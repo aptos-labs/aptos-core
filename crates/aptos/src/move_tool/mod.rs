@@ -535,15 +535,7 @@ pub struct MutatePackage {
     move_options: MovePackageDir,
     /// Options specific for the mutator tool
     #[clap(flatten)]
-    mutator_options: MutatorOptions,
-}
-
-/// Move mutator tool options
-#[derive(Parser)]
-pub struct MutatorOptions {
-    /// Move source files to mutate (paths)
-    #[clap(long, short)]
-    pub move_sources: Vec<String>,
+    mutator_options: Option<move_mutator::cli::Options>,
 }
 
 #[async_trait]
@@ -580,9 +572,7 @@ impl CliCommand<&'static str> for MutatePackage {
         let path = self.move_options.get_package_path()?;
 
         let result = move_mutator::run_move_mutator(
-            move_mutator::cli::Options {
-                move_sources: mutator_options.move_sources,
-            },
+            mutator_options.unwrap_or_default(),
             config,
             path,
         )
