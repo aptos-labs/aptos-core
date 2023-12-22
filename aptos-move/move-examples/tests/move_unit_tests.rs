@@ -82,6 +82,8 @@ fn test_resource_account_common(pkg: &str) {
     run_tests_for_pkg(pkg, named_address);
 }
 
+// TODO: Figure out how to automatically run all tests and do address assignments.
+// The below is too messy.
 #[test]
 fn test_veiled_coin() {
     let named_address = BTreeMap::from([(
@@ -244,6 +246,15 @@ fn test_nft_dao_test() {
         AccountAddress::from_hex_literal("0xcafe").unwrap(),
     )]);
     run_tests_for_pkg("dao/nft_dao", named_address);
+}
+
+#[test]
+fn test_claim() {
+    let named_address = BTreeMap::from([(
+        String::from("claim"),
+        AccountAddress::from_hex_literal("0xcafe").unwrap(),
+    )]);
+    run_tests_for_pkg("claim", named_address);
 }
 
 #[test]

@@ -1,0 +1,9 @@
+[package]
+name = "claim"
+version = "0.0.0"
+
+[addresses]
+claim = "_"
+
+[dependencies]
+AptosStdlib = { local = "../../framework/aptos-stdlib" }
