@@ -44,6 +44,14 @@ fun ability::no_key($t0: address) {
   6: return ()
 }
 
+
+Diagnostics:
+error: cannot copy local `x` implicitly
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
@@ -58,11 +66,11 @@ fun ability::invalid_copy() {
      # live vars: $t2
   1: $t1 := pack ability::Impotent($t2)
      # live vars: $t1
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
   3: $t3 := copy($t0)
      # live vars: $t0
-  4: $t4 := copy($t0)
+  4: $t4 := move($t0)
      # live vars:
   5: return ()
 }
@@ -120,36 +128,42 @@ fun ability::invalid_copy() {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: $t2 := false
      # live vars: $t2
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   1: $t1 := pack ability::Impotent($t2)
      # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t2}
      #
-  2: $t0 := copy($t1)
+  2: $t0 := move($t1)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t1,$t2}
      #
   3: $t3 := copy($t0)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t1,$t2}
      #
-  4: $t4 := copy($t0)
+  4: $t4 := move($t0)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t0,$t1,$t2}
      #
   5: return ()
 }
@@ -163,24 +177,28 @@ fun ability::invalid_move_to($t0: &signer) {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: $t2 := false
      # live vars: $t0, $t2
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   1: $t1 := pack ability::Impotent($t2)
      # live vars: $t0, $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t2}
      #
   2: move_to<ability::Impotent>($t0, $t1)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t0,$t1,$t2}
      #
   3: return ()
 }
@@ -198,42 +216,49 @@ fun ability::no_key($t0: address) {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   0: $t1 := copy($t0)
      # live vars: $t0, $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {}
      #
   1: $t2 := move_from<ability::Impotent>($t1)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t1}
      #
   2: $t3 := move_from<ability::S<ability::Impotent>>($t0)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t0,$t1}
      #
   3: $t4 := borrow_global<ability::Impotent>($t0)
      # live vars: $t0
      # graph: {L768=global<ability::Impotent>[borrow_global(true) -> L769],L769=local($t4)[]}
      # local_to_label: {$t4=L769}
      # global_to_label: {ability::Impotent=L768}
+     # moved: {$t0,$t1}
      #
   4: $t5 := borrow_global<ability::Impotent>($t0)
      # live vars: $t0
      # graph: {L1024=global<ability::Impotent>[borrow_global(false) -> L1025],L1025=local($t5)[]}
      # local_to_label: {$t5=L1025}
      # global_to_label: {ability::Impotent=L1024}
+     # moved: {$t0,$t1}
      #
   5: $t6 := exists<ability::Impotent>($t0)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
+     # moved: {$t0,$t1}
      #
   6: return ()
 }
@@ -249,14 +274,12 @@ fun ability::invalid_copy() {
      var $t4: ability::Impotent
   0: $t2 := false
   1: $t1 := pack ability::Impotent($t2)
-  2: $t0 := copy($t1)
-  3: destroy($t1)
-  4: $t3 := copy($t0)
-  5: destroy($t3)
-  6: $t4 := copy($t0)
-  7: destroy($t0)
-  8: destroy($t4)
-  9: return ()
+  2: $t0 := move($t1)
+  3: $t3 := copy($t0)
+  4: destroy($t3)
+  5: $t4 := move($t0)
+  6: destroy($t4)
+  7: return ()
 }
 
 
@@ -349,18 +372,6 @@ error: no key ability
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: cannot copy
-   ┌─ tests/ability-checker/ability_violation.move:26:7
-   │
-26 │         let x = Impotent {};
-   │             ^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:26:7
-   │
-26 │         let x = Impotent {};
-   │             ^
-
-error: cannot copy
    ┌─ tests/ability-checker/ability_violation.move:27:4
    │
 27 │         (x, x);
@@ -371,12 +382,6 @@ error: cannot drop
    │
 27 │         (x, x);
    │          ^
-
-error: cannot copy
-   ┌─ tests/ability-checker/ability_violation.move:27:7
-   │
-27 │         (x, x);
-   │             ^
 
 error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:27:7
@@ -395,14 +400,12 @@ fun ability::invalid_copy() {
      var $t4: ability::Impotent
   0: $t2 := false
   1: $t1 := pack ability::Impotent($t2)
-  2: $t0 := copy($t1)
-  3: destroy($t1)
-  4: $t3 := copy($t0)
-  5: destroy($t3)
-  6: $t4 := copy($t0)
-  7: destroy($t0)
-  8: destroy($t4)
-  9: return ()
+  2: $t0 := move($t1)
+  3: $t3 := copy($t0)
+  4: destroy($t3)
+  5: $t4 := move($t0)
+  6: destroy($t4)
+  7: return ()
 }
 
 

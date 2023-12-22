@@ -104,7 +104,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # live vars: $t0, $t2
   2: $t5 := borrow_local($t0)
      # live vars: $t0, $t2, $t5
-  3: $t4 := copy($t5)
+  3: $t4 := move($t5)
      # live vars: $t0, $t2, $t4
   4: label L0
      # live vars: $t0, $t2, $t4
@@ -186,7 +186,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # live vars: $t0, $t4
  43: $t20 := copy($t0)
      # live vars: $t4
- 44: $t21 := copy($t4)
+ 44: $t21 := move($t4)
      # live vars: $t21
  45: $t1 := vector::length<u8>($t21)
      # live vars: $t1
