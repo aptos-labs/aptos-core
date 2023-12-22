@@ -30,8 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        gen_get_ty_param_kinds, infer_abilities, NoUnificationContext, PrimitiveType,
+        ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -827,6 +827,11 @@ impl GlobalEnv {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
     }
 
+    /// Adds an error to this environment, with notes.
+    pub fn error_with_labels(&self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
+        self.diag_with_labels(Severity::Error, loc, msg, labels)
+    }
+
     /// Add a label to `labels` to specify "inlined from loc" for the `loc` in `inlined_from`,
     /// and, if that is inlined from someplace, repeat as needed, etc.
     fn add_inlined_from_labels(labels: &mut Vec<Label<FileId>>, inlined_from: &Option<Box<Loc>>) {
@@ -1120,7 +1125,7 @@ impl GlobalEnv {
         for memory in &inv.mem_usage {
             self.global_invariants_for_memory
                 .entry(memory.clone())
-                .or_insert_with(BTreeSet::new)
+                .or_default()
                 .insert(id);
         }
         self.global_invariants.insert(id, inv);
@@ -1218,45 +1223,11 @@ impl GlobalEnv {
 
     /// Computes the abilities associated with the given type.
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        match ty {
-            Type::Primitive(p) => match p {
-                PrimitiveType::Bool
-                | PrimitiveType::U8
-                | PrimitiveType::U16
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::U128
-                | PrimitiveType::U256
-                | PrimitiveType::Num
-                | PrimitiveType::Range
-                | PrimitiveType::EventStore
-                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-                PrimitiveType::Signer => AbilitySet::SIGNER,
-            },
-            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
-            Type::Struct(mid, sid, inst) => {
-                let struct_env = self.get_struct(mid.qualified(*sid));
-                let mut abilities = struct_env.get_abilities();
-                for inst_ty in inst {
-                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
-                }
-                abilities
-            },
-            Type::TypeParameter(i) => {
-                if let Some(tp) = ty_params.get(*i as usize) {
-                    tp.1.abilities
-                } else {
-                    AbilitySet::EMPTY
-                }
-            },
-            Type::Reference(_, _) => AbilitySet::REFERENCES,
-            Type::Fun(_, _)
-            | Type::Tuple(_)
-            | Type::TypeDomain(_)
-            | Type::ResourceDomain(_, _, _)
-            | Type::Error
-            | Type::Var(_) => AbilitySet::EMPTY,
-        }
+        infer_abilities(
+            ty,
+            gen_get_ty_param_kinds(ty_params),
+            self.gen_get_struct_sig(),
+        )
     }
 
     /// Returns associated intrinsics.
@@ -1616,6 +1587,27 @@ impl GlobalEnv {
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Generates a function that given module id, struct id,
+    /// returns the struct signature
+    pub fn gen_get_struct_sig(
+        &self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
+        |mid, sid| {
+            let qid = QualifiedId {
+                module_id: mid,
+                id: sid,
+            };
+            let struct_env = self.get_struct(qid);
+            let struct_abilities = struct_env.get_abilities();
+            let ty_param_kinds = struct_env
+                .get_type_parameters()
+                .iter()
+                .map(|tp| tp.1.clone())
+                .collect_vec();
+            (ty_param_kinds, struct_abilities)
+        }
     }
 
     // Gets the number of modules in this environment.
@@ -3279,14 +3271,35 @@ impl<'env> NamedConstantEnv<'env> {
 // =================================================================================================
 /// # Function Environment
 
+pub trait EqIgnoringLoc {
+    fn eq_ignoring_loc(&self, other: &Self) -> bool;
+}
+
+impl<T: EqIgnoringLoc> EqIgnoringLoc for Vec<T> {
+    fn eq_ignoring_loc(&self, other: &Self) -> bool {
+        self.len() == other.len()
+            && self
+                .iter()
+                .zip(other.iter())
+                .all(|(a, b)| a.eq_ignoring_loc(b))
+    }
+}
+
 /// Represents a type parameter.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TypeParameter(pub Symbol, pub TypeParameterKind);
+pub struct TypeParameter(pub Symbol, pub TypeParameterKind, pub Loc);
+
+impl EqIgnoringLoc for TypeParameter {
+    /// equal ignoring Loc
+    fn eq_ignoring_loc(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
 
 impl TypeParameter {
     /// Creates a new type parameter of given name.
-    pub fn new_named(sym: &Symbol) -> Self {
-        Self(*sym, TypeParameterKind::default())
+    pub fn new_named(sym: &Symbol, loc: &Loc) -> Self {
+        Self(*sym, TypeParameterKind::default(), loc.clone())
     }
 
     /// Turns an ordered list of type parameters into a vector of type parameters
@@ -3298,9 +3311,11 @@ impl TypeParameter {
             .collect()
     }
 
-    pub fn from_symbols<'a>(symbols: impl Iterator<Item = &'a Symbol>) -> Vec<TypeParameter> {
+    pub fn from_symbols<'a>(
+        symbols: impl Iterator<Item = &'a (Symbol, Loc)>,
+    ) -> Vec<TypeParameter> {
         symbols
-            .map(|name| TypeParameter(*name, TypeParameterKind::default()))
+            .map(|(name, loc)| TypeParameter(*name, TypeParameterKind::default(), loc.clone()))
             .collect()
     }
 }
@@ -3337,7 +3352,14 @@ impl Default for TypeParameterKind {
 
 /// Represents a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Parameter(pub Symbol, pub Type);
+pub struct Parameter(pub Symbol, pub Type, pub Loc);
+
+impl EqIgnoringLoc for Parameter {
+    /// equal ignoring Loc
+    fn eq_ignoring_loc(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
 
 #[derive(Debug)]
 pub struct FunctionData {
@@ -3728,7 +3750,7 @@ impl<'env> FunctionEnv<'env> {
     pub fn is_mutating(&self) -> bool {
         self.get_parameters()
             .iter()
-            .any(|Parameter(_, ty)| ty.is_mutable_reference())
+            .any(|Parameter(_, ty, _)| ty.is_mutable_reference())
     }
 
     /// Returns the name of the friend(the only allowed caller) of this function, if there is one.
@@ -3788,7 +3810,7 @@ impl<'env> FunctionEnv<'env> {
     pub fn get_parameter_types(&self) -> Vec<Type> {
         self.get_parameters()
             .into_iter()
-            .map(|Parameter(_, ty)| ty)
+            .map(|Parameter(_, ty, _)| ty)
             .collect()
     }
 
@@ -3943,7 +3965,7 @@ impl<'env> FunctionEnv<'env> {
                 let type_name = mid.qualified(sid);
                 modify_targets
                     .entry(type_name)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(target.clone());
             });
         }

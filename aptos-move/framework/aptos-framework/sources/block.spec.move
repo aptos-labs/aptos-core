@@ -8,7 +8,7 @@ spec aptos_framework::block {
     /// that the following conditions are met (1) the BlockResource resource is created, indicating its existence within
     /// the module's context, and moved under the Aptos framework account, (2) the block height is set to zero during
     /// initialization, and (3) the epoch interval is greater than zero.
-    /// Enforcement: Formally Verified via [high-level-spec-1](Initialize).
+    /// Enforcement: Formally Verified via [high-level-req-1](Initialize).
     ///
     /// No.: 2
     /// Property: Only the Aptos framework address may execute the following functionalities: (1) initialize
@@ -16,28 +16,28 @@ spec aptos_framework::block {
     /// Criticality: Critical
     /// Implementation: The initialize and  update_epoch_interval_microsecs functions ensure that only aptos_framework
     /// can call them.
-    /// Enforcement: Formally Verified via [high-level-spec-2.1](Initialize) and [high-level-spec-2.2](update_epoch_interval_microsecs).
+    /// Enforcement: Formally Verified via [high-level-req-2.1](Initialize) and [high-level-req-2.2](update_epoch_interval_microsecs).
     ///
     /// No.: 3
     /// Property: When updating the epoch interval, its value must be greater than zero and BlockResource must exist.
     /// Criticality: High
     /// Implementation: The update_epoch_interval_microsecs function asserts that new_epoch_interval is greater than
     /// zero and updates BlockResource's state.
-    /// Enforcement: Formally verified via [high-level-spec-3.1](UpdateEpochIntervalMicrosecs) and [high-level-spec-3.2](epoch_interval).
+    /// Enforcement: Formally verified via [high-level-req-3.1](UpdateEpochIntervalMicrosecs) and [high-level-req-3.2](epoch_interval).
     ///
     /// No.: 4
     /// Property: Only a valid proposer or the virtual machine is authorized to produce blocks.
     /// Criticality: Critical
     /// Implementation: During the execution of the block_prologue function, the validity of the proposer address is
     /// verified when setting the metadata for the current block.
-    /// Enforcement: Formally Verified via [high-level-spec-4](block_prologue).
+    /// Enforcement: Formally Verified via [high-level-req-4](block_prologue).
     ///
     /// No.: 5
     /// Property: While emitting a new block event, the number of them is equal to the current block height.
     /// Criticality: Medium
     /// Implementation: The emit_new_block_event function asserts that the number of new block events equals the current
     /// block height.
-    /// Enforcement: Formally Verified via [high-level-spec-5](emit_new_block_event).
+    /// Enforcement: Formally Verified via [high-level-req-5](emit_new_block_event).
     /// </high-level-req>
     ///
     spec module {
@@ -47,7 +47,7 @@ spec aptos_framework::block {
     }
 
     spec BlockResource {
-        /// [high-level-spec-3.2]
+        /// [high-level-req-3.2]
         invariant epoch_interval > 0;
     }
 
@@ -62,7 +62,7 @@ spec aptos_framework::block {
 
         requires chain_status::is_operating();
         requires system_addresses::is_vm(vm);
-        /// [high-level-spec-4]
+        /// [high-level-req-4]
         requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
         requires timestamp >= reconfiguration::last_reconfiguration_time();
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
@@ -95,7 +95,7 @@ spec aptos_framework::block {
         requires system_addresses::is_vm(vm);
         requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
-        /// [high-level-spec-5]
+        /// [high-level-req-5]
         requires event::counter(event_handle) == new_block_event.height;
 
         aborts_if false;
@@ -109,7 +109,7 @@ spec aptos_framework::block {
     /// The number of new events created does not exceed MAX_U64.
     spec initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
         use std::signer;
-        /// [high-level-spec-1]
+        /// [high-level-req-1]
         include Initialize;
         include NewEventHandle;
 
@@ -124,7 +124,7 @@ spec aptos_framework::block {
         epoch_interval_microsecs: u64;
 
         let addr = signer::address_of(aptos_framework);
-        /// [high-level-spec-2.1]
+        /// [high-level-req-2.1]
         aborts_if addr != @aptos_framework;
         aborts_if epoch_interval_microsecs <= 0;
         aborts_if exists<BlockResource>(addr);
@@ -149,7 +149,7 @@ spec aptos_framework::block {
         aptos_framework: &signer,
         new_epoch_interval: u64,
     ) {
-        /// [high-level-spec-3.1]
+        /// [high-level-req-3.1]
         include UpdateEpochIntervalMicrosecs;
     }
 
@@ -160,7 +160,7 @@ spec aptos_framework::block {
 
         let addr = signer::address_of(aptos_framework);
 
-        /// [high-level-spec-2.2]
+        /// [high-level-req-2.2]
         aborts_if addr != @aptos_framework;
         aborts_if new_epoch_interval <= 0;
         aborts_if !exists<BlockResource>(addr);

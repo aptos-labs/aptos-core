@@ -7,8 +7,8 @@ use ethnum::U256;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex, Value},
     model::{
-        FieldId, FunId, FunctionEnv, GlobalEnv, NodeId, Parameter, QualifiedId, QualifiedInstId,
-        StructId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -44,7 +44,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         local_names: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty) in gen.func_env.get_parameters() {
+    for Parameter(name, ty, _) in gen.func_env.get_parameters() {
         let temp = gen.new_temp(ty);
         scope.insert(name, temp);
         gen.local_names.insert(temp, name);
@@ -564,6 +564,26 @@ impl<'env> Generator<'env> {
                     self.internal_error(id, "inconsistent type in select expression")
                 }
             },
+            Operation::Exists(None)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveFrom
+            | Operation::MoveTo
+                if self.env().get_node_instantiation(id)[0]
+                    .get_struct(self.env())
+                    .is_none() =>
+            {
+                let err_loc = self.env().get_node_loc(id);
+                let mut reasons: Vec<(Loc, String)> = Vec::new();
+                let reason_msg = format!("Invalid call to {}.", op.display(self.env(), id));
+                reasons.push((err_loc.clone(), reason_msg.clone()));
+                let err_msg  = format!(
+                            "Expected a struct type. Global storage operations are restricted to struct types declared in the current module. \
+                            Found: '{}'",
+                            self.env().get_node_instantiation(id)[0].display(&self.env().get_type_display_ctx())
+                );
+                self.env()
+                    .diag_with_labels(Severity::Error, &err_loc, &err_msg, reasons)
+            },
             Operation::Exists(None) => {
                 let inst = self.env().get_node_instantiation(id);
                 let (mid, sid, inst) = inst[0].require_struct();
@@ -785,7 +805,7 @@ impl<'env> Generator<'env> {
             .get_function(fun)
             .get_parameters()
             .into_iter()
-            .map(|Parameter(_, ty)| ty.instantiate(&type_args))
+            .map(|Parameter(_, ty, _)| ty.instantiate(&type_args))
             .collect();
         if args.len() != param_types.len() {
             self.internal_error(id, "inconsistent type arity");

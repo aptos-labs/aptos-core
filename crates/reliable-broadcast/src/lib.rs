@@ -25,11 +25,15 @@ pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
 }
 
 pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + Clone {
-    type Ack: Into<Res> + TryFrom<Res> + Clone;
     type Aggregated: Send;
     type Message: Into<Req> + TryFrom<Req> + Clone;
+    type Response: Into<Res> + TryFrom<Res> + Clone;
 
-    fn add(&self, peer: Author, ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>>;
+    fn add(
+        &self,
+        peer: Author,
+        response: Self::Response,
+    ) -> anyhow::Result<Option<Self::Aggregated>>;
 }
 
 pub struct ReliableBroadcast<Req: RBMessage, TBackoff, Res: RBMessage = Req> {
@@ -71,7 +75,7 @@ where
         aggregating: S,
     ) -> impl Future<Output = S::Aggregated> + 'static
     where
-        <<S as BroadcastStatus<Req, Res>>::Ack as TryFrom<Res>>::Error: Debug,
+        <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {
         let receivers: Vec<_> = self.validators.clone();
         let network_sender = self.network_sender.clone();

@@ -12,6 +12,30 @@ error: invalid call of `==`: expected `integer` but found `bool` for argument 2
 14 │         0 == false;
    │              ^^^^^
 
+error: invalid call of `==`: expected `&integer` but found `integer` for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:15:15
+   │
+15 │         &0 == 1;
+   │               ^
+
+error: invalid call of `==`: expected `integer` but found `&integer` for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:16:14
+   │
+16 │         1 == &0;
+   │              ^^
+
+error: invalid call of `==`: expected `M::S` but found `&M::S` for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:17:14
+   │
+17 │         s == s_ref;
+   │              ^^^^^
+
+error: invalid call of `==`: expected `&mut M::S` but found `M::S` for argument 2
+   ┌─ tests/checking/typing/eq_invalid.move:18:18
+   │
+18 │         s_mut == s;
+   │                  ^
+
 error: unable to infer type: `M::G2<?8>`
    ┌─ tests/checking/typing/eq_invalid.move:28:9
    │

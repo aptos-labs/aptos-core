@@ -23,3 +23,11 @@ module 0x42::sort {
     spec fun $incorrect_sort<T>(arr: &mut vector<#0>,a_less_b: |(#0, #0)|bool);
     spec fun $incorrect_sort_recursive<T>(arr: &mut vector<#0>,low: u64,high: u64,a_less_b: |(#0, #0)|bool);
 } // end 0x42::sort
+
+
+Diagnostics:
+error: cannot copy local `a_less_b` implicitly
+   ┌─ tests/checking/inlining/non_lambda_arg.move:12:13
+   │
+12 │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

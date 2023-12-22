@@ -4,7 +4,7 @@ spec aptos_framework::governance_proposal {
     /// Property: Creating a proposal should never abort but should always return a governance proposal resource.
     /// Criticality: Medium
     /// Implementation: Both create_proposal and create_empty_proposal functions return a GovernanceProposal resource.
-    /// Enforcement: Enforced via [high-level-spec-1.1](create_proposal) and [high-level-spec-1.2](create_empty_proposal).
+    /// Enforcement: Enforced via [high-level-req-1.1](create_proposal) and [high-level-req-1.2](create_empty_proposal).
     ///
     /// No.: 2
     /// Property: The governance proposal module should only be accessible to the aptos governance.
@@ -16,13 +16,13 @@ spec aptos_framework::governance_proposal {
     ///
     spec create_proposal(): GovernanceProposal {
         aborts_if false;
-        /// [high-level-spec-1.1]
+        /// [high-level-req-1.1]
         ensures result == GovernanceProposal {};
     }
 
     spec create_empty_proposal(): GovernanceProposal {
         aborts_if false;
-        /// [high-level-spec-1.2]
+        /// [high-level-req-1.2]
         ensures result == GovernanceProposal {};
     }
 }

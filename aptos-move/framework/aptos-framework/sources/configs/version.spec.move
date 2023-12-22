@@ -1,4 +1,22 @@
 spec aptos_framework::version {
+    /// <high-level-req>
+    /// No.: 1
+    /// Property: During genesis, the Version resource should be initialized with the initial version and stored along
+    /// with its capability under the aptos framework account.
+    /// Criticality: Medium
+    /// Implementation: The initialize function ensures that the signer is the aptos framework account and stores the
+    /// Version and SetVersionCapability resources in it.
+    /// Enforcement: Formally verified via [high-level-req-1](initialize).
+    ///
+    /// No.: 2
+    /// Property: The version should be updateable after initialization, but only by the Aptos framework account and
+    /// with an increasing version number.
+    /// Criticality: Medium
+    /// Implementation: The version number for the blockchain should be updatable whenever necessary. This functionality
+    /// is provided by the set_version function which ensures that the new version is greater than the previous one.
+    /// Enforcement: Formally verified via [high-level-req-2](set_version).
+    /// </high-level-req>
+    ///
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -28,6 +46,7 @@ spec aptos_framework::version {
         aborts_if !exists<Version>(@aptos_framework);
 
         let old_major = global<Version>(@aptos_framework).major;
+        /// [high-level-req-2]
         aborts_if !(old_major < major);
 
         ensures global<Version>(@aptos_framework).major == major;
@@ -37,6 +56,7 @@ spec aptos_framework::version {
     spec initialize(aptos_framework: &signer, initial_version: u64) {
         use std::signer;
 
+        /// [high-level-req-1]
         aborts_if signer::address_of(aptos_framework) != @aptos_framework;
         aborts_if exists<Version>(@aptos_framework);
         aborts_if exists<SetVersionCapability>(@aptos_framework);

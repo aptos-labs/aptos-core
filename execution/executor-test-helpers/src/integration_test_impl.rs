@@ -14,7 +14,6 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
-use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
 use aptos_types::{
     account_config::aptos_test_root_address,
@@ -22,6 +21,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
+    state_store::account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
         signature_verified_transaction::{

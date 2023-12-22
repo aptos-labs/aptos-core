@@ -53,6 +53,10 @@ impl RandMetadata {
         self.metadata_to_sign.epoch
     }
 
+    pub fn timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_testing(round: Round) -> Self {
         Self::new(1, round, HashValue::zero(), 1)

@@ -17,13 +17,13 @@ use aptos_aggregator::{
     },
 };
 use aptos_gas_algebra::Fee;
-use aptos_state_view::StateViewId;
 use aptos_types::{
     aggregator::PanicError,
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
+        StateViewId,
     },
     write_set::{TransactionWrite, WriteOp},
 };

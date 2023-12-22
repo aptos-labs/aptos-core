@@ -5,6 +5,7 @@ use crate::{constants::IndexerGrpcRequestMetadata, timestamp_to_iso, timestamp_t
 use aptos_metrics_core::{register_gauge_vec, register_int_gauge_vec, GaugeVec, IntGaugeVec};
 use aptos_protos::util::timestamp::Timestamp;
 use once_cell::sync::Lazy;
+use prometheus::{register_int_counter_vec, IntCounterVec};
 
 pub enum IndexerGrpcStep {
     DataServiceNewRequestReceived,   // [Data Service] New request received.
@@ -15,10 +16,15 @@ pub enum IndexerGrpcStep {
     DataServiceChunkSent, // [Data Service] One chunk of transactions sent to GRPC response channel.
     DataServiceAllChunksSent, // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
 
+    CacheWorkerReceivedTxns, // [Indexer Cache] Received transactions from fullnode.
+    CacheWorkerTxnDecoded,   // [Indexer Cache] Decoded transactions.
     CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
     CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
-    FilestoreUploadTxns, // [File worker] Upload transactions to filestore.
+    FilestoreFetchTxns,      // [File worker] Fetch transactions from cache.
+    FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
+    FilestoreUpdateMetadata, // [File worker] Upload transactions to filestore.
+    FilestoreProcessedBatch, // [File worker] Successfully process current batch.
 
     FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
     FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
@@ -41,10 +47,15 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceChunkSent => "3.2",
             IndexerGrpcStep::DataServiceAllChunksSent => "4",
             // Cache worker steps
-            IndexerGrpcStep::CacheWorkerTxnsProcessed => "1",
-            IndexerGrpcStep::CacheWorkerBatchProcessed => "2",
+            IndexerGrpcStep::CacheWorkerReceivedTxns => "1",
+            IndexerGrpcStep::CacheWorkerTxnDecoded => "2",
+            IndexerGrpcStep::CacheWorkerTxnsProcessed => "3",
+            IndexerGrpcStep::CacheWorkerBatchProcessed => "4",
             // Filestore worker steps
-            IndexerGrpcStep::FilestoreUploadTxns => "1",
+            IndexerGrpcStep::FilestoreProcessedBatch => "1",
+            IndexerGrpcStep::FilestoreFetchTxns => "1.0",
+            IndexerGrpcStep::FilestoreUploadTxns => "1.1",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "1.2",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "1",
             IndexerGrpcStep::FullnodeDecodedBatch => "2",
@@ -73,10 +84,15 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceChunkSent => "[Data Service] One chunk of transactions sent to GRPC response channel.",
             IndexerGrpcStep::DataServiceAllChunksSent => "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
             // Cache worker steps
+            IndexerGrpcStep::CacheWorkerReceivedTxns => "[Indexer Cache] Received transactions from fullnode.",
+            IndexerGrpcStep::CacheWorkerTxnDecoded => "[Indexer Cache] Decoded transactions.",
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "[Indexer Cache] Processed transactions in a batch.",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps
-            IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Upload transactions to filestore.",
+            IndexerGrpcStep::FilestoreProcessedBatch => "[File worker] Successfully process current batch.",
+            IndexerGrpcStep::FilestoreFetchTxns => "[File worker] Fetch transactions from cache.",
+            IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Finished uploading batch of transactions to filestore.",
+            IndexerGrpcStep::FilestoreUpdateMetadata => "[File worker] Update filestore metadata.",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "[Indexer Fullnode] Fetched batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeDecodedBatch => "[Indexer Fullnode] Decoded batch of transactions from fullnode",
@@ -104,9 +120,9 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Transactions' total size in bytes at each step
-pub static TOTAL_SIZE_IN_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_grpc_total_size_in_bytes",
+pub static TOTAL_SIZE_IN_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_total_size_in_bytes_v2",
         "Total size in bytes at this step",
         &["service_type", "step", "message"],
     )
@@ -114,9 +130,9 @@ pub static TOTAL_SIZE_IN_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 /// Number of transactions at each step
-pub static NUM_TRANSACTIONS_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
-    register_int_gauge_vec!(
-        "indexer_grpc_num_transactions_count",
+pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_transactions_count_v2",
         "Total count of transactions at this step",
         &["service_type", "step", "message"],
     )
@@ -146,7 +162,6 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
 pub fn log_grpc_step(
     service_type: &str,
     step: IndexerGrpcStep,
-    enable_logging: bool,
     start_version: Option<i64>,
     end_version: Option<i64>,
     start_version_timestamp: Option<&Timestamp>,
@@ -166,7 +181,7 @@ pub fn log_grpc_step(
     if let Some(num_transactions) = num_transactions {
         NUM_TRANSACTIONS_COUNT
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(num_transactions);
+            .inc_by(num_transactions as u64);
     }
     if let Some(end_version) = end_version {
         LATEST_PROCESSED_VERSION
@@ -182,59 +197,57 @@ pub fn log_grpc_step(
     if let Some(size_in_bytes) = size_in_bytes {
         TOTAL_SIZE_IN_BYTES
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(size_in_bytes as i64);
+            .inc_by(size_in_bytes as u64);
     }
 
-    if enable_logging {
-        let start_txn_timestamp_iso = start_version_timestamp.map(timestamp_to_iso);
-        let end_txn_timestamp_iso = end_version_timestamp.map(timestamp_to_iso);
-        if request_metadata.is_none() {
-            tracing::info!(
-                start_version,
-                end_version,
-                start_txn_timestamp_iso,
-                end_txn_timestamp_iso,
-                num_transactions,
-                duration_in_secs,
-                size_in_bytes,
-                service_type,
-                step = step.get_step(),
-                "{}",
-                step.get_label(),
-            );
-        } else {
-            tracing::info!(
-                start_version,
-                end_version,
-                start_txn_timestamp_iso,
-                end_txn_timestamp_iso,
-                num_transactions,
-                duration_in_secs,
-                size_in_bytes,
-                // Request metadata variables
-                request_name = request_metadata.clone().unwrap().processor_name.as_str(),
-                request_email = request_metadata.clone().unwrap().request_email.as_str(),
-                request_api_key_name = request_metadata
-                    .clone()
-                    .unwrap()
-                    .request_api_key_name
-                    .as_str(),
-                processor_name = request_metadata.clone().unwrap().processor_name.as_str(),
-                connection_id = request_metadata
-                    .clone()
-                    .unwrap()
-                    .request_connection_id
-                    .as_str(),
-                request_user_classification = request_metadata
-                    .unwrap()
-                    .request_user_classification
-                    .as_str(),
-                service_type,
-                step = step.get_step(),
-                "{}",
-                step.get_label(),
-            );
-        }
+    let start_txn_timestamp_iso = start_version_timestamp.map(timestamp_to_iso);
+    let end_txn_timestamp_iso = end_version_timestamp.map(timestamp_to_iso);
+    if request_metadata.is_none() {
+        tracing::info!(
+            start_version,
+            end_version,
+            start_txn_timestamp_iso,
+            end_txn_timestamp_iso,
+            num_transactions,
+            duration_in_secs,
+            size_in_bytes,
+            service_type,
+            step = step.get_step(),
+            "{}",
+            step.get_label(),
+        );
+    } else {
+        tracing::info!(
+            start_version,
+            end_version,
+            start_txn_timestamp_iso,
+            end_txn_timestamp_iso,
+            num_transactions,
+            duration_in_secs,
+            size_in_bytes,
+            // Request metadata variables
+            request_name = request_metadata.clone().unwrap().processor_name.as_str(),
+            request_email = request_metadata.clone().unwrap().request_email.as_str(),
+            request_api_key_name = request_metadata
+                .clone()
+                .unwrap()
+                .request_api_key_name
+                .as_str(),
+            processor_name = request_metadata.clone().unwrap().processor_name.as_str(),
+            connection_id = request_metadata
+                .clone()
+                .unwrap()
+                .request_connection_id
+                .as_str(),
+            request_user_classification = request_metadata
+                .unwrap()
+                .request_user_classification
+                .as_str(),
+            service_type,
+            step = step.get_step(),
+            "{}",
+            step.get_label(),
+        );
     }
 }
 
@@ -258,7 +271,7 @@ pub fn log_grpc_step_fullnode(
     if let Some(num_transactions) = num_transactions {
         NUM_TRANSACTIONS_COUNT
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(num_transactions);
+            .inc_by(num_transactions as u64);
     }
     if let Some(end_version) = end_version {
         LATEST_PROCESSED_VERSION

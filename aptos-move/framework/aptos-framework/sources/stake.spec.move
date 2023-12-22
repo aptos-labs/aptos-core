@@ -1,8 +1,45 @@
 spec aptos_framework::stake {
+    /// <high-level-req>
+    /// No.: 1
+    /// Property: The validator set resource stores consensus information for each validator. The consensus scheme
+    /// remains consistent across all validators within the set.
+    /// Criticality: Low
+    /// Implementation: The consensus_scheme attribute within ValidatorSet initializes with the value zero during the
+    /// module's initialization and its value remains unchanged afterward.
+    /// Enforcement: Formally verified by the data invariant of [high-level-req-1](ValidatorSet).
+    ///
+    /// No.: 2
+    /// Property: The owner of a validator is immutable.
+    /// Criticality: Low
+    /// Implementation: During the initialization of a validator, the owner attribute becomes the signer's address. This
+    /// assignment establishes the signer as the owner and controller of the validator entity. Subsequently, the owner
+    /// attribute remains unchanged throughout the validator's lifespan, maintaining its assigned value without any
+    /// modifications.
+    /// Enforcement: Formally verified in the schema [high-level-req-2](ValidatorOwnerNoChange).
+    ///
+    /// No.: 3
+    /// Property: The total staked value in the stake pool should remain constant, excluding operations related to
+    /// adding and withdrawing.
+    /// Criticality: Low
+    /// Implementation: The total staked value (AptosCoin) of a stake pool is grouped by: active, inactive,
+    /// pending_active, and pending_inactive. The stake value remains constant except during the execution of the
+    /// add_stake_with_cap or withdraw_with_cap functions or on_new_epoch (which distributes the reward).
+    /// Enforcement: Formally specified in the schema [high-level-req-3](StakedValueNoChange).
+    ///
+    /// No.: 4
+    /// Property: During each epoch, the following operations should be consistently performed without aborting: rewards
+    /// distribution, validator activation/deactivation, updates to validator sets and voting power, and renewal of
+    /// lockups.
+    /// Criticality: Low
+    /// Implementation: The on_new_epoch function is triggered at each epoch boundary to perform distribution of the
+    /// transaction fee, updates to active/inactive stakes, updates to pending active/inactive validators and adjusts
+    /// voting power of the validators without aborting.
+    /// Enforcement: Formally verified via [high-level-req-4](on_new_epoch). This also requires a manual review to verify the state updates of the stake pool.
+    /// </high-level-req>
+    ///
     // -----------------
     // Global invariants
     // -----------------
-
     spec module {
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
@@ -22,10 +59,12 @@ spec aptos_framework::stake {
     // property 1: the validator set resource stores consensus information for each validator.
     // the consensus scheme remains consistent across all validators within the set.
     spec ValidatorSet {
+        /// [high-level-req-1]
         invariant consensus_scheme == 0;
     }
 
     spec schema ValidatorOwnerNoChange {
+        /// [high-level-req-2]
         ensures forall addr: address where old(exists<OwnerCapability>(addr)):
             old(global<OwnerCapability>(addr)).pool_address == global<OwnerCapability>(addr).pool_address;
     }
@@ -35,6 +74,7 @@ spec aptos_framework::stake {
         pool_address: address;
         let stake_pool = global<StakePool>(pool_address);
         let post post_stake_pool = global<StakePool>(pool_address);
+        /// [high-level-req-3]
         ensures stake_pool.active.value + stake_pool.inactive.value + stake_pool.pending_active.value + stake_pool.pending_inactive.value ==
             post_stake_pool.active.value + post_stake_pool.inactive.value + post_stake_pool.pending_active.value + post_stake_pool.pending_inactive.value;
     }
@@ -353,6 +393,7 @@ spec aptos_framework::stake {
         include staking_config::StakingRewardsConfigRequirement;
         include aptos_framework::aptos_coin::ExistsAptosCoin;
         // This function should never abort.
+        /// [high-level-req-4]
         aborts_if false;
     }
 

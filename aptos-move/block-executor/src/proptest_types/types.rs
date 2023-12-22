@@ -13,7 +13,6 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -24,6 +23,7 @@ use aptos_types::{
     state_store::{
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
+        StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::{TransactionWrite, WriteOp, WriteOpKind},

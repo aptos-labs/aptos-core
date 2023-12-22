@@ -3,7 +3,7 @@
 
 use crate::metrics::{
     ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_VERSIONS_COUNT,
+    PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
 };
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -29,11 +29,14 @@ use url::Url;
 type ChainID = u32;
 type StartingVersion = u64;
 
-const GCS_LOOKUP_FREQUENCY_IN_SECS: u64 = 60;
-const FILE_STORE_VERSIONS_RESERVED: u64 = 30_000;
+const FILE_STORE_VERSIONS_RESERVED: u64 = 150_000;
 // Cache worker will wait if filestore is behind by
 // `FILE_STORE_VERSIONS_RESERVED` versions
-const CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS: u64 = 1;
+// This is pinging the cache so it's OK to be more aggressive
+const CACHE_WORKER_WAIT_FOR_FILE_STORE_MS: u64 = 100;
+// This is the time we wait for the file store to be ready. It should only be
+// kicked off when there's no metadata in the file store.
+const FILE_STORE_METADATA_WAIT_MS: u64 = 2000;
 
 const SERVICE_TYPE: &str = "cache_worker";
 
@@ -44,7 +47,6 @@ pub struct Worker {
     fullnode_grpc_address: Url,
     /// File store config
     file_store: IndexerGrpcFileStoreConfig,
-    enable_verbose_logging: bool,
 }
 
 /// GRPC data status enum is to identify the data frame.
@@ -53,10 +55,7 @@ pub(crate) enum GrpcDataStatus {
     /// Ok status with processed count.
     /// Each batch may contain multiple data chunks(like 1000 transactions).
     /// These data chunks may be out of order.
-    ChunkDataOk {
-        start_version: u64,
-        num_of_transactions: u64,
-    },
+    ChunkDataOk { num_of_transactions: u64 },
     /// Init signal received with start version of current stream.
     /// No two `Init` signals will be sent in the same stream.
     StreamInit(u64),
@@ -73,7 +72,6 @@ impl Worker {
         fullnode_grpc_address: Url,
         redis_main_instance_address: RedisUrl,
         file_store: IndexerGrpcFileStoreConfig,
-        enable_verbose_logging: bool,
     ) -> Result<Self> {
         let redis_client = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -86,7 +84,6 @@ impl Worker {
             redis_client,
             file_store,
             fullnode_grpc_address,
-            enable_verbose_logging,
         })
     }
 
@@ -98,7 +95,8 @@ impl Worker {
     ///    * If metadata is not present and cache is not empty, crash.
     ///    * If metadata is present, start from file store version.
     /// 4. Process the streaming response.
-    // TODO: Use the ! return type when it is stable.
+    /// TODO: Use the ! return type when it is stable.
+    /// TODO: Rewrite logic to actually conform to this description
     pub async fn run(&mut self) -> Result<()> {
         // Re-connect if lost.
         loop {
@@ -123,14 +121,31 @@ impl Worker {
                     LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
                 ),
             };
+            // TODO: move chain id check somewhere around here
+            // This ensures that metadata is created before we start the cache worker
+            let mut starting_version = file_store_operator.get_latest_version().await;
+            while starting_version.is_none() {
+                starting_version = file_store_operator.get_latest_version().await;
+                tracing::warn!(
+                    "[Indexer Cache] File store metadata not found. Waiting for {} ms.",
+                    FILE_STORE_METADATA_WAIT_MS
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    FILE_STORE_METADATA_WAIT_MS,
+                ))
+                .await;
+            }
 
-            file_store_operator.verify_storage_bucket_existence().await;
-            let starting_version = file_store_operator
-                .get_starting_version()
-                .await
-                .unwrap_or(0);
+            // There's a guarantee at this point that starting_version is not null
+            let starting_version = starting_version.unwrap();
 
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
+            let file_store_metadata = file_store_operator.get_file_store_metadata().await.unwrap();
+
+            tracing::info!(
+                service_type = SERVICE_TYPE,
+                "[Indexer Cache] Starting cache worker with version {}",
+                starting_version
+            );
 
             // 2. Start streaming RPC.
             let request = tonic::Request::new(GetTransactionsFromNodeRequest {
@@ -147,16 +162,17 @@ impl Worker {
                         starting_version
                     )
                 })?;
-
+            info!(
+                service_type = SERVICE_TYPE,
+                "[Indexer Cache] Streaming RPC started."
+            );
             // 3&4. Infinite streaming until error happens. Either stream ends or worker crashes.
-            process_streaming_response(
-                conn,
-                file_store_metadata,
-                file_store_operator,
-                response.into_inner(),
-                self.enable_verbose_logging,
-            )
-            .await?;
+            process_streaming_response(conn, file_store_metadata, response.into_inner()).await?;
+
+            info!(
+                service_type = SERVICE_TYPE,
+                "[Indexer Cache] Streaming RPC ended."
+            );
         }
     }
 }
@@ -164,7 +180,7 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    enable_verbose_logging: bool,
+    batch_start_time: std::time::Instant,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
@@ -188,7 +204,6 @@ async fn process_transactions_from_node_response(
             }
         },
         Response::Data(data) => {
-            let starting_time = std::time::Instant::now();
             let transaction_len = data.transactions.len();
             let first_transaction = data
                 .transactions
@@ -201,6 +216,22 @@ async fn process_transactions_from_node_response(
             let start_version = first_transaction.version;
             let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
             let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
+
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerReceivedTxns,
+                Some(start_version as i64),
+                Some(last_transaction.version as i64),
+                first_transaction_pb_timestamp.as_ref(),
+                last_transaction_pb_timestamp.as_ref(),
+                Some(batch_start_time.elapsed().as_secs_f64()),
+                Some(size_in_bytes),
+                Some((last_transaction.version - first_transaction.version + 1) as i64),
+                None,
+            );
+
+            let decode_txns_start_time = std::time::Instant::now();
+
             let transactions = data
                 .transactions
                 .clone()
@@ -218,18 +249,32 @@ async fn process_transactions_from_node_response(
                 })
                 .collect::<Result<Vec<(u64, String, u64)>>>()?;
 
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerTxnDecoded,
+                Some(start_version as i64),
+                Some(last_transaction.version as i64),
+                first_transaction_pb_timestamp.as_ref(),
+                last_transaction_pb_timestamp.as_ref(),
+                Some(decode_txns_start_time.elapsed().as_secs_f64()),
+                Some(size_in_bytes),
+                Some((last_transaction.version - first_transaction.version + 1) as i64),
+                None,
+            );
+
+            let cache_update_start_time = std::time::Instant::now();
+
             // Push to cache.
             match cache_operator.update_cache_transactions(transactions).await {
                 Ok(_) => {
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerTxnsProcessed,
-                        enable_verbose_logging,
                         Some(first_transaction.version as i64),
                         Some(last_transaction.version as i64),
                         first_transaction_pb_timestamp.as_ref(),
                         last_transaction_pb_timestamp.as_ref(),
-                        Some(starting_time.elapsed().as_secs_f64()),
+                        Some(cache_update_start_time.elapsed().as_secs_f64()),
                         Some(size_in_bytes),
                         Some((last_transaction.version - first_transaction.version + 1) as i64),
                         None,
@@ -243,22 +288,18 @@ async fn process_transactions_from_node_response(
                 },
             }
             Ok(GrpcDataStatus::ChunkDataOk {
-                start_version,
                 num_of_transactions: transaction_len as u64,
             })
         },
     }
 }
 
-/// Setup the cache operator with init signal, includeing chain id and starting version from fullnode.
-async fn setup_cache_with_init_signal(
-    conn: redis::aio::ConnectionManager,
+// Setup the cache operator with init signal, including chain id and starting version from fullnode.
+async fn verify_fullnode_init_signal(
+    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     init_signal: TransactionsFromNodeResponse,
-) -> Result<(
-    CacheOperator<redis::aio::ConnectionManager>,
-    ChainID,
-    StartingVersion,
-)> {
+    file_store_metadata: FileStoreMetadata,
+) -> Result<(ChainID, StartingVersion)> {
     let (fullnode_chain_id, starting_version) = match init_signal
         .response
         .expect("[Indexer Cache] Response type does not exist.")
@@ -278,24 +319,29 @@ async fn setup_cache_with_init_signal(
         },
     };
 
-    let mut cache_operator = CacheOperator::new(conn);
-    cache_operator.cache_setup_if_needed().await?;
-    cache_operator
-        .update_or_verify_chain_id(fullnode_chain_id as u64)
-        .await
-        .context("[Indexer Cache] Chain id mismatch between cache and fullnode.")?;
+    // Guaranteed that chain id is here at this point because we already ensure that fileworker did the set up
+    let chain_id = cache_operator.get_chain_id().await?.unwrap();
+    if chain_id != fullnode_chain_id as u64 {
+        bail!("[Indexer Cache] Chain ID mismatch between fullnode init signal and cache.");
+    }
 
-    Ok((cache_operator, fullnode_chain_id, starting_version))
+    // It's required to start the worker with the same version as file store.
+    if file_store_metadata.version != starting_version {
+        bail!("[Indexer Cache] Starting version mismatch between filestore metadata and fullnode init signal.");
+    }
+    if file_store_metadata.chain_id != fullnode_chain_id as u64 {
+        bail!("[Indexer Cache] Chain id mismatch between filestore metadata and fullnode.");
+    }
+
+    Ok((fullnode_chain_id, starting_version))
 }
 
-// Infinite streaming processing. Retry if error happens; crash if fatal.
+/// Infinite streaming processing. Retry if error happens; crash if fatal.
 async fn process_streaming_response(
     conn: redis::aio::ConnectionManager,
-    file_store_metadata: Option<FileStoreMetadata>,
-    file_store_operator: Box<dyn FileStoreOperator>,
+    file_store_metadata: FileStoreMetadata,
     mut resp_stream: impl futures_core::Stream<Item = Result<TransactionsFromNodeResponse, tonic::Status>>
         + std::marker::Unpin,
-    enable_verbose_logging: bool,
 ) -> Result<()> {
     let mut tps_calculator = MovingAverage::new(10_000);
     let mut transaction_count = 0;
@@ -306,25 +352,30 @@ async fn process_streaming_response(
             bail!("[Indexer Cache] Streaming error: no response.");
         },
     };
-    let (mut cache_operator, fullnode_chain_id, starting_version) =
-        setup_cache_with_init_signal(conn, init_signal)
+    let mut cache_operator = CacheOperator::new(conn);
+
+    let (fullnode_chain_id, starting_version) =
+        verify_fullnode_init_signal(&mut cache_operator, init_signal, file_store_metadata)
             .await
-            .context("[Indexer Cache] Failed to setup cache")?;
-    // It's required to start the worker with the same version as file store.
-    if let Some(file_store_metadata) = file_store_metadata {
-        if file_store_metadata.version != starting_version {
-            bail!("[Indexer Cache] File store version mismatch with fullnode.");
-        }
-        if file_store_metadata.chain_id != fullnode_chain_id as u64 {
-            bail!("[Indexer Cache] Chain id mismatch between file store and fullnode.");
-        }
-    }
+            .context("[Indexer Cache] Failed to verify init signal")?;
+
     let mut current_version = starting_version;
-    let mut starting_time = std::time::Instant::now();
-    let mut last_file_update_check_timestamp = std::time::Instant::now();
+    let mut batch_start_time = std::time::Instant::now();
 
     // 4. Process the streaming response.
-    while let Some(received) = resp_stream.next().await {
+    loop {
+        let start_time = std::time::Instant::now();
+        let received = match resp_stream.next().await {
+            Some(r) => r,
+            _ => {
+                error!(
+                    service_type = SERVICE_TYPE,
+                    "[Indexer Cache] Streaming error: no response."
+                );
+                ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
+                break;
+            },
+        };
         let received: TransactionsFromNodeResponse = match received {
             Ok(r) => r,
             Err(err) => {
@@ -343,16 +394,11 @@ async fn process_streaming_response(
 
         let size_in_bytes = received.encoded_len();
 
-        match process_transactions_from_node_response(
-            received,
-            &mut cache_operator,
-            enable_verbose_logging,
-        )
-        .await
+        match process_transactions_from_node_response(received, &mut cache_operator, start_time)
+            .await
         {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
-                    start_version,
                     num_of_transactions,
                 } => {
                     current_version += num_of_transactions;
@@ -363,11 +409,6 @@ async fn process_streaming_response(
                     // TODO: Reasses whether this metric useful
                     LATEST_PROCESSED_VERSION_OLD.set(current_version as i64);
                     PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
-                    info!(
-                        start_version = start_version,
-                        num_of_transactions = num_of_transactions,
-                        "[Indexer Cache] Data chunk received.",
-                    );
                 },
                 GrpcDataStatus::StreamInit(new_version) => {
                     error!(
@@ -406,17 +447,16 @@ async fn process_streaming_response(
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::CacheWorkerBatchProcessed,
-                        enable_verbose_logging,
                         Some(start_version as i64),
                         Some((start_version + num_of_transactions - 1) as i64),
                         None,
                         None,
-                        Some(starting_time.elapsed().as_secs_f64()),
+                        Some(batch_start_time.elapsed().as_secs_f64()),
                         Some(size_in_bytes),
                         Some(num_of_transactions as i64),
                         None,
                     );
-                    starting_time = std::time::Instant::now();
+                    batch_start_time = std::time::Instant::now();
                 },
             },
             Err(e) => {
@@ -432,23 +472,27 @@ async fn process_streaming_response(
             },
         }
 
-        // Check if the file store has been updated.
-        if last_file_update_check_timestamp.elapsed().as_secs() >= GCS_LOOKUP_FREQUENCY_IN_SECS {
-            let file_store_metadata = file_store_operator.get_file_store_metadata().await;
-            if let Some(file_store_metadata) = file_store_metadata {
-                if file_store_metadata.version + FILE_STORE_VERSIONS_RESERVED < current_version {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        CACHE_WORKER_WAIT_FOR_FILE_STORE_IN_SECS,
-                    ))
-                    .await;
-                    tracing::warn!(
-                        current_version = current_version,
-                        file_store_version = file_store_metadata.version,
-                        "[Indexer Cache] File store version is behind current version too much."
-                    );
-                }
+        // Check if the file store isn't too far away
+        loop {
+            let file_store_version = cache_operator
+                .get_file_store_latest_version()
+                .await?
+                .unwrap();
+            if file_store_version + FILE_STORE_VERSIONS_RESERVED < current_version {
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    CACHE_WORKER_WAIT_FOR_FILE_STORE_MS,
+                ))
+                .await;
+                tracing::warn!(
+                    current_version = current_version,
+                    file_store_version = file_store_version,
+                    "[Indexer Cache] File store version is behind current version too much."
+                );
+                WAIT_FOR_FILE_STORE_COUNTER.inc();
+            } else {
+                // File store is up to date, continue cache update.
+                break;
             }
-            last_file_update_check_timestamp = std::time::Instant::now();
         }
     }
 

@@ -10,9 +10,10 @@ use crate::{
 };
 use aptos_logger::trace;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_types::{
-    state_store::state_key::StateKey, transaction::TransactionOutput, write_set::TransactionWrite,
+    state_store::{state_key::StateKey, StateView},
+    transaction::TransactionOutput,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::output::VMOutput;
 use once_cell::sync::Lazy;

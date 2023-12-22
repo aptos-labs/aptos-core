@@ -5,7 +5,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{CryptoHasher as _, TestOnlyHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
+    secp256k1_ecdsa, secp256r1_ecdsa,
     traits::{SigningKey, Uniform},
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -19,6 +19,7 @@ use aptos_types::{
     },
     transaction,
     transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    validator_txn::ValidatorTransaction,
     vm_status::AbortLocation,
     write_set,
 };
@@ -62,6 +63,14 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256k1_public_key)?;
     tracer.trace_value(samples, &secp256k1_signature)?;
 
+    let secp256r1_ecdsa_private_key = secp256r1_ecdsa::PrivateKey::generate(&mut rng);
+    let secp256r1_ecdsa_public_key =
+        aptos_crypto::PrivateKey::public_key(&secp256r1_ecdsa_private_key);
+    let secp256r1_ecdsa_signature = secp256r1_ecdsa_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &secp256r1_ecdsa_private_key)?;
+    tracer.trace_value(samples, &secp256r1_ecdsa_public_key)?;
+    tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
+
     Ok(())
 }
 
@@ -80,6 +89,7 @@ pub fn get_registry() -> Result<Registry> {
     // stdlib types
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;

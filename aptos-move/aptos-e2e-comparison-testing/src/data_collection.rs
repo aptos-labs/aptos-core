@@ -8,9 +8,8 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_rest_client::Client;
-use aptos_state_view::TStateView;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
         TransactionOutput, Version,

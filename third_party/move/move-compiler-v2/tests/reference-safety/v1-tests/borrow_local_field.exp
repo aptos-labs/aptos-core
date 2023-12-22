@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot mutable borrow local `v` since other references exists
+error: cannot mutably borrow local `v` since other references exists
    ┌─ tests/reference-safety/v1-tests/borrow_local_field.move:27:17
    │
 26 │         let f = &v.f;

@@ -20,6 +20,7 @@ impl Ord for SubBlockIdx {
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for SubBlockIdx {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         (self.round_id, self.shard_id).partial_cmp(&(other.round_id, other.shard_id))
@@ -68,6 +69,7 @@ impl Ord for ShardedTxnIndexV2 {
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for ShardedTxnIndexV2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         (self.sub_block_idx, self.pre_partitioned_txn_idx)

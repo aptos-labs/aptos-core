@@ -65,6 +65,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `borrow_store_resource`](#0x1_fungible_asset_borrow_store_resource)
 -  [Function `upgrade_to_concurrent`](#0x1_fungible_asset_upgrade_to_concurrent)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
 
 
 <pre><code><b>use</b> <a href="aggregator_v2.md#0x1_aggregator_v2">0x1::aggregator_v2</a>;
@@ -2147,6 +2149,162 @@ Decrease the supply of a fungible asset by burning.
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The metadata associated with the fungible asset is subject to precise size constraints.</td>
+<td>Medium</td>
+<td>The add_fungibility function has size limitations for the name, symbol, number of decimals, icon_uri, and project_uri field of the Metadata resource.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Adding fungibility to an existing object should initialize the metadata and supply resources and store them under the metadata object address.</td>
+<td>Low</td>
+<td>The add_fungibility function initializes the Metadata and Supply resources and moves them under the metadata object.</td>
+<td>Audited that the Metadata and Supply resources are initialized properly.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Generating mint, burn and transfer references can only be done at object creation time and if the object was added fungibility.</td>
+<td>Low</td>
+<td>The following functions generate the related references of the Metadata object: 1. generate_mint_ref 2. generate_burn_ref 3. generate_transfer_ref</td>
+<td>Audited that the Metadata object exists within the constructor ref.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Only the owner of a store should be allowed to withdraw fungible assets from it.</td>
+<td>High</td>
+<td>The fungible_asset::withdraw function ensures that the signer owns the store by asserting that the object address matches the address of the signer.</td>
+<td>Audited that the address of the signer owns the object.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The transfer, withdrawal and deposit operation should never change the current supply of the fungible asset.</td>
+<td>High</td>
+<td>The transfer function withdraws the fungible assets from the store and deposits them to the receiver. The withdraw function extracts the fungible asset from the fungible asset store. The deposit function adds the balance to the fungible asset store.</td>
+<td>Audited that the supply before and after the operation remains constant.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The owner of the store should only be able to withdraw a certain amount if its store has sufficient balance and is not frozen, unless the withdrawal is performed with a reference, and afterwards the store balance should be decreased.</td>
+<td>High</td>
+<td>The withdraw function ensures that the store is not frozen before calling withdraw_internal which ensures that the withdrawing amount is greater than 0 and less than the total balance from the store. The withdraw_with_ref ensures that the reference's metadata matches the store metadata.</td>
+<td>Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>Only the same type of fungible assets should be deposited in a fungible asset store, if the store is not frozen, unless the deposit is performed with a reference, and afterwards the store balance should be increased.</td>
+<td>High</td>
+<td>The deposit function ensures that store is not frozen and proceeds to call the deposit_internal function which validates the store's metadata and the depositing asset's metadata followed by increasing the store balance by the given amount. The deposit_with_ref ensures that the reference's metadata matches the depositing asset's metadata.</td>
+<td>Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store are different. Audited that the store's balance is increased by the deposited amount.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>An object should only be allowed to hold one store for fungible assets.</td>
+<td>Medium</td>
+<td>The create_store function initializes a new FungibleStore resource and moves it under the object address.</td>
+<td>Audited that the resource was moved under the object.</td>
+</tr>
+
+<tr>
+<td>9</td>
+<td>When a new store is created, the balance should be set by default to the value zero.</td>
+<td>High</td>
+<td>The create_store function initializes a new fungible asset store with zero balance and stores it under the given construtorRef object.</td>
+<td>Audited that the store is properly initialized with zero balance.</td>
+</tr>
+
+<tr>
+<td>10</td>
+<td>A store should only be deleted if it's balance is zero.</td>
+<td>Medium</td>
+<td>The remove_store function validates the store's balance and removes the store under the object address.</td>
+<td>Audited that aborts if the balance of the store is not zero. Audited that store is removed from the object address.</td>
+</tr>
+
+<tr>
+<td>11</td>
+<td>Minting and burning should alter the total supply value, and the store balances.</td>
+<td>High</td>
+<td>The mint process increases the total supply by the amount minted using the increase_supply function. The burn process withdraws the burn amount from the given store and decreases the total supply by the amount burned using the decrease_supply function.</td>
+<td>Audited the mint and burn functions that the supply was adjusted accordingly.</td>
+</tr>
+
+<tr>
+<td>12</td>
+<td>It must not be possible to burn an amount of fungible assets larger than their current supply.</td>
+<td>High</td>
+<td>The burn process ensures that the store has enough balance to burn, by asserting that the supply.current >= amount inside the decrease_supply function.</td>
+<td>Audited that it aborts if the provided store doesn't have sufficient balance.</td>
+</tr>
+
+<tr>
+<td>13</td>
+<td>Enabling or disabling store's frozen status should only be done with a valid transfer reference.</td>
+<td>High</td>
+<td>The set_frozen_flag function ensures that the TransferRef is provided via function argument and that the store's metadata matches the metadata from the reference. It then proceeds to update the frozen flag of the store.</td>
+<td>Audited that it aborts if the metadata doesn't match. Audited that the frozen flag is updated properly.</td>
+</tr>
+
+<tr>
+<td>14</td>
+<td>Extracting a specific amount from the fungible asset should be possible only if the total amount that it holds is greater or equal to the provided amount.</td>
+<td>High</td>
+<td>The extract function validates that the fungible asset has enough balance to extract and then updates it by subtracting the extracted amount.</td>
+<td>Audited that it aborts if the asset didn't have sufficient balance. Audited that the balance of the asset is updated. Audited that the extract function returns the extracted asset.</td>
+</tr>
+
+<tr>
+<td>15</td>
+<td>Merging two fungible assets should only be possible if both share the same metadata.</td>
+<td>Medium</td>
+<td>The merge function validates the metadata of the src and dst asset.</td>
+<td>Audited that it aborts if the metadata of the src and dst are not the same.</td>
+</tr>
+
+<tr>
+<td>16</td>
+<td>Post merging two fungible assets, the source asset should have the amount value equal to the sum of the two.</td>
+<td>High</td>
+<td>The merge function increases dst_fungible_asset.amount by src_fungible_asset.amount.</td>
+<td>Audited that the dst_fungible_asset balance is increased by amount.</td>
+</tr>
+
+<tr>
+<td>17</td>
+<td>Fungible assets with zero balance should be destroyed when the amount reaches value 0.</td>
+<td>Medium</td>
+<td>The destroy_zero ensures that the balance of the asset has the value 0 and destroy the asset.</td>
+<td>Audited that it aborts if the balance of the asset is non zero.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify=<b>false</b>;

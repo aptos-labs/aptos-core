@@ -83,6 +83,28 @@ impl LatencyMonitor {
                 },
             };
 
+            // Get the latest block timestamp from storage
+            let latest_block_timestamp_usecs = match self
+                .storage
+                .get_block_timestamp(highest_synced_version)
+            {
+                Ok(block_timestamp_usecs) => block_timestamp_usecs,
+                Err(error) => {
+                    sample!(
+                        SampleRate::Duration(Duration::from_secs(LATENCY_MONITOR_LOG_FREQ_SECS)),
+                        warn!(
+                            (LogSchema::new(LogEntry::LatencyMonitor)
+                                .event(LogEvent::StorageReadFailed)
+                                .message(&format!("Unable to read the latest block timestamp: {:?}", error)))
+                        );
+                    );
+                    continue; // Continue to the next round
+                },
+            };
+
+            // Update the block timestamp lag
+            self.update_block_timestamp_lag(latest_block_timestamp_usecs);
+
             // Update the latency metrics for all versions that we've now synced
             self.update_latency_metrics(highest_synced_version);
 
@@ -109,6 +131,24 @@ impl LatencyMonitor {
                 highest_advertised_version,
             );
         }
+    }
+
+    /// Updates the block timestamp lag metric (i.e., the difference between
+    /// the latest block timestamp and the current time).
+    fn update_block_timestamp_lag(&self, latest_block_timestamp_usecs: u64) {
+        // Get the current time (in microseconds)
+        let timestamp_now_usecs = self.get_timestamp_now_usecs();
+
+        // Calculate the block timestamp lag (saturating at 0)
+        let timestamp_lag_usecs = timestamp_now_usecs.saturating_sub(latest_block_timestamp_usecs);
+        let timestamp_lag_duration = Duration::from_micros(timestamp_lag_usecs);
+
+        // Update the block timestamp lag metric
+        metrics::observe_value_with_label(
+            &metrics::SYNC_LATENCIES,
+            metrics::BLOCK_TIMESTAMP_LAG_LABEL,
+            timestamp_lag_duration.as_secs_f64(),
+        );
     }
 
     /// Updates the latency metrics for all versions that have now been synced

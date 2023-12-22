@@ -84,6 +84,8 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `is_owner`](#0x1_object_is_owner)
 -  [Function `owns`](#0x1_object_owns)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `address_to_object`](#@Specification_1_address_to_object)
     -  [Function `create_object_address`](#@Specification_1_create_object_address)
     -  [Function `create_user_derived_object_address`](#@Specification_1_create_user_derived_object_address)
@@ -2138,6 +2140,74 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>It's not possible to create an object twice on the same address.</td>
+<td>Critical</td>
+<td>The create_object_internal function includes an assertion to ensure that the object being created does not already exist at the specified address.</td>
+<td>Formally verified via <a href="#high-level-req-1">create_object_internal</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Only its owner may transfer an object.</td>
+<td>Critical</td>
+<td>The transfer function mandates that the transaction be signed by the owner's address, ensuring that only the rightful owner may initiate the object transfer.</td>
+<td>Audited that it aborts if anyone other than the owner attempts to transfer.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The indirect owner of an object may transfer the object.</td>
+<td>Medium</td>
+<td>The owns function evaluates to true when the given address possesses either direct or indirect ownership of the specified object.</td>
+<td>Audited that it aborts if address transferring is not indirect owner.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Objects may never change the address which houses them.</td>
+<td>Low</td>
+<td>After creating an object, transfers to another owner may occur. However, the address which stores the object may not be changed.</td>
+<td>This is implied by <a href="#high-level-req">high-level requirement 1</a>.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>If an ungated transfer is disabled on an object in an indirect ownership chain, a transfer should not occur.</td>
+<td>Medium</td>
+<td>Calling disable_ungated_transfer disables direct transfer, and only TransferRef may trigger transfers. The transfer_with_ref function is called.</td>
+<td>Formally verified via <a href="#high-level-req-5">transfer_with_ref</a>.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>Object addresses must not overlap with other addresses in different domains.</td>
+<td>Critical</td>
+<td>The current addressing scheme with suffixes does not conflict with any existing addresses, such as resource accounts. The GUID space is explicitly separated to ensure this doesn't happen.</td>
+<td>This is true by construction if one correctly ensures the usage of INIT_GUID_CREATION_NUM during the creation of GUID.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> aborts_if_is_strict;
 <a id="0x1_object_g_roll"></a>
 <b>global</b> <a href="object.md#0x1_object_g_roll">g_roll</a>: u8;
@@ -2567,7 +2637,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>).guid_creation_num == <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1;
 <b>ensures</b> result == <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: <a href="object.md#0x1_object">object</a>, can_delete };
@@ -2765,6 +2836,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
+// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != ref.owner;
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner == <b>to</b>;
 </code></pre>

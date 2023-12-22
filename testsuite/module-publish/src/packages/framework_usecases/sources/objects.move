@@ -32,6 +32,7 @@ module 0xABCD::objects {
 
     // Resource being modified doesn't exist
     const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;
+    const ENOT_AUTHORIZED: u64 = 2;
 
     struct Counter has key {
         count: u64,
@@ -40,9 +41,13 @@ module 0xABCD::objects {
     // Create the global `Counter`.
     // Stored under the module publisher address.
     fun init_module(publisher: &signer) {
+        assert!(
+            signer::address_of(publisher) == @publisher_address,
+            ENOT_AUTHORIZED,
+        );
         move_to<Counter>(
             publisher,
-            Counter { count: 0 }
+            Counter { count: 0 },
         );
     }
 

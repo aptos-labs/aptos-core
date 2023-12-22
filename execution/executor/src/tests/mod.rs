@@ -17,7 +17,6 @@ use aptos_db::AptosDB;
 use aptos_executor_types::{
     BlockExecutorTrait, ExecutedChunk, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
 };
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
 };
@@ -30,7 +29,7 @@ use aptos_types::{
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proof::definition::LeafCount,
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, StateViewId},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
@@ -487,7 +486,7 @@ fn apply_transaction_by_writeset(
     let LedgerUpdateOutput {
         statuses_for_input_txns: _,
         to_commit,
-        reconfig_events: _,
+        subscribable_events: _,
         transaction_info_hashes: _,
         state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
         sharded_state_cache,
@@ -704,7 +703,7 @@ fn run_transactions_naive(
         let LedgerUpdateOutput {
             statuses_for_input_txns: _,
             to_commit,
-            reconfig_events: _,
+            subscribable_events: _,
             transaction_info_hashes: _,
             state_updates_until_last_checkpoint: state_updates_before_last_checkpoint,
             sharded_state_cache,

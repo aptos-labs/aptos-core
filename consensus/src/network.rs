@@ -312,6 +312,26 @@ impl NetworkSender {
         }
     }
 
+    pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
+        let self_author = self.author;
+        let other_validators: Vec<_> = self
+            .validators
+            .get_ordered_account_addresses_iter()
+            .filter(|author| author != &self_author)
+            .collect();
+
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc_by(other_validators.len() as u64);
+        // Broadcast message over direct-send to all other validators.
+        if let Err(err) = self
+            .consensus_network_client
+            .send_to_many(other_validators.into_iter(), msg)
+        {
+            warn!(error = ?err, "Error broadcasting message");
+        }
+    }
+
     /// Tries to send msg to given recipients.
     async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::any", |_| ());
@@ -701,6 +721,23 @@ impl NetworkTask {
                                 );
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                        },
+                        // TODO: get rid of the rpc dummy value
+                        ConsensusMsg::RandGenMessage(req) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback =
+                                IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
+                                    req,
+                                    sender: peer_id,
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
                         },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");

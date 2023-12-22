@@ -1041,7 +1041,7 @@ impl RoundManager {
                             unexpected_event => unreachable!("Unexpected event {:?}", unexpected_event),
                         }
                     };
-                    proposals.sort_by_key(|a| get_round(a));
+                    proposals.sort_by_key(get_round);
                     for proposal in proposals {
                         let result = match proposal {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {

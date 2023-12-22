@@ -719,6 +719,7 @@ impl<'env> Docgen<'env> {
         }
     }
 
+    #[allow(clippy::format_collect)]
     fn gen_html_table(&self, input: &str, column_names: Vec<&str>) {
         let row_blocks = input.split("\n\n").collect::<Vec<_>>();
 
@@ -782,7 +783,7 @@ impl<'env> Docgen<'env> {
                 let req_tag = *parts.get(1).unwrap_or(&"");
                 let label_link = self
                     .resolve_to_label(module_name, false)
-                    .unwrap_or(String::new());
+                    .unwrap_or_default();
                 let module_link = label_link.split('#').next().unwrap_or("").to_string();
                 let suffix = format!(" of the <a href={}>{}</a> module", module_link, module_name);
                 (req_tag, module_link, suffix)
@@ -828,22 +829,26 @@ impl<'env> Docgen<'env> {
         // Regular expression to match Markdown link format [text](link)
         let re = Regex::new(r"\[(.*?)\]\((.*?)\)").unwrap();
         re.replace_all(input, |caps: &regex::Captures| {
-            let mut href = &caps[1];
+            let tag = &caps[1];
             let text = &caps[2];
 
-            let mut module_link = String::new();
-            if href.contains("::") {
-                let parts = href.split("::").collect::<Vec<_>>();
+            if tag.starts_with("http://") || tag.starts_with("https://") {
+                format!("<a href=\"{}\">{}</a>", tag, text)
+            } else if tag.contains("::") {
+                let parts = tag.split("::").collect::<Vec<_>>();
                 if let Some(module_name) = parts.first() {
                     let label_link = self
                         .resolve_to_label(module_name, false)
                         .unwrap_or_default();
-                    module_link = label_link.split('#').next().unwrap_or("").to_string();
+                    let module_link = label_link.split('#').next().unwrap_or("").to_string();
+                    let spec_tag = parts.get(1).unwrap_or(&"");
+                    format!("<a href=\"{}#{}\">{}</a>", module_link, spec_tag, text)
+                } else {
+                    format!("<a href=\"#t{}\">{}</a>", tag, text)
                 }
-                href = parts.get(1).unwrap_or(&"");
+            } else {
+                format!("<a href=\"#{}\">{}</a>", tag, text)
             }
-
-            format!("<a href=\"{}#{}\">{}</a>", module_link, href, text)
         })
         .to_string()
     }
@@ -1276,7 +1281,9 @@ impl<'env> Docgen<'env> {
         let params = func_env
             .get_parameters()
             .iter()
-            .map(|Parameter(name, ty)| format!("{}: {}", self.name_string(*name), ty.display(tctx)))
+            .map(|Parameter(name, ty, _)| {
+                format!("{}: {}", self.name_string(*name), ty.display(tctx))
+            })
             .join(", ");
         let return_types = func_env.get_result_type().flatten();
         let return_str = match return_types.len() {
@@ -1344,13 +1351,13 @@ impl<'env> Docgen<'env> {
                     ];
                     self.gen_html_table(table_text, column_names);
                     self.doc_text(&text[end + end_tag.len()..text.len()]);
+                    self.section_header("Module-level Specification", "module-level-spec");
                 } else {
                     self.doc_text("");
                 }
             } else {
                 self.doc_text(text);
             }
-
             let mut in_code = false;
             let (is_schema, schema_header) =
                 if let SpecBlockTarget::Schema(_, sid, type_params) = &block.target {
@@ -1573,7 +1580,7 @@ impl<'env> Docgen<'env> {
         let type_param_names = func_env
             .get_type_parameters()
             .iter()
-            .map(|TypeParameter(name, _)| *name)
+            .map(|TypeParameter(name, _, _)| *name)
             .collect_vec();
         TypeDisplayContext::new_with_params(self.env, type_param_names)
     }
@@ -1586,7 +1593,7 @@ impl<'env> Docgen<'env> {
         let type_param_names = struct_env
             .get_type_parameters()
             .iter()
-            .map(|TypeParameter(name, _)| *name)
+            .map(|TypeParameter(name, _, _)| *name)
             .collect_vec();
         TypeDisplayContext::new_with_params(self.env, type_param_names)
     }

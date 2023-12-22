@@ -152,8 +152,7 @@ mod test {
     fn write_large_u16frame() {
         let (mut a, _b) = MemorySocket::new_pair();
 
-        let mut buf = Vec::new();
-        buf.resize((u16::max_value() as usize) * 2, 0);
+        let buf = vec![0; (u16::max_value() as usize) * 2];
 
         let result = block_on(write_u16frame(&mut a, &buf));
         assert!(result.is_err());

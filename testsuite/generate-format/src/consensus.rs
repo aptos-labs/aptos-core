@@ -6,7 +6,7 @@ use aptos_crypto::{
     bls12381,
     ed25519::Ed25519PrivateKey,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
+    secp256k1_ecdsa, secp256r1_ecdsa,
     traits::{SigningKey, Uniform},
     PrivateKey,
 };
@@ -17,7 +17,9 @@ use aptos_types::{
         state_key::StateKey,
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
-    transaction, write_set,
+    transaction,
+    validator_txn::ValidatorTransaction,
+    write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -60,6 +62,14 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256k1_private_key)?;
     tracer.trace_value(samples, &secp256k1_public_key)?;
     tracer.trace_value(samples, &secp256k1_signature)?;
+
+    let secp256r1_ecdsa_private_key = secp256r1_ecdsa::PrivateKey::generate(&mut rng);
+    let secp256r1_ecdsa_public_key = PrivateKey::public_key(&secp256r1_ecdsa_private_key);
+    let secp256r1_ecdsa_signature = secp256r1_ecdsa_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &secp256r1_ecdsa_private_key)?;
+    tracer.trace_value(samples, &secp256r1_ecdsa_public_key)?;
+    tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
+
     Ok(())
 }
 
@@ -82,6 +92,7 @@ pub fn get_registry() -> Result<Registry> {
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
