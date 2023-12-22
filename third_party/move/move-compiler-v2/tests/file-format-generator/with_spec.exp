@@ -12,14 +12,13 @@ public fun m::foo($t0: &m::S): u8 {
      var $t1: u8
      var $t2: &m::E
      var $t3: &vector<m::E>
-     var $t4: vector<m::E>
-     var $t5: u64
-     var $t6: &u8
-  0: $t3 := borrow_local($t4)
-  1: $t5 := 0
-  2: $t2 := vector::borrow<m::E>($t3, $t5)
-  3: $t6 := borrow_field<m::E>.k($t2)
-  4: $t1 := read_ref($t6)
+     var $t4: u64
+     var $t5: &u8
+  0: $t3 := borrow_field<m::S>.data($t0)
+  1: $t4 := 0
+  2: $t2 := vector::borrow<m::E>($t3, $t4)
+  3: $t5 := borrow_field<m::E>.k($t2)
+  4: $t1 := read_ref($t5)
   5: return $t1
 }
 
@@ -39,19 +38,18 @@ public fun m::foo($t0: &m::S): u8 {
      var $t1: u8
      var $t2: &m::E
      var $t3: &vector<m::E>
-     var $t4: vector<m::E>
-     var $t5: u64
-     var $t6: &u8
-     # live vars: $t4
-  0: $t3 := borrow_local($t4)
+     var $t4: u64
+     var $t5: &u8
+     # live vars: $t0
+  0: $t3 := borrow_field<m::S>.data($t0)
      # live vars: $t3
-  1: $t5 := 0
-     # live vars: $t3, $t5
-  2: $t2 := vector::borrow<m::E>($t3, $t5)
+  1: $t4 := 0
+     # live vars: $t3, $t4
+  2: $t2 := vector::borrow<m::E>($t3, $t4)
      # live vars: $t2
-  3: $t6 := borrow_field<m::E>.k($t2)
-     # live vars: $t6
-  4: $t1 := read_ref($t6)
+  3: $t5 := borrow_field<m::E>.k($t2)
+     # live vars: $t5
+  4: $t1 := read_ref($t5)
      # live vars: $t1
   5: return $t1
 }
@@ -73,11 +71,12 @@ B0:
 }
 public foo(Arg0: &S): u8 {
 B0:
-	0: ImmBorrowLoc[1](loc0: vector<E>)
-	1: LdU64(0)
-	2: VecImmBorrow(3)
-	3: ImmBorrowField[0](E.k: u8)
-	4: ReadRef
-	5: Ret
+	0: MoveLoc[0](Arg0: &S)
+	1: ImmBorrowField[0](S.data: vector<E>)
+	2: LdU64(0)
+	3: VecImmBorrow(3)
+	4: ImmBorrowField[1](E.k: u8)
+	5: ReadRef
+	6: Ret
 }
 }
