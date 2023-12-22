@@ -44,7 +44,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         local_names: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty) in gen.func_env.get_parameters() {
+    for Parameter(name, ty, _) in gen.func_env.get_parameters() {
         let temp = gen.new_temp(ty);
         scope.insert(name, temp);
         gen.local_names.insert(temp, name);
@@ -785,7 +785,7 @@ impl<'env> Generator<'env> {
             .get_function(fun)
             .get_parameters()
             .into_iter()
-            .map(|Parameter(_, ty)| ty.instantiate(&type_args))
+            .map(|Parameter(_, ty, _)| ty.instantiate(&type_args))
             .collect();
         if args.len() != param_types.len() {
             self.internal_error(id, "inconsistent type arity");
@@ -830,13 +830,21 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate the code for a list of arguments.
-    fn gen_arg_list(&mut self, exps: &[Exp], force_temp: bool) -> Vec<TempIndex> {
+    /// If `force_l2r_eval` is true, the arguments are forced to be evaluated in left-to-right order.
+    fn gen_arg_list(&mut self, exps: &[Exp], force_l2r_eval: bool) -> Vec<TempIndex> {
+        // If all args are side-effect free, we don't need to force temporary generation
+        // to get left-to-right evaluation.
+        let with_forced_temp = if exps.iter().all(is_definitely_pure) {
+            false
+        } else {
+            force_l2r_eval
+        };
         let len = exps.len();
-        // Generate code with forced creation of temporaries for all except last arg.
+        // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
             .iter()
             .take(if len == 0 { 0 } else { len - 1 })
-            .map(|exp| self.gen_arg(exp, force_temp))
+            .map(|exp| self.gen_arg(exp, with_forced_temp))
             .collect::<Vec<_>>();
         // If there is a last arg, we don't need to force create a temporary for it.
         if let Some(last_arg) = exps.iter().last().map(|exp| self.gen_arg(exp, false)) {
@@ -1188,4 +1196,29 @@ impl<'env> Generator<'env> {
             self.find_local(id, sym)
         }
     }
+}
+
+// ======================================================================================
+// Helpers
+
+/// Is this a leaf expression which cannot contain another expression?
+fn is_leaf_exp(exp: &Exp) -> bool {
+    matches!(
+        exp.as_ref(),
+        ExpData::Temporary(_, _) | ExpData::LocalVar(_, _) | ExpData::Value(_, _)
+    )
+}
+
+/// Can we be certain that this expression is side-effect free?
+fn is_definitely_pure(exp: &Exp) -> bool {
+    is_leaf_exp(exp) // A leaf expression is pure.
+        || match exp.as_ref() {
+            ExpData::Call(_, op, args) => {
+                // A move function could be side-effecting (eg, one's with mut ref params).
+                // A non-move function is pure if all arguments are non-side-effecting.
+                !matches!(op, Operation::MoveFunction(_, _)) && args.iter().all(is_definitely_pure)
+            },
+            // there maybe other cases where we can prove purity, but we are being conservative for simplicity.
+            _ => false,
+        }
 }

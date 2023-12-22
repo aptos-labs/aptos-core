@@ -20,6 +20,8 @@ pub enum CompressionClient {
     Consensus,
     Mempool,
     StateSync,
+    DKG,
+    JWKConsensus,
 }
 
 impl CompressionClient {
@@ -29,6 +31,8 @@ impl CompressionClient {
             Self::Consensus => "consensus",
             Self::Mempool => "mempool",
             Self::StateSync => "state_sync",
+            CompressionClient::DKG => "dkg",
+            CompressionClient::JWKConsensus => "jwk_consensus",
         }
     }
 }

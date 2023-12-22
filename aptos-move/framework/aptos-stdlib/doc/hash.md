@@ -26,7 +26,6 @@ Non-cryptograhic hashes:
 -  [Function `ripemd160_internal`](#0x1_aptos_hash_ripemd160_internal)
 -  [Function `blake2b_256_internal`](#0x1_aptos_hash_blake2b_256_internal)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `sip_hash`](#@Specification_1_sip_hash)
     -  [Function `sip_hash_from_value`](#@Specification_1_sip_hash_from_value)
     -  [Function `keccak256`](#@Specification_1_keccak256)
@@ -352,11 +351,6 @@ Returns the BLAKE2B-256 hash of <code>bytes</code>.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 <code>spec_sip_hash</code> is not assumed to be injective.

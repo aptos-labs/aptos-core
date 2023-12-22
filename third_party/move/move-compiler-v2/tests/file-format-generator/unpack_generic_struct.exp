@@ -122,7 +122,7 @@ public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
   7: $t9 := unpack m::E<#0>($t8)
      # live vars: $t1, $t9
   8: $t11 := 3
-     # live vars: $t1, $t9
+     # live vars: $t1, $t9, $t11
   9: $t10 := copy($t11)
      # live vars: $t1, $t9
  10: write_ref($t1, $t9)

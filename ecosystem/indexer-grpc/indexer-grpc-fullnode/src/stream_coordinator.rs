@@ -44,6 +44,7 @@ pub struct IndexerStreamCoordinator {
 }
 
 // Single batch of transactions to fetch, convert, and stream
+#[derive(Clone, Copy)]
 pub struct TransactionBatchInfo {
     pub start_version: u64,
     pub head_version: u64,
@@ -81,7 +82,7 @@ impl IndexerStreamCoordinator {
     /// 4. Encode protobuf objects (base64)
     pub async fn process_next_batch(
         &mut self,
-        enable_verbose_logging: bool,
+        enable_expensive_logging: bool,
     ) -> Vec<Result<EndVersion, Status>> {
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
@@ -94,21 +95,34 @@ impl IndexerStreamCoordinator {
             let transaction_sender = self.transactions_sender.clone();
 
             let task = tokio::spawn(async move {
-                let batch_start_time = std::time::Instant::now();
+                let fetch_start_time = std::time::Instant::now();
                 // Fetch and convert transactions from API
                 let raw_txns =
                     Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
+                let first_raw_transaction = raw_txns.first().unwrap();
+                let last_raw_transaction = raw_txns.last().unwrap();
+                let mut last_transaction_timestamp = None;
+                if enable_expensive_logging {
+                    // Reusing the conversion methods which need a vec, so make a vec of size 1
+                    let api_txn = Self::convert_to_api_txns(context.clone(), vec![
+                        last_raw_transaction.clone(),
+                    ])
+                    .await;
+                    let pb_txn = Self::convert_to_pb_txns(api_txn);
+                    last_transaction_timestamp = pb_txn.first().unwrap().timestamp.clone();
+                }
                 log_grpc_step_fullnode(
                     IndexerGrpcStep::FullnodeFetchedBatch,
-                    enable_verbose_logging,
-                    None,
-                    None,
-                    None,
+                    Some(first_raw_transaction.version as i64),
+                    Some(last_raw_transaction.version as i64),
+                    last_transaction_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(fetch_start_time.elapsed().as_secs_f64()),
                     Some(raw_txns.len() as i64),
                 );
+
+                let convert_start_time = std::time::Instant::now();
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
@@ -118,15 +132,16 @@ impl IndexerStreamCoordinator {
 
                 log_grpc_step_fullnode(
                     IndexerGrpcStep::FullnodeDecodedBatch,
-                    enable_verbose_logging,
                     Some(start_transaction.version as i64),
                     Some(end_transaction.version as i64),
                     end_txn_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(convert_start_time.elapsed().as_secs_f64()),
                     Some(pb_txns.len() as i64),
                 );
+
+                let send_start_time = std::time::Instant::now();
 
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
@@ -153,13 +168,12 @@ impl IndexerStreamCoordinator {
 
                 log_grpc_step_fullnode(
                     IndexerGrpcStep::FullnodeSentBatch,
-                    enable_verbose_logging,
                     Some(start_transaction.version as i64),
                     Some(end_transaction.version as i64),
                     end_txn_timestamp.as_ref(),
                     Some(ledger_version as i64),
                     None,
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(send_start_time.elapsed().as_secs_f64()),
                     Some(pb_txns.len() as i64),
                 );
                 Ok(end_transaction.version)
@@ -220,7 +234,7 @@ impl IndexerStreamCoordinator {
         batches
     }
 
-    async fn fetch_raw_txns_with_retries(
+    pub async fn fetch_raw_txns_with_retries(
         context: Arc<Context>,
         ledger_version: u64,
         batch: TransactionBatchInfo,
@@ -330,6 +344,10 @@ impl IndexerStreamCoordinator {
                         APITransaction::StateCheckpointTransaction(ref mut sct) => {
                             sct.info.block_height = Some(block_height_bcs);
                             sct.info.epoch = Some(epoch_bcs);
+                        },
+                        APITransaction::ValidatorTransaction(ref mut vt) => {
+                            vt.info.block_height = Some(block_height_bcs);
+                            vt.info.epoch = Some(epoch_bcs);
                         },
                     };
                     txn

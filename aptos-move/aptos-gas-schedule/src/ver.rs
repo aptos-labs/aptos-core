@@ -9,7 +9,6 @@
 ///
 /// Change log:
 /// - V12
-///   - Making resource group charge on first read independent of BTreeMap serialization.
 ///   - Added BN254 operations.
 /// - V11
 ///   - Ristretto255 natives (point cloning & double-scalar multiplication) and Bulletproofs natives

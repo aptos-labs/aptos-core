@@ -48,7 +48,7 @@ pub fn bootstrap(
     let processor_task_count = node_config.indexer_grpc.processor_task_count;
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
-    let enable_verbose_logging = node_config.indexer_grpc.enable_verbose_logging;
+    let enable_expensive_logging = node_config.indexer_grpc.enable_expensive_logging;
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
@@ -61,11 +61,11 @@ pub fn bootstrap(
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
             service_context: service_context.clone(),
-            enable_verbose_logging,
+            enable_expensive_logging,
         };
         let localnet_data_server = LocalnetDataService {
             service_context,
-            enable_verbose_logging,
+            enable_expensive_logging,
         };
 
         let reflection_service = tonic_reflection::server::Builder::configure()

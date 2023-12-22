@@ -644,7 +644,7 @@ fn spawn_committer<
                             "Committed a new transaction chunk! \
                                     Transaction total: {:?}, event total: {:?}",
                             notification.committed_transactions.len(),
-                            notification.committed_events.len()
+                            notification.subscribable_events.len()
                         ))
                     );
                     metrics::increment_gauge(
@@ -660,7 +660,7 @@ fn spawn_committer<
                     // We do this here due to synchronization issues with mempool and
                     // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
                     let committed_transactions = CommittedTransactions {
-                        events: notification.committed_events,
+                        events: notification.subscribable_events,
                         transactions: notification.committed_transactions,
                     };
                     utils::handle_committed_transactions(

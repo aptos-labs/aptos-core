@@ -126,8 +126,7 @@ In the future, we might support additional features:
 -  [Function `scalar_sub_internal`](#0x1_ristretto255_scalar_sub_internal)
 -  [Function `scalar_neg_internal`](#0x1_ristretto255_scalar_neg_internal)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
-    -  [Helper functions](#@Helper_functions_3)
+    -  [Helper functions](#@Helper_functions_2)
     -  [Function `point_equals`](#@Specification_1_point_equals)
     -  [Function `double_scalar_mul`](#@Specification_1_double_scalar_mul)
     -  [Function `multi_scalar_mul`](#@Specification_1_multi_scalar_mul)
@@ -2425,12 +2424,7 @@ WARNING: This function can only be called with P = RistrettoPoint and S = Scalar
 ## Specification
 
 
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
-
-
-<a id="@Helper_functions_3"></a>
+<a id="@Helper_functions_2"></a>
 
 ### Helper functions
 

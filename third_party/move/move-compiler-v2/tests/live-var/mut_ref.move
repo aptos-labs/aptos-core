@@ -38,7 +38,7 @@ module 0x42::m {
     fun f2_fail() {
         let r = R { v: 0 };
         let x = &mut r;
-        some2(x, x); // error is no longer raised in the live-var analysis phase
+        some2(x, x); // expected error because multiple use
     }
 
     fun f3_ok() {

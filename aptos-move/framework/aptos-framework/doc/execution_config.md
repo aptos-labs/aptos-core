@@ -11,7 +11,6 @@ Reconfiguration, and may be updated by root.
 -  [Constants](#@Constants_0)
 -  [Function `set`](#0x1_execution_config_set)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
     -  [Function `set`](#@Specification_1_set)
 
 
@@ -102,11 +101,6 @@ This can be called by on-chain governance to update on-chain execution configs.
 <a id="@Specification_1"></a>
 
 ## Specification
-
-
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
 
 
 

@@ -8,7 +8,6 @@ mod mock_vm_test;
 use crate::{block_executor::TransactionBlockExecutor, components::chunk_output::ChunkOutput};
 use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -26,11 +25,12 @@ use aptos_types::{
         access_path_for_config, new_epoch_event_key, ConfigurationResource, OnChainConfig,
         ValidatorSet,
     },
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, ChangeSet, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionArgument,
-        TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -80,7 +80,7 @@ impl VMExecutor for MockVM {
         transactions: &[SignatureVerifiedTransaction],
         state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         // output_cache is used to store the output of transactions so they are visible to later
         // transactions.
         let mut output_cache = HashMap::new();
@@ -187,7 +187,7 @@ impl VMExecutor for MockVM {
             }
         }
 
-        Ok(outputs)
+        Ok(BlockOutput::new(outputs))
     }
 
     fn execute_block_sharded<S: StateView + Sync + Send + 'static, E: ExecutorClient<S>>(
@@ -269,14 +269,14 @@ fn gen_genesis_writeset() -> WriteSet {
         access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test");
     write_set.insert((
         StateKey::access_path(validator_set_ap),
-        WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
+        WriteOp::legacy_modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
     ));
     write_set.insert((
         StateKey::access_path(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
-        WriteOp::Modification(
+        WriteOp::legacy_modification(
             bcs::to_bytes(&ConfigurationResource::default())
                 .unwrap()
                 .into(),
@@ -291,11 +291,11 @@ fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> Write
     let mut write_set = WriteSetMut::default();
     write_set.insert((
         StateKey::access_path(balance_ap(sender)),
-        WriteOp::Modification(balance.le_bytes()),
+        WriteOp::legacy_modification(balance.le_bytes()),
     ));
     write_set.insert((
         StateKey::access_path(seqnum_ap(sender)),
-        WriteOp::Modification(seqnum.le_bytes()),
+        WriteOp::legacy_modification(seqnum.le_bytes()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
 }
@@ -310,15 +310,15 @@ fn gen_payment_writeset(
     let mut write_set = WriteSetMut::default();
     write_set.insert((
         StateKey::access_path(balance_ap(sender)),
-        WriteOp::Modification(sender_balance.le_bytes()),
+        WriteOp::legacy_modification(sender_balance.le_bytes()),
     ));
     write_set.insert((
         StateKey::access_path(seqnum_ap(sender)),
-        WriteOp::Modification(sender_seqnum.le_bytes()),
+        WriteOp::legacy_modification(sender_seqnum.le_bytes()),
     ));
     write_set.insert((
         StateKey::access_path(balance_ap(recipient)),
-        WriteOp::Modification(recipient_balance.le_bytes()),
+        WriteOp::legacy_modification(recipient_balance.le_bytes()),
     ));
     write_set
         .freeze()

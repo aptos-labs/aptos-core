@@ -31,14 +31,14 @@ use aptos_mvhashmap::{
     versioned_delayed_fields::CommitError,
     MVHashMap,
 };
-use aptos_state_view::TStateView;
 use aptos_types::{
     aggregator::PanicError,
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
-    transaction::BlockExecutableTransaction as Transaction,
+    state_store::TStateView,
+    transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
@@ -479,9 +479,18 @@ where
             }
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
-                let approx_output_size = block_gas_limit_type
-                    .block_output_limit()
-                    .and_then(|_| last_input_output.output_approx_size(txn_idx));
+                let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
+                    last_input_output
+                        .output_approx_size(txn_idx)
+                        .map(|approx_output| {
+                            approx_output
+                                + if block_gas_limit_type.include_user_txn_size_in_block_output() {
+                                    block[txn_idx as usize].user_txn_bytes_len()
+                                } else {
+                                    0
+                                } as u64
+                        })
+                });
                 let txn_read_write_summary = block_gas_limit_type
                     .conflict_penalty_window()
                     .map(|_| last_input_output.get_txn_read_write_summary(txn_idx));
@@ -493,7 +502,9 @@ where
                     approx_output_size,
                 );
 
-                if block_limit_processor.should_end_block_parallel() {
+                if txn_idx < scheduler.num_txns() - 1
+                    && block_limit_processor.should_end_block_parallel()
+                {
                     // Set the execution output status to be SkipRest, to skip the rest of the txns.
                     last_input_output.update_to_skip_rest(txn_idx);
                 }
@@ -774,8 +785,10 @@ where
                 });
 
             // Must contain committed value as we set the base value above.
-            aggregator_v1_delta_writes
-                .push((k, WriteOp::Modification(serialize(&committed_delta).into())));
+            aggregator_v1_delta_writes.push((
+                k,
+                WriteOp::legacy_modification(serialize(&committed_delta).into()),
+            ));
         }
         aggregator_v1_delta_writes
     }
@@ -1039,7 +1052,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1055,7 +1068,7 @@ where
         let shared_counter = AtomicU32::new(start_shared_counter);
 
         if signature_verified_block.is_empty() {
-            return Ok(vec![]);
+            return Ok(BlockOutput::new(vec![]));
         }
 
         let num_txns = signature_verified_block.len();
@@ -1106,10 +1119,14 @@ where
         drop(timer);
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
-        let (_, maybe_error) = shared_commit_state.into_inner();
+        let (_block_limit_processor, maybe_error) = shared_commit_state.into_inner();
+
+        // TODO add block end info to output.
+        // block_limit_processor.is_block_limit_reached();
+
         match maybe_error {
             Some(err) => Err(err),
-            None => Ok(final_results.into_inner()),
+            None => Ok(BlockOutput::new(final_results.into_inner())),
         }
     }
 
@@ -1197,7 +1214,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
         dynamic_change_set_optimizations_enabled: bool,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
@@ -1236,7 +1253,19 @@ where
                         .onchain
                         .block_gas_limit_type
                         .block_output_limit()
-                        .map(|_| output.output_approx_size());
+                        .map(|_| {
+                            output.output_approx_size()
+                                + if self
+                                    .config
+                                    .onchain
+                                    .block_gas_limit_type
+                                    .include_user_txn_size_in_block_output()
+                                {
+                                    txn.user_txn_bytes_len()
+                                } else {
+                                    0
+                                } as u64
+                        });
 
                     let read_write_summary = self
                         .config
@@ -1394,7 +1423,7 @@ where
                 break;
             }
 
-            if block_limit_processor.should_end_block_sequential() {
+            if idx < num_txns - 1 && block_limit_processor.should_end_block_sequential() {
                 break;
             }
         }
@@ -1403,7 +1432,11 @@ where
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         ret.resize_with(num_txns, E::Output::skip_output);
-        Ok(ret)
+
+        // TODO add block end info to output.
+        // block_limit_processor.is_block_limit_reached();
+
+        Ok(BlockOutput::new(ret))
     }
 
     pub fn execute_block(
@@ -1411,7 +1444,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<Vec<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, E::Error> {
         let dynamic_change_set_optimizations_enabled = signature_verified_block.len() != 1
             || E::is_transaction_dynamic_change_set_capable(&signature_verified_block[0]);
 

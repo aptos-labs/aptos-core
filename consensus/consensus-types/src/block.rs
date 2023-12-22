@@ -411,47 +411,32 @@ impl Block {
     }
 
     pub fn transactions_to_execute_for_metadata(
-        block_id: HashValue,
         validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         metadata: BlockMetadata,
-        is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
-        let txns = once(Transaction::BlockMetadata(metadata))
+        once(Transaction::BlockMetadata(metadata))
             .chain(
                 validator_txns
                     .into_iter()
                     .map(Transaction::ValidatorTransaction),
             )
-            .chain(txns.into_iter().map(Transaction::UserTransaction));
-
-        if is_block_gas_limit {
-            // After the per-block gas limit change, StateCheckpoint txn
-            // is inserted after block execution
-            txns.collect()
-        } else {
-            // Before the per-block gas limit change, StateCheckpoint txn
-            // is inserted here for compatibility.
-            txns.chain(once(Transaction::StateCheckpoint(block_id)))
-                .collect()
-        }
+            .chain(txns.into_iter().map(Transaction::UserTransaction))
+            .collect()
     }
 
+    /// List of input transactions for each block.
+    /// Prepends BlockMetadata and validator txns, and then all user txns.
+    ///
+    /// It doesn't add StateCheckpoint/BlockEpilogue transaction - that gets added during execution.
     pub fn transactions_to_execute(
         &self,
         validators: &[AccountAddress],
         validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
-        is_block_gas_limit: bool,
     ) -> Vec<Transaction> {
         let metadata = self.new_block_metadata(validators);
-        Self::transactions_to_execute_for_metadata(
-            self.id,
-            validator_txns,
-            txns,
-            metadata,
-            is_block_gas_limit,
-        )
+        Self::transactions_to_execute_for_metadata(validator_txns, txns, metadata)
     }
 
     fn previous_bitvec(&self) -> BitVec {

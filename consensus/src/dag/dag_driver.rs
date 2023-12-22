@@ -32,9 +32,8 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::{
-    block_info::Round, epoch_state::EpochState, validator_txn::pool::ValidatorTransactionFilter,
-};
+use aptos_types::{block_info::Round, epoch_state::EpochState};
+use aptos_validator_transaction_pool as vtxn_pool;
 use async_trait::async_trait;
 use futures::{
     executor::block_on,
@@ -176,7 +175,7 @@ impl DagDriver {
 
         let (sys_payload_filter, payload_filter) = if strong_links.is_empty() {
             (
-                ValidatorTransactionFilter::PendingTxnHashSet(HashSet::new()),
+                vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
                 PayloadFilter::Empty,
             )
         } else {
@@ -200,7 +199,7 @@ impl DagDriver {
                 .iter()
                 .flat_map(|node| node.validator_txns())
                 .map(|txn| txn.hash());
-            let validator_payload_filter = ValidatorTransactionFilter::PendingTxnHashSet(
+            let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
                 HashSet::from_iter(validator_txn_hashes),
             );
 

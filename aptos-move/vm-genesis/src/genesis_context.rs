@@ -5,11 +5,11 @@
 #![forbid(unsafe_code)]
 
 use anyhow::Result;
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        TStateView,
     },
 };
 use bytes::Bytes;

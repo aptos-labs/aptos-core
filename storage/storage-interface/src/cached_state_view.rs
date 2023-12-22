@@ -8,11 +8,11 @@ use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree, StateStoreStatus};
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     proof::SparseMerkleProofExt,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        StateViewId, TStateView,
     },
     transaction::Version,
     write_set::WriteSet,

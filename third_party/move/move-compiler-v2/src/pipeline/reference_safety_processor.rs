@@ -178,7 +178,7 @@ impl BorrowEdgeKind {
 /// which is used to merge information from multiple incoming paths during data
 /// flow analysis.
 #[derive(Clone, Default, Debug)]
-struct LifetimeState {
+pub struct LifetimeState {
     /// Contains the borrow graph at the current program point.
     graph: MapDomain<LifetimeLabel, LifetimeNode>,
     /// A map from locals to labels. Represents root states of the active graph.
@@ -513,6 +513,18 @@ impl LifetimeState {
             }
         }
         roots
+    }
+}
+
+impl LifetimeState {
+    /// Returns the locals borrowed
+    pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
+        self.local_to_label_map.keys().cloned()
+    }
+
+    /// Checks if the given local is borrowed
+    pub fn is_borrowed(&self, temp: TempIndex) -> bool {
+        self.borrowed_locals().contains(&temp)
     }
 }
 
@@ -1278,8 +1290,8 @@ impl LifetimeAnnotation {
 /// Annotation present at each code offset
 #[derive(Debug, Clone)]
 pub struct LifetimeInfoAtCodeOffset {
-    before: LifetimeState,
-    after: LifetimeState,
+    pub before: LifetimeState,
+    pub after: LifetimeState,
 }
 
 /// Public functions on lifetime info

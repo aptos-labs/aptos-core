@@ -128,6 +128,7 @@ impl Checker for TpsChecker {
             targets_file: None,
             coin_source_args: self.config.coin_source_args.clone(),
             chain_id,
+            node_api_key: None,
         };
         let cluster = Cluster::try_from_cluster_args(&cluster_config)
             .await

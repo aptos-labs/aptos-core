@@ -73,6 +73,7 @@ default = []
 assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
+testing = []
 
 [[bench]]
 name = "ark_bls12_381"

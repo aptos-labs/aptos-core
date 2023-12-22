@@ -59,19 +59,25 @@ macro_rules! as_bytes {
 pub(crate) use as_bytes;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
-    StateValueMetadata::new(v, &CurrentTimeMicroseconds { microseconds: v })
+    StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
 }
 
 pub(crate) fn mock_create(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Creation(as_bytes!(v).into()))
+    (
+        as_state_key!(k),
+        WriteOp::legacy_creation(as_bytes!(v).into()),
+    )
 }
 
 pub(crate) fn mock_modify(k: impl ToString, v: u128) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Modification(as_bytes!(v).into()))
+    (
+        as_state_key!(k),
+        WriteOp::legacy_modification(as_bytes!(v).into()),
+    )
 }
 
 pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
-    (as_state_key!(k), WriteOp::Deletion)
+    (as_state_key!(k), WriteOp::legacy_deletion())
 }
 
 pub(crate) fn mock_create_with_layout(
@@ -82,7 +88,7 @@ pub(crate) fn mock_create_with_layout(
     (
         as_state_key!(k),
         AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
-            WriteOp::Creation(as_bytes!(v).into()),
+            WriteOp::legacy_creation(as_bytes!(v).into()),
             layout,
         ),
     )
@@ -96,7 +102,7 @@ pub(crate) fn mock_modify_with_layout(
     (
         as_state_key!(k),
         AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
-            WriteOp::Modification(as_bytes!(v).into()),
+            WriteOp::legacy_modification(as_bytes!(v).into()),
             layout,
         ),
     )
@@ -105,7 +111,10 @@ pub(crate) fn mock_modify_with_layout(
 pub(crate) fn mock_delete_with_layout(k: impl ToString) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
-        AbstractResourceWriteOp::from_resource_write_with_maybe_layout(WriteOp::Deletion, None),
+        AbstractResourceWriteOp::from_resource_write_with_maybe_layout(
+            WriteOp::legacy_deletion(),
+            None,
+        ),
     )
 }
 

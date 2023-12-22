@@ -63,6 +63,29 @@ pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn into_network_message(self) -> ConsensusMsg;
 }
 
+#[derive(Debug)]
+pub struct RpcResponder {
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+impl RpcResponder {
+    pub fn respond<R>(self, response: R) -> anyhow::Result<()>
+    where
+        R: TConsensusMsg,
+    {
+        let rpc_response = self
+            .protocol
+            .to_bytes(&response.into_network_message())
+            .map(Bytes::from)
+            .map_err(RpcError::Error);
+
+        self.response_sender
+            .send(rpc_response)
+            .map_err(|_| anyhow::anyhow!("unable to respond to rpc"))
+    }
+}
+
 /// The block retrieval request is used internally for implementing RPC: the callback is executed
 /// for carrying the response
 #[derive(Debug)]
@@ -83,8 +106,7 @@ pub struct IncomingBatchRetrievalRequest {
 pub struct IncomingDAGRequest {
     pub req: DAGNetworkMessage,
     pub sender: Author,
-    pub protocol: ProtocolId,
-    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+    pub responder: RpcResponder,
 }
 
 #[derive(Debug)]
@@ -271,6 +293,26 @@ impl NetworkSender {
 
         // Get the list of validators excluding our own account address. Note the
         // ordering is not important in this case.
+        let self_author = self.author;
+        let other_validators: Vec<_> = self
+            .validators
+            .get_ordered_account_addresses_iter()
+            .filter(|author| author != &self_author)
+            .collect();
+
+        counters::CONSENSUS_SENT_MSGS
+            .with_label_values(&[msg.name()])
+            .inc_by(other_validators.len() as u64);
+        // Broadcast message over direct-send to all other validators.
+        if let Err(err) = self
+            .consensus_network_client
+            .send_to_many(other_validators.into_iter(), msg)
+        {
+            warn!(error = ?err, "Error broadcasting message");
+        }
+    }
+
+    pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
         let self_author = self.author;
         let other_validators: Vec<_> = self
             .validators
@@ -680,6 +722,23 @@ impl NetworkTask {
                             }
                             Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
                         },
+                        // TODO: get rid of the rpc dummy value
+                        ConsensusMsg::RandGenMessage(req) => {
+                            let (tx, _rx) = oneshot::channel();
+                            let req_with_callback =
+                                IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
+                                    req,
+                                    sender: peer_id,
+                                    protocol: RPC[0],
+                                    response_sender: tx,
+                                });
+                            if let Err(e) = self.rpc_tx.push(
+                                (peer_id, discriminant(&req_with_callback)),
+                                (peer_id, req_with_callback),
+                            ) {
+                                warn!(error = ?e, "aptos channel closed");
+                            };
+                        },
                         _ => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
@@ -721,8 +780,10 @@ impl NetworkTask {
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
                                 req,
                                 sender: peer_id,
-                                protocol,
-                                response_sender: callback,
+                                responder: RpcResponder {
+                                    protocol,
+                                    response_sender: callback,
+                                },
                             })
                         },
                         ConsensusMsg::CommitMessage(req) => {

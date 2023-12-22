@@ -8,7 +8,8 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     pipeline::{
         buffer_manager::{
-            create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest, Sender,
+            create_channel, BufferManager, OrderedBlocks, Receiver, ResetAck, ResetRequest,
+            ResetSignal, Sender,
         },
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         execution_schedule_phase::ExecutionSchedulePhase,
@@ -57,7 +58,9 @@ use maplit::hashmap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-pub fn prepare_buffer_manager() -> (
+pub fn prepare_buffer_manager(
+    bounded_executor: BoundedExecutor,
+) -> (
     BufferManager,
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
@@ -159,6 +162,7 @@ pub fn prepare_buffer_manager() -> (
             epoch: 1,
             verifier: validators.clone(),
         }),
+        bounded_executor,
     );
 
     (
@@ -191,6 +195,7 @@ pub fn launch_buffer_manager() -> (
 ) {
     let runtime = consensus_runtime();
 
+    let bounded_executor: BoundedExecutor = BoundedExecutor::new(1, runtime.handle().clone());
     let (
         buffer_manager,
         block_tx,
@@ -205,14 +210,13 @@ pub fn launch_buffer_manager() -> (
         signers,
         result_rx,
         validators,
-    ) = prepare_buffer_manager();
-    let bounded_executor = BoundedExecutor::new(1, runtime.handle().clone());
+    ) = prepare_buffer_manager(bounded_executor);
 
     runtime.spawn(execution_schedule_phase_pipeline.start());
     runtime.spawn(execution_wait_phase_pipeline.start());
     runtime.spawn(signing_phase_pipeline.start());
     runtime.spawn(persisting_phase_pipeline.start());
-    runtime.spawn(buffer_manager.start(bounded_executor));
+    runtime.spawn(buffer_manager.start());
 
     (
         block_tx,
@@ -386,7 +390,13 @@ fn buffer_manager_sync_test() {
         // reset
         let (tx, rx) = oneshot::channel::<ResetAck>();
 
-        reset_tx.send(ResetRequest { tx, stop: false }).await.ok();
+        reset_tx
+            .send(ResetRequest {
+                tx,
+                signal: ResetSignal::TargetRound(1),
+            })
+            .await
+            .ok();
         rx.await.ok();
 
         // start sending back commit vote after reset, to avoid [0..dropped_batches] being sent to result_rx

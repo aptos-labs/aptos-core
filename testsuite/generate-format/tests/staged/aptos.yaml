@@ -47,6 +47,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Secp256k1EcdsaPublicKey
+    2:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256r1EcdsaPublicKey
 AnySignature:
   ENUM:
     0:
@@ -59,6 +64,24 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: Secp256k1EcdsaSignature
+    2:
+      WebAuthn:
+        STRUCT:
+          - signature:
+              TYPENAME: PartialAuthenticatorAssertionResponse
+PartialAuthenticatorAssertionResponse:
+  STRUCT:
+    - signature:
+        TYPENAME: AssertionSignature
+    - authenticator_data: BYTES
+    - client_data_json: BYTES
+AssertionSignature:
+  ENUM:
+    0:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - signature:
+              TYPENAME: Secp256r1EcdsaSignature
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -210,6 +233,12 @@ Secp256k1EcdsaPublicKey:
   NEWTYPESTRUCT: BYTES
 Secp256k1EcdsaSignature:
   NEWTYPESTRUCT: BYTES
+Secp256r1EcdsaPrivateKey:
+  NEWTYPESTRUCT: BYTES
+Secp256r1EcdsaPublicKey:
+  NEWTYPESTRUCT: BYTES
+Secp256r1EcdsaSignature:
+  NEWTYPESTRUCT: BYTES
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -244,6 +273,12 @@ StateValueMetadata:
         STRUCT:
           - deposit: U64
           - creation_time_usecs: U64
+    1:
+      V1:
+        STRUCT:
+          - slot_deposit: U64
+          - bytes_deposit: U64
+          - creation_time_usecs: U64
 StructTag:
   STRUCT:
     - address:
@@ -255,12 +290,6 @@ StructTag:
     - type_args:
         SEQ:
           TYPENAME: TypeTag
-ValidatorTransaction:
-  ENUM:
-    0:
-      DummyTopic:
-        NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
@@ -412,6 +441,16 @@ TypeTag:
       u32: UNIT
     10:
       u256: UNIT
+ValidatorTransaction:
+  ENUM:
+    0:
+      DummyTopic1:
+        NEWTYPE:
+          TYPENAME: DummyValidatorTransaction
+    1:
+      DummyTopic2:
+        NEWTYPE:
+          TYPENAME: DummyValidatorTransaction
 WriteOp:
   ENUM:
     0:

@@ -17,7 +17,6 @@ anyhow = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 async-trait = { workspace = true }

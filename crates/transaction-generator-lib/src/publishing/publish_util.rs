@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::publishing::{module_simple, raw_module_data};
-use aptos_framework::natives::code::PackageMetadata;
+use aptos_framework::{natives::code::PackageMetadata, KnownAttribute};
 use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{account_address::AccountAddress, transaction::SignedTransaction, LocalAccount},
+    types::{
+        account_address::AccountAddress,
+        transaction::{SignedTransaction, TransactionPayload},
+        LocalAccount,
+    },
 };
-use move_binary_format::{access::ModuleAccess, CompiledModule};
+use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -69,13 +73,12 @@ impl PackageHandler {
     // Return a `Package` to be published. Packages are tracked by publisher so if
     // the same `LocalAccount` is used, the package will be an upgrade of the existing one
     // otherwise a "new" package will be generated (new suffix)
-    pub fn pick_package(&mut self, rng: &mut StdRng, publisher: &LocalAccount) -> Package {
+    pub fn pick_package(&mut self, rng: &mut StdRng, publisher_address: AccountAddress) -> Package {
         let idx = rng.gen_range(0usize, self.packages.len());
         let tracker = self
             .packages
             .get_mut(idx)
             .expect("PackageTracker must exisit");
-        let publisher_address = publisher.address();
         let (idx, version) = match tracker.find_info(&publisher_address) {
             Some(idx) => (idx, true),
             None => {
@@ -158,16 +161,10 @@ impl Package {
         module_simple::scramble(self.get_mut_module("simple"), fn_count, rng)
     }
 
-    // Return a transaction to publish the current package
-    pub fn publish_transaction(
-        &self,
-        publisher: &LocalAccount,
-        txn_factory: &TransactionFactory,
-    ) -> SignedTransaction {
+    // Return a transaction payload to publish the current package
+    pub fn publish_transaction_payload(&self) -> TransactionPayload {
         match self {
-            Self::Simple(modules, metadata) => {
-                publish_transaction(txn_factory, publisher, modules, metadata)
-            },
+            Self::Simple(modules, metadata) => publish_transaction_payload(modules, metadata),
         }
     }
 
@@ -224,10 +221,19 @@ fn update(
             .get(module.self_handle_idx().0 as usize)
             .expect("ModuleId for self must exists");
         let original_address_idx = module_handle.address.0;
+        let original_address = new_module.address_identifiers[original_address_idx as usize];
         let _ = std::mem::replace(
             &mut new_module.address_identifiers[original_address_idx as usize],
             publisher,
         );
+
+        for constant in new_module.constant_pool.iter_mut() {
+            if constant.type_ == SignatureToken::Address
+                && original_address == AccountAddress::from_bytes(constant.data.clone()).unwrap()
+            {
+                constant.data.swap_with_slice(&mut publisher.to_vec());
+            }
+        }
 
         if suffix > 0 {
             for module_handle in &new_module.module_handles {
@@ -243,6 +249,35 @@ fn update(
                 }
             }
         }
+        if let Some(mut metadata) = aptos_framework::get_metadata_from_compiled_module(&new_module)
+        {
+            metadata
+                .struct_attributes
+                .iter_mut()
+                .for_each(|(_, attrs)| {
+                    attrs.iter_mut().for_each(|attr| {
+                        if let Some(member) = attr.get_resource_group_member() {
+                            if member.module_id().address() == &original_address {
+                                let new_full_name = format!(
+                                    "{}::{}::{}",
+                                    publisher.to_standard_string(),
+                                    member.module,
+                                    member.name
+                                );
+                                let _ = std::mem::replace(
+                                    attr,
+                                    KnownAttribute::resource_group_member(new_full_name),
+                                );
+                            }
+                        }
+                    });
+                });
+            assert!(new_module.metadata.len() == 1);
+            new_module.metadata.iter_mut().for_each(|metadata_holder| {
+                metadata_holder.value = bcs::to_bytes(&metadata).expect("Metadata must serialize");
+            })
+        }
+
         new_modules.push((original_name.clone(), new_module));
     }
     let mut metadata = metadata.clone();
@@ -257,12 +292,10 @@ fn update(
     (new_modules, metadata)
 }
 
-fn publish_transaction(
-    txn_factory: &TransactionFactory,
-    publisher: &LocalAccount,
+fn publish_transaction_payload(
     modules: &[(String, CompiledModule)],
     metadata: &PackageMetadata,
-) -> SignedTransaction {
+) -> TransactionPayload {
     let metadata = bcs::to_bytes(metadata).expect("PackageMetadata must serialize");
     let mut code: Vec<Vec<u8>> = vec![];
     for (_, module) in modules {
@@ -272,6 +305,5 @@ fn publish_transaction(
             .expect("Module must serialize");
         code.push(module_code);
     }
-    let payload = aptos_stdlib::code_publish_package_txn(metadata, code);
-    publisher.sign_with_transaction_builder(txn_factory.payload(payload))
+    aptos_stdlib::code_publish_package_txn(metadata, code)
 }

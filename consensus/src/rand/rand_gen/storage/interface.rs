@@ -6,7 +6,7 @@ use crate::rand::rand_gen::types::{
 };
 use aptos_consensus_types::randomness::RandMetadata;
 
-pub trait RandStorage<S, P>: 'static {
+pub trait RandStorage<S, P>: Send + Sync + 'static {
     fn save_share(&self, share: &RandShare<S>) -> anyhow::Result<()>;
     fn save_decision(&self, decision: &RandDecision<P>) -> anyhow::Result<()>;
 

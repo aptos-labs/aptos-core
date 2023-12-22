@@ -166,19 +166,12 @@ impl<P: Proof> RandDecision<P> {
 
     pub fn verify(&self, rand_config: &RandConfig, metadata: &RandMetadata) -> anyhow::Result<()> {
         ensure!(
-            metadata.round() == self.randomness.metadata().round(),
-            "Round does not match: local {}, received {}",
-            metadata.round(),
-            self.randomness.metadata().round()
-        );
-        self.proof.verify(rand_config, self.randomness.metadata())?;
-        // this is a sanity check in case we receive different ordered blocks from consensus
-        ensure!(
             metadata == self.randomness.metadata(),
             "Metadata does not match: local {:?}, received {:?}",
             metadata,
             self.randomness.metadata()
         );
+        self.proof.verify(rand_config, self.randomness.metadata())?;
         Ok(())
     }
 
@@ -192,16 +185,16 @@ impl<P: Proof> RandDecision<P> {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct ShareAck<P> {
+pub struct RequestShare {
     epoch: u64,
-    maybe_decision: Option<RandDecision<P>>,
+    rand_metadata: RandMetadata,
 }
 
-impl<P> ShareAck<P> {
-    pub fn new(epoch: u64, maybe_decision: Option<RandDecision<P>>) -> Self {
+impl RequestShare {
+    pub fn new(epoch: u64, rand_metadata: RandMetadata) -> Self {
         Self {
             epoch,
-            maybe_decision,
+            rand_metadata,
         }
     }
 
@@ -209,8 +202,8 @@ impl<P> ShareAck<P> {
         self.epoch
     }
 
-    pub fn into_maybe_decision(self) -> Option<RandDecision<P>> {
-        self.maybe_decision
+    pub fn rand_metadata(&self) -> &RandMetadata {
+        &self.rand_metadata
     }
 }
 

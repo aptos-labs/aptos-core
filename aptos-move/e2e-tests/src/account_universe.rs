@@ -380,8 +380,10 @@ pub fn run_and_assert_universe(
     for (idx, (output, expected)) in outputs.iter().zip(&expected_values).enumerate() {
         prop_assert!(
             transaction_status_eq(output.status(), &expected.0),
-            "unexpected status for transaction {}",
-            idx
+            "unexpected status for transaction {}, {:?} != {:?}",
+            idx,
+            output.status(),
+            &expected.0
         );
         executor.apply_write_set(output.write_set());
     }

@@ -84,7 +84,8 @@ pub async fn create_data_service_grpc_client(
 }
 
 // (Protobuf encoded transaction, version)
-pub type EncodedTransactionWithVersion = (String, u64);
+type Version = u64;
+pub type EncodedTransactionWithVersion = (String, Version);
 /// Build the EncodedTransactionWithVersion from the encoded transactions and starting version.
 #[inline]
 pub fn build_protobuf_encoded_transaction_wrappers(

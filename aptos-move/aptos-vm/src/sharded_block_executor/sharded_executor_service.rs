@@ -16,15 +16,16 @@ use crate::{
     },
 };
 use aptos_logger::{info, trace};
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::{ShardId, SubBlock, SubBlocksForShard, TransactionWithDependencies},
     },
+    state_store::StateView,
     transaction::{
         analyzed_transaction::AnalyzedTransaction,
-        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        TransactionOutput,
     },
 };
 use aptos_vm_logging::disable_speculative_logging;
@@ -145,7 +146,8 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                         onchain: onchain_config,
                     },
                     cross_shard_commit_sender,
-                );
+                )
+                .map(BlockOutput::into_transaction_outputs_forced);
                 if let Some(shard_id) = shard_id {
                     trace!(
                         "executed sub block for shard {} and round {}",

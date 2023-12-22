@@ -17,22 +17,22 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [common_load_per_byte: InternalGasPerByte, "common.load.per_byte", 1000],
         [common_load_failure: InternalGas, "common.load.failure", 0],
 
-        [new_table_handle_base: InternalGas, "new_table_handle.base", 20000],
+        [new_table_handle_base: InternalGas, "new_table_handle.base", 4180],
 
-        [add_box_base: InternalGas, "add_box.base", 24000],
-        [add_box_per_byte_serialized: InternalGasPerByte, "add_box.per_byte_serialized", 200],
+        [add_box_base: InternalGas, "add_box.base", 5016],
+        [add_box_per_byte_serialized: InternalGasPerByte, "add_box.per_byte_serialized", 41],
 
-        [borrow_box_base: InternalGas, "borrow_box.base", 24000],
-        [borrow_box_per_byte_serialized: InternalGasPerByte, "borrow_box.per_byte_serialized", 200],
+        [borrow_box_base: InternalGas, "borrow_box.base", 5016],
+        [borrow_box_per_byte_serialized: InternalGasPerByte, "borrow_box.per_byte_serialized", 41],
 
-        [contains_box_base: InternalGas, "contains_box.base", 24000],
-        [contains_box_per_byte_serialized: InternalGasPerByte, "contains_box.per_byte_serialized", 200],
+        [contains_box_base: InternalGas, "contains_box.base", 5016],
+        [contains_box_per_byte_serialized: InternalGasPerByte, "contains_box.per_byte_serialized", 41],
 
-        [remove_box_base: InternalGas, "remove_box.base", 24000],
-        [remove_box_per_byte_serialized: InternalGasPerByte, "remove_box.per_byte_serialized", 200],
+        [remove_box_base: InternalGas, "remove_box.base", 5016],
+        [remove_box_per_byte_serialized: InternalGasPerByte, "remove_box.per_byte_serialized", 41],
 
-        [destroy_empty_box_base: InternalGas, "destroy_empty_box.base", 24000],
+        [destroy_empty_box_base: InternalGas, "destroy_empty_box.base", 5016],
 
-        [drop_unchecked_box_base: InternalGas, "drop_unchecked_box.base", 2000],
+        [drop_unchecked_box_base: InternalGas, "drop_unchecked_box.base", 418],
     ]
 );

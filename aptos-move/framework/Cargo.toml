@@ -21,7 +21,6 @@ aptos-gas-schedule = { workspace = true }
 aptos-move-stdlib = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-sdk-builder = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-table-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }

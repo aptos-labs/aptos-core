@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pipeline::buffer_manager::OrderedBlocks;
+use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
+    pipeline::buffer_manager::OrderedBlocks,
+};
 use aptos_consensus_types::{
     common::Round,
     executed_block::ExecutedBlock,
@@ -62,6 +65,10 @@ impl QueueItem {
     pub fn set_randomness(&mut self, round: Round, rand: Randomness) -> bool {
         let offset = self.offset(round);
         if !self.blocks()[offset].has_randomness() {
+            observe_block(
+                self.blocks()[offset].timestamp_usecs(),
+                BlockStage::RAND_ADD_DECISION,
+            );
             self.blocks_mut()[offset].set_randomness(rand);
             self.num_undecided_blocks -= 1;
             true
@@ -91,6 +98,9 @@ impl BlockQueue {
     }
 
     pub fn push_back(&mut self, item: QueueItem) {
+        for block in item.blocks() {
+            observe_block(block.timestamp_usecs(), BlockStage::RAND_ENTER);
+        }
         assert!(self.queue.insert(item.first_round(), item).is_none());
     }
 
@@ -100,6 +110,9 @@ impl BlockQueue {
         while let Some((_starting_round, item)) = self.queue.first_key_value() {
             if item.num_undecided() == 0 {
                 let (_, item) = self.queue.pop_first().unwrap();
+                for block in item.blocks() {
+                    observe_block(block.timestamp_usecs(), BlockStage::RAND_READY);
+                }
                 let QueueItem { ordered_blocks, .. } = item;
                 debug_assert!(ordered_blocks
                     .ordered_blocks

@@ -36,8 +36,7 @@ This module defines the Option type and its methods to represent and handle an o
 -  [Function `any`](#0x1_option_any)
 -  [Function `destroy`](#0x1_option_destroy)
 -  [Specification](#@Specification_1)
-    -  [Module-level Specification](#@Module-level_Specification_2)
-    -  [Helper Schema](#@Helper_Schema_3)
+    -  [Helper Schema](#@Helper_Schema_2)
     -  [Struct `Option`](#@Specification_1_Option)
     -  [Function `none`](#@Specification_1_none)
     -  [Function `some`](#@Specification_1_some)
@@ -884,11 +883,6 @@ Utility function to destroy an option that is not droppable.
 ## Specification
 
 
-<a id="@Module-level_Specification_2"></a>
-
-### Module-level Specification
-
-
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
@@ -896,7 +890,7 @@ Utility function to destroy an option that is not droppable.
 
 
 
-<a id="@Helper_Schema_3"></a>
+<a id="@Helper_Schema_2"></a>
 
 ### Helper Schema
 
