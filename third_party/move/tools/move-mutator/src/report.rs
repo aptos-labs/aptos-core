@@ -138,7 +138,12 @@ pub struct MutationReport {
 impl MutationReport {
     /// Creates a new `MutationReport` instance.
     /// Generates diff (patch) between the original and mutated source.
-    pub fn new(mutant_path: &Path, original_file: &Path, mutated_source: &str, original_source: &str ) -> Self {
+    pub fn new(
+        mutant_path: &Path,
+        original_file: &Path,
+        mutated_source: &str,
+        original_source: &str,
+    ) -> Self {
         let patch = diffy::create_patch(original_source, mutated_source);
         Self {
             mutant_path: mutant_path.to_path_buf(),
@@ -172,7 +177,12 @@ mod tests {
             "old".to_string(),
             "new".to_string(),
         );
-        let mut report_entry = MutationReport::new(Path::new("file"), Path::new("original_file"), "\n", "diff\n");
+        let mut report_entry = MutationReport::new(
+            Path::new("file"),
+            Path::new("original_file"),
+            "\n",
+            "diff\n",
+        );
         report_entry.add_modification(modification);
 
         report.add_entry(report_entry.clone());
@@ -213,7 +223,12 @@ mod tests {
             "old".to_string(),
             "new".to_string(),
         );
-        let mut report_entry = MutationReport::new(Path::new("file"), Path::new("original_file"), "\n", "diff\n");
+        let mut report_entry = MutationReport::new(
+            Path::new("file"),
+            Path::new("original_file"),
+            "\n",
+            "diff\n",
+        );
         report_entry.add_modification(modification);
         report.add_entry(report_entry);
 
