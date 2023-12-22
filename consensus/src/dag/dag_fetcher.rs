@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::DAGRpcResult;
+use super::{dag_store::PersistentDagStore, DAGRpcResult};
 use crate::dag::{
     dag_network::{RpcResultWithResponder, TDAGNetworkSender},
-    dag_store::Dag,
     errors::FetchRequestHandleError,
     observability::logging::{LogEvent, LogSchema},
     types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
@@ -14,7 +13,6 @@ use anyhow::{anyhow, ensure};
 use aptos_bitvec::BitVec;
 use aptos_config::config::DagFetcherConfig;
 use aptos_consensus_types::common::Author;
-use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, info};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
@@ -131,7 +129,7 @@ impl LocalFetchRequest {
 
 pub struct DagFetcherService {
     inner: DagFetcher,
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<PersistentDagStore>,
     request_rx: Receiver<LocalFetchRequest>,
     ordered_authors: Vec<Author>,
 }
@@ -140,7 +138,7 @@ impl DagFetcherService {
     pub fn new(
         epoch_state: Arc<EpochState>,
         network: Arc<dyn TDAGNetworkSender>,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<PersistentDagStore>,
         time_service: TimeService,
         config: DagFetcherConfig,
     ) -> (
@@ -226,7 +224,7 @@ pub trait TDagFetcher: Send {
         &self,
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<PersistentDagStore>,
     ) -> anyhow::Result<()>;
 }
 
@@ -259,7 +257,7 @@ impl TDagFetcher for DagFetcher {
         &self,
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<PersistentDagStore>,
     ) -> anyhow::Result<()> {
         debug!(
             LogSchema::new(LogEvent::FetchNodes),
@@ -289,9 +287,8 @@ impl TDagFetcher for DagFetcher {
                             let certified_nodes = fetch_response.certified_nodes();
                             // TODO: support chunk response or fallback to state sync
                             {
-                                let mut dag_writer = dag.write();
                                 for node in certified_nodes.into_iter().rev() {
-                                    if let Err(e) = dag_writer.add_node(node) {
+                                    if let Err(e) = dag.add_node(node) {
                                         error!(error = ?e, "failed to add node");
                                     }
                                 }
@@ -319,12 +316,12 @@ impl TDagFetcher for DagFetcher {
 }
 
 pub struct FetchRequestHandler {
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<PersistentDagStore>,
     author_to_index: HashMap<Author, usize>,
 }
 
 impl FetchRequestHandler {
-    pub fn new(dag: Arc<RwLock<Dag>>, epoch_state: Arc<EpochState>) -> Self {
+    pub fn new(dag: Arc<PersistentDagStore>, epoch_state: Arc<EpochState>) -> Self {
         Self {
             dag,
             author_to_index: epoch_state.verifier.address_to_validator_index().clone(),

@@ -15,13 +15,13 @@ use crate::{
         storage::DAGStorage,
         types::{Node, NodeCertificate, Vote},
         NodeId,
-    },
-    util::is_vtxn_expected,
+        util::is_vtxn_expected,
+    }
 };
+use super::{dag_store::PersistentDagStore, health::HealthBackoff};
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState,
@@ -33,7 +33,7 @@ use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<PersistentDagStore>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
@@ -47,7 +47,7 @@ pub(crate) struct NodeBroadcastHandler {
 
 impl NodeBroadcastHandler {
     pub fn new(
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<PersistentDagStore>,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
