@@ -151,6 +151,12 @@ impl ModuleGenerator {
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
         }
+
+        // At handles of friend modules
+        for mid in module_env.get_friend_modules() {
+            let handle = self.module_handle(ctx, &module_env.get_loc(), &ctx.env.get_module(mid));
+            self.module.friend_decls.push(handle)
+        }
     }
 
     /// Generate information for a struct.
@@ -336,10 +342,7 @@ impl ModuleGenerator {
         if let Some(idx) = self.module_to_idx.get(&id) {
             return *idx;
         }
-        let name = module_env.get_name();
-        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
-        let name = self.name_index(ctx, loc, name.name());
-        let handle = FF::ModuleHandle { address, name };
+        let handle = self.module_handle(ctx, loc, module_env);
         let idx = if module_env.is_script_module() {
             self.script_handle = Some(handle);
             FF::ModuleHandleIndex(TableIndex::MAX)
@@ -355,6 +358,18 @@ impl ModuleGenerator {
         };
         self.module_to_idx.insert(id, idx);
         idx
+    }
+
+    fn module_handle(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        module_env: &ModuleEnv,
+    ) -> ModuleHandle {
+        let name = module_env.get_name();
+        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
+        let name = self.name_index(ctx, loc, name.name());
+        FF::ModuleHandle { address, name }
     }
 
     /// Obtains or generates a function index.

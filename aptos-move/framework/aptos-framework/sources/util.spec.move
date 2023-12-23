@@ -1,7 +1,7 @@
 spec aptos_framework::util {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The address input bytes should be exactly 32 bytes long.
+    /// Requirement: The address input bytes should be exactly 32 bytes long.
     /// Criticality: Low
     /// Implementation: The address_from_bytes function should assert if the length of the input bytes is 32.
     /// Enforcement: Verified via [high-level-req-1](address_from_bytes).

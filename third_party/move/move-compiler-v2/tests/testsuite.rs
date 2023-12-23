@@ -86,7 +86,9 @@ impl TestConfig {
         let verbose = cfg!(feature = "verbose-debug-print");
         let mut pipeline = FunctionTargetPipeline::default();
         if path.contains("/inlining/bug_11112") || path.contains("/inlining/bug_9717_looponly") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
@@ -97,7 +99,9 @@ impl TestConfig {
                 dump_annotated_targets: true,
             }
         } else if path.contains("/inlining/") || path.contains("/folding/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
@@ -109,7 +113,9 @@ impl TestConfig {
             }
         } else if path.contains("/inlining/") {
             pipeline.add_processor(Box::new(VisibilityChecker {}));
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
@@ -121,7 +127,9 @@ impl TestConfig {
                 dump_annotated_targets: verbose,
             }
         } else if path.contains("/unit_test/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(VisibilityChecker {}));
             options.testing = true;
             Self {
@@ -148,7 +156,9 @@ impl TestConfig {
                 dump_annotated_targets: true,
             }
         } else if path.contains("/file-format-generator/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             Self {
                 type_check_only: false,
                 dump_ast: false,
@@ -166,7 +176,9 @@ impl TestConfig {
                 dump_annotated_targets: verbose,
             }
         } else if path.contains("/live-var/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             Self {
                 type_check_only: false,
                 dump_ast: false,
@@ -175,7 +187,9 @@ impl TestConfig {
                 dump_annotated_targets: true,
             }
         } else if path.contains("/reference-safety/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
                 type_check_only: false,
@@ -185,7 +199,9 @@ impl TestConfig {
                 dump_annotated_targets: verbose,
             }
         } else if path.contains("/explicit-drop/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             Self {
@@ -196,7 +212,9 @@ impl TestConfig {
                 dump_annotated_targets: true,
             }
         } else if path.contains("/ability-checker/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));

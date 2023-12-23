@@ -1344,7 +1344,7 @@ impl<'env> Docgen<'env> {
                     self.section_header("High-level Requirements", "high-level-req");
                     let column_names = vec![
                         "No.",
-                        "Property",
+                        "Requirement",
                         "Criticality",
                         "Implementation",
                         "Enforcement",

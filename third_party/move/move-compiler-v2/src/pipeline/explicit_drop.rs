@@ -1,4 +1,7 @@
-//! Adds explicit destroy instructions for non-primitive types.
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// ! Adds explicit destroy instructions for non-primitive types.
 
 use super::{
     livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
@@ -9,7 +12,7 @@ use move_model::{ast::TempIndex, model::FunctionEnv, ty::Type};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AssignKind, AttrId, Bytecode, Operation},
+    stackless_bytecode::{AttrId, Bytecode, Operation},
 };
 use std::collections::BTreeSet;
 
@@ -172,9 +175,8 @@ fn released_temps(
     // this should come before the calculation
     // of unused vars; because of, for instance,
     // x = move(x)
-    for moved_src in moved_srcs(bytecode) {
-        released_temps.remove(&moved_src);
-    }
+    released_temps.retain(|t| !life_time_info.is_moved(*t));
+
     // this is needed because unused vars are not released by live var info
     for dst in bytecode.dests() {
         if !live_var_info.before.contains_key(&dst)
@@ -191,18 +193,4 @@ fn released_temps(
         }
     }
     released_temps
-}
-
-// returns locals that may be read and moved by the bytecode
-fn moved_srcs(bytecode: &Bytecode) -> Vec<TempIndex> {
-    match bytecode {
-        Bytecode::Assign(_, _, src, AssignKind::Move) => vec![*src],
-        // all srcs of a call are move into the call
-        // explicit copy has been introduced in copy transformation
-        Bytecode::Call(_, _, _, srcs, _) => srcs.clone(),
-        Bytecode::Branch(_, _, _, src) => vec![*src],
-        Bytecode::Ret(_, srcs) => srcs.clone(),
-        Bytecode::Abort(_, src) => vec![*src],
-        _ => Vec::new(),
-    }
 }

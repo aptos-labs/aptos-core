@@ -1,21 +1,21 @@
 spec aptos_framework::staking_contract {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The Store structure for the staker exists after the staking contract is created.
+    /// Requirement: The Store structure for the staker exists after the staking contract is created.
     /// Criticality: Medium
     /// Implementation: The create_staking_contract_with_coins function ensures that the staker account has a Store
     /// structure assigned.
     /// Enforcement: Formally verified via [high-level-req-1](CreateStakingContractWithCoinsAbortsifAndEnsures).
     ///
     /// No.: 2
-    /// Property: A staking contract is created and stored in a mapping within the Store resource.
+    /// Requirement: A staking contract is created and stored in a mapping within the Store resource.
     /// Criticality: High
     /// Implementation: The create_staking_contract_with_coins function adds the newly created StakingContract to the
     /// staking_contracts map with the operator as a key of the Store resource, effectively storing the staking contract.
     /// Enforcement: Formally verified via [high-level-req-2](CreateStakingContractWithCoinsAbortsifAndEnsures).
     ///
     /// No.: 3
-    /// Property: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional
+    /// Requirement: Adding stake to the stake pool increases the principal value of the pool, reflecting the additional
     /// stake amount.
     /// Criticality: High
     /// Implementation: The add_stake function transfers the specified amount of staked coins from the staker's account
@@ -24,7 +24,7 @@ spec aptos_framework::staking_contract {
     /// Enforcement: Formally verified via [high-level-req-3](add_stake).
     ///
     /// No.: 4
-    /// Property: The staker may update the voter of a staking contract, enabling them to modify the assigned voter
+    /// Requirement: The staker may update the voter of a staking contract, enabling them to modify the assigned voter
     /// address and ensure it accurately reflects their desired choice.
     /// Criticality: High
     /// Implementation: The update_voter function ensures that the voter address in a staking contract may be updated by
@@ -33,14 +33,14 @@ spec aptos_framework::staking_contract {
     /// Enforcement: Formally verified via [high-level-req-4](update_voter).
     ///
     /// No.: 5
-    /// Property: Only the owner of the stake pool has the permission to reset the lockup period of the pool.
+    /// Requirement: Only the owner of the stake pool has the permission to reset the lockup period of the pool.
     /// Criticality: Critical
     /// Implementation: The reset_lockup function ensures that only the staker who owns the stake pool has the authority
     /// to reset the lockup period of the pool.
     /// Enforcement: Formally verified via [high-level-req-5](reset_lockup).
     ///
     /// No.: 6
-    /// Property: Unlocked funds are correctly distributed to recipients based on their distribution shares, taking into
+    /// Requirement: Unlocked funds are correctly distributed to recipients based on their distribution shares, taking into
     /// account the associated commission percentage.
     /// Criticality: High
     /// Implementation: The distribution process, implemented in the distribute_internal function, accurately allocates
@@ -50,7 +50,7 @@ spec aptos_framework::staking_contract {
     /// Enforcement: Audited that the correct amount of unlocked funds is distributed according to distribution shares.
     ///
     /// No.: 7
-    /// Property: The stake pool ensures that the commission is correctly requested and paid out from the old operator's
+    /// Requirement: The stake pool ensures that the commission is correctly requested and paid out from the old operator's
     /// stake pool before allowing the switch to the new operator.
     /// Criticality: High
     /// Implementation: The switch_operator function initiates the commission payout from the stake pool associated with
@@ -59,7 +59,7 @@ spec aptos_framework::staking_contract {
     /// Enforcement: Audited that the commission is paid to the old operator.
     ///
     /// No.: 8
-    /// Property: Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes
+    /// Requirement: Stakers can withdraw their funds from the staking contract, ensuring the unlocked amount becomes
     /// available for withdrawal after the lockup period.
     /// Criticality: High
     /// Implementation: The unlock_stake function ensures that the requested amount is properly unlocked from the stake
