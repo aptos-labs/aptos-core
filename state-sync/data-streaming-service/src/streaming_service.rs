@@ -20,8 +20,9 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use aptos_time_service::TimeService;
+use arc_swap::ArcSwap;
 use futures::StreamExt;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
 
@@ -62,7 +63,7 @@ pub struct DataStreamingService<T> {
     aptos_data_client: T,
 
     // Cached global data summary
-    global_data_summary: GlobalDataSummary,
+    global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 
     // All requested data streams from clients
     data_streams: HashMap<DataStreamId, DataStream<T>>,
@@ -103,7 +104,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             data_client_config,
             streaming_service_config,
             aptos_data_client,
-            global_data_summary: GlobalDataSummary::empty(),
+            global_data_summary: Arc::new(ArcSwap::new(Arc::new(GlobalDataSummary::empty()))),
             data_streams: HashMap::new(),
             stream_requests,
             stream_update_notifier,
@@ -116,12 +117,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 
     /// Starts the dedicated streaming service
     pub async fn start_service(mut self) {
-        // Create a ticker that periodically refreshes the global data summary
-        let mut data_refresh_interval = IntervalStream::new(interval(Duration::from_millis(
-            self.streaming_service_config
-                .global_summary_refresh_interval_ms,
-        )))
-        .fuse();
+        // Spawn a dedicated task that refreshes the global data summary
+        spawn_global_data_summary_refresher(
+            self.streaming_service_config,
+            self.aptos_data_client.clone(),
+            self.global_data_summary.clone(),
+        );
 
         // Create a ticker that periodically checks the progress of all data streams
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
@@ -134,9 +135,6 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             ::futures::select! {
                 stream_request = self.stream_requests.select_next_some() => {
                     self.handle_stream_request_message(stream_request, self.stream_update_notifier.clone());
-                }
-                _ = data_refresh_interval.select_next_some() => {
-                    self.refresh_global_data_summary();
                 }
                 _ = progress_check_interval.select_next_some() => {
                     // Check the progress of all data streams at a scheduled interval
@@ -154,6 +152,11 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
                 }
             }
         }
+    }
+
+    /// Returns the global data summary
+    fn get_global_data_summary(&self) -> GlobalDataSummary {
+        self.global_data_summary.load().clone().deref().clone()
     }
 
     /// Handles new stream request messages from clients
@@ -261,10 +264,14 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         );
 
         // Refresh the cached global data summary
-        self.refresh_global_data_summary();
+        refresh_global_data_summary(
+            self.aptos_data_client.clone(),
+            self.global_data_summary.clone(),
+        );
 
         // Create a new data stream
         let stream_id = self.stream_id_generator.next();
+        let advertised_data = self.get_global_data_summary().advertised_data.clone();
         let (data_stream, stream_listener) = DataStream::new(
             self.data_client_config,
             self.streaming_service_config,
@@ -273,12 +280,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             stream_update_notifier,
             self.aptos_data_client.clone(),
             self.notification_id_generator.clone(),
-            &self.global_data_summary.advertised_data,
+            &advertised_data,
             self.time_service.clone(),
         )?;
 
         // Verify the data stream can be fulfilled using the currently advertised data
-        data_stream.ensure_data_is_available(&self.global_data_summary.advertised_data)?;
+        data_stream.ensure_data_is_available(&advertised_data)?;
 
         // Store the data stream internally
         if self.data_streams.insert(stream_id, data_stream).is_some() {
@@ -297,35 +304,6 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 
         // Return the listener
         Ok(stream_listener)
-    }
-
-    /// Refreshes the global data summary by communicating with the Aptos data client
-    fn refresh_global_data_summary(&mut self) {
-        if let Err(error) = self.fetch_global_data_summary() {
-            metrics::increment_counter(&metrics::GLOBAL_DATA_SUMMARY_ERROR, error.get_label());
-            sample!(
-                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
-                warn!(LogSchema::new(LogEntry::RefreshGlobalData)
-                    .event(LogEvent::Error)
-                    .error(&error))
-            );
-        }
-    }
-
-    fn fetch_global_data_summary(&mut self) -> Result<(), Error> {
-        let global_data_summary = self.aptos_data_client.get_global_data_summary();
-        if global_data_summary.is_empty() {
-            sample!(
-                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
-                info!(LogSchema::new(LogEntry::RefreshGlobalData)
-                    .message("Latest global data summary is empty."))
-            );
-        } else {
-            verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
-            self.global_data_summary = global_data_summary;
-        }
-
-        Ok(())
     }
 
     /// Ensures that all existing data streams are making progress
@@ -365,7 +343,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         &mut self,
         data_stream_id: &DataStreamId,
     ) -> Result<(), Error> {
-        let global_data_summary = self.global_data_summary.clone();
+        let global_data_summary = self.get_global_data_summary();
 
         // If there was a send failure, terminate the stream
         let data_stream = self.get_data_stream(data_stream_id)?;
@@ -426,6 +404,74 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             ))
         })
     }
+}
+
+/// Spawns a task that periodically refreshes the global data summary
+fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clone + 'static>(
+    data_streaming_service_config: DataStreamingServiceConfig,
+    aptos_data_client: T,
+    cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
+) {
+    tokio::spawn(async move {
+        loop {
+            // Refresh the cached global data summary
+            refresh_global_data_summary(
+                aptos_data_client.clone(),
+                cached_global_data_summary.clone(),
+            );
+
+            // Sleep for a while before refreshing the cache again
+            let sleep_duration_ms =
+                data_streaming_service_config.global_summary_refresh_interval_ms;
+            tokio::time::sleep(Duration::from_millis(sleep_duration_ms)).await;
+        }
+    });
+}
+
+/// Refreshes the global data summary and updates the cache
+fn refresh_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'static>(
+    aptos_data_client: T,
+    cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
+) {
+    // Fetch the global data summary and update the cache
+    match fetch_global_data_summary(aptos_data_client) {
+        Ok(global_data_summary) => {
+            // Update the cached global data summary
+            cached_global_data_summary.store(Arc::new(global_data_summary));
+        },
+        Err(error) => {
+            // Otherwise, log an error and increment the error counter
+            sample!(
+                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
+                warn!(LogSchema::new(LogEntry::RefreshGlobalData)
+                    .event(LogEvent::Error)
+                    .error(&error))
+            );
+            metrics::increment_counter(&metrics::GLOBAL_DATA_SUMMARY_ERROR, error.get_label());
+        },
+    }
+}
+
+/// Fetches and returns the global data summary from the data client
+fn fetch_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'static>(
+    aptos_data_client: T,
+) -> Result<GlobalDataSummary, Error> {
+    // Fetch the global data summary from the data client
+    let global_data_summary = aptos_data_client.get_global_data_summary();
+
+    // Periodically log if the global data summary is empty.
+    // Otherwise, verify that all optimal chunk sizes are valid.
+    if global_data_summary.is_empty() {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
+            info!(LogSchema::new(LogEntry::RefreshGlobalData)
+                .message("Latest global data summary is empty."))
+        );
+    } else {
+        verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
+    }
+
+    Ok(global_data_summary)
 }
 
 /// Verifies that all optimal chunk sizes are valid (i.e., not zero). Returns an
