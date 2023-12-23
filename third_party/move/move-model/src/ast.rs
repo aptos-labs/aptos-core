@@ -561,9 +561,11 @@ impl From<Exp> for ExpData {
 
 /// Rewrite result
 pub enum RewriteResult {
-    // A new expression
+    // A new expression, stopping descending into sub expressions
     Rewritten(Exp),
-    // The original expression
+    // A new expression, descending into sub-expressions of the new one.
+    RewrittenAndDescend(Exp),
+    // The original expression, descend into sub-expressions
     Unchanged(Exp),
 }
 
@@ -1013,7 +1015,8 @@ impl ExpData {
     /// returns `RewriteResult:Rewritten(e)` if the expression is rewritten, and passes back
     /// ownership using `RewriteResult:Unchanged(e)` if the expression stays unchanged. This
     /// function stops traversing on `RewriteResult::Rewritten(e)` and descents into sub-expressions
-    /// on `RewriteResult::Unchanged(e)`.
+    /// on `RewriteResult::Unchanged(e)`. In order to continue into sub-expressions after rewrite, use
+    /// `RewriteResult::RewrittenAndDescend(e)`.
     pub fn rewrite<F>(exp: Exp, exp_rewriter: &mut F) -> Exp
     where
         F: FnMut(Exp) -> RewriteResult,
@@ -1238,6 +1241,7 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         match (*self.exp_rewriter)(exp) {
             RewriteResult::Rewritten(new_exp) => new_exp,
+            RewriteResult::RewrittenAndDescend(new_exp) => self.rewrite_exp_descent(new_exp),
             RewriteResult::Unchanged(old_exp) => self.rewrite_exp_descent(old_exp),
         }
     }
