@@ -26,8 +26,11 @@ impl FunctionTargetProcessor for VisibilityChecker {
         }
         let func_target = FunctionTarget::new(fun_env, &data);
         let global_env = func_target.global_env();
-        let caller_mod_name = func_target.module_env().get_name();
-        let caller_mod_id = func_target.module_env().get_id();
+        let module_env = func_target.module_env();
+        let caller_mod_name = module_env.get_name();
+        let caller_mod_id = module_env.get_id();
+        let caller_name_str = fun_env.get_full_name_with_address();
+        let is_script = module_env.is_script_module();
         for bytecode in func_target.get_bytecode() {
             if let Bytecode::Call(
                 attr_id,
@@ -47,7 +50,7 @@ impl FunctionTargetProcessor for VisibilityChecker {
                         // Public functions are visible from any caller.
                         continue;
                     },
-                    _ if func_target.module_env().is_script_module() => {
+                    _ if is_script => {
                         // Only public functions are visible from scripts.
                         global_env.error(
                             &func_target.get_bytecode_loc(*attr_id),
@@ -65,8 +68,9 @@ impl FunctionTargetProcessor for VisibilityChecker {
                             global_env.error(
                                 &func_target.get_bytecode_loc(*attr_id),
                                 &format!(
-                                    "friend function `{}` cannot be called here because `{}` is not a friend of `{}`",
+                                    "`public(friend)` function `{}` cannot be called from `{}` because `{}` is not a friend of `{}`",
                                     callee_env.get_full_name_with_address(),
+                                    caller_name_str,
                                     caller_mod_name.display_full(global_env),
                                     callee_env.module_env.get_full_name_str()
                                 ),
@@ -78,8 +82,9 @@ impl FunctionTargetProcessor for VisibilityChecker {
                         global_env.error(
                             &func_target.get_bytecode_loc(*attr_id),
                             &format!(
-                                "function `{}` cannot be called here because it is private to module `{}`",
+                                "function `{}` cannot be called from `{}` because it is private to module `{}`",
                                 callee_env.get_full_name_with_address(),
+                                caller_name_str,
                                 callee_env.module_env.get_full_name_str()
                             ),
                         );
