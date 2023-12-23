@@ -143,8 +143,8 @@ fun m::g() {
      #
   5: $t2 := move($t4)
      # live vars: $t0
-     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=replaced[call(true) -> L1024],L1024=local($t4)[skip -> L1281],L1281=local($t2)[]}
-     # local_to_label: {$t0=L512,$t2=L1281,$t3=L513,$t4=L1024}
+     # graph: {L512=local($t0)[]}
+     # local_to_label: {$t0=L512}
      # global_to_label: {}
      # moved: {$t3,$t4}
      #
@@ -157,8 +157,8 @@ fun m::g() {
      #
   7: $t5 := move($t6)
      # live vars:
-     # graph: {L512=local($t0)[borrow(false) -> L1537],L1537=local($t6)[skip -> L1793],L1793=local($t5)[]}
-     # local_to_label: {$t0=L512,$t5=L1793,$t6=L1537}
+     # graph: {}
+     # local_to_label: {}
      # global_to_label: {}
      # moved: {$t3,$t4,$t6}
      #
@@ -190,8 +190,9 @@ fun m::g() {
   3: $t2 := move($t3)
   4: $t4 := m::f($t2)
   5: $t2 := move($t4)
-  6: $t6 := borrow_local($t0)
-  7: destroy($t2)
+  6: destroy($t2)
+  7: $t6 := borrow_local($t0)
   8: $t5 := move($t6)
-  9: return ()
+  9: destroy($t5)
+ 10: return ()
 }

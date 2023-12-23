@@ -384,7 +384,7 @@ fun operators::order($t0: u64, $t1: u64): bool {
 module 42.operators {
 
 
-arithm(Arg0: u64, Arg1: u64): u64 {
+arithm(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u64)
@@ -403,7 +403,7 @@ B0:
 	14: Add
 	15: Ret
 }
-bits(Arg0: u64, Arg1: u8): u64 {
+bits(Arg0: u64, Arg1: u8): u64 /* def_idx: 1 */ {
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u8)
@@ -418,7 +418,7 @@ B0:
 	10: BitOr
 	11: Ret
 }
-bools(Arg0: bool, Arg1: bool): bool {
+bools(Arg0: bool, Arg1: bool): bool /* def_idx: 2 */ {
 L0:	loc2: bool
 L1:	loc3: bool
 B0:
@@ -490,21 +490,21 @@ B18:
 	47: MoveLoc[5](loc3: bool)
 	48: Ret
 }
-equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool {
+equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
 B0:
 	0: MoveLoc[0](Arg0: Ty0)
 	1: MoveLoc[1](Arg1: Ty0)
 	2: Eq
 	3: Ret
 }
-inequality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool {
+inequality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
 B0:
 	0: MoveLoc[0](Arg0: Ty0)
 	1: MoveLoc[1](Arg1: Ty0)
 	2: Neq
 	3: Ret
 }
-order(Arg0: u64, Arg1: u64): bool {
+order(Arg0: u64, Arg1: u64): bool /* def_idx: 5 */ {
 L0:	loc2: bool
 B0:
 	0: CopyLoc[0](Arg0: u64)
