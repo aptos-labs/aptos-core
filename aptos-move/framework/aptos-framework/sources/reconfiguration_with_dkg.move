@@ -12,16 +12,17 @@ module aptos_framework::reconfiguration_with_dkg {
     friend aptos_framework::aptos_governance;
 
     /// Trigger a reconfiguration with DKG.
-    /// Abort if there is a DKG in progress.
-    public(friend) fun start(account: &signer) {
+    /// Do nothing if one is already in progress.
+    public(friend) fun try_start(account: &signer) {
+        if (dkg::in_progress()) { return };
         config_for_next_epoch::disable_validator_set_changes(account);
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
     }
 
-    /// Apply buffered on-chain configs.
-    /// Re-enable on-chain config changes.
-    /// Trigger the default reconfiguration to enter the new epoch.
+    /// Apply buffered on-chain configs (except for ValidatorSet, which is done inside `reconfiguration::reconfigure()`).
+    /// Re-enable validator set changes.
+    /// Run the default reconfiguration to enter the new epoch.
     public(friend) fun finish(account: &signer) {
         consensus_config::on_new_epoch(account);
         execution_config::on_new_epoch(account);

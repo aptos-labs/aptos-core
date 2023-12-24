@@ -220,6 +220,7 @@ The complete and ongoing DKG sessions.
 ## Function `start`
 
 Mark on-chain DKG state as in-progress. Notify validators to start DKG.
+Abort if a DKG is already in progress.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, dealer_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>, target_epoch: u64, target_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>)

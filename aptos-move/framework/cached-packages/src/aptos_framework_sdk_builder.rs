@@ -795,7 +795,7 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Updates the major version to a larger version.
+    /// Set the major version (to a larger version) for the next epoch.
     /// This can be called by on chain governance.
     VersionSetForNextEpoch {
         major: u64,
@@ -3684,7 +3684,7 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-/// Updates the major version to a larger version.
+/// Set the major version (to a larger version) for the next epoch.
 /// This can be called by on chain governance.
 pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(

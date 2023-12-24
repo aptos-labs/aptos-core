@@ -26,7 +26,6 @@ module aptos_framework::aptos_governance {
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
-    use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
@@ -539,36 +538,31 @@ module aptos_framework::aptos_governance {
     }
 
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
+    ///
+    /// WARNING: often, this function is called in a "update-resource-then-reconfig" script, e.g.
+    /// ```
+    /// consensus_config::set_for_next_epoch(aptos_framework, some_config_payload);
+    /// aptos_governance::reconfigure(aptos_framework);
+    /// ```
+    /// If `RECONFIGURE_WITH_DKG` is disabled, the update takes effect with in this txn, and so does an epoch change.
+    ///
+    /// If `RECONFIGURE_WITH_DKG` is enabled:
+    /// - The update will be buffered and applied a few seconds later (once a DKG finishes/aborts).
+    /// - If multiple updates are executed in a short period of time, they are likely buffered and applied together (waiting for the same DKG).
     public fun reconfigure(aptos_framework: &signer) {
-        assert!(!features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration::reconfigure();
-    }
-
-    /// Manully start a reconfiguration with DKG.
-    /// Can be called at the end of a series of proposals that alters on-chain configs.
-    ///
-    public fun trigger_reconfiguration_with_dkg(aptos_framework: &signer) {
-        assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
-        system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration_with_dkg::start(aptos_framework);
-    }
-
-    /// Apply all the pending config changes and start a new epoch, regardless of DKG status.
-    /// Can be used in emergency (e.g., when DKG is stuck).
-    ///
-    /// NOTE: there will be no randomness in the new epoch.
-    public fun force_finish_reconfiguration_with_dkg(aptos_framework: &signer) {
-        assert!(features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
-        system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration_with_dkg::finish(aptos_framework);
+        if (features::reconfigure_with_dkg_enabled()) {
+            reconfiguration_with_dkg::try_start(aptos_framework);
+        } else {
+            reconfiguration_with_dkg::finish(aptos_framework);
+        }
     }
 
     /// Update feature flags and also trigger reconfiguration.
     public fun toggle_features(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        features::change_feature_flags(aptos_framework, enable, disable);
-        reconfiguration::reconfigure();
+        features::change_feature_flags_for_next_epoch(aptos_framework, enable, disable);
+        reconfigure(aptos_framework);
     }
 
     /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.

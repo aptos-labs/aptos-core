@@ -49,6 +49,7 @@ module aptos_framework::dkg {
     }
 
     /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.
+    /// Abort if a DKG is already in progress.
     public(friend) fun start(
         dealer_epoch: u64,
         dealer_validator_set: ValidatorSet,

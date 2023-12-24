@@ -199,7 +199,7 @@ module aptos_framework::block {
                 reconfiguration_with_dkg::finish(&account);
             }
         } else if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            reconfiguration_with_dkg::start(&account);
+            reconfiguration_with_dkg::try_start(&account);
         }
     }
 

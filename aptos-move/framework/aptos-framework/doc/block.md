@@ -502,7 +502,7 @@ Also, it will run as account <code>0x1</code> to make on-chain config locking ea
             <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">reconfiguration_with_dkg::finish</a>(&<a href="account.md#0x1_account">account</a>);
         }
     } <b>else</b> <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
-        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_start">reconfiguration_with_dkg::start</a>(&<a href="account.md#0x1_account">account</a>);
+        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>(&<a href="account.md#0x1_account">account</a>);
     }
 }
 </code></pre>

@@ -6,7 +6,7 @@
 Reconfiguration with DKG helper functions.
 
 
--  [Function `start`](#0x1_reconfiguration_with_dkg_start)
+-  [Function `try_start`](#0x1_reconfiguration_with_dkg_try_start)
 -  [Function `finish`](#0x1_reconfiguration_with_dkg_finish)
 -  [Function `finish_with_dkg_result`](#0x1_reconfiguration_with_dkg_finish_with_dkg_result)
 
@@ -24,15 +24,15 @@ Reconfiguration with DKG helper functions.
 
 
 
-<a id="0x1_reconfiguration_with_dkg_start"></a>
+<a id="0x1_reconfiguration_with_dkg_try_start"></a>
 
-## Function `start`
+## Function `try_start`
 
 Trigger a reconfiguration with DKG.
-Abort if there is a DKG in progress.
+Do nothing if one is already in progress.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_start">start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">try_start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -41,7 +41,8 @@ Abort if there is a DKG in progress.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_start">start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">try_start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>if</b> (<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>()) { <b>return</b> };
     <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_disable_validator_set_changes">config_for_next_epoch::disable_validator_set_changes</a>(<a href="account.md#0x1_account">account</a>);
     <b>let</b> cur_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
     <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch, <a href="stake.md#0x1_stake_cur_validator_set">stake::cur_validator_set</a>(), cur_epoch + 1, <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>());
@@ -56,9 +57,9 @@ Abort if there is a DKG in progress.
 
 ## Function `finish`
 
-Apply buffered on-chain configs.
-Re-enable on-chain config changes.
-Trigger the default reconfiguration to enter the new epoch.
+Apply buffered on-chain configs (except for ValidatorSet, which is done inside <code><a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>()</code>).
+Re-enable validator set changes.
+Run the default reconfiguration to enter the new epoch.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">finish</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)

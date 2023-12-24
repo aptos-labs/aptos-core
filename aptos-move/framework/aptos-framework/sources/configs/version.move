@@ -49,7 +49,7 @@ module aptos_framework::version {
         reconfiguration::reconfigure();
     }
 
-    /// Updates the major version to a larger version.
+    /// Set the major version (to a larger version) for the next epoch.
     /// This can be called by on chain governance.
     public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
