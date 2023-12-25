@@ -1294,8 +1294,15 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             _ => {},
         }
         // After processing, release any locals which are dying at this program point.
+        // Variables which are introduced in this step but not alive after need to be released as well, as they
+        // are not in the before set.
         let after_set = alive.after_set();
-        for released in alive.before.keys() {
+        for released in alive.before.keys().chain(
+            instr
+                .dests()
+                .iter()
+                .filter(|t| !alive.before.contains_key(t)),
+        ) {
             if !after_set.contains(released) {
                 state.release_local(*released, &after_set)
             }

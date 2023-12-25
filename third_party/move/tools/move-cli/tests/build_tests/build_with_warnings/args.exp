@@ -11,7 +11,7 @@ Command `disassemble --package Test --name m`:
 module 42.m {
 
 
-public foo(x: u64): u64 {
+public foo(x: u64): u64 /* def_idx: 0 */ {
 B0:
 	0: LdU64(2)
 	1: Ret

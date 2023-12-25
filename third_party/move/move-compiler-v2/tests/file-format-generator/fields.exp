@@ -282,7 +282,7 @@ struct S {
 	g: T
 }
 
-read_ref(Arg0: &S): u64 {
+read_ref(Arg0: &S): u64 /* def_idx: 0 */ {
 B0:
 	0: MoveLoc[0](Arg0: &S)
 	1: ImmBorrowField[0](S.g: T)
@@ -290,7 +290,7 @@ B0:
 	3: ReadRef
 	4: Ret
 }
-read_val(Arg0: S): u64 {
+read_val(Arg0: S): u64 /* def_idx: 1 */ {
 B0:
 	0: ImmBorrowLoc[0](Arg0: S)
 	1: ImmBorrowField[0](S.g: T)
@@ -298,7 +298,7 @@ B0:
 	3: ReadRef
 	4: Ret
 }
-write_local_direct(): S {
+write_local_direct(): S /* def_idx: 2 */ {
 L0:	loc0: S
 L1:	loc1: S
 B0:
@@ -317,7 +317,7 @@ B0:
 	12: MoveLoc[1](loc1: S)
 	13: Ret
 }
-write_local_via_ref(): S {
+write_local_via_ref(): S /* def_idx: 3 */ {
 L0:	loc0: S
 L1:	loc1: &mut S
 L2:	loc2: S
@@ -339,7 +339,7 @@ B0:
 	14: MoveLoc[2](loc2: S)
 	15: Ret
 }
-write_param(Arg0: &mut S) {
+write_param(Arg0: &mut S) /* def_idx: 4 */ {
 B0:
 	0: LdU64(42)
 	1: MoveLoc[0](Arg0: &mut S)
@@ -348,7 +348,7 @@ B0:
 	4: WriteRef
 	5: Ret
 }
-write_val(Arg0: S): S {
+write_val(Arg0: S): S /* def_idx: 5 */ {
 B0:
 	0: LdU64(42)
 	1: MutBorrowLoc[0](Arg0: S)
