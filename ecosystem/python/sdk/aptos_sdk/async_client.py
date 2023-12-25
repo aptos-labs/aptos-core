@@ -60,7 +60,7 @@ class RestClient:
         )
         self.client_config = client_config
         self._chain_id = None
-        if client_config.api_key: 
+        if client_config.api_key is not None: 
             self.client.headers["Authorization"] = f"Bearer {client_config.api_key}"
 
     async def close(self):
