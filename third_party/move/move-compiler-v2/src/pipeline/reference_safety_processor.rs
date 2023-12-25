@@ -1294,14 +1294,17 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             _ => {},
         }
         // After processing, release any locals which are dying at this program point.
+        // Variables which are introduced in this step but not alive after need to be released as well, as they
+        // are not in the before set.
         let after_set = alive.after_set();
-        let mut release_cands = alive.before.keys().cloned().collect::<BTreeSet<_>>();
-        // Variables which are introduced in this step but not alive after need to be released as well.
-        // They are not in the before set.
-        release_cands.extend(instr.dests());
-        for released in release_cands {
-            if !after_set.contains(&released) {
-                state.release_local(released, &after_set)
+        for released in alive.before.keys().chain(
+            instr
+                .dests()
+                .iter()
+                .filter(|t| !alive.before.contains_key(t)),
+        ) {
+            if !after_set.contains(released) {
+                state.release_local(*released, &after_set)
             }
         }
     }
