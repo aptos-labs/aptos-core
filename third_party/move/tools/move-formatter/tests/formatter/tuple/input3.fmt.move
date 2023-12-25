@@ -1,9 +1,7 @@
 address 0x42 {
 module example {
     // there is an implicit () value in empty expression blocks
-    fun returs_unit_2(): () {
-        /*comment*/
-    }
+    fun returs_unit_2(): () { /*comment*/ }
 
     // explicit version of `returs_unit_1` and `returs_unit_2`
     fun returs_unit_3(): () {
