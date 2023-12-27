@@ -1,0 +1,64 @@
+// ---- Model Dump
+module 0x42::m {
+    struct Object {
+        inner: address,
+    }
+    struct ObjectCore {
+        owner: address,
+    }
+    private fun owner_correct(o: m::Object): address {
+        {
+          let addr: address = select m::Object.inner(o);
+          select m::ObjectCore.owner(BorrowGlobal(Immutable)<m::ObjectCore>(addr))
+        }
+    }
+    private fun owner_read_ref_missing(o: m::Object): address {
+        select m::ObjectCore.owner(BorrowGlobal(Immutable)<m::ObjectCore>(select m::Object.inner(o)))
+    }
+    spec fun $owner_correct(o: m::Object): address {
+        {
+          let addr: address = select m::Object.inner(o);
+          select m::ObjectCore.owner(global<m::ObjectCore>(addr))
+        }
+    }
+    spec fun $owner_read_ref_missing(o: m::Object): address {
+        select m::ObjectCore.owner(global<m::ObjectCore>(select m::Object.inner(o)))
+    }
+} // end 0x42::m
+
+============ initial bytecode ================
+
+[variant baseline]
+fun m::owner_correct($t0: m::Object): address {
+     var $t1: address
+     var $t2: address
+     var $t3: address
+     var $t4: &m::Object
+     var $t5: &address
+     var $t6: &m::ObjectCore
+     var $t7: &address
+  0: $t4 := borrow_local($t0)
+  1: $t5 := borrow_field<m::Object>.inner($t4)
+  2: $t3 := read_ref($t5)
+  3: $t2 := infer($t3)
+  4: $t6 := borrow_global<m::ObjectCore>($t2)
+  5: $t7 := borrow_field<m::ObjectCore>.owner($t6)
+  6: $t1 := read_ref($t7)
+  7: return $t1
+}
+
+
+[variant baseline]
+fun m::owner_read_ref_missing($t0: m::Object): address {
+     var $t1: address
+     var $t2: &m::ObjectCore
+     var $t3: &address
+     var $t4: &m::Object
+     var $t5: &address
+  0: $t4 := borrow_local($t0)
+  1: $t3 := borrow_field<m::Object>.inner($t4)
+  2: $t2 := borrow_global<m::ObjectCore>($t3)
+  3: $t5 := borrow_field<m::ObjectCore>.owner($t2)
+  4: $t1 := read_ref($t5)
+  5: return $t1
+}
