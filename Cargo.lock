@@ -3539,7 +3539,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde-generate",
- "serde-reflection 0.3.5",
+ "serde-reflection",
  "serde_yaml 0.8.26",
  "tempfile",
  "textwrap 0.15.2",
@@ -4036,7 +4036,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-genesis",
  "bcs 0.1.4",
- "clap 4.3.21",
+ "clap 4.4.11",
  "datatest-stable",
  "hex",
  "move-binary-format",
@@ -7828,7 +7828,7 @@ dependencies = [
  "move-core-types",
  "rand 0.7.3",
  "serde",
- "serde-reflection 0.3.5",
+ "serde-reflection",
  "serde_yaml 0.8.26",
 ]
 
@@ -9996,7 +9996,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "petgraph 0.5.1",
- "serde-reflection 0.3.6",
+ "serde-reflection",
 ]
 
 [[package]]
@@ -13729,7 +13729,7 @@ dependencies = [
  "include_dir 0.6.2",
  "maplit",
  "serde",
- "serde-reflection 0.3.5",
+ "serde-reflection",
  "serde_bytes",
  "serde_yaml 0.8.26",
  "structopt",
@@ -13750,17 +13750,6 @@ dependencies = [
 name = "serde-reflection"
 version = "0.3.5"
 source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
-dependencies = [
- "once_cell",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "serde-reflection"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f05a5f801ac62a51a49d378fdb3884480041b99aced450b28990673e8ff99895"
 dependencies = [
  "once_cell",
  "serde",
