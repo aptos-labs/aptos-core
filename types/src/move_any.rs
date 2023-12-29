@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use anyhow::bail;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Rust representation of the Move Any type
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -28,5 +28,13 @@ impl Any {
         } else {
             bail!("type mismatch")
         }
+    }
+}
+
+pub trait AsMoveAny: Serialize {
+    const MOVE_TYPE_NAME: &'static str;
+
+    fn as_move_any(&self) -> Any where Self: Sized {
+        Any::pack(Self::MOVE_TYPE_NAME, self)
     }
 }

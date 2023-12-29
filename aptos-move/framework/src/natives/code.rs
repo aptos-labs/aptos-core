@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{natives::any::Any, unzip_metadata_str};
+use crate::unzip_metadata_str;
 use anyhow::bail;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    RawSafeNative, safely_pop_arg, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
 use aptos_types::{
@@ -26,6 +26,7 @@ use std::{
     fmt,
     str::FromStr,
 };
+use aptos_types::move_any::Any;
 
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
 /// TODO: move this elsewhere for reuse?

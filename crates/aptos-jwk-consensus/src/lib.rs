@@ -62,3 +62,4 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>> JWKNetworkClient<Ne
 }
 
 pub mod network_interface;
+pub mod jwk_manager;
