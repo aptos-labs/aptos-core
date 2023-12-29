@@ -1,9 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::{dkg, dkg::decrypt_key_map, smoke_test_environment::SwarmBuilder};
+use crate::{randomness, randomness::decrypt_key_map, smoke_test_environment::SwarmBuilder};
 use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_forge::{Node, Swarm};
 use std::sync::Arc;
+use crate::randomness::{num_validators, verify_dkg_transcript, wait_for_dkg_finish};
 
 #[tokio::test]
 async fn dkg_with_validator_join_leave() {
@@ -26,18 +27,18 @@ async fn dkg_with_validator_join_leave() {
     println!("Wait for a moment when DKG is not running.");
     let client_endpoint = swarm.validators().nth(1).unwrap().rest_api_endpoint();
     let client = aptos_rest_client::Client::new(client_endpoint.clone());
-    let dkg_session_1 = dkg::wait_for_dkg_finish(&client, None, time_limit_secs).await;
+    let dkg_session_1 = wait_for_dkg_finish(&client, None, time_limit_secs).await;
     println!(
         "Current epoch is {}. Number of validators: {}.",
         dkg_session_1.target_epoch,
-        dkg::num_validators(&dkg_session_1)
+        num_validators(&dkg_session_1)
     );
 
     println!(
         "Wait until we fully entered epoch {}.",
         dkg_session_1.target_epoch + 1
     );
-    let dkg_session_2 = dkg::wait_for_dkg_finish(
+    let dkg_session_2 = wait_for_dkg_finish(
         &client,
         Some(dkg_session_1.target_epoch + 1),
         time_limit_secs,
@@ -47,7 +48,7 @@ async fn dkg_with_validator_join_leave() {
     println!(
         "Current epoch is {}. Number of validators: {}.",
         dkg_session_2.target_epoch,
-        dkg::num_validators(&dkg_session_2)
+        num_validators(&dkg_session_2)
     );
 
     println!("Letting one of the validators leave.");
@@ -89,7 +90,7 @@ async fn dkg_with_validator_join_leave() {
         "Wait until we fully entered epoch {}.",
         dkg_session_2.target_epoch + 1
     );
-    let dkg_session_3 = dkg::wait_for_dkg_finish(
+    let dkg_session_3 = wait_for_dkg_finish(
         &client,
         Some(dkg_session_2.target_epoch + 1),
         time_limit_secs,
@@ -99,13 +100,13 @@ async fn dkg_with_validator_join_leave() {
     println!(
         "Current epoch is {}. Number of validators: {}.",
         dkg_session_3.target_epoch,
-        dkg::num_validators(&dkg_session_3)
+        num_validators(&dkg_session_3)
     );
 
-    assert!(dkg::verify_dkg_transcript(&dkg_session_3, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_3, &decrypt_key_map));
     assert_eq!(
-        dkg::num_validators(&dkg_session_3),
-        dkg::num_validators(&dkg_session_2) - 1
+        num_validators(&dkg_session_3),
+        num_validators(&dkg_session_2) - 1
     );
 
     println!("Now re-join.");
@@ -115,7 +116,7 @@ async fn dkg_with_validator_join_leave() {
         "Wait until we fully entered epoch {}.",
         dkg_session_3.target_epoch + 1
     );
-    let dkg_session_4 = dkg::wait_for_dkg_finish(
+    let dkg_session_4 = wait_for_dkg_finish(
         &client,
         Some(dkg_session_3.target_epoch + 1),
         time_limit_secs,
@@ -125,12 +126,12 @@ async fn dkg_with_validator_join_leave() {
     println!(
         "Current epoch is {}. Number of validators: {}.",
         dkg_session_4.target_epoch,
-        dkg::num_validators(&dkg_session_4)
+        num_validators(&dkg_session_4)
     );
 
-    assert!(dkg::verify_dkg_transcript(&dkg_session_4, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_4, &decrypt_key_map));
     assert_eq!(
-        dkg::num_validators(&dkg_session_4),
-        dkg::num_validators(&dkg_session_3) + 1
+        num_validators(&dkg_session_4),
+        num_validators(&dkg_session_3) + 1
     );
 }

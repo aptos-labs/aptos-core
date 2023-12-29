@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
+    randomness::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{NodeExt, SwarmExt};

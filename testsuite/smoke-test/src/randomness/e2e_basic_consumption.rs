@@ -6,6 +6,7 @@ use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::info;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
+use aptos_crypto::compat::Sha3_256;
 
 #[derive(Deserialize, Serialize)]
 struct DiceRollHistory {
@@ -34,6 +35,15 @@ async fn basic_consumption() {
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
         .await
         .expect("Epoch 2 taking too long to arrive!");
+
+    // let actual_block_randomness = get_latest_block_randomness();
+    // let vuf_shared_sf: G2;
+    // let rand_metadata_signed: G1;
+    // let vuf_output: Gt;
+    // let eval_bytes = bcs::to_bytes(&vuf_output).unwrap();
+    // let expected_block_randomness = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
+    //
+    // assert_eq!();
 
     let root_address = swarm.chain_info().root_account().address();
     info!("Root account: {}", root_address);

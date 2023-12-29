@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{decrypt_key_map, get_latest_dkg_state, verify_dkg_transcript},
+    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use std::{sync::Arc, time::Duration};
+use aptos_types::on_chain_config::DKGState;
 
 /// A quick overview of what this test does.
 ///             Has randomness?     What else happened?
@@ -46,7 +47,7 @@ async fn dkg_feature_flag_flips() {
         .await
         .expect("Waited too long for epoch 5.");
 
-    let dkg_session_3 = get_latest_dkg_state(&client)
+    let dkg_session_3 = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_complete
         .expect("After epoch 3, there should be DKG results on chain.");
@@ -79,7 +80,7 @@ script {
         )
         .await
         .expect("Waited too long for epoch 5.");
-    let maybe_last_complete = get_latest_dkg_state(&client).await.last_complete;
+    let maybe_last_complete = get_on_chain_resource::<DKGState>(&client).await.last_complete;
     assert!(
         maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch < 5
     );
@@ -111,7 +112,7 @@ script {
         )
         .await
         .expect("Waited too long for epoch 7");
-    let dkg_session_7 = get_latest_dkg_state(&client)
+    let dkg_session_7 = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_complete
         .expect("Starting epoch 7, there should be DKG results again.");
