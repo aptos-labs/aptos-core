@@ -9,16 +9,16 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - DefaultGas
-      - Framework:
-          bytecode_version: 6
-          git_hash: ~
-  - name: step_2_change_operator_beneficiary
-    metadata:
-      title: "AIP-51: Changing beneficiaries for operators"
-      description: "AIP-51: This allows operator to change their beneficiaries."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/251"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - operator_beneficiary_change
+  - name: step_4_update_block_limits
+    metadata: 
+      title: "Rollback AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  
+      description: "Rollback AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/285" 
+    execution_mode: MultiStep 
+    update_sequence:  
+      - Execution:  
+          V3:  
+            transaction_shuffler_type:  
+              sender_aware_v2: 32  
+            block_gas_limit: 35000
+            transaction_deduper_type: txn_hash_and_authenticator_v1
