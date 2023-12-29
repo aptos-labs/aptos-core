@@ -3,21 +3,21 @@ spec aptos_framework::create_signer {
 
     /// <high-level-req>
     /// No.: 1
-    /// Property: Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.
+    /// Requirement: Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.
     /// Criticality: Critical
     /// Implementation: The create_signer::create_signer function only allows friend modules to retrieve the signer for
     /// an arbitrarily address.
     /// Enforcement: Enforced through function visibility.
     ///
     /// No.: 2
-    /// Property: The account owner should have the ability to create a signer for their account.
+    /// Requirement: The account owner should have the ability to create a signer for their account.
     /// Criticality: Medium
     /// Implementation: Before an Account resource is created, a signer is created for the specified new_address, and
     /// later, the Account resource is assigned to this signer.
     /// Enforcement: Enforced by the [https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-vm/types/src/values/values_impl.rs#L1129](move vm).
     ///
     /// No.: 3
-    /// Property: An account should only be able to create a signer for another account if that account has granted it
+    /// Requirement: An account should only be able to create a signer for another account if that account has granted it
     /// signing capabilities.
     /// Criticality: Critical
     /// Implementation: The Account resource holds a signer_capability_offer field which allows the owner to share the
@@ -25,7 +25,7 @@ spec aptos_framework::create_signer {
     /// Enforcement: Formally verified via [account::high-level-spec-3](AccountContainsAddr).
     ///
     /// No.: 4
-    /// Property: A signer should be returned for addresses that are not registered as accounts.
+    /// Requirement: A signer should be returned for addresses that are not registered as accounts.
     /// Criticality: Low
     /// Implementation: The signer is just a struct that wraps an address, allows for non-accounts to have a signer.
     /// Enforcement: Formally verified via [0x1_create_signer_create_signer](create_signer).

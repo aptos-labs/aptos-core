@@ -1,7 +1,7 @@
 spec aptos_framework::guid {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The creation of GUID constructs a unique GUID by combining an address with an incremented creation
+    /// Requirement: The creation of GUID constructs a unique GUID by combining an address with an incremented creation
     /// number.
     /// Criticality: Low
     /// Implementation: The create function generates a new GUID by combining an address with an incremented creation
@@ -9,7 +9,7 @@ spec aptos_framework::guid {
     /// Enforcement: Enforced via [high-level-req-1](create).
     ///
     /// No.: 2
-    /// Property: The operations on GUID and ID, such as construction, field access, and equality comparison, should not
+    /// Requirement: The operations on GUID and ID, such as construction, field access, and equality comparison, should not
     /// abort.
     /// Criticality: Low
     /// Implementation: The following functions will never abort: (1) create_id, (2) id, (3) creator_address, (4)
@@ -17,14 +17,14 @@ spec aptos_framework::guid {
     /// Enforcement: Verified via [high-level-req-2.1](create_id), [high-level-req-2.2](id), [high-level-req-2.3](creator_address), [high-level-req-2.4](id_creator_address), [high-level-req-2.5](creation_num), [high-level-req-2.6](id_creation_num), and [high-level-req-2.7](eq_id).
     ///
     /// No.: 3
-    /// Property: The creation number should increment by 1 with each new creation.
+    /// Requirement: The creation number should increment by 1 with each new creation.
     /// Criticality: Low
     /// Implementation: An account can only own up to MAX_U64 resources. Not incrementing the guid_creation_num
     /// constantly could lead to shrinking the space for new resources.
     /// Enforcement: Enforced via [high-level-req-3](create).
     ///
     /// No.: 4
-    /// Property: The creation number and address of an ID / GUID must be immutable.
+    /// Requirement: The creation number and address of an ID / GUID must be immutable.
     /// Criticality: Medium
     /// Implementation: The addr and creation_num values are meant to be constant and never updated as they are unique
     /// and used for identification.

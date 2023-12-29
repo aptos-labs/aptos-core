@@ -1,7 +1,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#![allow(clippy::unwrap_or_default)]
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
 //! This module is responsible for building symbolication information on top of compiler's typed
@@ -171,12 +170,13 @@ struct StructDef {
     field_defs: Vec<FieldDef>,
 }
 
-#[derive(Derivative, Debug, Clone, PartialEq, Eq)]
-#[derivative(PartialOrd, Ord)]
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, PartialEq, PartialOrd, Ord)]
 pub struct FunctionDef {
     name: Symbol,
     start: Position,
     attrs: Vec<String>,
+    #[derivative(PartialEq = "ignore")]
     #[derivative(PartialOrd = "ignore")]
     #[derivative(Ord = "ignore")]
     ident_type: IdentType,
@@ -525,10 +525,7 @@ impl UseDef {
             col_end,
         };
 
-        references
-            .entry(def_loc)
-            .or_insert_with(BTreeSet::new)
-            .insert(use_loc);
+        references.entry(def_loc).or_default().insert(use_loc);
         Self {
             col_start: use_start.character,
             col_end,
@@ -564,7 +561,7 @@ impl UseDefMap {
     }
 
     fn insert(&mut self, key: u32, val: UseDef) {
-        self.0.entry(key).or_insert_with(BTreeSet::new).insert(val);
+        self.0.entry(key).or_default().insert(val);
     }
 
     fn get(&self, key: u32) -> Option<BTreeSet<UseDef>> {
@@ -597,10 +594,7 @@ impl FunctionIdentTypeMap {
 impl Symbols {
     pub fn merge(&mut self, other: Self) {
         for (k, v) in other.references {
-            self.references
-                .entry(k)
-                .or_insert_with(BTreeSet::new)
-                .extend(v);
+            self.references.entry(k).or_default().extend(v);
         }
         self.file_use_defs.extend(other.file_use_defs);
         self.file_name_mapping.extend(other.file_name_mapping);

@@ -5,7 +5,7 @@ task 0 'print-bytecode'. lines 1-11:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 L0:	loc0: u64
 L1:	loc1: &u64
 B0:
@@ -24,7 +24,7 @@ task 1 'print-bytecode'. lines 13-24:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 L0:	loc0: u64
 L1:	loc1: &u64
 L2:	loc2: &u64
@@ -46,7 +46,7 @@ struct T {
 	u: u64
 }
 
-f(Arg0: &T) {
+f(Arg0: &T) /* def_idx: 0 */ {
 B0:
 	0: MoveLoc[0](Arg0: &T)
 	1: ImmBorrowField[0](T.u: u64)
@@ -55,7 +55,7 @@ B0:
 	4: Pop
 	5: Ret
 }
-g(Arg0: &mut T) {
+g(Arg0: &mut T) /* def_idx: 1 */ {
 B0:
 	0: MoveLoc[0](Arg0: &mut T)
 	1: ImmBorrowField[0](T.u: u64)
@@ -64,7 +64,7 @@ B0:
 	4: Pop
 	5: Ret
 }
-public h(Arg0: &mut T) {
+public h(Arg0: &mut T) /* def_idx: 2 */ {
 B0:
 	0: MoveLoc[0](Arg0: &mut T)
 	1: MutBorrowField[0](T.u: u64)
@@ -82,7 +82,7 @@ struct T<Ty0> {
 	u: Ty0
 }
 
-f(Arg0: &T<u64>) {
+f(Arg0: &T<u64>) /* def_idx: 0 */ {
 B0:
 	0: MoveLoc[0](Arg0: &T<u64>)
 	1: ImmBorrowFieldGeneric[0](T.u: Ty0)
@@ -91,7 +91,7 @@ B0:
 	4: Pop
 	5: Ret
 }
-g(Arg0: &mut T<u128>) {
+g(Arg0: &mut T<u128>) /* def_idx: 1 */ {
 B0:
 	0: MoveLoc[0](Arg0: &mut T<u128>)
 	1: ImmBorrowFieldGeneric[1](T.u: Ty0)

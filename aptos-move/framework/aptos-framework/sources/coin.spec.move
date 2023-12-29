@@ -1,44 +1,44 @@
 spec aptos_framework::coin {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Only the owner of a coin may mint, burn or freeze coins.
+    /// Requirement: Only the owner of a coin may mint, burn or freeze coins.
     /// Criticality: Critical
     /// Implementation: Acquiring capabilities for a particular CoinType may only occur if the caller has a signer for
     /// the module declaring that type. The initialize function returns these capabilities to the caller.
     /// Enforcement: Formally Verified via [high-level-req-1.1](upgrade_supply) and [high-level-req-1.2](initialize).
     ///
     /// No.: 2
-    /// Property: Each coin may only be created exactly once.
+    /// Requirement: Each coin may only be created exactly once.
     /// Criticality: Medium
     /// Implementation: The initialization function may only be called once.
     /// Enforcement: Formally Verified via [high-level-req-2](initialize).
     ///
     /// No.: 3
-    /// Property: The merging of coins may only be done on coins of the same type.
+    /// Requirement: The merging of coins may only be done on coins of the same type.
     /// Criticality: Critical
     /// Implementation: The merge function is limited to merging coins of the same type only.
     /// Enforcement: Formally Verified via [high-level-req-3](merge).
     ///
     /// No.: 4
-    /// Property: The supply of a coin is only affected by burn and mint operations.
+    /// Requirement: The supply of a coin is only affected by burn and mint operations.
     /// Criticality: High
     /// Implementation: Only mint and burn operations on a coin alter the total supply of coins.
     /// Enforcement: Formally Verified via [high-level-req-4](TotalSupplyNoChange).
     ///
     /// No.: 5
-    /// Property: Users may register an account for a coin multiple times idempotently.
+    /// Requirement: Users may register an account for a coin multiple times idempotently.
     /// Criticality: Medium
     /// Implementation: The register function should work idempotently. Importantly, it should not abort if the coin is already registered.
     /// Enforcement: Formally verified via aborts_if on [high-level-req-5](register).
     ///
     /// No.: 6
-    /// Property: Coin operations should fail if the user has not registered for the coin.
+    /// Requirement: Coin operations should fail if the user has not registered for the coin.
     /// Criticality: Medium
     /// Implementation: Coin operations may succeed only on valid user coin registration.
     /// Enforcement: Formally Verified via [high-level-req-6.1](balance), [high-level-req-6.2](burn_from), [high-level-req-6.3](freeze), [high-level-req-6.4](unfreeze), [high-level-req-6.5](transfer) and [high-level-req-6.6](withdraw).
     ///
     /// No.: 7
-    /// Property: It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered
+    /// Requirement: It should always be possible to (1) determine if a coin exists, and (2) determine if a user registered
     /// an account with a particular coin. If a coin exists, it should always be possible to request the following
     /// information of the coin: (1) Name, (2) Symbol, and (3) Supply.
     /// Criticality: Low
@@ -46,13 +46,13 @@ spec aptos_framework::coin {
     /// Enforcement: Formally Verified in corresponding functions: [high-level-req-7.1](is_coin_initialized), [high-level-req-7.2](is_account_registered), [high-level-req-7.3](name), [high-level-req-7.4](symbol) and [high-level-req-7.5](supply).
     ///
     /// No.: 8
-    /// Property: Coin operations should fail if the user's CoinStore is frozen.
+    /// Requirement: Coin operations should fail if the user's CoinStore is frozen.
     /// Criticality: Medium
     /// Implementation: If the CoinStore of an address is frozen, coin operations are disallowed.
     /// Enforcement: Formally Verified via [high-level-req-8.1](withdraw), [high-level-req-8.2](transfer) and [high-level-req-8.3](deposit).
     ///
     /// No.: 9
-    /// Property: Utilizing AggregatableCoins does not violate other critical invariants, such as (4).
+    /// Requirement: Utilizing AggregatableCoins does not violate other critical invariants, such as (4).
     /// Criticality: High
     /// Implementation: Utilizing AggregatableCoin does not change the real-supply of any token.
     /// Enforcement: Formally Verified via [high-level-req-9](TotalSupplyNoChange).

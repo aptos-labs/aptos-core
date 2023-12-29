@@ -1,7 +1,7 @@
 spec aptos_framework::vesting {
     /// <high-level-req>
     /// No.: 1
-    /// Property: In order to retrieve the address of the underlying stake pool, the vesting start timestamp of the
+    /// Requirement: In order to retrieve the address of the underlying stake pool, the vesting start timestamp of the
     /// vesting contract, the duration of the vesting period, the remaining grant of a vesting contract, the beneficiary
     /// account of a shareholder in a vesting contract, the percentage of accumulated rewards that is paid to the
     /// operator as commission, the operator who runs the validator, the voter who will be voting on-chain, and the
@@ -13,14 +13,14 @@ spec aptos_framework::vesting {
     /// Enforcement: Formally verified via [high-level-req-1](assert_vesting_contract_exists).
     ///
     /// No.: 2
-    /// Property: The vesting pool should not exceed a maximum of 30 shareholders.
+    /// Requirement: The vesting pool should not exceed a maximum of 30 shareholders.
     /// Criticality: Medium
     /// Implementation: The maximum number of shareholders a vesting pool can support is stored as a constant in
     /// MAXIMUM_SHAREHOLDERS which is passed to the pool_u64::create function.
     /// Enforcement: Formally verified via a [high-level-spec-2](global invariant).
     ///
     /// No.: 3
-    /// Property: Retrieving all the vesting contracts of a given address and retrieving the list of beneficiaries from
+    /// Requirement: Retrieving all the vesting contracts of a given address and retrieving the list of beneficiaries from
     /// a vesting contract should never fail.
     /// Criticality: Medium
     /// Implementation: The function vesting_contracts checks if the supplied admin address contains an AdminStore
@@ -31,7 +31,7 @@ spec aptos_framework::vesting {
     /// [high-level-spec-3.2](get_beneficiary).
     ///
     /// No.: 4
-    /// Property: The shareholders should be able to start vesting only after the vesting cliff and the first vesting
+    /// Requirement: The shareholders should be able to start vesting only after the vesting cliff and the first vesting
     /// period have transpired.
     /// Criticality: High
     /// Implementation: The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs.
@@ -40,7 +40,7 @@ spec aptos_framework::vesting {
     /// Enforcement: Audited the check for the end of vesting cliff: [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566](vest) module.
     ///
     /// No.: 5
-    /// Property: In order to retrieve the total accumulated rewards that have not been distributed, the accumulated
+    /// Requirement: In order to retrieve the total accumulated rewards that have not been distributed, the accumulated
     /// rewards of a given beneficiary, the list of al shareholders in a vesting contract,the shareholder address given
     /// the beneficiary address in a given vesting contract, to terminate a vesting contract and to distribute any
     /// withdrawable stake from the stake pool, the supplied vesting contract should exist and be active.
@@ -51,7 +51,7 @@ spec aptos_framework::vesting {
     /// Enforcement: Formally verified via [high-level-spec-5](ActiveVestingContractAbortsIf).
     ///
     /// No.: 6
-    /// Property: A new vesting schedule should not be allowed to start vesting in the past or to supply an empty
+    /// Requirement: A new vesting schedule should not be allowed to start vesting in the past or to supply an empty
     /// schedule or for the period duration to be zero.
     /// Criticality: High
     /// Implementation: The create_vesting_schedule function ensures that the length of the schedule vector is greater
@@ -60,7 +60,7 @@ spec aptos_framework::vesting {
     /// Enforcement: Formally verified via [high-level-req-6](create_vesting_schedule).
     ///
     /// No.: 7
-    /// Property: The shareholders should be able to vest the tokens from previous periods.
+    /// Requirement: The shareholders should be able to vest the tokens from previous periods.
     /// Criticality: High
     /// Implementation: When vesting, the last_completed_period is checked against the next period to vest. This allows
     /// to unlock vested tokens for the next period since last vested, in case they didn't call vest for some periods.
@@ -68,7 +68,7 @@ spec aptos_framework::vesting {
     /// retrieve all the vested tokens.
     ///
     /// No.: 8
-    /// Property: Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing
+    /// Requirement: Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing
     /// withdrawable stake, and terminating the vesting contract should be accessible exclusively while the vesting
     /// contract remains active.
     /// Criticality: Low
@@ -77,14 +77,14 @@ spec aptos_framework::vesting {
     /// Enforcement: Formally verified via [high-level-spec-8](ActiveVestingContractAbortsIf).
     ///
     /// No.: 9
-    /// Property: The ability to terminate a vesting contract should only be available to the owner.
+    /// Requirement: The ability to terminate a vesting contract should only be available to the owner.
     /// Criticality: High
     /// Implementation: Limiting the access of accounts to specific function, is achieved by asserting that the signer
     /// matches the admin of the VestingContract.
     /// Enforcement: Formally verified via [high-level-req-9](verify_admin).
     ///
     /// No.: 10
-    /// Property: A new vesting contract should not be allowed to have an empty list of shareholders, have a different
+    /// Requirement: A new vesting contract should not be allowed to have an empty list of shareholders, have a different
     /// amount of shareholders than buy-ins, and provide a withdrawal address which is either reserved or not registered
     /// for apt.
     /// Criticality: High
@@ -94,7 +94,7 @@ spec aptos_framework::vesting {
     /// Enforcement: Formally verified via [high-level-req-10](create_vesting_contract).
     ///
     /// No.: 11
-    /// Property: Creating a vesting contract account should require the signer (admin) to own an admin store and should
+    /// Requirement: Creating a vesting contract account should require the signer (admin) to own an admin store and should
     /// enforce that the seed of the resource account is composed of the admin store's nonce, the vesting pool salt,
     /// and the custom contract creation seed.
     /// Criticality: Medium
