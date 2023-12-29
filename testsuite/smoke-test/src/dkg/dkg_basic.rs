@@ -4,8 +4,8 @@ use crate::{
     dkg::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
 };
-use aptos_forge::NodeExt;
-use std::sync::Arc;
+use aptos_forge::{NodeExt, SwarmExt};
+use std::{sync::Arc, time::Duration};
 
 #[tokio::test]
 async fn dkg_basic() {
@@ -28,4 +28,8 @@ async fn dkg_basic() {
 
     let decrypt_key_map = decrypt_key_map(&swarm);
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map));
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 10))
+        .await
+        .unwrap();
 }

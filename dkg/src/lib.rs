@@ -10,9 +10,7 @@ mod tracing;
 pub mod types;
 
 use crate::{
-    epoch_manager::EpochManager,
-    network::NetworkTask,
-    network_interface::{DKGMsg, DKGNetworkClient},
+    epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
 use aptos_config::config::NodeConfig;
 use aptos_event_notifications::{
@@ -22,7 +20,7 @@ use aptos_metrics_core::IntGauge;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 pub use aptos_types::dkg::DKGAggNode;
 use tokio::runtime::Runtime;
-pub use types::{DKGMessage, DKGNetworkMessage, DKGNode};
+pub use types::{DKGMessage, DKGNode};
 
 struct IntGaugeGuard {
     gauge: IntGauge,
@@ -56,8 +54,8 @@ macro_rules! monitor {
 
 pub fn start_dkg_runtime(
     node_config: &NodeConfig,
-    network_client: NetworkClient<DKGMsg>,
-    network_service_events: NetworkServiceEvents<DKGMsg>,
+    network_client: NetworkClient<DKGMessage>,
+    network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     start_dkg_events: EventNotificationListener,
     dkg_txn_writer: aptos_validator_transaction_pool::SingleTopicWriteClient,

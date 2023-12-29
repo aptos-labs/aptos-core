@@ -59,4 +59,4 @@ serde_json = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing"]
+fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "aptos-dkg/fuzzing", "move-core-types/fuzzing"]

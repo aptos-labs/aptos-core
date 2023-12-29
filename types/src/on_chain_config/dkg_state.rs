@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionState {
+    pub start_time_us: u64,
     pub dealer_epoch: u64,
     pub dealer_validator_set: ValidatorSet,
     pub target_epoch: u64,
@@ -21,7 +22,7 @@ impl DKGSessionState {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGState {
     pub last_complete: Option<DKGSessionState>,
     pub in_progress: Option<DKGSessionState>,

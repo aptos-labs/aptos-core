@@ -8,7 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::network_interface::{ConsensusMsg, DIRECT_SEND, RPC};
-use aptos_dkg_runtime::network_interface::{DKGMsg, DIRECT_SEND_DKG, RPC_DKG};
+use aptos_dkg_runtime::network_interface::{DIRECT_SEND_DKG, RPC_DKG};
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_logger::debug;
 use aptos_mempool::network::MempoolSyncMsg;
@@ -32,6 +32,7 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
+use aptos_dkg_runtime::DKGMessage;
 
 /// A simple struct that holds both the network client
 /// and receiving interfaces for an application.
@@ -206,7 +207,7 @@ pub fn setup_networks_and_get_interfaces(
 ) -> (
     Vec<Runtime>,
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<DKGMsg>>,
+    Option<ApplicationNetworkInterfaces<DKGMessage>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
@@ -392,7 +393,7 @@ fn register_client_and_service_with_network<
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
-    dkg_network_handle: Option<ApplicationNetworkHandle<DKGMsg>>,
+    dkg_network_handle: Option<ApplicationNetworkHandle<DKGMessage>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
     peer_monitoring_service_network_handles: Vec<
         ApplicationNetworkHandle<PeerMonitoringServiceMessage>,
@@ -401,7 +402,7 @@ fn transform_network_handles_into_interfaces(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<DKGMsg>>,
+    Option<ApplicationNetworkInterfaces<DKGMessage>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,

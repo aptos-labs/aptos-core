@@ -1278,7 +1278,7 @@ impl AptosVM {
         session_id: SessionId,
         agg_node: DKGAggNode,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        debug!("[DKG] process_dkg_transcript: BEGIN");
+        debug!("[DKG] process_dkg_transcript: BEGIN: epoch={}", agg_node.epoch());
         let dkg_state_bytes = resolver
             .get_resource(&AccountAddress::ONE, &DKGState::struct_tag())
             .map_err(|e| {

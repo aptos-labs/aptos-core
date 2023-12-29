@@ -19,12 +19,14 @@ module aptos_framework::dkg {
     #[event]
     struct StartDKGEvent has drop, store {
         target_epoch: u64,
+        start_time_us: u64,
         target_validator_set: ValidatorSet,
     }
 
     /// The input and output of a DKG session.
     /// The validator set of epoch `x` works together and outputs a transcript for the target validator set of epoch `x+1`.
     struct DKGSessionState has copy, store, drop {
+        start_time_us: u64,
         dealer_epoch: u64,
         dealer_validator_set: ValidatorSet,
         target_epoch: u64,
@@ -59,17 +61,20 @@ module aptos_framework::dkg {
     ) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
         assert!(std::option::is_none(&dkg_state.in_progress), error::invalid_state(EDKG_IN_PROGRESS));
+        let now = timestamp::now_microseconds();
         dkg_state.in_progress = std::option::some(DKGSessionState {
+            start_time_us: now,
             dealer_epoch,
             dealer_validator_set,
             target_epoch,
             target_validator_set,
-            deadline_microseconds: timestamp::now_microseconds() + 60000000,
+            deadline_microseconds: now + 999999999,
             result: vector[],
         });
 
         let event = StartDKGEvent {
             target_epoch,
+            start_time_us: now,
             target_validator_set,
         };
         emit(event);

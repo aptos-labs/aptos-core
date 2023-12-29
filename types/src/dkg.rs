@@ -25,6 +25,7 @@ pub type EncPK = <WTrx as Transcript>::EncryptPubKey;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
     pub target_epoch: u64,
+    pub start_time_us: u64,
     pub target_validator_set: ValidatorSet,
 }
 
@@ -72,6 +73,13 @@ pub struct DKGTranscriptWrapper {
 }
 
 impl DKGTranscriptWrapper {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Self {
+            trx: WTrx::dummy(),
+        }
+    }
+
     pub fn verify(
         &self,
         dkg_pvss_config: &DKGPvssConfig,

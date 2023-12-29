@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::DKGManager,
-    network::{IncomingDKGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender},
-    network_interface::{DKGMsg, DKGNetworkClient},
+    dkg_manager::{agg_node_producer::RealAggNodeProducer, DKGManager},
+    network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
+    network_interface::DKGNetworkClient,
+    DKGMessage,
 };
-use anyhow::anyhow;
+use anyhow::bail;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{NodeConfig, SecureBackend};
@@ -24,7 +25,7 @@ use aptos_types::{
     dkg::StartDKGEvent,
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
+        DKGState, FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
 };
@@ -41,12 +42,12 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
     reconfig_events: ReconfigNotificationListener<P>,
     start_dkg_events: EventNotificationListener,
-    dkg_rpc_msg_tx: Option<aptos_channel::Sender<u64, (AccountAddress, IncomingDKGRequest)>>,
+    dkg_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 
-    self_sender: aptos_channels::Sender<Event<DKGMsg>>,
-    network_sender: DKGNetworkClient<NetworkClient<DKGMsg>>,
-    start_dkg_event_tx: Option<aptos_channel::Sender<u64, StartDKGEvent>>,
+    self_sender: aptos_channels::Sender<Event<DKGMessage>>,
+    network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
+    start_dkg_event_tx: Option<aptos_channel::Sender<(), StartDKGEvent>>,
     dkg_txn_writer: Arc<vtxn_pool::SingleTopicWriteClient>,
     dkg_txn_pulled_rx_from_pool: vtxn_pool::PullNotificationReceiver,
     dkg_txn_pulled_tx_to_dkg_mgr: Option<vtxn_pool::PullNotificationSender>,
@@ -57,8 +58,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         node_config: &NodeConfig,
         reconfig_events: ReconfigNotificationListener<P>,
         start_dkg_events: EventNotificationListener,
-        self_sender: aptos_channels::Sender<Event<DKGMsg>>,
-        network_sender: DKGNetworkClient<NetworkClient<DKGMsg>>,
+        self_sender: aptos_channels::Sender<Event<DKGMessage>>,
+        network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         dkg_txn_writer: vtxn_pool::SingleTopicWriteClient,
         dkg_pulled_rx: vtxn_pool::PullNotificationReceiver,
     ) -> Self {
@@ -93,30 +94,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn process_rpc_request(
         &mut self,
         peer_id: Author,
-        request: IncomingRpcRequest,
+        dkg_request: IncomingRpcRequest,
     ) -> anyhow::Result<()> {
-        match request {
-            IncomingRpcRequest::DKG(dkg_request) => {
-                let ret = if dkg_request.req.epoch == self.epoch() {
-                    debug!("[DKG] EpochManager: request is for current epoch.");
-                    if let Some(tx) = &self.dkg_rpc_msg_tx {
-                        debug!(
-                            "[DKG] EpochManager::process_rpc_request: forwarding to DKGManager."
-                        );
-                        tx.push(0, (peer_id, dkg_request))
-                    } else {
-                        Err(anyhow!("DKGManager not started."))
-                    }
-                } else {
-                    debug!(
-                        "[DKG] EpochManager::process_rpc_request: request is for another epoch."
-                    );
-                    Err(anyhow!("request isi for another epoch."))
-                    // self.process_different_epoch(req.req.epoch, peer_id)
-                };
-                debug!("[DKG] EpochManager::process_rpc_request: END");
-                ret
-            },
+        if dkg_request.msg.epoch() != self.epoch() {
+            bail!("request is for another epoch.")
+        };
+        if let Some(tx) = &self.dkg_rpc_msg_tx {
+            tx.push((), (peer_id, dkg_request))
+        } else {
+            bail!("DKGManager not started.")
         }
     }
 
@@ -127,7 +113,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         for event in subscribed_events {
             let start_dkg_event = StartDKGEvent::try_from(&event).unwrap();
             if let Some(tx) = self.start_dkg_event_tx.as_ref() {
-                tx.push(0, start_dkg_event).unwrap();
+                tx.push((), start_dkg_event).unwrap();
             }
         }
     }
@@ -178,7 +164,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         };
         self.epoch_state = Some(Arc::new(epoch_state.clone()));
         debug!("[DKG] start_new_epoch: new_epoch={}", epoch_state.epoch);
-
         let features = payload.get::<Features>().unwrap_or_default();
 
         if features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
@@ -186,23 +171,32 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 "[DKG] DKG manager init, epoch={}",
                 self.epoch_state.as_ref().unwrap().epoch
             );
-            let network_sender = self.create_network_sender(&epoch_state);
-            let dkg_rb = Arc::new(ReliableBroadcast::new(
+            let DKGState {
+                in_progress: in_progress_session,
+                ..
+            } = payload.get::<DKGState>().unwrap_or_default();
+
+            debug!("[DKG] in_progress_session={:?}", in_progress_session);
+
+            let network_sender = self.create_network_sender();
+            let dkg_rb = ReliableBroadcast::new(
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),
                 ExponentialBackoff::from_millis(5),
                 aptos_time_service::TimeService::real(),
                 Duration::from_millis(1000),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
-            ));
+            );
+
+            let agg_node_producer = RealAggNodeProducer::new(self.author, dkg_rb);
 
             let (start_dkg_event_tx, start_dkg_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
             self.start_dkg_event_tx = Some(start_dkg_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
-                u64,
-                (AccountAddress, IncomingDKGRequest),
+                (),
+                (AccountAddress, IncomingRpcRequest),
             >(QueueStyle::FIFO, 100, None);
             self.dkg_rpc_msg_tx = Some(dkg_rpc_msg_tx);
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
@@ -212,12 +206,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.author,
                 self.epoch_state().clone(),
                 self.private_key(),
-                dkg_rb,
+                Arc::new(agg_node_producer),
                 self.dkg_txn_writer.clone(),
             );
             let (tx, dkg_txn_pulled_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
             self.dkg_txn_pulled_tx_to_dkg_mgr = Some(tx);
             tokio::spawn(dkg_manager.run(
+                in_progress_session,
                 start_dkg_event_rx,
                 dkg_rpc_msg_rx,
                 dkg_txn_pulled_rx,
@@ -246,12 +241,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         debug!("[DKG] shutdown_current_processor: END");
     }
 
-    fn create_network_sender(&mut self, epoch_state: &EpochState) -> NetworkSender {
+    fn create_network_sender(&mut self) -> NetworkSender {
         NetworkSender::new(
             self.author,
             self.network_sender.clone(),
             self.self_sender.clone(),
-            epoch_state.verifier.clone(),
         )
     }
 

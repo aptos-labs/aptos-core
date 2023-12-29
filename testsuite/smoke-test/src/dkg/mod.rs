@@ -177,3 +177,5 @@ mod dkg_basic;
 mod dkg_feature_flag_flips;
 mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
+
+mod validator_restart_during_dkg;

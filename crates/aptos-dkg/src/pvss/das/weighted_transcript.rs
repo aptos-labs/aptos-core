@@ -521,3 +521,15 @@ impl Transcript {
         Ok(())
     }
 }
+
+impl Transcript {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Self {
+            soks: vec![],
+            R: vec![],
+            V: vec![],
+            C: vec![],
+        }
+    }
+}

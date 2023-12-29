@@ -36,6 +36,7 @@ serde_with = "2.2.0"
 
 [features]
 assert-private-keys-not-cloneable = []
+fuzzing = []
 
 [[bench]]
 name = "pvss"

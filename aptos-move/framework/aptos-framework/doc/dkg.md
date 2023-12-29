@@ -52,6 +52,12 @@
 
 </dd>
 <dt>
+<code>start_time_us: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>target_validator_set: <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a></code>
 </dt>
 <dd>
@@ -80,6 +86,12 @@ The validator set of epoch <code>x</code> works together and outputs a transcrip
 
 
 <dl>
+<dt>
+<code>start_time_us: u64</code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>dealer_epoch: u64</code>
 </dt>
@@ -242,17 +254,20 @@ The complete and ongoing DKG sessions.
 ) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
     <b>assert</b>!(std::option::is_none(&dkg_state.in_progress), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="dkg.md#0x1_dkg_EDKG_IN_PROGRESS">EDKG_IN_PROGRESS</a>));
+    <b>let</b> now = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>();
     dkg_state.in_progress = std::option::some(<a href="dkg.md#0x1_dkg_DKGSessionState">DKGSessionState</a> {
+        start_time_us: now,
         dealer_epoch,
         dealer_validator_set,
         target_epoch,
         target_validator_set,
-        deadline_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() + 60000000,
+        deadline_microseconds: now + 999999999,
         result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
     });
 
     <b>let</b> <a href="event.md#0x1_event">event</a> = <a href="dkg.md#0x1_dkg_StartDKGEvent">StartDKGEvent</a> {
         target_epoch,
+        start_time_us: now,
         target_validator_set,
     };
     emit(<a href="event.md#0x1_event">event</a>);

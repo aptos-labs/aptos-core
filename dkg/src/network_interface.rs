@@ -1,21 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::DKGNetworkMessage;
+use crate::DKGMessage;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},
     ProtocolId,
 };
 use aptos_types::PeerId;
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
-
-/// Network type for consensus
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum DKGMsg {
-    /// DKG protocol message.
-    DKGMessage(Box<DKGNetworkMessage>),
-}
 
 pub const RPC_DKG: &[ProtocolId] = &[
     ProtocolId::DKGRpcCompressed,
@@ -34,14 +26,14 @@ pub struct DKGNetworkClient<NetworkClient> {
     network_client: NetworkClient,
 }
 
-impl<NetworkClient: NetworkClientInterface<DKGMsg>> DKGNetworkClient<NetworkClient> {
+impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<NetworkClient> {
     /// Returns a new consensus network client
     pub fn new(network_client: NetworkClient) -> Self {
         Self { network_client }
     }
 
     /// Send a single message to the destination peer
-    pub fn send_to(&self, peer: PeerId, message: DKGMsg) -> Result<(), Error> {
+    pub fn send_to(&self, peer: PeerId, message: DKGMessage) -> Result<(), Error> {
         let peer_network_id = self.get_peer_network_id_for_peer(peer);
         self.network_client.send_to_peer(message, peer_network_id)
     }
@@ -50,7 +42,7 @@ impl<NetworkClient: NetworkClientInterface<DKGMsg>> DKGNetworkClient<NetworkClie
     pub fn send_to_many(
         &self,
         peers: impl Iterator<Item = PeerId>,
-        message: DKGMsg,
+        message: DKGMessage,
     ) -> Result<(), Error> {
         let peer_network_ids: Vec<PeerNetworkId> = peers
             .map(|peer| self.get_peer_network_id_for_peer(peer))
@@ -63,9 +55,9 @@ impl<NetworkClient: NetworkClientInterface<DKGMsg>> DKGNetworkClient<NetworkClie
     pub async fn send_rpc(
         &self,
         peer: PeerId,
-        message: DKGMsg,
+        message: DKGMessage,
         rpc_timeout: Duration,
-    ) -> Result<DKGMsg, Error> {
+    ) -> Result<DKGMessage, Error> {
         let peer_network_id = self.get_peer_network_id_for_peer(peer);
         self.network_client
             .send_to_peer_rpc(message, rpc_timeout, peer_network_id)
