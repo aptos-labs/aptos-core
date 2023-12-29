@@ -71,11 +71,14 @@ module aptos_framework::jwks {
         /// The utf-8 encoding of the issuer string (e.g., "https://www.facebook.com").
         issuer: vector<u8>,
 
+        /// Bumped every time the JWKs for the current issuer is updated.
+        version: u64,
+
         /// The `jwks` each has a unique `id` and are sorted by `id` in dictionary order.
         jwks: vector<JWK>,
     }
 
-    /// Multiple `JWK`s, indexed by issuer and key ID.
+    /// Multiple `ProviderJWKs`s, indexed by issuer and key ID.
     struct JWKs has copy, drop, store {
         /// Entries each has a unique `issuer`, and are sorted by `issuer` in dictionary order.
         entries: vector<ProviderJWKs>,
@@ -83,7 +86,6 @@ module aptos_framework::jwks {
 
     /// The `JWKs` that validators observed and agreed on.
     struct ObservedJWKs has copy, drop, key, store {
-        version: u64,
         jwks: JWKs,
     }
 
@@ -91,7 +93,6 @@ module aptos_framework::jwks {
     /// When the `ObservedJWKs` is updated, this event is sent to resync the JWK consensus state in all validators.
     struct ObservedJWKsUpdated has drop, store {
         epoch: u64,
-        version: u64,
         jwks: JWKs,
     }
 
@@ -268,7 +269,7 @@ module aptos_framework::jwks {
     public(friend) fun initialize(account: &signer) {
         system_addresses::assert_aptos_framework(account);
         move_to(account, SupportedOIDCProviders { providers: vector[] });
-        move_to(account, ObservedJWKs { version: 0, jwks: JWKs { entries: vector[] } });
+        move_to(account, ObservedJWKs { jwks: JWKs { entries: vector[] } });
         move_to(account, JWKPatches { patches: vector[] });
         move_to(account, FinalJWKs { jwks: JWKs { entries: vector [] } });
     }
@@ -277,11 +278,11 @@ module aptos_framework::jwks {
     ///
     /// NOTE: for validator-proposed updates, the quorum certificate acquisition and verification should be done before invoking this.
     /// This function should only worry about on-chain state updates.
-    fun set_observed_jwks(account: &signer, version: u64, jwks: JWKs) acquires ObservedJWKs, FinalJWKs, JWKPatches {
+    fun upsert_provider_jwks(account: &signer, jwks: JWKs) acquires ObservedJWKs, FinalJWKs, JWKPatches {
         system_addresses::assert_aptos_framework(account);
-        *borrow_global_mut<ObservedJWKs>(@aptos_framework) = ObservedJWKs { version, jwks };
+        *borrow_global_mut<ObservedJWKs>(@aptos_framework) = ObservedJWKs { jwks };
         let epoch = reconfiguration::current_epoch();
-        emit(ObservedJWKsUpdated { epoch, version, jwks });
+        emit(ObservedJWKsUpdated { epoch, jwks });
         regenerate_final_jwks();
     }
 
@@ -522,6 +523,7 @@ module aptos_framework::jwks {
                 option::extract(&mut existing_jwk_set)
             } else {
                 ProviderJWKs {
+                    version: 0,
                     issuer: cmd.issuer,
                     jwks: vector[],
                 }

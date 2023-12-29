@@ -36,7 +36,7 @@ JWK functions and structs.
 -  [Function `new_rsa_jwk`](#0x1_jwks_new_rsa_jwk)
 -  [Function `new_unsupported_jwk`](#0x1_jwks_new_unsupported_jwk)
 -  [Function `initialize`](#0x1_jwks_initialize)
--  [Function `set_observed_jwks`](#0x1_jwks_set_observed_jwks)
+-  [Function `upsert_provider_jwks`](#0x1_jwks_upsert_provider_jwks)
 -  [Function `regenerate_final_jwks`](#0x1_jwks_regenerate_final_jwks)
 -  [Function `exists_in_jwks`](#0x1_jwks_exists_in_jwks)
 -  [Function `exists_in_provider_jwks`](#0x1_jwks_exists_in_provider_jwks)
@@ -271,6 +271,12 @@ A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
  The utf-8 encoding of the issuer string (e.g., "https://www.facebook.com").
 </dd>
 <dt>
+<code><a href="version.md#0x1_version">version</a>: u64</code>
+</dt>
+<dd>
+ Bumped every time the JWKs for the current issuer is updated.
+</dd>
+<dt>
 <code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;</code>
 </dt>
 <dd>
@@ -285,7 +291,7 @@ A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
 
 ## Struct `JWKs`
 
-Multiple <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s, indexed by issuer and key ID.
+Multiple <code><a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a></code>s, indexed by issuer and key ID.
 
 
 <pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_JWKs">JWKs</a> <b>has</b> <b>copy</b>, drop, store
@@ -327,12 +333,6 @@ The <code><a href="jwks.md#0x1_jwks_JWKs">JWKs</a></code> that validators observ
 
 <dl>
 <dt>
-<code><a href="version.md#0x1_version">version</a>: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
 <code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">jwks::JWKs</a></code>
 </dt>
 <dd>
@@ -363,12 +363,6 @@ When the <code><a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a></code> i
 <dl>
 <dt>
 <code>epoch: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code><a href="version.md#0x1_version">version</a>: u64</code>
 </dt>
 <dd>
 
@@ -1038,7 +1032,7 @@ Initialize some JWK resources. Should only be invoked by genesis.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwks.md#0x1_jwks_initialize">initialize</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> { providers: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
-    <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="version.md#0x1_version">version</a>: 0, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">JWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
+    <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">JWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] } });
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_JWKPatches">JWKPatches</a> { patches: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[] });
     <b>move_to</b>(<a href="account.md#0x1_account">account</a>, <a href="jwks.md#0x1_jwks_FinalJWKs">FinalJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">JWKs</a> { entries: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a> [] } });
 }
@@ -1048,9 +1042,9 @@ Initialize some JWK resources. Should only be invoked by genesis.
 
 </details>
 
-<a id="0x1_jwks_set_observed_jwks"></a>
+<a id="0x1_jwks_upsert_provider_jwks"></a>
 
-## Function `set_observed_jwks`
+## Function `upsert_provider_jwks`
 
 Only used by validators to publish their observed JWK update.
 
@@ -1058,7 +1052,7 @@ NOTE: for validator-proposed updates, the quorum certificate acquisition and ver
 This function should only worry about on-chain state updates.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_set_observed_jwks">set_observed_jwks</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="version.md#0x1_version">version</a>: u64, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">jwks::JWKs</a>)
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">jwks::JWKs</a>)
 </code></pre>
 
 
@@ -1067,11 +1061,11 @@ This function should only worry about on-chain state updates.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_set_observed_jwks">set_observed_jwks</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="version.md#0x1_version">version</a>: u64, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">JWKs</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>, <a href="jwks.md#0x1_jwks_FinalJWKs">FinalJWKs</a>, <a href="jwks.md#0x1_jwks_JWKPatches">JWKPatches</a> {
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">JWKs</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>, <a href="jwks.md#0x1_jwks_FinalJWKs">FinalJWKs</a>, <a href="jwks.md#0x1_jwks_JWKPatches">JWKPatches</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
-    *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework) = <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="version.md#0x1_version">version</a>, <a href="jwks.md#0x1_jwks">jwks</a> };
+    *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework) = <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a> };
     <b>let</b> epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
-    emit(<a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> { epoch, <a href="version.md#0x1_version">version</a>, <a href="jwks.md#0x1_jwks">jwks</a> });
+    emit(<a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> { epoch, <a href="jwks.md#0x1_jwks">jwks</a> });
     <a href="jwks.md#0x1_jwks_regenerate_final_jwks">regenerate_final_jwks</a>();
 }
 </code></pre>
@@ -1572,6 +1566,7 @@ Modify a <code><a href="jwks.md#0x1_jwks_JWKs">JWKs</a></code>.
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> existing_jwk_set)
         } <b>else</b> {
             <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> {
+                <a href="version.md#0x1_version">version</a>: 0,
                 issuer: cmd.issuer,
                 <a href="jwks.md#0x1_jwks">jwks</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
             }
