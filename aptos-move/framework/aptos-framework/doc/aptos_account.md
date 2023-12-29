@@ -497,7 +497,7 @@ By default, this returns true if an account has not explicitly set whether the c
 
 <table>
 <tr>
-<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
 </tr>
 
 <tr>
@@ -590,34 +590,6 @@ Limit the address of auth_key is not @vm_reserved / @aptos_framework / @aptos_to
 <b>ensures</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
 // This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(auth_key);
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_CreateAccountAbortsIf"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_account.md#0x1_aptos_account_CreateAccountAbortsIf">CreateAccountAbortsIf</a> {
-    auth_key: <b>address</b>;
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(auth_key);
-    <b>aborts_if</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key);
-    <b>aborts_if</b> auth_key == @vm_reserved || auth_key == @aptos_framework || auth_key == @aptos_token;
-}
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_account_length_judgment"></a>
-
-
-<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_length_judgment">length_judgment</a>(auth_key: <b>address</b>): bool {
-   <b>use</b> std::bcs;
-
-   <b>let</b> authentication_key = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(auth_key);
-   len(authentication_key) != 32
-}
 </code></pre>
 
 

@@ -16,6 +16,7 @@ use crate::{
     pruner::{LedgerPrunerManager, PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     rocksdb_property_reporter::RocksdbPropertyReporter,
     schema::{
+        block_by_version::BlockByVersionSchema,
         block_info::BlockInfoSchema,
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     },

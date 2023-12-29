@@ -1,26 +1,26 @@
 spec aptos_framework::aptos_governance {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The create proposal function calls create proposal v2.
+    /// Requirement: The create proposal function calls create proposal v2.
     /// Criticality: Low
     /// Implementation: The create_proposal function internally calls create_proposal_v2.
     /// Enforcement: This is manually audited to ensure create_proposal_v2 is called in create_proposal.
     ///
     /// No.: 2
-    /// Property: The proposer must have a stake equal to or greater than the required bond amount.
+    /// Requirement: The proposer must have a stake equal to or greater than the required bond amount.
     /// Criticality: High
     /// Implementation: The create_proposal_v2 function verifies that the stake balance equals or exceeds the required
     /// proposer stake amount.
     /// Enforcement: Formally verified in [high-level-req-2](CreateProposalAbortsIf).
     ///
     /// No.: 3
-    /// Property: The Approved execution hashes resources that exist when the vote function is called.
+    /// Requirement: The Approved execution hashes resources that exist when the vote function is called.
     /// Criticality: Low
     /// Implementation: The Vote function acquires the Approved execution hashes resources.
     /// Enforcement: Formally verified in [high-level-req-3](VoteAbortIf).
     ///
     /// No.: 4
-    /// Property: The execution script hash of a successful governance proposal is added to the approved list if the
+    /// Requirement: The execution script hash of a successful governance proposal is added to the approved list if the
     /// proposal can be resolved.
     /// Criticality: Medium
     /// Implementation: The add_approved_script_hash function asserts that proposal_state == PROPOSAL_STATE_SUCCEEDED.

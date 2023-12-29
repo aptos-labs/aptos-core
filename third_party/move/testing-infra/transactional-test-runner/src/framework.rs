@@ -686,11 +686,13 @@ fn compile_source_unit_v2(
                     .map(|p| p.to_string_lossy().to_string())
             })
             .collect();
+        remove_sub_dirs(&mut dirs);
         dirs.extend(deps.iter().cloned());
         dirs.into_iter().collect()
     } else {
         deps.to_vec()
     };
+
     let options = move_compiler_v2::Options {
         sources: vec![path],
         dependencies: deps,
@@ -718,6 +720,17 @@ fn compile_source_unit_v2(
         Ok((unit, None))
     } else {
         Ok((unit, Some(error_str)))
+    }
+}
+
+fn remove_sub_dirs(dirs: &mut BTreeSet<String>) {
+    for dir in dirs.clone() {
+        for other_dir in dirs.clone() {
+            if dir != other_dir && dir.starts_with(&other_dir) {
+                dirs.remove(&dir);
+                break;
+            }
+        }
     }
 }
 

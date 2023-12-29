@@ -6,18 +6,21 @@ use crate::{
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::rand_gen::{
         aug_data_store::AugDataStore,
-        block_queue::QueueItem,
+        block_queue::{BlockQueue, QueueItem},
         network_messages::{RandMessage, RpcRequest},
         rand_store::RandStore,
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
-        storage::interface::{AugDataStorage, RandStorage},
-        types::{AugmentedData, Proof, RandConfig, RequestShare, Share},
+        storage::interface::AugDataStorage,
+        types::{AugmentedData, CertifiedAugData, RandConfig, RequestShare, Share},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_consensus_types::{common::Author, randomness::RandMetadata};
+use aptos_consensus_types::{
+    common::Author,
+    randomness::{RandMetadata, Randomness},
+};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
@@ -28,13 +31,13 @@ use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
-pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage> {
+pub struct RandManager<S: Share, D: AugmentedData, Storage> {
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
@@ -42,20 +45,17 @@ pub struct RandManager<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage>
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
 
+    // local channel received from rand_store
+    decision_rx: Receiver<Randomness>,
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
-    rand_store: Arc<Mutex<RandStore<S, P, Storage>>>,
+    rand_store: Arc<Mutex<RandStore<S>>>,
     aug_data_store: AugDataStore<D, Storage>,
+    block_queue: BlockQueue,
 }
 
-impl<
-        S: Share,
-        P: Proof<Share = S>,
-        D: AugmentedData,
-        Storage: RandStorage<S, P> + AugDataStorage<D>,
-    > RandManager<S, P, D, Storage>
-{
+impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, Storage> {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
@@ -77,11 +77,12 @@ impl<
             Duration::from_secs(10),
             bounded_executor,
         ));
+        let (decision_tx, decision_rx) = unbounded_channel();
         let rand_store = Arc::new(Mutex::new(RandStore::new(
             epoch_state.epoch,
             author,
             config.clone(),
-            db.clone(),
+            decision_tx,
         )));
         let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
 
@@ -93,14 +94,16 @@ impl<
             reliable_broadcast,
             network_sender,
 
+            decision_rx,
             outgoing_blocks,
 
             rand_store,
             aug_data_store,
+            block_queue: BlockQueue::new(),
         }
     }
 
-    fn process_incoming_blocks(&self, blocks: OrderedBlocks) {
+    fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -108,19 +111,19 @@ impl<
             .map(|metadata| self.process_incoming_metadata(metadata))
             .collect();
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
-        self.rand_store.lock().add_blocks(queue_item);
+        self.block_queue.push_back(queue_item);
     }
 
     fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.clone());
-        self.network_sender.broadcast_without_self(
-            RandMessage::<S, D>::Share(self_share.clone()).into_network_message(),
-        );
-        self.rand_store
-            .lock()
-            .add_share(self_share)
+        let mut rand_store = self.rand_store.lock();
+        rand_store.add_rand_metadata(metadata.clone());
+        rand_store
+            .add_share(self_share.clone())
             .expect("Add self share should succeed");
-        self.aggregate_shares_task(metadata)
+        self.network_sender
+            .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
+        self.spawn_aggregate_shares_task(metadata)
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
@@ -135,9 +138,16 @@ impl<
             ResetSignal::Stop => 0,
             ResetSignal::TargetRound(round) => round,
         };
+        self.block_queue = BlockQueue::new();
         self.rand_store.lock().reset(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
+    }
+
+    fn process_randomness(&mut self, randomness: Randomness) {
+        if let Some(block) = self.block_queue.item_mut(randomness.round()) {
+            block.set_randomness(randomness.round(), randomness);
+        }
     }
 
     fn process_response(
@@ -185,51 +195,78 @@ impl<
         }
     }
 
-    fn aggregate_shares_task(&self, metadata: RandMetadata) -> DropGuard {
+    fn spawn_aggregate_shares_task(&self, metadata: RandMetadata) -> DropGuard {
         let rb = self.reliable_broadcast.clone();
         let aggregate_state = Arc::new(ShareAggregateState::new(
             self.rand_store.clone(),
             metadata.clone(),
             self.config.clone(),
         ));
-        let epoch = metadata.epoch();
+        let epoch_state = self.epoch_state.clone();
         let round = metadata.round();
-        let request = RequestShare::new(self.epoch_state.epoch, metadata);
+        let rand_store = self.rand_store.clone();
         let task = async move {
-            info!(
-                epoch = epoch,
-                round = round,
-                "[RandManager] Start broadcasting share request",
-            );
-            rb.broadcast(request, aggregate_state).await;
-            info!(
-                epoch = epoch,
-                round = round,
-                "[RandManager] Finish broadcasting share request",
-            );
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let maybe_existing_shares = rand_store.lock().get_all_shares_authors(&metadata);
+            if let Some(existing_shares) = maybe_existing_shares {
+                let epoch = epoch_state.epoch;
+                let request = RequestShare::new(epoch, metadata);
+                let targets = epoch_state
+                    .verifier
+                    .get_ordered_account_addresses_iter()
+                    .filter(|author| !existing_shares.contains(author))
+                    .collect::<Vec<_>>();
+                info!(
+                    epoch = epoch,
+                    round = round,
+                    "[RandManager] Start broadcasting share request for {}",
+                    targets.len(),
+                );
+                rb.multicast(request, aggregate_state, targets).await;
+                info!(
+                    epoch = epoch,
+                    round = round,
+                    "[RandManager] Finish broadcasting share request",
+                );
+            }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
     }
 
-    fn broadcast_aug_data(&self) -> DropGuard {
-        let data = D::generate(&self.config);
+    async fn broadcast_aug_data(&mut self) -> CertifiedAugData<D> {
+        if let Some(certified_data) = self.aug_data_store.get_my_certified_aug_data() {
+            info!("[RandManager] Already have certified aug data");
+            return certified_data;
+        }
+        let data = self
+            .aug_data_store
+            .get_my_aug_data()
+            .unwrap_or_else(|| D::generate(&self.config));
+        // Add it synchronously to avoid race that it sends to others but panics before it persists locally.
+        self.aug_data_store
+            .add_aug_data(data.clone())
+            .expect("Add self aug data should succeed");
         let aug_ack = AugDataCertBuilder::new(data.clone(), self.epoch_state.clone());
         let rb = self.reliable_broadcast.clone();
-        let rb2 = self.reliable_broadcast.clone();
-        let first_phase = async move {
-            info!("[RandManager] Start broadcasting aug data");
-            let data = rb.broadcast(data, aug_ack).await;
-            info!("[RandManager] Finish broadcasting aug data");
-            data
-        };
+        info!("[RandManager] Start broadcasting aug data");
+        let certified_data = rb.broadcast(data, aug_ack).await;
+        info!("[RandManager] Finish broadcasting aug data");
+        certified_data
+    }
+
+    fn broadcast_certified_aug_data(&mut self, certified_data: CertifiedAugData<D>) -> DropGuard {
+        let rb = self.reliable_broadcast.clone();
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
+        // Add it synchronously to be able to sign without a race that we get to sign before the broadcast reaches aug store.
+        self.aug_data_store
+            .add_certified_aug_data(certified_data.clone())
+            .expect("Add self aug data should succeed");
         let task = async move {
-            let cert = first_phase.await;
             let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
             info!("[RandManager] Start broadcasting certified aug data");
-            rb2.broadcast(cert, ack_state).await;
+            rb.broadcast(certified_data, ack_state).await;
             info!("[RandManager] Finish broadcasting certified aug data");
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -259,7 +296,8 @@ impl<
             )
         );
 
-        let _guard = self.broadcast_aug_data();
+        let certified_data = self.broadcast_aug_data().await;
+        let _guard = self.broadcast_certified_aug_data(certified_data);
 
         while !self.stop {
             tokio::select! {
@@ -270,6 +308,9 @@ impl<
                     while incoming_blocks.try_recv().is_ok() {}
                     self.process_reset(reset);
                 }
+                Some(randomness) = self.decision_rx.recv()  => {
+                    self.process_randomness(randomness);
+                }
                 Some(request) = verified_msg_rx.recv() => {
                     let RpcRequest {
                         req: rand_gen_msg,
@@ -278,8 +319,20 @@ impl<
                     } = request;
                     match rand_gen_msg {
                         RandMessage::RequestShare(request) => {
-                            if let Some(share) = self.rand_store.lock().get_self_share(request.rand_metadata()) {
-                                self.process_response(protocol, response_sender, RandMessage::Share(share));
+                            let result = self.rand_store.lock().get_self_share(request.rand_metadata());
+                            match result {
+                                Ok(maybe_share) => {
+                                    let share = maybe_share.unwrap_or_else(|| {
+                                        // reproduce previous share if not found
+                                        let share = S::generate(&self.config, request.rand_metadata().clone());
+                                        self.rand_store.lock().add_share(share.clone()).expect("Add self share should succeed");
+                                        share
+                                    });
+                                    self.process_response(protocol, response_sender, RandMessage::Share(share));
+                                },
+                                Err(e) => {
+                                    warn!("[RandManager] Failed to get share: {}", e);
+                                }
                             }
                         }
                         RandMessage::Share(share) => {
@@ -303,9 +356,9 @@ impl<
                     }
                 }
             }
-            let maybe_ready_blocks = self.rand_store.lock().try_dequeue_rand_ready_prefix();
-            if let Some(ready_blocks) = maybe_ready_blocks {
-                self.process_ready_blocks(ready_blocks);
+            let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
+            if !maybe_ready_blocks.is_empty() {
+                self.process_ready_blocks(maybe_ready_blocks);
             }
         }
         info!("RandManager stopped");

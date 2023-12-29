@@ -44,7 +44,7 @@ module 0x42::n {
 
 
 Diagnostics:
-error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is not a friend of `0x42::m`
+error: `public(friend)` function `0x42::m::bar` cannot be called from `0x42::n::test` because `0x42::n` is not a friend of `0x42::m`
    ┌─ tests/checking/inlining/private_call_2.move:4:9
    │
  4 │         bar()
@@ -56,7 +56,7 @@ error: friend function `0x42::m::bar` cannot be called here because `0x42::n` is
 25 │         assert!(o::foo() == 42, 1);
    │                 -------- in a call inlined at this callsite
 
-error: function `0x42::o::bar` cannot be called here because it is private to module `0x42::o`
+error: function `0x42::o::bar` cannot be called from `0x42::n::test` because it is private to module `0x42::o`
    ┌─ tests/checking/inlining/private_call_2.move:15:2
    │
 15 │     bar()

@@ -78,6 +78,18 @@ where
         <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {
         let receivers: Vec<_> = self.validators.clone();
+        self.multicast(message, aggregating, receivers)
+    }
+
+    pub fn multicast<S: BroadcastStatus<Req, Res> + 'static>(
+        &self,
+        message: S::Message,
+        aggregating: S,
+        receivers: Vec<Author>,
+    ) -> impl Future<Output = S::Aggregated> + 'static
+    where
+        <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
+    {
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
         let rpc_timeout_duration = self.rpc_timeout_duration;

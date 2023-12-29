@@ -1,21 +1,21 @@
 spec aptos_framework::staking_proxy {
     /// <high-level-req>
     /// No.: 1
-    /// Property: When updating the Vesting operator, it should be updated throughout all depending units.
+    /// Requirement: When updating the Vesting operator, it should be updated throughout all depending units.
     /// Criticality: Medium
     /// Implementation: The VestingContract contains a StakingInfo object that has an operator field, and this operator
     /// is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.
     /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update.
     ///
     /// No.: 2
-    /// Property: When updating the Vesting voter, it should be updated throughout all depending units.
+    /// Requirement: When updating the Vesting voter, it should be updated throughout all depending units.
     /// Criticality: Medium
     /// Implementation: The VestingContract contains a StakingInfo object that has an operator field, and this operator
     /// is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.
     /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update.
     ///
     /// No.: 3
-    /// Property: The operator and voter of a Vesting Contract should only be updated by the owner of the contract.
+    /// Requirement: The operator and voter of a Vesting Contract should only be updated by the owner of the contract.
     /// Criticality: High
     /// Implementation: The owner-operator-voter model, as defined in the documentation, grants distinct abilities to
     /// each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or
@@ -24,7 +24,7 @@ spec aptos_framework::staking_proxy {
     /// intended for the update actually exists.
     ///
     /// No.: 4
-    /// Property: The operator and voter of a Staking Contract should only be updated by the owner of the contract.
+    /// Requirement: The operator and voter of a Staking Contract should only be updated by the owner of the contract.
     /// Criticality: High
     /// Implementation: The owner-operator-voter model, as defined in the documentation, grants distinct abilities to
     /// each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or
@@ -32,7 +32,7 @@ spec aptos_framework::staking_proxy {
     /// Enforcement: Audited the patterns of updating operators and voters in the staking contract.
     ///
     /// No.: 5
-    /// Property: Staking Contract's operators should be unique inside a store.
+    /// Requirement: Staking Contract's operators should be unique inside a store.
     /// Criticality: Medium
     /// Implementation: Duplicates among operators could result in incorrectly updating the operator or voter
     /// associated with the incorrect StakingContract.

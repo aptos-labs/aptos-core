@@ -1,7 +1,7 @@
 spec aptos_framework::voting {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The proposal ID in a voting forum is unique and always increases monotonically with each new proposal
+    /// Requirement: The proposal ID in a voting forum is unique and always increases monotonically with each new proposal
     /// created for that voting forum.
     /// Criticality: High
     /// Implementation: The create_proposal and create_proposal_v2 create a new proposal with a unique ID derived from
@@ -9,7 +9,7 @@ spec aptos_framework::voting {
     /// Enforcement: Formally verified via [high-level-req-1](create_proposal).
     ///
     /// No.: 2
-    /// Property: While voting, it ensures that only the governance module that defines ProposalType may initiate voting
+    /// Requirement: While voting, it ensures that only the governance module that defines ProposalType may initiate voting
     /// and that the proposal under vote exists in the specified voting forum.
     /// Criticality: Critical
     /// Implementation: The vote function verifies the eligibility and validity of a proposal before allowing voting. It
@@ -18,7 +18,7 @@ spec aptos_framework::voting {
     /// Enforcement: Formally verified via [high-level-req-2](vote).
     ///
     /// No.: 3
-    /// Property: After resolving a single-step proposal, the corresponding proposal is guaranteed to be marked as
+    /// Requirement: After resolving a single-step proposal, the corresponding proposal is guaranteed to be marked as
     /// successfully resolved.
     /// Criticality: High
     /// Implementation: Upon invoking the resolve function on a proposal, it undergoes a series of checks to ensure its
@@ -28,7 +28,7 @@ spec aptos_framework::voting {
     /// Enforcement: Formally verified via [high-level-req-3](resolve).
     ///
     /// No.: 4
-    /// Property: In the context of v2 proposal resolving, both single-step and multi-step proposals are accurately
+    /// Requirement: In the context of v2 proposal resolving, both single-step and multi-step proposals are accurately
     /// handled. It ensures that for single-step proposals, the next execution hash is empty and resolves the proposal,
     /// while for multi-step proposals, it guarantees that the next execution hash corresponds to the hash of the next
     /// step, maintaining the integrity of the proposal execution sequence.

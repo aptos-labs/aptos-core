@@ -213,14 +213,19 @@ impl DbWriter for AptosDB {
         gauged_api("index_table_info", || {
             self.indexer_async_v2
                 .as_ref()
-                .map(|indexer| indexer.index_table_info(db_reader, first_version, write_sets, end_early_if_pending_on_empty))
+                .map(|indexer| {
+                    indexer.index_table_info(
+                        db_reader,
+                        first_version,
+                        write_sets,
+                        end_early_if_pending_on_empty,
+                    )
+                })
                 .unwrap_or(Ok(()))
         })
     }
 
-    fn cleanup_pending_on_items(
-        &self,
-    ) -> Result<()> {
+    fn cleanup_pending_on_items(&self) -> Result<()> {
         gauged_api("cleanup_pending_on_items", || {
             self.indexer_async_v2
                 .as_ref()
@@ -229,10 +234,7 @@ impl DbWriter for AptosDB {
         })
     }
 
-    fn update_next_version(
-        &self,
-        end_version: u64
-    ) -> Result<()> {
+    fn update_next_version(&self, end_version: u64) -> Result<()> {
         gauged_api("update_next_version", || {
             self.indexer_async_v2
                 .as_ref()
@@ -425,6 +427,8 @@ impl AptosDB {
                             ));
                             ledger_metadata_batch
                                 .put::<BlockInfoSchema>(&block_height, &block_info)?;
+                            ledger_metadata_batch
+                                .put::<BlockByVersionSchema>(&version, &block_height)?;
                         }
                     }
                 }

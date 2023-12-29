@@ -2295,9 +2295,14 @@ impl<'env> ModuleEnv<'env> {
         &self.data.use_decls
     }
 
-    /// Does this module have a friend with `module_id`?
+    /// Does this module declare `module_id` as a friend?
     pub fn has_friend(&self, module_id: &ModuleId) -> bool {
         self.data.friend_modules.contains(module_id)
+    }
+
+    /// Does this module have any friends?
+    pub fn has_no_friends(&self) -> bool {
+        self.data.friend_modules.is_empty()
     }
 
     /// Returns full name as a string.

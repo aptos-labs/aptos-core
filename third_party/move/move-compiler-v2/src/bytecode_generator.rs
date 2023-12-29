@@ -7,8 +7,8 @@ use ethnum::U256;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex, Value},
     model::{
-        FieldId, FunId, FunctionEnv, GlobalEnv, NodeId, Parameter, QualifiedId, QualifiedInstId,
-        StructId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -563,6 +563,26 @@ impl<'env> Generator<'env> {
                 } else {
                     self.internal_error(id, "inconsistent type in select expression")
                 }
+            },
+            Operation::Exists(None)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveFrom
+            | Operation::MoveTo
+                if self.env().get_node_instantiation(id)[0]
+                    .get_struct(self.env())
+                    .is_none() =>
+            {
+                let err_loc = self.env().get_node_loc(id);
+                let mut reasons: Vec<(Loc, String)> = Vec::new();
+                let reason_msg = format!("Invalid call to {}.", op.display(self.env(), id));
+                reasons.push((err_loc.clone(), reason_msg.clone()));
+                let err_msg  = format!(
+                            "Expected a struct type. Global storage operations are restricted to struct types declared in the current module. \
+                            Found: '{}'",
+                            self.env().get_node_instantiation(id)[0].display(&self.env().get_type_display_ctx())
+                );
+                self.env()
+                    .diag_with_labels(Severity::Error, &err_loc, &err_msg, reasons)
             },
             Operation::Exists(None) => {
                 let inst = self.env().get_node_instantiation(id);

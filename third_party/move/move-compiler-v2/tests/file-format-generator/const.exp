@@ -144,7 +144,7 @@ fun constant::test_constans() {
 module 42.constant {
 
 
-test_constans() {
+test_constans() /* def_idx: 0 */ {
 L0:	loc0: bool
 L1:	loc1: bool
 L2:	loc2: u8

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
@@ -31,15 +31,21 @@ use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 
 #[test]
 fn test_existing_account_with_fee_payer() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
-    let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let alice = h.new_account_with_balance_and_sequence_number(0, 0);
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
 
     let alice_start = h.read_aptos_balance(alice.address());
     let bob_start = h.read_aptos_balance(bob.address());
 
-    let payload = aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true);
+    let payload = aptos_stdlib::aptos_coin_transfer(*alice.address(), 0);
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .payload(payload)
@@ -59,8 +65,50 @@ fn test_existing_account_with_fee_payer() {
 }
 
 #[test]
+fn test_existing_account_with_fee_payer_aborts() {
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
+
+    let alice = h.new_account_with_balance_and_sequence_number(0, 0);
+    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+
+    let alice_start = h.read_aptos_balance(alice.address());
+    let bob_start = h.read_aptos_balance(bob.address());
+
+    let payload = aptos_stdlib::aptos_coin_transfer(*alice.address(), 1);
+    let transaction = TransactionBuilder::new(alice.clone())
+        .fee_payer(bob.clone())
+        .payload(payload)
+        .sequence_number(h.sequence_number(alice.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign_fee_payer();
+
+    let output = h.run_raw(transaction);
+    // Alice has an insufficient balance, trying to 1 when she has 0.
+    assert_abort!(output.status(), 65542);
+
+    let alice_after = h.read_aptos_balance(alice.address());
+    let bob_after = h.read_aptos_balance(bob.address());
+
+    assert_eq!(alice_start, alice_after);
+    assert!(bob_start > bob_after);
+}
+
+#[test]
 fn test_account_not_exist_with_fee_payer() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
     let alice = Account::new();
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
@@ -92,7 +140,13 @@ fn test_account_not_exist_with_fee_payer() {
 
 #[test]
 fn test_account_not_exist_with_fee_payer_insufficient_gas() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
     let alice = Account::new();
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
@@ -126,7 +180,13 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
 
 #[test]
 fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
     let alice = Account::new();
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
@@ -175,7 +235,13 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
 
 #[test]
 fn test_account_not_exist_out_of_gas_with_fee_payer() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
     let alice = Account::new();
     let beef = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -212,7 +278,13 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
 #[test]
 fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
     // Very large transaction to trigger the out of gas error aborted seqno 0 sponsored transactions
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
     let alice = Account::new();
     let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
@@ -284,7 +356,13 @@ fn test_account_not_exist_with_fee_payer_without_create_account() {
 
 #[test]
 fn test_normal_tx_with_fee_payer_insufficient_funds() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::GAS_PAYER_ENABLED], vec![]);
+    let mut h = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+        ],
+        vec![],
+    );
 
     let alice = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
     let bob = h.new_account_with_balance_and_sequence_number(1, 0);
