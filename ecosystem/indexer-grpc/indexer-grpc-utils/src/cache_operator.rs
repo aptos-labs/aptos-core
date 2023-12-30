@@ -8,6 +8,7 @@ use redis::{AsyncCommands, RedisError, RedisResult};
 // Configurations for cache.
 // Cache entries that are present.
 const CACHE_SIZE_ESTIMATION: u64 = 250_000_u64;
+const CACHE_SIZE_ESTIMATION_TEMP: u64 = 10_000_u64;
 
 // Hard limit for cache lower bound. Only used for active eviction.
 // Cache worker actively evicts the cache entries if the cache entry version is
@@ -192,7 +193,7 @@ impl<T: redis::aio::ConnectionLike + Send> CacheOperator<T> {
 
         if requested_version >= latest_version {
             Ok(CacheCoverageStatus::DataNotReady)
-        } else if requested_version + CACHE_SIZE_ESTIMATION < latest_version {
+        } else if requested_version + CACHE_SIZE_ESTIMATION_TEMP < latest_version {
             Ok(CacheCoverageStatus::CacheEvicted)
         } else {
             Ok(CacheCoverageStatus::CacheHit(std::cmp::min(
