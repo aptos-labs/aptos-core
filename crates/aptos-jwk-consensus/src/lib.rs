@@ -14,6 +14,7 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::runtime::Runtime;
+use crate::jwk_manager::{ObservedUpdateRequest, ObservedUpdateResponse};
 
 #[allow(clippy::let_and_return)]
 pub fn start_jwk_consensus_runtime(
@@ -35,8 +36,21 @@ pub fn start_jwk_consensus_runtime(
     runtime
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct JWKConsensusMsg {}
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub enum JWKConsensusMsg {
+    ObservationRequest(ObservedUpdateRequest),
+    ObservationResponse(ObservedUpdateResponse),
+}
+
+impl JWKConsensusMsg {
+    pub fn name(&self) -> &str {
+        match self {
+            JWKConsensusMsg::ObservationRequest(_) => "ObservationRequest",
+            JWKConsensusMsg::ObservationResponse(_) => "ObservationResponse",
+        }
+    }
+}
+
 
 #[derive(Clone)]
 pub struct JWKNetworkClient<NetworkClient> {
@@ -61,5 +75,7 @@ impl<NetworkClient: NetworkClientInterface<JWKConsensusMsg>> JWKNetworkClient<Ne
     }
 }
 
+
+pub mod network;
 pub mod network_interface;
 pub mod jwk_manager;

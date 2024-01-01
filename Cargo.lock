@@ -2421,8 +2421,12 @@ dependencies = [
 name = "aptos-jwk-consensus"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "aptos-channels",
  "aptos-config",
+ "aptos-crypto",
  "aptos-event-notifications",
+ "aptos-infallible",
  "aptos-network",
  "aptos-runtimes",
  "aptos-types",

@@ -13,8 +13,12 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+anyhow = { workspace = true }
+aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-event-notifications = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-network = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-types = { workspace = true }
@@ -22,6 +26,9 @@ aptos-validator-transaction-pool = { workspace = true }
 futures-util = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+
+[dev-dependencies]
+aptos-types = { workspace = true, features = ["fuzzing"] }
 
 [features]
 smoke-test = []
