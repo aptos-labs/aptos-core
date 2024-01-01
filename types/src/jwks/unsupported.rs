@@ -14,6 +14,16 @@ pub struct UnsupportedJWK {
     pub payload: Vec<u8>,
 }
 
+impl UnsupportedJWK {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test(id: &str, payload: &str) -> Self {
+        Self {
+            id: id.as_bytes().to_vec(),
+            payload: payload.as_bytes().to_vec(),
+        }
+    }
+}
+
 impl TryFrom<&serde_json::Value> for UnsupportedJWK {
     type Error = anyhow::Error;
 

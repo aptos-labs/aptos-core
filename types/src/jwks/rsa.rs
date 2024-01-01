@@ -10,7 +10,7 @@ use crate::move_utils::as_move_value::AsMoveValue;
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-struct RSA_JWK {
+pub struct RSA_JWK {
     pub kid: String,
     pub kty: String,
     pub alg: String,
