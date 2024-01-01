@@ -11,7 +11,6 @@ use aptos_network::application::{
 use aptos_types::PeerId;
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use types::JWKConsensusMsg;

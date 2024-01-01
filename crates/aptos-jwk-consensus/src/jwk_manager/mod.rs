@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_channels::aptos_channel;
-use aptos_crypto::{bls12381::PrivateKey, SigningKey, Uniform};
+use aptos_crypto::{bls12381::PrivateKey, SigningKey};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
@@ -58,10 +58,7 @@ impl JWKManager {
 
     /// Triggered by an observation thread periodically.
     pub fn process_new_observation(&mut self, issuer: Issuer, jwks: Vec<JWK>) -> Result<()> {
-        let state = self
-            .states_by_issuer
-            .entry(issuer.clone())
-            .or_insert_with(PerProviderState::default);
+        let state = self.states_by_issuer.entry(issuer.clone()).or_default();
         state.observed = Some(jwks.clone());
         if state.observed.as_ref() != state.on_chain.as_ref().map(ProviderJWKs::jwks) {
             let observed = ProviderJWKs {
@@ -111,15 +108,12 @@ impl JWKManager {
     pub fn process_peer_request(&mut self, rpc_req: IncomingRpcRequest) -> Result<()> {
         let IncomingRpcRequest {
             msg,
-            sender,
             mut response_sender,
+            ..
         } = rpc_req;
         match msg {
             JWKConsensusMsg::ObservationRequest(request) => {
-                let state = self
-                    .states_by_issuer
-                    .entry(request.issuer)
-                    .or_insert_with(PerProviderState::default);
+                let state = self.states_by_issuer.entry(request.issuer).or_default();
                 let response: Result<JWKConsensusMsg> = match &state.consensus_state {
                     ConsensusState::NotStarted => Err(anyhow!("observed update unavailable")),
                     ConsensusState::InProgress { my_proposal, .. }
@@ -143,7 +137,7 @@ impl JWKManager {
         let state = self
             .states_by_issuer
             .entry(update.observed.issuer.clone())
-            .or_insert_with(PerProviderState::default);
+            .or_default();
         match &state.consensus_state {
             ConsensusState::InProgress { my_proposal, .. } => {
                 //TODO: counters

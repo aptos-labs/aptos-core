@@ -2,17 +2,18 @@
 
 use crate::{
     jwk_manager::{
-        certified_update_producer::DummyCertifiedUpdateProducer, AbortHandleWrapper,
-        ConsensusState, JWKManager, PerProviderState,
+        certified_update_producer::CertifiedUpdateProducer, AbortHandleWrapper, ConsensusState,
+        JWKManager, PerProviderState,
     },
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
 };
+use aptos_channels::aptos_channel;
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey, Signature},
     SigningKey, Uniform,
 };
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
@@ -24,6 +25,7 @@ use aptos_types::{
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use aptos_validator_transaction_pool::TransactionFilter;
+use futures_util::future::AbortHandle;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     sync::Arc,
@@ -46,13 +48,13 @@ async fn test_jwk_manager_state_transition() {
         verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
     };
 
-    let certified_update_producer = DummyCertifiedUpdateProducer::new();
+    let certified_update_producer = DummyCertifiedUpdateProducer::default();
     let (vtxn_pool_read_cli, mut vtxn_pool_write_clis) =
         aptos_validator_transaction_pool::new(vec![(Topic::JWK_CONSENSUS, None)]);
     let vtxn_pool_write_cli = vtxn_pool_write_clis.pop().unwrap();
     let mut jwk_manager = JWKManager::new(
         private_keys[0].clone(),
-        addrs[0].clone(),
+        addrs[0],
         epoch_state,
         Arc::new(certified_update_producer),
         Arc::new(vtxn_pool_write_cli),
@@ -130,7 +132,7 @@ async fn test_jwk_manager_state_transition() {
         rpc_response_collector.clone(),
     );
     assert!(jwk_manager.process_peer_request(bob_ob_req).is_ok());
-    let last_invocations = std::mem::replace(&mut *rpc_response_collector.write(), vec![]);
+    let last_invocations = std::mem::take(&mut *rpc_response_collector.write());
     assert!(last_invocations.len() == 1 && last_invocations[0].is_err());
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
 
@@ -144,7 +146,7 @@ async fn test_jwk_manager_state_transition() {
         rpc_response_collector.clone(),
     );
     assert!(jwk_manager.process_peer_request(carl_ob_req).is_ok());
-    let last_invocations = std::mem::replace(&mut *rpc_response_collector.write(), vec![]);
+    let last_invocations = std::mem::take(&mut *rpc_response_collector.write());
     assert!(last_invocations.len() == 1 && last_invocations[0].is_err());
     expected_states.insert(issuer_carl.clone(), PerProviderState::default());
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
@@ -232,7 +234,7 @@ async fn test_jwk_manager_state_transition() {
     assert!(jwk_manager.process_peer_request(carl_ob_req).is_ok());
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
     let last_invocations: Vec<JWKConsensusMsg> =
-        std::mem::replace(&mut *rpc_response_collector.write(), vec![])
+        std::mem::take(&mut *rpc_response_collector.write())
             .into_iter()
             .map(|maybe_msg| maybe_msg.unwrap())
             .collect();
@@ -352,7 +354,7 @@ async fn test_jwk_manager_state_transition() {
         },
     )];
     let actual_responses: Vec<JWKConsensusMsg> =
-        std::mem::replace(&mut *rpc_response_collector.write(), vec![])
+        std::mem::take(&mut *rpc_response_collector.write())
             .into_iter()
             .map(|maybe_msg| maybe_msg.unwrap())
             .collect();
@@ -430,7 +432,7 @@ async fn test_jwk_manager_state_transition() {
 }
 
 fn new_rpc_observation_request(
-    epoch: u64,
+    _epoch: u64,
     issuer: Issuer,
     sender: AccountAddress,
     response_collector: Arc<RwLock<Vec<anyhow::Result<JWKConsensusMsg>>>>,
@@ -439,5 +441,30 @@ fn new_rpc_observation_request(
         msg: JWKConsensusMsg::ObservationRequest(ObservedUpdateRequest { issuer }),
         sender,
         response_sender: Box::new(DummyRpcResponseSender::new(response_collector)),
+    }
+}
+
+pub struct DummyCertifiedUpdateProducer {
+    pub invocations: Mutex<Vec<(EpochState, ProviderJWKs)>>,
+}
+
+impl Default for DummyCertifiedUpdateProducer {
+    fn default() -> Self {
+        Self {
+            invocations: Mutex::new(vec![]),
+        }
+    }
+}
+
+impl CertifiedUpdateProducer for DummyCertifiedUpdateProducer {
+    fn start_produce(
+        &self,
+        epoch_state: EpochState,
+        payload: ProviderJWKs,
+        _agg_node_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+    ) -> AbortHandle {
+        self.invocations.lock().push((epoch_state, payload));
+        let (abort_handle, _) = AbortHandle::new_pair();
+        abort_handle
     }
 }
