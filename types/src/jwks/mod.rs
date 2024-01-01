@@ -76,6 +76,6 @@ pub mod unsupported;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct QuorumCertifiedUpdate {
     pub authors: BTreeSet<AccountAddress>,
-    pub payload: ProviderJWKs,
+    pub observed: ProviderJWKs,
     pub multi_sig: bls12381::Signature,
 }

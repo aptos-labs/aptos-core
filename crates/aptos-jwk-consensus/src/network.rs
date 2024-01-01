@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 
-use std::sync::Arc;
+use crate::types::JWKConsensusMsg;
 use aptos_infallible::RwLock;
 use aptos_types::account_address::AccountAddress;
-use crate::JWKConsensusMsg;
+use std::sync::Arc;
 
 pub struct IncomingRpcRequest {
     pub msg: JWKConsensusMsg,
