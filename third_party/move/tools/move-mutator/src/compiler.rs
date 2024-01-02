@@ -1,7 +1,6 @@
 use move_command_line_common::address::NumericalAddress;
 use move_command_line_common::parser::NumberFormat;
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
@@ -35,7 +34,7 @@ use move_package::BuildConfig;
 pub fn generate_ast(
     mutator_config: &Configuration,
     config: &BuildConfig,
-    package_path: PathBuf,
+    _package_path: PathBuf,
 ) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
     let source_files = mutator_config
         .project
@@ -43,6 +42,8 @@ pub fn generate_ast(
         .iter()
         .map(|p| p.to_str().unwrap_or(""))
         .collect::<Vec<_>>();
+
+    debug!("Source files and folders: {:?}", source_files);
 
     let named_addr_map = config
         .additional_named_addresses
@@ -56,13 +57,10 @@ pub fn generate_ast(
         })
         .collect::<BTreeMap<_, _>>();
 
-    let out_dir = "mutator_build";
-    let interface_files_dir = format!("{}/generated_interface_files", out_dir);
+    let interface_files_dir = mutator_config.project.out_mutant_dir.join("generated_interface_files/mutator_build");
     let flags = Flags::empty();
 
-    //TODO(asmie): check if root is not found (we cannot parse then Move.toml and get the address resolution)
-    // Maybe we should then allow only source files with numerical addresses
-    let _rooted_path = SourcePackageLayout::try_find_root(&package_path.canonicalize()?);
+    trace!("Interface files dir: {:?}", interface_files_dir);
 
     let (files, res) = Compiler::from_files(
         source_files,
@@ -71,11 +69,13 @@ pub fn generate_ast(
         flags,
         &config.compiler_config.known_attributes,
     )
-    .set_interface_files_dir(interface_files_dir)
+    .set_interface_files_dir(interface_files_dir.to_str().unwrap_or("").to_string())
     .run::<PASS_PARSER>()?;
 
     let (_, stepped) = unwrap_or_report_diagnostics(&files, res);
     let (_, ast) = stepped.into_ast();
+
+    trace!("Sources parsed successfully, AST generated");
 
     Ok((files, ast))
 }
@@ -90,7 +90,6 @@ pub fn generate_ast(
 ///
 /// # Arguments
 ///
-/// * `mutator_config` - the configuration for the mutator.
 /// * `config` - the build configuration.
 /// * `mutated_source` - the mutated source code as a string.
 /// * `original_file` - the path to the original file.
@@ -99,7 +98,6 @@ pub fn generate_ast(
 ///
 /// * `Result<(), anyhow::Error>` - Ok if the mutant is valid, or an error if any error occurs.
 pub fn verify_mutant(
-    mutator_config: &Configuration,
     config: &BuildConfig,
     mutated_source: &str,
     original_file: &Path,
@@ -107,11 +105,17 @@ pub fn verify_mutant(
     // Find the root for the package
     let root = SourcePackageLayout::try_find_root(&original_file.canonicalize()?)?;
 
+    debug!("Package path found: {:?}", root);
+
     // Get the relative path to the original file
     let relative_path = original_file.canonicalize()?;
     let relative_path = relative_path.strip_prefix(&root)?;
 
+    debug!("Relative path: {:?}", relative_path);
+
     let tempdir = tempfile::tempdir()?;
+
+    debug!("Temporary directory: {:?}", tempdir.path());
 
     // Copy the whole package to the tempdir
     // We need to copy the whole package because the Move compiler needs to find the Move.toml file and all the dependencies
@@ -119,18 +123,28 @@ pub fn verify_mutant(
     copy_dir_all(&root, &tempdir.path())?;
 
     // Write the mutated source to the tempdir in place of the original file
-    std::fs::write(tempdir.path().join(relative_path), mutated_source)?;
+    std::fs::write(tempdir.path().join(&relative_path), mutated_source)?;
 
-    let mut output: Box<dyn Write> = if mutator_config.project.verbose {
-        Box::new(std::io::stdout())
-    } else {
-        Box::new(std::io::sink())
-    };
+    debug!(
+        "Mutated source written to {:?}",
+        tempdir.path().join(&relative_path)
+    );
+
+    let mut compilation_msg = vec![];
+
+    // Create a working config, making sure that the test mode is disabled
+    // We want just check if the compilation is successful
+    let mut working_config = config.clone();
+    working_config.test_mode = false;
 
     // Compile the package
-    config
-        .clone()
-        .compile_package(&tempdir.path(), &mut output)?;
+    working_config
+        .compile_package(&tempdir.path(), &mut compilation_msg)?;
+
+    info!(
+        "Compilation status: {}",
+        String::from_utf8(compilation_msg).unwrap_or("Internal error: can't convert compilation error to UTF8".to_string())
+    );
 
     Ok(())
 }

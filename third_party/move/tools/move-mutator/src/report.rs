@@ -21,12 +21,16 @@ impl Report {
 
     /// Adds a new `MutationReport` to the report.
     pub fn add_entry(&mut self, entry: MutationReport) {
+        trace!("Adding a mutant to the report: {:?}", entry);
         self.mutants.push(entry);
     }
 
     /// Saves the `Report` as a JSON file.
     pub fn save_to_json_file(&self, path: &Path) -> std::io::Result<()> {
         let file = std::fs::File::create(path)?;
+
+        info!("Saving report to {}", path.display());
+
         serde_json::to_writer_pretty(file, &self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
@@ -34,16 +38,19 @@ impl Report {
     /// Saves the `Report` as a text file.
     pub fn save_to_text_file(&self, path: &Path) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
+
+        info!("Saving report to {}", path.display());
+
         for entry in &self.mutants {
             writeln!(
                 file,
                 "Mutant path: {}",
-                entry.mutant_path.to_str().unwrap_or("")
+                entry.mutant_path.display()
             )?;
             writeln!(
                 file,
                 "Original file: {}",
-                entry.original_file.to_str().unwrap_or("")
+                entry.original_file.display()
             )?;
             writeln!(file, "Mutations:")?;
             for modification in &entry.mutations {
@@ -60,6 +67,9 @@ impl Report {
             writeln!(file, "{}", entry.diff)?;
             writeln!(file, "----------------------------------------")?;
         }
+
+        debug!("Report saved to {}", path.display());
+
         Ok(())
     }
 
@@ -155,6 +165,7 @@ impl MutationReport {
 
     /// Adds a `Mutation` to the `MutationReport`.
     pub fn add_modification(&mut self, modification: Mutation) {
+        trace!("Adding modification to report: {modification:?}");
         self.mutations.push(modification);
     }
 }

@@ -23,6 +23,7 @@ impl Mutant {
     /// Applies the mutation operator to the given source code, by calling the mutation operator's apply method.
     /// Returns differently mutated source code listings in a vector.
     pub fn apply(&self, source: &str) -> Vec<MutantInfo> {
+        trace!("Applying mutation operator: {}", self.operator);
         self.operator.apply(source)
     }
 }

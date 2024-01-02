@@ -46,6 +46,7 @@ impl Configuration {
     /// Reads configuration from the configuration file recognizing its type.
     pub fn from_file(file_path: &Path) -> anyhow::Result<Configuration> {
         let file_type = Configuration::get_file_type(file_path)?;
+        debug!("Reading configuration from file type: {:?}", file_type);
         match file_type {
             FileType::JSON => Configuration::from_json_file(file_path),
             FileType::TOML => Configuration::from_toml_file(file_path),
@@ -54,12 +55,14 @@ impl Configuration {
 
     /// Reads configuration from the TOML configuration file.
     pub fn from_toml_file(toml_file: &Path) -> anyhow::Result<Configuration> {
+        debug!("Reading configuration from TOML file: {:?}", toml_file);
         let toml_source = std::fs::read_to_string(toml_file)?;
         Ok(toml::from_str(toml_source.as_str())?)
     }
 
     /// Reads configuration from the JSON configuration source.
     pub fn from_json_file(json_file: &Path) -> anyhow::Result<Configuration> {
+        debug!("Reading configuration from JSON file: {:?}", json_file);
         Ok(serde_json::from_str(&std::fs::read_to_string(json_file)?)?)
     }
 }
