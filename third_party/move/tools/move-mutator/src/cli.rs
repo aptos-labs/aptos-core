@@ -32,7 +32,4 @@ pub struct Options {
     /// Optional configuration file. If provided, it will override the default configuration.
     #[clap(long, short, value_parser)]
     pub configuration_file: Option<PathBuf>,
-    /// Indicates if the output should be verbose.
-    #[clap(long, short, default_value = "false")]
-    pub verbose: bool,
 }
