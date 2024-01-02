@@ -57,7 +57,10 @@ pub fn generate_ast(
         })
         .collect::<BTreeMap<_, _>>();
 
-    let interface_files_dir = mutator_config.project.out_mutant_dir.join("generated_interface_files/mutator_build");
+    let interface_files_dir = mutator_config
+        .project
+        .out_mutant_dir
+        .join("generated_interface_files/mutator_build");
     let flags = Flags::empty();
 
     trace!("Interface files dir: {:?}", interface_files_dir);
@@ -138,12 +141,12 @@ pub fn verify_mutant(
     working_config.test_mode = false;
 
     // Compile the package
-    working_config
-        .compile_package(&tempdir.path(), &mut compilation_msg)?;
+    working_config.compile_package(&tempdir.path(), &mut compilation_msg)?;
 
     info!(
         "Compilation status: {}",
-        String::from_utf8(compilation_msg).unwrap_or("Internal error: can't convert compilation error to UTF8".to_string())
+        String::from_utf8(compilation_msg)
+            .unwrap_or("Internal error: can't convert compilation error to UTF8".to_string())
     );
 
     Ok(())

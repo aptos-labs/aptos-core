@@ -42,16 +42,8 @@ impl Report {
         info!("Saving report to {}", path.display());
 
         for entry in &self.mutants {
-            writeln!(
-                file,
-                "Mutant path: {}",
-                entry.mutant_path.display()
-            )?;
-            writeln!(
-                file,
-                "Original file: {}",
-                entry.original_file.display()
-            )?;
+            writeln!(file, "Mutant path: {}", entry.mutant_path.display())?;
+            writeln!(file, "Original file: {}", entry.original_file.display())?;
             writeln!(file, "Mutations:")?;
             for modification in &entry.mutations {
                 writeln!(file, "  Operator: {}", modification.operator_name)?;
