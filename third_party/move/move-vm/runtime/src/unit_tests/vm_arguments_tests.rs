@@ -253,23 +253,27 @@ impl RemoteStore {
 }
 
 impl ModuleResolver for RemoteStore {
+    type Error = anyhow::Error;
+
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
         Ok(self.modules.get(module_id).cloned())
     }
 }
 
 impl ResourceResolver for RemoteStore {
+    type Error = anyhow::Error;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
         Ok((None, 0))
     }
 }

@@ -510,11 +510,13 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
+    type Error = anyhow::Error;
+
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)
@@ -522,13 +524,15 @@ impl ModuleResolver for BogusStorage {
 }
 
 impl ResourceResolver for BogusStorage {
+    type Error = anyhow::Error;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
         Ok(Err(
             PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
         )?)

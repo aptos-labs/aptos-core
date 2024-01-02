@@ -412,20 +412,21 @@ impl Context {
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                let is_resource_group =
-                    |resolver: &dyn ModuleResolver, struct_tag: &StructTag| -> bool {
-                        aptos_try!({
-                            let md = aptos_framework::get_metadata(
-                                &resolver.get_module_metadata(&struct_tag.module_id()),
-                            )?;
-                            md.struct_attributes
-                                .get(struct_tag.name.as_ident_str().as_str())?
-                                .iter()
-                                .find(|attr| attr.is_resource_group())?;
-                            Some(())
-                        })
-                        .is_some()
-                    };
+                let is_resource_group = |resolver: &dyn ModuleResolver<Error = anyhow::Error>,
+                                         struct_tag: &StructTag|
+                 -> bool {
+                    aptos_try!({
+                        let md = aptos_framework::get_metadata(
+                            &resolver.get_module_metadata(&struct_tag.module_id()),
+                        )?;
+                        md.struct_attributes
+                            .get(struct_tag.name.as_ident_str().as_str())?
+                            .iter()
+                            .find(|attr| attr.is_resource_group())?;
+                        Some(())
+                    })
+                    .is_some()
+                };
 
                 let resolver = state_view.as_move_resolver();
                 if is_resource_group(&resolver, &key) {

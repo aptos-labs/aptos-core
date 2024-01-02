@@ -52,7 +52,7 @@ struct SimpleVMTestAdapter<'a> {
 }
 
 pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver,
+    storage: &impl MoveResolver<anyhow::Error>,
     address: AccountAddress,
     module: &ModuleId,
     resource: &IdentStr,

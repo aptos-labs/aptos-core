@@ -11,6 +11,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.52"
 better_any = "0.1.1"
 bytes = "1.4.0"
 fail = "0.4.0"
@@ -28,7 +29,6 @@ move-core-types = { path = "../../move-core/types" }
 move-vm-types = { path = "../types" }
 
 [dev-dependencies]
-anyhow = "1.0.52"
 hex = "0.4.3"
 move-compiler = { path = "../../move-compiler" }
 move-ir-compiler = { path = "../../move-ir-compiler" }

@@ -208,18 +208,22 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
+    type Error = anyhow::Error;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
         Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)?)
     }
 }
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
+    type Error = anyhow::Error;
+
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
             Ok(Some(bytes)) => bytes,
@@ -234,7 +238,7 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
         module.metadata
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
         let access_path = AccessPath::from(module_id);
         Ok(self
             .executor_view

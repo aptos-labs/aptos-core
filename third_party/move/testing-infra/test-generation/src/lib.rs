@@ -132,7 +132,7 @@ fn execute_function_in_module(
     idx: FunctionDefinitionIndex,
     ty_args: Vec<TypeTag>,
     args: Vec<Vec<u8>>,
-    storage: &impl MoveResolver,
+    storage: &impl MoveResolver<anyhow::Error>,
 ) -> Result<(), VMStatus> {
     let module_id = module.self_id();
     let entry_name = {

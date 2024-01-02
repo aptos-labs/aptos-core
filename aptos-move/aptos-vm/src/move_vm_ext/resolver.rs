@@ -19,7 +19,7 @@ pub trait AptosMoveResolver:
     AggregatorV1Resolver
     + ConfigStorage
     + DelayedFieldResolver
-    + MoveResolver
+    + MoveResolver<anyhow::Error>
     + ResourceGroupResolver
     + StateValueMetadataResolver
     + StateStorageView

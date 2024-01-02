@@ -14660,6 +14660,7 @@ dependencies = [
 name = "test-generation"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap 4.3.21",
  "crossbeam-channel",
  "getrandom 0.2.7",

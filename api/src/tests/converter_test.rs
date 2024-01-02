@@ -58,7 +58,7 @@ async fn test_value_conversion() {
     );
 }
 
-fn assert_value_conversion<R: MoveResolver, V: Serialize>(
+fn assert_value_conversion<R: MoveResolver<anyhow::Error>, V: Serialize>(
     converter: &MoveConverter<'_, R>,
     json_move_type: &str,
     json_value: V,
@@ -77,7 +77,7 @@ fn assert_value_conversion<R: MoveResolver, V: Serialize>(
     assert_eq!(json_value_back, json!(json_value));
 }
 
-fn assert_value_conversion_bytes<R: MoveResolver>(
+fn assert_value_conversion_bytes<R: MoveResolver<anyhow::Error>>(
     converter: &MoveConverter<'_, R>,
     json_move_type: &str,
     vm_bytes: &[u8],

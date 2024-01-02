@@ -137,13 +137,15 @@ macro_rules! patch_blob_from_db {
 }
 
 impl ResourceResolver for MockStateView {
+    type Error = anyhow::Error;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
         let ap = AccessPath::resource_access_path(*address, typ.clone())
             .expect("Access path for resource have to be valid");
         let state_key = StateKey::access_path(ap);

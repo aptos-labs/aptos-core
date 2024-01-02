@@ -336,23 +336,27 @@ impl OnDiskStateView {
 }
 
 impl ModuleResolver for OnDiskStateView {
+    type Error = anyhow::Error;
+
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
         self.get_module_bytes(module_id)
     }
 }
 
 impl ResourceResolver for OnDiskStateView {
+    type Error = anyhow::Error;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize)> {
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
         let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
         let buf_size = resource_size(&buf);
         Ok((buf, buf_size))
