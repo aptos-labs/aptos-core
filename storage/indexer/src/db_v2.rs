@@ -33,7 +33,7 @@ use dashmap::{DashMap, DashSet};
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::ModuleResolver,
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
@@ -114,7 +114,7 @@ impl IndexerAsyncV2 {
 
     /// Index write sets with the move annotator to parse obscure table handle and key value types
     /// After the current batch's parsed, write the mapping to the rocksdb, also update the next version to be processed
-    pub fn index_with_annotator<R: MoveResolver>(
+    pub fn index_with_annotator<R: ModuleResolver>(
         &self,
         annotator: &MoveValueAnnotator<R>,
         first_version: Version,
@@ -235,7 +235,7 @@ struct TableInfoParser<'a, R> {
     pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
 }
 
-impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
+impl<'a, R: ModuleResolver> TableInfoParser<'a, R> {
     pub fn new(
         indexer_async_v2: &'a IndexerAsyncV2,
         annotator: &'a MoveValueAnnotator<R>,
