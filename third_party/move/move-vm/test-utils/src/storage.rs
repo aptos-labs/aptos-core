@@ -2,8 +2,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Error, Result};
 use bytes::Bytes;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     account_address::AccountAddress,
     effects::{AccountChangeSet, ChangeSet, Op},
@@ -12,6 +12,7 @@ use move_core_types::{
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, MoveResolver, ResourceResolver},
     value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 #[cfg(feature = "table-extension")]
 use move_table_extension::{TableChangeSet, TableHandle, TableResolver};
@@ -31,7 +32,7 @@ impl BlankStorage {
 }
 
 impl ModuleResolver for BlankStorage {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
@@ -43,7 +44,7 @@ impl ModuleResolver for BlankStorage {
 }
 
 impl ResourceResolver for BlankStorage {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
@@ -63,7 +64,7 @@ impl TableResolver for BlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> anyhow::Result<Option<Bytes>> {
         Ok(None)
     }
 }
@@ -123,14 +124,14 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> anyhow::Result<Option<Bytes>> {
         // TODO: In addition to `change_set`, cache table outputs.
         self.base
             .resolve_table_entry_bytes_with_layout(handle, key, maybe_layout)
     }
 }
 
-impl<'a, 'b, S: MoveResolver<anyhow::Error>> DeltaStorage<'a, 'b, S> {
+impl<'a, 'b, S: MoveResolver<PartialVMError>> DeltaStorage<'a, 'b, S> {
     pub fn new(base: &'a S, delta: &'b ChangeSet) -> Self {
         Self {
             base,
@@ -157,7 +158,7 @@ pub struct InMemoryStorage {
 fn apply_changes<K, V>(
     map: &mut BTreeMap<K, V>,
     changes: impl IntoIterator<Item = (K, Op<V>)>,
-) -> Result<()>
+) -> PartialVMResult<()>
 where
     K: Ord + Debug,
 {
@@ -167,9 +168,11 @@ where
     for (k, op) in changes.into_iter() {
         match (map.entry(k), op) {
             (Occupied(entry), New(_)) => {
-                bail!(
-                    "Failed to apply changes -- key {:?} already exists",
-                    entry.key()
+                return Err(
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                        "Failed to apply changes -- key {:?} already exists",
+                        entry.key()
+                    )),
                 )
             },
             (Occupied(entry), Delete) => {
@@ -181,10 +184,14 @@ where
             (Vacant(entry), New(val)) => {
                 entry.insert(val);
             },
-            (Vacant(entry), Delete | Modify(_)) => bail!(
-                "Failed to apply changes -- key {:?} does not exist",
-                entry.key()
-            ),
+            (Vacant(entry), Delete | Modify(_)) => {
+                return Err(
+                    PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                        "Failed to apply changes -- key {:?} does not exist",
+                        entry.key()
+                    )),
+                )
+            },
         }
     }
     Ok(())
@@ -204,7 +211,7 @@ where
 }
 
 impl InMemoryAccountStorage {
-    fn apply(&mut self, account_changeset: AccountChangeSet) -> Result<()> {
+    fn apply(&mut self, account_changeset: AccountChangeSet) -> PartialVMResult<()> {
         let (modules, resources) = account_changeset.into_inner();
         apply_changes(&mut self.modules, modules)?;
         apply_changes(&mut self.resources, resources)?;
@@ -224,7 +231,7 @@ impl InMemoryStorage {
         &mut self,
         changeset: ChangeSet,
         #[cfg(feature = "table-extension")] table_changes: TableChangeSet,
-    ) -> Result<()> {
+    ) -> PartialVMResult<()> {
         for (addr, account_changeset) in changeset.into_inner() {
             match self.accounts.entry(addr) {
                 btree_map::Entry::Occupied(entry) => {
@@ -244,7 +251,7 @@ impl InMemoryStorage {
         Ok(())
     }
 
-    pub fn apply(&mut self, changeset: ChangeSet) -> Result<()> {
+    pub fn apply(&mut self, changeset: ChangeSet) -> PartialVMResult<()> {
         self.apply_extended(
             changeset,
             #[cfg(feature = "table-extension")]
@@ -253,7 +260,7 @@ impl InMemoryStorage {
     }
 
     #[cfg(feature = "table-extension")]
-    fn apply_table(&mut self, changes: TableChangeSet) -> Result<()> {
+    fn apply_table(&mut self, changes: TableChangeSet) -> PartialVMResult<()> {
         let TableChangeSet {
             new_tables,
             removed_tables,
@@ -302,7 +309,7 @@ impl InMemoryStorage {
 }
 
 impl ModuleResolver for InMemoryStorage {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
@@ -317,7 +324,7 @@ impl ModuleResolver for InMemoryStorage {
 }
 
 impl ResourceResolver for InMemoryStorage {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
@@ -342,7 +349,7 @@ impl TableResolver for InMemoryStorage {
         handle: &TableHandle,
         key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> anyhow::Result<Option<Bytes>> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
     }
 }

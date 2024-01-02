@@ -10,7 +10,7 @@ use move_async_vm::{
     async_vm::{AsyncResult, AsyncSession, AsyncVM, Message},
     natives::GasParameters as ActorGasParameters,
 };
-use move_binary_format::access::ModuleAccess;
+use move_binary_format::{access::ModuleAccess, errors::PartialVMError};
 use move_command_line_common::testing::EXP_EXT;
 use move_compiler::{
     attr_derivation, compiled_unit::CompiledUnit, diagnostics::report_diagnostics_to_buffer,
@@ -382,7 +382,7 @@ struct HarnessProxy<'a> {
 }
 
 impl<'a> ModuleResolver for HarnessProxy<'a> {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
@@ -398,7 +398,7 @@ impl<'a> ModuleResolver for HarnessProxy<'a> {
 }
 
 impl<'a> ResourceResolver for HarnessProxy<'a> {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_resource_bytes_with_metadata_and_layout(
         &self,

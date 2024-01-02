@@ -4,7 +4,7 @@
 
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -510,21 +510,19 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
     fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
-        Ok(Err(
-            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
-        )?)
+        Err(PartialVMError::new(self.bad_status_code))
     }
 }
 
 impl ResourceResolver for BogusStorage {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
@@ -533,9 +531,7 @@ impl ResourceResolver for BogusStorage {
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize), Self::Error> {
-        Ok(Err(
-            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
-        )?)
+        Err(PartialVMError::new(self.bad_status_code))
     }
 }
 

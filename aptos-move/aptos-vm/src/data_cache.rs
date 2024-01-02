@@ -125,7 +125,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), VMError> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             // TODO[agg_v2](fix) pass the layout to resource groups
@@ -136,10 +136,9 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             ));
 
             let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
-            let common_error = |e| -> VMError {
+            let common_error = |e| -> PartialVMError {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("{}", e))
-                    .finish(Location::Undefined)
             };
 
             let buf = self
@@ -159,16 +158,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size + group_size as usize))
         } else {
             let access_path = AccessPath::resource_access_path(*address, struct_tag.clone())
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
-                })?;
+                .map_err(|_| PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES))?;
 
             let buf = self
                 .executor_view
                 .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-                })?;
+                .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?;
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size))
         }
@@ -208,7 +203,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
@@ -217,12 +212,12 @@ impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<(Option<Bytes>, usize), Self::Error> {
-        Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)?)
+        self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 }
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
-    type Error = anyhow::Error;
+    type Error = PartialVMError;
 
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
@@ -240,12 +235,9 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
 
     fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
         let access_path = AccessPath::from(module_id);
-        Ok(self
-            .executor_view
+        self.executor_view
             .get_module_bytes(&StateKey::access_path(access_path))
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-            })?)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 

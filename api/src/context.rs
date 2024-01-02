@@ -43,12 +43,11 @@ use aptos_types::{
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
 use aptos_utils::aptos_try;
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
-    resolver::ModuleResolver,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -412,21 +411,20 @@ impl Context {
         let kvs = kvs
             .into_iter()
             .map(|(key, value)| {
-                let is_resource_group = |resolver: &dyn ModuleResolver<Error = anyhow::Error>,
-                                         struct_tag: &StructTag|
-                 -> bool {
-                    aptos_try!({
-                        let md = aptos_framework::get_metadata(
-                            &resolver.get_module_metadata(&struct_tag.module_id()),
-                        )?;
-                        md.struct_attributes
-                            .get(struct_tag.name.as_ident_str().as_str())?
-                            .iter()
-                            .find(|attr| attr.is_resource_group())?;
-                        Some(())
-                    })
-                    .is_some()
-                };
+                let is_resource_group =
+                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
+                        aptos_try!({
+                            let md = aptos_framework::get_metadata(
+                                &resolver.get_module_metadata(&struct_tag.module_id()),
+                            )?;
+                            md.struct_attributes
+                                .get(struct_tag.name.as_ident_str().as_str())?
+                                .iter()
+                                .find(|attr| attr.is_resource_group())?;
+                            Some(())
+                        })
+                        .is_some()
+                    };
 
                 let resolver = state_view.as_move_resolver();
                 if is_resource_group(&resolver, &key) {

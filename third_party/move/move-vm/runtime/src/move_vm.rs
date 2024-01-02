@@ -12,7 +12,7 @@ use crate::{
     session::Session,
 };
 use move_binary_format::{
-    errors::{Location, VMResult},
+    errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -57,14 +57,17 @@ impl MoveVM {
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(&self, remote: &'r impl MoveResolver<anyhow::Error>) -> Session<'r, '_> {
+    pub fn new_session<'r>(
+        &self,
+        remote: &'r impl MoveResolver<PartialVMError>,
+    ) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r impl MoveResolver<anyhow::Error>,
+        remote: &'r impl MoveResolver<PartialVMError>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
@@ -78,7 +81,7 @@ impl MoveVM {
     /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r impl MoveResolver<anyhow::Error>,
+        remote: &'r impl MoveResolver<PartialVMError>,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
@@ -94,7 +97,7 @@ impl MoveVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        remote: &impl MoveResolver<anyhow::Error>,
+        remote: &impl MoveResolver<PartialVMError>,
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()
