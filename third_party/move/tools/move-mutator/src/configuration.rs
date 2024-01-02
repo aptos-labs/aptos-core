@@ -110,7 +110,10 @@ mod tests {
         "#;
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_toml_file(Path::new("test.toml")).unwrap();
-        assert_eq!(config.project.move_sources, vec![Path::new("/path/to/move/source")]);
+        assert_eq!(
+            config.project.move_sources,
+            vec![Path::new("/path/to/move/source")]
+        );
         assert_eq!(
             config.mutation.unwrap().operators,
             vec!["operator1", "operator2"]
@@ -171,7 +174,10 @@ mod tests {
         "#;
         fs::write("test.json", json_content).unwrap();
         let config = Configuration::from_json_file(Path::new("test.json")).unwrap();
-        assert_eq!(config.project.move_sources, vec![Path::new("/path/to/move/source")]);
+        assert_eq!(
+            config.project.move_sources,
+            vec![Path::new("/path/to/move/source")]
+        );
         assert_eq!(
             config.project.include_only_files.unwrap(),
             vec![Path::new("/path/to/include/file")]
@@ -180,11 +186,8 @@ mod tests {
             config.project.exclude_files.unwrap(),
             vec![Path::new("/path/to/exclude/file")]
         );
-        assert_eq!(
-            config.project.out_mutant_dir,
-            Path::new("/path/to/output")
-        );
-        assert_eq!(config.project.verify_mutants.unwrap(), true);
+        assert_eq!(config.project.out_mutant_dir, Path::new("/path/to/output"));
+        assert_eq!(config.project.verify_mutants, true);
         assert_eq!(config.project.no_overwrite.unwrap(), false);
         assert_eq!(config.project.downsample_filter.unwrap(), "filter");
         assert_eq!(
@@ -247,7 +250,10 @@ mod tests {
         "#;
         fs::write("test.json", json_content).unwrap();
         let config = Configuration::from_file(Path::new("test.json")).unwrap();
-        assert_eq!(config.project.move_sources, vec![Path::new("/path/to/move/source")]);
+        assert_eq!(
+            config.project.move_sources,
+            vec![Path::new("/path/to/move/source")]
+        );
         fs::remove_file("test.json").unwrap();
     }
 
@@ -259,7 +265,10 @@ mod tests {
         "#;
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_file(Path::new("test.toml")).unwrap();
-        assert_eq!(config.project.move_sources, vec![Path::new("/path/to/move/source")]);
+        assert_eq!(
+            config.project.move_sources,
+            vec![Path::new("/path/to/move/source")]
+        );
         fs::remove_file("test.toml").unwrap();
     }
 

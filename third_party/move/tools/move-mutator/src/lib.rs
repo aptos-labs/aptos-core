@@ -8,7 +8,7 @@ mod mutant;
 mod operator;
 mod report;
 
-use crate::compiler::generate_ast;
+use crate::compiler::{generate_ast, verify_mutant};
 use std::path::Path;
 
 use crate::cli::DEFAULT_OUTPUT_DIR;
@@ -34,7 +34,7 @@ pub fn run_move_mutator(
         None => configuration::Configuration::new(options, Some(package_path.clone())),
     };
 
-    let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
+    let (files, ast) = generate_ast(&mutator_configuration, &config, package_path)?;
 
     let mutants = mutate::mutate(ast)?;
 
@@ -65,6 +65,19 @@ pub fn run_move_mutator(
         for mutant in mutants.iter().filter(|m| m.get_file_hash() == hash) {
             let mutated_sources = mutant.apply(&source);
             for mutated in mutated_sources {
+                if mutator_configuration.project.verify_mutants {
+                    let res = verify_mutant(
+                        &mutator_configuration,
+                        &config,
+                        &mutated.mutated_source,
+                        path,
+                    );
+                    // In case the mutant is not a valid Move file, skip the mutant (do not save it)
+                    if res.is_err() {
+                        continue;
+                    }
+                }
+
                 let mutant_path = setup_mutant_path(&output_dir, file_name, i);
                 std::fs::write(&mutant_path, &mutated.mutated_source)?;
 
@@ -82,6 +95,7 @@ pub fn run_move_mutator(
                     &mutated.mutated_source,
                     &source,
                 );
+
                 entry.add_modification(mutated.mutation);
                 report.add_entry(entry);
                 i += 1;
