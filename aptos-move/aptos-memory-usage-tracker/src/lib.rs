@@ -208,6 +208,7 @@ where
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
+        io_amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()> {
         if let Some(ret_vals) = ret_vals.clone() {
@@ -220,7 +221,7 @@ where
             }))?;
         }
 
-        self.base.charge_native_function(amount, ret_vals)
+        self.base.charge_native_function(amount, io_amount, ret_vals)
     }
 
     #[inline]

@@ -126,7 +126,8 @@ impl SafeNativeBuilder {
                 misc_gas_params: &data.misc_gas_params,
 
                 gas_budget,
-                gas_used: 0.into(),
+                exe_gas_used: 0.into(),
+                io_gas_used: 0.into(),
 
                 enable_incremental_gas_charging,
 
@@ -137,10 +138,10 @@ impl SafeNativeBuilder {
                 native(&mut context, ty_args, args);
 
             match res {
-                Ok(ret_vals) => Ok(NativeResult::ok(context.gas_used, ret_vals)),
+                Ok(ret_vals) => Ok(NativeResult::ok_with_io(context.exe_gas_used, context.io_gas_used, ret_vals)),
                 Err(err) => match err {
-                    Abort { abort_code } => Ok(NativeResult::err(context.gas_used, abort_code)),
-                    OutOfGas => Ok(NativeResult::out_of_gas(context.gas_used)),
+                    Abort { abort_code } => Ok(NativeResult::err_with_io(context.exe_gas_used, context.io_gas_used, abort_code)),
+                    OutOfGas => Ok(NativeResult::out_of_gas_with_io(context.exe_gas_used, context.io_gas_used)),
                     // TODO(Gas): Check if err is indeed an invariant violation.
                     InvariantViolation(err) => Err(err),
                 },

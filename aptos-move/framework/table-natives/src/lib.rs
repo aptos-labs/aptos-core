@@ -283,7 +283,7 @@ fn charge_load_cost(
     context: &mut SafeNativeContext,
     loaded: Option<Option<NumBytes>>,
 ) -> SafeNativeResult<()> {
-    context.charge(COMMON_LOAD_BASE_LEGACY)?;
+    context.charge_io(COMMON_LOAD_BASE_LEGACY)?;
 
     match loaded {
         Some(Some(num_bytes)) => {
@@ -300,9 +300,9 @@ fn charge_load_cost(
             } else {
                 num_bytes
             };
-            context.charge(COMMON_LOAD_BASE_NEW + COMMON_LOAD_PER_BYTE * num_bytes)
+            context.charge_io(COMMON_LOAD_BASE_NEW + COMMON_LOAD_PER_BYTE * num_bytes)
         },
-        Some(None) => context.charge(COMMON_LOAD_BASE_NEW + COMMON_LOAD_FAILURE),
+        Some(None) => context.charge_io(COMMON_LOAD_BASE_NEW + COMMON_LOAD_FAILURE),
         None => Ok(()),
     }
 }

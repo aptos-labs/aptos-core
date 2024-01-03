@@ -284,6 +284,7 @@ pub trait GasMeter {
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
+        io_amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()>;
 
@@ -509,6 +510,7 @@ impl GasMeter for UnmeteredGasMeter {
     fn charge_native_function(
         &mut self,
         _amount: InternalGas,
+        _io_amount: InternalGas,
         _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
     ) -> PartialVMResult<()> {
         Ok(())

@@ -34,14 +34,17 @@ use smallvec::{smallvec, SmallVec};
 pub enum NativeResult {
     Success {
         cost: InternalGas,
+        io_cost: InternalGas,
         ret_vals: SmallVec<[Value; 1]>,
     },
     Abort {
         cost: InternalGas,
+        io_cost: InternalGas,
         abort_code: u64,
     },
     OutOfGas {
         partial_cost: InternalGas,
+        partial_io_cost: InternalGas,
     },
 }
 
@@ -50,6 +53,15 @@ impl NativeResult {
     pub fn ok(cost: InternalGas, values: SmallVec<[Value; 1]>) -> Self {
         NativeResult::Success {
             cost,
+            io_cost: 0.into(),
+            ret_vals: values,
+        }
+    }
+
+    pub fn ok_with_io(cost: InternalGas, io_cost: InternalGas, values: SmallVec<[Value; 1]>) -> Self {
+        NativeResult::Success {
+            cost,
+            io_cost,
             ret_vals: values,
         }
     }
@@ -59,7 +71,11 @@ impl NativeResult {
     /// The only thing the funciton can specify is its abort code, as if it had invoked the `Abort`
     /// bytecode instruction
     pub fn err(cost: InternalGas, abort_code: u64) -> Self {
-        NativeResult::Abort { cost, abort_code }
+        NativeResult::Abort { cost, io_cost: 0.into(), abort_code }
+    }
+
+    pub fn err_with_io(cost: InternalGas, io_cost: InternalGas, abort_code: u64) -> Self {
+        NativeResult::Abort { cost, io_cost, abort_code }
     }
 
     /// A special variant indicating that the native has determined there is not enough
@@ -72,7 +88,11 @@ impl NativeResult {
     /// The natives are still required to return a partial cost, which the VM will pass
     /// to the gas meter for proper bookkeeping.
     pub fn out_of_gas(partial_cost: InternalGas) -> Self {
-        NativeResult::OutOfGas { partial_cost }
+        NativeResult::OutOfGas { partial_cost, partial_io_cost: 0.into()}
+    }
+
+    pub fn out_of_gas_with_io(partial_cost: InternalGas, partial_io_cost: InternalGas) -> Self {
+        NativeResult::OutOfGas { partial_cost, partial_io_cost}
     }
 
     /// Convert a `PartialVMResult<()>` into a `PartialVMResult<NativeResult>`

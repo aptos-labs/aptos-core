@@ -224,9 +224,11 @@ impl<'b> GasMeter for GasStatus<'b> {
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
+        _io_amount: InternalGas,
         _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
     ) -> PartialVMResult<()> {
         self.deduct_gas(amount)
+        // io not charged
     }
 
     fn charge_native_function_before_execution(

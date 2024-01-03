@@ -140,10 +140,12 @@ where
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
+        io_amount: InternalGas,
         _ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView>>,
     ) -> PartialVMResult<()> {
         // TODO(Gas): Is this correct???
-        self.algebra.charge_execution(amount)
+        self.algebra.charge_execution(amount)?;
+        self.algebra.charge_io(io_amount)
     }
 
     #[inline]

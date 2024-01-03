@@ -314,10 +314,11 @@ where
     fn charge_native_function(
         &mut self,
         amount: InternalGas,
+        io_amount: InternalGas,
         ret_vals: Option<impl ExactSizeIterator<Item = impl ValueView> + Clone>,
     ) -> PartialVMResult<()> {
         let (cost, res) =
-            self.delegate_charge(|base| base.charge_native_function(amount, ret_vals));
+            self.delegate_charge(|base| base.charge_native_function(amount, io_amount, ret_vals));
 
         let cur = self.frames.pop().expect("frame must exist");
         let (module_id, name, ty_args) = match cur.name {

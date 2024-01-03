@@ -30,7 +30,8 @@ pub struct SafeNativeContext<'a, 'b, 'c, 'd> {
     pub(crate) misc_gas_params: &'c MiscGasParameters,
 
     pub(crate) gas_budget: InternalGas,
-    pub(crate) gas_used: InternalGas,
+    pub(crate) exe_gas_used: InternalGas,
+    pub(crate) io_gas_used: InternalGas,
 
     pub(crate) enable_incremental_gas_charging: bool,
 
@@ -68,9 +69,30 @@ impl<'a, 'b, 'c, 'd> SafeNativeContext<'a, 'b, 'c, 'd> {
             hook(node);
         }
 
-        self.gas_used += amount;
+        self.exe_gas_used += amount;
 
-        if self.gas_used > self.gas_budget && self.enable_incremental_gas_charging {
+        if self.exe_gas_used + self.io_gas_used > self.gas_budget && self.enable_incremental_gas_charging {
+            Err(SafeNativeError::OutOfGas)
+        } else {
+            Ok(())
+        }
+    }
+
+    #[must_use = "must always propagate the error returned by this function to the native function that called it using the ? operator"]
+    pub fn charge_io(
+        &mut self,
+        abstract_amount: impl GasExpression<NativeGasParameters, Unit = InternalGasUnit>,
+    ) -> SafeNativeResult<()> {
+        let amount = abstract_amount.evaluate(self.gas_feature_version, self.native_gas_params);
+
+        if let Some(hook) = self.gas_hook {
+            let node = abstract_amount.to_dynamic();
+            hook(node);
+        }
+
+        self.io_gas_used += amount;
+
+        if self.exe_gas_used + self.io_gas_used > self.gas_budget && self.enable_incremental_gas_charging {
             Err(SafeNativeError::OutOfGas)
         } else {
             Ok(())

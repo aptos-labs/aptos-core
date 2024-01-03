@@ -426,17 +426,18 @@ impl Interpreter {
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
         let return_values = match result {
-            NativeResult::Success { cost, ret_vals } => {
-                gas_meter.charge_native_function(cost, Some(ret_vals.iter()))?;
+            NativeResult::Success { cost, io_cost, ret_vals } => {
+                gas_meter.charge_native_function(cost, io_cost, Some(ret_vals.iter()))?;
                 ret_vals
             },
-            NativeResult::Abort { cost, abort_code } => {
-                gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
+            NativeResult::Abort { cost, io_cost, abort_code } => {
+                gas_meter.charge_native_function(cost, io_cost, Option::<std::iter::Empty<&Value>>::None)?;
                 return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code));
             },
-            NativeResult::OutOfGas { partial_cost } => {
+            NativeResult::OutOfGas { partial_cost , partial_io_cost } => {
                 let err = match gas_meter.charge_native_function(
                     partial_cost,
+                    partial_io_cost,
                     Option::<std::iter::Empty<&Value>>::None,
                 ) {
                     Err(err) if err.major_status() == StatusCode::OUT_OF_GAS => err,
