@@ -833,7 +833,10 @@ impl Loader {
         allow_loading_failure: bool,
     ) -> VMResult<CompiledModule> {
         // bytes fetching, allow loading to fail if the flag is set
-        let bytes = match data_store.load_module(id) {
+        let bytes = match data_store
+            .load_module(id)
+            .map_err(|e| e.finish(Location::Undefined))
+        {
             Ok(bytes) => bytes,
             Err(err) if allow_loading_failure => return Err(err),
             Err(err) => {
