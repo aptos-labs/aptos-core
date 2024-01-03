@@ -80,7 +80,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // in cache, hence target charging 1-2 4k-sized pages for each read. Notice the cost
             // of seeking for the leaf node is covered by the first page of the "value size fee"
             // (storage_io_per_state_byte_read) defined below.
-            800_000,
+            400_000,
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
@@ -88,7 +88,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // Notice in the latest IoPricing, bytes are charged at 4k intervals (even the smallest
             // read will be charged for 4KB) to reflect the assumption that every roughly 4k bytes
             // might require a separate random IO upon the FS.
-            100,
+            200,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
