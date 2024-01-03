@@ -80,7 +80,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // in cache, hence target charging 1-2 4k-sized pages for each read. Notice the cost
             // of seeking for the leaf node is covered by the first page of the "value size fee"
             // (storage_io_per_state_byte_read) defined below.
-            690_000,
+            270_238,
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
@@ -88,7 +88,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // Notice in the latest IoPricing, bytes are charged at 4k intervals (even the smallest
             // read will be charged for 4KB) to reflect the assumption that every roughly 4k bytes
             // might require a separate random IO upon the FS.
-            86,
+            135,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
@@ -100,7 +100,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // to each transactions assuming they don't touch exactly the same leaves. It's fair to
             // target roughly 1-2 full internal JMT nodes (about 0.5-1KB in total) worth of writes
             // for each write op.
-            51_000,
+            130_089,
         ],
         [
             legacy_write_data_per_new_item: InternalGasPerArg,
@@ -110,7 +110,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_io_per_state_byte_write: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
-            51,
+            130,
         ],
         [
             legacy_write_data_per_byte_in_val: InternalGasPerByte,
