@@ -37,7 +37,6 @@ use bytes::Bytes;
 use move_binary_format::errors::PartialVMError;
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-#[cfg(feature = "testing")]
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use std::{
