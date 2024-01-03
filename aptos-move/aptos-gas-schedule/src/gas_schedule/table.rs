@@ -12,9 +12,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
     NativeGasParameters => .table,
     [
         // These are dummy value, they copied from storage gas in aptos-core/aptos-vm/src/aptos_vm_impl.rs
-        [common_load_base_legacy: InternalGas, "common.load.base", 8000],
-        [common_load_base_new: InternalGas, { 7.. => "common.load.base_new" }, 8000],
-        [common_load_per_byte: InternalGasPerByte, "common.load.per_byte", 1000],
+        [common_load_base_legacy: InternalGas, "common.load.base", 400000],
+        [common_load_base_new: InternalGas, { 7.. => "common.load.base_new" }, 400000],
+        [common_load_per_byte: InternalGasPerByte, "common.load.per_byte", 200],
         [common_load_failure: InternalGas, "common.load.failure", 0],
 
         [new_table_handle_base: InternalGas, "new_table_handle.base", 20000],
