@@ -181,6 +181,7 @@ pub enum EntryPoints {
     TokenV1MintAndTransferFT,
 
     TokenV2AmbassadorMint,
+    TokenV2AmbassadorMintByPublisher,
 
     InitializeVectorPicture {
         length: u64,
@@ -230,7 +231,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+            EntryPoints::TokenV2AmbassadorMint | EntryPoints::TokenV2AmbassadorMintByPublisher => "ambassador_token",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -271,7 +272,7 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => "token_v1",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::TokenV2AmbassadorMint | EntryPoints::TokenV2AmbassadorMintByPublisher => "ambassador",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
@@ -445,6 +446,19 @@ impl EntryPoints {
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
                         bcs::to_bytes("superstar #").unwrap(),          // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                    ],
+                )
+            },
+            EntryPoints::TokenV2AmbassadorMintByPublisher => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_numbered_ambassador_token").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes("superstar #").unwrap(),          // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                        bcs::to_bytes(other.expect("Must provide other")).unwrap(),
                     ],
                 )
             },

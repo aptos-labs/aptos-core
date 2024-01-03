@@ -295,7 +295,7 @@ impl MoveHarness {
             .executor
             .execute_transaction_with_gas_profiler(txn)
             .unwrap();
-        // println!("output: {:?}", output);
+        // println!("output: {:?}", output.status());
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());
         }

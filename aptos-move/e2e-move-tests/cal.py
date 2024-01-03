@@ -3,29 +3,53 @@ import numpy.linalg as la
 import scipy as sp
 
 data = [
-    ["entry_point_Nop", 2963, 1.5, 0.0012, 0, 0],
-    ["entry_point_BytesMakeOrChange { data_length: Some(32) }", 2426, 1.5, 0.099, 0.8, 0.1087],
-    ["entry_point_StepDst", 2388, 1.5, 0.1894, 2.0096, 0.2178],
-    ["entry_point_Loop { loop_count: Some(100000), loop_type: NoOp }", 27, 1.5, 2400.0128, 0, 0],
-    ["entry_point_Loop { loop_count: Some(10000), loop_type: Arithmetic }", 44, 1.5, 1312.02, 0, 0],
-    ["entry_point_CreateObjects { num_objects: 10, object_payload_size: 0 }", 666, 1.5, 4.8356, 8, 1.227],
-    ["entry_point_CreateObjects { num_objects: 10, object_payload_size: 10240 }", 103, 1.5, 505.4636, 16, 11.527],
-    ["entry_point_CreateObjects { num_objects: 100, object_payload_size: 0 }", 93, 1.5, 47.3516, 80, 12.27],
-    ["entry_point_CreateObjects { num_objects: 100, object_payload_size: 10240 }", 43, 1.5, 629.9516, 160, 115.27],
-    ["entry_point_InitializeVectorPicture { length: 40 }", 1605, 1.5, 2.6054, 2.4, 0.2531],
-    ["entry_point_VectorPicture { length: 40 }", 2850, 1.5, 0.1048, 2.4192, 0.1405],
-    ["entry_point_VectorPictureRead { length: 40 }", 2900, 1.5, 0.147, 2.4192, 0],
-    ["entry_point_InitializeVectorPicture { length: 30720 }", 30, 1.5, 1438.4294, 2.4, 9.4575],
-    ["entry_point_VectorPicture { length: 30720 }", 169, 1.5, 0.1048, 20.8512, 9.3449],
-    ["entry_point_VectorPictureRead { length: 30720 }", 189, 1.5, 0.147, 20.8512, 0],
-    ["entry_point_SmartTablePicture { length: 30720, num_points_per_txn: 200 }", 22, 4.254, 1623.39, 2.4192, 0.8106],
-    ["entry_point_SmartTablePicture { length: 1048576, num_points_per_txn: 1024 }", 3, 19.086, 11957.2104, 2.4192, 3.3392],
-    ["entry_point_TokenV1MintAndTransferFT", 1351, 1.5, 19.18316, 6.4384, 0.8813],
-    ["entry_point_TokenV1MintAndTransferNFTSequential", 971, 1.5, 30.42634, 6.4384, 0.9953],
-    # ["entry_point_TokenV2AmbassadorMint { multisig: false }", 1077, 1.5, 0, 0, 0],
-    ["Transfer", 2032, 1.5, 2.249, 2.4192, 0.2482],
-    ["CreateAccount", 1583, 1.5, 3.1536, 1.6, 0.247],
-    ["PublishModule", 138, 27.734, 2.86256, 37.6064, 1.6832],
+    ["entry_point_Nop", 2963, 1.5, 0, 0.0012, 0, 0],
+    ["entry_point_BytesMakeOrChange { data_length: Some(32) }", 2426, 1.5, 0, 0.099, 0.4, 0.1087],
+    ["entry_point_StepDst", 2388, 1.5, 0, 0.1894, 1.6192, 0.2178],
+    ["entry_point_Loop { loop_count: Some(100000), loop_type: NoOp }", 27, 1.5, 0, 2400.0128, 0, 0],
+    ["entry_point_Loop { loop_count: Some(10000), loop_type: Arithmetic }", 44, 1.5, 0, 1312.02, 0, 0],
+    ["entry_point_CreateObjects { num_objects: 10, object_payload_size: 0 }", 666, 1.5, 0, 4.8356, 4, 1.227],
+    ["entry_point_CreateObjects { num_objects: 10, object_payload_size: 10240 }", 103, 1.5, 0, 505.4636, 8, 11.527],
+    ["entry_point_CreateObjects { num_objects: 100, object_payload_size: 0 }", 93, 1.5, 0, 47.3516, 40, 12.27],
+    ["entry_point_CreateObjects { num_objects: 100, object_payload_size: 10240 }", 43, 1.5, 0, 629.9516, 80, 115.27],
+    ["entry_point_InitializeVectorPicture { length: 40 }", 1605, 1.5, 0, 2.6054, 1.2, 0.2531],
+    ["entry_point_VectorPicture { length: 40 }", 2850, 1.5, 0, 0.1048, 2.4384, 0.1405],
+    ["entry_point_VectorPictureRead { length: 40 }", 2900, 1.5, 0, 0.147, 2.4384, 0],
+    ["entry_point_InitializeVectorPicture { length: 30720 }", 30, 1.5, 0, 1438.4294, 1.2, 9.4575],
+    ["entry_point_VectorPicture { length: 30720 }", 169, 1.5, 0, 0.1048, 39.3024, 9.3449],
+    ["entry_point_VectorPictureRead { length: 30720 }", 189, 1.5, 0, 0.147, 39.3024, 0],
+    ["entry_point_SmartTablePicture { length: 30720, num_points_per_txn: 200 }", 22, 1.5, 2.7539999999999996, 1622.6092, 2.4384, 0.8106],
+    ["entry_point_SmartTablePicture { length: 1048576, num_points_per_txn: 1024 }", 3, 1.5, 17.586, 11950.8296, 2.4384, 3.3392],
+    ["entry_point_TokenV1MintAndTransferFT", 1351, 1.5, 0, 9.845276, 5.6768, 0.8813],
+    ["entry_point_TokenV1MintAndTransferNFTSequential", 971, 1.5, 0, 15.238725, 5.6768, 0.9953],
+    ["entry_point_TokenV2AmbassadorMintByPublisher", 1077, 1.5, 0, 11.338862, 6.8576, 0.3599],
+    ["Transfer", 2032, 1.5, 0, 1.120142, 2.4384, 0.2482],
+    ["CreateAccount", 1583, 1.5, 0, 1.940597, 0.8, 0.247],
+    ["PublishModule", 138, 1.5, 26.234, 2.86256, 70.4128, 1.6832],
+
+    # ["entry_point_Nop", 2963, 1.5, 0.0012, 0, 0],
+    # ["entry_point_BytesMakeOrChange { data_length: Some(32) }", 2426, 1.5, 0.099, 0.8, 0.1087],
+    # ["entry_point_StepDst", 2388, 1.5, 0.1894, 2.0096, 0.2178],
+    # ["entry_point_Loop { loop_count: Some(100000), loop_type: NoOp }", 27, 1.5, 2400.0128, 0, 0],
+    # ["entry_point_Loop { loop_count: Some(10000), loop_type: Arithmetic }", 44, 1.5, 1312.02, 0, 0],
+    # ["entry_point_CreateObjects { num_objects: 10, object_payload_size: 0 }", 666, 1.5, 4.8356, 8, 1.227],
+    # ["entry_point_CreateObjects { num_objects: 10, object_payload_size: 10240 }", 103, 1.5, 505.4636, 16, 11.527],
+    # ["entry_point_CreateObjects { num_objects: 100, object_payload_size: 0 }", 93, 1.5, 47.3516, 80, 12.27],
+    # ["entry_point_CreateObjects { num_objects: 100, object_payload_size: 10240 }", 43, 1.5, 629.9516, 160, 115.27],
+    # ["entry_point_InitializeVectorPicture { length: 40 }", 1605, 1.5, 2.6054, 2.4, 0.2531],
+    # ["entry_point_VectorPicture { length: 40 }", 2850, 1.5, 0.1048, 2.4192, 0.1405],
+    # ["entry_point_VectorPictureRead { length: 40 }", 2900, 1.5, 0.147, 2.4192, 0],
+    # ["entry_point_InitializeVectorPicture { length: 30720 }", 30, 1.5, 1438.4294, 2.4, 9.4575],
+    # ["entry_point_VectorPicture { length: 30720 }", 169, 1.5, 0.1048, 20.8512, 9.3449],
+    # ["entry_point_VectorPictureRead { length: 30720 }", 189, 1.5, 0.147, 20.8512, 0],
+    # ["entry_point_SmartTablePicture { length: 30720, num_points_per_txn: 200 }", 22, 4.254, 1623.39, 2.4192, 0.8106],
+    # ["entry_point_SmartTablePicture { length: 1048576, num_points_per_txn: 1024 }", 3, 19.086, 11957.2104, 2.4192, 3.3392],
+    # ["entry_point_TokenV1MintAndTransferFT", 1351, 1.5, 19.18316, 6.4384, 0.8813],
+    # ["entry_point_TokenV1MintAndTransferNFTSequential", 971, 1.5, 30.42634, 6.4384, 0.9953],
+    # # ["entry_point_TokenV2AmbassadorMint { multisig: false }", 1077, 1.5, 0, 0, 0],
+    # ["Transfer", 2032, 1.5, 2.249, 2.4192, 0.2482],
+    # ["CreateAccount", 1583, 1.5, 3.1536, 1.6, 0.247],
+    # ["PublishModule", 138, 27.734, 2.86256, 37.6064, 1.6832],
 
     # large db
     # ["entry_point_Nop", 2963, 1.5, 0.0012, 0, 0],
@@ -102,8 +126,10 @@ data = [
     # ["PublishModule", 148, 27.786, 2.8636, 99.9063, 28.616],
 ]
 
-A = np.array([[row[i] * row[1] for i in range(2, 6)] for row in data])
-b = np.array([[12000]]*len(data))
+COLUMNS = 5
+
+A = np.array([[row[i] * row[1] for i in range(2, 2 + COLUMNS)] for row in data])
+b = np.array([[10000]]*len(data))
 
 print("LSQ")
 x = la.lstsq(A, b)[0]
@@ -118,7 +144,7 @@ print(np.matmul(A, x))
 print(x)
 print((res.cost, res.optimality, res.message))
 
-b_current = np.matmul(A, np.array([[1], [1], [1], [1]]))
+b_current = np.matmul(A, np.array([[1]] * COLUMNS))
 b_lsq_constrained = np.matmul(A, x)
 b_diff = b_lsq_constrained - b_current
 

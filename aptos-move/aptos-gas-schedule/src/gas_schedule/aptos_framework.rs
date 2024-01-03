@@ -265,9 +265,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 40],
 
         // Note(Gas): These are storage operations so the values should not be multiplied.
-        [event_write_to_event_store_base: InternalGas, "event.write_to_event_store.base", 300000],
+        [event_write_to_event_store_base: InternalGas, "event.write_to_event_store.base", 108851],
         // TODO(Gas): the on-chain name is wrong...
-        [event_write_to_event_store_per_abstract_value_unit: InternalGasPerAbstractValueUnit, "event.write_to_event_store.per_abstract_memory_unit", 5000],
+        [event_write_to_event_store_per_abstract_value_unit: InternalGasPerAbstractValueUnit, "event.write_to_event_store.per_abstract_memory_unit", 334],
 
         [state_storage_get_usage_base_cost: InternalGas, "state_storage.get_usage.base", 10000],
 

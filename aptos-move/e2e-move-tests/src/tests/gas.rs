@@ -6,6 +6,7 @@ use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_gas_algebra::GasQuantity;
 use aptos_gas_profiling::TransactionGasLog;
+use aptos_gas_schedule::gas_params::txn::MIN_TRANSACTION_GAS_UNITS;
 use aptos_language_e2e_tests::account::Account;
 use aptos_transaction_generator_lib::{
     publishing::{
@@ -390,7 +391,7 @@ pub fn print_gas_cost_with_statement(
 
 pub fn print_gas_cost_with_statement_and_tps_header() {
     println!(
-        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8} | {:8} | {:8} | {:8} | {:8} | {:10}",
+        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8} | {:8} | {:8} | {:8} | {:8} | {:8} | {:10}",
         "gas units",
         "$ at 5",
         "$ at 15",
@@ -398,6 +399,7 @@ pub fn print_gas_cost_with_statement_and_tps_header() {
         "exe+io g",
         // "exe gas",
         // "io gas",
+        "int_base",
         "intrins",
         "execut",
         "read",
@@ -418,7 +420,7 @@ pub fn print_gas_cost_with_statement_and_tps(
 ) {
     if !ALT_MODE {
         println!(
-        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.0} | {}",
+        "{:9} | {:9.6} | {:9.6} | {:9.6} | {:8} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.2} | {:8.0} | {}",
         gas_units,
         dollar_cost(gas_units, 5),
         dollar_cost(gas_units, 15),
@@ -426,7 +428,8 @@ pub fn print_gas_cost_with_statement_and_tps(
         fee_statement.unwrap().execution_gas_used() + fee_statement.unwrap().io_gas_used(),
         // fee_statement.unwrap().execution_gas_used(),
         // fee_statement.unwrap().io_gas_used(),
-        summary.intrinsic_cost,
+        1.5,
+        summary.intrinsic_cost - 1.5,
         summary.execution_cost,
         summary.read_cost,
         summary.write_cost,
@@ -436,10 +439,11 @@ pub fn print_gas_cost_with_statement_and_tps(
     );
     } else {
         println!(
-            "[\"{}\", {}, {}, {}, {}, {}],",
+            "[\"{}\", {}, {}, {}, {}, {}, {}],",
             function,
             tps,
-            summary.intrinsic_cost,
+            1.5,
+            summary.intrinsic_cost - 1.5,
             summary.execution_cost,
             summary.read_cost,
             summary.write_cost,
@@ -528,7 +532,7 @@ fn test_simple_calibrate_gas() {
         }),
         (1351., 1719., EntryPoints::TokenV1MintAndTransferFT),
         (971., 1150., EntryPoints::TokenV1MintAndTransferNFTSequential),
-        (1077., 1274., EntryPoints::TokenV2AmbassadorMint),
+        (1077., 1274., EntryPoints::TokenV2AmbassadorMintByPublisher),
     ];
 
     for (large_db_tps, small_db_tps, entry_point) in &entry_points {
@@ -555,7 +559,7 @@ fn test_simple_calibrate_gas() {
 
             runner.run_with_tps_estimate(
                 &format!("entry_point_{entry_point:?}"),
-                &user,
+                if let EntryPoints::TokenV2AmbassadorMintByPublisher = entry_point { &publisher } else { &user},
                 entry_point.create_payload(
                     package.get_module_id(entry_point.module_name()),
                     Some(&mut rng),
