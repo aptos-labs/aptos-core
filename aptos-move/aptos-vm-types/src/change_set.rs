@@ -16,7 +16,6 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     aggregator::PanicError,
-    aggregator::PanicError,
     contract_event::ContractEvent,
     state_store::{
         state_key::{StateKey, StateKeyInner},
@@ -40,7 +39,7 @@ use std::{
     sync::Arc,
 };
 
-// Sporadically checks if the given two input type layouts match
+/// Sporadically checks if the given two input type layouts match.
 pub fn randomly_check_layout_matches(
     layout_1: Option<&MoveTypeLayout>,
     layout_2: Option<&MoveTypeLayout>,
@@ -650,19 +649,9 @@ impl VMChangeSet {
                     let (additional_write_op, additional_type_layout) = additional_entry;
                     let (write_op, type_layout) = entry.get_mut();
                     randomly_check_layout_matches(
-                        type_layout.as_ref().map(|l| l.as_ref()),
-                        additional_type_layout.as_ref().map(|l| l.as_ref()),
-                    )
-                    .map_err(|_e| {
-                        VMStatus::error(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg(format!(
-                                "Cannot squash two writes with different type layouts.
-                                    key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                                key, type_layout, additional_type_layout
-                            )),
-                        )
-                    })?;
+                        type_layout.as_deref(),
+                        additional_type_layout.as_deref(),
+                    )?;
                     let noop = !WriteOp::squash(write_op, additional_write_op).map_err(|e| {
                         code_invariant_error(format!("Error while squashing two write ops: {}.", e))
                     })?;
@@ -713,13 +702,7 @@ impl VMChangeSet {
                                 materialized_size: additional_materialized_size,
                             }),
                         ) => {
-                            if layout != additional_layout {
-                                return Err(code_invariant_error(format!(
-                                    "Cannot squash two writes with different type layouts.
-                                    key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                                    key, layout, additional_layout
-                                )));
-                            }
+                            randomly_check_layout_matches(Some(layout), Some(additional_layout))?;
                             let to_delete = !WriteOp::squash(write_op, additional_write_op.clone())
                                 .map_err(|e| {
                                     code_invariant_error(format!(
