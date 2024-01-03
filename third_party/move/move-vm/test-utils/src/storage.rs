@@ -64,7 +64,7 @@ impl TableResolver for BlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> Result<Option<Bytes>, PartialVMError> {
         Ok(None)
     }
 }
@@ -124,7 +124,7 @@ impl<'a, 'b, S: TableResolver> TableResolver for DeltaStorage<'a, 'b, S> {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> Result<Option<Bytes>, PartialVMError> {
         // TODO: In addition to `change_set`, cache table outputs.
         self.base
             .resolve_table_entry_bytes_with_layout(handle, key, maybe_layout)
@@ -349,7 +349,7 @@ impl TableResolver for InMemoryStorage {
         handle: &TableHandle,
         key: &[u8],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> Result<Option<Bytes>, PartialVMError> {
         Ok(self.tables.get(handle).and_then(|t| t.get(key).cloned()))
     }
 }

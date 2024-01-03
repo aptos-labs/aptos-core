@@ -247,11 +247,16 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         handle: &TableHandle,
         key: &[u8],
         layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
-        self.executor_view.get_resource_bytes(
-            &StateKey::table_item((*handle).into(), key.to_vec()),
-            layout,
-        )
+    ) -> Result<Option<Bytes>, PartialVMError> {
+        self.executor_view
+            .get_resource_bytes(
+                &StateKey::table_item((*handle).into(), key.to_vec()),
+                layout,
+            )
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                    .with_message(format!("remote table resolver failure: {}", e))
+            })
     }
 }
 
