@@ -38,15 +38,10 @@ def modify_file(path: str, modify_entry: Callable[[GasEntry], GasEntry]):
 def modify_all_execution(modify_entry: Callable[[GasEntry], GasEntry]):
     modify_file(root_path + "/src/gas_schedule/instr.rs", modify_entry)
     modify_file(root_path + "/src/gas_schedule/move_stdlib.rs", modify_entry)
+    modify_file(root_path + "/src/gas_schedule/aptos_framework.rs", modify_entry)
 
     def wrapper(entry):
-        if entry.name.startswith("event_"):
-            return entry
-        else:
-            return modify_entry(entry)
-    modify_file(root_path + "/src/gas_schedule/aptos_framework.rs", wrapper)
-
-    def wrapper(entry):
+        # part of io costs
         if entry.name.startswith("common_load_"):
             return entry
         else:
@@ -63,4 +58,4 @@ def id(entry):
     return entry
 
 # modify_all_execution(id)
-scale_all_execution(209, 1000)
+scale_all_execution(1838, 10000)
