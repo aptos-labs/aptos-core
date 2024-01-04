@@ -496,7 +496,7 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = "2.1.0"
+diesel = "2.1"
 diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
@@ -562,7 +562,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
-num-bigint = { version = "0.3.2", features = ["rand"] }
+num-bigint = { version = "0.4.4", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
@@ -763,5 +763,3 @@ debug = true
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
-# More context here: https://github.com/weiznich/diesel_async/pull/121.
-diesel-async = { git = "https://github.com/banool/diesel_async", rev = "7115c8668b88d56029cb1471e84d2ea0234ff035" }

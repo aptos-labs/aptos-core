@@ -992,7 +992,7 @@ dependencies = [
  "libsecp256k1",
  "merlin",
  "more-asserts",
- "num-bigint 0.3.3",
+ "num-bigint 0.4.4",
  "num-integer",
  "once_cell",
  "p256",
@@ -2709,7 +2709,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc#af795c0a082385908d8ff3c72e54d53810e337fc"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf#4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf"
 dependencies = [
  "chrono",
 ]
@@ -6634,7 +6634,8 @@ dependencies = [
 [[package]]
 name = "diesel-async"
 version = "0.4.1"
-source = "git+https://github.com/banool/diesel_async?rev=7115c8668b88d56029cb1471e84d2ea0234ff035#7115c8668b88d56029cb1471e84d2ea0234ff035"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acada1517534c92d3f382217b485db8a8638f111b0e3f2a2a8e26165050f77be"
 dependencies = [
  "async-trait",
  "bb8",
@@ -11090,7 +11091,6 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
- "rand 0.7.3",
 ]
 
 [[package]]
@@ -11102,6 +11102,7 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -12366,10 +12367,10 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc#af795c0a082385908d8ff3c72e54d53810e337fc"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf#4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c)",
  "async-trait",
  "base64 0.13.1",
@@ -13926,7 +13927,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=af795c0a082385908d8ff3c72e54d53810e337fc#af795c0a082385908d8ff3c72e54d53810e337fc"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf#4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf"
 dependencies = [
  "anyhow",
  "async-trait",
