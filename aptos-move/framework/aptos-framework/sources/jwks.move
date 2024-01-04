@@ -441,13 +441,7 @@ module aptos_framework::jwks {
             jwks.entries = vector[];
         } else if (variant_type_name == b"0x1::jwks::PatchRemoveIssuer") {
             let cmd = copyable_any::unpack<PatchRemoveIssuer>(patch.variant);
-            let (found, index) = vector::find(&jwks.entries, |obj| {
-                let provider_jwk_set: &ProviderJWKs = obj;
-                provider_jwk_set.issuer == cmd.issuer
-            });
-            if (found) {
-                vector::remove(&mut jwks.entries, index);
-            };
+            remove_issuer(jwks, cmd.issuer);
         } else if (variant_type_name == b"0x1::jwks::PatchRemoveJWK") {
             let cmd = copyable_any::unpack<PatchRemoveJWK>(patch.variant);
             // TODO: This is inefficient: we remove the issuer, modify its JWKs & and reinsert the updated issuer. Why
