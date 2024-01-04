@@ -1,14 +1,14 @@
 spec aptos_framework::delegation_pool {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Every DelegationPool has only one corresponding StakePool stored at the same address.
+    /// Requirement: Every DelegationPool has only one corresponding StakePool stored at the same address.
     /// Criticality: Critical
     /// Implementation: Upon calling the initialize_delegation_pool function, a resource account is created from the
     /// "owner" signer to host the delegation pool resource and own the underlying stake pool.
     /// Enforcement: Audited that the address of StakePool equals address of DelegationPool and the data invariant on the DelegationPool.
     ///
     /// No.: 2
-    /// Property: The signer capability within the delegation pool has an address equal to the address of the
+    /// Requirement: The signer capability within the delegation pool has an address equal to the address of the
     /// delegation pool.
     /// Criticality: Critical
     /// Implementation: The initialize_delegation_pool function moves the DelegationPool resource to the address
@@ -16,7 +16,7 @@ spec aptos_framework::delegation_pool {
     /// Enforcement: Audited that the address of signer cap equals address of DelegationPool.
     ///
     /// No.: 3
-    /// Property: A delegator holds shares exclusively in one inactive shares pool, which could either be an already
+    /// Requirement: A delegator holds shares exclusively in one inactive shares pool, which could either be an already
     /// inactive pool or the pending_inactive pool.
     /// Criticality: High
     /// Implementation: The get_stake function returns the inactive stake owned by a delegator and checks which
@@ -25,7 +25,7 @@ spec aptos_framework::delegation_pool {
     /// zero and both are never non-zero.
     ///
     /// No.: 4
-    /// Property: The specific pool in which the delegator possesses inactive shares becomes designated as the
+    /// Requirement: The specific pool in which the delegator possesses inactive shares becomes designated as the
     /// pending withdrawal pool for that delegator.
     /// Criticality: Medium
     /// Implementation: The get_pending_withdrawal function checks if any pending withdrawal exists for a delegate
@@ -34,7 +34,7 @@ spec aptos_framework::delegation_pool {
     /// Enforcement: This has been audited.
     ///
     /// No.: 5
-    /// Property: The existence of a pending withdrawal implies that it is associated with a pool where the
+    /// Requirement: The existence of a pending withdrawal implies that it is associated with a pool where the
     /// delegator possesses inactive shares.
     /// Criticality: Medium
     /// Implementation: In the get_pending_withdrawal function, if withdrawal_exists is true, the function returns
@@ -42,28 +42,28 @@ spec aptos_framework::delegation_pool {
     /// Enforcement: get_pending_withdrawal has been audited.
     ///
     /// No.: 6
-    /// Property: An inactive shares pool should have coins allocated to it; otherwise, it should become deleted.
+    /// Requirement: An inactive shares pool should have coins allocated to it; otherwise, it should become deleted.
     /// Criticality: Medium
     /// Implementation: The redeem_inactive_shares function has a check that destroys the inactive shares pool,
     /// given that it is empty.
     /// Enforcement: shares pools have been audited.
     ///
     /// No.: 7
-    /// Property: The index of the pending withdrawal will not exceed the current OLC on DelegationPool.
+    /// Requirement: The index of the pending withdrawal will not exceed the current OLC on DelegationPool.
     /// Criticality: High
     /// Implementation: The get_pending_withdrawal function has a check which ensures that withdrawal_olc.index <
     /// pool.observed_lockup_cycle.index.
     /// Enforcement: This has been audited.
     ///
     /// No.: 8
-    /// Property: Slashing is not possible for inactive stakes.
+    /// Requirement: Slashing is not possible for inactive stakes.
     /// Criticality: Critical
     /// Implementation: The number of inactive staked coins must be greater than or equal to the
     /// total_coins_inactive of the pool.
     /// Enforcement: This has been audited.
     ///
     /// No.: 9
-    /// Property: The delegator's active or pending inactive stake will always meet or exceed the minimum allowed
+    /// Requirement: The delegator's active or pending inactive stake will always meet or exceed the minimum allowed
     /// value.
     /// Criticality: Medium
     /// Implementation: The add_stake, unlock and reactivate_stake functions ensure the active_shares or
@@ -73,7 +73,7 @@ spec aptos_framework::delegation_pool {
     /// MIN_COINS_ON_SHARES_POOL value.
     ///
     /// No.: 10
-    /// Property: The delegation pool exists at a given address.
+    /// Requirement: The delegation pool exists at a given address.
     /// Criticality: Low
     /// Implementation: Functions that operate on the DelegationPool abort if there is no DelegationPool struct
     /// under the given pool_address.
@@ -81,7 +81,7 @@ spec aptos_framework::delegation_pool {
     /// parameter.
     ///
     /// No.: 11
-    /// Property: The initialization of the delegation pool is contingent upon enabling the delegation pools
+    /// Requirement: The initialization of the delegation pool is contingent upon enabling the delegation pools
     /// feature.
     /// Criticality: Critical
     /// Implementation: The initialize_delegation_pool function should proceed if the DELEGATION_POOLS feature is

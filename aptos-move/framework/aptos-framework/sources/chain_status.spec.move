@@ -1,20 +1,20 @@
 spec aptos_framework::chain_status {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The end of genesis mark should persist throughout the entire life of the chain.
+    /// Requirement: The end of genesis mark should persist throughout the entire life of the chain.
     /// Criticality: Medium
     /// Implementation: The Aptos framework account should never drop the GenesisEndMarker resource.
     /// Enforcement: Audited that GenesisEndMarker is published at the end of genesis and never removed. Formally
     /// verified via [high-level-req-1](set_genesis_end) that GenesisEndMarker is published.
     ///
     /// No.: 2
-    /// Property: The status of the chain should never be genesis and operating at the same time.
+    /// Requirement: The status of the chain should never be genesis and operating at the same time.
     /// Criticality: Low
     /// Implementation: The status of the chain is determined by the GenesisEndMarker resource.
     /// Enforcement: Formally verified via [high-level-req-2](global invariant).
     ///
     /// No.: 3
-    /// Property: The status of the chain should only be changed once, from genesis to operating.
+    /// Requirement: The status of the chain should only be changed once, from genesis to operating.
     /// Criticality: Low
     /// Implementation: Attempting to assign a resource type more than once will abort.
     /// Enforcement: Formally verified via [high-level-req-3](set_genesis_end).

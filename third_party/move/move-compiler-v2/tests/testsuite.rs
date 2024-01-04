@@ -7,7 +7,7 @@ use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    inliner,
+    function_checker, inliner,
     pipeline::{
         ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
@@ -61,6 +61,8 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
     let mut sources = extract_test_directives(path, "// dep:")?;
     sources.push(path.to_string_lossy().to_string());
     let deps = vec![path_from_crate_root("../move-stdlib/sources")];
+    let path_string = path.to_string_lossy();
+    let warn_unused = path_string.contains("unused");
 
     // For each experiment, run the test at `path`.
     for experiment in experiments {
@@ -69,6 +71,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             sources: sources.clone(),
             dependencies: deps.clone(),
             named_address_mapping: vec!["std=0x1".to_string()],
+            warn_unused,
             ..Options::default()
         };
         TestConfig::get_config_from_path(path, &mut options).run(path, experiment, options)?
@@ -246,6 +249,12 @@ impl TestConfig {
         // Run context checker
         let mut env = move_compiler_v2::run_checker(options.clone())?;
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+
+        if ok {
+            function_checker::check_for_function_typed_parameters(&mut env);
+            function_checker::check_access_and_use(&mut env);
+            ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+        }
 
         if ok {
             if options.debug {

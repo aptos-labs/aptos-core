@@ -1,3 +1,28 @@
+
+Diagnostics:
+warning: Function `0x42::explicate_drop::unused_arg` is unused: it has no current callers and is private to its module.
+  ┌─ tests/explicit-drop/unused_var.move:6:2
+  │
+6 │ ╭     fun unused_arg<T: drop>(x: T) {
+7 │ │     }
+  │ ╰─────^
+
+warning: Function `0x42::explicate_drop::unused_call_assign` is unused: it has no current callers and is private to its module.
+   ┌─ tests/explicit-drop/unused_var.move:13:2
+   │
+13 │ ╭     fun unused_call_assign() {
+14 │ │         let _x = id(42);
+15 │ │     }
+   │ ╰─────^
+
+warning: Function `0x42::explicate_drop::unused_var` is unused: it has no current callers and is private to its module.
+  ┌─ tests/explicit-drop/unused_var.move:2:2
+  │
+2 │ ╭     fun unused_var() {
+3 │ │         let _x = 42;
+4 │ │     }
+  │ ╰─────^
+
 ============ initial bytecode ================
 
 [variant baseline]

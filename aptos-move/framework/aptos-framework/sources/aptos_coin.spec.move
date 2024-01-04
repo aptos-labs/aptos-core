@@ -1,20 +1,20 @@
 spec aptos_framework::aptos_coin {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The native token, APT, must be initialized during genesis.
+    /// Requirement: The native token, APT, must be initialized during genesis.
     /// Criticality: Medium
     /// Implementation: The initialize function is only called once, during genesis.
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Property: The APT coin may only be created exactly once.
+    /// Requirement: The APT coin may only be created exactly once.
     /// Criticality: Medium
     /// Implementation: The initialization function may only be called once.
     /// Enforcement: Enforced through the [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move](coin)
     /// module, which has been audited.
     ///
     /// No.: 3
-    /// Property: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.
+    /// Requirement: The abilities to mint Aptos tokens should be transferable, duplicatable, and destroyable.
     /// Criticality: High
     /// Implementation: The MintCapability struct has the copy and store abilities. This means that it can be duplicated
     /// and stored in different object wrappers (such as MintCapStore). This capability is tested against the
@@ -22,7 +22,7 @@ spec aptos_framework::aptos_coin {
     /// Enforcement: Verified via [high-level-req-3](initialize).
 
     /// No.: 4
-    /// Property: Any type of operation on the APT coin should fail if the user has not registered for the coin.
+    /// Requirement: Any type of operation on the APT coin should fail if the user has not registered for the coin.
     /// Criticality: Medium
     /// Implementation: Coin operations may succeed only on valid user coin registration.
     /// Enforcement: Enforced through the [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move](coin)

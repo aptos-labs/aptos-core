@@ -5,20 +5,15 @@ use crate::{
     error::DbError,
     rand::rand_gen::{
         storage::{
-            interface::{AugDataStorage, RandStorage},
+            interface::AugDataStorage,
             schema::{
-                AugDataSchema, CertifiedAugDataSchema, RandDecisionSchema, RandShareSchema,
-                AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME, DECISION_CF_NAME, SHARE_CF_NAME,
+                AugDataSchema, CertifiedAugDataSchema, AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME,
             },
         },
-        types::{
-            AugData, AugDataId, AugmentedData, CertifiedAugData, Proof, RandDecision, RandShare,
-            Share, ShareId,
-        },
+        types::{AugData, AugDataId, AugmentedData, CertifiedAugData},
     },
 };
 use anyhow::Result;
-use aptos_consensus_types::randomness::RandMetadata;
 use aptos_logger::info;
 use aptos_schemadb::{schema::Schema, Options, ReadOptions, SchemaBatch, DB};
 use std::{path::Path, sync::Arc, time::Instant};
@@ -31,12 +26,7 @@ pub const RAND_DB_NAME: &str = "rand_db";
 
 impl RandDb {
     pub(crate) fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        let column_families = vec![
-            SHARE_CF_NAME,
-            DECISION_CF_NAME,
-            AUG_DATA_CF_NAME,
-            CERTIFIED_AUG_DATA_CF_NAME,
-        ];
+        let column_families = vec![AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME];
 
         let path = db_root_path.as_ref().join(RAND_DB_NAME);
         let instant = Instant::now();
@@ -79,35 +69,6 @@ impl RandDb {
         let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>>>()?)
-    }
-}
-
-impl<S: Share, P: Proof<Share = S>> RandStorage<S, P> for RandDb {
-    fn save_share(&self, share: &RandShare<S>) -> anyhow::Result<()> {
-        Ok(self.put::<RandShareSchema<S>>(&share.share_id(), share)?)
-    }
-
-    fn save_decision(&self, decision: &RandDecision<P>) -> anyhow::Result<()> {
-        Ok(self.put::<RandDecisionSchema<P>>(decision.rand_metadata(), decision)?)
-    }
-
-    fn get_all_shares(&self) -> anyhow::Result<Vec<(ShareId, RandShare<S>)>> {
-        Ok(self.get_all::<RandShareSchema<S>>()?)
-    }
-
-    fn get_all_decisions(&self) -> anyhow::Result<Vec<(RandMetadata, RandDecision<P>)>> {
-        Ok(self.get_all::<RandDecisionSchema<P>>()?)
-    }
-
-    fn remove_shares(&self, shares: impl Iterator<Item = RandShare<S>>) -> anyhow::Result<()> {
-        Ok(self.delete::<RandShareSchema<S>>(shares.map(|s| s.share_id()))?)
-    }
-
-    fn remove_decisions(
-        &self,
-        decisions: impl Iterator<Item = RandDecision<P>>,
-    ) -> anyhow::Result<()> {
-        Ok(self.delete::<RandDecisionSchema<P>>(decisions.map(|d| d.rand_metadata().clone()))?)
     }
 }
 

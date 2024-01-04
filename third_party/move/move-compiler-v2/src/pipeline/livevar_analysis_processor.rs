@@ -348,11 +348,16 @@ impl<'a> CopyTransformation<'a> {
     ) -> bool {
         let target = self.target();
         let ty = target.get_local_type(temp);
-        if !ty.is_reference() && has_ability(&target, ty, Ability::Copy) {
+        if !ty.is_reference()
+            && has_ability(&target, ty, Ability::Copy)
+            && has_ability(&target, ty, Ability::Drop)
+        {
             // TODO(#11223): Until we have info about whether a var may have had a reference
-            // taken, be very conservative here and always copy if the type has the ability.
-            // If not, reference analysis should give us an error if we move the value and
-            // references still exist.
+            // taken, be very conservative here and always copy if the type has both drop
+            // and copy ability. Notice we also need drop ability as with too many copies we
+            // may end up with the need to destroy a value, which requires drop.
+            // If conditions don't hold, reference analysis should give us an error if we move
+            // the value and references still exist.
             true
         } else {
             let needed = alive.after.contains_key(&temp);

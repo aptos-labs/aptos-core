@@ -1521,7 +1521,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     .specialize_with_defaults(struct_ty)
                                     .skip_reference()
                                 {
-                                    RewriteResult::Rewritten(
+                                    RewriteResult::RewrittenAndDescend(
                                         ExpData::Call(
                                             id,
                                             Operation::Select(

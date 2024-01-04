@@ -76,6 +76,9 @@ struct AptosTestAdapter<'a> {
     storage: FakeDataStore,
     default_syntax: SyntaxChoice,
     private_key_mapping: BTreeMap<String, Ed25519PrivateKey>,
+    #[allow(unused)]
+    comparison_mode: bool,
+    run_config: TestRunConfig,
 }
 
 /// Parameters *required* to create a transaction.
@@ -566,10 +569,14 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         aptos_framework::extended_checks::get_all_attribute_names()
     }
 
+    fn run_config(&self) -> TestRunConfig {
+        self.run_config
+    }
+
     fn init(
         default_syntax: SyntaxChoice,
-        _comparison_mode: bool,
-        _run_config: TestRunConfig,
+        comparison_mode: bool,
+        run_config: TestRunConfig,
         pre_compiled_deps: Option<&'a FullyCompiledProgram>,
         task_opt: Option<TaskInput<(InitCommand, Self::ExtraInitArgs)>>,
     ) -> (Self, Option<String>) {
@@ -631,6 +638,8 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             default_syntax,
             storage,
             private_key_mapping,
+            comparison_mode,
+            run_config,
         };
 
         for (_, addr) in additional_named_address_mapping {
@@ -979,11 +988,14 @@ fn render_events(events: &[ContractEvent]) -> Option<String> {
 }
 
 pub fn run_aptos_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
+}
+
+pub fn run_aptos_test_with_config(
+    path: &Path,
+    config: TestRunConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
     // TODO: remove once bundles removed
     aptos_vm::aptos_vm::allow_module_bundle_for_test();
-    run_test_impl::<AptosTestAdapter>(
-        TestRunConfig::CompilerV1,
-        path,
-        Some(&*PRECOMPILED_APTOS_FRAMEWORK),
-    )
+    run_test_impl::<AptosTestAdapter>(config, path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

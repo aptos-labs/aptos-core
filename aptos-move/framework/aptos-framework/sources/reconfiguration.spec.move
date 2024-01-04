@@ -1,7 +1,7 @@
 spec aptos_framework::reconfiguration {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The Configuration resource is stored under the Aptos framework account with initial values upon
+    /// Requirement: The Configuration resource is stored under the Aptos framework account with initial values upon
     /// module's initialization.
     /// Criticality: Medium
     /// Implementation: The Configuration resource may only be initialized with specific values and published under the
@@ -9,7 +9,7 @@ spec aptos_framework::reconfiguration {
     /// Enforcement: Formally verified via [high-level-req-1](initialize).
     ///
     /// No.: 2
-    /// Property: The reconfiguration status may be determined at any time without causing an abort, indicating whether
+    /// Requirement: The reconfiguration status may be determined at any time without causing an abort, indicating whether
     /// or not the system allows reconfiguration.
     /// Criticality: Low
     /// Implementation: The reconfiguration_enabled function will never abort and always returns a boolean value that
@@ -17,7 +17,7 @@ spec aptos_framework::reconfiguration {
     /// Enforcement: Formally verified via [high-level-req-2](reconfiguration_enabled).
     ///
     /// No.: 3
-    /// Property: For each reconfiguration, the epoch value (config_ref.epoch) increases by 1, and one 'NewEpochEvent'
+    /// Requirement: For each reconfiguration, the epoch value (config_ref.epoch) increases by 1, and one 'NewEpochEvent'
     /// is emitted.
     /// Criticality: Critical
     /// Implementation: After reconfiguration, the reconfigure() function increases the epoch value of the configuration
@@ -25,7 +25,7 @@ spec aptos_framework::reconfiguration {
     /// Enforcement: Audited that these two values remain in sync.
     ///
     /// No.: 4
-    /// Property: Reconfiguration is possible only if genesis has started and reconfiguration is enabled. Also, the last
+    /// Requirement: Reconfiguration is possible only if genesis has started and reconfiguration is enabled. Also, the last
     /// reconfiguration must not be the current time, returning early without further actions otherwise.
     /// Criticality: High
     /// Implementation: The reconfigure() function may only execute to perform successful reconfiguration when genesis
@@ -34,7 +34,7 @@ spec aptos_framework::reconfiguration {
     /// Enforcement: Formally verified via [high-level-req-4](reconfigure).
     ///
     /// No.: 5
-    /// Property: Consecutive reconfigurations without the passage of time are not permitted.
+    /// Requirement: Consecutive reconfigurations without the passage of time are not permitted.
     /// Criticality: High
     /// Implementation: The reconfigure() function enforces the restriction that reconfiguration may only be performed
     /// when the current time is not equal to the last_reconfiguration_time.
