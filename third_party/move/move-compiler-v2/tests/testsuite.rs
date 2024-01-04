@@ -9,8 +9,9 @@ use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
     function_checker, inliner,
     pipeline::{
-        ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
-        livevar_analysis_processor::LiveVarAnalysisProcessor,
+        ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         visibility_checker::VisibilityChecker,
     },
@@ -225,6 +226,23 @@ impl TestConfig {
                 generate_file_format: false,
                 dump_annotated_targets: true,
             }
+        } else if path.contains("/copy-propagation/") {
+            pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(CopyPropagation {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
+            pipeline.add_processor(Box::new(DeadStoreElimination {}));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: false,
+            }));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: true,
+                dump_annotated_targets: true,
+            }
         } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
@@ -349,7 +367,8 @@ impl TestConfig {
     /// Callback from the framework to register formatters for annotations.
     fn register_formatters(target: &FunctionTarget) {
         LiveVarAnalysisProcessor::register_formatters(target);
-        ReferenceSafetyProcessor::register_formatters(target)
+        ReferenceSafetyProcessor::register_formatters(target);
+        AvailCopiesAnalysisProcessor::register_formatters(target);
     }
 
     fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {

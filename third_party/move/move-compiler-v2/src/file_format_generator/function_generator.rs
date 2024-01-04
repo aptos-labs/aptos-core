@@ -40,7 +40,7 @@ pub struct FunctionGenerator<'a> {
     code: Vec<FF::Bytecode>,
 }
 
-/// Immutable context for a function, seperated from the mutable generator state, to reduce
+/// Immutable context for a function, separated from the mutable generator state, to reduce
 /// borrow conflicts.
 #[derive(Clone)]
 pub struct FunctionContext<'env> {
