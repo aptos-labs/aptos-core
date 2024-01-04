@@ -18,9 +18,9 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "03000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 4,
+            gas_used: 3,
             status: Keep(
                 Success,
             ),
@@ -43,7 +43,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
             gas_used: 4,
             status: Keep(
@@ -76,7 +76,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
             gas_used: 4,
             status: Keep(
@@ -101,9 +101,9 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "05000000000000000400000000000000020000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 5,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),
@@ -130,9 +130,9 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "05000000000000000400000000000000020000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000020000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 5,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),
@@ -155,7 +155,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
             gas_used: 4,
             status: Keep(
@@ -184,7 +184,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
             gas_used: 4,
             status: Keep(
@@ -217,7 +217,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
             gas_used: 4,
             status: Keep(
@@ -246,9 +246,9 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "05000000000000000400000000000000020000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000020000000000000000000000000000000000000000000000" },
             ],
-            gas_used: 5,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),
@@ -267,7 +267,7 @@ Ok(
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000400000000000000010000000000000000000000000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04000000000000000300000000000000010000000000000000000000000000000000000000000000" },
             ],
             gas_used: 4,
             status: Keep(
