@@ -193,7 +193,7 @@ class RestClient:
         """
         response = await self._get(
             endpoint=f"accounts/{account_address}/module/{module_name}",
-            params={"ledger_version": ledger_version}
+            params={"ledger_version": ledger_version},
         )
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
@@ -225,7 +225,7 @@ class RestClient:
                 "ledger_version": ledger_version,
                 "limit": limit,
                 "start": start,
-            }
+            },
         )
         if response.status_code == 404:
             raise AccountNotFound(f"{account_address}", account_address)
@@ -258,7 +258,7 @@ class RestClient:
             endpoint=f"blocks/by_height/{block_height}",
             params={
                 "with_transactions": with_transactions,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(f"{response.text}", response.status_code)
@@ -285,7 +285,7 @@ class RestClient:
             endpoint=f"blocks/by_version/{version}",
             params={
                 "with_transactions": with_transactions,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(f"{response.text}", response.status_code)
@@ -321,7 +321,7 @@ class RestClient:
             params={
                 "limit": limit,
                 "start": start,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
@@ -351,7 +351,7 @@ class RestClient:
             params={
                 "limit": limit,
                 "start": start,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(f"{response.text} - {account_address}", response.status_code)
@@ -536,9 +536,7 @@ class RestClient:
         return response.json()["hash"]
 
     async def transaction_pending(self, txn_hash: str) -> bool:
-        response = await self._get(
-            endpoint=f"transactions/by_hash/{txn_hash}"
-        )
+        response = await self._get(endpoint=f"transactions/by_hash/{txn_hash}")
         # TODO(@davidiw): consider raising a different error here, since this is an ambiguous state
         if response.status_code == 404:
             return True
@@ -612,7 +610,7 @@ class RestClient:
             params={
                 "limit": limit,
                 "start": start,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
@@ -639,7 +637,7 @@ class RestClient:
             params={
                 "limit": limit,
                 "start": start,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
@@ -816,7 +814,7 @@ class RestClient:
                 "function": function,
                 "type_arguments": type_arguments,
                 "arguments": arguments,
-            }
+            },
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
@@ -840,7 +838,9 @@ class RestClient:
             json=data,
         )
 
-    async def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> httpx.Response:
+    async def _get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> httpx.Response:
         # format params:
         params = {} if params is None else params
         params = {key: val for key, val in params.items() if val is not None}

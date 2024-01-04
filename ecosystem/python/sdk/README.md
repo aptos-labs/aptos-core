@@ -5,7 +5,7 @@
 
 This provides basic functionalities to interact with [Aptos](https:/github.com/aptos-labs/aptos-core/). Get started [here](https://aptos.dev/guides/system-integrators-guide/#getting-started).
 
-Currently this is still in development and may not be suitable for production purposes.
+Currently, this is still in development and may not be suitable for production purposes.
 
 Note: The sync client is deprecated, please only start new projects using the async client. Feature contributions to the sync client will be rejected.
 
@@ -51,9 +51,19 @@ make examples
 
 Note: These end-to-end tests are tested against a node built from the same commit as part of CI, not devnet. For examples tested against devnet, see `developer-docs-site/static/examples/python/` from the root of the repo.
 
+### Integration Testing Using the Aptos CLI
+```bash
+make examples_cli
+```
+
 ## Autoformatting
 ```bash
 make fmt
+```
+
+## Autolinting
+```bash
+make lint
 ```
 
 ## Package Publishing
