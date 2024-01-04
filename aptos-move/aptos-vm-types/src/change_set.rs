@@ -24,11 +24,8 @@ use aptos_types::{
     transaction::ChangeSet as StorageChangeSet,
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
-use move_binary_format::errors::{Location, PartialVMError};
-use move_core_types::{
-    value::MoveTypeLayout,
-    vm_status::{err_msg, StatusCode, VMStatus},
-};
+use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
+use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
@@ -62,10 +59,8 @@ macro_rules! squash_writes_pair {
         // Squashing creation and deletion is a no-op. In that case, we
         // have to remove the old write op from the write set.
         let noop = !WriteOp::squash($write_entry.get_mut(), $additional_write).map_err(|e| {
-            VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg(format!("Error while squashing two write ops: {}.", e)),
-            )
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message(format!("Error while squashing two write ops: {}.", e))
         })?;
         if noop {
             $write_entry.remove();
@@ -93,7 +88,7 @@ impl VMChangeSet {
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         checker: &dyn CheckChangeSet,
-    ) -> Result<Self, VMStatus> {
+    ) -> PartialVMResult<Self> {
         let change_set = Self {
             resource_write_set,
             module_write_set,
@@ -120,11 +115,11 @@ impl VMChangeSet {
         group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
-    ) -> Result<Self, VMStatus> {
+    ) -> PartialVMResult<Self> {
         Self::new(
             resource_write_set
                 .into_iter()
-                .map::<Result<_, VMStatus>, _>(|(k, (w, l))| {
+                .map::<PartialVMResult<_>, _>(|(k, (w, l))| {
                     Ok((
                         k,
                         AbstractResourceWriteOp::from_resource_write_with_maybe_layout(w, l),
@@ -147,11 +142,12 @@ impl VMChangeSet {
                                         materialized_size: WriteOpSize::from(&w)
                                             .write_len()
                                             .ok_or_else(|| {
-                                                VMStatus::error(
+                                                PartialVMError::new(
                                                     StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
-                                                    err_msg(
-                                                        "Read with exchange cannot be a delete.",
-                                                    ),
+                                                )
+                                                .with_message(
+                                                    "Read with exchange cannot be a delete."
+                                                        .to_string(),
                                                 )
                                             })?,
                                         metadata: w.into_metadata(),
@@ -173,14 +169,16 @@ impl VMChangeSet {
                         ))
                     },
                 ))
-                .try_fold::<_, _, Result<BTreeMap<_, _>, VMStatus>>(
+                .try_fold::<_, _, PartialVMResult<BTreeMap<_, _>>>(
                     BTreeMap::new(),
                     |mut acc, element| {
                         let (key, value) = element?;
                         if acc.insert(key, value).is_some() {
-                            Err(VMStatus::error(
+                            Err(PartialVMError::new(
                                 StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
-                                err_msg("Found duplicate key across resource change sets."),
+                            )
+                            .with_message(
+                                "Found duplicate key across resource change sets.".to_string(),
                             ))
                         } else {
                             Ok(acc)
@@ -209,7 +207,7 @@ impl VMChangeSet {
         // Pass in within which resolver context are we creating this change set.
         // Used to eagerly reject changes created in an incompatible way.
         is_delayed_field_optimization_capable: bool,
-    ) -> anyhow::Result<Self, VMStatus> {
+    ) -> VMResult<Self> {
         assert!(
             !is_delayed_field_optimization_capable,
             "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
@@ -247,7 +245,9 @@ impl VMChangeSet {
             aggregator_v1_delta_set: BTreeMap::new(),
             events,
         };
-        checker.check_change_set(&change_set)?;
+        checker
+            .check_change_set(&change_set)
+            .map_err(|e| e.finish(Location::Undefined))?;
         Ok(change_set)
     }
 
@@ -444,13 +444,14 @@ impl VMChangeSet {
     pub fn try_materialize_aggregator_v1_delta_set(
         &mut self,
         resolver: &impl AggregatorV1Resolver,
-    ) -> anyhow::Result<(), VMStatus> {
+    ) -> VMResult<()> {
         let into_write =
-            |(state_key, delta): (StateKey, DeltaOp)| -> anyhow::Result<(StateKey, WriteOp), VMStatus> {
+            |(state_key, delta): (StateKey, DeltaOp)| -> VMResult<(StateKey, WriteOp)> {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write = resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
+                let write =
+                    resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
                 Ok((state_key, write))
             };
 
@@ -458,7 +459,7 @@ impl VMChangeSet {
         let materialized_aggregator_delta_set = aggregator_v1_delta_set
             .into_iter()
             .map(into_write)
-            .collect::<anyhow::Result<BTreeMap<StateKey, WriteOp>, VMStatus>>()?;
+            .collect::<VMResult<BTreeMap<StateKey, WriteOp>>>()?;
         self.aggregator_v1_write_set
             .extend(materialized_aggregator_delta_set);
         Ok(())
@@ -469,7 +470,7 @@ impl VMChangeSet {
         aggregator_v1_delta_set: &mut BTreeMap<StateKey, DeltaOp>,
         additional_aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         additional_aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
-    ) -> anyhow::Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         use WriteOp::*;
 
         // First, squash deltas.
@@ -485,17 +486,18 @@ impl VMChangeSet {
                             .expect("Deserializing into an aggregator value always succeeds");
                         let value = additional_delta_op
                             .apply_to(base)
-                            .map_err(PartialVMError::from)
-                            .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            .map_err(PartialVMError::from)?;
                         *data = serialize(&value).into();
                     },
                     Deletion { .. } => {
                         // This case (applying a delta to deleted item) should
                         // never happen. Let's still return an error instead of
                         // panicking.
-                        return Err(VMStatus::error(
+                        return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg("Cannot squash delta which was already deleted."),
+                        )
+                        .with_message(
+                            "Cannot squash delta which was already deleted.".to_string(),
                         ));
                     },
                 }
@@ -509,8 +511,7 @@ impl VMChangeSet {
                         entry
                             .into_mut()
                             .merge_with_next_delta(additional_delta_op)
-                            .map_err(PartialVMError::from)
-                            .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            .map_err(PartialVMError::from)?;
                     },
                     Vacant(entry) => {
                         // We see this delta for the first time, so simply add it
@@ -535,9 +536,11 @@ impl VMChangeSet {
 
                     // We cannot create after modification with a delta!
                     if removed_delta.is_some() && additional_write_op.is_creation() {
-                        return Err(VMStatus::error(
+                        return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg("Cannot create a resource after modification with a delta."),
+                        )
+                        .with_message(
+                            "Cannot create a resource after modification with a delta.".to_string(),
                         ));
                     }
 
@@ -552,7 +555,7 @@ impl VMChangeSet {
     fn squash_additional_delayed_field_changes(
         change_set: &mut BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
         additional_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    ) -> anyhow::Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         let merged_changes = additional_change_set
             .into_iter()
             .map(|(id, additional_change)| {
@@ -580,12 +583,7 @@ impl VMChangeSet {
             .collect::<Vec<_>>();
 
         for (id, merged_change) in merged_changes.into_iter() {
-            change_set.insert(
-                id,
-                merged_change
-                    .map_err(PartialVMError::from)
-                    .map_err(|e| e.finish(Location::Undefined).into_vm_status())?,
-            );
+            change_set.insert(id, merged_change.map_err(PartialVMError::from)?);
         }
         Ok(())
     }
@@ -593,7 +591,7 @@ impl VMChangeSet {
     fn squash_additional_module_writes(
         write_set: &mut BTreeMap<StateKey, WriteOp>,
         additional_write_set: BTreeMap<StateKey, WriteOp>,
-    ) -> anyhow::Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         for (key, additional_write_op) in additional_write_set.into_iter() {
             match write_set.entry(key) {
                 Occupied(mut entry) => {
@@ -616,7 +614,7 @@ impl VMChangeSet {
         for (key, additional_entry) in additional_write_set.into_iter() {
             match write_set.entry(key.clone()) {
                 Occupied(mut entry) => {
-                    // Squash entry and addtional entries if type layouts match
+                    // Squash entry and additional entries if type layouts match.
                     let (additional_write_op, additional_type_layout) = additional_entry;
                     let (write_op, type_layout) = entry.get_mut();
                     if *type_layout != additional_type_layout {
@@ -653,7 +651,7 @@ impl VMChangeSet {
                     entry.insert(additional_entry);
                 },
                 Occupied(mut entry) => {
-                    let (to_delete, to_overwite) = match (entry.get_mut(), &additional_entry) {
+                    let (to_delete, to_overwrite) = match (entry.get_mut(), &additional_entry) {
                         (Write(write_op), Write(additional_write_op)) => {
                             let to_delete = !WriteOp::squash(write_op, additional_write_op.clone())
                                 .map_err(|e| {
@@ -797,7 +795,7 @@ impl VMChangeSet {
                         },
                     };
 
-                    if to_overwite {
+                    if to_overwrite {
                         entry.insert(additional_entry);
                     } else if to_delete {
                         entry.remove();
@@ -812,7 +810,7 @@ impl VMChangeSet {
         &mut self,
         additional_change_set: Self,
         checker: &dyn CheckChangeSet,
-    ) -> anyhow::Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         let Self {
             resource_write_set: additional_resource_write_set,
             module_write_set: additional_module_write_set,
@@ -831,13 +829,7 @@ impl VMChangeSet {
         Self::squash_additional_resource_writes(
             &mut self.resource_write_set,
             additional_resource_write_set,
-        )
-        .map_err(|e| {
-            VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg(format!("Error while squashing two write ops: {:?}.", e)),
-            )
-        })?;
+        )?;
         Self::squash_additional_module_writes(
             &mut self.module_write_set,
             additional_module_write_set,

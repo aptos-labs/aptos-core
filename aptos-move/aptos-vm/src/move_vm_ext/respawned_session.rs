@@ -467,6 +467,7 @@ mod test {
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
     use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
+    use move_binary_format::errors::PartialVMResult;
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -477,7 +478,7 @@ mod test {
     struct NoOpChangeSetChecker;
 
     impl CheckChangeSet for NoOpChangeSetChecker {
-        fn check_change_set(&self, _change_set: &VMChangeSet) -> anyhow::Result<(), VMStatus> {
+        fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
             Ok(())
         }
     }

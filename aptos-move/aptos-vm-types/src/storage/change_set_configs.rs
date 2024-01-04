@@ -3,7 +3,8 @@
 
 use crate::{change_set::VMChangeSet, check_change_set::CheckChangeSet};
 use aptos_gas_schedule::AptosGasParameters;
-use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::vm_status::StatusCode;
 
 #[derive(Clone, Debug)]
 pub struct ChangeSetConfigs {
@@ -84,13 +85,12 @@ impl ChangeSetConfigs {
 }
 
 impl CheckChangeSet for ChangeSetConfigs {
-    fn check_change_set(&self, change_set: &VMChangeSet) -> Result<(), VMStatus> {
-        const ERR: StatusCode = StatusCode::STORAGE_WRITE_LIMIT_REACHED;
-
+    fn check_change_set(&self, change_set: &VMChangeSet) -> PartialVMResult<()> {
         if self.max_write_ops_per_transaction != 0
             && change_set.num_write_ops() as u64 > self.max_write_ops_per_transaction
         {
-            return Err(VMStatus::error(ERR, err_msg("Too many write ops.")));
+            return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED)
+                .with_message("Too many write ops.".to_string()));
         }
 
         let mut write_set_size = 0;
@@ -98,12 +98,12 @@ impl CheckChangeSet for ChangeSetConfigs {
             if let Some(len) = op_size.write_len() {
                 let write_op_size = len + (key.size() as u64);
                 if write_op_size > self.max_bytes_per_write_op {
-                    return Err(VMStatus::error(ERR, None));
+                    return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
                 }
                 write_set_size += write_op_size;
             }
             if write_set_size > self.max_bytes_all_write_ops_per_transaction {
-                return Err(VMStatus::error(ERR, None));
+                return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
             }
         }
 
@@ -111,11 +111,11 @@ impl CheckChangeSet for ChangeSetConfigs {
         for (event, _) in change_set.events() {
             let size = event.event_data().len() as u64;
             if size > self.max_bytes_per_event {
-                return Err(VMStatus::error(ERR, None));
+                return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
             }
             total_event_size += size;
             if total_event_size > self.max_bytes_all_events_per_transaction {
-                return Err(VMStatus::error(ERR, None));
+                return Err(PartialVMError::new(StatusCode::STORAGE_WRITE_LIMIT_REACHED));
             }
         }
 

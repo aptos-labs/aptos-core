@@ -280,7 +280,8 @@ impl<'r> TransactionDataCache<'r> {
         }
         Ok(self
             .remote
-            .get_module(module_id)?
+            .get_module(module_id)
+            .map_err(|e| e.finish(Location::Undefined))?
             .is_some())
     }
 }
