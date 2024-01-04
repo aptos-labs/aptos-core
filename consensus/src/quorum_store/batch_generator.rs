@@ -13,7 +13,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchId, BatchInfo},
+    proof_of_store::{BatchId, ProposedBatch},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -28,7 +28,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(u64, Vec<BatchInfo>),
+    CommitNotification(u64, Vec<ProposedBatch>),
     ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }

@@ -83,6 +83,20 @@ pub fn extract_txns_from_block<'a>(
                         }
                     }
                 },
+                Payload::InQuorumStoreV2(proof) => {
+                    for proof in &proof.proof_with_data.proofs {
+                        let digest = proof.digest();
+                        if let Some(batch) = all_batches.get(digest) {
+                            if let Some(txns) = batch.payload() {
+                                block_txns.extend(txns);
+                            } else {
+                                bail!("Payload is not found for batch ({digest}).");
+                            }
+                        } else {
+                            bail!("Batch ({digest}) is not found.");
+                        }
+                    }
+                },
             }
             Ok(block_txns)
         },

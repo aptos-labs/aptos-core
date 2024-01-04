@@ -10,7 +10,8 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
+    BatchInfo, ProofOfStore, ProposedBatch, SignedBatchInfo, SignedBatchInfoError,
+    SignedBatchInfoMsg,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -30,7 +31,7 @@ use tokio::{
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
     AppendSignature(SignedBatchInfoMsg),
-    CommitNotification(Vec<BatchInfo>),
+    CommitNotification(Vec<ProposedBatch>),
     Shutdown(TokioOneshot::Sender<()>),
 }
 
@@ -288,7 +289,7 @@ impl ProofCoordinator {
                             for batch in batches {
                                 let digest = batch.digest();
                                 if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
-                                    if batch == *existing_proof.get().batch_info() {
+                                    if batch.info() == existing_proof.get().batch_info() {
                                         Self::update_counters(existing_proof.get());
                                         existing_proof.remove();
                                     }

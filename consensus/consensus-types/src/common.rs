@@ -12,7 +12,7 @@ use aptos_types::{
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
+use std::{collections::HashSet, fmt, fmt::Write, ops::Range, sync::Arc};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -139,17 +139,34 @@ impl ProofWithData {
     }
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct ProofsWithDataAndRange {
+    pub proof_with_data: ProofWithData,
+    pub ranges: Vec<Range<u64>>,
+}
+
+impl ProofsWithDataAndRange {
+    pub fn new(proofs: Vec<ProofOfStore>, ranges: Vec<Range<u64>>) -> Self {
+        Self {
+            proof_with_data: ProofWithData::new(proofs),
+            ranges,
+        }
+    }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
+    InQuorumStoreV2(ProofsWithDataAndRange),
 }
 
 impl Payload {
     pub fn empty(quorum_store_enabled: bool) -> Self {
         if quorum_store_enabled {
-            Payload::InQuorumStore(ProofWithData::new(Vec::new()))
+            // TODO: backwards compatibility?
+            Payload::InQuorumStoreV2(ProofsWithDataAndRange::new(vec![], vec![]))
         } else {
             Payload::DirectMempool(Vec::new())
         }
@@ -163,6 +180,12 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_txns() as usize)
                 .sum(),
+            Payload::InQuorumStoreV2(proofs_with_data_and_range) => proofs_with_data_and_range
+                .proof_with_data
+                .proofs
+                .iter()
+                .map(|proof| proof.num_txns() as usize)
+                .sum(),
         }
     }
 
@@ -170,6 +193,9 @@ impl Payload {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
+            Payload::InQuorumStoreV2(proofs_with_data_and_range) => {
+                proofs_with_data_and_range.proof_with_data.proofs.is_empty()
+            },
         }
     }
 
@@ -177,6 +203,9 @@ impl Payload {
         match (self, other) {
             (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2),
             (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
+            (Payload::InQuorumStoreV2(p1), Payload::InQuorumStoreV2(p2)) => {
+                p1.proof_with_data.extend(p2.proof_with_data)
+            },
             (_, _) => unreachable!(),
         }
     }
@@ -198,6 +227,12 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
+            Payload::InQuorumStoreV2(proofs_with_data_and_range) => proofs_with_data_and_range
+                .proof_with_data
+                .proofs
+                .iter()
+                .map(|proof| proof.num_bytes() as usize)
+                .sum(),
         }
     }
 
@@ -210,6 +245,12 @@ impl Payload {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
                 for proof in proof_with_status.proofs.iter() {
+                    proof.verify(validator)?;
+                }
+                Ok(())
+            },
+            (true, Payload::InQuorumStoreV2(proofs_with_data_and_range)) => {
+                for proof in proofs_with_data_and_range.proof_with_data.proofs.iter() {
                     proof.verify(validator)?;
                 }
                 Ok(())
@@ -231,6 +272,13 @@ impl fmt::Display for Payload {
             },
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
+            },
+            Payload::InQuorumStoreV2(proofs_with_data_and_range) => {
+                write!(
+                    f,
+                    "InMemory proofs: {}",
+                    proofs_with_data_and_range.proof_with_data.proofs.len()
+                )
             },
         }
     }

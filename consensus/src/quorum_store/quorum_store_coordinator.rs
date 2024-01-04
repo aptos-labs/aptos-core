@@ -10,14 +10,14 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::proof_of_store::BatchInfo;
+use aptos_consensus_types::proof_of_store::ProposedBatch;
 use aptos_logger::prelude::*;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot};
 
 pub enum CoordinatorCommand {
-    CommitNotification(u64, Vec<BatchInfo>),
+    CommitNotification(u64, Vec<ProposedBatch>),
     Shutdown(futures_channel::oneshot::Sender<()>),
 }
 

@@ -14,7 +14,7 @@ use std::{
     cmp::Ordering,
     fmt::{Display, Formatter},
     hash::Hash,
-    ops::Deref,
+    ops::{Deref, Range},
 };
 
 #[derive(
@@ -131,6 +131,44 @@ impl BatchInfo {
 
     pub fn gas_bucket_start(&self) -> u64 {
         self.gas_bucket_start
+    }
+}
+
+#[derive(
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+)]
+pub struct ProposedBatch {
+    info: BatchInfo,
+    range: Range<u64>,
+}
+
+impl ProposedBatch {
+    pub fn new(info: BatchInfo) -> Self {
+        let num_txns = info.num_txns();
+        Self {
+            info,
+            range: 0..num_txns,
+        }
+    }
+
+    pub fn new_with_range(info: BatchInfo, range: Range<u64>) -> Self {
+        Self { info, range }
+    }
+
+    pub fn info(&self) -> &BatchInfo {
+        &self.info
+    }
+
+    pub fn range(&self) -> &Range<u64> {
+        &self.range
+    }
+}
+
+impl Deref for ProposedBatch {
+    type Target = BatchInfo;
+
+    fn deref(&self) -> &Self::Target {
+        &self.info
     }
 }
 

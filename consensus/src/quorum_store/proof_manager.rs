@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
-    proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{ProofOfStore, ProofOfStoreMsg, ProposedBatch},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
@@ -19,7 +19,7 @@ use std::collections::HashSet;
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    CommitNotification(u64, Vec<BatchInfo>),
+    CommitNotification(u64, Vec<ProposedBatch>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -57,7 +57,7 @@ impl ProofManager {
     pub(crate) fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
-        batches: Vec<BatchInfo>,
+        batches: Vec<ProposedBatch>,
     ) {
         trace!(
             "QS: got clean request from execution at block timestamp {}",

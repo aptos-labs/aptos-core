@@ -4,7 +4,7 @@
 use crate::{monitor, quorum_store::counters};
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+    proof_of_store::{BatchId, BatchInfo, ProofOfStore, ProposedBatch},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -17,6 +17,7 @@ use std::{
     cmp::{Ordering, Reverse},
     collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque},
     hash::Hash,
+    ops::{Deref, Range},
     time::{Duration, Instant},
 };
 use tokio::time::timeout;
@@ -193,12 +194,72 @@ impl Ord for BatchSortKey {
     }
 }
 
+struct QueuedProof {
+    proof_of_store: ProofOfStore,
+    ranges: Vec<Range<u64>>,
+    insertion_time: Instant,
+}
+
+impl QueuedProof {
+    fn new(proof_of_store: ProofOfStore) -> Self {
+        let all_txns_range = 0..proof_of_store.num_txns();
+        Self {
+            proof_of_store,
+            ranges: vec![all_txns_range],
+            insertion_time: Instant::now(),
+        }
+    }
+
+    fn proof(&self) -> &ProofOfStore {
+        &self.proof_of_store
+    }
+
+    fn insertion_time(&self) -> Instant {
+        self.insertion_time
+    }
+
+    #[allow(clippy::single_range_in_vec_init)]
+    fn commit(&mut self, range: Range<u64>) {
+        self.ranges = self
+            .ranges
+            .iter()
+            .flat_map(|r| {
+                // subtract range from r
+                if r.start >= range.end || r.end <= range.start {
+                    // no overlap
+                    vec![r.clone()]
+                } else if r.start < range.start && r.end > range.end {
+                    // split into 2
+                    vec![r.start..range.start, range.end..r.end]
+                } else if r.start < range.start {
+                    // truncate left
+                    vec![r.start..range.start]
+                } else if r.end > range.end {
+                    // truncate right
+                    vec![range.end..r.end]
+                } else {
+                    // remove
+                    vec![]
+                }
+            })
+            .collect();
+    }
+}
+
+impl Deref for QueuedProof {
+    type Target = ProofOfStore;
+
+    fn deref(&self) -> &Self::Target {
+        &self.proof_of_store
+    }
+}
+
 pub struct ProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness between peers and priority within peer
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     // ProofOfStore and insertion_time. None if committed
-    batch_to_proof: HashMap<BatchKey, Option<(ProofOfStore, Instant)>>,
+    batch_to_proof: HashMap<BatchKey, Option<QueuedProof>>,
     // Expiration index
     expirations: TimeExpirations<BatchSortKey>,
     latest_block_timestamp: u64,
@@ -264,7 +325,7 @@ impl ProofQueue {
         queue.insert(batch_sort_key.clone(), proof.info().clone());
         self.expirations.add_item(batch_sort_key, expiration);
         self.batch_to_proof
-            .insert(batch_key, Some((proof, Instant::now())));
+            .insert(batch_key, Some(QueuedProof::new(proof)));
 
         if author == self.my_peer_id {
             counters::inc_local_pos_count(bucket);
@@ -304,9 +365,7 @@ impl ProofQueue {
                 if let Some((sort_key, batch)) = iter.next() {
                     if excluded_batches.contains(batch) {
                         excluded_txns += batch.num_txns();
-                    } else if let Some(Some((proof, insertion_time))) =
-                        self.batch_to_proof.get(&sort_key.batch_key)
-                    {
+                    } else if let Some(Some(proof)) = self.batch_to_proof.get(&sort_key.batch_key) {
                         cur_bytes += batch.num_bytes();
                         cur_txns += batch.num_txns();
                         if cur_bytes > max_bytes || cur_txns > max_txns {
@@ -315,8 +374,11 @@ impl ProofQueue {
                             return false;
                         }
                         let bucket = proof.gas_bucket_start();
-                        ret.push(proof.clone());
-                        counters::pos_to_pull(bucket, insertion_time.elapsed().as_secs_f64());
+                        ret.push(proof.proof().clone());
+                        counters::pos_to_pull(
+                            bucket,
+                            proof.insertion_time().elapsed().as_secs_f64(),
+                        );
                         if cur_bytes == max_bytes || cur_txns == max_txns {
                             // Exactly the limit for requested bytes or number of transactions.
                             full = true;
@@ -362,6 +424,7 @@ impl ProofQueue {
         let expired = self.expirations.expire(block_timestamp);
         let mut num_expired_but_not_committed = 0;
         for key in &expired {
+            // TODO: change to mut pattern?
             if let Some(mut queue) = self.author_to_batches.remove(&key.author()) {
                 if let Some(batch) = queue.remove(key) {
                     if self
@@ -396,17 +459,29 @@ impl ProofQueue {
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn mark_committed(&mut self, batches: Vec<ProposedBatch>) {
         for batch in batches {
             let batch_key = BatchKey::from_info(&batch);
-            if let Some(Some((proof, insertion_time))) = self.batch_to_proof.get(&batch_key) {
-                counters::pos_to_commit(
-                    proof.gas_bucket_start(),
-                    insertion_time.elapsed().as_secs_f64(),
-                );
-                self.dec_remaining(&batch.author(), batch.num_txns());
+            let mut num_txns = None;
+            let mut remove = false;
+            if let Some(Some(proof)) = self.batch_to_proof.get_mut(&batch_key) {
+                num_txns = Some(batch.range().end.saturating_sub(batch.range().start));
+                proof.commit(batch.range().clone());
+                remove = true;
+                if remove {
+                    counters::pos_to_commit(
+                        proof.gas_bucket_start(),
+                        proof.insertion_time().elapsed().as_secs_f64(),
+                    );
+                }
+                // TODO: add a metric for partial commit
             }
-            self.batch_to_proof.insert(batch_key, None);
+            if let Some(num_txns) = num_txns {
+                self.dec_remaining(&batch.author(), num_txns);
+            }
+            if remove {
+                self.batch_to_proof.insert(batch_key, None);
+            }
         }
     }
 }

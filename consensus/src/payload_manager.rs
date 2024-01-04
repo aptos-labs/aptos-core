@@ -8,7 +8,7 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload},
-    proof_of_store::ProofOfStore,
+    proof_of_store::{ProofOfStore, ProposedBatch},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
@@ -74,9 +74,21 @@ impl PayloadManager {
                         Payload::DirectMempool(_) => {
                             unreachable!("InQuorumStore should be used");
                         },
-                        Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
+                        Payload::InQuorumStore(proof_with_status) => proof_with_status
+                            .proofs
+                            .iter()
+                            .map(|proof| ProposedBatch::new(proof.info().clone()))
+                            .collect::<Vec<_>>(),
+                        Payload::InQuorumStoreV2(proofs) => proofs
+                            .proof_with_data
+                            .proofs
+                            .iter()
+                            .zip(proofs.ranges.iter())
+                            .map(|(proof, range)| {
+                                ProposedBatch::new_with_range(proof.info().clone(), range.clone())
+                            })
+                            .collect::<Vec<_>>(),
                     })
-                    .map(|proof| proof.info().clone())
                     .collect();
 
                 let mut tx = coordinator_tx.clone();
@@ -107,6 +119,20 @@ impl PayloadManager {
                             batch_reader.clone(),
                         );
                         proof_with_status
+                            .status
+                            .lock()
+                            .replace(DataStatus::Requested(receivers));
+                    }
+                },
+                Payload::InQuorumStoreV2(proofs) => {
+                    if proofs.proof_with_data.status.lock().is_none() {
+                        let receivers = PayloadManager::request_transactions(
+                            proofs.proof_with_data.proofs.clone(),
+                            timestamp,
+                            batch_reader.clone(),
+                        );
+                        proofs
+                            .proof_with_data
                             .status
                             .lock()
                             .replace(DataStatus::Requested(receivers));

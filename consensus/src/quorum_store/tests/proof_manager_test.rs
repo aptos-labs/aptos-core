@@ -4,7 +4,7 @@
 use crate::quorum_store::proof_manager::ProofManager;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
+    proof_of_store::{BatchId, BatchInfo, ProofOfStore, ProposedBatch},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_crypto::HashValue;
@@ -104,7 +104,7 @@ async fn test_batch_commit() {
     let proof1 = create_proof(PeerId::random(), 11, 2);
     proof_manager.receive_proofs(vec![proof1.clone()]);
 
-    proof_manager.handle_commit_notification(1, vec![proof1.info().clone()]);
+    proof_manager.handle_commit_notification(1, vec![ProposedBatch::new(proof1.info().clone())]);
     get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof0]).await;
 }
 
@@ -196,7 +196,7 @@ async fn test_duplicate_batches_on_commit() {
     get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
 
     // Nothing goes wrong on commits
-    proof_manager.handle_commit_notification(4, vec![batch.clone()]);
+    proof_manager.handle_commit_notification(4, vec![ProposedBatch::new(batch.clone())]);
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 
     // Before expiration, still marked as committed

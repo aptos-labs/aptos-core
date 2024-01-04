@@ -107,8 +107,10 @@ impl Block {
     pub fn payload_size(&self) -> usize {
         match self.block_data.payload() {
             None => 0,
+            // TODO: encapsulate?
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
+                Payload::InQuorumStoreV2(pos) => pos.proof_with_data.proofs.len(),
                 Payload::DirectMempool(txns) => txns.len(),
             },
         }
