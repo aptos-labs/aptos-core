@@ -3,9 +3,7 @@
 
 use crate::{
     counters::{log_grpc_step, IndexerGrpcStep},
-    storage_format::{
-        CacheEntry, CacheEntryBuilder, CacheEntryKey, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT,
-    },
+    storage_format::{CacheEntry, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
 };
 use anyhow::{ensure, Context};
 use aptos_protos::transaction::v1::Transaction;
@@ -226,7 +224,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     ) -> anyhow::Result<(Vec<Transaction>, f64, f64)> {
         let start_time = std::time::Instant::now();
         let versions = (start_version..start_version + transaction_count)
-            .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
+            .map(|e| CacheEntry::build_key(e, self.storage_format).to_string())
             .collect::<Vec<String>>();
         let encoded_transactions: Vec<Vec<u8>> = self
             .conn
@@ -237,8 +235,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_time = std::time::Instant::now();
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
-            let cache_entry: CacheEntry =
-                CacheEntry::from_bytes(encoded_transaction, self.storage_format);
+            let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
             let transaction: Transaction = cache_entry
                 .try_into()
                 .context("Failed to decode cache entry")?;
@@ -266,13 +263,13 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_time = std::time::Instant::now();
         for transaction in transactions {
             let version = transaction.version;
-            let cache_key = CacheEntryKey::new(version, self.storage_format).to_string();
+            let cache_key = CacheEntry::build_key(version, self.storage_format).to_string();
             let timestamp_in_seconds = transaction
                 .timestamp
                 .clone()
                 .map_or(0, |t| t.seconds as u64);
-            let cache_entry_builder = CacheEntryBuilder::new(transaction, self.storage_format);
-            let cache_entry: CacheEntry = cache_entry_builder.try_into()?;
+            let cache_entry: CacheEntry =
+                CacheEntry::from_transaction(transaction, self.storage_format);
             let bytes = cache_entry.into_inner();
             size_in_bytes += bytes.len();
             redis_pipeline
@@ -286,7 +283,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             // eviction policy, which is probabilistic-based and may evict the
             // cache that is still needed.
             if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
-                let key = CacheEntryKey::new(
+                let key = CacheEntry::build_key(
                     version - CACHE_SIZE_EVICTION_LOWER_BOUND,
                     self.storage_format,
                 )
@@ -327,7 +324,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         match cache_coverage_status {
             Ok(CacheCoverageStatus::CacheHit(v)) => {
                 let versions = (start_version..start_version + v)
-                    .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
+                    .map(|e| CacheEntry::build_key(e, self.storage_format))
                     .collect::<Vec<String>>();
                 let encoded_transactions: Vec<Vec<u8>> = self.conn.mget(versions).await?;
                 Ok(CacheBatchGetStatus::Ok(encoded_transactions))
@@ -373,7 +370,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     ) -> anyhow::Result<(Vec<Transaction>, f64, f64)> {
         let start_time = std::time::Instant::now();
         let versions = (start_version..start_version + transaction_count)
-            .map(|e| CacheEntryKey::new(e, self.storage_format).to_string())
+            .map(|e| CacheEntry::build_key(e, self.storage_format))
             .collect::<Vec<String>>();
         let encoded_transactions: Vec<Vec<u8>> = self
             .conn
@@ -384,8 +381,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_time = std::time::Instant::now();
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
-            let cache_entry: CacheEntry =
-                CacheEntry::from_bytes(encoded_transaction, self.storage_format);
+            let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
             let transaction: Transaction = cache_entry
                 .try_into()
                 .context("Failed to decode cache entry")?;

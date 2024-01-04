@@ -468,7 +468,7 @@ async fn data_fetch(
             let transactions = transactions
                 .into_iter()
                 .map(|transaction| {
-                    let cache_entry = CacheEntry::from_bytes(transaction, storage_format);
+                    let cache_entry = CacheEntry::new(transaction, storage_format);
                     cache_entry.try_into().unwrap()
                 })
                 .collect::<Vec<Transaction>>();

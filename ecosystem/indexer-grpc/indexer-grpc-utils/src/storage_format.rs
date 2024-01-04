@@ -22,40 +22,6 @@ pub enum StorageFormat {
     JsonBase64UncompressedProto,
 }
 
-pub enum CacheEntry {
-    GzipCompressionProto(Vec<u8>),
-    // Only used for legacy cache entry.
-    Base64UncompressedProto(Vec<u8>),
-}
-
-// into_inner to get the inner Vec<u8>
-impl CacheEntry {
-    pub fn from_bytes(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
-        match storage_format {
-            StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
-            // Legacy format.
-            StorageFormat::Base64UncompressedProto => Self::Base64UncompressedProto(bytes),
-            StorageFormat::JsonBase64UncompressedProto => {
-                panic!("JsonBase64UncompressedProto is not supported.")
-            },
-        }
-    }
-
-    pub fn into_inner(self) -> Vec<u8> {
-        match self {
-            CacheEntry::GzipCompressionProto(bytes) => bytes,
-            CacheEntry::Base64UncompressedProto(bytes) => bytes,
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        match self {
-            CacheEntry::GzipCompressionProto(bytes) => bytes.len(),
-            CacheEntry::Base64UncompressedProto(bytes) => bytes.len(),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct TransactionsLegacyFile {
     /// The version of the first transaction in the blob.
@@ -110,50 +76,74 @@ impl TryFrom<Vec<u8>> for FileStoreMetadata {
     }
 }
 
-pub struct CacheEntryBuilder {
-    // This is used to determine how to serialize the transaction.
-    // Do not use in the storage; format can be inferred or configured externally.
-    storage_format: StorageFormat,
-    transaction: Transaction,
+pub enum CacheEntry {
+    GzipCompressionProto(Vec<u8>),
+    // Only used for legacy cache entry.
+    Base64UncompressedProto(Vec<u8>),
 }
 
-impl CacheEntryBuilder {
-    pub fn new(transaction: Transaction, storage_format: StorageFormat) -> Self {
-        Self {
-            storage_format,
-            transaction,
-        }
-    }
-}
-
-pub struct CacheEntryKey {
-    pub version: u64,
-    pub storage_format: StorageFormat,
-}
-
-impl CacheEntryKey {
-    pub fn new(version: u64, storage_format: StorageFormat) -> Self {
-        Self {
-            version,
-            storage_format,
-        }
-    }
-}
-
-impl ToString for CacheEntryKey {
-    // Cacche key is generated based on the assumption that the naming prefix
-    // doesn't have impact on the cache key.
-    fn to_string(&self) -> String {
-        match self.storage_format {
-            StorageFormat::GzipCompressedProto => {
-                format!("gz:{}", self.version)
-            },
+impl CacheEntry {
+    pub fn new(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
+        match storage_format {
+            StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
             // Legacy format.
-            StorageFormat::Base64UncompressedProto => {
-                format!("{}", self.version)
-            },
+            StorageFormat::Base64UncompressedProto => Self::Base64UncompressedProto(bytes),
             StorageFormat::JsonBase64UncompressedProto => {
                 panic!("JsonBase64UncompressedProto is not supported.")
+            },
+        }
+    }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        match self {
+            CacheEntry::GzipCompressionProto(bytes) => bytes,
+            CacheEntry::Base64UncompressedProto(bytes) => bytes,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            CacheEntry::GzipCompressionProto(bytes) => bytes.len(),
+            CacheEntry::Base64UncompressedProto(bytes) => bytes.len(),
+        }
+    }
+
+    pub fn from_transaction(transaction: Transaction, storage_format: StorageFormat) -> Self {
+        let mut bytes = Vec::new();
+        transaction
+            .encode(&mut bytes)
+            .expect("proto serialization failed.");
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
+                let mut result = Vec::new();
+                compressed
+                    .read_to_end(&mut result)
+                    .expect("Gzip compression failed.");
+                CacheEntry::GzipCompressionProto(result)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                let base64 = base64::encode(bytes).into_bytes();
+                CacheEntry::Base64UncompressedProto(base64)
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                // This is fatal to see that we are using legacy file format in cache side.
+                panic!("JsonBase64UncompressedProto is not supported in cache.")
+            },
+        }
+    }
+
+    pub fn build_key(version: u64, storage_format: StorageFormat) -> String {
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                format!("gz:{}", version)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                format!("{}", version)
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                // This is fatal to see that we are using legacy file format in cache side.
+                panic!("JsonBase64UncompressedProto is not supported in cache.")
             },
         }
     }
@@ -185,36 +175,6 @@ impl TryFrom<CacheEntry> for Transaction {
     }
 }
 
-impl TryFrom<CacheEntryBuilder> for CacheEntry {
-    type Error = anyhow::Error;
-
-    fn try_from(value: CacheEntryBuilder) -> Result<Self, Self::Error> {
-        let mut bytes = Vec::new();
-        value
-            .transaction
-            .encode(&mut bytes)
-            .context("proto serialization failed.")?;
-        match value.storage_format {
-            StorageFormat::GzipCompressedProto => {
-                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
-                let mut result = Vec::new();
-                compressed
-                    .read_to_end(&mut result)
-                    .context("Gzip compression failed.")?;
-                Ok(CacheEntry::GzipCompressionProto(result))
-            },
-            StorageFormat::Base64UncompressedProto => {
-                let base64 = base64::encode(bytes).into_bytes();
-                Ok(CacheEntry::Base64UncompressedProto(base64))
-            },
-            StorageFormat::JsonBase64UncompressedProto => {
-                // This is fatal to see that we are using legacy file format in cache side.
-                anyhow::bail!("JsonBase64UncompressedProto is not supported.")
-            },
-        }
-    }
-}
-
 pub enum FileEntry {
     GzipCompressionProto(Vec<u8>),
     // Only used for legacy file format.
@@ -222,7 +182,7 @@ pub enum FileEntry {
 }
 
 impl FileEntry {
-    pub fn from_bytes(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
+    pub fn new(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
         match storage_format {
             StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
             StorageFormat::Base64UncompressedProto => {
@@ -245,18 +205,12 @@ impl FileEntry {
             FileEntry::JsonBase64UncompressedProto(bytes) => bytes.len(),
         }
     }
-}
 
-// FileEntry is used to build the raw file to upload to the file store.
-pub struct FileEntryBuilder {
-    // This is used to determine how to serialize the transaction.
-    // Do not use in the storage; format can be inferred or configured externally.
-    storage_format: StorageFormat,
-    transactions: TransactionsInStorage,
-}
-
-impl FileEntryBuilder {
-    pub fn new(transactions: Vec<Transaction>, storage_format: StorageFormat) -> Self {
+    pub fn from_transactions(
+        transactions: Vec<Transaction>,
+        storage_format: StorageFormat,
+    ) -> Self {
+        let mut bytes = Vec::new();
         let starting_version = transactions
             .first()
             .expect("Cannot build empty file")
@@ -268,53 +222,59 @@ impl FileEntryBuilder {
         if starting_version % FILE_ENTRY_TRANSACTION_COUNT != 0 {
             panic!("Starting version has to be a multiple of FILE_ENTRY_TRANSACTION_COUNT.")
         }
-        let t = TransactionsInStorage {
-            starting_version: Some(transactions.first().unwrap().version),
-            transactions,
-        };
-        Self {
-            storage_format,
-            transactions: t,
-        }
-    }
-}
-
-pub struct FileEntryKey {
-    pub starting_version: u64,
-    pub storage_format: StorageFormat,
-}
-
-impl FileEntryKey {
-    pub fn new(version: u64, storage_format: StorageFormat) -> Self {
-        let starting_version =
-            version / FILE_ENTRY_TRANSACTION_COUNT * FILE_ENTRY_TRANSACTION_COUNT;
-        Self {
-            starting_version,
-            storage_format,
-        }
-    }
-}
-
-impl ToString for FileEntryKey {
-    // File key is generated based on the assumption that the naming prefix
-    // has impact on the performance.
-    fn to_string(&self) -> String {
-        let mut hasher = Ripemd128::new();
-        hasher.update(self.starting_version.to_string());
-        let file_prefix = format!("{:x}", hasher.finalize());
-        match self.storage_format {
+        match storage_format {
             StorageFormat::GzipCompressedProto => {
-                format!(
-                    "compressed_files/gzip/{}_{}.bin",
-                    file_prefix, self.starting_version
-                )
+                let t = TransactionsInStorage {
+                    starting_version: Some(transactions.first().unwrap().version),
+                    transactions,
+                };
+                t.encode(&mut bytes).expect("proto serialization failed.");
+                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
+                let mut result = Vec::new();
+                compressed
+                    .read_to_end(&mut result)
+                    .expect("Gzip compression failed.");
+                FileEntry::GzipCompressionProto(result)
             },
             StorageFormat::Base64UncompressedProto => {
                 panic!("Base64UncompressedProto is not supported.")
             },
-            // Legacy format.
             StorageFormat::JsonBase64UncompressedProto => {
-                format!("files/{}.json", self.starting_version)
+                let transactions_in_base64 = transactions
+                    .into_iter()
+                    .map(|transaction| {
+                        let mut bytes = Vec::new();
+                        transaction
+                            .encode(&mut bytes)
+                            .expect("proto serialization failed.");
+                        base64::encode(bytes)
+                    })
+                    .collect::<Vec<String>>();
+                let file = TransactionsLegacyFile {
+                    starting_version,
+                    transactions_in_base64,
+                };
+                let json = serde_json::to_vec(&file).expect("json serialization failed.");
+                FileEntry::JsonBase64UncompressedProto(json)
+            },
+        }
+    }
+
+    pub fn build_key(version: u64, storage_format: StorageFormat) -> String {
+        let starting_version =
+            version / FILE_ENTRY_TRANSACTION_COUNT * FILE_ENTRY_TRANSACTION_COUNT;
+        let mut hasher = Ripemd128::new();
+        hasher.update(starting_version.to_string());
+        let file_prefix = format!("{:x}", hasher.finalize());
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                format!("compressed_files/gzip/{}_{}.bin", file_prefix, version)
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                format!("files/{}.json", starting_version)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                panic!("Base64UncompressedProto is not supported.")
             },
         }
     }
@@ -358,54 +318,6 @@ impl TryFrom<FileEntry> for TransactionsInStorage {
     }
 }
 
-impl TryFrom<FileEntryBuilder> for FileEntry {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FileEntryBuilder) -> Result<Self, Self::Error> {
-        let mut bytes = Vec::new();
-        value
-            .transactions
-            .encode(&mut bytes)
-            .context("proto serialization failed.")?;
-        match value.storage_format {
-            StorageFormat::GzipCompressedProto => {
-                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
-                let mut result = Vec::new();
-                compressed
-                    .read_to_end(&mut result)
-                    .context("Gzip compression failed.")?;
-                Ok(FileEntry::GzipCompressionProto(result))
-            },
-            StorageFormat::Base64UncompressedProto => {
-                anyhow::bail!("Base64UncompressedProto is not supported.")
-            },
-            StorageFormat::JsonBase64UncompressedProto => {
-                let transactions_in_base64 = value
-                    .transactions
-                    .transactions
-                    .into_iter()
-                    .map(|transaction| {
-                        let mut bytes = Vec::new();
-                        transaction
-                            .encode(&mut bytes)
-                            .context("proto serialization failed.")?;
-                        Ok(base64::encode(bytes))
-                    })
-                    .collect::<Result<Vec<String>, anyhow::Error>>()?;
-                let file = TransactionsLegacyFile {
-                    starting_version: value
-                        .transactions
-                        .starting_version
-                        .context("starting version is missing from file")?,
-                    transactions_in_base64,
-                };
-                let json = serde_json::to_vec(&file).context("json serialization failed.")?;
-                Ok(FileEntry::JsonBase64UncompressedProto(json))
-            },
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,14 +329,15 @@ mod tests {
             epoch: 333,
             ..Transaction::default()
         };
-        let builder = CacheEntryBuilder {
-            storage_format: StorageFormat::Base64UncompressedProto,
-            transaction: transaction.clone(),
-        };
-        let cache_entry = CacheEntry::try_from(builder).expect("CacheEntryBuilder failed.");
+        let transaction_clone = transaction.clone();
+        let transaction_size = transaction.encoded_len();
+        let cache_entry =
+            CacheEntry::from_transaction(transaction, StorageFormat::Base64UncompressedProto);
+        // Make sure data is compressed.
+        assert_ne!(cache_entry.size(), transaction_size);
         let deserialized_transaction =
             Transaction::try_from(cache_entry).expect("CacheEntry deserialization failed.");
-        assert_eq!(transaction, deserialized_transaction);
+        assert_eq!(transaction_clone, deserialized_transaction);
     }
 
     #[test]
@@ -434,120 +347,91 @@ mod tests {
             epoch: 333,
             ..Transaction::default()
         };
+        let transaction_clone = transaction.clone();
         let proto_size = transaction.encoded_len();
-        let builder = CacheEntryBuilder {
-            storage_format: StorageFormat::GzipCompressedProto,
-            transaction: transaction.clone(),
-        };
-        let cache_entry = CacheEntry::try_from(builder).expect("CacheEntryBuilder failed.");
+        let cache_entry =
+            CacheEntry::from_transaction(transaction, StorageFormat::GzipCompressedProto);
         let compressed_size = cache_entry.size();
         assert!(compressed_size != proto_size);
         let deserialized_transaction =
             Transaction::try_from(cache_entry).expect("CacheEntry deserialization failed.");
-        assert_eq!(transaction, deserialized_transaction);
+        assert_eq!(transaction_clone, deserialized_transaction);
     }
 
     #[test]
+    #[should_panic]
     fn test_cache_entry_builder_json_base64_uncompressed_proto() {
         let transaction = Transaction {
             version: 42,
             epoch: 333,
             ..Transaction::default()
         };
-        let builder = CacheEntryBuilder {
-            storage_format: StorageFormat::JsonBase64UncompressedProto,
-            transaction: transaction.clone(),
-        };
-        let cache_entry = CacheEntry::try_from(builder);
-        assert!(cache_entry.is_err());
+        let _cache_entry =
+            CacheEntry::from_transaction(transaction, StorageFormat::JsonBase64UncompressedProto);
     }
 
     #[test]
+    #[should_panic]
     fn test_file_entry_builder_base64_uncompressed_proto_not_supported() {
-        let transactions = TransactionsInStorage {
-            starting_version: Some(42),
-            transactions: vec![
-                Transaction {
-                    version: 42,
-                    epoch: 333,
-                    ..Transaction::default()
-                },
-                Transaction {
-                    version: 43,
-                    epoch: 333,
-                    ..Transaction::default()
-                },
-            ],
-        };
-        let builder = FileEntryBuilder {
-            storage_format: StorageFormat::Base64UncompressedProto,
-            transactions: transactions.clone(),
-        };
-        let file_entry = FileEntry::try_from(builder);
-        assert!(file_entry.is_err());
+        let transactions = (1000..2000)
+            .map(|version| Transaction {
+                version,
+                epoch: 333,
+                ..Transaction::default()
+            })
+            .collect::<Vec<Transaction>>();
+        let _file_entry =
+            FileEntry::from_transactions(transactions, StorageFormat::Base64UncompressedProto);
     }
 
     #[test]
     fn test_file_entry_builder_json_base64_uncompressed_proto() {
-        let transactions = TransactionsInStorage {
-            starting_version: Some(42),
-            transactions: vec![
-                Transaction {
-                    version: 42,
-                    epoch: 333,
-                    ..Transaction::default()
-                },
-                Transaction {
-                    version: 43,
-                    epoch: 333,
-                    ..Transaction::default()
-                },
-            ],
-        };
-        let builder = FileEntryBuilder {
-            storage_format: StorageFormat::JsonBase64UncompressedProto,
-            transactions: transactions.clone(),
-        };
-        let file_entry = FileEntry::try_from(builder).expect("FileEntryBuilder failed.");
+        let transactions = (1000..2000)
+            .map(|version| Transaction {
+                version,
+                epoch: 333,
+                ..Transaction::default()
+            })
+            .collect::<Vec<Transaction>>();
+        let file_entry = FileEntry::from_transactions(
+            transactions.clone(),
+            StorageFormat::JsonBase64UncompressedProto,
+        );
         let deserialized_transactions =
             TransactionsInStorage::try_from(file_entry).expect("FileEntry deserialization failed.");
-        assert_eq!(transactions, deserialized_transactions);
+        for (i, transaction) in transactions.iter().enumerate() {
+            assert_eq!(transaction, &deserialized_transactions.transactions[i]);
+        }
     }
 
     #[test]
     fn test_file_entry_builder_gzip_compressed_proto() {
-        let transactions = TransactionsInStorage {
-            starting_version: Some(42),
-            transactions: vec![
-                Transaction {
-                    version: 42,
-                    epoch: 333,
-                    ..Transaction::default()
-                },
-                Transaction {
-                    version: 43,
-                    epoch: 333,
-                    ..Transaction::default()
-                },
-            ],
-        };
-        let proto_size = transactions.encoded_len();
-        let builder = FileEntryBuilder {
-            storage_format: StorageFormat::GzipCompressedProto,
+        let transactions = (1000..2000)
+            .map(|version| Transaction {
+                version,
+                epoch: 333,
+                ..Transaction::default()
+            })
+            .collect::<Vec<Transaction>>();
+        let transactions_in_storage = TransactionsInStorage {
+            starting_version: Some(1000),
             transactions: transactions.clone(),
         };
-        let file_entry = FileEntry::try_from(builder).expect("FileEntryBuilder failed.");
-        let compressed_size = file_entry.size();
-        assert!(compressed_size != proto_size);
+        let transactions_in_storage_size = transactions_in_storage.encoded_len();
+        let file_entry =
+            FileEntry::from_transactions(transactions.clone(), StorageFormat::GzipCompressedProto);
+        assert_ne!(file_entry.size(), transactions_in_storage_size);
         let deserialized_transactions =
             TransactionsInStorage::try_from(file_entry).expect("FileEntry deserialization failed.");
-        assert_eq!(transactions, deserialized_transactions);
+        for (i, transaction) in transactions.iter().enumerate() {
+            assert_eq!(transaction, &deserialized_transactions.transactions[i]);
+        }
     }
 
     #[test]
     fn test_cache_entry_key_to_string_gzip_compressed_proto() {
         assert_eq!(
-            CacheEntryKey::new(42, StorageFormat::GzipCompressedProto).to_string(),
+            CacheEntry::build_key(42, StorageFormat::GzipCompressedProto),
             "gz:42"
         );
     }
@@ -555,20 +439,21 @@ mod tests {
     #[test]
     fn test_cache_entry_key_to_string_base64_uncompressed_proto() {
         assert_eq!(
-            CacheEntryKey::new(42, StorageFormat::Base64UncompressedProto).to_string(),
+            CacheEntry::build_key(42, StorageFormat::Base64UncompressedProto),
             "42"
         );
     }
+
     #[test]
     #[should_panic]
     fn test_cache_entry_key_to_string_json_base64_uncompressed_proto() {
-        let _key = CacheEntryKey::new(42, StorageFormat::JsonBase64UncompressedProto).to_string();
+        let _key = CacheEntry::build_key(42, StorageFormat::JsonBase64UncompressedProto);
     }
 
     #[test]
     fn test_file_entry_key_to_string_gzip_compressed_proto() {
         assert_eq!(
-            FileEntryKey::new(42, StorageFormat::GzipCompressedProto).to_string(),
+            FileEntry::build_key(42, StorageFormat::GzipCompressedProto),
             "compressed_files/gzip/3d1bff1ba654ca5fdb6ac1370533d876_0.bin"
         );
     }
@@ -576,13 +461,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_file_entry_key_to_string_base64_uncompressed_proto() {
-        let _key = FileEntryKey::new(42, StorageFormat::Base64UncompressedProto).to_string();
+        let _key = FileEntry::build_key(42, StorageFormat::Base64UncompressedProto);
     }
 
     #[test]
     fn test_file_entry_key_to_string_json_base64_uncompressed_proto() {
         assert_eq!(
-            FileEntryKey::new(42, StorageFormat::JsonBase64UncompressedProto).to_string(),
+            FileEntry::build_key(42, StorageFormat::JsonBase64UncompressedProto),
             "files/0.json"
         );
     }

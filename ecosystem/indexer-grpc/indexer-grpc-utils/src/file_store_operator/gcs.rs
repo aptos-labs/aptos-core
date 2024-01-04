@@ -4,10 +4,7 @@
 use crate::{
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::{FileStoreOperator, METADATA_FILE_NAME},
-    storage_format::{
-        FileEntry, FileEntryBuilder, FileEntryKey, FileStoreMetadata, StorageFormat,
-        FILE_ENTRY_TRANSACTION_COUNT,
-    },
+    storage_format::{FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
@@ -65,7 +62,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
     }
 
     async fn get_transactions_bytes(&self, version: u64) -> anyhow::Result<Vec<u8>> {
-        let file_entry_key = FileEntryKey::new(version, self.storage_format).to_string();
+        let file_entry_key = FileEntry::build_key(version, self.storage_format).to_string();
         match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
             Ok(file) => Ok(file),
             Err(cloud_storage::Error::Other(err)) => {
@@ -177,9 +174,8 @@ impl FileStoreOperator for GcsFileStoreOperator {
         );
         let start_time = std::time::Instant::now();
         let bucket_name = self.bucket_name.clone();
-        let file_entry: FileEntry =
-            FileEntryBuilder::new(transactions, self.storage_format).try_into()?;
-        let file_entry_key = FileEntryKey::new(start_version, self.storage_format).to_string();
+        let file_entry = FileEntry::from_transactions(transactions, self.storage_format);
+        let file_entry_key = FileEntry::build_key(start_version, self.storage_format).to_string();
         log_grpc_step(
             "file_worker",
             IndexerGrpcStep::FilestoreUploadTxns,

@@ -5,10 +5,7 @@ use crate::{
     file_store_operator::{
         FileStoreOperator, FILE_STORE_UPDATE_FREQUENCY_SECS, METADATA_FILE_NAME,
     },
-    storage_format::{
-        FileEntry, FileEntryBuilder, FileEntryKey, FileStoreMetadata, StorageFormat,
-        FILE_ENTRY_TRANSACTION_COUNT,
-    },
+    storage_format::{FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
 };
 use aptos_protos::transaction::v1::Transaction;
 use itertools::{any, Itertools};
@@ -56,7 +53,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
 
     async fn get_transactions_bytes(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key =
-            FileEntryKey::new(version, StorageFormat::JsonBase64UncompressedProto).to_string();
+            FileEntry::build_key(version, StorageFormat::JsonBase64UncompressedProto).to_string();
         let file_path = self.path.join(file_entry_key);
         match tokio::fs::read(file_path).await {
             Ok(file) => Ok(file),
@@ -171,10 +168,9 @@ impl FileStoreOperator for LocalFileStoreOperator {
         for i in transactions.chunks(FILE_ENTRY_TRANSACTION_COUNT as usize) {
             let current_batch = i.iter().cloned().collect_vec();
             let starting_version = current_batch.first().unwrap().version;
-            let file_entry_builder = FileEntryBuilder::new(current_batch, self.storage_format);
-            let file_entry: FileEntry = file_entry_builder.try_into()?;
+            let file_entry = FileEntry::from_transactions(current_batch, self.storage_format);
             let file_entry_key =
-                FileEntryKey::new(starting_version, self.storage_format).to_string();
+                FileEntry::build_key(starting_version, self.storage_format).to_string();
             let txns_path = self.path.join(file_entry_key.as_str());
             if !txns_path.exists() {
                 tokio::fs::create_dir_all(txns_path.clone()).await?;
