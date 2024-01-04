@@ -469,7 +469,7 @@ async fn data_fetch(
                 .into_iter()
                 .map(|transaction| {
                     let cache_entry = CacheEntry::new(transaction, storage_format);
-                    cache_entry.try_into().unwrap()
+                    cache_entry.into_transaction()
                 })
                 .collect::<Vec<Transaction>>();
             let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();

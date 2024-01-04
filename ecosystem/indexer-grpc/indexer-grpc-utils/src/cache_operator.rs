@@ -236,9 +236,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
             let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
-            let transaction: Transaction = cache_entry
-                .try_into()
-                .context("Failed to decode cache entry")?;
+            let transaction = cache_entry.into_transaction();
             transactions.push(transaction);
         }
         ensure!(
@@ -382,9 +380,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
             let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
-            let transaction: Transaction = cache_entry
-                .try_into()
-                .context("Failed to decode cache entry")?;
+            let transaction = cache_entry.into_transaction();
             transactions.push(transaction);
         }
         ensure!(

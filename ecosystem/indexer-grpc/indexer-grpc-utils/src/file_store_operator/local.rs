@@ -73,11 +73,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata> {
         let metadata_path = self.path.join(METADATA_FILE_NAME);
         match tokio::fs::read(metadata_path).await {
-            Ok(metadata) => Some(
-                metadata
-                    .try_into()
-                    .expect("FileStoreMetadata deserialization failed"),
-            ),
+            Ok(metadata) => Some(FileStoreMetadata::from_bytes(metadata)),
             Err(err) => {
                 if err.kind() == std::io::ErrorKind::NotFound {
                     // Metadata is not found.

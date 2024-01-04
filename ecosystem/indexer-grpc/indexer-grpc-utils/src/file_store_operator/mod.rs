@@ -39,7 +39,7 @@ pub trait FileStoreOperator: Send + Sync {
         let io_duration = io_start_time.elapsed().as_secs_f64();
         let decoding_start_time = std::time::Instant::now();
         let transactions_in_storage: TransactionsInStorage =
-            FileEntry::new(bytes, self.storage_format()).try_into()?;
+            FileEntry::new(bytes, self.storage_format()).into_transactions_in_storage();
         let decoding_duration = decoding_start_time.elapsed().as_secs_f64();
         Ok((
             transactions_in_storage

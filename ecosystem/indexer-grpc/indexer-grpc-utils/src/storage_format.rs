@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::default_file_storage_format;
-use anyhow::Context;
 use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
 use flate2::read::{GzDecoder, GzEncoder};
 use prost::Message;
 use ripemd::{Digest, Ripemd128};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, io::Read};
+use std::io::Read;
 
 pub const FILE_ENTRY_TRANSACTION_COUNT: u64 = 1000;
 
@@ -54,25 +53,14 @@ impl FileStoreMetadata {
             storage_format,
         }
     }
-}
 
-impl TryFrom<FileStoreMetadata> for Vec<u8> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FileStoreMetadata) -> Result<Self, Self::Error> {
-        let bytes =
-            serde_json::to_vec(&value).context("FileStoreMetadata json serialization failed.")?;
-        Ok(bytes)
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        serde_json::from_slice(bytes.as_slice())
+            .expect("FileStoreMetadata json deserialization failed.")
     }
-}
 
-impl TryFrom<Vec<u8>> for FileStoreMetadata {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        let metadata = serde_json::from_slice(value.as_slice())
-            .context("FileStoreMetadata json deserialization failed.")?;
-        Ok(metadata)
+    pub fn into_bytes(self) -> Vec<u8> {
+        serde_json::to_vec(&self).expect("FileStoreMetadata json serialization failed.")
     }
 }
 
@@ -147,29 +135,20 @@ impl CacheEntry {
             },
         }
     }
-}
 
-impl TryFrom<CacheEntry> for Transaction {
-    type Error = anyhow::Error;
-
-    fn try_from(value: CacheEntry) -> Result<Self, Self::Error> {
-        match value {
+    pub fn into_transaction(self) -> Transaction {
+        match self {
             CacheEntry::GzipCompressionProto(bytes) => {
                 let mut decompressor = GzDecoder::new(&bytes[..]);
                 let mut decompressed = Vec::new();
                 decompressor
                     .read_to_end(&mut decompressed)
-                    .context("[GzipCompressed] Gzip decompression failed.")?;
-                let t = Transaction::decode(decompressed.as_slice())
-                    .context("[GzipCompressed] proto deserialization failed.")?;
-                Ok(t)
+                    .expect("Gzip decompression failed.");
+                Transaction::decode(decompressed.as_slice()).expect("proto deserialization failed.")
             },
-            CacheEntry::Base64UncompressedProto(base64) => {
-                let bytes: Vec<u8> = base64::decode(base64)
-                    .context("[Base64Uncompressed] base64 decoding failed.")?;
-                let t = Transaction::decode(bytes.as_slice())
-                    .context("[Base64] proto deserialization failed.")?;
-                Ok(t)
+            CacheEntry::Base64UncompressedProto(bytes) => {
+                let bytes: Vec<u8> = base64::decode(bytes).expect("base64 decoding failed.");
+                Transaction::decode(bytes.as_slice()).expect("proto deserialization failed.")
             },
         }
     }
@@ -278,41 +257,35 @@ impl FileEntry {
             },
         }
     }
-}
 
-impl TryFrom<FileEntry> for TransactionsInStorage {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FileEntry) -> Result<Self, Self::Error> {
-        match value {
+    pub fn into_transactions_in_storage(self) -> TransactionsInStorage {
+        match self {
             FileEntry::GzipCompressionProto(bytes) => {
                 let mut decompressor = GzDecoder::new(&bytes[..]);
                 let mut decompressed = Vec::new();
                 decompressor
                     .read_to_end(&mut decompressed)
-                    .context("[GzipCompressed] Gzip decompression failed.")?;
-                let t = TransactionsInStorage::decode(decompressed.as_slice())
-                    .context("[GzipCompressed] proto deserialization failed.")?;
-                Ok(t)
+                    .expect("Gzip decompression failed.");
+                TransactionsInStorage::decode(decompressed.as_slice())
+                    .expect("proto deserialization failed.")
             },
             FileEntry::JsonBase64UncompressedProto(bytes) => {
-                let file: TransactionsLegacyFile = serde_json::from_slice(bytes.as_slice())
-                    .context("[JsonBase64Uncompressed] json deserialization failed.")?;
+                let file: TransactionsLegacyFile =
+                    serde_json::from_slice(bytes.as_slice()).expect("json deserialization failed.");
                 let transactions = file
                     .transactions_in_base64
                     .into_iter()
                     .map(|base64| {
-                        let bytes: Vec<u8> = base64::decode(base64)
-                            .context("[Base64Uncompressed] base64 decoding failed.")?;
-                        let t = Transaction::decode(bytes.as_slice())
-                            .context("[Base64] proto deserialization failed.")?;
-                        Ok(t)
+                        let bytes: Vec<u8> =
+                            base64::decode(base64).expect("base64 decoding failed.");
+                        Transaction::decode(bytes.as_slice())
+                            .expect("proto deserialization failed.")
                     })
-                    .collect::<Result<Vec<Transaction>, anyhow::Error>>()?;
-                Ok(TransactionsInStorage {
+                    .collect::<Vec<Transaction>>();
+                TransactionsInStorage {
                     starting_version: Some(file.starting_version),
                     transactions,
-                })
+                }
             },
         }
     }
@@ -335,8 +308,7 @@ mod tests {
             CacheEntry::from_transaction(transaction, StorageFormat::Base64UncompressedProto);
         // Make sure data is compressed.
         assert_ne!(cache_entry.size(), transaction_size);
-        let deserialized_transaction =
-            Transaction::try_from(cache_entry).expect("CacheEntry deserialization failed.");
+        let deserialized_transaction = cache_entry.into_transaction();
         assert_eq!(transaction_clone, deserialized_transaction);
     }
 
@@ -353,8 +325,7 @@ mod tests {
             CacheEntry::from_transaction(transaction, StorageFormat::GzipCompressedProto);
         let compressed_size = cache_entry.size();
         assert!(compressed_size != proto_size);
-        let deserialized_transaction =
-            Transaction::try_from(cache_entry).expect("CacheEntry deserialization failed.");
+        let deserialized_transaction = cache_entry.into_transaction();
         assert_eq!(transaction_clone, deserialized_transaction);
     }
 
@@ -397,8 +368,7 @@ mod tests {
             transactions.clone(),
             StorageFormat::JsonBase64UncompressedProto,
         );
-        let deserialized_transactions =
-            TransactionsInStorage::try_from(file_entry).expect("FileEntry deserialization failed.");
+        let deserialized_transactions = file_entry.into_transactions_in_storage();
         for (i, transaction) in transactions.iter().enumerate() {
             assert_eq!(transaction, &deserialized_transactions.transactions[i]);
         }
@@ -421,8 +391,7 @@ mod tests {
         let file_entry =
             FileEntry::from_transactions(transactions.clone(), StorageFormat::GzipCompressedProto);
         assert_ne!(file_entry.size(), transactions_in_storage_size);
-        let deserialized_transactions =
-            TransactionsInStorage::try_from(file_entry).expect("FileEntry deserialization failed.");
+        let deserialized_transactions = file_entry.into_transactions_in_storage();
         for (i, transaction) in transactions.iter().enumerate() {
             assert_eq!(transaction, &deserialized_transactions.transactions[i]);
         }
