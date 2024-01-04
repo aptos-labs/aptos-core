@@ -98,5 +98,9 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
+
+    // aliases within StructTag
+    tracer.ignore_aliases("StructTag", &["type_params"])?;
+
     tracer.registry()
 }
