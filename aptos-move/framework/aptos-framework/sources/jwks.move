@@ -10,7 +10,6 @@ module aptos_framework::jwks {
     use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::{Any, pack};
-    use aptos_std::debug;
     use aptos_framework::event::emit;
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
@@ -276,13 +275,18 @@ module aptos_framework::jwks {
 
     /// Only used by validators to publish their observed JWK update.
     ///
-    /// NOTE: for validator-proposed updates, the quorum certificate acquisition and verification should be done before invoking this.
-    /// This function should only worry about on-chain state updates.
-    fun upsert_provider_jwks(account: &signer, jwks: JWKs) acquires ObservedJWKs, FinalJWKs, JWKPatches {
-        system_addresses::assert_aptos_framework(account);
-        *borrow_global_mut<ObservedJWKs>(@aptos_framework) = ObservedJWKs { jwks };
+    /// NOTE: It is assumed verification has been done to ensure each update is quorum-certified,
+    /// and its `version` equals to the on-chain version + 1.
+    fun upsert_into_observed_jwks(aptos_framework: &signer, provider_jwks_vec: vector<ProviderJWKs>) acquires ObservedJWKs, FinalJWKs, JWKPatches {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let observed_jwks = borrow_global_mut<ObservedJWKs>(@aptos_framework);
+        vector::for_each(provider_jwks_vec, |obj| {
+            let provider_jwks: ProviderJWKs = obj;
+            upsert_into_jwks(&mut observed_jwks.jwks, provider_jwks);
+        });
+
         let epoch = reconfiguration::current_epoch();
-        emit(ObservedJWKsUpdated { epoch, jwks });
+        emit(ObservedJWKsUpdated { epoch, jwks: observed_jwks.jwks });
         regenerate_final_jwks();
     }
 
@@ -318,11 +322,8 @@ module aptos_framework::jwks {
     /// Get a JWK by issuer and key ID from a `JWKs`.
     /// Abort if such a JWK does not exist.
     fun get_jwk_from_jwks(jwks: &JWKs, issuer: vector<u8>, jwk_id: vector<u8>): JWK {
-        debug::print(&utf8(issuer));
-        debug::print(&utf8(b"get_jwk_from_jwks for loop"));
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
-            debug::print(&utf8(provider_jwks.issuer));
             !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
         });
 
@@ -553,6 +554,7 @@ module aptos_framework::jwks {
             entries: vector[
                 ProviderJWKs {
                     issuer: b"alice",
+                    version: 111,
                     jwks: vector[
                         new_rsa_jwk(
                             utf8(b"e4adfb436b9e197e2e1106af2c842284e4986aff"), // kid
@@ -565,6 +567,7 @@ module aptos_framework::jwks {
                 },
                 ProviderJWKs {
                     issuer: b"bob",
+                    version: 222,
                     jwks: vector[
                         new_unsupported_jwk(b"key_id_1", b"key_content_1"),
                         new_unsupported_jwk(b"key_id_2", b"key_content_2"),
@@ -579,6 +582,7 @@ module aptos_framework::jwks {
             entries: vector[
                 ProviderJWKs {
                     issuer: b"bob",
+                    version: 222,
                     jwks: vector[
                         new_unsupported_jwk(b"key_id_1", b"key_content_1"),
                         new_unsupported_jwk(b"key_id_2", b"key_content_2"),
@@ -593,6 +597,7 @@ module aptos_framework::jwks {
             entries: vector[
                 ProviderJWKs {
                     issuer: b"bob",
+                    version: 222,
                     jwks: vector[
                         new_unsupported_jwk(b"key_id_2", b"key_content_2"),
                     ],
@@ -617,6 +622,7 @@ module aptos_framework::jwks {
             entries: vector[
                 ProviderJWKs {
                     issuer: b"alice",
+                    version: 0,
                     jwks: vector[
                         new_unsupported_jwk(b"key_id_0", b"key_content_0b"),
                         new_unsupported_jwk(b"key_id_3", b"key_content_3"),
@@ -624,12 +630,14 @@ module aptos_framework::jwks {
                 },
                 ProviderJWKs {
                     issuer: b"bob",
+                    version: 222,
                     jwks: vector[
                         new_unsupported_jwk(b"key_id_2", b"key_content_2b"),
                     ],
                 },
                 ProviderJWKs {
                     issuer: b"carl",
+                    version: 0,
                     jwks: vector[
                         new_rsa_jwk(
                             utf8(b"0ad1fec78504f447bae65bcf5afaedb65eec9e81"), // kid
@@ -657,18 +665,18 @@ module aptos_framework::jwks {
         let jwk_3b = new_unsupported_jwk(b"key_id_3", b"key_payload_3b");
 
         // Fake observation from validators.
-        set_observed_jwks(&aptos_framework, 1, JWKs {
-            entries: vector[
-                ProviderJWKs {
-                    issuer: b"alice",
-                    jwks: vector[jwk_0, jwk_1],
-                },
-                ProviderJWKs{
-                    issuer: b"bob",
-                    jwks: vector[jwk_2, jwk_3],
-                },
-            ],
-        });
+        upsert_into_observed_jwks(&aptos_framework, vector [
+            ProviderJWKs {
+                issuer: b"alice",
+                version: 111,
+                jwks: vector[jwk_0, jwk_1],
+            },
+            ProviderJWKs{
+                issuer: b"bob",
+                version: 222,
+                jwks: vector[jwk_2, jwk_3],
+            },
+        ]);
         assert!(jwk_3 == get_final_jwk(b"bob", b"key_id_3"), 1);
         assert!(exists_in_final_jwks(b"bob", b"key_id_3"), 1);
         assert!(option::some(jwk_3) == try_get_final_jwk(b"bob", b"key_id_3"), 1);

@@ -36,7 +36,7 @@ JWK functions and structs.
 -  [Function `new_rsa_jwk`](#0x1_jwks_new_rsa_jwk)
 -  [Function `new_unsupported_jwk`](#0x1_jwks_new_unsupported_jwk)
 -  [Function `initialize`](#0x1_jwks_initialize)
--  [Function `upsert_provider_jwks`](#0x1_jwks_upsert_provider_jwks)
+-  [Function `upsert_into_observed_jwks`](#0x1_jwks_upsert_into_observed_jwks)
 -  [Function `regenerate_final_jwks`](#0x1_jwks_regenerate_final_jwks)
 -  [Function `exists_in_jwks`](#0x1_jwks_exists_in_jwks)
 -  [Function `exists_in_provider_jwks`](#0x1_jwks_exists_in_provider_jwks)
@@ -54,7 +54,6 @@ JWK functions and structs.
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/comparator.md#0x1_comparator">0x1::comparator</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/debug.md#0x1_debug">0x1::debug</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -1042,17 +1041,17 @@ Initialize some JWK resources. Should only be invoked by genesis.
 
 </details>
 
-<a id="0x1_jwks_upsert_provider_jwks"></a>
+<a id="0x1_jwks_upsert_into_observed_jwks"></a>
 
-## Function `upsert_provider_jwks`
+## Function `upsert_into_observed_jwks`
 
 Only used by validators to publish their observed JWK update.
 
-NOTE: for validator-proposed updates, the quorum certificate acquisition and verification should be done before invoking this.
-This function should only worry about on-chain state updates.
+NOTE: It is assumed verification has been done to ensure each update is quorum-certified,
+and its <code><a href="version.md#0x1_version">version</a></code> equals to the on-chain version + 1.
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">jwks::JWKs</a>)
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_into_observed_jwks">upsert_into_observed_jwks</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, provider_jwks_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">jwks::ProviderJWKs</a>&gt;)
 </code></pre>
 
 
@@ -1061,11 +1060,16 @@ This function should only worry about on-chain state updates.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_provider_jwks">upsert_provider_jwks</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="jwks.md#0x1_jwks">jwks</a>: <a href="jwks.md#0x1_jwks_JWKs">JWKs</a>) <b>acquires</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>, <a href="jwks.md#0x1_jwks_FinalJWKs">FinalJWKs</a>, <a href="jwks.md#0x1_jwks_JWKPatches">JWKPatches</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
-    *<b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework) = <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a> { <a href="jwks.md#0x1_jwks">jwks</a> };
+<pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_upsert_into_observed_jwks">upsert_into_observed_jwks</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, provider_jwks_vec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a>&gt;) <b>acquires</b> <a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>, <a href="jwks.md#0x1_jwks_FinalJWKs">FinalJWKs</a>, <a href="jwks.md#0x1_jwks_JWKPatches">JWKPatches</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>let</b> observed_jwks = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_ObservedJWKs">ObservedJWKs</a>&gt;(@aptos_framework);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(provider_jwks_vec, |obj| {
+        <b>let</b> provider_jwks: <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> = obj;
+        <a href="jwks.md#0x1_jwks_upsert_into_jwks">upsert_into_jwks</a>(&<b>mut</b> observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a>, provider_jwks);
+    });
+
     <b>let</b> epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
-    emit(<a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> { epoch, <a href="jwks.md#0x1_jwks">jwks</a> });
+    emit(<a href="jwks.md#0x1_jwks_ObservedJWKsUpdated">ObservedJWKsUpdated</a> { epoch, <a href="jwks.md#0x1_jwks">jwks</a>: observed_jwks.<a href="jwks.md#0x1_jwks">jwks</a> });
     <a href="jwks.md#0x1_jwks_regenerate_final_jwks">regenerate_final_jwks</a>();
 }
 </code></pre>
@@ -1181,11 +1185,8 @@ Abort if such a JWK does not exist.
 
 
 <pre><code><b>fun</b> <a href="jwks.md#0x1_jwks_get_jwk_from_jwks">get_jwk_from_jwks</a>(<a href="jwks.md#0x1_jwks">jwks</a>: &<a href="jwks.md#0x1_jwks_JWKs">JWKs</a>, issuer: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, jwk_id: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="jwks.md#0x1_jwks_JWK">JWK</a> {
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(issuer));
-    <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(b"get_jwk_from_jwks for <b>loop</b>"));
     <b>let</b> (issuer_found, index) = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_find">vector::find</a>(&<a href="jwks.md#0x1_jwks">jwks</a>.entries, |obj| {
         <b>let</b> provider_jwks: &<a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> = obj;
-        <a href="../../aptos-stdlib/doc/debug.md#0x1_debug_print">debug::print</a>(&utf8(provider_jwks.issuer));
         !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
     });
 
