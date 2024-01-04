@@ -69,6 +69,7 @@ pub struct IndexerGrpcDataServiceConfig {
     /// Redis read replica address.
     pub redis_read_replica_address: RedisUrl,
     /// Support compressed cache data.
+    #[serde(default = "IndexerGrpcDataServiceConfig::default_enable_cache_compression")]
     pub enable_cache_compression: bool,
 }
 
@@ -98,6 +99,10 @@ impl IndexerGrpcDataServiceConfig {
 
     pub const fn default_data_service_response_channel_size() -> usize {
         DEFAULT_MAX_RESPONSE_CHANNEL_SIZE
+    }
+
+    pub const fn default_enable_cache_compression() -> bool {
+        false
     }
 }
 

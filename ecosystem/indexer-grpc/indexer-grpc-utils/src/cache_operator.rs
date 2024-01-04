@@ -219,7 +219,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     }
 
     /// Fail if not all transactions requested are returned
-    pub async fn batch_get_encoded_proto_data_x(
+    pub async fn batch_get_encoded_proto_data_with_length(
         &mut self,
         start_version: u64,
         transaction_count: u64,

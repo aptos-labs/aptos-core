@@ -17,7 +17,12 @@ pub struct IndexerGrpcCacheWorkerConfig {
     pub fullnode_grpc_address: Url,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub redis_main_instance_address: RedisUrl,
+    #[serde(default = "default_enable_cache_compression")]
     pub enable_cache_compression: bool,
+}
+
+const fn default_enable_cache_compression() -> bool {
+    false
 }
 
 impl IndexerGrpcCacheWorkerConfig {

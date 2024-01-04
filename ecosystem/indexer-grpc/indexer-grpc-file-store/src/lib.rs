@@ -17,7 +17,12 @@ pub struct IndexerGrpcFileStoreWorkerConfig {
     pub redis_main_instance_address: RedisUrl,
     pub enable_expensive_logging: Option<bool>,
     pub chain_id: u64,
+    #[serde(default = "default_enable_cache_compression")]
     pub enable_cache_compression: bool,
+}
+
+const fn default_enable_cache_compression() -> bool {
+    false
 }
 
 impl IndexerGrpcFileStoreWorkerConfig {

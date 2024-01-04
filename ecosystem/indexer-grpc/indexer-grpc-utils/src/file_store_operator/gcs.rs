@@ -87,32 +87,6 @@ impl FileStoreOperator for GcsFileStoreOperator {
         }
     }
 
-    // /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
-    // async fn get_transactions(&self, version: u64) -> anyhow::Result<Vec<Transaction>> {
-    //     let file_entry_key = FileEntryKey::new(version, self.storage_format).to_string();
-    //     match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
-    //         Ok(file) => {
-
-    //         },
-    //         Err(cloud_storage::Error::Other(err)) => {
-    //             if err.contains("No such object: ") {
-    //                 anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
-    //             } else {
-    //                 anyhow::bail!(
-    //                     "[Indexer File] Error happens when transaction file. {}",
-    //                     err
-    //                 );
-    //             }
-    //         },
-    //         Err(err) => {
-    //             anyhow::bail!(
-    //                 "[Indexer File] Error happens when transaction file. {}",
-    //                 err
-    //             );
-    //         },
-    //     }
-    // }
-
     /// Gets the metadata from the file store. Operator will panic if error happens when accessing the metadata file(except not found).
     async fn get_file_store_metadata(&self) -> Option<FileStoreMetadata> {
         match Object::download(&self.bucket_name, METADATA_FILE_NAME).await {

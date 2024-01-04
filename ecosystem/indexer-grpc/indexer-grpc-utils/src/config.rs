@@ -10,13 +10,19 @@ pub struct GcsFileStore {
     pub gcs_file_store_bucket_name: String,
     // Required to operate on GCS.
     pub gcs_file_store_service_account_key_path: String,
+    #[serde(default = "default_enable_compression")]
     pub enable_compression: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LocalFileStore {
     pub local_file_store_path: PathBuf,
+    #[serde(default = "default_enable_compression")]
     pub enable_compression: bool,
+}
+
+const fn default_enable_compression() -> bool {
+    false
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

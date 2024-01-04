@@ -186,7 +186,7 @@ impl Worker {
 async fn process_transactions_from_node_response(
     response: TransactionsFromNodeResponse,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    batch_start_time: std::time::Instant,
+    download_start_time: std::time::Instant,
 ) -> Result<GrpcDataStatus> {
     let size_in_bytes = response.encoded_len();
     match response.response.unwrap() {
@@ -211,6 +211,7 @@ async fn process_transactions_from_node_response(
         },
         Response::Data(data) => {
             let transaction_len = data.transactions.len();
+            let data_download_duration_in_secs = download_start_time.elapsed().as_secs_f64();
             let mut cache_operator_clone = cache_operator.clone();
             let task: JoinHandle<anyhow::Result<()>> = tokio::spawn({
                 let first_transaction = data
@@ -234,7 +235,7 @@ async fn process_transactions_from_node_response(
                     Some(last_transaction_version as i64),
                     first_transaction_pb_timestamp.as_ref(),
                     last_transaction_pb_timestamp.as_ref(),
-                    Some(batch_start_time.elapsed().as_secs_f64()),
+                    Some(data_download_duration_in_secs),
                     Some(size_in_bytes),
                     Some((last_transaction_version + 1 - first_transaction_version) as i64),
                     None,
@@ -356,7 +357,7 @@ async fn process_streaming_response(
     let mut tasks_to_run = vec![];
     // 4. Process the streaming response.
     loop {
-        let start_time = std::time::Instant::now();
+        let download_start_time = std::time::Instant::now();
         let received = match resp_stream.next().await {
             Some(r) => r,
             _ => {
@@ -368,6 +369,7 @@ async fn process_streaming_response(
                 break;
             },
         };
+        // 10 batches doewnload + slowest processing& uploading task
         let received: TransactionsFromNodeResponse = match received {
             Ok(r) => r,
             Err(err) => {
@@ -385,7 +387,7 @@ async fn process_streaming_response(
         }
 
         let size_in_bytes = received.encoded_len();
-        match process_transactions_from_node_response(received, &mut cache_operator, start_time)
+        match process_transactions_from_node_response(received, &mut cache_operator, download_start_time)
             .await
         {
             Ok(status) => match status {
