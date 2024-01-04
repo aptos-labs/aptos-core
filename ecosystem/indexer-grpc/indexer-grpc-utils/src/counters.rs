@@ -109,6 +109,82 @@ impl IndexerGrpcStep {
     }
 }
 
+pub enum IndexerGrpcError {
+    DataServiceRedisConnectionFailed, // [Data Service] Failed to get Redis connection.
+    DataServiceRedisGetChainIdFailed, // [Data Service] Failed to get chain id from Redis.
+    DataServiceChainIdMismatch,       // [Data Service] Chain id mismatch.
+    DataServiceDataFetchFailed, // [Data Service] Failed to fetch data from cache and file store.
+
+    CacheWorkerUpdateLatestVersionFailed, // [Indexer Cache] Failed to update latest version.
+    CacheWorkerNoResponseFromStream,      // [Indexer Cache] No response from stream.
+    CacheWorkerStreamingError,            // [Indexer Cache] Streaming error.
+    CacheWorkerInitSignalReceivedTwice,   // [Indexer Cache] Init signal received twice.
+    CacheWorkEndSignalWrongVersion,       // [Indexer Cache] End signal with wrong version.
+    CacheWorkerProcessingFailed,          // [Indexer Cache] Failed to process transactions.
+    CacheWorkerWaitForFilestore, // [Indexer Cache] File store version is behind current version too much. Waiting.
+
+    FilestoreMetadataUploadFailed, // [File worker] Failed to upload metadata to filestore. Retrying.
+    FilestoreChainIdMismatch,      // [File worker] Chain id mismatch.
+
+    FullnodeFetchFailed, // [Indexer Fullnode] Failed to fetch raw transactions from fullnode.
+    FullnodeSetHighestKnownVersionFailed, // [Indexer Fullnode] Failed to set highest known version.
+    FullnodeApiTxnConversionFailed, // [Indexer Fullnode] Failed to convert raw transactions to API transactions.
+}
+
+impl IndexerGrpcError {
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            // Data service errors
+            IndexerGrpcError::DataServiceRedisConnectionFailed => {
+                "[Data Service] Failed to get Redis connection."
+            },
+            IndexerGrpcError::DataServiceRedisGetChainIdFailed => {
+                "[Data Service] Failed to get chain id from Redis."
+            },
+            IndexerGrpcError::DataServiceChainIdMismatch => "[Data Service] Chain id mismatch.",
+            IndexerGrpcError::DataServiceDataFetchFailed => {
+                "[Data Service] Failed to fetch data from cache and file store."
+            },
+            // Cache worker errors
+            IndexerGrpcError::CacheWorkerUpdateLatestVersionFailed => {
+                "[Indexer Cache] Failed to update latest version."
+            },
+            IndexerGrpcError::CacheWorkerNoResponseFromStream => {
+                "[Indexer Cache] No response from stream."
+            },
+            IndexerGrpcError::CacheWorkerStreamingError => "[Indexer Cache] Streaming error.",
+            IndexerGrpcError::CacheWorkerInitSignalReceivedTwice => {
+                "[Indexer Cache] Init signal received twice."
+            },
+            IndexerGrpcError::CacheWorkEndSignalWrongVersion => {
+                "[Indexer Cache] End signal with wrong version."
+            },
+            IndexerGrpcError::CacheWorkerProcessingFailed => {
+                "[Indexer Cache] Failed to process transactions."
+            },
+            IndexerGrpcError::CacheWorkerWaitForFilestore => {
+                "[Indexer Cache] File store version is behind current version too much. Waiting."
+            },
+            // Filestore worker errors
+            IndexerGrpcError::FilestoreMetadataUploadFailed => {
+                "[File worker] Failed to upload metadata to filestore. Retrying."
+            },
+            IndexerGrpcError::FilestoreChainIdMismatch => "[File worker] Chain id mismatch.",
+            // Fullnode errors
+            IndexerGrpcError::FullnodeFetchFailed => {
+                "[Indexer Fullnode] Failed to fetch raw transactions from fullnode."
+            },
+            IndexerGrpcError::FullnodeSetHighestKnownVersionFailed => {
+                "[Indexer Fullnode] Failed to set highest known version."
+            },
+            IndexerGrpcError::FullnodeApiTxnConversionFailed => {
+                "[Indexer Fullnode] Failed to convert raw transactions to API transactions."
+            },
+            // Table info service errors
+        }
+    }
+}
+
 /// Latest processed transaction version.
 pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -156,6 +232,15 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
         "Transaction timestamp in unixtime",
         &["service_type", "step", "message"]
     )
+    .unwrap()
+});
+
+/// Error counts
+pub static ERROR_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!("indexer_grpc_error_count", "Error count", &[
+        "service_type",
+        "error_message"
+    ])
     .unwrap()
 });
 

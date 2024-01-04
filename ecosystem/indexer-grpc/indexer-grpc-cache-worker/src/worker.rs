@@ -1,15 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    ERROR_COUNT, LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_VERSIONS_COUNT, WAIT_FOR_FILE_STORE_COUNTER,
-};
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
     config::IndexerGrpcFileStoreConfig,
-    counters::{log_grpc_step, IndexerGrpcStep},
+    counters::{log_grpc_step, IndexerGrpcError, IndexerGrpcStep, ERROR_COUNT},
     create_grpc_client,
     file_store_operator::{
         FileStoreMetadata, FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator,
@@ -282,7 +278,10 @@ async fn process_transactions_from_node_response(
                 },
                 Err(e) => {
                     ERROR_COUNT
-                        .with_label_values(&["failed_to_update_cache_version"])
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcError::CacheWorkerUpdateLatestVersionFailed.get_label(),
+                        ])
                         .inc();
                     bail!("Update cache with version failed: {}", e);
                 },
@@ -370,9 +369,15 @@ async fn process_streaming_response(
             _ => {
                 error!(
                     service_type = SERVICE_TYPE,
-                    "[Indexer Cache] Streaming error: no response."
+                    "{}",
+                    IndexerGrpcError::CacheWorkerNoResponseFromStream.get_label(),
                 );
-                ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::CacheWorkerNoResponseFromStream.get_label(),
+                    ])
+                    .inc();
                 break;
             },
         };
@@ -381,9 +386,16 @@ async fn process_streaming_response(
             Err(err) => {
                 error!(
                     service_type = SERVICE_TYPE,
-                    "[Indexer Cache] Streaming error: {}", err
+                    error = ?err,
+                    "{}",
+                    IndexerGrpcError::CacheWorkerStreamingError.get_label(),
                 );
-                ERROR_COUNT.with_label_values(&["streaming_error"]).inc();
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::CacheWorkerStreamingError.get_label(),
+                    ])
+                    .inc();
                 break;
             },
         };
@@ -404,18 +416,19 @@ async fn process_streaming_response(
                     current_version += num_of_transactions;
                     transaction_count += num_of_transactions;
                     tps_calculator.tick_now(num_of_transactions);
-
-                    PROCESSED_VERSIONS_COUNT.inc_by(num_of_transactions);
-                    // TODO: Reasses whether this metric useful
-                    LATEST_PROCESSED_VERSION_OLD.set(current_version as i64);
-                    PROCESSED_BATCH_SIZE.set(num_of_transactions as i64);
                 },
                 GrpcDataStatus::StreamInit(new_version) => {
                     error!(
                         current_version = new_version,
-                        "[Indexer Cache] Init signal received twice."
+                        "{}",
+                        IndexerGrpcError::CacheWorkerInitSignalReceivedTwice.get_label(),
                     );
-                    ERROR_COUNT.with_label_values(&["data_init_twice"]).inc();
+                    ERROR_COUNT
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcError::CacheWorkerInitSignalReceivedTwice.get_label(),
+                        ])
+                        .inc();
                     break;
                 },
                 GrpcDataStatus::BatchEnd {
@@ -425,16 +438,22 @@ async fn process_streaming_response(
                     info!(
                         start_version = start_version,
                         num_of_transactions = num_of_transactions,
+                        service_type = SERVICE_TYPE,
                         "[Indexer Cache] End signal received for current batch.",
                     );
                     if current_version != start_version + num_of_transactions {
                         error!(
                             current_version = current_version,
                             actual_current_version = start_version + num_of_transactions,
-                            "[Indexer Cache] End signal received with wrong version."
+                            service_type = SERVICE_TYPE,
+                            "{}",
+                            IndexerGrpcError::CacheWorkEndSignalWrongVersion.get_label(),
                         );
                         ERROR_COUNT
-                            .with_label_values(&["data_end_wrong_version"])
+                            .with_label_values(&[
+                                SERVICE_TYPE,
+                                IndexerGrpcError::CacheWorkEndSignalWrongVersion.get_label(),
+                            ])
                             .inc();
                         break;
                     }
@@ -464,10 +483,16 @@ async fn process_streaming_response(
                     start_version = current_version,
                     chain_id = fullnode_chain_id,
                     service_type = SERVICE_TYPE,
-                    "[Indexer Cache] Process transactions from fullnode failed: {}",
-                    e
+                    error = ?e,
+                    "{}",
+                    IndexerGrpcError::CacheWorkerProcessingFailed.get_label(),
                 );
-                ERROR_COUNT.with_label_values(&["response_error"]).inc();
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::CacheWorkerProcessingFailed.get_label(),
+                    ])
+                    .inc();
                 break;
             },
         }
@@ -486,9 +511,16 @@ async fn process_streaming_response(
                 tracing::warn!(
                     current_version = current_version,
                     file_store_version = file_store_version,
-                    "[Indexer Cache] File store version is behind current version too much."
+                    service_type = SERVICE_TYPE,
+                    "{}",
+                    IndexerGrpcError::CacheWorkerWaitForFilestore.get_label(),
                 );
-                WAIT_FOR_FILE_STORE_COUNTER.inc();
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::CacheWorkerWaitForFilestore.get_label(),
+                    ])
+                    .inc();
             } else {
                 // File store is up to date, continue cache update.
                 break;

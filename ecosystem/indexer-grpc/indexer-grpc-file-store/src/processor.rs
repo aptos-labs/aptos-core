@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
 use anyhow::{bail, ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     config::IndexerGrpcFileStoreConfig,
     constants::BLOB_STORAGE_SIZE,
-    counters::{log_grpc_step, IndexerGrpcStep},
+    counters::{log_grpc_step, IndexerGrpcError, IndexerGrpcStep, ERROR_COUNT},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
     types::RedisUrl,
     EncodedTransactionWithVersion,
@@ -83,10 +82,16 @@ impl Processor {
                 tracing::error!(
                     batch_start_version = 0,
                     service_type = SERVICE_TYPE,
-                    "[File worker] Failed to update file store metadata. Retrying."
+                    "{}",
+                    IndexerGrpcError::FilestoreMetadataUploadFailed.get_label(),
                 );
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::FilestoreMetadataUploadFailed.get_label(),
+                    ])
+                    .inc();
                 std::thread::sleep(std::time::Duration::from_millis(500));
-                METADATA_UPLOAD_FAILURE_COUNT.inc();
             }
         }
         // Metadata is guaranteed to exist now
@@ -257,7 +262,6 @@ impl Processor {
                 "[Filestore] Batch must be multiple of 1000"
             );
             let size = last_version - first_version + 1;
-            PROCESSED_VERSIONS_COUNT.inc_by(size);
             tps_calculator.tick_now(size);
 
             // Update filestore metadata. First do it in cache for performance then update metadata file
@@ -273,10 +277,16 @@ impl Processor {
             {
                 tracing::error!(
                     batch_start_version = batch_start_version,
-                    "Failed to update file store metadata. Retrying."
+                    "{}",
+                    IndexerGrpcError::FilestoreMetadataUploadFailed.get_label(),
                 );
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::FilestoreMetadataUploadFailed.get_label(),
+                    ])
+                    .inc();
                 std::thread::sleep(std::time::Duration::from_millis(500));
-                METADATA_UPLOAD_FAILURE_COUNT.inc();
             }
             log_grpc_step(
                 SERVICE_TYPE,

@@ -3,7 +3,6 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
@@ -11,7 +10,7 @@ use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnC
 use aptos_indexer_grpc_utils::{
     chunk_transactions,
     constants::MESSAGE_SIZE_LIMIT,
-    counters::{log_grpc_step_fullnode, IndexerGrpcStep},
+    counters::{log_grpc_step_fullnode, IndexerGrpcError, IndexerGrpcStep, ERROR_COUNT},
 };
 use aptos_logger::{error, info, sample, sample::SampleRate};
 use aptos_protos::{
@@ -21,10 +20,7 @@ use aptos_protos::{
     transaction::v1::Transaction as TransactionPB,
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tonic::Status;
 
@@ -124,7 +120,6 @@ impl IndexerStreamCoordinator {
 
                 let convert_start_time = std::time::Instant::now();
                 let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
-                api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 let start_transaction = pb_txns.first().unwrap();
                 let end_transaction = pb_txns.last().unwrap();
@@ -248,7 +243,12 @@ impl IndexerStreamCoordinator {
             ) {
                 Ok(raw_txns) => return raw_txns,
                 Err(err) => {
-                    UNABLE_TO_FETCH_TRANSACTION.inc();
+                    ERROR_COUNT
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcError::FullnodeFetchFailed.get_label(),
+                        ])
+                        .inc();
                     retries += 1;
 
                     if retries >= DEFAULT_NUM_RETRIES {
@@ -256,10 +256,10 @@ impl IndexerStreamCoordinator {
                             starting_version = batch.start_version,
                             num_transactions = batch.num_transactions_to_fetch,
                             error = format!("{:?}", err),
-                            "Could not fetch transactions: retries exhausted",
+                            "[Indexer Fullnode] Could not fetch transactions: retries exhausted",
                         );
                         panic!(
-                            "Could not fetch {} transactions after {} retries, starting at {}: {:?}",
+                            "[Indexer Fullnode] Could not fetch {} transactions after {} retries, starting at {}: {:?}",
                             batch.num_transactions_to_fetch, retries, batch.start_version, err
                         );
                     } else {
@@ -267,7 +267,7 @@ impl IndexerStreamCoordinator {
                             starting_version = batch.start_version,
                             num_transactions = batch.num_transactions_to_fetch,
                             error = format!("{:?}", err),
-                            "Could not fetch transactions: will retry",
+                            "[Indexer Fullnode] Could not fetch transactions: will retry",
                         );
                     }
                     tokio::time::sleep(Duration::from_millis(300)).await;
@@ -283,7 +283,6 @@ impl IndexerStreamCoordinator {
         if raw_txns.is_empty() {
             return vec![];
         }
-        let start_millis = chrono::Utc::now().naive_utc();
 
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
@@ -354,11 +353,18 @@ impl IndexerStreamCoordinator {
                 }) {
                 Ok(transaction) => transactions.push(transaction),
                 Err(err) => {
-                    UNABLE_TO_FETCH_TRANSACTION.inc();
+                    ERROR_COUNT
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcError::FullnodeApiTxnConversionFailed.get_label(),
+                        ])
+                        .inc();
                     error!(
                         version = txn_version,
                         error = format!("{:?}", err),
-                        "[Indexer Fullnode] Could not convert from OnChainTransactions",
+                        service_type = SERVICE_TYPE,
+                        "{}",
+                        IndexerGrpcError::FullnodeApiTxnConversionFailed.get_label(),
                     );
                     // IN CASE WE NEED TO SKIP BAD TXNS
                     // continue;
@@ -374,21 +380,6 @@ impl IndexerStreamCoordinator {
             panic!("[Indexer Fullnode] No transactions!");
         }
 
-        let fetch_millis = (chrono::Utc::now().naive_utc() - start_millis).num_milliseconds();
-
-        info!(
-            start_version = first_version,
-            end_version = transactions
-                .last()
-                .map(|txn| txn.version().unwrap())
-                .unwrap_or(0),
-            num_of_transactions = transactions.len(),
-            fetch_duration_in_ms = fetch_millis,
-            service_type = SERVICE_TYPE,
-            "[Indexer Fullnode] Successfully converted transactions",
-        );
-
-        FETCHED_TRANSACTION.inc();
         transactions
     }
 
@@ -420,32 +411,26 @@ impl IndexerStreamCoordinator {
             if let Err(err) = self.set_highest_known_version() {
                 error!(
                     error = format!("{:?}", err),
-                    "[Indexer Fullnode] Failed to set highest known version"
+                    "{}",
+                    IndexerGrpcError::FullnodeSetHighestKnownVersionFailed.get_label(),
                 );
+                ERROR_COUNT
+                    .with_label_values(&[
+                        SERVICE_TYPE,
+                        IndexerGrpcError::FullnodeSetHighestKnownVersionFailed.get_label(),
+                    ])
+                    .inc();
                 continue;
             } else {
                 sample!(
                     SampleRate::Frequency(10),
                     info!(
                         highest_known_version = self.highest_known_version,
+                        service_type = SERVICE_TYPE,
                         "[Indexer Fullnode] Found new highest known version",
                     )
                 );
             }
         }
-    }
-}
-
-/// Record the transaction fetched from the storage latency.
-fn record_fetched_transaction_latency(txn: &aptos_api_types::Transaction) {
-    let current_time_in_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Current time is before UNIX_EPOCH")
-        .as_secs_f64();
-    let txn_timestamp = txn.timestamp();
-
-    if txn_timestamp > 0 {
-        let txn_timestemp_in_secs = txn_timestamp as f64 / 1_000_000.0;
-        FETCHED_LATENCY_IN_SECS.set(current_time_in_secs - txn_timestemp_in_secs);
     }
 }

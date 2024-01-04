@@ -1,12 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
-    LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
-    PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
-    SHORT_CONNECTION_COUNT,
-};
+use crate::metrics::{CONNECTION_COUNT, SHORT_CONNECTION_COUNT};
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
     build_protobuf_encoded_transaction_wrappers,
@@ -17,9 +12,8 @@ use aptos_indexer_grpc_utils::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
         MESSAGE_SIZE_LIMIT,
     },
-    counters::{log_grpc_step, IndexerGrpcStep},
+    counters::{log_grpc_step, IndexerGrpcError, IndexerGrpcStep, ERROR_COUNT},
     file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
-    time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
     EncodedTransactionWithVersion,
 };
@@ -182,7 +176,10 @@ impl RawData for RawDataServerWrapper {
                     Ok(conn) => conn,
                     Err(e) => {
                         ERROR_COUNT
-                            .with_label_values(&["redis_connection_failed"])
+                            .with_label_values(&[
+                                SERVICE_TYPE,
+                                IndexerGrpcError::DataServiceRedisConnectionFailed.get_label(),
+                            ])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
@@ -195,7 +192,8 @@ impl RawData for RawDataServerWrapper {
                             .await;
                         error!(
                             error = e.to_string(),
-                            "[Data Service] Failed to get redis connection."
+                            "{}",
+                            IndexerGrpcError::DataServiceRedisConnectionFailed.get_label(),
                         );
                         return;
                     },
@@ -223,7 +221,10 @@ impl RawData for RawDataServerWrapper {
                     Ok(chain_id) => chain_id.unwrap(),
                     Err(e) => {
                         ERROR_COUNT
-                            .with_label_values(&["redis_get_chain_id_failed"])
+                            .with_label_values(&[
+                                SERVICE_TYPE,
+                                IndexerGrpcError::DataServiceRedisGetChainIdFailed.get_label(),
+                            ])
                             .inc();
                         // Connection will be dropped anyway, so we ignore the error here.
                         let _result = tx
@@ -236,7 +237,8 @@ impl RawData for RawDataServerWrapper {
                                             .await;
                         error!(
                             error = e.to_string(),
-                            "[Data Service] Failed to get chain id from redis."
+                            "{}",
+                            IndexerGrpcError::DataServiceRedisGetChainIdFailed.get_label(),
                         );
                         return;
                     },
@@ -249,7 +251,16 @@ impl RawData for RawDataServerWrapper {
                             RESPONSE_CHANNEL_SEND_TIMEOUT,
                         )
                         .await;
-                    error!("[Data Service] Chain ID mismatch.",);
+                    ERROR_COUNT
+                        .with_label_values(&[
+                            SERVICE_TYPE,
+                            IndexerGrpcError::DataServiceChainIdMismatch.get_label(),
+                        ])
+                        .inc();
+                    error!(
+                        "{}",
+                        IndexerGrpcError::DataServiceChainIdMismatch.get_label()
+                    );
                     return;
                 }
 
@@ -283,19 +294,43 @@ impl RawData for RawDataServerWrapper {
                                 "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
                                 AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
                             );
-                            ahead_of_cache_data_handling().await;
                             // Retry after a short sleep.
+                            // TODO: add exponential backoff.
+                            tokio::time::sleep(Duration::from_millis(
+                                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
+                            ))
+                            .await;
                             continue;
                         },
                         Ok(TransactionsDataStatus::DataGap) => {
-                            data_gap_handling(current_version);
+                            // TODO(larry): add metrics/alerts to track the gap.
+                            // Do not crash the server when gap detected since other clients may still be able to get data.
+                            error!(
+                                current_version,
+                                "[Data Service] Data gap detected. Please check the logs for more details."
+                            );
                             // End the data stream.
                             break;
                         },
                         Err(e) => {
-                            ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
-                            data_fetch_error_handling(e, current_version, chain_id).await;
+                            ERROR_COUNT
+                                .with_label_values(&[
+                                    SERVICE_TYPE,
+                                    IndexerGrpcError::DataServiceDataFetchFailed.get_label(),
+                                ])
+                                .inc();
+                            error!(
+                                error = e.to_string(),
+                                chain_id = chain_id,
+                                current_version = current_version,
+                                "{}",
+                                IndexerGrpcError::DataServiceDataFetchFailed.get_label(),
+                            );
                             // Retry after a short sleep.
+                            tokio::time::sleep(Duration::from_millis(
+                                TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS,
+                            ))
+                            .await;
                             continue;
                         },
                     };
@@ -315,20 +350,6 @@ impl RawData for RawDataServerWrapper {
                             transactions_count = Some(count - transaction_data.len() as u64);
                         }
                     };
-                    // Note: this is not the actual bytes transferred to the client.
-                    // This is the bytes consumed internally by the server
-                    // and ready to be transferred to the client.
-                    let bytes_ready_to_transfer = transaction_data
-                        .iter()
-                        .map(|(encoded, _)| encoded.len())
-                        .sum::<usize>();
-                    BYTES_READY_TO_TRANSFER_FROM_SERVER
-                        .with_label_values(&[
-                            request_metadata.request_api_key_name.as_str(),
-                            request_metadata.request_email.as_str(),
-                            request_metadata.processor_name.as_str(),
-                        ])
-                        .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
                     let end_of_batch_version = transaction_data.as_slice().last().unwrap().1;
@@ -337,15 +358,6 @@ impl RawData for RawDataServerWrapper {
                         chain_id as u32,
                         request_metadata.clone(),
                     );
-                    let data_latency_in_secs = resp_items
-                        .last()
-                        .unwrap()
-                        .transactions
-                        .last()
-                        .unwrap()
-                        .timestamp
-                        .as_ref()
-                        .map(time_diff_since_pb_timestamp_in_secs);
 
                     match channel_send_multiple_with_timeout(
                         resp_items,
@@ -354,44 +366,7 @@ impl RawData for RawDataServerWrapper {
                     )
                     .await
                     {
-                        Ok(_) => {
-                            PROCESSED_BATCH_SIZE
-                                .with_label_values(&[
-                                    request_metadata.request_api_key_name.as_str(),
-                                    request_metadata.request_email.as_str(),
-                                    request_metadata.processor_name.as_str(),
-                                ])
-                                .set(current_batch_size as i64);
-                            // TODO: Reasses whether this metric useful
-                            LATEST_PROCESSED_VERSION_OLD
-                                .with_label_values(&[
-                                    request_metadata.request_api_key_name.as_str(),
-                                    request_metadata.request_email.as_str(),
-                                    request_metadata.processor_name.as_str(),
-                                ])
-                                .set(end_of_batch_version as i64);
-                            PROCESSED_VERSIONS_COUNT
-                                .with_label_values(&[
-                                    request_metadata.request_api_key_name.as_str(),
-                                    request_metadata.request_email.as_str(),
-                                    request_metadata.processor_name.as_str(),
-                                ])
-                                .inc_by(current_batch_size as u64);
-                            if let Some(data_latency_in_secs) = data_latency_in_secs {
-                                PROCESSED_LATENCY_IN_SECS
-                                    .with_label_values(&[
-                                        request_metadata.request_api_key_name.as_str(),
-                                        request_metadata.request_email.as_str(),
-                                        request_metadata.processor_name.as_str(),
-                                    ])
-                                    .set(data_latency_in_secs);
-                                PROCESSED_LATENCY_IN_SECS_ALL
-                                    .with_label_values(&[request_metadata
-                                        .request_user_classification
-                                        .as_str()])
-                                    .observe(data_latency_in_secs);
-                            }
-                        },
+                        Ok(_) => {},
                         Err(SendTimeoutError::Timeout(_)) => {
                             warn!("[Data Service] Receiver is full; exiting.");
                             break;
@@ -604,39 +579,6 @@ async fn data_fetch(
         },
         Err(e) => Err(e),
     }
-}
-
-/// Handles the case when the data is not ready in the cache, i.e., beyond the current head.
-async fn ahead_of_cache_data_handling() {
-    // TODO: add exponential backoff.
-    tokio::time::sleep(Duration::from_millis(
-        AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-    ))
-    .await;
-}
-
-/// Handles data gap errors, i.e., the data is not present in the cache or file store.
-fn data_gap_handling(version: u64) {
-    // TODO(larry): add metrics/alerts to track the gap.
-    // Do not crash the server when gap detected since other clients may still be able to get data.
-    error!(
-        current_version = version,
-        "[Data Service] Data gap detected. Please check the logs for more details."
-    );
-}
-
-/// Handles data fetch errors, including cache and file store related errors.
-async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, chain_id: u64) {
-    error!(
-        chain_id = chain_id,
-        current_version = current_version,
-        "[Data Service] Failed to fetch data from cache and file store. {:?}",
-        err
-    );
-    tokio::time::sleep(Duration::from_millis(
-        TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS,
-    ))
-    .await;
 }
 
 /// Gets the request metadata. Useful for logging.

@@ -139,7 +139,7 @@ impl FullnodeData for FullnodeDataService {
                         }
                     },
                     Err(_) => {
-                        aptos_logger::warn!("[Indexer Fullnode] Unable to send end batch status");
+                        error!("[Indexer Fullnode] Unable to send end batch status");
                         break;
                     },
                 }
