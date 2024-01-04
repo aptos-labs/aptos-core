@@ -387,8 +387,12 @@ async fn process_streaming_response(
         }
 
         let size_in_bytes = received.encoded_len();
-        match process_transactions_from_node_response(received, &mut cache_operator, download_start_time)
-            .await
+        match process_transactions_from_node_response(
+            received,
+            &mut cache_operator,
+            download_start_time,
+        )
+        .await
         {
             Ok(status) => match status {
                 GrpcDataStatus::ChunkDataOk {
