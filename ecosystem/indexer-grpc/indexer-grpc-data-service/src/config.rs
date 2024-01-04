@@ -5,7 +5,7 @@ use crate::service::RawDataServerWrapper;
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
-    config::IndexerGrpcFileStoreConfig, storage_format::StorageFormat, types::RedisUrl,
+    compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig, types::RedisUrl,
 };
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,

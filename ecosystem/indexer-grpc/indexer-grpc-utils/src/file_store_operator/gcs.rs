@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    compression_util::{FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::{FileStoreOperator, METADATA_FILE_NAME},
-    storage_format::{FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
 };
 use anyhow::bail;
 use aptos_protos::transaction::v1::Transaction;
@@ -61,7 +61,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
         self.storage_format
     }
 
-    async fn get_transactions_bytes(&self, version: u64) -> anyhow::Result<Vec<u8>> {
+    async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key = FileEntry::build_key(version, self.storage_format).to_string();
         match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
             Ok(file) => Ok(file),
@@ -120,7 +120,10 @@ impl FileStoreOperator for GcsFileStoreOperator {
     ) -> anyhow::Result<()> {
         if let Some(metadata) = self.get_file_store_metadata().await {
             assert_eq!(metadata.chain_id, expected_chain_id, "Chain ID mismatch.");
-            assert_eq!(metadata.storage_format, self.storage_format, "Storage format mismatch.");
+            assert_eq!(
+                metadata.storage_format, self.storage_format,
+                "Storage format mismatch."
+            );
         }
         if self.file_store_metadata_last_updated.elapsed().as_millis()
             < FILE_STORE_METADATA_TIMEOUT_MILLIS
@@ -138,11 +141,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
         chain_id: u64,
         version: u64,
     ) -> anyhow::Result<()> {
-        let metadata = FileStoreMetadata::new(
-            chain_id,
-            version,
-            self.storage_format,
-        );
+        let metadata = FileStoreMetadata::new(chain_id, version, self.storage_format);
         // If the metadata is not updated, the indexer will be restarted.
         Object::create(
             self.bucket_name.as_str(),

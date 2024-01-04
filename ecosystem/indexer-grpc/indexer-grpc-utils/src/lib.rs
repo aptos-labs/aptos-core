@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod cache_operator;
+pub mod compression_util;
 pub mod config;
 pub mod constants;
 pub mod counters;
 pub mod file_store_operator;
-pub mod storage_format;
 pub mod types;
 
 use anyhow::{Context, Result};
@@ -23,8 +23,8 @@ pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
 
 /// The default file storage format is JsonBase64UncompressedProto.
 /// This is only used in file store metadata for backward compatibility.
-pub fn default_file_storage_format() -> storage_format::StorageFormat {
-    storage_format::StorageFormat::JsonBase64UncompressedProto
+pub fn default_file_storage_format() -> compression_util::StorageFormat {
+    compression_util::StorageFormat::JsonBase64UncompressedProto
 }
 
 /// Create a gRPC client with exponential backoff.

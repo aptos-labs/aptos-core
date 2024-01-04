@@ -5,10 +5,10 @@ use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
 use anyhow::{ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
+    compression_util::{FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     config::IndexerGrpcFileStoreConfig,
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::FileStoreOperator,
-    storage_format::{FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;

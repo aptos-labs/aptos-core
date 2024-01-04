@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    compression_util::{CacheEntry, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     counters::{log_grpc_step, IndexerGrpcStep},
-    storage_format::{CacheEntry, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
 };
 use anyhow::{ensure, Context};
 use aptos_protos::transaction::v1::Transaction;

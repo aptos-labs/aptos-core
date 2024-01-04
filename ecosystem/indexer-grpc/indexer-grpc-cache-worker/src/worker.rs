@@ -8,11 +8,11 @@ use crate::metrics::{
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::CacheOperator,
+    compression_util::{FileStoreMetadata, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
     counters::{log_grpc_step, IndexerGrpcStep},
     create_grpc_client,
     file_store_operator::FileStoreOperator,
-    storage_format::{FileStoreMetadata, StorageFormat},
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;

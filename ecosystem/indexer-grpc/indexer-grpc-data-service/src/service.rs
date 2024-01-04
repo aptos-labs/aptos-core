@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     chunk_transactions,
+    compression_util::{CacheEntry, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
     constants::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
@@ -18,7 +19,6 @@ use aptos_indexer_grpc_utils::{
     },
     counters::{log_grpc_step, IndexerGrpcStep},
     file_store_operator::FileStoreOperator,
-    storage_format::{CacheEntry, StorageFormat},
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };

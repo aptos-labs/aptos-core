@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::storage_format::{
+use crate::compression_util::{
     FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT,
 };
 use anyhow::Result;
@@ -28,14 +28,14 @@ pub trait FileStoreOperator: Send + Sync {
         Ok(transactions)
     }
 
-    async fn get_transactions_bytes(&self, version: u64) -> Result<Vec<u8>>;
+    async fn get_raw_file(&self, version: u64) -> Result<Vec<u8>>;
 
     async fn get_transactions_with_durations(
         &self,
         version: u64,
     ) -> Result<(Vec<Transaction>, f64, f64)> {
         let io_start_time = std::time::Instant::now();
-        let bytes = self.get_transactions_bytes(version).await?;
+        let bytes = self.get_raw_file(version).await?;
         let io_duration = io_start_time.elapsed().as_secs_f64();
         let decoding_start_time = std::time::Instant::now();
         let transactions_in_storage: TransactionsInStorage =

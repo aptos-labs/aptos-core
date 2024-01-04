@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    compression_util::{FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     file_store_operator::{
         FileStoreOperator, FILE_STORE_UPDATE_FREQUENCY_SECS, METADATA_FILE_NAME,
     },
-    storage_format::{FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
 };
 use aptos_protos::transaction::v1::Transaction;
 use itertools::{any, Itertools};
@@ -51,7 +51,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
         self.storage_format
     }
 
-    async fn get_transactions_bytes(&self, version: u64) -> anyhow::Result<Vec<u8>> {
+    async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key =
             FileEntry::build_key(version, StorageFormat::JsonBase64UncompressedProto).to_string();
         let file_path = self.path.join(file_entry_key);
