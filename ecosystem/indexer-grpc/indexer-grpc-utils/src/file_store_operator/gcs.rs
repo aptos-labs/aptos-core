@@ -169,7 +169,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
             "Starting version has to be a multiple of BLOB_STORAGE_SIZE."
         );
         anyhow::ensure!(
-            batch_size % FILE_ENTRY_TRANSACTION_COUNT as usize == 0,
+            batch_size == FILE_ENTRY_TRANSACTION_COUNT as usize,
             "The number of transactions to upload has to be multiplier of BLOB_STORAGE_SIZE."
         );
         let start_time = std::time::Instant::now();
@@ -178,7 +178,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
         let file_entry_key = FileEntry::build_key(start_version, self.storage_format).to_string();
         log_grpc_step(
             "file_worker",
-            IndexerGrpcStep::FilestoreUploadTxns,
+            IndexerGrpcStep::FileStoreEncodedTxns,
             Some(start_version as i64),
             Some((start_version + FILE_ENTRY_TRANSACTION_COUNT - 1) as i64),
             None,
