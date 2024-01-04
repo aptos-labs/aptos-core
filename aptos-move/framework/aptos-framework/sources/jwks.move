@@ -1,7 +1,11 @@
 /// JWK functions and structs.
+///
+/// Note: An important design constraint for this module is that the JWK consensus Rust code is unable to
+/// spawn a VM and make a Move function call. Instead, the JWK consensus Rust code will have to directly
+/// write some of the resources in this file. As a result, the structs in this file are declared so as to
+/// have a simple layout which is easily accessible in Rust.
 module aptos_framework::jwks {
     use std::error;
-    use std::error::invalid_argument;
     use std::option;
     use std::option::Option;
     use std::string;
@@ -9,7 +13,7 @@ module aptos_framework::jwks {
     use std::vector;
     use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
     use aptos_std::copyable_any;
-    use aptos_std::copyable_any::{Any, pack};
+    use aptos_std::copyable_any::Any;
     use aptos_framework::event::emit;
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
@@ -163,55 +167,32 @@ module aptos_framework::jwks {
         try_get_jwk_by_issuer(jwks, issuer, jwk_id)
     }
 
-    /// Upsert an OIDC provider metadata into the `SupportedOIDCProviders`.
+    /// Upsert an OIDC provider metadata into the `SupportedOIDCProviders` resource.
     /// Can only be called in a governance proposal.
-    public fun upsert_oidc_provider(account: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
-        system_addresses::assert_aptos_framework(account);
+    /// Returns the old config URL of the provider, if any, as an `Option`.
+    public fun upsert_oidc_provider(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(fx);
 
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
 
-        let (name_exists, idx) = vector::find(&provider_set.providers, |obj| {
-            let provider: &OIDCProvider = obj;
-            provider.name == name
-        });
-
-        let old_config_endpoint = if (name_exists) {
-            let old_provider_info = vector::swap_remove(&mut provider_set.providers, idx);
-            option::some(old_provider_info.config_url)
-        } else {
-            option::none()
-        };
-
+        let old_config_url= remove_oidc_provider_internal(provider_set, name);
         vector::push_back(&mut provider_set.providers, OIDCProvider { name, config_url });
-
-        old_config_endpoint
+        old_config_url
     }
 
-    /// Remove an OIDC provider from the `SupportedOIDCProviders`.
+    /// Remove an OIDC provider from the `SupportedOIDCProviders` resource.
     /// Can only be called in a governance proposal.
-    public fun remove_oidc_provider(account: &signer, name: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
-        system_addresses::assert_aptos_framework(account);
+    /// Returns the old config URL of the provider, if any, as an `Option`.
+    public fun remove_oidc_provider(fx: &signer, name: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(fx);
 
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
-
-        let (name_exists, idx) = vector::find(&provider_set.providers, |obj| {
-            let provider: &OIDCProvider = obj;
-            provider.name == name
-        });
-
-        let old_config_endpoint = if (name_exists) {
-            let old_provider_info = vector::swap_remove(&mut provider_set.providers, idx);
-            option::some(old_provider_info.config_url)
-        } else {
-            option::none()
-        };
-
-        old_config_endpoint
+        remove_oidc_provider_internal(provider_set, name)
     }
 
     /// Set the `Patches`. Only called in governance proposals.
-    public fun set_patches(aptos_framework: &signer, patches: vector<Patch>) acquires Patches, PatchedJWKs, ObservedJWKs {
-        system_addresses::assert_aptos_framework(aptos_framework);
+    public fun set_patches(fx: &signer, patches: vector<Patch>) acquires Patches, PatchedJWKs, ObservedJWKs {
+        system_addresses::assert_aptos_framework(fx);
         borrow_global_mut<Patches>(@aptos_framework).patches = patches;
         regenerate_patched_jwks();
     }
@@ -219,28 +200,28 @@ module aptos_framework::jwks {
     /// Create a `Patch` that removes all entries.
     public fun new_patch_remove_all(): Patch {
         Patch {
-            variant: pack(PatchRemoveAll {}),
+            variant: copyable_any::pack(PatchRemoveAll {}),
         }
     }
 
     /// Create a `Patch` that removes the entry of a given issuer, if exists.
     public fun new_patch_remove_issuer(issuer: vector<u8>): Patch {
         Patch {
-            variant: pack(PatchRemoveIssuer { issuer }),
+            variant: copyable_any::pack(PatchRemoveIssuer { issuer }),
         }
     }
 
     /// Create a `Patch` that removes the entry of a given issuer, if exists.
     public fun new_patch_remove_jwk(issuer: vector<u8>, jwk_id: vector<u8>): Patch {
         Patch {
-            variant: pack(PatchRemoveJWK { issuer, jwk_id })
+            variant: copyable_any::pack(PatchRemoveJWK { issuer, jwk_id })
         }
     }
 
     /// Create a `Patch` that upserts a JWK into an issuer's JWK set.
     public fun new_patch_upsert_jwk(issuer: vector<u8>, jwk: JWK): Patch {
         Patch {
-            variant: pack(PatchUpsertJWK { issuer, jwk })
+            variant: copyable_any::pack(PatchUpsertJWK { issuer, jwk })
         }
     }
 
@@ -265,20 +246,36 @@ module aptos_framework::jwks {
     }
 
     /// Initialize some JWK resources. Should only be invoked by genesis.
-    public(friend) fun initialize(account: &signer) {
-        system_addresses::assert_aptos_framework(account);
-        move_to(account, SupportedOIDCProviders { providers: vector[] });
-        move_to(account, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
-        move_to(account, Patches { patches: vector[] });
-        move_to(account, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector [] } });
+    public(friend) fun initialize(fx: &signer) {
+        system_addresses::assert_aptos_framework(fx);
+        move_to(fx, SupportedOIDCProviders { providers: vector[] });
+        move_to(fx, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
+        move_to(fx, Patches { patches: vector[] });
+        move_to(fx, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector [] } });
+    }
+
+    /// Helper function that removes an OIDC provider from the `SupportedOIDCProviders`.
+    /// Returns the old config URL of the provider, if any, as an `Option`.
+    fun remove_oidc_provider_internal(provider_set: &mut SupportedOIDCProviders, name: vector<u8>): Option<vector<u8>> {
+        let (name_exists, idx) = vector::find(&provider_set.providers, |obj| {
+            let provider: &OIDCProvider = obj;
+            provider.name == name
+        });
+
+        if (name_exists) {
+            let old_provider = vector::swap_remove(&mut provider_set.providers, idx);
+            option::some(old_provider.config_url)
+        } else {
+            option::none()
+        }
     }
 
     /// Only used by validators to publish their observed JWK update.
     ///
     /// NOTE: It is assumed verification has been done to ensure each update is quorum-certified,
     /// and its `version` equals to the on-chain version + 1.
-    fun upsert_into_observed_jwks(aptos_framework: &signer, provider_jwks_vec: vector<ProviderJWKs>) acquires ObservedJWKs, PatchedJWKs, Patches {
-        system_addresses::assert_aptos_framework(aptos_framework);
+    public fun upsert_into_observed_jwks(fx: &signer, provider_jwks_vec: vector<ProviderJWKs>) acquires ObservedJWKs, PatchedJWKs, Patches {
+        system_addresses::assert_aptos_framework(fx);
         let observed_jwks = borrow_global_mut<ObservedJWKs>(@aptos_framework);
         vector::for_each(provider_jwks_vec, |obj| {
             let provider_jwks: ProviderJWKs = obj;
@@ -305,7 +302,7 @@ module aptos_framework::jwks {
     fun exists_in_all_providers_jwks(jwks: &AllProvidersJWKs, issuer: vector<u8>, jwk_id: vector<u8>): bool {
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
-            !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
+            issuer == provider_jwks.issuer
         });
 
         issuer_found && exists_in_provider_jwks(vector::borrow(&jwks.entries, index), jwk_id)
@@ -334,7 +331,7 @@ module aptos_framework::jwks {
     fun try_get_jwk_by_issuer(jwks: &AllProvidersJWKs, issuer: vector<u8>, jwk_id: vector<u8>): Option<JWK> {
         let (issuer_found, index) = vector::find(&jwks.entries, |obj| {
             let provider_jwks: &ProviderJWKs = obj;
-            !is_greater_than(&compare_u8_vector(issuer, provider_jwks.issuer))
+            issuer == provider_jwks.issuer
         });
 
         if (issuer_found) {
@@ -360,7 +357,7 @@ module aptos_framework::jwks {
     fun try_get_jwk_by_id(provider_jwks: &ProviderJWKs, jwk_id: vector<u8>): Option<JWK> {
         let (jwk_id_found, index) = vector::find(&provider_jwks.jwks, |obj|{
             let jwk: &JWK = obj;
-            !is_greater_than(&compare_u8_vector(jwk_id, get_jwk_id(jwk)))
+            jwk_id == get_jwk_id(jwk)
         });
 
         if (jwk_id_found) {
