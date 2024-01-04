@@ -61,30 +61,29 @@ spec aptos_framework::fungible_asset {
     /// function which validates the store's metadata and the depositing asset's metadata followed by increasing the
     /// store balance by the given amount. The deposit_with_ref ensures that the reference's metadata matches the
     /// depositing asset's metadata.
-    /// Enforcement: Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store
-    /// are different. Audited that the store's balance is increased by the deposited amount.
+    /// Enforcement: Formally verified via [high-level-req-7.1](deposit), [high-level-req-7.2](deposit_internal),
+    /// and [high-level-req-7.3](deposit_with_ref).
     ///
     /// No.: 8
     /// Property: An object should only be allowed to hold one store for fungible assets.
     /// Criticality: Medium
     /// Implementation: The create_store function initializes a new FungibleStore resource and moves it under the
     /// object address.
-    /// Enforcement: Audited that the resource was moved under the object.
+    /// Enforcement: Formally verified via [high-level-req-8](create_store).
     ///
     /// No.: 9
     /// Property: When a new store is created, the balance should be set by default to the value zero.
     /// Criticality: High
     /// Implementation: The create_store function initializes a new fungible asset store with zero balance and stores it
     /// under the given construtorRef object.
-    /// Enforcement: Audited that the store is properly initialized with zero balance.
+    /// Enforcement: Formally verified via [high-level-req-9](create_store).
     ///
     /// No.: 10
     /// Property: A store should only be deleted if it's balance is zero.
     /// Criticality: Medium
     /// Implementation: The remove_store function validates the store's balance and removes the store under the object
     /// address.
-    /// Enforcement: Audited that aborts if the balance of the store is not zero. Audited that store is removed from the
-    /// object address.
+    /// Enforcement: Formally verified via [high-level-req-10](remove_store).
     ///
     /// No.: 11
     /// Property: Minting and burning should alter the total supply value, and the store balances.
@@ -92,7 +91,7 @@ spec aptos_framework::fungible_asset {
     /// Implementation: The mint process increases the total supply by the amount minted using the increase_supply
     /// function. The burn process withdraws the burn amount from the given store and decreases the total supply by the
     /// amount burned using the decrease_supply function.
-    /// Enforcement: Audited the mint and burn functions that the supply was adjusted accordingly.
+    /// Enforcement: Formally verified via [high-level-req-11.1](mint) and [high-level-req-11.2](burn).
     ///
     /// No.: 12
     /// Property: It must not be possible to burn an amount of fungible assets larger than their current supply.
@@ -167,8 +166,8 @@ spec aptos_framework::fungible_asset {
         aborts_if !exists<object::ObjectCore>(contructor_ref_addr);
         aborts_if !object::spec_exists_at<Metadata>(contructor_ref_addr);
         aborts_if exists<Metadata>(contructor_ref_addr);
-        // aborts_if (features::spec_is_enabled(features::CONCURRENT_ASSETS)) ==> exists<ConcurrentSupply>(contructor_ref_addr);
-        // aborts_if !(features::spec_is_enabled(features::CONCURRENT_ASSETS)) ==> exists<Supply>(contructor_ref_addr);
+        aborts_if (features::spec_is_enabled(features::CONCURRENT_ASSETS)) && exists<ConcurrentSupply>(contructor_ref_addr);
+        aborts_if !(features::spec_is_enabled(features::CONCURRENT_ASSETS)) && exists<Supply>(contructor_ref_addr);
 
         /// [high-level-req-2]
         ensures exists<Metadata>(contructor_ref_addr);
@@ -199,7 +198,6 @@ spec aptos_framework::fungible_asset {
     }
 
     spec maximum<T: key>(metadata: Object<T>): Option<u128> {
-        pragma aborts_if_is_partial;
     }
 
     spec name<T: key>(metadata: Object<T>): String {
@@ -216,11 +214,9 @@ spec aptos_framework::fungible_asset {
     }
 
     spec store_exists(store: address): bool {
-        pragma aborts_if_is_partial;
     }
 
     spec metadata_from_asset(fa: &FungibleAsset): Object<Metadata> {
-        pragma aborts_if_is_partial;
     }
 
     spec store_metadata<T: key>(store: Object<T>): Object<Metadata> {
@@ -228,31 +224,24 @@ spec aptos_framework::fungible_asset {
     }
 
     spec amount(fa: &FungibleAsset): u64 {
-        pragma aborts_if_is_partial;
     }
 
     spec balance<T: key>(store: Object<T>): u64 {
-        pragma aborts_if_is_partial;
     }
 
     spec is_frozen<T: key>(store: Object<T>): bool {
-        pragma aborts_if_is_partial;
     }
 
     spec asset_metadata(fa: &FungibleAsset): Object<Metadata> {
-        pragma aborts_if_is_partial;
     }
 
     spec mint_ref_metadata(ref: &MintRef): Object<Metadata> {
-        pragma aborts_if_is_partial;
     }
 
     spec transfer_ref_metadata(ref: &TransferRef): Object<Metadata> {
-        pragma aborts_if_is_partial;
     }
 
     spec burn_ref_metadata(ref: &BurnRef): Object<Metadata> {
-        pragma aborts_if_is_partial;
     }
 
     spec transfer<T: key>(
@@ -275,10 +264,29 @@ spec aptos_framework::fungible_asset {
         metadata: Object<T>,
         ): Object<FungibleStore> {
         pragma aborts_if_is_partial;
+
+        /// [high-level-req-8]
+        let contructor_ref_addr = object::address_from_constructor_ref(constructor_ref);
+        aborts_if exists<FungibleStore>(contructor_ref_addr);
+        aborts_if !exists<object::ObjectCore>(metadata.inner);
+        aborts_if exists<FungibleAssetEvents>(contructor_ref_addr);
+
+        ensures exists<FungibleStore>(contructor_ref_addr);
+        ensures exists<FungibleAssetEvents>(contructor_ref_addr);
+
+        /// [high-level-req-9]
+        ensures borrow_global<FungibleStore>(contructor_ref_addr).balance == 0;
     }
 
     spec remove_store(delete_ref: &DeleteRef) {
         pragma aborts_if_is_partial;
+
+        let store = object::object_from_delete_ref<FungibleStore>(delete_ref);
+        let addr = object::object_address(store);
+        aborts_if !exists<FungibleStore>(addr);
+        /// [high-level-req-10]
+        aborts_if borrow_global<FungibleStore>(addr).balance != 0;
+        ensures !exists<FungibleStore>(addr);
     }
 
     spec withdraw<T: key>(
@@ -312,6 +320,9 @@ spec aptos_framework::fungible_asset {
     spec deposit<T: key>(store: Object<T>, fa: FungibleAsset) {
         pragma aborts_if_is_partial;
 
+        /// [high-level-req-7.1]
+        aborts_if(is_frozen(store));
+
         let reciepient_addr = store.inner;
         let supply = global<ConcurrentSupply>(reciepient_addr);
         let post post_supply = global<ConcurrentSupply>(reciepient_addr);
@@ -321,6 +332,8 @@ spec aptos_framework::fungible_asset {
 
     spec mint(ref: &MintRef, amount: u64): FungibleAsset {
         pragma aborts_if_is_partial;
+
+        aborts_if amount == 0;
     }
 
     spec mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64) {
@@ -364,6 +377,9 @@ spec aptos_framework::fungible_asset {
         fa: FungibleAsset
         ) {
         pragma aborts_if_is_partial;
+
+        /// [high-level-req-7.3]
+        aborts_if (ref.metadata != fa.metadata);
     }
 
     spec transfer_with_ref<T: key>(
@@ -394,6 +410,10 @@ spec aptos_framework::fungible_asset {
     spec deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) {
         pragma aborts_if_is_partial;
 
+        let metadata = fa.metadata;
+        let store_metadata = store_metadata(store);
+        /// [high-level-req-7.2]
+        aborts_if amount != 0 && (metadata != store_metadata);
         let store_addr = object::object_address(store);
         let store = global<FungibleStore>(store_addr);
         let amount = fa.amount;
@@ -420,6 +440,11 @@ spec aptos_framework::fungible_asset {
 
     spec increase_supply<T: key>(metadata: &Object<T>, amount: u64) {
         pragma aborts_if_is_partial;
+
+        aborts_if amount == 0;
+        let metadata_address = object::object_address(metadata);
+
+        aborts_if !exists<ConcurrentSupply>(metadata_address) && !exists<Supply>(metadata_address);
     }
 
     spec decrease_supply<T: key>(metadata: &Object<T>, amount: u64) {

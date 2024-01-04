@@ -2207,7 +2207,7 @@ Decrease the supply of a fungible asset by burning.
 <td>The metadata associated with the fungible asset is subject to precise size constraints.</td>
 <td>Medium</td>
 <td>The add_fungibility function has size limitations for the name, symbol, number of decimals, icon_uri, and project_uri field of the Metadata resource.</td>
-<td>This has been audited.</td>
+<td>Formally verified via <a href="#high-level-req-1">add_fungibility</a>.</td>
 </tr>
 
 <tr>
@@ -2215,7 +2215,7 @@ Decrease the supply of a fungible asset by burning.
 <td>Adding fungibility to an existing object should initialize the metadata and supply resources and store them under the metadata object address.</td>
 <td>Low</td>
 <td>The add_fungibility function initializes the Metadata and Supply resources and moves them under the metadata object.</td>
-<td>Audited that the Metadata and Supply resources are initialized properly.</td>
+<td>Formally verified via <a href="#high-level-req-2">add_fungibility</a>.</td>
 </tr>
 
 <tr>
@@ -2223,15 +2223,15 @@ Decrease the supply of a fungible asset by burning.
 <td>Generating mint, burn and transfer references can only be done at object creation time and if the object was added fungibility.</td>
 <td>Low</td>
 <td>The following functions generate the related references of the Metadata object: 1. generate_mint_ref 2. generate_burn_ref 3. generate_transfer_ref</td>
-<td>Audited that the Metadata object exists within the constructor ref.</td>
+<td>Formally verified via <a href="#high-level-req-3.1">generate_mint_ref</a>, <a href="#high-level-req-3.2">generate_burn_ref</a>, and <a href="#high-level-req-3.3">generate_transfer_ref</a></td>
 </tr>
 
 <tr>
 <td>4</td>
 <td>Only the owner of a store should be allowed to withdraw fungible assets from it.</td>
 <td>High</td>
-<td>The fungible_asset::withdraw function ensures that the signer owns the store by asserting that the object address matches the address of the signer.</td>
-<td>Audited that the address of the signer owns the object.</td>
+<td>The withdraw function ensures that the signer owns the store by asserting that the object address matches the address of the signer.</td>
+<td>Formally verified via <a href="#high-level-req-4">withdraw</a>.</td>
 </tr>
 
 <tr>
@@ -2239,7 +2239,7 @@ Decrease the supply of a fungible asset by burning.
 <td>The transfer, withdrawal and deposit operation should never change the current supply of the fungible asset.</td>
 <td>High</td>
 <td>The transfer function withdraws the fungible assets from the store and deposits them to the receiver. The withdraw function extracts the fungible asset from the fungible asset store. The deposit function adds the balance to the fungible asset store.</td>
-<td>Audited that the supply before and after the operation remains constant.</td>
+<td>Formally verified via <a href="#high-level-req-5.1">withdraw</a>, <a href="#high-level-req-5.1">deposit</a>, and <a href="#high-level-req-5.3">transfer</a>.</td>
 </tr>
 
 <tr>
@@ -2247,7 +2247,7 @@ Decrease the supply of a fungible asset by burning.
 <td>The owner of the store should only be able to withdraw a certain amount if its store has sufficient balance and is not frozen, unless the withdrawal is performed with a reference, and afterwards the store balance should be decreased.</td>
 <td>High</td>
 <td>The withdraw function ensures that the store is not frozen before calling withdraw_internal which ensures that the withdrawing amount is greater than 0 and less than the total balance from the store. The withdraw_with_ref ensures that the reference's metadata matches the store metadata.</td>
-<td>Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.</td>
+<td>Formally verified via <a href="#high-level-req-6.1">withdraw</a>, <a href="#high-level-req-6.2">withdrawl_internal</a>, and <a href="#high-level-req-6.3">withdrawl_with_ref</a>.</td>
 </tr>
 
 <tr>
@@ -2255,7 +2255,7 @@ Decrease the supply of a fungible asset by burning.
 <td>Only the same type of fungible assets should be deposited in a fungible asset store, if the store is not frozen, unless the deposit is performed with a reference, and afterwards the store balance should be increased.</td>
 <td>High</td>
 <td>The deposit function ensures that store is not frozen and proceeds to call the deposit_internal function which validates the store's metadata and the depositing asset's metadata followed by increasing the store balance by the given amount. The deposit_with_ref ensures that the reference's metadata matches the depositing asset's metadata.</td>
-<td>Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store are different. Audited that the store's balance is increased by the deposited amount.</td>
+<td>Formally verified via <a href="#high-level-req-7.1">deposit</a>, <a href="#high-level-req-7.2">deposit_internal</a>, and <a href="#high-level-req-7.3">deposit_with_ref</a>.</td>
 </tr>
 
 <tr>
@@ -2263,7 +2263,7 @@ Decrease the supply of a fungible asset by burning.
 <td>An object should only be allowed to hold one store for fungible assets.</td>
 <td>Medium</td>
 <td>The create_store function initializes a new FungibleStore resource and moves it under the object address.</td>
-<td>Audited that the resource was moved under the object.</td>
+<td>Formally verified via <a href="#high-level-req-8">create_store</a>.</td>
 </tr>
 
 <tr>
@@ -2271,7 +2271,7 @@ Decrease the supply of a fungible asset by burning.
 <td>When a new store is created, the balance should be set by default to the value zero.</td>
 <td>High</td>
 <td>The create_store function initializes a new fungible asset store with zero balance and stores it under the given construtorRef object.</td>
-<td>Audited that the store is properly initialized with zero balance.</td>
+<td>Formally verified via <a href="#high-level-req-9">create_store</a>.</td>
 </tr>
 
 <tr>
@@ -2279,7 +2279,7 @@ Decrease the supply of a fungible asset by burning.
 <td>A store should only be deleted if it's balance is zero.</td>
 <td>Medium</td>
 <td>The remove_store function validates the store's balance and removes the store under the object address.</td>
-<td>Audited that aborts if the balance of the store is not zero. Audited that store is removed from the object address.</td>
+<td>Formally verified via <a href="#high-level-req-10">remove_store</a>.</td>
 </tr>
 
 <tr>
@@ -2287,7 +2287,7 @@ Decrease the supply of a fungible asset by burning.
 <td>Minting and burning should alter the total supply value, and the store balances.</td>
 <td>High</td>
 <td>The mint process increases the total supply by the amount minted using the increase_supply function. The burn process withdraws the burn amount from the given store and decreases the total supply by the amount burned using the decrease_supply function.</td>
-<td>Audited the mint and burn functions that the supply was adjusted accordingly.</td>
+<td>Formally verified via <a href="#high-level-req-11.1">mint</a> and <a href="#high-level-req-11.2">burn</a>.</td>
 </tr>
 
 <tr>
@@ -2348,7 +2348,17 @@ Decrease the supply of a fungible asset by burning.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_strict;
+</code></pre>
+
+
+
+
+<a id="0x1_fungible_asset_spec_exists_at"></a>
+
+
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_spec_exists_at">spec_exists_at</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): bool;
 </code></pre>
 
 
@@ -2364,7 +2374,24 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<b>aborts_if</b> (<a href="object.md#0x1_object_can_generate_delete_ref">object::can_generate_delete_ref</a>(constructor_ref));
+<b>aborts_if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(name) &gt; <a href="fungible_asset.md#0x1_fungible_asset_MAX_NAME_LENGTH">MAX_NAME_LENGTH</a>);
+<b>aborts_if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(symbol) &gt; <a href="fungible_asset.md#0x1_fungible_asset_MAX_SYMBOL_LENGTH">MAX_SYMBOL_LENGTH</a>);
+<b>aborts_if</b> (decimals &gt; <a href="fungible_asset.md#0x1_fungible_asset_MAX_DECIMALS">MAX_DECIMALS</a>);
+<b>aborts_if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(icon_uri) &gt; <a href="fungible_asset.md#0x1_fungible_asset_MAX_URI_LENGTH">MAX_URI_LENGTH</a>);
+<b>aborts_if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_length">string::length</a>(project_uri) &gt; <a href="fungible_asset.md#0x1_fungible_asset_MAX_URI_LENGTH">MAX_URI_LENGTH</a>);
+<b>let</b> contructor_ref_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_CONCURRENT_ASSETS">features::CONCURRENT_ASSETS</a>)) && <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> !(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_CONCURRENT_ASSETS">features::CONCURRENT_ASSETS</a>)) && <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(contructor_ref_addr);
+// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+<b>ensures</b> <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(contructor_ref_addr);
+<b>ensures</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_CONCURRENT_ASSETS">features::CONCURRENT_ASSETS</a>)) ==&gt; <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(contructor_ref_addr);
+<b>ensures</b> !(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_is_enabled">features::spec_is_enabled</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_CONCURRENT_ASSETS">features::CONCURRENT_ASSETS</a>)) ==&gt; <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(contructor_ref_addr);
 </code></pre>
 
 
@@ -2380,7 +2407,9 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>let</b> contructor_ref_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(contructor_ref_addr);
 </code></pre>
 
 
@@ -2396,7 +2425,9 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>let</b> contructor_ref_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(contructor_ref_addr);
 </code></pre>
 
 
@@ -2412,7 +2443,9 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>let</b> contructor_ref_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(contructor_ref_addr);
 </code></pre>
 
 
@@ -2429,7 +2462,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2446,11 +2479,6 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_name"></a>
 
 ### Function `name`
@@ -2463,7 +2491,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2480,7 +2508,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2497,7 +2525,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2514,11 +2542,6 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_metadata_from_asset"></a>
 
 ### Function `metadata_from_asset`
@@ -2527,11 +2550,6 @@ Decrease the supply of a fungible asset by burning.
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_metadata_from_asset">metadata_from_asset</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
 
 
 
@@ -2547,7 +2565,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2563,11 +2581,6 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_balance"></a>
 
 ### Function `balance`
@@ -2577,11 +2590,6 @@ Decrease the supply of a fungible asset by burning.
 <b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;): u64
 </code></pre>
 
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
 
 
 
@@ -2597,11 +2605,6 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_asset_metadata"></a>
 
 ### Function `asset_metadata`
@@ -2610,11 +2613,6 @@ Decrease the supply of a fungible asset by burning.
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_asset_metadata">asset_metadata</a>(fa: &<a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">fungible_asset::FungibleAsset</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
 
 
 
@@ -2629,11 +2627,6 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_transfer_ref_metadata"></a>
 
 ### Function `transfer_ref_metadata`
@@ -2642,11 +2635,6 @@ Decrease the supply of a fungible asset by burning.
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_transfer_ref_metadata">transfer_ref_metadata</a>(ref: &<a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
 </code></pre>
 
-
-
-
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
 
 
 
@@ -2661,11 +2649,6 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_transfer"></a>
 
 ### Function `transfer`
@@ -2677,7 +2660,12 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> from_addr = from.inner;
+<b>let</b> supply = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(from_addr);
+<b>let</b> <b>post</b> post_supply = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(from_addr);
+// This enforces <a id="high-level-req-5.3" href="#high-level-req">high level requirement 5</a>:
+<b>ensures</b> post_supply == supply;
 </code></pre>
 
 
@@ -2693,7 +2681,16 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-8" href="#high-level-req">high level requirement 8</a>:
+<b>let</b> contructor_ref_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(constructor_ref);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(contructor_ref_addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(metadata.inner);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(contructor_ref_addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(contructor_ref_addr);
+<b>ensures</b> <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(contructor_ref_addr);
+// This enforces <a id="high-level-req-9" href="#high-level-req">high level requirement 9</a>:
+<b>ensures</b> <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(contructor_ref_addr).balance == 0;
 </code></pre>
 
 
@@ -2709,7 +2706,13 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> store = <a href="object.md#0x1_object_object_from_delete_ref">object::object_from_delete_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(delete_ref);
+<b>let</b> addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(store);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(addr);
+// This enforces <a id="high-level-req-10" href="#high-level-req">high level requirement 10</a>:
+<b>aborts_if</b> <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(addr).balance != 0;
+<b>ensures</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(addr);
 </code></pre>
 
 
@@ -2725,7 +2728,23 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> current_address_0 = store.inner;
+<b>let</b> object_0 = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(current_address_0);
+<b>let</b> current_address = object_0.owner;
+// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+<b>aborts_if</b> store.inner != <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner) && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(store.inner);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(current_address_0);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(current_address_0);
+<b>aborts_if</b> (amount == 0);
+// This enforces <a id="high-level-spec-6.1" href="#high-level-req">high level requirement 6</a>:
+<b>aborts_if</b> (<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store));
+<b>let</b> fungible_store = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(current_address_0);
+<b>aborts_if</b> (fungible_store.<a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a> &lt; amount);
+<b>let</b> supply = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(current_address_0);
+<b>let</b> <b>post</b> post_supply = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(current_address_0);
+// This enforces <a id="high-level-req-5.1" href="#high-level-req">high level requirement 5</a>:
+<b>ensures</b> post_supply == supply;
 </code></pre>
 
 
@@ -2741,7 +2760,14 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-7.1" href="#high-level-req">high level requirement 7</a>:
+<b>aborts_if</b>(<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store));
+<b>let</b> reciepient_addr = store.inner;
+<b>let</b> supply = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(reciepient_addr);
+<b>let</b> <b>post</b> post_supply = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(reciepient_addr);
+// This enforces <a id="high-level-req-5.2" href="#high-level-req">high level requirement 5</a>:
+<b>ensures</b> post_supply == supply;
 </code></pre>
 
 
@@ -2757,7 +2783,8 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> amount == 0;
 </code></pre>
 
 
@@ -2773,7 +2800,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2789,7 +2816,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2805,7 +2832,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2821,7 +2848,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2837,7 +2864,9 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-6.3" href="#high-level-req">high level requirement 6</a>:
+<b>aborts_if</b> (ref.metadata != <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store));
 </code></pre>
 
 
@@ -2853,7 +2882,9 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-7.3" href="#high-level-req">high level requirement 7</a>:
+<b>aborts_if</b> (ref.metadata != fa.metadata);
 </code></pre>
 
 
@@ -2869,7 +2900,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2885,7 +2916,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2901,7 +2932,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2917,7 +2948,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2933,7 +2964,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -2949,7 +2980,16 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> metadata = fa.metadata;
+<b>let</b> store_metadata = <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store);
+// This enforces <a id="high-level-req-7.2" href="#high-level-req">high level requirement 7</a>:
+<b>aborts_if</b> amount != 0 && (metadata != store_metadata);
+<b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(store);
+<b>let</b> store = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
+<b>let</b> amount = fa.amount;
+<b>let</b> <b>post</b> store_balance = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).balance;
+<b>ensures</b> store_balance == store.balance + amount;
 </code></pre>
 
 
@@ -2965,7 +3005,15 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> (amount == 0);
+<b>let</b> store = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
+// This enforces <a id="high-level-req-6.2" href="#high-level-req">high level requirement 6</a>:
+<b>aborts_if</b> (store.<a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a> &lt; amount);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleAssetEvents">FungibleAssetEvents</a>&gt;(store_addr);
+<b>let</b> <b>post</b> store_balance = <b>global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).balance;
+<b>ensures</b> store_balance == store.balance - amount;
 </code></pre>
 
 
@@ -2981,7 +3029,10 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>aborts_if</b> amount == 0;
+<b>let</b> metadata_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(metadata);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address) && !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(metadata_address);
 </code></pre>
 
 
@@ -2997,7 +3048,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -3013,7 +3064,7 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
