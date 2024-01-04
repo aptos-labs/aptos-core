@@ -119,7 +119,8 @@ impl FileStoreOperator for GcsFileStoreOperator {
         version: u64,
     ) -> anyhow::Result<()> {
         if let Some(metadata) = self.get_file_store_metadata().await {
-            anyhow::ensure!(metadata.chain_id == expected_chain_id, "Chain ID mismatch.");
+            assert_eq!(metadata.chain_id, expected_chain_id, "Chain ID mismatch.");
+            assert_eq!(metadata.storage_format, self.storage_format, "Storage format mismatch.");
         }
         if self.file_store_metadata_last_updated.elapsed().as_millis()
             < FILE_STORE_METADATA_TIMEOUT_MILLIS
@@ -140,7 +141,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
         let metadata = FileStoreMetadata::new(
             chain_id,
             version,
-            StorageFormat::JsonBase64UncompressedProto,
+            self.storage_format,
         );
         // If the metadata is not updated, the indexer will be restarted.
         Object::create(
