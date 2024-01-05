@@ -27,7 +27,7 @@ impl DeadStoreElimination {
     /// Transforms the `code` of a function using the `live_vars_annotation`,
     /// by removing assignments and loads to locals which are not live afterwards.
     /// Also removes self-assignments.
-    /// 
+    ///
     /// Returns the transformed code.
     fn transform(code: Vec<Bytecode>, live_vars_annotation: &LiveVarAnnotation) -> Vec<Bytecode> {
         let mut new_code = vec![];
