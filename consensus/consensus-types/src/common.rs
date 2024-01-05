@@ -87,6 +87,7 @@ pub enum DataStatus {
         Vec<(
             HashValue,
             oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
+            Range<u64>,
         )>,
     ),
 }

@@ -15,7 +15,7 @@ use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::channel::mpsc::Sender;
-use std::sync::Arc;
+use std::{ops::Range, sync::Arc};
 use tokio::sync::oneshot;
 
 pub trait TPayloadManager: Send + Sync {
@@ -38,14 +38,16 @@ impl TPayloadManager for PayloadManager {
 impl PayloadManager {
     fn request_transactions(
         proofs: Vec<ProofOfStore>,
+        ranges: Vec<Range<u64>>,
         block_timestamp: u64,
         batch_reader: Arc<dyn BatchReader>,
     ) -> Vec<(
         HashValue,
         oneshot::Receiver<ExecutorResult<Vec<SignedTransaction>>>,
+        Range<u64>,
     )> {
         let mut receivers = Vec::new();
-        for pos in proofs {
+        for (pos, range) in proofs.into_iter().zip(ranges.into_iter()) {
             trace!(
                 "QSE: requesting pos {:?}, digest {}, time = {}",
                 pos,
@@ -53,7 +55,7 @@ impl PayloadManager {
                 block_timestamp
             );
             if block_timestamp <= pos.expiration() {
-                receivers.push((*pos.digest(), batch_reader.get_batch(pos)));
+                receivers.push((*pos.digest(), batch_reader.get_batch(pos), range));
             } else {
                 debug!("QSE: skipped expired pos {}", pos.digest());
             }
@@ -112,9 +114,15 @@ impl PayloadManager {
             PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(batch_reader, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
+                    let ranges: Vec<_> = proof_with_status
+                        .proofs
+                        .iter()
+                        .map(|p| 0..p.num_txns())
+                        .collect();
                     if proof_with_status.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proof_with_status.proofs.clone(),
+                            ranges,
                             timestamp,
                             batch_reader.clone(),
                         );
@@ -128,6 +136,7 @@ impl PayloadManager {
                     if proofs.proof_with_data.status.lock().is_none() {
                         let receivers = PayloadManager::request_transactions(
                             proofs.proof_with_data.proofs.clone(),
+                            proofs.ranges.clone(),
                             timestamp,
                             batch_reader.clone(),
                         );
@@ -160,6 +169,11 @@ impl PayloadManager {
                 Payload::InQuorumStore(proof_with_data),
             ) => {
                 let status = proof_with_data.status.lock().take();
+                let ranges: Vec<_> = proof_with_data
+                    .proofs
+                    .iter()
+                    .map(|p| 0..p.num_txns())
+                    .collect();
                 match status.expect("Should have been updated before.") {
                     DataStatus::Cached(data) => {
                         counters::QUORUM_BATCH_READY_COUNT.inc();
@@ -179,13 +193,14 @@ impl PayloadManager {
                                 block.round()
                             );
                         }
-                        for (digest, rx) in receivers {
+                        for (digest, rx, _) in receivers {
                             match rx.await {
                                 Err(e) => {
                                     // We probably advanced epoch already.
                                     warn!("Oneshot channel to get a batch was dropped with error {:?}", e);
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
+                                        ranges,
                                         block.timestamp_usecs(),
                                         batch_reader.clone(),
                                     );
@@ -202,6 +217,7 @@ impl PayloadManager {
                                 Ok(Err(e)) => {
                                     let new_receivers = PayloadManager::request_transactions(
                                         proof_with_data.proofs.clone(),
+                                        ranges,
                                         block.timestamp_usecs(),
                                         batch_reader.clone(),
                                     );
@@ -220,6 +236,92 @@ impl PayloadManager {
                             .status
                             .lock()
                             .replace(DataStatus::Cached(ret.clone()));
+                        Ok(ret)
+                    },
+                }
+            },
+            (PayloadManager::InQuorumStore(batch_reader, _), Payload::InQuorumStoreV2(proof)) => {
+                let status = proof.proof_with_data.status.lock().take();
+                match status.expect("Should have been updated before.") {
+                    DataStatus::Cached(data) => {
+                        counters::QUORUM_BATCH_READY_COUNT.inc();
+                        proof
+                            .proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Cached(data.clone()));
+                        Ok(data)
+                    },
+                    DataStatus::Requested(receivers) => {
+                        let _timer = counters::BATCH_WAIT_DURATION.start_timer();
+                        let mut vec_all = Vec::new();
+                        let mut ranges = Vec::new();
+                        if !receivers.is_empty() {
+                            debug!(
+                                "QSE: waiting for data on {} receivers, block_round {}",
+                                receivers.len(),
+                                block.round()
+                            );
+                        }
+                        for (digest, rx, range) in receivers {
+                            match rx.await {
+                                Err(e) => {
+                                    // We probably advanced epoch already.
+                                    warn!("Oneshot channel to get a batch was dropped with error {:?}", e);
+                                    let new_receivers = PayloadManager::request_transactions(
+                                        proof.proof_with_data.proofs.clone(),
+                                        proof.ranges.clone(),
+                                        block.timestamp_usecs(),
+                                        batch_reader.clone(),
+                                    );
+                                    // Could not get all data so requested again
+                                    proof
+                                        .proof_with_data
+                                        .status
+                                        .lock()
+                                        .replace(DataStatus::Requested(new_receivers));
+                                    return Err(DataNotFound(digest));
+                                },
+                                Ok(Ok(data)) => {
+                                    vec_all.push(data);
+                                    ranges.push(range);
+                                },
+                                Ok(Err(e)) => {
+                                    let new_receivers = PayloadManager::request_transactions(
+                                        proof.proof_with_data.proofs.clone(),
+                                        proof.ranges.clone(),
+                                        block.timestamp_usecs(),
+                                        batch_reader.clone(),
+                                    );
+                                    // Could not get all data so requested again
+                                    proof
+                                        .proof_with_data
+                                        .status
+                                        .lock()
+                                        .replace(DataStatus::Requested(new_receivers));
+                                    return Err(e);
+                                },
+                            }
+                        }
+                        let ret: Vec<SignedTransaction> = vec_all
+                            .clone()
+                            .into_iter()
+                            .zip(ranges.into_iter())
+                            .flat_map(|(data, range)| {
+                                data.into_iter()
+                                    .skip(range.start as usize)
+                                    .take(range.end as usize - range.start as usize)
+                                    .collect::<Vec<_>>()
+                            })
+                            .collect();
+
+                        let all: Vec<SignedTransaction> = vec_all.into_iter().flatten().collect();
+                        // execution asks for the data twice, so data is cached here for the second time.
+                        proof
+                            .proof_with_data
+                            .status
+                            .lock()
+                            .replace(DataStatus::Cached(all.clone()));
                         Ok(ret)
                     },
                 }
