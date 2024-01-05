@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
-use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
 use anyhow::bail;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Rust representation of the Move Any type
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -34,7 +33,10 @@ impl Any {
 pub trait AsMoveAny: Serialize {
     const MOVE_TYPE_NAME: &'static str;
 
-    fn as_move_any(&self) -> Any where Self: Sized {
+    fn as_move_any(&self) -> Any
+    where
+        Self: Sized,
+    {
         Any::pack(Self::MOVE_TYPE_NAME, self)
     }
 }

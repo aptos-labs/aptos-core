@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use serde::{Deserialize, Serialize};
+use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use aptos_crypto::HashValue;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
-use crate::move_any::AsMoveAny;
-use crate::move_utils::as_move_value::AsMoveValue;
+use serde::{Deserialize, Serialize};
 
 /// Move type `0x1::jwks::UnsupportedJWK` in rust.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -39,9 +38,7 @@ impl TryFrom<&serde_json::Value> for UnsupportedJWK {
 
 impl AsMoveValue for UnsupportedJWK {
     fn as_move_value(&self) -> MoveValue {
-        MoveValue::Struct(MoveStruct::Runtime(vec![
-            self.payload.as_move_value(),
-        ]))
+        MoveValue::Struct(MoveStruct::Runtime(vec![self.payload.as_move_value()]))
     }
 }
 

@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 
-use crate::move_any::{Any, AsMoveAny};
+use crate::{
+    jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
+    move_any::{Any, AsMoveAny},
+};
+use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use aptos_crypto::bls12381;
-use move_core_types::account_address::AccountAddress;
-use crate::jwks::rsa::RSA_JWK;
-use crate::jwks::unsupported::UnsupportedJWK;
 
 pub type Issuer = Vec<u8>;
 
@@ -35,13 +36,13 @@ pub struct JWK {
 impl JWK {
     pub fn new_rsa(rsa: RSA_JWK) -> Self {
         Self {
-            variant: rsa.as_move_any()
+            variant: rsa.as_move_any(),
         }
     }
 
     pub fn new_unsupported(unsupported: UnsupportedJWK) -> Self {
         Self {
-            variant: unsupported.as_move_any()
+            variant: unsupported.as_move_any(),
         }
     }
 }
@@ -61,21 +62,14 @@ impl ProviderJWKs {
 }
 
 /// Move type `0x1::jwks::JWKs` in rust.
-pub struct JWKs {
+pub struct AllProvidersJWKs {
     pub entries: Vec<ProviderJWKs>,
 }
 
 /// Move type `0x1::jwks::ObservedJWKs` in rust.
 pub struct ObservedJWKs {
-    pub jwks: JWKs,
+    pub jwks: AllProvidersJWKs,
 }
 
 pub mod rsa;
 pub mod unsupported;
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct QuorumCertifiedUpdate {
-    pub authors: BTreeSet<AccountAddress>,
-    pub payload: ProviderJWKs,
-    pub multi_sig: bls12381::Signature,
-}
