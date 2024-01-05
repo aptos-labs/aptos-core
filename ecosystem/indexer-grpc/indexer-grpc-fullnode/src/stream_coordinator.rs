@@ -146,7 +146,7 @@ impl IndexerStreamCoordinator {
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
                     for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
-                        let item = TransactionsFromNodeResponse {
+                        let _item = TransactionsFromNodeResponse {
                             response: Some(transactions_from_node_response::Response::Data(
                                 TransactionsOutput {
                                     transactions: chunk,
@@ -154,15 +154,7 @@ impl IndexerStreamCoordinator {
                             )),
                             chain_id: ledger_chain_id as u32,
                         };
-                        match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
-                            Ok(_) => {},
-                            Err(_) => {
-                                // Client disconnects.
-                                return Err(Status::aborted(
-                                    "[Indexer Fullnode] Client disconnected",
-                                ));
-                            },
-                        }
+                        // Skip the channel to see if this is the problem.
                     }
                 }
 
