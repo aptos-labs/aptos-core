@@ -98,7 +98,6 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
-    "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -361,7 +360,6 @@ aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
-aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
@@ -448,6 +446,7 @@ ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"

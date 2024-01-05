@@ -218,7 +218,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.3.2"
+version = "2.4.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -2013,7 +2013,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0",
+ "aptos-moving-average",
  "aptos-protos 1.1.2",
  "aptos-runtimes",
  "async-trait",
@@ -2086,7 +2086,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0",
+ "aptos-moving-average",
  "aptos-protos 1.1.2",
  "aptos-runtimes",
  "async-trait",
@@ -2115,7 +2115,7 @@ dependencies = [
  "aptos-indexer-grpc-server-framework",
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0",
+ "aptos-moving-average",
  "aptos-protos 1.1.2",
  "aptos-runtimes",
  "async-trait",
@@ -2155,7 +2155,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0",
+ "aptos-moving-average",
  "aptos-proptest-helpers",
  "aptos-protos 1.1.2",
  "aptos-runtimes",
@@ -2276,7 +2276,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-mempool-notifications",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0",
+ "aptos-moving-average",
  "aptos-proptest-helpers",
  "aptos-protos 1.1.2",
  "aptos-rocksdb-options",
@@ -2697,13 +2697,6 @@ dependencies = [
  "smallvec",
  "tempfile",
  "walkdir",
-]
-
-[[package]]
-name = "aptos-moving-average"
-version = "0.1.0"
-dependencies = [
- "chrono",
 ]
 
 [[package]]
@@ -12370,7 +12363,7 @@ version = "1.0.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf#4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf"
 dependencies = [
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
+ "aptos-moving-average",
  "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c)",
  "async-trait",
  "base64 0.13.1",
