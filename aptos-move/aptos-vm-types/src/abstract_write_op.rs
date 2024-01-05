@@ -149,7 +149,10 @@ impl GroupWrite {
             metadata_op
         );
         for (v, _layout) in inner_ops.values() {
-            assert_none!(v.metadata(), "Group inner ops must have no metadata");
+            assert!(
+                v.metadata().is_none(),
+                "Group inner ops must have no metadata",
+            );
         }
 
         let maybe_group_op_size = (!metadata_op.is_deletion()).then_some(group_size);
