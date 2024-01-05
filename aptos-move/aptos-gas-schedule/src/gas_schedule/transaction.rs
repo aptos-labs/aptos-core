@@ -167,12 +167,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_execution_gas: InternalGas,
             { 7.. => "max_execution_gas" },
-            20_000_000_000,
+            5_000_000_000,
         ],
         [
             max_io_gas: InternalGas,
             { 7.. => "max_io_gas" },
-            10_000_000_000,
+            5_000_000_000,
         ],
         [
             max_storage_fee: Fee,
