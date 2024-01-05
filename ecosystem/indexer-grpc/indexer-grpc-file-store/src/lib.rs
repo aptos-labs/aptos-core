@@ -17,6 +17,12 @@ pub struct IndexerGrpcFileStoreWorkerConfig {
     pub redis_main_instance_address: RedisUrl,
     pub enable_expensive_logging: Option<bool>,
     pub chain_id: u64,
+    #[serde(default = "default_enable_cache_compression")]
+    pub enable_cache_compression: bool,
+}
+
+const fn default_enable_cache_compression() -> bool {
+    false
 }
 
 impl IndexerGrpcFileStoreWorkerConfig {
@@ -25,12 +31,14 @@ impl IndexerGrpcFileStoreWorkerConfig {
         redis_main_instance_address: RedisUrl,
         enable_expensive_logging: Option<bool>,
         chain_id: u64,
+        enable_cache_compression: bool,
     ) -> Self {
         Self {
             file_store_config,
             redis_main_instance_address,
             enable_expensive_logging,
             chain_id,
+            enable_cache_compression,
         }
     }
 }
@@ -41,8 +49,8 @@ impl RunnableConfig for IndexerGrpcFileStoreWorkerConfig {
         let mut processor = Processor::new(
             self.redis_main_instance_address.clone(),
             self.file_store_config.clone(),
-            self.enable_expensive_logging.unwrap_or(false),
             self.chain_id,
+            self.enable_cache_compression,
         )
         .await
         .expect("Failed to create file store processor");

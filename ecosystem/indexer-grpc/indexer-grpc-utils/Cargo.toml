@@ -23,6 +23,7 @@ base64 = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
+flate2 = { workspace = true }
 futures = { workspace = true }
 futures-core = { workspace = true }
 futures-util = { workspace = true }
@@ -32,6 +33,7 @@ prometheus = { workspace = true }
 prost = { workspace = true }
 redis = { workspace = true }
 redis-test = { workspace = true }
+ripemd = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

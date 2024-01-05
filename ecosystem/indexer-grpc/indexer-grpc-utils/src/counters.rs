@@ -17,14 +17,15 @@ pub enum IndexerGrpcStep {
     DataServiceAllChunksSent, // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
 
     CacheWorkerReceivedTxns, // [Indexer Cache] Received transactions from fullnode.
-    CacheWorkerTxnDecoded,   // [Indexer Cache] Decoded transactions.
+    CacheWorkerTxnEncoded,   // [Indexer Cache] Encoded transactions.
     CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
     CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
     FilestoreFetchTxns,      // [File worker] Fetch transactions from cache.
     FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
-    FilestoreUpdateMetadata, // [File worker] Upload transactions to filestore.
+    FilestoreUpdateMetadata, // [File worker] Update metadata to filestore.
     FilestoreProcessedBatch, // [File worker] Successfully process current batch.
+    FileStoreEncodedTxns,    // [File worker] Encoded transactions.
 
     FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
     FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
@@ -48,12 +49,13 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceAllChunksSent => "4",
             // Cache worker steps
             IndexerGrpcStep::CacheWorkerReceivedTxns => "1",
-            IndexerGrpcStep::CacheWorkerTxnDecoded => "2",
+            IndexerGrpcStep::CacheWorkerTxnEncoded => "2",
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "3",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "4",
             // Filestore worker steps
             IndexerGrpcStep::FilestoreProcessedBatch => "1",
             IndexerGrpcStep::FilestoreFetchTxns => "1.0",
+            IndexerGrpcStep::FileStoreEncodedTxns => "1.0.1",
             IndexerGrpcStep::FilestoreUploadTxns => "1.1",
             IndexerGrpcStep::FilestoreUpdateMetadata => "1.2",
             // Fullnode steps
@@ -85,7 +87,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::DataServiceAllChunksSent => "[Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.",
             // Cache worker steps
             IndexerGrpcStep::CacheWorkerReceivedTxns => "[Indexer Cache] Received transactions from fullnode.",
-            IndexerGrpcStep::CacheWorkerTxnDecoded => "[Indexer Cache] Decoded transactions.",
+            IndexerGrpcStep::CacheWorkerTxnEncoded => "[Indexer Cache] Encoded transactions.",
             IndexerGrpcStep::CacheWorkerTxnsProcessed => "[Indexer Cache] Processed transactions in a batch.",
             IndexerGrpcStep::CacheWorkerBatchProcessed => "[Indexer Cache] Successfully process current batch.",
             // Filestore worker steps
@@ -93,6 +95,7 @@ impl IndexerGrpcStep {
             IndexerGrpcStep::FilestoreFetchTxns => "[File worker] Fetch transactions from cache.",
             IndexerGrpcStep::FilestoreUploadTxns => "[File worker] Finished uploading batch of transactions to filestore.",
             IndexerGrpcStep::FilestoreUpdateMetadata => "[File worker] Update filestore metadata.",
+            IndexerGrpcStep::FileStoreEncodedTxns => "[File worker] Encoded transactions.",
             // Fullnode steps
             IndexerGrpcStep::FullnodeFetchedBatch => "[Indexer Fullnode] Fetched batch of transactions from fullnode",
             IndexerGrpcStep::FullnodeDecodedBatch => "[Indexer Fullnode] Decoded batch of transactions from fullnode",

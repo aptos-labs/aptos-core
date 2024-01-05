@@ -2,20 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{METADATA_UPLOAD_FAILURE_COUNT, PROCESSED_VERSIONS_COUNT};
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Context, Result};
 use aptos_indexer_grpc_utils::{
-    build_protobuf_encoded_transaction_wrappers,
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::CacheOperator,
+    compression_util::{FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     config::IndexerGrpcFileStoreConfig,
-    constants::BLOB_STORAGE_SIZE,
     counters::{log_grpc_step, IndexerGrpcStep},
-    file_store_operator::{FileStoreOperator, GcsFileStoreOperator, LocalFileStoreOperator},
+    file_store_operator::FileStoreOperator,
     types::RedisUrl,
-    EncodedTransactionWithVersion,
 };
 use aptos_moving_average::MovingAverage;
-use aptos_protos::transaction::v1::Transaction;
-use prost::Message;
 use std::time::Duration;
 use tracing::debug;
 
@@ -28,16 +24,21 @@ pub struct Processor {
     cache_operator: CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Box<dyn FileStoreOperator>,
     chain_id: u64,
-    enable_expensive_logging: bool,
 }
 
 impl Processor {
     pub async fn new(
         redis_main_instance_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
-        enable_expensive_logging: bool,
         chain_id: u64,
+        enable_cache_compression: bool,
     ) -> Result<Self> {
+        let cache_storage_format = if enable_cache_compression {
+            StorageFormat::GzipCompressedProto
+        } else {
+            StorageFormat::Base64UncompressedProto
+        };
+
         // Connection to redis is a hard dependency for file store processor.
         let conn = redis::Client::open(redis_main_instance_address.0.clone())
             .with_context(|| {
@@ -54,25 +55,12 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?;
-        let mut cache_operator = CacheOperator::new(conn);
+        let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
 
-        let mut file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
-            IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {
-                Box::new(GcsFileStoreOperator::new(
-                    gcs_file_store.gcs_file_store_bucket_name.clone(),
-                    gcs_file_store
-                        .gcs_file_store_service_account_key_path
-                        .clone(),
-                ))
-            },
-            IndexerGrpcFileStoreConfig::LocalFileStore(local_file_store) => Box::new(
-                LocalFileStoreOperator::new(local_file_store.local_file_store_path.clone()),
-            ),
-        };
+        let mut file_store_operator: Box<dyn FileStoreOperator> = file_store_config.create();
         file_store_operator.verify_storage_bucket_existence().await;
-        let file_store_metadata: Option<
-            aptos_indexer_grpc_utils::file_store_operator::FileStoreMetadata,
-        > = file_store_operator.get_file_store_metadata().await;
+        let file_store_metadata: Option<FileStoreMetadata> =
+            file_store_operator.get_file_store_metadata().await;
         if file_store_metadata.is_none() {
             // If metadata doesn't exist, create and upload it and init file store latest version in cache.
             while file_store_operator
@@ -111,7 +99,6 @@ impl Processor {
             cache_operator,
             file_store_operator,
             chain_id,
-            enable_expensive_logging,
         })
     }
 
@@ -142,9 +129,9 @@ impl Processor {
             // batches tracks the start version of the batches to fetch. 1000 at the time
             let mut batches = vec![];
             let mut start_version = batch_start_version;
-            while start_version + (BLOB_STORAGE_SIZE as u64) < cache_worker_latest {
+            while start_version + (FILE_ENTRY_TRANSACTION_COUNT) < cache_worker_latest {
                 batches.push(start_version);
-                start_version += BLOB_STORAGE_SIZE as u64;
+                start_version += FILE_ENTRY_TRANSACTION_COUNT;
             }
 
             // we're too close to the head
@@ -169,20 +156,20 @@ impl Processor {
                 let task = tokio::spawn(async move {
                     let fetch_start_time = std::time::Instant::now();
                     let transactions = cache_operator_clone
-                        .batch_get_encoded_proto_data_x(start_version, BLOB_STORAGE_SIZE as u64)
+                        .get_transactions(start_version, FILE_ENTRY_TRANSACTION_COUNT)
                         .await
                         .unwrap();
-                    let last_transaction = transactions.last().unwrap().0.clone();
+                    let last_transaction = transactions.last().unwrap().clone();
                     log_grpc_step(
                         SERVICE_TYPE,
                         IndexerGrpcStep::FilestoreFetchTxns,
                         Some(start_version as i64),
-                        Some((start_version + BLOB_STORAGE_SIZE as u64 - 1) as i64),
+                        Some((start_version + FILE_ENTRY_TRANSACTION_COUNT - 1) as i64),
                         None,
                         None,
                         Some(fetch_start_time.elapsed().as_secs_f64()),
                         None,
-                        Some(BLOB_STORAGE_SIZE as i64),
+                        Some(FILE_ENTRY_TRANSACTION_COUNT as i64),
                         None,
                     );
 
@@ -195,12 +182,12 @@ impl Processor {
                         SERVICE_TYPE,
                         IndexerGrpcStep::FilestoreUploadTxns,
                         Some(start_version as i64),
-                        Some((start_version + BLOB_STORAGE_SIZE as u64 - 1) as i64),
+                        Some((start_version + FILE_ENTRY_TRANSACTION_COUNT - 1) as i64),
                         None,
                         None,
                         Some(upload_start_time.elapsed().as_secs_f64()),
                         None,
-                        Some(BLOB_STORAGE_SIZE as i64),
+                        Some(FILE_ENTRY_TRANSACTION_COUNT as i64),
                         None,
                     );
 
@@ -253,7 +240,7 @@ impl Processor {
             // update next batch start version
             batch_start_version = last_version + 1;
             assert!(
-                batch_start_version % BLOB_STORAGE_SIZE as u64 == 0,
+                batch_start_version % FILE_ENTRY_TRANSACTION_COUNT == 0,
                 "[Filestore] Batch must be multiple of 1000"
             );
             let size = last_version - first_version + 1;
@@ -291,25 +278,8 @@ impl Processor {
                 None,
             );
 
-            let (mut start_version_timestamp, mut end_version_timestamp) = (None, None);
-            if self.enable_expensive_logging {
-                // This decoding may be inefficient, but this is the file store so we don't have to be overly
-                // concerned with efficiency.
-                start_version_timestamp = {
-                    let decoded_transaction =
-                        base64::decode(first_version_encoded).expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(&*decoded_transaction)
-                        .expect("Failed to decode protobuf.");
-                    transaction.timestamp
-                };
-                end_version_timestamp = {
-                    let decoded_transaction =
-                        base64::decode(last_version_encoded).expect("Failed to decode base64.");
-                    let transaction = Transaction::decode(&*decoded_transaction)
-                        .expect("Failed to decode protobuf.");
-                    transaction.timestamp
-                };
-            }
+            let start_version_timestamp = first_version_encoded.timestamp;
+            let end_version_timestamp = last_version_encoded.timestamp;
             let full_loop_duration = latest_loop_time.elapsed().as_secs_f64();
             log_grpc_step(
                 SERVICE_TYPE,
@@ -324,25 +294,5 @@ impl Processor {
                 None,
             );
         }
-    }
-}
-
-fn _handle_batch_from_cache(
-    fullnode_rpc_status: anyhow::Result<CacheBatchGetStatus>,
-    batch_start_version: u64,
-) -> Result<Option<Vec<EncodedTransactionWithVersion>>> {
-    match fullnode_rpc_status {
-        Ok(CacheBatchGetStatus::Ok(encoded_transactions)) => Ok(Some(
-            build_protobuf_encoded_transaction_wrappers(encoded_transactions, batch_start_version),
-        )),
-        Ok(CacheBatchGetStatus::NotReady) => Ok(None),
-        Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            bail!(
-                "[indexer file] Cache evicted from cache. For file store worker, this is not expected."
-            );
-        },
-        Err(err) => {
-            bail!("Batch get encoded proto data failed: {}", err);
-        },
     }
 }
