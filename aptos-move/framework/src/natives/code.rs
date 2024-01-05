@@ -5,7 +5,7 @@ use crate::unzip_metadata_str;
 use anyhow::bail;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    RawSafeNative, safely_pop_arg, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
 use aptos_types::{
