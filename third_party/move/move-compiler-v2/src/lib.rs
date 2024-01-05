@@ -11,8 +11,9 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
-    livevar_analysis_processor::LiveVarAnalysisProcessor,
+    ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+    explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
@@ -180,7 +181,24 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }
-    // Run live var again because it is invalidated by ExplicitDrop but needed by file format generator
+    // ----------------------------------------------------------
+    // ----------- Default optimization pipeline ----------------
+    // The default optimization pipeline is currently always run by the compiler.
+    // While this section of the pipeline is optional, some code that used to previously compile
+    // may no longer compile without this section because of using too many local (temp) variables.
+    //
+    // Available copies analysis is needed by copy propagation.
+    pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(CopyPropagation {}));
+    // Live var analysis is needed by dead store elimination.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
+    pipeline.add_processor(Box::new(DeadStoreElimination {}));
+    // ------------ End default optimization pipeline ------------
+    // ----------------------------------------------------------
+    // Run live var analysis again because it could be invalidated by previous pipeline steps,
+    // but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
         with_copy_inference: false,
     }));

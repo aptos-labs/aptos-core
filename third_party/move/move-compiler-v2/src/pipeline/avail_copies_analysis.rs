@@ -49,6 +49,10 @@ impl AvailCopies {
         src: TempIndex,
         borrowed_locals: &BTreeSet<TempIndex>,
     ) {
+        if src == dst {
+            // No need to make a copy available for self-assignments.
+            return;
+        }
         // Note that we are conservative here for the sake of simplicity, and disallow copies
         // when either `dst` or `src` is borrowed. We could track more copies as available by using
         // reference analysis.
@@ -78,10 +82,15 @@ impl AvailCopies {
     /// the copy chain: `tmp_0 --copied-to--> tmp_1 --copied-to--> tmp_2 -> ... -> tmp_n-1 -> tmp_n`,
     /// return the head of the copy chain `tmp_0` for any input `tmp_x` (x in 0..=n) in the chain.
     ///
-    /// Note that it is required that the copy chain is acyclic: we don't check for this explicitly,
-    /// but the natural way of constructing the copy chain for move bytecode ensures this.
+    /// Note that it is a required invariant that the copy chain is acyclic, else we panic.
+    /// The natural way of constructing the copy chain for move bytecode (like in this file) ensures this.
     pub fn get_head_of_copy_chain(&self, mut tmp: TempIndex) -> TempIndex {
+        let mut visited = BTreeSet::from([tmp]);
         while let Some(src) = self.0.get(&tmp) {
+            if !visited.insert(*src) {
+                // The copy chain is cyclic, which is an invariant violation.
+                panic!("ICE: copy chain is cyclic");
+            }
             tmp = *src;
         }
         tmp
@@ -270,7 +279,7 @@ pub fn format_avail_copies_annotation(
 
 fn format_avail_copies(state: &AvailCopies, target: &FunctionTarget<'_>) -> String {
     let mut s = String::new();
-    s.push_str("{");
+    s.push('{');
     let mut first = true;
     for (dst, src) in &state.0 {
         if first {
@@ -288,7 +297,7 @@ fn format_avail_copies(state: &AvailCopies, target: &FunctionTarget<'_>) -> Stri
                 .join(" := "),
         );
     }
-    s.push_str("}");
+    s.push('}');
     s
 }
 
@@ -333,5 +342,19 @@ mod tests {
         for i in 0..=4 {
             assert_eq!(copies.get_head_of_copy_chain(i), 0);
         }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_cyclic_copy_chain() {
+        let mut copies = AvailCopies::new();
+        let borrowed_locals: BTreeSet<TempIndex> = BTreeSet::new();
+        copies.make_copy_available(1, 0, &borrowed_locals);
+        copies.make_copy_available(2, 1, &borrowed_locals);
+        copies.make_copy_available(3, 2, &borrowed_locals);
+        copies.make_copy_available(4, 3, &borrowed_locals);
+        copies.make_copy_available(0, 4, &borrowed_locals);
+        // copies = (1, 0), (2, 1), (3, 2), (4, 3), (0, 4)
+        copies.get_head_of_copy_chain(4);
     }
 }
