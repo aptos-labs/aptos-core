@@ -3,11 +3,13 @@
 
 use super::indexer_api::confirm_metadata_applied;
 use anyhow::{anyhow, Context, Result};
-use aptos_protos::indexer::v1::GetTransactionsRequest;
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use diesel_async::{pg::AsyncPgConnection, AsyncConnection, RunQueryDsl};
 use futures::StreamExt;
-use processor::schema::processor_status;
+use processor::{
+    aptos_protos::indexer::v1::{raw_data_client::RawDataClient, GetTransactionsRequest},
+    schema::processor_status,
+};
 use reqwest::Url;
 use serde::Serialize;
 use std::time::Duration;
@@ -56,11 +58,9 @@ impl HealthChecker {
                 Ok(())
             },
             HealthChecker::DataServiceGrpc(url) => {
-                let mut client = aptos_indexer_grpc_utils::create_data_service_grpc_client(
-                    url.clone(),
-                    Some(Duration::from_secs(5)),
-                )
-                .await?;
+                let mut client =
+                    create_data_service_grpc_client(url.clone(), Some(Duration::from_secs(5)))
+                        .await?;
                 let request = tonic::Request::new(GetTransactionsRequest {
                     starting_version: Some(0),
                     ..Default::default()
@@ -213,4 +213,45 @@ where
     }
 
     Ok(())
+}
+
+pub type GrpcDataServiceClientType = RawDataClient<tonic::transport::Channel>;
+
+/// Create a gRPC client for the indexer data service with exponential backoff.
+/// max_elapsed_time is the maximum time to wait for the connection to be established.
+//
+// While this function is defined in indexer-grpc-utils, we can't use it directly
+// because that crate uses a different version of aptos-protos than we do.
+//
+// See more: https://aptos-org.slack.com/archives/C04PF1X2UKY/p1704470254299569
+pub async fn create_data_service_grpc_client(
+    address: Url,
+    max_elapsed_time: Option<Duration>,
+) -> Result<GrpcDataServiceClientType> {
+    let mut backoff = backoff::ExponentialBackoff::default();
+    if let Some(max_elapsed_time) = max_elapsed_time {
+        backoff.max_elapsed_time = Some(max_elapsed_time);
+    }
+    let client = backoff::future::retry(backoff, || async {
+        match RawDataClient::connect(address.to_string()).await {
+            Ok(client) => {
+                tracing::info!(
+                    address = address.to_string(),
+                    "[Indexer Cache] Connected to indexer data service gRPC server."
+                );
+                Ok(client)
+            },
+            Err(e) => {
+                tracing::error!(
+                    address = address.to_string(),
+                    "[Indexer Cache] Failed to connect to indexer data service gRPC server: {}",
+                    e
+                );
+                Err(backoff::Error::transient(e))
+            },
+        }
+    })
+    .await
+    .context("Failed to create data service GRPC client")?;
+    Ok(client)
 }
