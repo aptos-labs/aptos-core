@@ -24,7 +24,7 @@ module aptos_framework::jwks {
 
     const EUNEXPECTED_EPOCH: u64 = 1;
     const EUNEXPECTED_VERSION: u64 = 2;
-    const EUNKNOWN_Patch_VARIANT: u64 = 3;
+    const EUNKNOWN_PATCH_VARIANT: u64 = 3;
     const EUNKNOWN_JWK_VARIANT: u64 = 4;
     const EISSUER_NOT_FOUND: u64 = 5;
     const EJWK_ID_NOT_FOUND: u64 = 6;
@@ -81,7 +81,7 @@ module aptos_framework::jwks {
         jwks: vector<JWK>,
     }
 
-    /// Multiple `ProviderJWKs`s, indexed by issuer and key ID.
+    /// Multiple `ProviderJWKs` objects, indexed by issuer and key ID.
     struct AllProvidersJWKs has copy, drop, store {
         /// Vector of `ProviderJWKs` sorted by `ProviderJWKs::issuer` in dictionary order.
         entries: vector<ProviderJWKs>,
@@ -246,7 +246,7 @@ module aptos_framework::jwks {
         move_to(fx, SupportedOIDCProviders { providers: vector[] });
         move_to(fx, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
         move_to(fx, Patches { patches: vector[] });
-        move_to(fx, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector [] } });
+        move_to(fx, PatchedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
     }
 
     /// Helper function that removes an OIDC provider from the `SupportedOIDCProviders`.
@@ -305,7 +305,6 @@ module aptos_framework::jwks {
         } else {
             option::none()
         }
-
     }
 
     /// Get a JWK by key ID from a `ProviderJWKs`, if it exists.
@@ -469,7 +468,7 @@ module aptos_framework::jwks {
             upsert_jwk(&mut jwk_set, cmd.jwk);
             upsert_provider_jwks(jwks, jwk_set);
         } else {
-            abort(std::error::invalid_argument(EUNKNOWN_Patch_VARIANT))
+            abort(std::error::invalid_argument(EUNKNOWN_PATCH_VARIANT))
         }
     }
 
