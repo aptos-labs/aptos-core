@@ -149,6 +149,126 @@ async fn test_peers_with_ready_optimistic_fetches() {
 }
 
 #[tokio::test]
+async fn test_peers_with_ready_optimistic_fetches_update() {
+    // Create a mock time service
+    let time_service = TimeService::mock();
+
+    // Create two peers and optimistic fetch requests
+    let peer_network_1 = PeerNetworkId::random();
+    let peer_network_2 = PeerNetworkId::random();
+    let optimistic_fetch_1 =
+        create_optimistic_fetch_request(time_service.clone(), Some(1), Some(1));
+    let optimistic_fetch_2 =
+        create_optimistic_fetch_request(time_service.clone(), Some(10), Some(1));
+
+    // Insert the optimistic fetches into the pending map
+    let optimistic_fetches = Arc::new(DashMap::new());
+    optimistic_fetches.insert(peer_network_1, optimistic_fetch_1);
+    optimistic_fetches.insert(peer_network_2, optimistic_fetch_2);
+
+    // Create the storage reader
+    let db_reader = mock::create_mock_db_reader();
+    let storage_service_config = StorageServiceConfig::default();
+    let storage_reader = StorageReader::new(storage_service_config, Arc::new(db_reader));
+
+    // Create test data with an empty storage server summary
+    let bounded_executor = BoundedExecutor::new(100, Handle::current());
+    let cached_storage_server_summary =
+        Arc::new(ArcSwap::from(Arc::new(StorageServerSummary::default())));
+    let lru_response_cache = Cache::new(0);
+    let request_moderator = Arc::new(RequestModerator::new(
+        AptosDataClientConfig::default(),
+        cached_storage_server_summary.clone(),
+        mock::create_peers_and_metadata(vec![]),
+        storage_service_config,
+        time_service.clone(),
+    ));
+    let subscriptions = Arc::new(DashMap::new());
+
+    // Update the storage server summary so that there is new data for optimistic fetch 1
+    let highest_synced_version = 5;
+    let synced_ledger_info = utils::update_storage_summary_cache(
+        cached_storage_server_summary.clone(),
+        highest_synced_version,
+        1,
+    );
+
+    // Verify that optimistic fetch 1 is ready
+    let peers_with_ready_optimistic_fetches =
+        optimistic_fetch::get_peers_with_ready_optimistic_fetches(
+            bounded_executor.clone(),
+            storage_service_config,
+            cached_storage_server_summary.clone(),
+            optimistic_fetches.clone(),
+            lru_response_cache.clone(),
+            request_moderator.clone(),
+            storage_reader.clone(),
+            subscriptions.clone(),
+            time_service.clone(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(peers_with_ready_optimistic_fetches, vec![(
+        peer_network_1,
+        synced_ledger_info
+    )]);
+
+    // Update optimistic fetch 1 to have a new higher known version
+    let optimistic_fetch_1 = create_optimistic_fetch_request(
+        time_service.clone(),
+        Some(highest_synced_version),
+        Some(1),
+    );
+    optimistic_fetches.insert(peer_network_1, optimistic_fetch_1);
+
+    // Handle the ready optimistic fetches
+    optimistic_fetch::handle_ready_optimistic_fetches(
+        bounded_executor.clone(),
+        cached_storage_server_summary.clone(),
+        storage_service_config,
+        optimistic_fetches.clone(),
+        lru_response_cache.clone(),
+        request_moderator.clone(),
+        storage_reader.clone(),
+        subscriptions.clone(),
+        time_service.clone(),
+        peers_with_ready_optimistic_fetches,
+    )
+    .await;
+
+    // Verify that there are still 2 optimistic fetches pending (the
+    // first one was not removed because it was updated!)
+    assert_eq!(optimistic_fetches.len(), 2);
+
+    // Update the storage server summary so that there is new data for optimistic fetch 1
+    let synced_ledger_info = utils::update_storage_summary_cache(
+        cached_storage_server_summary.clone(),
+        highest_synced_version + 1,
+        1,
+    );
+
+    // Verify that optimistic fetch 1 is ready (again!)
+    let peers_with_ready_optimistic_fetches =
+        optimistic_fetch::get_peers_with_ready_optimistic_fetches(
+            bounded_executor.clone(),
+            storage_service_config,
+            cached_storage_server_summary.clone(),
+            optimistic_fetches.clone(),
+            lru_response_cache.clone(),
+            request_moderator.clone(),
+            storage_reader.clone(),
+            subscriptions.clone(),
+            time_service.clone(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(peers_with_ready_optimistic_fetches, vec![(
+        peer_network_1,
+        synced_ledger_info
+    )]);
+}
+
+#[tokio::test]
 async fn test_remove_expired_optimistic_fetches() {
     // Create a storage service config
     let max_optimistic_fetch_period_ms = 100;

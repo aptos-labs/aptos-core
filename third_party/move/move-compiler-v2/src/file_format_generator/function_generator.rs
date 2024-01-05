@@ -463,7 +463,8 @@ impl<'a> FunctionGenerator<'a> {
                 // Currently Destroy is only translated for references. It may also make
                 // sense for other values, as we may figure later. Its known to be required
                 // for references to make the bytecode verifier happy.
-                if ctx.fun_ctx.fun.get_local_type(source[0]).is_reference() {
+                let ty = ctx.fun_ctx.fun.get_local_type(source[0]);
+                if ty.is_reference() {
                     self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
                 }
             },
@@ -690,22 +691,40 @@ impl<'a> FunctionGenerator<'a> {
         push_kind: Option<&AssignKind>,
     ) {
         let fun_ctx = ctx.fun_ctx;
-        // Compute the maximal prefix of `temps` which are already on the stack.
+        // Compute the maximal prefix of `temps` which are already on the stack. Also
+        // compute the offset from which on we need to flush the stack. See comments
+        // below for the need for flushing.
         let temps = temps.as_ref();
         let mut temps_to_push = temps;
+        let mut stack_to_flush = self.stack.len();
         for i in 0..temps.len() {
             let end = temps.len() - i;
             if end > self.stack.len() || end == 0 {
                 continue;
             }
             if self.stack.ends_with(&temps[0..end]) {
+                // We found 0..end temps which are already on top of the stack. The remaining ones
+                // need to be pushed.
                 temps_to_push = &temps[end..temps.len()];
+                // However, if any of the temps we found on the stack are used again after this program
+                // point we can't really consume them from the stack but need to flush them to registers.
+                for temp in &temps[0..end] {
+                    if ctx.is_alive_after(*temp) {
+                        stack_to_flush = std::cmp::min(
+                            stack_to_flush,
+                            self.stack
+                                .iter()
+                                .position(|t| t == temp)
+                                .expect("temp on stack"),
+                        );
+                        temps_to_push = temps
+                    }
+                }
                 break;
             }
         }
-        // However, the remaining temps in temps_to_push need to be stored in locals and not on the
-        // stack. Otherwise we need to flush the stack to reach them.
-        let mut stack_to_flush = self.stack.len();
+        // If any of the temps we need to push now are actually underneath the temps already on the stack,
+        // we need to even flush more of the stack to reach them.
         for temp in temps_to_push {
             if let Some(offs) = self.stack.iter().position(|t| t == temp) {
                 // The lowest point in the stack we need to flush.

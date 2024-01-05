@@ -8,6 +8,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 - Added `for` loop. 
   - Syntax: `for (iter in lower_bound..upper_bound) { loop_body }` with integer bounds.
   - Documentation: https://aptos.dev/move/book/loops
+- Upgraded indexer processors for local testnet from 2d5cb211a89a8705674e9e1e741c841dd899c558 to 4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf. Upgraded Hasura metadata accordingly.
+- Upgraded Hasura GraphQL engine image from 2.35.0 to 2.36.1.
 
 ## [2.3.2] - 2023/11/28
 - Services in the local testnet now bind to 127.0.0.1 by default (unless the CLI is running inside a container, which most users should not do) rather than 0.0.0.0. You can override this behavior with the `--bind-to` flag. This fixes an issue preventing the local testnet from working on Windows.

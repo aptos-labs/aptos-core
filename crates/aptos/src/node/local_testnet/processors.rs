@@ -92,6 +92,7 @@ impl ProcessorManager {
             starting_version: None,
             ending_version: None,
             number_concurrent_processing_tasks: None,
+            enable_verbose_logging: None,
         };
         let manager = Self {
             config,
