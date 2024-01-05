@@ -213,7 +213,33 @@ async fn process_transactions_from_node_response(
             let transaction_len = data.transactions.len();
             let data_download_duration_in_secs = download_start_time.elapsed().as_secs_f64();
             let mut cache_operator_clone = cache_operator.clone();
-            let task = tokio::spawn(async move{
+            let first_transaction = data
+                .transactions
+                .first()
+                .context("There were unexpectedly no transactions in the response")?;
+            let first_transaction_version = first_transaction.version;
+            let last_transaction = data
+                .transactions
+                .last()
+                .context("There were unexpectedly no transactions in the response")?;
+            let last_transaction_version = last_transaction.version;
+            let start_version = first_transaction.version;
+            let first_transaction_pb_timestamp = first_transaction.timestamp.clone();
+            let last_transaction_pb_timestamp = last_transaction.timestamp.clone();
+
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::CacheWorkerReceivedTxns,
+                Some(start_version as i64),
+                Some(last_transaction_version as i64),
+                first_transaction_pb_timestamp.as_ref(),
+                last_transaction_pb_timestamp.as_ref(),
+                Some(data_download_duration_in_secs),
+                Some(size_in_bytes),
+                Some((last_transaction_version + 1 - first_transaction_version) as i64),
+                None,
+            );
+            let task = tokio::spawn(async move {
                 Ok(())
             });
             Ok(GrpcDataStatus::ChunkDataOk {
