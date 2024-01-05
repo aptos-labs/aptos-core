@@ -12373,7 +12373,7 @@ source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=480
 dependencies = [
  "anyhow",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c)",
+ "aptos-protos 1.1.2",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
