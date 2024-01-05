@@ -108,7 +108,7 @@ impl FullnodeData for FullnodeDataService {
                 // send end batch message (each batch) upon success of the entire batch
                 // client can use the start and end version to ensure that there are no gaps
                 // end loop if this message fails to send because otherwise the client can't validate
-                let batch_end_status = get_status(
+                let _batch_end_status = get_status(
                     StatusType::BatchEnd,
                     coordinator.current_version,
                     Some(max_version),
@@ -118,31 +118,25 @@ impl FullnodeData for FullnodeDataService {
                 CHANNEL_SIZE
                     .with_label_values(&["2"])
                     .set(channel_size as i64);
-                match tx.send(Result::<_, Status>::Ok(batch_end_status)).await {
-                    Ok(_) => {
-                        // tps logging
-                        let new_base: u64 = ma.sum() / (DEFAULT_EMIT_SIZE as u64);
-                        ma.tick_now(max_version - coordinator.current_version + 1);
-                        if base != new_base {
-                            base = new_base;
+               
+                // tps logging
+                let new_base: u64 = ma.sum() / (DEFAULT_EMIT_SIZE as u64);
+                ma.tick_now(max_version - coordinator.current_version + 1);
+                if base != new_base {
+                    base = new_base;
 
-                            log_grpc_step_fullnode(
-                                IndexerGrpcStep::FullnodeProcessedBatch,
-                                Some(coordinator.current_version as i64),
-                                Some(max_version as i64),
-                                None,
-                                Some(highest_known_version as i64),
-                                Some(ma.avg() * 1000.0),
-                                Some(start_time.elapsed().as_secs_f64()),
-                                Some(ma.sum() as i64),
-                            );
-                        }
-                    },
-                    Err(_) => {
-                        aptos_logger::warn!("[Indexer Fullnode] Unable to send end batch status");
-                        break;
-                    },
+                    log_grpc_step_fullnode(
+                        IndexerGrpcStep::FullnodeProcessedBatch,
+                        Some(coordinator.current_version as i64),
+                        Some(max_version as i64),
+                        None,
+                        Some(highest_known_version as i64),
+                        Some(ma.avg() * 1000.0),
+                        Some(start_time.elapsed().as_secs_f64()),
+                        Some(ma.sum() as i64),
+                    );
                 }
+                    
                 coordinator.current_version = max_version + 1;
             }
         });
