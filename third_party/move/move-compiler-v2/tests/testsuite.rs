@@ -45,6 +45,11 @@ struct TestConfig {
     generate_file_format: bool,
     /// Whether we should dump annotated targets for each stage of the pipeline.
     dump_annotated_targets: bool,
+    /// Optionally, dump annotated targets for only certain stages of the pipeline.
+    /// If None, dump annotated targets for all stages.
+    /// If Some(list), dump annotated targets for pipeline stages whose index is in the list.
+    /// If `dump_annotated_targets` is false, this field is ignored.
+    dump_for_only_some_stages: Option<Vec<usize>>,
 }
 
 fn path_from_crate_root(path: &str) -> String {
@@ -98,6 +103,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/inlining/") || path.contains("/folding/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -111,6 +117,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/inlining/") {
             pipeline.add_processor(Box::new(VisibilityChecker {}));
@@ -126,6 +133,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/unit_test/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -139,6 +147,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/checking/") {
             Self {
@@ -147,6 +156,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
@@ -155,6 +165,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/file-format-generator/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -166,6 +177,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: true,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/visibility-checker/") {
             pipeline.add_processor(Box::new(VisibilityChecker {}));
@@ -175,6 +187,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/live-var/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -186,6 +199,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/reference-safety/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -198,6 +212,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/explicit-drop/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -211,6 +226,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/ability-checker/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -225,14 +241,15 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/copy-propagation/") {
-            pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(CopyPropagation {}));
+            pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {})); // 0
+            pipeline.add_processor(Box::new(CopyPropagation {})); // 1
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-                with_copy_inference: true,
+                with_copy_inference: false,
             }));
-            pipeline.add_processor(Box::new(DeadStoreElimination {}));
+            pipeline.add_processor(Box::new(DeadStoreElimination {})); // 3
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: false,
             }));
@@ -240,8 +257,10 @@ impl TestConfig {
                 type_check_only: false,
                 dump_ast: false,
                 pipeline,
-                generate_file_format: true,
+                generate_file_format: false,
                 dump_annotated_targets: true,
+                // Only dump with annotations after these pipeline stages.
+                dump_for_only_some_stages: Some(vec![0, 1, 3]),
             }
         } else {
             panic!(
@@ -321,10 +340,16 @@ impl TestConfig {
                     },
                     // Hook which is run after every step in the pipeline. Prints out
                     // bytecode after the processor, if requested.
-                    |_, processor, targets_after| {
+                    |i, processor, targets_after| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
-                        if self.dump_annotated_targets {
+                        if self.dump_annotated_targets
+                            && (self.dump_for_only_some_stages.is_none() // dump all stages
+                                || self
+                                    .dump_for_only_some_stages
+                                    .as_ref()
+                                    .is_some_and(|list| list.contains(&(i - 1))))
+                        {
                             out.push_str(
                                 &move_stackless_bytecode::print_targets_with_annotations_for_test(
                                     &env,

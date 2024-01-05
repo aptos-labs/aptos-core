@@ -9,6 +9,7 @@
 //!
 //! Given live variables at each program point, this transformation removes dead stores, i.e.,
 //! assignments and loads to locals which are not live afterwards.
+//! In addition, it also removes self-assignments, i.e., assignments of the form `x = x`.
 
 use crate::pipeline::livevar_analysis_processor::LiveVarAnnotation;
 use move_binary_format::file_format::CodeOffset;
@@ -25,6 +26,8 @@ pub struct DeadStoreElimination {}
 impl DeadStoreElimination {
     /// Transforms the `code` of a function using the `live_vars_annotation`,
     /// by removing assignments and loads to locals which are not live afterwards.
+    /// Also removes self-assignments.
+    /// 
     /// Returns the transformed code.
     fn transform(code: Vec<Bytecode>, live_vars_annotation: &LiveVarAnnotation) -> Vec<Bytecode> {
         let mut new_code = vec![];
@@ -41,6 +44,13 @@ impl DeadStoreElimination {
                     continue;
                 }
             }
+            if let Bytecode::Assign(_, dst, src, _) = instr {
+                if dst == src {
+                    // This is a self-assignment, we don't need to emit it.
+                    continue;
+                }
+            }
+            // None of the above special cases, so we emit the instruction.
             new_code.push(instr);
         }
         new_code
@@ -65,6 +75,8 @@ impl FunctionTargetProcessor for DeadStoreElimination {
             .get::<LiveVarAnnotation>()
             .expect("live variable annotation is a prerequisite");
         let new_code = Self::transform(code, live_var_annotation);
+        // Note that the file format generator will not include unused locals in the generated code,
+        // so we don't need to prune unused locals here for various fields of `data` (like `local_types`).
         data.code = new_code;
         // Annotations may no longer be valid after this transformation, so remove them.
         data.annotations.clear();
