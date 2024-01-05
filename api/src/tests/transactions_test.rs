@@ -255,7 +255,7 @@ async fn test_multi_agent_signed_transaction() {
 async fn test_fee_payer_signed_transaction() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
-    let fee_payer = context.gen_account();
+    let fee_payer = context.create_account().await;
     let factory = context.transaction_factory();
     let mut root_account = context.root_account().await;
 
@@ -324,7 +324,10 @@ async fn test_fee_payer_signed_transaction() {
         .sign_fee_payer_with_transaction_builder(
             vec![],
             &fee_payer,
-            factory.create_user_account(yet_another_account.public_key()),
+            factory
+                .create_user_account(yet_another_account.public_key())
+                .max_gas_amount(200_000)
+                .gas_unit_price(1),
         )
         .into_raw_transaction();
     let another_txn = another_raw_txn

@@ -3,13 +3,13 @@
 
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::common::{Payload, PayloadFilter};
-use aptos_types::validator_txn::{pool::ValidatorTransactionFilter, ValidatorTransaction};
+use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_validator_transaction_pool::TransactionFilter;
 use futures::future::BoxFuture;
 use std::time::Duration;
 
 pub mod mixed;
 pub mod user;
-#[cfg(test)]
 pub mod validator;
 
 #[async_trait::async_trait]
@@ -19,7 +19,7 @@ pub trait PayloadClient: Send + Sync {
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
-        validator_txn_filter: ValidatorTransactionFilter,
+        validator_txn_filter: TransactionFilter,
         user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,

@@ -5,7 +5,7 @@ task 0 'print-bytecode'. lines 1-18:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 L0:	loc0: u64
 B0:
 	0: LdU64(0)
@@ -31,7 +31,7 @@ task 1 'print-bytecode'. lines 20-32:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 L0:	loc0: u64
 B0:
 	0: LdU64(0)
@@ -53,7 +53,7 @@ task 2 'print-bytecode'. lines 34-42:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 B0:
 	0: LdTrue
 	1: BrFalse(3)
@@ -69,7 +69,7 @@ task 3 'print-bytecode'. lines 44-55:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 B0:
 	0: Branch(2)
 B1:

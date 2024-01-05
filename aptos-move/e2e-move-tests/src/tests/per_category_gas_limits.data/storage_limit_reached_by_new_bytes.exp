@@ -8,7 +8,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-                            }: Modification(283d28a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            }: Modification(985428a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -32,15 +32,15 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-                            }: Modification(279e5705000000000100000000000000),
+                            }: Modification(97b55705000000000100000000000000),
                         },
                     },
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "768e01000000000005000000000000000200000000000000c0a39b00000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "798e01000000000007000000000000000200000000000000c0a39b00000000000000000000000000" },
             ],
-            gas_used: 102006,
+            gas_used: 102009,
             status: Keep(
                 Success,
             ),
@@ -57,7 +57,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-                            }: Modification(e0d56ea37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            }: Modification(88ec6ea37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -65,15 +65,15 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-                            }: Modification(df369e04000000000100000000000000),
+                            }: Modification(874d9e04000000000100000000000000),
                         },
                     },
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "a2da01000000000005000000000000000200000000000000f064b900000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "a4da01000000000006000000000000000200000000000000f064b900000000000000000000000000" },
             ],
-            gas_used: 121506,
+            gas_used: 121508,
             status: Keep(
                 MiscellaneousError(
                     Some(
@@ -94,7 +94,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-                            }: Modification(18e159a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
+                            }: Modification(f8f659a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -102,15 +102,15 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-                            }: Modification(17428903000000000100000000000000),
+                            }: Modification(f7578903000000000100000000000000),
                         },
                     },
                 ),
             ),
             events: [
-                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "02c50200000000000500000000000000020000000000000070f21401000000000000000000000000" },
+                ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_params: [] }), event_data: "04c50200000000000600000000000000020000000000000070f21401000000000000000000000000" },
             ],
-            gas_used: 181506,
+            gas_used: 181508,
             status: Keep(
                 MiscellaneousError(
                     Some(

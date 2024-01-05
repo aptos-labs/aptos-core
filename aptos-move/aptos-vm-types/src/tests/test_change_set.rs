@@ -385,8 +385,8 @@ fn test_roundtrip_to_storage_change_set() {
     );
     let module_key = StateKey::access_path(AccessPath::code_access_path(test_module_id));
     let write_set = WriteSetMut::new(vec![
-        (resource_key, WriteOp::Deletion),
-        (module_key, WriteOp::Deletion),
+        (resource_key, WriteOp::legacy_deletion()),
+        (module_key, WriteOp::legacy_deletion()),
     ])
     .freeze()
     .unwrap();
@@ -502,19 +502,19 @@ fn test_aggregator_v2_snapshots_and_derived() {
 
 #[test]
 fn test_resource_groups_squashing() {
-    let modification_metadata = WriteOp::ModificationWithMetadata {
+    let modification_metadata = WriteOp::Modification {
         data: Bytes::new(),
         metadata: raw_metadata(2000),
     };
 
     macro_rules! as_create_op {
         ($val:expr) => {
-            (WriteOp::Creation(as_bytes!($val).into()), None)
+            (WriteOp::legacy_creation(as_bytes!($val).into()), None)
         };
     }
     macro_rules! as_modify_op {
         ($val:expr) => {
-            (WriteOp::Modification(as_bytes!($val).into()), None)
+            (WriteOp::legacy_modification(as_bytes!($val).into()), None)
         };
     }
 
@@ -649,18 +649,18 @@ fn test_write_and_read_discrepancy_caught() {
     assert_err!(ExpandedVMChangeSetBuilder::new()
         .with_resource_write_set(vec![(
             as_state_key!("1"),
-            (WriteOp::Modification(as_bytes!(1).into()), None),
+            (WriteOp::legacy_modification(as_bytes!(1).into()), None),
         )])
         .with_reads_needing_delayed_field_exchange(vec![(
             as_state_key!("1"),
             (
-                WriteOp::Modification(as_bytes!(1).into()),
+                WriteOp::legacy_modification(as_bytes!(1).into()),
                 Arc::new(MoveTypeLayout::U64)
             )
         )])
         .try_build());
 
-    let metadata_op = WriteOp::ModificationWithMetadata {
+    let metadata_op = WriteOp::Modification {
         data: Bytes::new(),
         metadata: raw_metadata(1000),
     };
@@ -696,15 +696,15 @@ mod tests {
 
     pub(crate) fn write_op_with_metadata(type_idx: u8, v: u128) -> WriteOp {
         match type_idx {
-            CREATION => WriteOp::CreationWithMetadata {
+            CREATION => WriteOp::Creation {
                 data: vec![].into(),
                 metadata: raw_metadata(v as u64),
             },
-            MODIFICATION => WriteOp::ModificationWithMetadata {
+            MODIFICATION => WriteOp::Modification {
                 data: vec![].into(),
                 metadata: raw_metadata(v as u64),
             },
-            DELETION => WriteOp::DeletionWithMetadata {
+            DELETION => WriteOp::Deletion {
                 metadata: raw_metadata(v as u64),
             },
             _ => unreachable!("Wrong type index for test"),
@@ -741,9 +741,9 @@ mod tests {
     #[test]
     fn test_group_write_size() {
         // Deletions should lead to size 0.
-        assert_group_write_size!(WriteOp::Deletion, 0, None);
+        assert_group_write_size!(WriteOp::legacy_deletion(), 0, None);
         assert_group_write_size!(
-            WriteOp::DeletionWithMetadata {
+            WriteOp::Deletion {
                 metadata: raw_metadata(10)
             },
             0,
@@ -751,9 +751,13 @@ mod tests {
         );
 
         let sizes = [20, 100, 45279432, 5];
-        assert_group_write_size!(WriteOp::Creation(Bytes::new()), sizes[0], Some(sizes[0]));
         assert_group_write_size!(
-            WriteOp::CreationWithMetadata {
+            WriteOp::legacy_creation(Bytes::new()),
+            sizes[0],
+            Some(sizes[0])
+        );
+        assert_group_write_size!(
+            WriteOp::Creation {
                 data: Bytes::new(),
                 metadata: raw_metadata(20)
             },
@@ -761,12 +765,12 @@ mod tests {
             Some(sizes[1])
         );
         assert_group_write_size!(
-            WriteOp::Modification(Bytes::new()),
+            WriteOp::legacy_modification(Bytes::new()),
             sizes[2],
             Some(sizes[2])
         );
         assert_group_write_size!(
-            WriteOp::ModificationWithMetadata {
+            WriteOp::Modification {
                 data: Bytes::new(),
                 metadata: raw_metadata(30)
             },
@@ -797,13 +801,13 @@ mod tests {
         ));
 
         assert_eq!(base_update.len(), 2);
-        assert_some_eq!(
+        assert_eq!(
             extract_group_op(base_update.get(&key_1).unwrap())
                 .metadata_op
                 .metadata(),
             &raw_metadata(100)
         );
-        assert_some_eq!(
+        assert_eq!(
             extract_group_op(base_update.get(&key_2).unwrap())
                 .metadata_op
                 .metadata(),
@@ -826,7 +830,7 @@ mod tests {
         );
         additional_update.insert(
             key.clone(),
-            group_write(write_op_with_metadata(additional_type_idx, 200), vec![], 0),
+            group_write(write_op_with_metadata(additional_type_idx, 100), vec![], 0),
         );
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
@@ -835,7 +839,7 @@ mod tests {
         ));
 
         assert_eq!(base_update.len(), 1);
-        assert_some_eq!(
+        assert_eq!(
             extract_group_op(base_update.get(&key).unwrap())
                 .metadata_op
                 .metadata(),
@@ -885,7 +889,7 @@ mod tests {
         additional_update.insert(
             key.clone(),
             group_write(
-                write_op_with_metadata(DELETION, 200), // delete
+                write_op_with_metadata(DELETION, 100), // delete
                 vec![],
                 0,
             ),
@@ -905,14 +909,20 @@ mod tests {
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
-        // TODO[agg_v2](test): Harcoding type layout to None. Test with layout = Some(..)
+        // TODO[agg_v2](test): Hardcoding type layout to None. Test with layout = Some(..)
         base_update.insert(
             key_1.clone(),
             group_write(
                 write_op_with_metadata(MODIFICATION, 100),
                 vec![
-                    (mock_tag_0(), (WriteOp::Creation(vec![100].into()), None)),
-                    (mock_tag_2(), (WriteOp::Modification(vec![2].into()), None)),
+                    (
+                        mock_tag_0(),
+                        (WriteOp::legacy_creation(vec![100].into()), None),
+                    ),
+                    (
+                        mock_tag_2(),
+                        (WriteOp::legacy_modification(vec![2].into()), None),
+                    ),
                 ],
                 0,
             ),
@@ -920,10 +930,16 @@ mod tests {
         additional_update.insert(
             key_1.clone(),
             group_write(
-                write_op_with_metadata(MODIFICATION, 200),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![
-                    (mock_tag_0(), (WriteOp::Modification(vec![0].into()), None)),
-                    (mock_tag_1(), (WriteOp::Modification(vec![1].into()), None)),
+                    (
+                        mock_tag_0(),
+                        (WriteOp::legacy_modification(vec![0].into()), None),
+                    ),
+                    (
+                        mock_tag_1(),
+                        (WriteOp::legacy_modification(vec![1].into()), None),
+                    ),
                 ],
                 0,
             ),
@@ -934,9 +950,15 @@ mod tests {
             group_write(
                 write_op_with_metadata(MODIFICATION, 100),
                 vec![
-                    (mock_tag_0(), (WriteOp::Deletion, None)),
-                    (mock_tag_1(), (WriteOp::Modification(vec![2].into()), None)),
-                    (mock_tag_2(), (WriteOp::Creation(vec![2].into()), None)),
+                    (mock_tag_0(), (WriteOp::legacy_deletion(), None)),
+                    (
+                        mock_tag_1(),
+                        (WriteOp::legacy_modification(vec![2].into()), None),
+                    ),
+                    (
+                        mock_tag_2(),
+                        (WriteOp::legacy_creation(vec![2].into()), None),
+                    ),
                 ],
                 0,
             ),
@@ -944,11 +966,14 @@ mod tests {
         additional_update.insert(
             key_2.clone(),
             group_write(
-                write_op_with_metadata(MODIFICATION, 200),
+                write_op_with_metadata(MODIFICATION, 100),
                 vec![
-                    (mock_tag_0(), (WriteOp::Creation(vec![0].into()), None)),
-                    (mock_tag_1(), (WriteOp::Deletion, None)),
-                    (mock_tag_2(), (WriteOp::Deletion, None)),
+                    (
+                        mock_tag_0(),
+                        (WriteOp::legacy_creation(vec![0].into()), None),
+                    ),
+                    (mock_tag_1(), (WriteOp::legacy_deletion(), None)),
+                    (mock_tag_2(), (WriteOp::legacy_deletion(), None)),
                 ],
                 0,
             ),
@@ -963,29 +988,32 @@ mod tests {
         assert_eq!(inner_ops_1.len(), 3);
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_0()),
-            &(WriteOp::Creation(vec![0].into()), None)
+            &(WriteOp::legacy_creation(vec![0].into()), None)
         );
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_1()),
-            &(WriteOp::Modification(vec![1].into()), None)
+            &(WriteOp::legacy_modification(vec![1].into()), None)
         );
         assert_some_eq!(
             inner_ops_1.get(&mock_tag_2()),
-            &(WriteOp::Modification(vec![2].into()), None)
+            &(WriteOp::legacy_modification(vec![2].into()), None)
         );
         let inner_ops_2 = &extract_group_op(base_update.get(&key_2).unwrap()).inner_ops;
         assert_eq!(inner_ops_2.len(), 2);
         assert_some_eq!(
             inner_ops_2.get(&mock_tag_0()),
-            &(WriteOp::Modification(vec![0].into()), None)
+            &(WriteOp::legacy_modification(vec![0].into()), None)
         );
-        assert_some_eq!(inner_ops_2.get(&mock_tag_1()), &(WriteOp::Deletion, None));
+        assert_some_eq!(
+            inner_ops_2.get(&mock_tag_1()),
+            &(WriteOp::legacy_deletion(), None)
+        );
 
         let additional_update = BTreeMap::from([(
             key_2.clone(),
             group_write(
-                write_op_with_metadata(MODIFICATION, 200),
-                vec![(mock_tag_1(), (WriteOp::Deletion, None))],
+                write_op_with_metadata(MODIFICATION, 100),
+                vec![(mock_tag_1(), (WriteOp::legacy_deletion(), None))],
                 0,
             ),
         )]);

@@ -8,4 +8,11 @@ module 0x42::M {
     const E0: bool = vector<u8>[] == vector[];
     const E1: bool = vector[0] == vector[1, 100];
 
+    const E3: vector<vector<u8>> = vector[vector[1], vector[2]];
+
+    fun foo() {
+        assert!(vector[vector[1], vector[2]] == E3, 0);
+    }
 }
+
+//#run 0x42::M::foo

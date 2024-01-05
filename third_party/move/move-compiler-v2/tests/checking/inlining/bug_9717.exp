@@ -1,0 +1,155 @@
+// ---- Model Dump
+module 0xcafe::vectors {
+    use std::vector;
+    public entry fun guess_flips(flips: vector<u8>) {
+        {
+          let (flips: &vector<u8>) = Tuple(Borrow(Immutable)(flips));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, vector::length<u8>(flips)) {
+                if Neq<u8>(Deref(vector::borrow<u8>(flips, i)), 0) {
+                  break
+                } else {
+                  Tuple()
+                };
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        };
+        {
+          let _v: vector<u8> = Copy(flips);
+          {
+            let _v2: vector<u8> = flips;
+            Tuple()
+          }
+        }
+    }
+    public entry fun guess_flips_directly(flips: vector<u8>) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<u8>(Borrow(Immutable)(flips))) {
+              if Neq<u8>(Deref(vector::borrow<u8>(Borrow(Immutable)(flips), i)), 0) {
+                break
+              } else {
+                Tuple()
+              };
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          {
+            let _v: vector<u8> = Copy(flips);
+            {
+              let _v2: vector<u8> = flips;
+              Tuple()
+            }
+          }
+        }
+    }
+    public entry fun guess_with_break_without_inline(flips: vector<u8>) {
+        vectors::loops_with_break_no_inline(Borrow(Immutable)(flips));
+        {
+          let _v: vector<u8> = Copy(flips);
+          {
+            let _v2: vector<u8> = flips;
+            Tuple()
+          }
+        }
+    }
+    public entry fun guess_without_break_with_inline(flips: vector<u8>) {
+        {
+          let (flips: &vector<u8>) = Tuple(Borrow(Immutable)(flips));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, vector::length<u8>(flips)) {
+                if Eq<u8>(Deref(vector::borrow<u8>(flips, i)), 0) {
+                  Tuple()
+                } else {
+                  Abort(3)
+                };
+                i: u64 = Add<u64>(i, 1);
+                Tuple()
+              } else {
+                break
+              }
+            };
+            Tuple()
+          }
+        };
+        {
+          let _v: vector<u8> = flips;
+          {
+            let _v2: vector<u8> = Copy(flips);
+            Tuple()
+          }
+        }
+    }
+    private fun loops_with_break_no_inline(flips: &vector<u8>) {
+        {
+          let i: u64 = 0;
+          loop {
+            if Lt<u64>(i, vector::length<u8>(flips)) {
+              if Neq<u8>(Deref(vector::borrow<u8>(flips, i)), 0) {
+                break
+              } else {
+                Tuple()
+              };
+              i: u64 = Add<u64>(i, 1);
+              Tuple()
+            } else {
+              break
+            }
+          };
+          Tuple()
+        }
+    }
+    private fun test_guess_directly() {
+        {
+          let flips: vector<u8> = Vector<u8>(0, 0, 0, 0);
+          vectors::guess_flips_directly(flips);
+          Tuple()
+        }
+    }
+    private fun test_guess_with_break_no_inline() {
+        {
+          let flips: vector<u8> = Vector<u8>(0, 0, 0, 0);
+          vectors::guess_with_break_without_inline(flips);
+          Tuple()
+        }
+    }
+    private fun test_guess_with_inline_break() {
+        {
+          let flips: vector<u8> = Vector<u8>(0, 0, 0, 0);
+          vectors::guess_flips(flips);
+          Tuple()
+        }
+    }
+    private fun test_guess_without_break() {
+        {
+          let flips: vector<u8> = Vector<u8>(0, 0, 0, 0);
+          vectors::guess_without_break_with_inline(flips);
+          Tuple()
+        }
+    }
+    spec fun $guess_flips(flips: vector<u8>);
+    spec fun $guess_flips_directly(flips: vector<u8>);
+    spec fun $guess_with_break_without_inline(flips: vector<u8>);
+    spec fun $guess_without_break_with_inline(flips: vector<u8>);
+    spec fun $loops_with_break(flips: &vector<u8>);
+    spec fun $loops_with_break_no_inline(flips: &vector<u8>);
+    spec fun $loops_without_break(flips: &vector<u8>);
+    spec fun $test_guess_directly();
+    spec fun $test_guess_with_break_no_inline();
+    spec fun $test_guess_with_inline_break();
+    spec fun $test_guess_without_break();
+} // end 0xcafe::vectors

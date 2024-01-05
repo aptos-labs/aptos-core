@@ -711,6 +711,7 @@ impl RoundManager {
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
         if self.decoupled_execution() && self.block_store.vote_back_pressure() {
+            counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(1.0);
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time. Even if processing proposal is delayed, we add
             // the block to the block store so that we don't need to fetch it from remote once we
@@ -733,6 +734,7 @@ impl RoundManager {
             .await;
             Ok(())
         } else {
+            counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(0.0);
             self.process_verified_proposal(proposal).await
         }
     }
@@ -1041,7 +1043,7 @@ impl RoundManager {
                             unexpected_event => unreachable!("Unexpected event {:?}", unexpected_event),
                         }
                     };
-                    proposals.sort_by_key(|a| get_round(a));
+                    proposals.sort_by_key(get_round);
                     for proposal in proposals {
                         let result = match proposal {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {

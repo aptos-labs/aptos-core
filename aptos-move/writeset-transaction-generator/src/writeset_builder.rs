@@ -5,18 +5,18 @@
 use anyhow::format_err;
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{self, aptos_test_root_address},
     on_chain_config::{Features, TimedFeaturesBuilder},
+    state_store::StateView,
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use aptos_vm_types::storage::ChangeSetConfigs;
+use aptos_vm_types::storage::change_set_configs::ChangeSetConfigs;
 use move_core_types::{
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},

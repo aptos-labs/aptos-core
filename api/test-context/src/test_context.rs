@@ -51,7 +51,7 @@ use bytes::Bytes;
 use hyper::{HeaderMap, Response};
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, iter::once, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{boxed::Box, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use warp::{http::header::CONTENT_TYPE, Filter, Rejection, Reply};
 use warp_reverse_proxy::reverse_proxy_filter;
 
@@ -130,6 +130,7 @@ pub fn new_test_context(
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+                false, /* indexer async v2 */
             )
             .unwrap(),
         )
@@ -604,7 +605,6 @@ impl TestContext {
                     .cloned()
                     .map(Transaction::UserTransaction),
             )
-            .chain(once(Transaction::StateCheckpoint(metadata.id())))
             .collect();
 
         // Check that txn execution was successful.
@@ -617,14 +617,10 @@ impl TestContext {
                 BlockExecutorConfigFromOnchain::new_no_block_limit(),
             )
             .unwrap();
-        let mut compute_status = result.compute_status().clone();
+        let compute_status = result.compute_status_for_input_txns().clone();
         assert_eq!(compute_status.len(), txns.len(), "{:?}", result);
-        if matches!(compute_status.last(), Some(TransactionStatus::Retry)) {
-            // a state checkpoint txn can be Retry if prefixed by a write set txn
-            compute_status.pop();
-        }
         // But the rest of the txns must be Kept.
-        for st in result.compute_status() {
+        for st in compute_status {
             match st {
                 TransactionStatus::Discard(st) => panic!("transaction is discarded: {:?}", st),
                 TransactionStatus::Retry => panic!("should not retry"),
@@ -635,7 +631,8 @@ impl TestContext {
         self.executor
             .commit_blocks(
                 vec![metadata.id()],
-                self.new_ledger_info(&metadata, result.root_hash(), txns.len()),
+                // StateCheckpoint/BlockEpilogue is added on top of the input transactions.
+                self.new_ledger_info(&metadata, result.root_hash(), txns.len() + 1),
             )
             .unwrap();
 

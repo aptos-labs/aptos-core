@@ -1,4 +1,29 @@
 spec aptos_framework::optional_aggregator {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: When creating a new integer instance, it guarantees that the limit assigned is a value passed into the
+    /// function as an argument, and the value field becomes zero.
+    /// Criticality: High
+    /// Implementation: The new_integer function sets the limit field to the argument passed in, and the value field is
+    /// set to zero.
+    /// Enforcement: Formally verified via [high-level-req-1](new_integer).
+    ///
+    /// No.: 2
+    /// Requirement: For a given integer instance it should always be possible to: (1) return the limit value of the integer
+    /// resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.
+    /// Criticality: Low
+    /// Implementation: The following functions should not abort if the Integer instance exists: limit(), read_integer(),
+    /// destroy_integer().
+    /// Enforcement: Formally verified via: [high-level-req-2.1](read_integer), [high-level-req-2.2](limit), and
+    /// [high-level-req-2.3](destroy_integer).
+    ///
+    /// No.: 3
+    /// Requirement: Every successful switch must end with the aggregator type changed from non-parallelizable to
+    /// parallelizable or vice versa.
+    /// Criticality: High
+    /// Implementation: The switch function run, if successful, should always change the aggregator type.
+    /// Enforcement: Formally verified via [high-level-req-3](switch_and_zero_out).
+    /// </high-level-req>
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -15,6 +40,7 @@ spec aptos_framework::optional_aggregator {
     spec new_integer(limit: u128): Integer {
         aborts_if false;
         ensures result.limit == limit;
+        /// [high-level-req-1]
         ensures result.value == 0;
     }
 
@@ -27,14 +53,17 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec limit {
+        /// [high-level-req-2.2]
         aborts_if false;
     }
 
     spec read_integer {
+        /// [high-level-req-2.1]
         aborts_if false;
     }
 
     spec destroy_integer {
+        /// [high-level-req-2.3]
         aborts_if false;
     }
 
@@ -105,6 +134,7 @@ spec aptos_framework::optional_aggregator {
         aborts_if is_parallelizable(optional_aggregator) && len(vec_ref) != 0;
         aborts_if !is_parallelizable(optional_aggregator) && len(vec_ref) == 0;
         aborts_if !is_parallelizable(optional_aggregator) && !exists<aggregator_factory::AggregatorFactory>(@aptos_framework);
+        /// [high-level-req-3]
         ensures is_parallelizable(old(optional_aggregator)) ==> !is_parallelizable(optional_aggregator);
         ensures !is_parallelizable(old(optional_aggregator)) ==> is_parallelizable(optional_aggregator);
         ensures optional_aggregator_value(optional_aggregator) == 0;

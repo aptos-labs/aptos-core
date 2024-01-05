@@ -43,6 +43,12 @@ fun m::some($t0: m::R) {
 
 
 Diagnostics:
+error: cannot copy local `x` implicitly
+   ┌─ tests/live-var/explicit_move.move:12:9
+   │
+12 │         some(x);
+   │         ^^^^^^^
+
 error: cannot move local `r` since it is used later
    ┌─ tests/live-var/explicit_move.move:18:17
    │

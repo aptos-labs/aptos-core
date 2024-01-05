@@ -15,19 +15,18 @@ use aptos_aggregator::{
 use aptos_block_executor::{
     errors::Error, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
-    txn_commit_hook::TransactionCommitHook,
+    txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateView, StateViewId},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, TransactionOutput,
-        TransactionStatus,
+        signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
+        TransactionOutput, TransactionStatus,
     },
     write_set::WriteOp,
 };
@@ -36,7 +35,10 @@ use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutpu
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::VMStatus};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+};
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -64,12 +66,13 @@ impl AptosTransactionOutput {
             Some(output) => output,
             // TODO: revisit whether we should always get it via committed, or o.w. create a
             // dedicated API without creating empty data structures.
+            // This is currently used because we do not commit skip_output() transactions.
             None => self
                 .vm_output
                 .lock()
                 .take()
                 .expect("Output must be set")
-                .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![])
+                .into_transaction_output()
                 .expect("Transaction output is not alerady materialized"),
         }
     }
@@ -316,6 +319,61 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .expect("Output to be set to get fee statement")
             .fee_statement()
     }
+
+    fn output_approx_size(&self) -> u64 {
+        let vm_output = self.vm_output.lock();
+        let change_set = vm_output
+            .as_ref()
+            .expect("Output to be set to get write summary")
+            .change_set();
+
+        let mut size = 0;
+        for (state_key, write_size) in change_set.write_set_size_iter() {
+            size += state_key.size() as u64 + write_size.write_len().unwrap_or(0);
+        }
+
+        for (event, _) in change_set.events() {
+            size += event.size() as u64;
+        }
+
+        size
+    }
+
+    fn get_write_summary(&self) -> HashSet<InputOutputKey<StateKey, StructTag, DelayedFieldID>> {
+        let vm_output = self.vm_output.lock();
+        let change_set = vm_output
+            .as_ref()
+            .expect("Output to be set to get write summary")
+            .change_set();
+
+        let mut writes = HashSet::new();
+
+        for (state_key, write) in change_set.resource_write_set() {
+            match write {
+                AbstractResourceWriteOp::Write(_)
+                | AbstractResourceWriteOp::WriteWithDelayedFields(_) => {
+                    writes.insert(InputOutputKey::Resource(state_key.clone()));
+                },
+                AbstractResourceWriteOp::WriteResourceGroup(write) => {
+                    for tag in write.inner_ops().keys() {
+                        writes.insert(InputOutputKey::Group(state_key.clone(), tag.clone()));
+                    }
+                },
+                AbstractResourceWriteOp::InPlaceDelayedFieldChange(_)
+                | AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(_) => {
+                    // No conflicts on resources from in-place delayed field changes.
+                    // Delayed fields conflicts themselves are handled via
+                    // delayed_field_change_set below.
+                },
+            }
+        }
+
+        for identifier in change_set.delayed_field_change_set().keys() {
+            writes.insert(InputOutputKey::DelayedField(*identifier));
+        }
+
+        writes
+    }
 }
 
 pub struct BlockAptosVM();
@@ -330,7 +388,7 @@ impl BlockAptosVM {
         state_view: &S,
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {
@@ -350,8 +408,9 @@ impl BlockAptosVM {
 
         let ret = executor.execute_block(state_view, signature_verified_block, state_view);
         match ret {
-            Ok(outputs) => {
-                let output_vec: Vec<TransactionOutput> = outputs
+            Ok(block_output) => {
+                let transaction_outputs = block_output.into_inner();
+                let output_vec: Vec<_> = transaction_outputs
                     .into_iter()
                     .map(|output| output.take_output())
                     .collect();
@@ -365,7 +424,7 @@ impl BlockAptosVM {
                     flush_speculative_logs(pos);
                 }
 
-                Ok(output_vec)
+                Ok(BlockOutput::new(output_vec))
             },
             Err(Error::FallbackToSequential(e)) => {
                 unreachable!(

@@ -5,11 +5,12 @@ use crate::{
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
     rand::rand_gen::types::{
-        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck, Proof,
-        RandConfig, RandShare, Share, ShareAck,
+        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck,
+        RandConfig, RandShare, RequestShare, Share,
     },
 };
 use anyhow::bail;
+use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
@@ -20,32 +21,41 @@ use serde::{Deserialize, Serialize};
 use std::cmp::min;
 
 #[derive(Clone, Serialize, Deserialize, EnumConversion)]
-pub enum RandMessage<S, P, D> {
+pub enum RandMessage<S, D> {
+    RequestShare(RequestShare),
     Share(RandShare<S>),
-    ShareAck(ShareAck<P>),
     AugData(AugData<D>),
     AugDataSignature(AugDataSignature),
     CertifiedAugData(CertifiedAugData<D>),
     CertifiedAugDataAck(CertifiedAugDataAck),
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RandMessage<S, P, D> {
+impl<S: Share, D: AugmentedData> RandMessage<S, D> {
     pub fn verify(
         &self,
-        _epoch_state: &EpochState,
-        _rand_config: &RandConfig,
+        epoch_state: &EpochState,
+        rand_config: &RandConfig,
+        sender: Author,
     ) -> anyhow::Result<()> {
-        Ok(())
+        match self {
+            RandMessage::RequestShare(_) => Ok(()),
+            RandMessage::Share(share) => share.verify(rand_config),
+            RandMessage::AugData(aug_data) => aug_data.verify(rand_config, sender),
+            RandMessage::CertifiedAugData(certified_aug_data) => {
+                certified_aug_data.verify(&epoch_state.verifier)
+            },
+            _ => bail!("[RandMessage] unexpected message type"),
+        }
     }
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData> RBMessage for RandMessage<S, P, D> {}
+impl<S: Share, D: AugmentedData> RBMessage for RandMessage<S, D> {}
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData> TConsensusMsg for RandMessage<S, P, D> {
+impl<S: Share, D: AugmentedData> TConsensusMsg for RandMessage<S, D> {
     fn epoch(&self) -> u64 {
         match self {
+            RandMessage::RequestShare(request) => request.epoch(),
             RandMessage::Share(share) => share.epoch(),
-            RandMessage::ShareAck(ack) => ack.epoch(),
             RandMessage::AugData(aug_data) => aug_data.epoch(),
             RandMessage::AugDataSignature(signature) => signature.epoch(),
             RandMessage::CertifiedAugData(certified_aug_data) => certified_aug_data.epoch(),
@@ -76,6 +86,10 @@ pub struct RandGenMessage {
 }
 
 impl RandGenMessage {
+    pub fn new(epoch: u64, data: Vec<u8>) -> Self {
+        Self { epoch, data }
+    }
+
     pub fn data(&self) -> &[u8] {
         &self.data
     }
@@ -90,8 +104,8 @@ impl core::fmt::Debug for RandGenMessage {
     }
 }
 
-pub struct RpcRequest<S, P, D> {
-    pub req: RandMessage<S, P, D>,
+pub struct RpcRequest<S, D> {
+    pub req: RandMessage<S, D>,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }

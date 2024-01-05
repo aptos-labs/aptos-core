@@ -10,12 +10,12 @@ use crate::{
         DeltaApplicationFailureReason, PanicOr,
     },
 };
-use aptos_state_view::StateView;
 use aptos_types::{
     aggregator::PanicError,
     state_store::{
         state_key::StateKey,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
+        StateView,
     },
     write_set::WriteOp,
 };
@@ -64,7 +64,7 @@ pub trait TAggregatorV1View {
     fn get_aggregator_v1_state_value_metadata(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
@@ -120,7 +120,7 @@ pub trait TAggregatorV1View {
                     )))
                     .into_vm_status()
             })
-            .map(|result| WriteOp::Modification(serialize(&result).into()))
+            .map(|result| WriteOp::legacy_modification(serialize(&result).into()))
     }
 }
 

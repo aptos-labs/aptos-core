@@ -26,7 +26,6 @@ use aptos_gas_schedule::{
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -40,16 +39,16 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::ContractEvent,
     on_chain_config::{
-        BlockGasLimitType, FeatureFlag, Features, OnChainConfig, TimedFeatureOverride,
-        TimedFeaturesBuilder, ValidatorSet, Version,
+        FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
+        ValidatorSet, Version,
     },
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        EntryFunction, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult,
+        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
+        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -62,7 +61,7 @@ use aptos_vm::{
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::storage::{ChangeSetConfigs, StorageGasParameters};
+use aptos_vm_types::storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters};
 use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress,
@@ -487,7 +486,7 @@ impl FakeExecutor {
                 onchain: onchain_config,
             },
             None,
-        )
+        ).map(BlockOutput::into_transaction_outputs_forced)
     }
 
     pub fn execute_transaction_block(
@@ -517,17 +516,18 @@ impl FakeExecutor {
             }
         });
 
-        let onchain_config = BlockExecutorConfigFromOnchain {
-            // TODO fetch values from state?
-            block_gas_limit_type: BlockGasLimitType::Limit(30000),
-        };
+        // TODO fetch values from state?
+        let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(AptosVM::execute_block(
-                &sig_verified_block,
-                &self.data_store,
-                onchain_config.clone(),
-            ))
+            Some(
+                AptosVM::execute_block(
+                    &sig_verified_block,
+                    &self.data_store,
+                    onchain_config.clone(),
+                )
+                .map(BlockOutput::into_transaction_outputs_forced),
+            )
         } else {
             None
         };

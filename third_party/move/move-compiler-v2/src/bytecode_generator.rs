@@ -7,8 +7,8 @@ use ethnum::U256;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex, Value},
     model::{
-        FieldId, FunId, FunctionEnv, GlobalEnv, NodeId, Parameter, QualifiedId, QualifiedInstId,
-        StructId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        QualifiedInstId, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -44,7 +44,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         local_names: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty) in gen.func_env.get_parameters() {
+    for Parameter(name, ty, _) in gen.func_env.get_parameters() {
         let temp = gen.new_temp(ty);
         scope.insert(name, temp);
         gen.local_names.insert(temp, name);
@@ -191,6 +191,17 @@ impl<'env> Generator<'env> {
         self.reference_mode_counter += 1;
         let r = action(self, enter);
         self.reference_mode_counter -= 1;
+        r
+    }
+
+    /// Perform some action outside of reference mode, preserving and restoring the current mode,
+    fn without_reference_mode<T>(&mut self, action: impl FnOnce(&mut Self) -> T) -> T {
+        let cnt = self.reference_mode_counter;
+        let kind = self.reference_mode_kind;
+        self.reference_mode_counter = 0;
+        let r = action(self);
+        self.reference_mode_kind = kind;
+        self.reference_mode_counter = cnt;
         r
     }
 
@@ -357,7 +368,7 @@ impl<'env> Generator<'env> {
                 self.scopes.pop();
             },
             ExpData::Mutate(id, lhs, rhs) => {
-                let rhs_temp = self.gen_arg(rhs, false);
+                let rhs_temp = self.gen_escape_auto_ref_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
                 if !self.temp_type(lhs_temp).is_mutable_reference() {
                     self.error(
@@ -380,7 +391,7 @@ impl<'env> Generator<'env> {
                 self.emit_with(*id, |attr| Bytecode::Ret(attr, results))
             },
             ExpData::IfElse(id, cond, then_exp, else_exp) => {
-                let cond_temp = self.gen_arg(cond, false);
+                let cond_temp = self.gen_escape_auto_ref_arg(cond, false);
                 let then_label = self.new_label(*id);
                 let else_label = self.new_label(*id);
                 let end_label = self.new_label(*id);
@@ -449,13 +460,13 @@ impl<'env> Generator<'env> {
 impl<'env> Generator<'env> {
     fn gen_value(&mut self, target: Vec<TempIndex>, id: NodeId, val: &Value) {
         let target = self.require_unary_target(id, target);
-        let cons = self.to_constant(id, val);
+        let ty = self.get_node_type(id);
+        let cons = self.to_constant(id, ty, val);
         self.emit_with(id, |attr| Bytecode::Load(attr, target, cons))
     }
 
     /// Convert a value from AST world into a constant as expected in bytecode.
-    fn to_constant(&self, id: NodeId, val: &Value) -> Constant {
-        let ty = self.get_node_type(id);
+    fn to_constant(&self, id: NodeId, ty: Type, val: &Value) -> Constant {
         match val {
             Value::Address(x) => Constant::Address(x.clone()),
             Value::Number(x) => match ty {
@@ -488,7 +499,16 @@ impl<'env> Generator<'env> {
             Value::ByteArray(x) => Constant::ByteArray(x.clone()),
             Value::AddressArray(x) => Constant::AddressArray(x.clone()),
             Value::Vector(x) => {
-                Constant::Vector(x.iter().map(|v| self.to_constant(id, v)).collect())
+                if let Some(inner_ty) = ty.get_vector_element_type() {
+                    Constant::Vector(
+                        x.iter()
+                            .map(|v| self.to_constant(id, inner_ty.clone(), v))
+                            .collect(),
+                    )
+                } else {
+                    self.internal_error(id, format!("inconsistent vector type: {:?}", ty));
+                    Constant::Bool(false)
+                }
             },
         }
     }
@@ -555,6 +575,26 @@ impl<'env> Generator<'env> {
                     self.internal_error(id, "inconsistent type in select expression")
                 }
             },
+            Operation::Exists(None)
+            | Operation::BorrowGlobal(_)
+            | Operation::MoveFrom
+            | Operation::MoveTo
+                if self.env().get_node_instantiation(id)[0]
+                    .get_struct(self.env())
+                    .is_none() =>
+            {
+                let err_loc = self.env().get_node_loc(id);
+                let mut reasons: Vec<(Loc, String)> = Vec::new();
+                let reason_msg = format!("Invalid call to {}.", op.display(self.env(), id));
+                reasons.push((err_loc.clone(), reason_msg.clone()));
+                let err_msg  = format!(
+                            "Expected a struct type. Global storage operations are restricted to struct types declared in the current module. \
+                            Found: '{}'",
+                            self.env().get_node_instantiation(id)[0].display(&self.env().get_type_display_ctx())
+                );
+                self.env()
+                    .diag_with_labels(Severity::Error, &err_loc, &err_msg, reasons)
+            },
             Operation::Exists(None) => {
                 let inst = self.env().get_node_instantiation(id);
                 let (mid, sid, inst) = inst[0].require_struct();
@@ -597,7 +637,7 @@ impl<'env> Generator<'env> {
             },
             Operation::Copy | Operation::Move => {
                 let target = self.require_unary_target(id, targets);
-                let arg = self.gen_arg(&self.require_unary_arg(id, args), false);
+                let arg = self.gen_escape_auto_ref_arg(&self.require_unary_arg(id, args), false);
                 let assign_kind = if matches!(op, Operation::Copy) {
                     AssignKind::Copy
                 } else {
@@ -612,7 +652,7 @@ impl<'env> Generator<'env> {
             },
             Operation::Abort => {
                 let arg = self.require_unary_arg(id, args);
-                let temp = self.gen_arg(&arg, false);
+                let temp = self.gen_escape_auto_ref_arg(&arg, false);
                 self.emit_with(id, |attr| Bytecode::Abort(attr, temp))
             },
             Operation::Deref => self.gen_op_call(targets, id, BytecodeOperation::ReadRef, args),
@@ -731,7 +771,7 @@ impl<'env> Generator<'env> {
         args: &[Exp],
     ) {
         let target = self.require_unary_target(id, targets);
-        let arg1 = self.gen_arg(&args[0], false);
+        let arg1 = self.gen_escape_auto_ref_arg(&args[0], false);
         let true_label = self.new_label(id);
         let false_label = self.new_label(id);
         let done_label = self.new_label(id);
@@ -776,7 +816,7 @@ impl<'env> Generator<'env> {
             .get_function(fun)
             .get_parameters()
             .into_iter()
-            .map(|Parameter(_, ty)| ty.instantiate(&type_args))
+            .map(|Parameter(_, ty, _)| ty.instantiate(&type_args))
             .collect();
         if args.len() != param_types.len() {
             self.internal_error(id, "inconsistent type arity");
@@ -821,16 +861,28 @@ impl<'env> Generator<'env> {
     }
 
     /// Generate the code for a list of arguments.
-    fn gen_arg_list(&mut self, exps: &[Exp], force_temp: bool) -> Vec<TempIndex> {
+    /// If `force_l2r_eval` is true, the arguments are forced to be evaluated in left-to-right order.
+    fn gen_arg_list(&mut self, exps: &[Exp], force_l2r_eval: bool) -> Vec<TempIndex> {
+        // If all args are side-effect free, we don't need to force temporary generation
+        // to get left-to-right evaluation.
+        let with_forced_temp = if exps.iter().all(is_definitely_pure) {
+            false
+        } else {
+            force_l2r_eval
+        };
         let len = exps.len();
-        // Generate code with forced creation of temporaries for all except last arg.
+        // Generate code with (potentially) forced creation of temporaries for all except last arg.
         let mut args = exps
             .iter()
             .take(if len == 0 { 0 } else { len - 1 })
-            .map(|exp| self.gen_arg(exp, force_temp))
+            .map(|exp| self.gen_escape_auto_ref_arg(exp, with_forced_temp))
             .collect::<Vec<_>>();
         // If there is a last arg, we don't need to force create a temporary for it.
-        if let Some(last_arg) = exps.iter().last().map(|exp| self.gen_arg(exp, false)) {
+        if let Some(last_arg) = exps
+            .iter()
+            .last()
+            .map(|exp| self.gen_escape_auto_ref_arg(exp, false))
+        {
             args.push(last_arg);
         }
         args
@@ -868,6 +920,9 @@ impl<'env> Generator<'env> {
         }
     }
 
+    /// Compile the expression in reference mode. This enables automatic creation of references
+    /// (e.g. for locals) and disables automatic dereferencing. This is used for compilation
+    /// of expressions in 'lvalue' mode.
     fn gen_auto_ref_arg(&mut self, exp: &Exp, default_ref_kind: ReferenceKind) -> TempIndex {
         let temp = self.with_reference_mode(|s, entering| {
             if entering {
@@ -892,6 +947,13 @@ impl<'env> Generator<'env> {
             );
             temp_ref
         }
+    }
+
+    /// Compile the expression disabling any current reference mode. This is used
+    /// to compile inner expressions. For example, if `f(e)` is compiled in reference
+    /// mode, `e` must be not compiled in reference mode.
+    fn gen_escape_auto_ref_arg(&mut self, exp: &Exp, with_forced_temp: bool) -> TempIndex {
+        self.without_reference_mode(|s| s.gen_arg(exp, with_forced_temp))
     }
 }
 
@@ -1044,7 +1106,7 @@ impl<'env> Generator<'env> {
         if let Pattern::Tuple(_, pat_args) = pat {
             self.gen_tuple_assign(id, pat_args, exp, next_scope)
         } else {
-            let arg = self.gen_arg(exp, false);
+            let arg = self.gen_escape_auto_ref_arg(exp, false);
             self.gen_assign_from_temp(id, pat, arg, next_scope)
         }
     }
@@ -1179,4 +1241,29 @@ impl<'env> Generator<'env> {
             self.find_local(id, sym)
         }
     }
+}
+
+// ======================================================================================
+// Helpers
+
+/// Is this a leaf expression which cannot contain another expression?
+fn is_leaf_exp(exp: &Exp) -> bool {
+    matches!(
+        exp.as_ref(),
+        ExpData::Temporary(_, _) | ExpData::LocalVar(_, _) | ExpData::Value(_, _)
+    )
+}
+
+/// Can we be certain that this expression is side-effect free?
+fn is_definitely_pure(exp: &Exp) -> bool {
+    is_leaf_exp(exp) // A leaf expression is pure.
+        || match exp.as_ref() {
+            ExpData::Call(_, op, args) => {
+                // A move function could be side-effecting (eg, one's with mut ref params).
+                // A non-move function is pure if all arguments are non-side-effecting.
+                !matches!(op, Operation::MoveFunction(_, _)) && args.iter().all(is_definitely_pure)
+            },
+            // there maybe other cases where we can prove purity, but we are being conservative for simplicity.
+            _ => false,
+        }
 }

@@ -12,6 +12,7 @@ mod logging;
 mod metrics;
 pub mod peer_states;
 pub mod poller;
+pub mod priority;
 mod utils;
 
 #[cfg(test)]

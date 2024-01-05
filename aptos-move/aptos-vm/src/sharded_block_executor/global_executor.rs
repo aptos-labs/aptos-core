@@ -5,12 +5,12 @@ use crate::sharded_block_executor::{
     local_executor_shard::GlobalCrossShardClient, sharded_executor_service::ShardedExecutorService,
 };
 use aptos_logger::trace;
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{TransactionWithDependencies, GLOBAL_ROUND_ID},
     },
+    state_store::StateView,
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;

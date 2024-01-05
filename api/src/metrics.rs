@@ -2,11 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
     IntCounterVec,
 };
 use once_cell::sync::Lazy;
+
+pub const GAS_ESTIMATE_DEPRIORITIZED: &str = "deprioritized";
+pub const GAS_ESTIMATE_CURRENT: &str = "current";
+pub const GAS_ESTIMATE_PRIORITIZED: &str = "prioritized";
 
 /// In addition to DEFAULT_BUCKETS, add histogram buckets that are < 5ms:
 /// 0.0001, 0.00025, 0.0005, 0.001, 0.0025
@@ -59,6 +64,16 @@ pub static REQUEST_SOURCE_CLIENT: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_api_request_source_client",
         "API requests grouped by source (e.g. which SDK, unknown, etc), operation_id, and status",
         &["request_source_client", "operation_id", "status"]
+    )
+    .unwrap()
+});
+
+pub static GAS_ESTIMATE: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_gas_estimate",
+        "API gas estimate returned as part of API calls",
+        &["level"],
+        DEFAULT_BUCKETS.iter().map(|x| *x as f64).collect(),
     )
     .unwrap()
 });

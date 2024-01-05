@@ -121,7 +121,7 @@ where
 
             baseline
                 .entry(k.clone())
-                .or_insert_with(BTreeMap::new)
+                .or_default()
                 .insert(idx as TxnIndex, value_to_update);
         }
         Self(baseline)

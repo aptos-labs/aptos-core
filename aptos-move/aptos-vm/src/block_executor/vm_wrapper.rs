@@ -8,9 +8,11 @@ use crate::{
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
-use aptos_types::transaction::{
-    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+use aptos_types::{
+    state_store::StateView,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+    },
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};

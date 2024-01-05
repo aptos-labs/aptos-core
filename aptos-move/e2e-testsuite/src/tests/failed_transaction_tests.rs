@@ -6,9 +6,8 @@ use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_language_e2e_tests::{common_transactions::peer_to_peer_txn, executor::FakeExecutor};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_state_view::TStateView;
 use aptos_types::{
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, TStateView},
     transaction::ExecutionStatus,
     vm_status::{StatusCode, VMStatus},
     write_set::WriteOp,
@@ -40,11 +39,11 @@ fn failed_transaction_cleanup_test() {
 
     let gas_params = AptosGasParameters::zeros();
     let storage_gas_params =
-        StorageGasParameters::unlimited(gas_params.vm.txn.free_write_bytes_quota);
+        StorageGasParameters::unlimited(gas_params.vm.txn.legacy_free_write_bytes_quota);
 
     let change_set_configs = storage_gas_params.change_set_configs.clone();
 
-    let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+    let mut gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
         LATEST_GAS_FEATURE_VERSION,
         gas_params.vm,
         storage_gas_params,
@@ -54,7 +53,7 @@ fn failed_transaction_cleanup_test() {
     // TYPE_MISMATCH should be kept and charged.
     let out1 = aptos_vm.failed_transaction_cleanup(
         VMStatus::error(StatusCode::TYPE_MISMATCH, None),
-        &gas_meter,
+        &mut gas_meter,
         &txn_data,
         &data_cache,
         &log_context,
@@ -78,7 +77,7 @@ fn failed_transaction_cleanup_test() {
     // Invariant violations should be charged.
     let out2 = aptos_vm.failed_transaction_cleanup(
         VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, None),
-        &gas_meter,
+        &mut gas_meter,
         &txn_data,
         &data_cache,
         &log_context,

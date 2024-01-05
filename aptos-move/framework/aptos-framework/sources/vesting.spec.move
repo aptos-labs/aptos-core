@@ -1,7 +1,114 @@
 spec aptos_framework::vesting {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: In order to retrieve the address of the underlying stake pool, the vesting start timestamp of the
+    /// vesting contract, the duration of the vesting period, the remaining grant of a vesting contract, the beneficiary
+    /// account of a shareholder in a vesting contract, the percentage of accumulated rewards that is paid to the
+    /// operator as commission, the operator who runs the validator, the voter who will be voting on-chain, and the
+    /// vesting schedule of a vesting contract, the supplied vesting contract should exist.
+    /// Criticality: Low
+    /// Implementation: The vesting_start_secs, period_duration_secs, remaining_grant, beneficiary,
+    /// operator_commission_percentage, operator, voter, and vesting_schedule functions ensure that the supplied vesting
+    /// contract address exists by calling the assert_vesting_contract_exists function.
+    /// Enforcement: Formally verified via [high-level-req-1](assert_vesting_contract_exists).
+    ///
+    /// No.: 2
+    /// Requirement: The vesting pool should not exceed a maximum of 30 shareholders.
+    /// Criticality: Medium
+    /// Implementation: The maximum number of shareholders a vesting pool can support is stored as a constant in
+    /// MAXIMUM_SHAREHOLDERS which is passed to the pool_u64::create function.
+    /// Enforcement: Formally verified via a [high-level-spec-2](global invariant).
+    ///
+    /// No.: 3
+    /// Requirement: Retrieving all the vesting contracts of a given address and retrieving the list of beneficiaries from
+    /// a vesting contract should never fail.
+    /// Criticality: Medium
+    /// Implementation: The function vesting_contracts checks if the supplied admin address contains an AdminStore
+    /// resource and returns all the vesting contracts as a vector<address>. Otherwise it returns an empty vector. The
+    /// function get_beneficiary checks for a given vesting contract, a specific shareholder exists, and if so, the
+    /// beneficiary will be returned, otherwise it will simply return the address of the shareholder.
+    /// Enforcement: Formally verified via [high-level-spec-3.1](vesting_contracts) and
+    /// [high-level-spec-3.2](get_beneficiary).
+    ///
+    /// No.: 4
+    /// Requirement: The shareholders should be able to start vesting only after the vesting cliff and the first vesting
+    /// period have transpired.
+    /// Criticality: High
+    /// Implementation: The end of the vesting cliff is stored under VestingContract.vesting_schedule.start_timestamp_secs.
+    /// The vest function always checks that timestamp::now_seconds is greater or equal to the end of the vesting cliff
+    /// period.
+    /// Enforcement: Audited the check for the end of vesting cliff: [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/vesting.move#L566](vest) module.
+    ///
+    /// No.: 5
+    /// Requirement: In order to retrieve the total accumulated rewards that have not been distributed, the accumulated
+    /// rewards of a given beneficiary, the list of al shareholders in a vesting contract,the shareholder address given
+    /// the beneficiary address in a given vesting contract, to terminate a vesting contract and to distribute any
+    /// withdrawable stake from the stake pool, the supplied vesting contract should exist and be active.
+    /// Criticality: Low
+    /// Implementation: The distribute, terminate_vesting_contract, shareholder, shareholders, accumulated_rewards,
+    /// and total_accumulated_rewards functions ensure that the supplied vesting contract address exists and is active
+    /// by calling the assert_active_vesting_contract function.
+    /// Enforcement: Formally verified via [high-level-spec-5](ActiveVestingContractAbortsIf).
+    ///
+    /// No.: 6
+    /// Requirement: A new vesting schedule should not be allowed to start vesting in the past or to supply an empty
+    /// schedule or for the period duration to be zero.
+    /// Criticality: High
+    /// Implementation: The create_vesting_schedule function ensures that the length of the schedule vector is greater
+    /// than 0, that the period duration is greater than 0 and that the start_timestamp_secs is greater or equal to
+    /// timestamp::now_seconds.
+    /// Enforcement: Formally verified via [high-level-req-6](create_vesting_schedule).
+    ///
+    /// No.: 7
+    /// Requirement: The shareholders should be able to vest the tokens from previous periods.
+    /// Criticality: High
+    /// Implementation: When vesting, the last_completed_period is checked against the next period to vest. This allows
+    /// to unlock vested tokens for the next period since last vested, in case they didn't call vest for some periods.
+    /// Enforcement: Audited that vesting doesn't skip periods, but gradually increments to allow shareholders to
+    /// retrieve all the vested tokens.
+    ///
+    /// No.: 8
+    /// Requirement: Actions such as obtaining a list of shareholders, calculating accrued rewards, distributing
+    /// withdrawable stake, and terminating the vesting contract should be accessible exclusively while the vesting
+    /// contract remains active.
+    /// Criticality: Low
+    /// Implementation: Restricting access to inactive vesting contracts is achieved through the
+    /// assert_active_vesting_contract function.
+    /// Enforcement: Formally verified via [high-level-spec-8](ActiveVestingContractAbortsIf).
+    ///
+    /// No.: 9
+    /// Requirement: The ability to terminate a vesting contract should only be available to the owner.
+    /// Criticality: High
+    /// Implementation: Limiting the access of accounts to specific function, is achieved by asserting that the signer
+    /// matches the admin of the VestingContract.
+    /// Enforcement: Formally verified via [high-level-req-9](verify_admin).
+    ///
+    /// No.: 10
+    /// Requirement: A new vesting contract should not be allowed to have an empty list of shareholders, have a different
+    /// amount of shareholders than buy-ins, and provide a withdrawal address which is either reserved or not registered
+    /// for apt.
+    /// Criticality: High
+    /// Implementation: The create_vesting_contract function ensures that the withdrawal_address is not a reserved
+    /// address, that it is registered for apt, that the list of shareholders is non-empty, and that the amount of
+    /// shareholders matches the amount of buy_ins.
+    /// Enforcement: Formally verified via [high-level-req-10](create_vesting_contract).
+    ///
+    /// No.: 11
+    /// Requirement: Creating a vesting contract account should require the signer (admin) to own an admin store and should
+    /// enforce that the seed of the resource account is composed of the admin store's nonce, the vesting pool salt,
+    /// and the custom contract creation seed.
+    /// Criticality: Medium
+    /// Implementation: The create_vesting_contract_account concatenates to the seed first the admin_store.nonce then
+    /// the VESTING_POOL_SALT then the contract_creation_seed and then it is passed to the create_resource_account
+    /// function.
+    /// Enforcement: Enforced via [high-level-req-11](create_vesting_contract_account).
+    /// </high-level-req>
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
+        // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
+        /// [high-level-spec-2]
+        invariant forall pool: Pool: len(pool.shareholders) <= MAXIMUM_SHAREHOLDERS;
     }
 
     spec stake_pool_address(vesting_contract_address: address): address {
@@ -29,6 +136,7 @@ spec aptos_framework::vesting {
     }
 
     spec vesting_contracts(admin: address): vector<address> {
+        /// [high-level-spec-3.1]
         aborts_if false;
     }
 
@@ -132,6 +240,7 @@ spec aptos_framework::vesting {
         start_timestamp_secs: u64,
         period_duration: u64,
     ): VestingSchedule {
+        /// [high-level-req-6]
         aborts_if !(len(schedule) > 0);
         aborts_if !(period_duration > 0);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
@@ -141,11 +250,14 @@ spec aptos_framework::vesting {
     spec create_vesting_contract {
         // TODO: Data invariant does not hold.
         pragma verify = false;
+        /// [high-level-req-10]
         aborts_if withdrawal_address == @aptos_framework || withdrawal_address == @vm_reserved;
         aborts_if !exists<account::Account>(withdrawal_address);
         aborts_if !exists<coin::CoinStore<AptosCoin>>(withdrawal_address);
         aborts_if len(shareholders) == 0;
+        // property 2: The vesting pool should not exceed a maximum of 30 shareholders.
         aborts_if simple_map::spec_len(buy_ins) != len(shareholders);
+        ensures global<VestingContract>(result).grant_pool.shareholders_limit == 30;
     }
 
     spec unlock_rewards(contract_address: address) {
@@ -403,6 +515,7 @@ spec aptos_framework::vesting {
         let second = concat(first, VESTING_POOL_SALT);
         let end = concat(second, contract_creation_seed);
 
+        /// [high-level-req-11]
         let resource_addr = account::spec_create_resource_address(admin_addr, end);
         aborts_if !exists<AdminStore>(admin_addr);
         aborts_if len(account::ZERO_AUTH_KEY) != 32;
@@ -422,10 +535,12 @@ spec aptos_framework::vesting {
     }
 
     spec verify_admin(admin: &signer, vesting_contract: &VestingContract) {
+        /// [high-level-req-9]
         aborts_if signer::address_of(admin) != vesting_contract.admin;
     }
 
     spec assert_vesting_contract_exists(contract_address: address) {
+        /// [high-level-req-1]
         aborts_if !exists<VestingContract>(contract_address);
     }
 
@@ -504,6 +619,7 @@ spec aptos_framework::vesting {
     }
 
     spec get_beneficiary(contract: &VestingContract, shareholder: address): address {
+        /// [high-level-spec-3.2]
         aborts_if false;
     }
 
@@ -526,8 +642,10 @@ spec aptos_framework::vesting {
 
     spec schema ActiveVestingContractAbortsIf<VestingContract> {
         contract_address: address;
+        /// [high-level-spec-5]
         aborts_if !exists<VestingContract>(contract_address);
         let vesting_contract = global<VestingContract>(contract_address);
+        /// [high-level-spec-8]
         aborts_if vesting_contract.state != VESTING_POOL_ACTIVE;
     }
 }

@@ -23,7 +23,6 @@ aptos-executor = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-sdk = { workspace = true }
-aptos-state-view = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }

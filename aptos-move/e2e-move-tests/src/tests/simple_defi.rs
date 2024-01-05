@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, tests::common, MoveHarness};
+use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_framework::BuildOptions;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
@@ -37,7 +37,7 @@ fn exchange_e2e_test() {
     build_options
         .named_addresses
         .insert("resource_account".to_string(), resource_address);
-    let package = BuiltPackage::build(
+    let package = build_package(
         common::test_dir_path("../../../move-examples/resource_account"),
         build_options,
     )

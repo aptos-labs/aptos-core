@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::IndexerGrpcConfig;
 use crate::{
     config::{
         node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
@@ -99,6 +100,9 @@ impl ConfigOptimizer for NodeConfig {
         let mut optimizers_with_modifications = vec![];
         if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(IndexerConfig::get_optimizer_name());
+        }
+        if IndexerGrpcConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
+            optimizers_with_modifications.push(IndexerGrpcConfig::get_optimizer_name());
         }
         if AdminServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(AdminServiceConfig::get_optimizer_name());

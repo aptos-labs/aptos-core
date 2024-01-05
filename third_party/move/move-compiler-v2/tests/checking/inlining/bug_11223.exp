@@ -1,0 +1,34 @@
+// ---- Model Dump
+module 0xcafe::vectors {
+    use std::vector;
+    public entry fun guess_flips_break2(flips: vector<u8>): u64 {
+        {
+          let flipsref5: &vector<u8> = Borrow(Immutable)(flips);
+          {
+            let _v: vector<u8> = Copy(flips);
+            {
+              let _v2: vector<u8> = flips;
+              {
+                let x: &vector<u8> = flipsref5;
+                vector::length<u8>(x)
+              }
+            }
+          }
+        }
+    }
+    spec fun $guess_flips_break2(flips: vector<u8>): u64 {
+        {
+          let flipsref5: vector<u8> = flips;
+          {
+            let _v: vector<u8> = Copy(flips);
+            {
+              let _v2: vector<u8> = flips;
+              {
+                let x: vector<u8> = flipsref5;
+                vector::$length<u8>(x)
+              }
+            }
+          }
+        }
+    }
+} // end 0xcafe::vectors

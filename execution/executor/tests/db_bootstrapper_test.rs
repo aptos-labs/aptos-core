@@ -15,7 +15,6 @@ use aptos_executor_test_helpers::{
     bootstrap_genesis, gen_ledger_info_with_sigs, get_test_signed_transaction,
 };
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -29,7 +28,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
-    state_store::state_key::StateKey,
+    state_store::{account_with_state_view::AsAccountWithStateView, state_key::StateKey},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     trusted_state::TrustedState,
@@ -89,7 +88,7 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
     let executor = BlockExecutor::<AptosVM>::new(db.clone());
     let output = executor
         .execute_block(
-            (block_id, block(txns, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG)).into(),
+            (block_id, block(txns)).into(),
             executor.committed_block_id(),
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
@@ -229,14 +228,16 @@ fn test_new_genesis() {
                 StateKey::access_path(
                     access_path_for_config(ValidatorSet::CONFIG_ID).expect("access path in test"),
                 ),
-                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into()),
+                WriteOp::legacy_modification(
+                    bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap().into(),
+                ),
             ),
             (
                 StateKey::access_path(AccessPath::new(
                     CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
-                WriteOp::Modification(
+                WriteOp::legacy_modification(
                     bcs::to_bytes(&configuration.bump_epoch_for_test())
                         .unwrap()
                         .into(),
@@ -247,7 +248,7 @@ fn test_new_genesis() {
                     account1,
                     CoinStoreResource::resource_path(),
                 )),
-                WriteOp::Modification(
+                WriteOp::legacy_modification(
                     bcs::to_bytes(&CoinStoreResource::new(
                         100_000_000,
                         false,

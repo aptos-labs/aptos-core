@@ -3,7 +3,7 @@
 
 use crate::{
     pipeline::buffer_manager::OrderedBlocks,
-    rand::rand_gen::types::{MockProof, MockShare, RandDecision, RandShare},
+    rand::rand_gen::types::{MockShare, RandShare},
 };
 use aptos_consensus_types::{
     block::Block,
@@ -11,7 +11,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
-    randomness::{RandMetadata, Randomness},
+    randomness::RandMetadata,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
@@ -57,8 +57,4 @@ pub(super) fn create_share_for_round(round: Round, author: Author) -> RandShare<
 
 pub(super) fn create_share(rand_metadata: RandMetadata, author: Author) -> RandShare<MockShare> {
     RandShare::<MockShare>::new(author, rand_metadata, MockShare)
-}
-
-pub(super) fn create_decision(rand_metadata: RandMetadata) -> RandDecision<MockProof> {
-    RandDecision::new(Randomness::new(rand_metadata, vec![1, 2, 3]), MockProof)
 }

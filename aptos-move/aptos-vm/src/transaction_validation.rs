@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::{
-        convert_epilogue_error, convert_prologue_error, discarded_output,
-        expect_only_successful_execution,
-    },
+    errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     move_vm_ext::SessionExt,
     system_module_names::{
         EMIT_FEE_STATEMENT, MULTISIG_ACCOUNT_MODULE, TRANSACTION_FEE_MODULE,
@@ -20,7 +17,6 @@ use aptos_types::{
     on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
 use fail::fail_point;
 use move_binary_format::errors::VMResult;
 use move_core_types::{
@@ -322,19 +318,12 @@ pub(crate) fn run_failure_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-) -> Option<(VMStatus, VMOutput)> {
-    if let Err(e) =
-        run_epilogue(session, gas_remaining, fee_statement, txn_data, features).or_else(|e| {
-            expect_only_successful_execution(
-                e,
-                APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
-                log_context,
-            )
-        })
-    {
-        let discarded_output = discarded_output(e.status_code());
-        Some((e, discarded_output))
-    } else {
-        None
-    }
+) -> Result<(), VMStatus> {
+    run_epilogue(session, gas_remaining, fee_statement, txn_data, features).or_else(|e| {
+        expect_only_successful_execution(
+            e,
+            APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
+            log_context,
+        )
+    })
 }

@@ -3,7 +3,10 @@
 All notable changes to the Aptos Node SDK will be captured in this file. This changelog is written by hand for now. It adheres to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+
+## 1.21.0 (2023-12-13)
 - Fix nested type tag parsing in `Object` types
+- Update all dependencies including `@aptos-labs/aptos-client`
 
 ## 1.20.0 (2023-09-22)
 

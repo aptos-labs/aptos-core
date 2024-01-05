@@ -5,9 +5,10 @@ use crate::{
     error::Error,
     interface::AptosDataClientInterface,
     poller,
+    priority::PeerPriority,
     tests::{mock::MockNetwork, utils},
 };
-use aptos_config::config::AptosDataClientConfig;
+use aptos_config::{config::AptosDataClientConfig, network_id::NetworkId};
 use aptos_network::protocols::wire::handshake::v1::ProtocolId;
 use aptos_storage_service_types::{
     requests::{DataRequest, TransactionsWithProofRequest},
@@ -18,23 +19,26 @@ use claims::assert_matches;
 
 #[tokio::test]
 async fn compression_mismatch_disabled() {
+    // Create a base config for a validator
+    let base_config = utils::create_validator_base_config();
+
     // Create a data client config that disables compression
     let data_client_config = AptosDataClientConfig {
         use_compression: false,
         ..Default::default()
     };
 
-    // Ensure the properties hold for both priority and non-priority peers
-    for poll_priority_peers in [true, false] {
+    // Ensure the properties hold for all peer priorities
+    for peer_priority in PeerPriority::get_all_ordered_priorities() {
         // Create the mock network, mock time, client and poller
         let (mut mock_network, mut mock_time, client, poller) =
-            MockNetwork::new(None, Some(data_client_config), None);
+            MockNetwork::new(Some(base_config.clone()), Some(data_client_config), None);
 
         // Start the poller
         tokio::spawn(poller::start_poller(poller));
 
         // Add a connected peer
-        let (_, network_id) = utils::add_peer_to_network(poll_priority_peers, &mut mock_network);
+        let (_, network_id) = utils::add_peer_to_network(peer_priority, &mut mock_network);
 
         // Advance time so the poller sends a data summary request
         utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
@@ -64,29 +68,32 @@ async fn compression_mismatch_disabled() {
             .get_transactions_with_proof(100, 50, 100, false, request_timeout)
             .await
             .unwrap_err();
-        assert_matches!(response, Error::InvalidResponse(_));
+        assert_matches!(response, Error::DataIsUnavailable(_));
     }
 }
 
 #[tokio::test]
 async fn compression_mismatch_enabled() {
+    // Create a base config for a validator
+    let base_config = utils::create_validator_base_config();
+
     // Create a data client config that enables compression
     let data_client_config = AptosDataClientConfig {
         use_compression: true,
         ..Default::default()
     };
 
-    // Ensure the properties hold for both priority and non-priority peers
-    for poll_priority_peers in [true, false] {
+    // Ensure the properties hold for all peer priorities
+    for peer_priority in PeerPriority::get_all_ordered_priorities() {
         // Create the mock network, mock time, client and poller
         let (mut mock_network, mut mock_time, client, poller) =
-            MockNetwork::new(None, Some(data_client_config), None);
+            MockNetwork::new(Some(base_config.clone()), Some(data_client_config), None);
 
         // Start the poller
         tokio::spawn(poller::start_poller(poller));
 
         // Add a connected peer
-        let (_, network_id) = utils::add_peer_to_network(poll_priority_peers, &mut mock_network);
+        let (_, network_id) = utils::add_peer_to_network(peer_priority, &mut mock_network);
 
         // Advance time so the poller sends a data summary request
         utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
@@ -113,29 +120,36 @@ async fn compression_mismatch_enabled() {
             .get_transactions_with_proof(100, 50, 100, false, request_timeout)
             .await
             .unwrap_err();
-        assert_matches!(response, Error::InvalidResponse(_));
+        assert_matches!(response, Error::DataIsUnavailable(_));
     }
 }
 
 #[tokio::test]
 async fn disable_compression() {
+    // Create a base config for a VFN
+    let base_config = utils::create_fullnode_base_config();
+    let networks = vec![NetworkId::Vfn, NetworkId::Public];
+
     // Create a data client config that disables compression
     let data_client_config = AptosDataClientConfig {
         use_compression: false,
         ..Default::default()
     };
 
-    // Ensure the properties hold for both priority and non-priority peers
-    for poll_priority_peers in [true, false] {
+    // Ensure the properties hold for all peer priorities
+    for peer_priority in PeerPriority::get_all_ordered_priorities() {
         // Create the mock network, mock time, client and poller
-        let (mut mock_network, mut mock_time, client, poller) =
-            MockNetwork::new(None, Some(data_client_config), None);
+        let (mut mock_network, mut mock_time, client, poller) = MockNetwork::new(
+            Some(base_config.clone()),
+            Some(data_client_config),
+            Some(networks.clone()),
+        );
 
         // Start the poller
         tokio::spawn(poller::start_poller(poller));
 
         // Add a connected peer
-        let (peer, network_id) = utils::add_peer_to_network(poll_priority_peers, &mut mock_network);
+        let (peer, network_id) = utils::add_peer_to_network(peer_priority, &mut mock_network);
 
         // Advance time so the poller sends a data summary request
         utils::advance_polling_timer(&mut mock_time, &data_client_config).await;

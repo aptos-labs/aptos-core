@@ -7,6 +7,7 @@ use crate::{
     error::error_kind,
     monitor,
     network::NetworkSender,
+    payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
     round_manager::VerifiedEvent,
     state_replication::StateComputer,
@@ -31,6 +32,7 @@ pub struct RecoveryManager {
     state_computer: Arc<dyn StateComputer>,
     last_committed_round: Round,
     max_blocks_to_request: u64,
+    payload_manager: Arc<PayloadManager>,
 }
 
 impl RecoveryManager {
@@ -41,6 +43,7 @@ impl RecoveryManager {
         state_computer: Arc<dyn StateComputer>,
         last_committed_round: Round,
         max_blocks_to_request: u64,
+        payload_manager: Arc<PayloadManager>,
     ) -> Self {
         RecoveryManager {
             epoch_state,
@@ -49,6 +52,7 @@ impl RecoveryManager {
             state_computer,
             last_committed_round,
             max_blocks_to_request,
+            payload_manager,
         }
     }
 
@@ -92,6 +96,7 @@ impl RecoveryManager {
             &mut retriever,
             self.storage.clone(),
             self.state_computer.clone(),
+            self.payload_manager.clone(),
         )
         .await?;
 

@@ -54,17 +54,25 @@ impl QuorumStoreCoordinator {
             monitor!("quorum_store_coordinator_loop", {
                 match cmd {
                     CoordinatorCommand::CommitNotification(block_timestamp, batches) => {
+                        // TODO: need a callback or not?
+                        self.proof_coordinator_cmd_tx
+                            .send(ProofCoordinatorCommand::CommitNotification(batches.clone()))
+                            .await
+                            .expect("Failed to send to ProofCoordinator");
+
                         self.proof_manager_cmd_tx
                             .send(ProofManagerCommand::CommitNotification(
                                 block_timestamp,
-                                batches,
+                                batches.clone(),
                             ))
                             .await
                             .expect("Failed to send to ProofManager");
-                        // TODO: need a callback or not?
 
                         self.batch_generator_cmd_tx
-                            .send(BatchGeneratorCommand::CommitNotification(block_timestamp))
+                            .send(BatchGeneratorCommand::CommitNotification(
+                                block_timestamp,
+                                batches,
+                            ))
                             .await
                             .expect("Failed to send to BatchGenerator");
                     },

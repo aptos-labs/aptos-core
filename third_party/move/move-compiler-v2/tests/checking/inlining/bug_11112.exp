@@ -1,0 +1,761 @@
+// ---- Model Dump
+module 0xcafe::vectors {
+    use std::vector;
+    private fun test_for_each_mut() {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let s: u64 = 2;
+            {
+              let (v: &mut vector<u64>) = Tuple(Borrow(Mutable)(v));
+              {
+                let i: u64 = 0;
+                loop {
+                  if Lt<u64>(i, vector::length<u64>(v)) {
+                    {
+                      let (e: &mut u64) = Tuple(vector::borrow_mut<u64>(v, i));
+                      e = s;
+                      s: u64 = Add<u64>(s, 1)
+                    };
+                    i: u64 = Add<u64>(i, 1)
+                  } else {
+                    break
+                  }
+                }
+              }
+            };
+            if Eq<vector<u64>>(v, Vector<u64>(2, 3, 4)) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+    spec fun $test_for_each_mut();
+} // end 0xcafe::vectors
+
+============ initial bytecode ================
+
+[variant baseline]
+fun vectors::test_for_each_mut() {
+     var $t0: vector<u64>
+     var $t1: vector<u64>
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: u64
+     var $t10: u64
+     var $t11: bool
+     var $t12: u64
+     var $t13: &vector<u64>
+     var $t14: &mut u64
+     var $t15: &mut u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: bool
+     var $t21: vector<u64>
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+  0: $t2 := 1
+  1: $t3 := 2
+  2: $t4 := 3
+  3: $t1 := vector($t2, $t3, $t4)
+  4: $t0 := infer($t1)
+  5: $t6 := 2
+  6: $t5 := infer($t6)
+  7: $t8 := borrow_local($t0)
+  8: $t7 := infer($t8)
+  9: $t10 := 0
+ 10: $t9 := infer($t10)
+ 11: label L0
+ 12: $t13 := freeze_ref($t7)
+ 13: $t12 := vector::length<u64>($t13)
+ 14: $t11 := <($t9, $t12)
+ 15: if ($t11) goto 16 else goto 27
+ 16: label L2
+ 17: $t15 := vector::borrow_mut<u64>($t7, $t9)
+ 18: $t14 := infer($t15)
+ 19: write_ref($t14, $t5)
+ 20: $t17 := 1
+ 21: $t16 := +($t5, $t17)
+ 22: $t5 := infer($t16)
+ 23: $t19 := 1
+ 24: $t18 := +($t9, $t19)
+ 25: $t9 := infer($t18)
+ 26: goto 29
+ 27: label L3
+ 28: goto 31
+ 29: label L4
+ 30: goto 11
+ 31: label L1
+ 32: $t22 := 2
+ 33: $t23 := 3
+ 34: $t24 := 4
+ 35: $t21 := vector($t22, $t23, $t24)
+ 36: $t20 := ==($t0, $t21)
+ 37: if ($t20) goto 38 else goto 40
+ 38: label L5
+ 39: goto 43
+ 40: label L6
+ 41: $t25 := 0
+ 42: abort($t25)
+ 43: label L7
+ 44: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun vectors::test_for_each_mut() {
+     var $t0: vector<u64>
+     var $t1: vector<u64>
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: u64
+     var $t10: u64
+     var $t11: bool
+     var $t12: u64
+     var $t13: &vector<u64>
+     var $t14: &mut u64
+     var $t15: &mut u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: bool
+     var $t21: vector<u64>
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: &mut vector<u64>
+     var $t27: &mut vector<u64>
+     var $t28: vector<u64>
+     var $t29: vector<u64>
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := 2
+     # live vars: $t2, $t3
+  2: $t4 := 3
+     # live vars: $t2, $t3, $t4
+  3: $t1 := vector($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t0 := copy($t1)
+     # live vars: $t0
+  5: $t6 := 2
+     # live vars: $t0, $t6
+  6: $t5 := copy($t6)
+     # live vars: $t0, $t5
+  7: $t8 := borrow_local($t0)
+     # live vars: $t0, $t5, $t8
+  8: $t7 := move($t8)
+     # live vars: $t0, $t5, $t7
+  9: $t10 := 0
+     # live vars: $t0, $t5, $t7, $t10
+ 10: $t9 := copy($t10)
+     # live vars: $t0, $t5, $t7, $t9
+ 11: label L0
+     # live vars: $t0, $t5, $t7, $t9
+ 12: $t26 := copy($t7)
+     # live vars: $t0, $t5, $t7, $t9, $t26
+ 13: $t13 := freeze_ref($t26)
+     # live vars: $t0, $t5, $t7, $t9, $t13
+ 14: $t12 := vector::length<u64>($t13)
+     # live vars: $t0, $t5, $t7, $t9, $t12
+ 15: $t11 := <($t9, $t12)
+     # live vars: $t0, $t5, $t7, $t9, $t11
+ 16: if ($t11) goto 17 else goto 29
+     # live vars: $t0, $t5, $t7, $t9
+ 17: label L2
+     # live vars: $t0, $t5, $t7, $t9
+ 18: $t27 := copy($t7)
+     # live vars: $t0, $t5, $t7, $t9, $t27
+ 19: $t15 := vector::borrow_mut<u64>($t27, $t9)
+     # live vars: $t0, $t5, $t7, $t9, $t15
+ 20: $t14 := move($t15)
+     # live vars: $t0, $t5, $t7, $t9, $t14
+ 21: write_ref($t14, $t5)
+     # live vars: $t0, $t5, $t7, $t9
+ 22: $t17 := 1
+     # live vars: $t0, $t5, $t7, $t9, $t17
+ 23: $t16 := +($t5, $t17)
+     # live vars: $t0, $t7, $t9, $t16
+ 24: $t5 := copy($t16)
+     # live vars: $t0, $t5, $t7, $t9
+ 25: $t19 := 1
+     # live vars: $t0, $t5, $t7, $t9, $t19
+ 26: $t18 := +($t9, $t19)
+     # live vars: $t0, $t5, $t7, $t18
+ 27: $t9 := copy($t18)
+     # live vars: $t0, $t5, $t7, $t9
+ 28: goto 31
+     # live vars: $t0
+ 29: label L3
+     # live vars: $t0
+ 30: goto 33
+     # live vars: $t0, $t5, $t7, $t9
+ 31: label L4
+     # live vars: $t0, $t5, $t7, $t9
+ 32: goto 11
+     # live vars: $t0
+ 33: label L1
+     # live vars: $t0
+ 34: $t22 := 2
+     # live vars: $t0, $t22
+ 35: $t23 := 3
+     # live vars: $t0, $t22, $t23
+ 36: $t24 := 4
+     # live vars: $t0, $t22, $t23, $t24
+ 37: $t21 := vector($t22, $t23, $t24)
+     # live vars: $t0, $t21
+ 38: $t28 := copy($t0)
+     # live vars: $t21, $t28
+ 39: $t29 := copy($t21)
+     # live vars: $t28, $t29
+ 40: $t20 := ==($t28, $t29)
+     # live vars: $t20
+ 41: if ($t20) goto 42 else goto 44
+     # live vars:
+ 42: label L5
+     # live vars:
+ 43: goto 47
+     # live vars:
+ 44: label L6
+     # live vars:
+ 45: $t25 := 0
+     # live vars: $t25
+ 46: abort($t25)
+     # live vars:
+ 47: label L7
+     # live vars:
+ 48: return ()
+}
+
+============ after VisibilityChecker: ================
+
+[variant baseline]
+fun vectors::test_for_each_mut() {
+     var $t0: vector<u64>
+     var $t1: vector<u64>
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: u64
+     var $t10: u64
+     var $t11: bool
+     var $t12: u64
+     var $t13: &vector<u64>
+     var $t14: &mut u64
+     var $t15: &mut u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: bool
+     var $t21: vector<u64>
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: &mut vector<u64>
+     var $t27: &mut vector<u64>
+     var $t28: vector<u64>
+     var $t29: vector<u64>
+     # live vars:
+  0: $t2 := 1
+     # live vars: $t2
+  1: $t3 := 2
+     # live vars: $t2, $t3
+  2: $t4 := 3
+     # live vars: $t2, $t3, $t4
+  3: $t1 := vector($t2, $t3, $t4)
+     # live vars: $t1
+  4: $t0 := copy($t1)
+     # live vars: $t0
+  5: $t6 := 2
+     # live vars: $t0, $t6
+  6: $t5 := copy($t6)
+     # live vars: $t0, $t5
+  7: $t8 := borrow_local($t0)
+     # live vars: $t0, $t5, $t8
+  8: $t7 := move($t8)
+     # live vars: $t0, $t5, $t7
+  9: $t10 := 0
+     # live vars: $t0, $t5, $t7, $t10
+ 10: $t9 := copy($t10)
+     # live vars: $t0, $t5, $t7, $t9
+ 11: label L0
+     # live vars: $t0, $t5, $t7, $t9
+ 12: $t26 := copy($t7)
+     # live vars: $t0, $t5, $t7, $t9, $t26
+ 13: $t13 := freeze_ref($t26)
+     # live vars: $t0, $t5, $t7, $t9, $t13
+ 14: $t12 := vector::length<u64>($t13)
+     # live vars: $t0, $t5, $t7, $t9, $t12
+ 15: $t11 := <($t9, $t12)
+     # live vars: $t0, $t5, $t7, $t9, $t11
+ 16: if ($t11) goto 17 else goto 29
+     # live vars: $t0, $t5, $t7, $t9
+ 17: label L2
+     # live vars: $t0, $t5, $t7, $t9
+ 18: $t27 := copy($t7)
+     # live vars: $t0, $t5, $t7, $t9, $t27
+ 19: $t15 := vector::borrow_mut<u64>($t27, $t9)
+     # live vars: $t0, $t5, $t7, $t9, $t15
+ 20: $t14 := move($t15)
+     # live vars: $t0, $t5, $t7, $t9, $t14
+ 21: write_ref($t14, $t5)
+     # live vars: $t0, $t5, $t7, $t9
+ 22: $t17 := 1
+     # live vars: $t0, $t5, $t7, $t9, $t17
+ 23: $t16 := +($t5, $t17)
+     # live vars: $t0, $t7, $t9, $t16
+ 24: $t5 := copy($t16)
+     # live vars: $t0, $t5, $t7, $t9
+ 25: $t19 := 1
+     # live vars: $t0, $t5, $t7, $t9, $t19
+ 26: $t18 := +($t9, $t19)
+     # live vars: $t0, $t5, $t7, $t18
+ 27: $t9 := copy($t18)
+     # live vars: $t0, $t5, $t7, $t9
+ 28: goto 31
+     # live vars: $t0
+ 29: label L3
+     # live vars: $t0
+ 30: goto 33
+     # live vars: $t0, $t5, $t7, $t9
+ 31: label L4
+     # live vars: $t0, $t5, $t7, $t9
+ 32: goto 11
+     # live vars: $t0
+ 33: label L1
+     # live vars: $t0
+ 34: $t22 := 2
+     # live vars: $t0, $t22
+ 35: $t23 := 3
+     # live vars: $t0, $t22, $t23
+ 36: $t24 := 4
+     # live vars: $t0, $t22, $t23, $t24
+ 37: $t21 := vector($t22, $t23, $t24)
+     # live vars: $t0, $t21
+ 38: $t28 := copy($t0)
+     # live vars: $t21, $t28
+ 39: $t29 := copy($t21)
+     # live vars: $t28, $t29
+ 40: $t20 := ==($t28, $t29)
+     # live vars: $t20
+ 41: if ($t20) goto 42 else goto 44
+     # live vars:
+ 42: label L5
+     # live vars:
+ 43: goto 47
+     # live vars:
+ 44: label L6
+     # live vars:
+ 45: $t25 := 0
+     # live vars: $t25
+ 46: abort($t25)
+     # live vars:
+ 47: label L7
+     # live vars:
+ 48: return ()
+}
+
+============ after MemorySafetyProcessor: ================
+
+[variant baseline]
+fun vectors::test_for_each_mut() {
+     var $t0: vector<u64>
+     var $t1: vector<u64>
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut vector<u64>
+     var $t8: &mut vector<u64>
+     var $t9: u64
+     var $t10: u64
+     var $t11: bool
+     var $t12: u64
+     var $t13: &vector<u64>
+     var $t14: &mut u64
+     var $t15: &mut u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: bool
+     var $t21: vector<u64>
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: u64
+     var $t26: &mut vector<u64>
+     var $t27: &mut vector<u64>
+     var $t28: vector<u64>
+     var $t29: vector<u64>
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t2 := 1
+     # live vars: $t2
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: $t3 := 2
+     # live vars: $t2, $t3
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  2: $t4 := 3
+     # live vars: $t2, $t3, $t4
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  3: $t1 := vector($t2, $t3, $t4)
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4}
+     #
+  4: $t0 := copy($t1)
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4}
+     #
+  5: $t6 := 2
+     # live vars: $t0, $t6
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4}
+     #
+  6: $t5 := copy($t6)
+     # live vars: $t0, $t5
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4}
+     #
+  7: $t8 := borrow_local($t0)
+     # live vars: $t0, $t5, $t8
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[]}
+     # local_to_label: {$t0=L1792,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4}
+     #
+  8: $t7 := move($t8)
+     # live vars: $t0, $t5, $t7
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8}
+     #
+  9: $t10 := 0
+     # live vars: $t0, $t5, $t7, $t10
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8}
+     #
+ 10: $t9 := copy($t10)
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 11: label L0
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 12: $t26 := copy($t7)
+     # live vars: $t0, $t5, $t7, $t9, $t26
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[skip -> L3073],L3073=local($t26)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793,$t26=L3073}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t27}
+     #
+ 13: $t13 := freeze_ref($t26)
+     # live vars: $t0, $t5, $t7, $t9, $t13
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[skip -> L3073],L3073=local($t26)[call(false) -> L3328],L3328=local($t13)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793,$t13=L3328,$t26=L3073}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t15,$t17,$t19,$t26,$t27}
+     #
+ 14: $t12 := vector::length<u64>($t13)
+     # live vars: $t0, $t5, $t7, $t9, $t12
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 15: $t11 := <($t9, $t12)
+     # live vars: $t0, $t5, $t7, $t9, $t11
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 16: if ($t11) goto 17 else goto 29
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 17: label L2
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 18: $t27 := copy($t7)
+     # live vars: $t0, $t5, $t7, $t9, $t27
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[skip -> L4609],L4609=local($t27)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793,$t27=L4609}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26}
+     #
+ 19: $t15 := vector::borrow_mut<u64>($t27, $t9)
+     # live vars: $t0, $t5, $t7, $t9, $t15
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[skip -> L4609],L4609=local($t27)[call(true) -> L4864],L4864=local($t15)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793,$t15=L4864,$t27=L4609}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t17,$t19,$t26,$t27}
+     #
+ 20: $t14 := move($t15)
+     # live vars: $t0, $t5, $t7, $t9, $t14
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[skip -> L4609],L4609=local($t27)[call(true) -> L4864],L4864=local($t15)[skip -> L5121],L5121=local($t14)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793,$t14=L5121,$t15=L4864,$t27=L4609}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 21: write_ref($t14, $t5)
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t5,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 22: $t17 := 1
+     # live vars: $t0, $t5, $t7, $t9, $t17
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t5,$t8,$t9,$t12,$t13,$t15,$t19,$t26,$t27}
+     #
+ 23: $t16 := +($t5, $t17)
+     # live vars: $t0, $t7, $t9, $t16
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t5,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 24: $t5 := copy($t16)
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 25: $t19 := 1
+     # live vars: $t0, $t5, $t7, $t9, $t19
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t26,$t27}
+     #
+ 26: $t18 := +($t9, $t19)
+     # live vars: $t0, $t5, $t7, $t18
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 27: $t9 := copy($t18)
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 28: goto 31
+     # live vars: $t0
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 29: label L3
+     # live vars: $t0
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 30: goto 33
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 31: label L4
+     # live vars: $t0, $t5, $t7, $t9
+     # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
+     # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 32: goto 11
+     # live vars: $t0
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 33: label L1
+     # live vars: $t0
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 34: $t22 := 2
+     # live vars: $t0, $t22
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 35: $t23 := 3
+     # live vars: $t0, $t22, $t23
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 36: $t24 := 4
+     # live vars: $t0, $t22, $t23, $t24
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     #
+ 37: $t21 := vector($t22, $t23, $t24)
+     # live vars: $t0, $t21
+     # graph: {L1792=local($t0)[]}
+     # local_to_label: {$t0=L1792}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27}
+     #
+ 38: $t28 := copy($t0)
+     # live vars: $t21, $t28
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27}
+     #
+ 39: $t29 := copy($t21)
+     # live vars: $t28, $t29
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27}
+     #
+ 40: $t20 := ==($t28, $t29)
+     # live vars: $t20
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 41: if ($t20) goto 42 else goto 44
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 42: label L5
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 43: goto 47
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 44: label L6
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 45: $t25 := 0
+     # live vars: $t25
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 46: abort($t25)
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 47: label L7
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t22,$t23,$t24,$t26,$t27,$t28,$t29}
+     #
+ 48: return ()
+}

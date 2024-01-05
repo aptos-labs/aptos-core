@@ -411,7 +411,7 @@ struct AuthorToTwinIds(HashMap<Author, Vec<TwinId>>);
 
 impl AuthorToTwinIds {
     pub fn extend_author_to_twin_ids(&mut self, author: Author, twin_id: TwinId) {
-        self.0.entry(author).or_insert_with(Vec::new);
+        self.0.entry(author).or_default();
 
         self.0.get_mut(&author).unwrap().push(twin_id)
     }
@@ -430,7 +430,7 @@ impl DropConfig {
     }
 
     pub fn drop_message_for(&mut self, src: &TwinId, dst: &TwinId) -> bool {
-        self.0.entry(*src).or_insert_with(HashSet::new).insert(*dst)
+        self.0.entry(*src).or_default().insert(*dst)
     }
 
     pub fn split_network(
@@ -472,7 +472,7 @@ impl DropConfigRound {
         partition_first: &[TwinId],
         partition_second: &[TwinId],
     ) -> bool {
-        let config = self.0.entry(round).or_insert_with(DropConfig::default);
+        let config = self.0.entry(round).or_default();
         config.split_network(partition_first, partition_second)
     }
 }

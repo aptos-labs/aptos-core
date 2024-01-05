@@ -79,8 +79,7 @@ impl StateSyncTrigger {
         Ok(())
     }
 
-    /// This method checks if a state sync is required, and if so,
-    /// notifies the bootstraper, to let the bootstraper can abort this task.
+    /// This method checks if a state sync is required
     pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<SyncOutcome> {
         let ledger_info_with_sigs = node.ledger_info();
 
@@ -139,9 +138,9 @@ impl StateSyncTrigger {
         }
 
         let dag_reader = self.dag_store.read();
-        // check whether if DAG order round is behind the given ledger info round
+        // check whether if DAG order round is behind the given ledger info committed round
         // (meaning consensus is behind) or
-        // the highest committed anchor round is 2*DAG_WINDOW behind the given ledger info round
+        // the local highest committed anchor round is 2*DAG_WINDOW behind the given ledger info round
         // (meaning execution is behind the DAG window)
 
         // fetch can't work since nodes are garbage collected

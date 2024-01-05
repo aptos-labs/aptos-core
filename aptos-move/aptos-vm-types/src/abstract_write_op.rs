@@ -5,7 +5,6 @@ use aptos_types::{
     state_store::state_value::StateValueMetadata,
     write_set::{TransactionWrite, WriteOp, WriteOpSize},
 };
-use claims::assert_none;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -55,18 +54,13 @@ impl AbstractResourceWriteOp {
             }) => {
                 use WriteOp::*;
                 match write_op {
-                    Creation(_) | CreationWithMetadata { .. } => WriteOpSize::Creation {
+                    Creation { .. } => WriteOpSize::Creation {
                         write_len: materialized_size.expect("Creation must have size"),
                     },
-                    Modification(_) | ModificationWithMetadata { .. } => {
-                        WriteOpSize::Modification {
-                            write_len: materialized_size.expect("Modification must have size"),
-                        }
+                    Modification { .. } => WriteOpSize::Modification {
+                        write_len: materialized_size.expect("Modification must have size"),
                     },
-                    Deletion => WriteOpSize::Deletion,
-                    DeletionWithMetadata { metadata } => WriteOpSize::DeletionWithDeposit {
-                        deposit: metadata.deposit(),
-                    },
+                    Deletion { .. } => WriteOpSize::Deletion,
                 }
             },
             InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp {
@@ -83,7 +77,7 @@ impl AbstractResourceWriteOp {
 
     /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.
     /// So this method is needed to be able to update metadata generically across different variants.
-    pub fn get_metadata_mut(&mut self) -> Option<&mut StateValueMetadata> {
+    pub fn get_metadata_mut(&mut self) -> &mut StateValueMetadata {
         use AbstractResourceWriteOp::*;
         match self {
             Write(write_op)
@@ -91,8 +85,12 @@ impl AbstractResourceWriteOp {
             | WriteResourceGroup(GroupWrite {
                 metadata_op: write_op,
                 ..
+            })
+            | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
+                metadata_op: write_op,
+                ..
             }) => write_op.get_metadata_mut(),
-            InPlaceDelayedFieldChange(_) | ResourceGroupInPlaceDelayedFieldChange(_) => None,
+            InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp { metadata, .. }) => metadata,
         }
     }
 
@@ -193,6 +191,7 @@ pub struct WriteWithDelayedFieldsOp {
 pub struct InPlaceDelayedFieldChangeOp {
     pub layout: Arc<MoveTypeLayout>,
     pub materialized_size: u64,
+    pub metadata: StateValueMetadata,
 }
 
 /// Actual information of which individual tag has delayed fields was read,

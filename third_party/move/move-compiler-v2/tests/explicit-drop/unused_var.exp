@@ -1,0 +1,243 @@
+
+Diagnostics:
+warning: Function `0x42::explicate_drop::unused_arg` is unused: it has no current callers and is private to its module.
+  ┌─ tests/explicit-drop/unused_var.move:6:2
+  │
+6 │ ╭     fun unused_arg<T: drop>(x: T) {
+7 │ │     }
+  │ ╰─────^
+
+warning: Function `0x42::explicate_drop::unused_call_assign` is unused: it has no current callers and is private to its module.
+   ┌─ tests/explicit-drop/unused_var.move:13:2
+   │
+13 │ ╭     fun unused_call_assign() {
+14 │ │         let _x = id(42);
+15 │ │     }
+   │ ╰─────^
+
+warning: Function `0x42::explicate_drop::unused_var` is unused: it has no current callers and is private to its module.
+  ┌─ tests/explicit-drop/unused_var.move:2:2
+  │
+2 │ ╭     fun unused_var() {
+3 │ │         let _x = 42;
+4 │ │     }
+  │ ╰─────^
+
+============ initial bytecode ================
+
+[variant baseline]
+fun explicate_drop::id<#0>($t0: #0): #0 {
+     var $t1: #0
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_arg<#0>($t0: #0) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_call_assign() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 42
+  1: $t1 := explicate_drop::id<u64>($t2)
+  2: $t0 := infer($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_var() {
+     var $t0: u64
+     var $t1: u64
+  0: $t1 := 42
+  1: $t0 := infer($t1)
+  2: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun explicate_drop::id<#0>($t0: #0): #0 {
+     var $t1: #0
+     # live vars: $t0
+  0: $t1 := move($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_arg<#0>($t0: #0) {
+     # live vars:
+  0: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_call_assign() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+  0: $t2 := 42
+     # live vars: $t2
+  1: $t1 := explicate_drop::id<u64>($t2)
+     # live vars: $t1
+  2: $t0 := copy($t1)
+     # live vars:
+  3: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_var() {
+     var $t0: u64
+     var $t1: u64
+     # live vars:
+  0: $t1 := 42
+     # live vars: $t1
+  1: $t0 := copy($t1)
+     # live vars:
+  2: return ()
+}
+
+============ after MemorySafetyProcessor: ================
+
+[variant baseline]
+fun explicate_drop::id<#0>($t0: #0): #0 {
+     var $t1: #0
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t1 := move($t0)
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0}
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_arg<#0>($t0: #0) {
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_call_assign() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t2 := 42
+     # live vars: $t2
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: $t1 := explicate_drop::id<u64>($t2)
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2}
+     #
+  2: $t0 := copy($t1)
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2}
+     #
+  3: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_var() {
+     var $t0: u64
+     var $t1: u64
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t1 := 42
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: $t0 := copy($t1)
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  2: return ()
+}
+
+============ after ExplicitDrop: ================
+
+[variant baseline]
+fun explicate_drop::id<#0>($t0: #0): #0 {
+     var $t1: #0
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_arg<#0>($t0: #0) {
+  0: destroy($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_call_assign() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 42
+  1: $t1 := explicate_drop::id<u64>($t2)
+  2: $t0 := copy($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+fun explicate_drop::unused_var() {
+     var $t0: u64
+     var $t1: u64
+  0: $t1 := 42
+  1: $t0 := copy($t1)
+  2: return ()
+}

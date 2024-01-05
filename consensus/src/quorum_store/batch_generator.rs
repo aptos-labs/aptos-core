@@ -13,7 +13,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::BatchId,
+    proof_of_store::{BatchId, BatchInfo},
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -28,7 +28,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(u64),
+    CommitNotification(u64, Vec<BatchInfo>),
     ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -146,19 +146,36 @@ impl BatchGenerator {
         num_txns_in_bucket: usize,
         expiry_time: u64,
         bucket_start: u64,
-    ) -> bool {
-        let mut remaining_txns = num_txns_in_bucket;
-        while remaining_txns > 0 {
-            if batches.len() == self.config.sender_max_num_batches {
-                return false;
+        total_batches_remaining: &mut u64,
+    ) {
+        let mut txns_remaining = num_txns_in_bucket;
+        while txns_remaining > 0 {
+            if *total_batches_remaining == 0 {
+                return;
             }
-            let num_batch_txns = std::cmp::min(self.config.sender_max_batch_txns, remaining_txns);
-            let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
-            let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
-            batches.push(batch);
-            remaining_txns -= num_batch_txns;
+            let num_take_txns = std::cmp::min(self.config.sender_max_batch_txns, txns_remaining);
+            let mut batch_bytes_remaining = self.config.sender_max_batch_bytes as u64;
+            let num_batch_txns = txns
+                .iter()
+                .take(num_take_txns)
+                .take_while(|txn| {
+                    let txn_bytes = txn.txn_bytes_len() as u64;
+                    if batch_bytes_remaining.checked_sub(txn_bytes).is_some() {
+                        batch_bytes_remaining -= txn_bytes;
+                        true
+                    } else {
+                        false
+                    }
+                })
+                .count();
+            if num_batch_txns > 0 {
+                let batch_txns: Vec<_> = txns.drain(0..num_batch_txns).collect();
+                let batch = self.create_new_batch(batch_txns, expiry_time, bucket_start);
+                batches.push(batch);
+                *total_batches_remaining = total_batches_remaining.saturating_sub(1);
+                txns_remaining -= num_batch_txns;
+            }
         }
-        true
     }
 
     fn bucket_into_batches(
@@ -178,10 +195,12 @@ impl BatchGenerator {
             .rev()
             .cloned()
             .collect();
+
+        let mut max_batches_remaining = self.config.sender_max_num_batches as u64;
         let mut batches = vec![];
         for bucket_start in &reverse_buckets_excluding_zero {
-            if pulled_txns.is_empty() {
-                break;
+            if pulled_txns.is_empty() || max_batches_remaining == 0 {
+                return batches;
             }
 
             // Search for key in descending gas order
@@ -196,24 +215,23 @@ impl BatchGenerator {
                 continue;
             }
 
-            let batches_space_remaining = self.push_bucket_to_batches(
+            self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 num_txns_in_bucket,
                 expiry_time,
                 *bucket_start,
+                &mut max_batches_remaining,
             );
-            if !batches_space_remaining {
-                return batches;
-            }
         }
-        if !pulled_txns.is_empty() {
+        if !pulled_txns.is_empty() && max_batches_remaining > 0 {
             self.push_bucket_to_batches(
                 &mut batches,
                 pulled_txns,
                 pulled_txns.len(),
                 expiry_time,
                 0,
+                &mut max_batches_remaining,
             );
         }
         batches
@@ -276,7 +294,7 @@ impl BatchGenerator {
             .mempool_proxy
             .pull_internal(
                 max_count,
-                self.config.mempool_txn_pull_max_bytes,
+                self.config.sender_max_batch_bytes as u64,
                 self.txns_in_progress_sorted.clone(),
             )
             .await
@@ -402,7 +420,7 @@ impl BatchGenerator {
                 }),
                 Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
-                        BatchGeneratorCommand::CommitNotification(block_timestamp) => {
+                        BatchGeneratorCommand::CommitNotification(block_timestamp, batches) => {
                             trace!(
                                 "QS: got clean request from execution, block timestamp {}",
                                 block_timestamp
@@ -413,10 +431,17 @@ impl BatchGenerator {
                             );
                             self.latest_block_timestamp = block_timestamp;
 
+                            for batch_id in batches.iter().map(|b| b.batch_id()) {
+                                if self.remove_batch_in_progress(&batch_id) {
+                                    counters::BATCH_IN_PROGRESS_COMMITTED.inc();
+                                }
+                            }
+
                             // Cleans up all batches that expire in timestamp <= block_timestamp. This is
                             // safe since clean request must occur only after execution result is certified.
                             for batch_id in self.batch_expirations.expire(block_timestamp) {
                                 if self.remove_batch_in_progress(&batch_id) {
+                                    counters::BATCH_IN_PROGRESS_EXPIRED.inc();
                                     debug!(
                                         "QS: logical time based expiration batch w. id {} from batches_in_progress, new size {}",
                                         batch_id,
@@ -427,6 +452,7 @@ impl BatchGenerator {
                         },
                         BatchGeneratorCommand::ProofExpiration(batch_ids) => {
                             for batch_id in batch_ids {
+                                counters::BATCH_IN_PROGRESS_TIMEOUT.inc();
                                 debug!(
                                     "QS: received timeout for proof of store, batch id = {}",
                                     batch_id

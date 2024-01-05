@@ -156,6 +156,30 @@ ProtocolId:
       NetbenchDirectSend: UNIT
     14:
       NetbenchRpc: UNIT
+    15:
+      DKGDirectSendCompressed: UNIT
+    16:
+      DKGDirectSendBcs: UNIT
+    17:
+      DKGDirectSendJson: UNIT
+    18:
+      DKGRpcCompressed: UNIT
+    19:
+      DKGRpcBcs: UNIT
+    20:
+      DKGRpcJson: UNIT
+    21:
+      JWKConsensusDirectSendCompressed: UNIT
+    22:
+      JWKConsensusDirectSendBcs: UNIT
+    23:
+      JWKConsensusDirectSendJson: UNIT
+    24:
+      JWKConsensusRpcCompressed: UNIT
+    25:
+      JWKConsensusRpcBcs: UNIT
+    26:
+      JWKConsensusRpcJson: UNIT
 ProtocolIdSet:
   NEWTYPESTRUCT:
     TYPENAME: BitVec

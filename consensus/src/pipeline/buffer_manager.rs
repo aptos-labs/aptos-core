@@ -10,7 +10,7 @@ use crate::{
     pipeline::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
-        commit_reliable_broadcast::{AckState, CommitMessage, DropGuard},
+        commit_reliable_broadcast::{AckState, CommitMessage},
         execution_schedule_phase::ExecutionRequest,
         execution_wait_phase::{ExecutionResponse, ExecutionWaitRequest},
         persisting_phase::PersistingRequest,
@@ -25,7 +25,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
@@ -54,9 +54,14 @@ pub const LOOP_INTERVAL_MS: u64 = 1500;
 #[derive(Debug, Default)]
 pub struct ResetAck {}
 
+pub enum ResetSignal {
+    Stop,
+    TargetRound(u64),
+}
+
 pub struct ResetRequest {
     pub tx: oneshot::Sender<ResetAck>,
-    pub stop: bool,
+    pub signal: ResetSignal,
 }
 
 pub struct OrderedBlocks {
@@ -121,6 +126,7 @@ pub struct BufferManager {
     end_epoch_timestamp: OnceCell<u64>,
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
+    bounded_executor: BoundedExecutor,
 }
 
 impl BufferManager {
@@ -144,6 +150,7 @@ impl BufferManager {
         epoch_state: Arc<EpochState>,
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
+        executor: BoundedExecutor,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -171,6 +178,7 @@ impl BufferManager {
                 rb_backoff_policy,
                 TimeService::real(),
                 Duration::from_millis(COMMIT_VOTE_BROADCAST_INTERVAL_MS),
+                executor.clone(),
             ),
             commit_proof_rb_handle: None,
             commit_msg_tx,
@@ -187,6 +195,7 @@ impl BufferManager {
             end_epoch_timestamp: OnceCell::new(),
             previous_commit_time: Instant::now(),
             reset_flag,
+            bounded_executor: executor,
         }
     }
 
@@ -396,11 +405,11 @@ impl BufferManager {
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
-        let ResetRequest { tx, stop } = request;
+        let ResetRequest { tx, signal } = request;
         info!("Receive reset");
         self.reset_flag.store(true, Ordering::SeqCst);
 
-        self.stop = stop;
+        self.stop = matches!(signal, ResetSignal::Stop);
         self.reset().await;
         let _ = tx.send(ResetAck::default());
         self.reset_flag.store(false, Ordering::SeqCst);
@@ -694,12 +703,13 @@ impl BufferManager {
             .set(pending_aggregated as i64);
     }
 
-    pub async fn start(mut self, bounded_executor: BoundedExecutor) {
+    pub async fn start(mut self) {
         info!("Buffer manager starts.");
         let (verified_commit_msg_tx, mut verified_commit_msg_rx) = create_channel();
         let mut interval = tokio::time::interval(Duration::from_millis(LOOP_INTERVAL_MS));
         let mut commit_msg_rx = self.commit_msg_rx.take().expect("commit msg rx must exist");
         let epoch_state = self.epoch_state.clone();
+        let bounded_executor = self.bounded_executor.clone();
         spawn_named!("buffer manager verification", async move {
             while let Some(commit_msg) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();

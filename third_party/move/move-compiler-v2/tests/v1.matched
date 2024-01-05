@@ -64,8 +64,14 @@ move-compiler/tests/move_check/borrows/return_borrowed_local_invalid.exp   move-
 move-compiler/tests/move_check/borrows/return_mutual_borrows.exp   move-compiler-v2/tests/reference-safety/v1-tests/return_mutual_borrows.exp
 move-compiler/tests/move_check/borrows/return_mutual_borrows_invalid.exp   move-compiler-v2/tests/reference-safety/v1-tests/return_mutual_borrows_invalid.exp
 move-compiler/tests/move_check/borrows/unused_ref.exp   move-compiler-v2/tests/reference-safety/v1-tests/unused_ref.exp
+move-compiler/tests/move_check/folding/non_constant_empty_vec.exp   move-compiler-v2/tests/folding/non_constant_empty_vec.exp
+move-compiler/tests/move_check/folding/unfoldable_constants.exp   move-compiler-v2/tests/folding/unfoldable_constants.exp
+move-compiler/tests/move_check/folding/unfoldable_constants_blocks.exp   move-compiler-v2/tests/folding/unfoldable_constants_blocks.exp
 move-compiler/tests/move_check/inlining/acquires_error_msg.exp   move-compiler-v2/tests/checking/inlining/acquires_error_msg.exp
 move-compiler/tests/move_check/inlining/break_continue_in_lambda.exp   move-compiler-v2/tests/checking/inlining/break_continue_in_lambda.exp
+move-compiler/tests/move_check/inlining/bug_11112.exp   move-compiler-v2/tests/checking/inlining/bug_11112.exp
+move-compiler/tests/move_check/inlining/bug_9717.exp   move-compiler-v2/tests/checking/inlining/bug_9717.exp
+move-compiler/tests/move_check/inlining/bug_9717_looponly.exp   move-compiler-v2/tests/checking/inlining/bug_9717_looponly.exp
 move-compiler/tests/move_check/inlining/cool_inlining_test.exp   move-compiler-v2/tests/checking/inlining/cool_inlining_test.exp
 move-compiler/tests/move_check/inlining/double_nesting.exp   move-compiler-v2/tests/checking/inlining/double_nesting.exp
 move-compiler/tests/move_check/inlining/inline_accessing_constant.exp   move-compiler-v2/tests/checking/inlining/inline_accessing_constant.exp
@@ -115,6 +121,7 @@ move-compiler/tests/move_check/typing/annotated_types.exp   move-compiler-v2/tes
 move-compiler/tests/move_check/typing/assign_duplicate_assigning.exp   move-compiler-v2/tests/checking/typing/assign_duplicate_assigning.exp
 move-compiler/tests/move_check/typing/assign_nested.exp   move-compiler-v2/tests/checking/typing/assign_nested.exp
 move-compiler/tests/move_check/typing/assign_tuple.exp   move-compiler-v2/tests/checking/typing/assign_tuple.exp
+move-compiler/tests/move_check/typing/assign_tuple_wg.exp   move-compiler-v2/tests/checking/typing/assign_tuple_wg.exp
 move-compiler/tests/move_check/typing/assign_unpack_references.exp   move-compiler-v2/tests/checking/typing/assign_unpack_references.exp
 move-compiler/tests/move_check/typing/assign_unpack_references_invalid.exp   move-compiler-v2/tests/checking/typing/assign_unpack_references_invalid.exp
 move-compiler/tests/move_check/typing/assign_wrong_arity.exp   move-compiler-v2/tests/checking/typing/assign_wrong_arity.exp
@@ -182,17 +189,19 @@ move-compiler/tests/move_check/typing/borrow_local_temp.exp   move-compiler-v2/t
 move-compiler/tests/move_check/typing/borrow_local_temp_invalid.exp   move-compiler-v2/tests/checking/typing/borrow_local_temp_invalid.exp
 move-compiler/tests/move_check/typing/borrow_local_temp_resource.exp   move-compiler-v2/tests/checking/typing/borrow_local_temp_resource.exp
 move-compiler/tests/move_check/typing/break_any_type.exp   move-compiler-v2/tests/checking/typing/break_any_type.exp
+move-compiler/tests/move_check/typing/break_constant.exp   move-compiler-v2/tests/checking/typing/break_constant.exp
 move-compiler/tests/move_check/typing/break_outside_loop.exp   move-compiler-v2/tests/checking/typing/break_outside_loop.exp
 move-compiler/tests/move_check/typing/cast.exp   move-compiler-v2/tests/checking/typing/cast.exp
 move-compiler/tests/move_check/typing/cast_invalid.exp   move-compiler-v2/tests/checking/typing/cast_invalid.exp
 move-compiler/tests/move_check/typing/conditional_global_operations.exp   move-compiler-v2/tests/checking/typing/conditional_global_operations.exp
 move-compiler/tests/move_check/typing/constant_all_valid_types.exp   move-compiler-v2/tests/checking/typing/constant_all_valid_types.exp
 move-compiler/tests/move_check/typing/constant_allowed_but_not_supported.exp   move-compiler-v2/tests/checking/typing/constant_allowed_but_not_supported.exp
+move-compiler/tests/move_check/typing/constant_folding.exp   move-compiler-v2/tests/checking/typing/constant_folding.exp
+move-compiler/tests/move_check/typing/constant_inference.exp   move-compiler-v2/tests/checking/typing/constant_inference.exp
 move-compiler/tests/move_check/typing/constant_internal.exp   move-compiler-v2/tests/checking/typing/constant_internal.exp
 move-compiler/tests/move_check/typing/constant_invalid_base_type.exp   move-compiler-v2/tests/checking/typing/constant_invalid_base_type.exp
 move-compiler/tests/move_check/typing/constant_invalid_usage.exp   move-compiler-v2/tests/checking/typing/constant_invalid_usage.exp
 move-compiler/tests/move_check/typing/constant_non_base_type.exp   move-compiler-v2/tests/checking/typing/constant_non_base_type.exp
-move-compiler/tests/move_check/typing/constant_supported_exps.exp   move-compiler-v2/tests/checking/typing/constant_supported_exps.exp
 move-compiler/tests/move_check/typing/constant_unsupported_exps.exp   move-compiler-v2/tests/checking/typing/constant_unsupported_exps.exp
 move-compiler/tests/move_check/typing/continue_any_type.exp   move-compiler-v2/tests/checking/typing/continue_any_type.exp
 move-compiler/tests/move_check/typing/continue_outside_loop.exp   move-compiler-v2/tests/checking/typing/continue_outside_loop.exp
@@ -214,6 +223,7 @@ move-compiler/tests/move_check/typing/exp_list_resource_drop.exp   move-compiler
 move-compiler/tests/move_check/typing/explicit_copy.exp   move-compiler-v2/tests/checking/typing/explicit_copy.exp
 move-compiler/tests/move_check/typing/explicit_move.exp   move-compiler-v2/tests/checking/typing/explicit_move.exp
 move-compiler/tests/move_check/typing/global_builtins.exp   move-compiler-v2/tests/checking/typing/global_builtins.exp
+move-compiler/tests/move_check/typing/global_builtins_inferred.exp   move-compiler-v2/tests/checking/typing/global_builtins_inferred.exp
 move-compiler/tests/move_check/typing/global_builtins_invalid.exp   move-compiler-v2/tests/checking/typing/global_builtins_invalid.exp
 move-compiler/tests/move_check/typing/global_builtins_script.exp   move-compiler-v2/tests/checking/typing/global_builtins_script.exp
 move-compiler/tests/move_check/typing/hex_and_decimal_address.exp   move-compiler-v2/tests/checking/typing/hex_and_decimal_address.exp
@@ -253,6 +263,7 @@ move-compiler/tests/move_check/typing/module_call_missing_function.exp   move-co
 move-compiler/tests/move_check/typing/module_call_wrong_argument_in_list.exp   move-compiler-v2/tests/checking/typing/module_call_wrong_argument_in_list.exp
 move-compiler/tests/move_check/typing/module_call_wrong_arity.exp   move-compiler-v2/tests/checking/typing/module_call_wrong_arity.exp
 move-compiler/tests/move_check/typing/module_call_wrong_single_argument.exp   move-compiler-v2/tests/checking/typing/module_call_wrong_single_argument.exp
+move-compiler/tests/move_check/typing/move_from_type_argument.exp   move-compiler-v2/tests/checking/typing/move_from_type_argument.exp
 move-compiler/tests/move_check/typing/mutable_eq_and_neq.exp   move-compiler-v2/tests/checking/typing/mutable_eq_and_neq.exp
 move-compiler/tests/move_check/typing/mutate.exp   move-compiler-v2/tests/checking/typing/mutate.exp
 move-compiler/tests/move_check/typing/mutate_field_internal.exp   move-compiler-v2/tests/checking/typing/mutate_field_internal.exp
@@ -282,6 +293,7 @@ move-compiler/tests/move_check/typing/shadowing_invalid_scope.exp   move-compile
 move-compiler/tests/move_check/typing/shadowing_invalid_types.exp   move-compiler-v2/tests/checking/typing/shadowing_invalid_types.exp
 move-compiler/tests/move_check/typing/spec_block_fail.exp   move-compiler-v2/tests/checking/typing/spec_block_fail.exp
 move-compiler/tests/move_check/typing/spec_block_ok.exp   move-compiler-v2/tests/checking/typing/spec_block_ok.exp
+move-compiler/tests/move_check/typing/specs.exp   move-compiler-v2/tests/checking/typing/specs.exp
 move-compiler/tests/move_check/typing/subtype_annotation.exp   move-compiler-v2/tests/checking/typing/subtype_annotation.exp
 move-compiler/tests/move_check/typing/subtype_annotation_invalid.exp   move-compiler-v2/tests/checking/typing/subtype_annotation_invalid.exp
 move-compiler/tests/move_check/typing/subtype_args.exp   move-compiler-v2/tests/checking/typing/subtype_args.exp

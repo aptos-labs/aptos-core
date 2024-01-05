@@ -10,7 +10,7 @@ struct T has key {
 	b: bool
 }
 
-f(Arg0: signer) {
+f(Arg0: signer) /* def_idx: 0 */ {
 B0:
 	0: ImmBorrowLoc[0](Arg0: signer)
 	1: Call signer::address_of(&signer): address

@@ -1253,6 +1253,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 
     // Build corresponding expression:
     // let iter = lower_bound;
+    // let ub_value = upper_bound_value;
     // flag = false;
     // loop {
     //     if (flag) {
@@ -1260,7 +1261,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     //     } else {
     //         flag = true;
     //     };
-    //     if (i < upper_bound) {
+    //     if (i < ub_value) {
     //         loop_body;
     //     } else break;
     // }
@@ -1284,6 +1285,18 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     let decl_flag = sp(
         for_loc,
         SequenceItem_::Bind(flag, None, Box::new(false_exp)),
+    );
+
+    // To create the declaration "let ub_value = upper_bound", first create the variable flag, and
+    // then assign it to upper_bound
+    let ub_value_symbol = Symbol::from("__upper_bound_value");
+    let ub_value_bindlist = sp(for_loc, vec![sp(
+        for_loc,
+        Bind_::Var(Var(sp(for_loc, ub_value_symbol))),
+    )]);
+    let ub_value_assignment = sp(
+        for_loc,
+        SequenceItem_::Bind(ub_value_bindlist, None, Box::new(ub)),
     );
 
     // Construct the increment "iter = iter + 1"
@@ -1336,7 +1349,14 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 
     // Create the condition "iter < upper_bound"
     let op_le = sp(iter.loc, BinOp_::Lt);
-    let e = Exp_::BinopExp(Box::new(iter_exp.clone()), op_le, Box::new(ub));
+    let ub_value_exp = sp(
+        for_loc,
+        Exp_::Name(
+            sp(for_loc, NameAccessChain_::One(sp(for_loc, ub_value_symbol))),
+            None,
+        ),
+    );
+    let e = Exp_::BinopExp(Box::new(iter_exp), op_le, Box::new(ub_value_exp));
     let loop_condition = sp(iter.loc, e);
 
     // Create the "if (loop_condition) { loop_body; } else break"
@@ -1377,7 +1397,7 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
         for_loc,
         Exp_::Block((
             vec![],
-            vec![iter_init, decl_flag, loop_body],
+            vec![iter_init, decl_flag, ub_value_assignment, loop_body],
             Some(for_loc),
             Box::new(None),
         )),

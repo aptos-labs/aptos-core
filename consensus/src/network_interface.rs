@@ -7,7 +7,7 @@
 use crate::{
     dag::DAGNetworkMessage,
     pipeline,
-    quorum_store::types::{Batch, BatchMsg, BatchRequest},
+    quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::rand_gen::RandGenMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -73,6 +73,8 @@ pub enum ConsensusMsg {
     CommitMessage(Box<CommitMessage>),
     /// Randomness generation message
     RandGenMessage(RandGenMessage),
+    /// Quorum Store: Response to the batch request.
+    BatchResponseV2(Box<BatchResponse>),
 }
 
 /// Network type for consensus
@@ -98,6 +100,7 @@ impl ConsensusMsg {
             ConsensusMsg::DAGMessage(_) => "DAGMessage",
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
             ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
+            ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
         }
     }
 }
