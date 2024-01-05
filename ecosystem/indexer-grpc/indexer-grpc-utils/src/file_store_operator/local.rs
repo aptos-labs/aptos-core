@@ -53,7 +53,7 @@ impl FileStoreOperator for LocalFileStoreOperator {
 
     async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key =
-            FileEntry::build_key(version, StorageFormat::JsonBase64UncompressedProto).to_string();
+            FileEntry::build_key(version, self.storage_format).to_string();
         let file_path = self.path.join(file_entry_key);
         match tokio::fs::read(file_path).await {
             Ok(file) => Ok(file),
