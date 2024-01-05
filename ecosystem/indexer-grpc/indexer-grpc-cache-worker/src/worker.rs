@@ -22,7 +22,6 @@ use aptos_protos::internal::fullnode::v1::{
 };
 use futures::{self, future::join_all, StreamExt};
 use prost::Message;
-use tokio::task::JoinHandle;
 use tracing::{error, info};
 use url::Url;
 
@@ -212,7 +211,7 @@ async fn process_transactions_from_node_response(
         Response::Data(data) => {
             let transaction_len = data.transactions.len();
             let data_download_duration_in_secs = download_start_time.elapsed().as_secs_f64();
-            let mut cache_operator_clone = cache_operator.clone();
+            let _cache_operator_clone = cache_operator.clone();
             let first_transaction = data
                 .transactions
                 .first()

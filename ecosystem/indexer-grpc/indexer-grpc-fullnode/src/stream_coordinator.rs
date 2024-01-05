@@ -92,7 +92,7 @@ impl IndexerStreamCoordinator {
         for batch in batches {
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
-            let transaction_sender = self.transactions_sender.clone();
+            let _transaction_sender = self.transactions_sender.clone();
 
             let task = tokio::spawn(async move {
                 let fetch_start_time = std::time::Instant::now();
