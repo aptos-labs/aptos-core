@@ -6,7 +6,7 @@ module 0xc0ffee::m {
         d: u64,
         e: u64,
     }
-    
+
     fun sequential(p: Foo): Foo {
         let a = p;
         let b = a;
