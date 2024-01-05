@@ -184,6 +184,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // ----------------------------------------------------------
     // ----------- Default optimization pipeline ----------------
     // The default optimization pipeline is currently always run by the compiler.
+    // Any compiler errors or warnings should be reported before running this section, as we can
+    // potentially delete or change code through these optimizations.
     // While this section of the pipeline is optional, some code that used to previously compile
     // may no longer compile without this section because of using too many local (temp) variables.
     //
