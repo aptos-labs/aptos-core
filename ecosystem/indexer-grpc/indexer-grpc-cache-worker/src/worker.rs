@@ -418,10 +418,10 @@ async fn process_streaming_response(
                             .inc();
                         break;
                     }
-                    cache_operator
-                        .update_cache_latest_version(transaction_count, current_version)
-                        .await
-                        .context("Failed to update the latest version in the cache")?;
+                    // cache_operator
+                    //     .update_cache_latest_version(transaction_count, current_version)
+                    //     .await
+                    //     .context("Failed to update the latest version in the cache")?;
                     transaction_count = 0;
 
                     log_grpc_step(
