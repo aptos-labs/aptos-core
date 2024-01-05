@@ -10,13 +10,13 @@
 //! Given definitely available copies at each program point, this transformation replaces the use of locals
 //! with their copy-chain heads, possibly rendering several copies redundant (i.e., creating dead stores).
 //! For example, consider the following code:
-//! ```
+//! ```move
 //! let b = a;
 //! let c = b;
 //! let d = c + 1;
 //! ```
 //! This transformation will modify the code will to:
-//! ```
+//! ```move
 //! let b = a;  // redundant copy
 //! let c = a;  // redundant copy
 //! let d = a + 1;
