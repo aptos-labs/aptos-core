@@ -315,10 +315,7 @@ impl ReleaseEntry {
                 }
             },
             ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
-                if !fetch_and_equals(
-                    client_opt,
-                    &gas_override_default(gas_overrides)?,
-                )? {
+                if !fetch_and_equals(client_opt, &gas_override_default(gas_overrides)?)? {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
