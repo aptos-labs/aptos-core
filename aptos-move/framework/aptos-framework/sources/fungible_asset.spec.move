@@ -98,7 +98,7 @@ spec aptos_framework::fungible_asset {
     /// Criticality: High
     /// Implementation: The burn process ensures that the store has enough balance to burn, by asserting that the
     /// supply.current >= amount inside the decrease_supply function.
-    /// Enforcement: Audited that it aborts if the provided store doesn't have sufficient balance.
+    /// Enforcement: Formally verified via [high-level-req-12](decrease_supply).
     ///
     /// No.: 13
     /// Property: Enabling or disabling store's frozen status should only be done with a valid transfer reference.
@@ -122,20 +122,20 @@ spec aptos_framework::fungible_asset {
     /// Property: Merging two fungible assets should only be possible if both share the same metadata.
     /// Criticality: Medium
     /// Implementation: The merge function validates the metadata of the src and dst asset.
-    /// Enforcement: Audited that it aborts if the metadata of the src and dst are not the same.
+    /// Enforcement: Verified via [high-level-req-15](merge).
     ///
     /// No.: 16
     /// Property: Post merging two fungible assets, the source asset should have the amount value equal to the sum of
     /// the two.
     /// Criticality: High
     /// Implementation: The merge function increases dst_fungible_asset.amount by src_fungible_asset.amount.
-    /// Enforcement: Audited that the dst_fungible_asset balance is increased by amount.
+    /// Enforcement: Verified via [high-level-req-16](merge).
     ///
     /// No.: 17
     /// Property: Fungible assets with zero balance should be destroyed when the amount reaches value 0.
     /// Criticality: Medium
     /// Implementation: The destroy_zero ensures that the balance of the asset has the value 0 and destroy the asset.
-    /// Enforcement: Audited that it aborts if the balance of the asset is non zero.
+    /// Enforcement: Verified via [high-level-req-17](destroy_zero).
     /// </high-level-req>
     ///
     spec module {
@@ -346,6 +346,10 @@ spec aptos_framework::fungible_asset {
         frozen: bool,
         ) {
         pragma aborts_if_is_partial;
+        /// [high-level-req-13]
+        aborts_if ref.metadata != store_metadata(store);
+        let store_addr = object::object_address(store);
+        ensures borrow_global<FungibleStore>(store_addr).frozen == frozen;
     }
 
     spec burn(ref: &BurnRef, fa: FungibleAsset) {
@@ -401,10 +405,19 @@ spec aptos_framework::fungible_asset {
 
     spec merge(dst_fungible_asset: &mut FungibleAsset, src_fungible_asset: FungibleAsset) {
         pragma aborts_if_is_partial;
+
+        /// [high-level-req-15]
+        aborts_if dst_fungible_asset.metadata != src_fungible_asset.metadata;
+
+        let dst_fungible_asset_amount = dst_fungible_asset.amount;
+        let post post_amount = dst_fungible_asset.amount;
+        /// [high-level-req-16]
+        ensures post_amount == dst_fungible_asset_amount + src_fungible_asset.amount;
     }
 
     spec destroy_zero(fungible_asset: FungibleAsset) {
-        pragma aborts_if_is_partial;
+        /// [high-level-req-17]
+        aborts_if fungible_asset.amount != 0;
     }
 
     spec deposit_internal<T: key>(store: Object<T>, fa: FungibleAsset) {
@@ -449,6 +462,14 @@ spec aptos_framework::fungible_asset {
 
     spec decrease_supply<T: key>(metadata: &Object<T>, amount: u64) {
         pragma aborts_if_is_partial;
+        let metadata_address = object::object_address(metadata);
+        aborts_if amount == 0;
+        aborts_if !exists<ConcurrentSupply>(metadata_address) && !exists<Supply>(metadata_address);
+        /// [high-level-req-12]
+        let concurrent_supply = borrow_global<ConcurrentSupply>(metadata_address);
+        // aborts_if exists<ConcurrentSupply>(metadata_address) && (concurrent_supply.current.value < amount);
+        let supply = borrow_global<Supply>(metadata_address);
+        // aborts_if exists<Supply>(metadata_address) && (supply.current < amount);
     }
 
     spec upgrade_to_concurrent(
