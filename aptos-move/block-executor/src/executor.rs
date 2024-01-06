@@ -1229,6 +1229,10 @@ where
             num_txns,
         );
 
+        let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
+            TxnLastInputOutput::new(num_txns as TxnIndex);
+        let mut found_module_rw_conflict = false;
+
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
@@ -1241,7 +1245,6 @@ where
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
-
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -1278,6 +1281,17 @@ where
                                 output.get_write_summary(),
                             )
                         });
+
+                    if !found_module_rw_conflict
+                        && !last_input_output.append_and_check_module_rw_conflict(
+                            latest_view.take_sequential_reads().module_reads.iter(),
+                            output.module_write_set().keys(),
+                        )
+                    {
+                        block_limit_processor.recompute_acc_eff_block_gas_on_module_rw_conflict();
+                        found_module_rw_conflict = true;
+                    }
+
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,
                         read_write_summary,
@@ -1417,7 +1431,7 @@ where
                         msg,
                     )));
                 },
-            }
+            };
             // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
                 break;

@@ -255,6 +255,17 @@ impl BlockGasLimitType {
         }
     }
 
+    pub fn use_module_publishing_block_conflict(&self) -> bool {
+        match self {
+            BlockGasLimitType::NoLimit => false,
+            BlockGasLimitType::Limit(_) => false,
+            BlockGasLimitType::ComplexLimitV1 {
+                use_module_publishing_block_conflict,
+                ..
+            } => *use_module_publishing_block_conflict,
+        }
+    }
+
     pub fn include_user_txn_size_in_block_output(&self) -> bool {
         match self {
             BlockGasLimitType::NoLimit => false,
