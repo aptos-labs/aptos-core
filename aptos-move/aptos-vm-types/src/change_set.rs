@@ -25,7 +25,14 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
 use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
@@ -450,8 +457,18 @@ impl VMChangeSet {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write =
-                    resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
+                let write = resolver
+                    .try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)
+                    .map_err(|e| {
+                        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can
+                        // be constructed.
+                        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
+                        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
+                        e.finish(Location::Module(ModuleId::new(
+                            AGGREGATOR_V1_ADDRESS,
+                            AGGREGATOR_V1_MODULE_NAME.into(),
+                        )))
+                    })?;
                 Ok((state_key, write))
             };
 

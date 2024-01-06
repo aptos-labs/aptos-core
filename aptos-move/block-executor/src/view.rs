@@ -50,6 +50,7 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::{StatusCode, VMStatus},
@@ -1607,13 +1608,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
         // be useful for cross-testing the old and the new flows.
         // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
+        // TODO: Fix error propagation here.
         self.get_resource_state_value(state_key, None)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 

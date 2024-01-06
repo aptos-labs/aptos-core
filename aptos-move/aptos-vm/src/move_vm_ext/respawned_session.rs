@@ -37,6 +37,7 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -201,7 +202,7 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base_executor_view

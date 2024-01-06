@@ -265,7 +265,7 @@ impl<'r> WriteOpConverter<'r> {
 
     fn convert(
         &self,
-        state_value_metadata_result: anyhow::Result<Option<StateValueMetadata>>,
+        state_value_metadata_result: PartialVMResult<Option<StateValueMetadata>>,
         move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<WriteOp> {
@@ -333,11 +333,7 @@ impl<'r> WriteOpConverter<'r> {
     ) -> PartialVMResult<WriteOp> {
         let maybe_existing_metadata = self
             .remote
-            .get_aggregator_v1_state_value_metadata(state_key)
-            .map_err(|e| {
-                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                    .with_message(format!("convert_aggregator_modification failed {:?}", e))
-            })?;
+            .get_aggregator_v1_state_value_metadata(state_key)?;
         let data = serialize(&value).into();
 
         let op = match maybe_existing_metadata {

@@ -266,7 +266,7 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id)
     }
 }
@@ -379,17 +379,19 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     fn get_module_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         self.executor_view
             .get_module_state_value_metadata(state_key)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         self.executor_view
             .get_resource_state_value_metadata(state_key)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 

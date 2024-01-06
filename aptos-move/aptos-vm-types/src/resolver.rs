@@ -15,6 +15,7 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use std::collections::{BTreeMap, HashMap};
 
@@ -275,13 +276,13 @@ pub trait StateValueMetadataResolver {
     fn get_module_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>>;
+    ) -> PartialVMResult<Option<StateValueMetadata>>;
 
     /// Can also be used to get the metadata of a resource group at a provided group key.
     fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>>;
+    ) -> PartialVMResult<Option<StateValueMetadata>>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

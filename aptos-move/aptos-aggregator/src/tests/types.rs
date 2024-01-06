@@ -16,6 +16,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue},
     write_set::WriteOp,
 };
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use std::{
     cell::RefCell,
@@ -73,7 +74,7 @@ impl TAggregatorV1View for FakeAggregatorView {
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         Ok(self.v1_store.get(state_key).cloned())
     }
 }
