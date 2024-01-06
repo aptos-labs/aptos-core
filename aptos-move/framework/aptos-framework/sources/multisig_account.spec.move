@@ -1,7 +1,7 @@
 spec aptos_framework::multisig_account {
     /// <high-level-req>
     /// No.: 1
-    /// Property: For every multi-signature account, the range of required signatures should always be in the range of
+    /// Requirement: For every multi-signature account, the range of required signatures should always be in the range of
     /// one to the total number of owners.
     /// Criticality: Critical
     /// Implementation: While creating a MultisigAccount, the function create_with_owners_internal checks that
@@ -9,14 +9,14 @@ spec aptos_framework::multisig_account {
     /// Enforcement: This has been audited.
     ///
     /// No.: 2
-    /// Property: The list of owners for a multi-signature account should not contain any duplicate owners, and the
+    /// Requirement: The list of owners for a multi-signature account should not contain any duplicate owners, and the
     /// multi-signature account itself cannot be listed as one of its owners.
     /// Criticality: Critical
     /// Implementation: The function validate_owners validates the owner vector that no duplicate entries exists.
     /// Enforcement: This has been audited.
     ///
     /// No.: 3
-    /// Property: The current value of the next sequence number should not be present in the transaction table, until
+    /// Requirement: The current value of the next sequence number should not be present in the transaction table, until
     /// the next sequence number gets increased.
     /// Criticality: Medium
     /// Implementation: The add_transaction function increases the next sequence number and only then adds the
@@ -24,7 +24,7 @@ spec aptos_framework::multisig_account {
     /// Enforcement: This has been audited.
     ///
     /// No.: 4
-    /// Property: When the last executed sequence number is smaller than the next sequence number by only one unit, no
+    /// Requirement: When the last executed sequence number is smaller than the next sequence number by only one unit, no
     /// transactions should exist in the multi-signature account's transactions list.
     /// Criticality: High
     /// Implementation: The get_pending_transactions function retrieves pending transactions by iterating through the
@@ -33,7 +33,7 @@ spec aptos_framework::multisig_account {
     /// last_executed_sequence_number == next_sequence_number -1
     ///
     /// No.: 5
-    /// Property: The last executed sequence number is always smaller than the next sequence number.
+    /// Requirement: The last executed sequence number is always smaller than the next sequence number.
     /// Criticality: Medium
     /// Implementation: When creating a new MultisigAccount, the last_executed_sequence_number and next_sequence_number
     /// are assigned with 0 and 1 respectively, and from there both these values increase monotonically when a
@@ -41,7 +41,7 @@ spec aptos_framework::multisig_account {
     /// Enforcement: This has been audited.
     ///
     /// No.: 6
-    /// Property: The number of pending transactions should be equal to the difference between the next sequence number
+    /// Requirement: The number of pending transactions should be equal to the difference between the next sequence number
     /// and the last executed sequence number.
     /// Criticality: High
     /// Implementation: When a transaction is added, next_sequence_number is incremented. And when a transaction is
@@ -49,14 +49,14 @@ spec aptos_framework::multisig_account {
     /// Enforcement: This has been audited.
     ///
     /// No.: 7
-    /// Property: Only transactions with valid sequence number should be fetched.
+    /// Requirement: Only transactions with valid sequence number should be fetched.
     /// Criticality: Medium
     /// Implementation: Functions such as: 1. get_transaction 2. can_be_executed 3. can_be_rejected 4. vote always
     /// validate the given sequence number and only then fetch the associated transaction.
     /// Enforcement: Audited that it aborts if the sequence number is not valid.
     ///
     /// No.: 8
-    /// Property: The execution or rejection of a transaction should enforce that the minimum number of required
+    /// Requirement: The execution or rejection of a transaction should enforce that the minimum number of required
     /// signatures is less or equal to the total number of approvals.
     /// Criticality: Critical
     /// Implementation: The functions can_be_executed and can_be_rejected perform validation on the number of votes
@@ -64,7 +64,7 @@ spec aptos_framework::multisig_account {
     /// Enforcement: Audited that these functions return the correct value.
     ///
     /// No.: 9
-    /// Property: The creation of a multi-signature account properly initializes the resources and then it gets
+    /// Requirement: The creation of a multi-signature account properly initializes the resources and then it gets
     /// published under the corresponding account.
     /// Criticality: Medium
     /// Implementation: When creating a MultisigAccount via one of the functions: create_with_existing_account,
@@ -73,7 +73,7 @@ spec aptos_framework::multisig_account {
     /// Enforcement: Audited that the MultisigAccount is initialized properly.
     ///
     /// No.: 10
-    /// Property: Creation of a multi-signature account on top of an existing account should revoke auth key and any
+    /// Requirement: Creation of a multi-signature account on top of an existing account should revoke auth key and any
     /// previous offered capabilities or control.
     /// Criticality: Critical
     /// Implementation: The function create_with_existing_account_and_revoke_auth_key, after successfully creating the
@@ -81,7 +81,7 @@ spec aptos_framework::multisig_account {
     /// Enforcement: Audited that the account's auth key and the offered capabilities are revoked.
     ///
     /// No.: 11
-    /// Property: Upon the creation of a multi-signature account from a bootstrapping account, the ownership of the
+    /// Requirement: Upon the creation of a multi-signature account from a bootstrapping account, the ownership of the
     /// resultant account should not pertain to the bootstrapping account.
     /// Criticality: High
     /// Implementation: In create_with_owners_then_remove_bootstrapper function after successful creation of the account
@@ -89,7 +89,7 @@ spec aptos_framework::multisig_account {
     /// Enforcement: Audited that the bootstrapping account is not in the owners list.
     ///
     /// No.: 12
-    /// Property: Performing any changes on the list of owners such as adding new owners, removing owners, swapping
+    /// Requirement: Performing any changes on the list of owners such as adding new owners, removing owners, swapping
     /// owners should ensure that the number of required signature, for the multi-signature account remains valid.
     /// Criticality: Critical
     /// Implementation: The following function as used to modify the owners list and the required signature of the
@@ -105,7 +105,7 @@ spec aptos_framework::multisig_account {
     /// swap_owners_and_update_signatures_required, update_signatures_required, update_owner_schema)
     ///
     /// No.: 13
-    /// Property: The creation of a transaction should be limited to an account owner, which should be automatically
+    /// Requirement: The creation of a transaction should be limited to an account owner, which should be automatically
     /// considered a voter; additionally, the account's sequence should increase monotonically.
     /// Criticality: Critical
     /// Implementation: The following functions can only be called by the owners of the account and create a transaction
@@ -120,7 +120,7 @@ spec aptos_framework::multisig_account {
     /// add_transaction)
     ///
     /// No.: 14
-    /// Property: Only owners are allowed to vote for a valid transaction.
+    /// Requirement: Only owners are allowed to vote for a valid transaction.
     /// Criticality: Critical
     /// Implementation: Any owner of the MultisigAccount can either approve (approve_transaction) or reject
     /// (reject_transaction) a transaction. Both these functions use a generic function to vote for the transaction
@@ -131,7 +131,7 @@ spec aptos_framework::multisig_account {
     /// Audited that the vote is recorded as intended.
     ///
     /// No.: 15
-    /// Property: Only owners are allowed to execute a valid transaction, if the number of approvals meets the k-of-n
+    /// Requirement: Only owners are allowed to execute a valid transaction, if the number of approvals meets the k-of-n
     /// criteria, finally the executed transaction should be removed.
     /// Criticality: Critical
     /// Implementation: Functions execute_rejected_transaction and validate_multisig_transaction can only be called by
@@ -149,7 +149,7 @@ spec aptos_framework::multisig_account {
     /// failed_transaction_execution_cleanup).
     ///
     /// No.: 16
-    /// Property: Removing an executed transaction from the transactions list should increase the last sequence number
+    /// Requirement: Removing an executed transaction from the transactions list should increase the last sequence number
     /// monotonically.
     /// Criticality: High
     /// Implementation: When transactions are removed via remove_executed_transaction (maybe called by VM cleanup or
@@ -157,13 +157,16 @@ spec aptos_framework::multisig_account {
     /// Enforcement: Audited that last_executed_sequence_number is incremented.
     ///
     /// No.: 17
-    /// Property: The voting and transaction creation operations should only be available if a multi-signature account
+    /// Requirement: The voting and transaction creation operations should only be available if a multi-signature account
     /// exists.
     /// Criticality: Low
     /// Implementation: The function assert_multisig_account_exists validates the existence of MultisigAccount under the
     /// account.
     /// Enforcement: Audited that it aborts if the MultisigAccount doesn't exist on the account.
     /// </high-level-req>
+
+    spec module {
+    }
 
     spec metadata(multisig_account: address): SimpleMap<String, vector<u8>> {
         aborts_if !exists<MultisigAccount>(multisig_account);
