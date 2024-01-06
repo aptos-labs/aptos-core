@@ -1,0 +1,151 @@
+processed 1 task
+
+task 0 'print-bytecode'. lines 1-25:
+// Move bytecode v6
+script {
+
+
+main() /* def_idx: 0 */ {
+L0:	loc0: bool
+L1:	loc1: bool
+L2:	loc2: u64
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: u64
+L6:	loc6: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[4](loc4: u64)
+	2: LdU64(0)
+	3: StLoc[6](loc6: u64)
+	4: LdU64(0)
+	5: StLoc[3](loc3: u64)
+	6: LdFalse
+	7: StLoc[0](loc0: bool)
+B1:
+	8: CopyLoc[0](loc0: bool)
+	9: BrFalse(15)
+B2:
+	10: MoveLoc[3](loc3: u64)
+	11: LdU64(1)
+	12: Add
+	13: StLoc[3](loc3: u64)
+	14: Branch(17)
+B3:
+	15: LdTrue
+	16: StLoc[0](loc0: bool)
+B4:
+	17: CopyLoc[3](loc3: u64)
+	18: LdU64(10)
+	19: Lt
+	20: BrFalse(90)
+B5:
+	21: MoveLoc[6](loc6: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[6](loc6: u64)
+	25: CopyLoc[6](loc6: u64)
+	26: LdU64(15)
+	27: Ge
+	28: BrFalse(30)
+B6:
+	29: Branch(96)
+B7:
+	30: MoveLoc[6](loc6: u64)
+	31: LdU64(2)
+	32: Add
+	33: StLoc[6](loc6: u64)
+	34: LdU64(0)
+	35: StLoc[5](loc5: u64)
+	36: LdU64(0)
+	37: StLoc[2](loc2: u64)
+	38: LdFalse
+	39: StLoc[1](loc1: bool)
+B8:
+	40: CopyLoc[1](loc1: bool)
+	41: BrFalse(47)
+B9:
+	42: MoveLoc[2](loc2: u64)
+	43: LdU64(1)
+	44: Add
+	45: StLoc[2](loc2: u64)
+	46: Branch(49)
+B10:
+	47: LdTrue
+	48: StLoc[1](loc1: bool)
+B11:
+	49: CopyLoc[2](loc2: u64)
+	50: LdU64(10)
+	51: Lt
+	52: BrFalse(73)
+B12:
+	53: MoveLoc[5](loc5: u64)
+	54: LdU64(1)
+	55: Add
+	56: StLoc[5](loc5: u64)
+	57: CopyLoc[5](loc5: u64)
+	58: LdU64(15)
+	59: Ge
+	60: BrFalse(62)
+B13:
+	61: Branch(79)
+B14:
+	62: MoveLoc[5](loc5: u64)
+	63: LdU64(2)
+	64: Add
+	65: StLoc[5](loc5: u64)
+	66: CopyLoc[2](loc2: u64)
+	67: LdU64(2)
+	68: Mod
+	69: LdU64(0)
+	70: Eq
+	71: BrFalse(74)
+B15:
+	72: Branch(40)
+B16:
+	73: Branch(79)
+B17:
+	74: MoveLoc[5](loc5: u64)
+	75: LdU64(2)
+	76: Mul
+	77: StLoc[5](loc5: u64)
+	78: Branch(40)
+B18:
+	79: MoveLoc[4](loc4: u64)
+	80: MoveLoc[5](loc5: u64)
+	81: Add
+	82: StLoc[4](loc4: u64)
+	83: CopyLoc[3](loc3: u64)
+	84: LdU64(2)
+	85: Mod
+	86: LdU64(0)
+	87: Eq
+	88: BrFalse(91)
+B19:
+	89: Branch(8)
+B20:
+	90: Branch(96)
+B21:
+	91: MoveLoc[6](loc6: u64)
+	92: LdU64(2)
+	93: Mul
+	94: StLoc[6](loc6: u64)
+	95: Branch(8)
+B22:
+	96: CopyLoc[4](loc4: u64)
+	97: CopyLoc[6](loc6: u64)
+	98: Add
+	99: LdU64(106)
+	100: Eq
+	101: BrFalse(103)
+B23:
+	102: Branch(107)
+B24:
+	103: MoveLoc[4](loc4: u64)
+	104: MoveLoc[6](loc6: u64)
+	105: Add
+	106: Abort
+B25:
+	107: Ret
+}
+}

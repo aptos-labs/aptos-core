@@ -1,0 +1,14 @@
+// ---- Model Dump
+module 0x42::M {
+    private fun t2() {
+        loop {
+          if return Tuple() {
+            break
+          } else {
+            Tuple()
+          };
+          Tuple()
+        }
+    }
+    spec fun $t2();
+} // end 0x42::M
