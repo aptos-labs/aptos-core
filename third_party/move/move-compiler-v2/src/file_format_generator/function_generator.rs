@@ -695,7 +695,7 @@ impl<'a> FunctionGenerator<'a> {
         // Ensure that temps on the stack which are used after this point are saved to locals.
         self.save_used_after(ctx, temps);
         // Now compute which temps need to be pushed, on top of any which are already on the stack
-        let mut temps_to_push = self.analyze_stack(ctx, temps);
+        let mut temps_to_push = self.analyze_stack(temps);
         // If any of the temps we need to push now are actually underneath the temps already on the stack,
         // we need to even flush more of the stack to reach them.
         let mut stack_to_flush = self.stack.len();
@@ -758,11 +758,7 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Determines the maximal prefix of `temps` which are already on the stack, and
     /// returns the temps which are not and need to be pushed.
-    fn analyze_stack<'t>(
-        &mut self,
-        _ctx: &BytecodeContext,
-        temps: &'t [TempIndex],
-    ) -> &'t [TempIndex] {
+    fn analyze_stack<'t>(&mut self, temps: &'t [TempIndex]) -> &'t [TempIndex] {
         let mut temps_to_push = temps; // worst case need to push all
         for end in (1..=temps.len()).rev() {
             if self.stack.ends_with(&temps[0..end]) {
