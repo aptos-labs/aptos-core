@@ -863,7 +863,8 @@ module aptos_framework::fungible_asset {
     #[test(fx = @aptos_framework, creator = @0xcafe)]
     fun test_fungible_asset_upgrade(fx: &signer, creator: &signer) acquires Supply, ConcurrentSupply, FungibleAssetEvents, FungibleStore {
         let feature = features::get_concurrent_assets_feature();
-        features::change_feature_flags(fx, vector[], vector[feature]);
+        let agg_feature = features::get_aggregator_v2_api_feature();
+        features::change_feature_flags(fx, vector[], vector[feature, agg_feature]);
 
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
@@ -875,7 +876,7 @@ module aptos_framework::fungible_asset {
 
         deposit_with_ref(&transfer_ref, creator_store, fa);
 
-        features::change_feature_flags(fx, vector[feature], vector[]);
+        features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
 
         let extend_ref = object::generate_extend_ref(&creator_ref);
         upgrade_to_concurrent(&extend_ref);
