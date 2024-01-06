@@ -58,7 +58,7 @@ impl AggNodeProducer for RealAggNodeProducer {
         let task = async move {
             let agg_node = rb.broadcast(req, agg_state).await;
             if let Some(tx) = agg_node_tx {
-                tx.push((), agg_node).unwrap();
+                tx.push((), agg_node);
             }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
