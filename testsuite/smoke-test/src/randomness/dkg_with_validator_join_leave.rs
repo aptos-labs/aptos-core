@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::{randomness, randomness::decrypt_key_map, smoke_test_environment::SwarmBuilder};
+use crate::{
+    randomness,
+    randomness::{decrypt_key_map, num_validators, verify_dkg_transcript, wait_for_dkg_finish},
+    smoke_test_environment::SwarmBuilder,
+};
 use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_forge::{Node, Swarm};
 use std::sync::Arc;
-use crate::randomness::{num_validators, verify_dkg_transcript, wait_for_dkg_finish};
 
 #[tokio::test]
 async fn dkg_with_validator_join_leave() {
@@ -103,7 +106,7 @@ async fn dkg_with_validator_join_leave() {
         num_validators(&dkg_session_3)
     );
 
-    assert!(verify_dkg_transcript(&dkg_session_3, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_3, &decrypt_key_map).is_ok());
     assert_eq!(
         num_validators(&dkg_session_3),
         num_validators(&dkg_session_2) - 1
@@ -129,7 +132,7 @@ async fn dkg_with_validator_join_leave() {
         num_validators(&dkg_session_4)
     );
 
-    assert!(verify_dkg_transcript(&dkg_session_4, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_4, &decrypt_key_map).is_ok());
     assert_eq!(
         num_validators(&dkg_session_4),
         num_validators(&dkg_session_3) + 1

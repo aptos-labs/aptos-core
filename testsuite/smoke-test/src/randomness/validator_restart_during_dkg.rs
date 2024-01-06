@@ -1,15 +1,17 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript, wait_for_dkg_finish},
+    randomness::{
+        decrypt_key_map, get_on_chain_resource, verify_dkg_transcript, wait_for_dkg_finish,
+    },
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
+use aptos_types::on_chain_config::DKGState;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
-use aptos_types::on_chain_config::DKGState;
 
 #[tokio::test]
 async fn validator_restart_during_dkg() {
@@ -83,5 +85,5 @@ async fn validator_restart_during_dkg() {
         .last_complete
         .clone()
         .unwrap();
-    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map).is_ok());
 }

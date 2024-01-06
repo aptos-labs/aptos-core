@@ -27,7 +27,7 @@ async fn dkg_basic() {
     let dkg_session = wait_for_dkg_finish(&client, None, time_limit_secs).await;
 
     let decrypt_key_map = decrypt_key_map(&swarm);
-    assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 10))
         .await

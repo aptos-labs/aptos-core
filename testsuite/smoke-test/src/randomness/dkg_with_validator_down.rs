@@ -46,5 +46,5 @@ async fn dkg_with_validator_down() {
     )
     .await;
 
-    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_2, &decrypt_key_map).is_ok());
 }

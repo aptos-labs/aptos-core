@@ -23,7 +23,7 @@ mod aptos_features;
 mod aptos_version;
 mod chain_id;
 mod consensus_config;
-mod dkg_state;
+mod randomness;
 mod execution_config;
 mod gas_schedule;
 mod timed_features;
@@ -41,7 +41,7 @@ pub use self::{
         ConsensusConfigV1, ConsensusConfigV1Ext, ConsensusExtraFeature, DagConsensusConfigV1,
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
     },
-    dkg_state::{DKGSessionState, DKGState},
+    randomness::{BlockRandomness, DKGSessionState, DKGState},
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig,
         TransactionDeduperType, TransactionShufflerType,

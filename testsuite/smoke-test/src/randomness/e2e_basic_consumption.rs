@@ -1,23 +1,31 @@
 // Copyright © Aptos Foundation
 
-use crate::smoke_test_environment::SwarmBuilder;
+use crate::{
+    randomness::{
+        dealt_secret_from_shares, decrypt_key_map, get_on_chain_resource,
+        get_on_chain_resource_at_version, verify_randomness,
+    },
+    smoke_test_environment::SwarmBuilder,
+};
 use aptos::{move_tool::MemberId, test::CliTestFramework};
-use aptos_forge::{Node, Swarm, SwarmExt};
+use aptos_crypto::compat::Sha3_256;
+use aptos_dkg::weighted_vuf::traits::WeightedVUF;
+use aptos_forge::{Node, NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
+use aptos_types::{
+    dkg::{build_dkg_pvss_config, DKGTranscriptWrapper},
+    on_chain_config::{BlockRandomness, DKGState},
+    randomness::{RandMetadataToSign, WVUF},
+};
+use digest::Digest;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
-use aptos_crypto::compat::Sha3_256;
-
-#[derive(Deserialize, Serialize)]
-struct DiceRollHistory {
-    rolls: Vec<u64>,
-}
 
 /// Publish the `on-chain-dice` example module,
 /// run its function that consume on-chain randomness, and
 /// print out the random results.
 #[tokio::test]
-async fn basic_consumption() {
+async fn e2e_basic_consumption() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
@@ -25,10 +33,11 @@ async fn basic_consumption() {
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
-            conf.allow_new_validators = true;
         }))
         .build_with_cli(0)
         .await;
+
+    let rest_client = swarm.validators().next().unwrap().rest_client();
 
     info!("Wait for epoch 2. Epoch 1 does not have randomness.");
     swarm
@@ -36,21 +45,9 @@ async fn basic_consumption() {
         .await
         .expect("Epoch 2 taking too long to arrive!");
 
-    // let actual_block_randomness = get_latest_block_randomness();
-    // let vuf_shared_sf: G2;
-    // let rand_metadata_signed: G1;
-    // let vuf_output: Gt;
-    // let eval_bytes = bcs::to_bytes(&vuf_output).unwrap();
-    // let expected_block_randomness = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
-    //
-    // assert_eq!();
-
     let root_address = swarm.chain_info().root_account().address();
     info!("Root account: {}", root_address);
     let _root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_address);
-
-    let client_endpoint = swarm.validators().next().unwrap().rest_api_endpoint();
-    let rest_client = aptos_rest_client::Client::new(client_endpoint.clone());
 
     info!("Publishing OnChainDice module.");
     publish_on_chain_dice_module(&mut cli, 0).await;
@@ -76,7 +73,12 @@ async fn basic_consumption() {
         .unwrap()
         .into_inner();
 
-    println!("Roll history: {:?}", dice_roll_history.rolls);
+    info!("Roll history: {:?}", dice_roll_history.rolls);
+}
+
+#[derive(Deserialize, Serialize)]
+struct DiceRollHistory {
+    rolls: Vec<u64>,
 }
 
 async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {

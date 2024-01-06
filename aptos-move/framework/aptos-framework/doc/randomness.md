@@ -31,8 +31,9 @@ On-chain randomness Move API as specified in [AIP-41](https://github.com/aptos-f
 
 ## Resource `BlockRandomness`
 
-The block-level seed randomness, only stored under account <code>0x0</code>.
-It's updated at the beginning of every block.
+The block-level randomness seed.
+It is updated at the beginning of every block.
+VUF input (<code>epoch, round</code>) is also included for smoke-testability.
 
 NOTE: This is a seed shared by every txn in the block. Your transaction should NOT consume it directly.
 Use the public functions in this module instead.
@@ -48,6 +49,18 @@ Use the public functions in this module instead.
 
 
 <dl>
+<dt>
+<code>epoch: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>round: u64</code>
+</dt>
+<dd>
+
+</dd>
 <dt>
 <code>block_randomness: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
 </dt>
@@ -86,10 +99,10 @@ Use the public functions in this module instead.
 
 ## Function `on_new_block`
 
-Invoked in <code>block_prologue_ext()</code> to update the block-level seed randomness.
+Invoked in <code>block_prologue_ext()</code> to update the block randomness.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, randomness_available: bool, block_randomness: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, randomness_available: bool, epoch: u64, round: u64, block_randomness: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
 
 
@@ -98,13 +111,23 @@ Invoked in <code>block_prologue_ext()</code> to update the block-level seed rand
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, randomness_available: bool, block_randomness: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a> {
-    <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
-    <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a>&gt;(@vm)) {
-        <b>move_from</b>&lt;<a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a>&gt;(@vm);
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    randomness_available: bool,
+    epoch: u64,
+    round: u64,
+    block_randomness: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+) <b>acquires</b> <a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a>&gt;(@aptos_framework)) {
+        <b>move_from</b>&lt;<a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a>&gt;(@aptos_framework);
     };
     <b>if</b> (randomness_available) {
-        <b>move_to</b>(vm, <a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a> { block_randomness })
+        <b>move_to</b>(aptos_framework, <a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a> {
+            epoch,
+            round,
+            block_randomness
+        })
     };
 }
 </code></pre>
@@ -131,7 +154,7 @@ Generate 32 random bytes.
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_next_blob">next_blob</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a> {
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a>&gt;(@vm).block_randomness);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a>&gt;(@aptos_framework).block_randomness);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, get_transaction_hash());
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <a href="randomness.md#0x1_randomness_get_and_add_txn_local_state">get_and_add_txn_local_state</a>());
     sha3_256(input)

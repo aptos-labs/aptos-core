@@ -51,6 +51,7 @@ diesel = { workspace = true, features = [
     "numeric",
     "serde_json",
 ] }
+digest = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
 num-traits = { workspace = true }

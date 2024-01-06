@@ -11,30 +11,43 @@ module aptos_std::randomness {
     const EUT_FAILURE: u64 = 1;
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
-    /// The block-level seed randomness, only stored under account `0x0`.
-    /// It's updated at the beginning of every block.
+    /// The block-level randomness seed.
+    /// It is updated at the beginning of every block.
+    /// VUF input (`epoch, round`) is also included for smoke-testability.
     ///
     /// NOTE: This is a seed shared by every txn in the block. Your transaction should NOT consume it directly.
     /// Use the public functions in this module instead.
     struct BlockRandomness has drop, key {
+        epoch: u64,
+        round: u64,
         block_randomness: vector<u8>,
     }
 
-    /// Invoked in `block_prologue_ext()` to update the block-level seed randomness.
-    public(friend) fun on_new_block(vm: &signer, randomness_available: bool, block_randomness: vector<u8>) acquires BlockRandomness {
-        system_addresses::assert_vm(vm);
-        if (exists<BlockRandomness>(@vm)) {
-            move_from<BlockRandomness>(@vm);
+    /// Invoked in `block_prologue_ext()` to update the block randomness.
+    public(friend) fun on_new_block(
+        aptos_framework: &signer,
+        randomness_available: bool,
+        epoch: u64,
+        round: u64,
+        block_randomness: vector<u8>
+    ) acquires BlockRandomness {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        if (exists<BlockRandomness>(@aptos_framework)) {
+            move_from<BlockRandomness>(@aptos_framework);
         };
         if (randomness_available) {
-            move_to(vm, BlockRandomness { block_randomness })
+            move_to(aptos_framework, BlockRandomness {
+                epoch,
+                round,
+                block_randomness
+            })
         };
     }
 
     /// Generate 32 random bytes.
     public fun next_blob(): vector<u8> acquires BlockRandomness {
         let input = DST;
-        vector::append(&mut input, borrow_global<BlockRandomness>(@vm).block_randomness);
+        vector::append(&mut input, borrow_global<BlockRandomness>(@aptos_framework).block_randomness);
         vector::append(&mut input, get_transaction_hash());
         vector::append(&mut input, get_and_add_txn_local_state());
         sha3_256(input)

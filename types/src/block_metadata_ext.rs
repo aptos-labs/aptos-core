@@ -52,9 +52,9 @@ impl BlockMetadataExt {
         }
     }
 
-    pub fn get_prologue_ext_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
+    pub fn get_prologue_ext_move_args(self) -> Vec<MoveValue> {
         let mut ret = vec![
-            MoveValue::Signer(signer),
+            MoveValue::Signer(AccountAddress::ONE),
             MoveValue::Address(AccountAddress::from_bytes(self.id().to_vec()).unwrap()),
             MoveValue::U64(self.epoch()),
             MoveValue::U64(self.round()),

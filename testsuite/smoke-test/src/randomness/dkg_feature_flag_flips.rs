@@ -5,8 +5,8 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
-use std::{sync::Arc, time::Duration};
 use aptos_types::on_chain_config::DKGState;
+use std::{sync::Arc, time::Duration};
 
 /// A quick overview of what this test does.
 ///             Has randomness?     What else happened?
@@ -52,7 +52,7 @@ async fn dkg_feature_flag_flips() {
         .last_complete
         .expect("After epoch 3, there should be DKG results on chain.");
     assert_eq!(3, dkg_session_3.target_epoch);
-    assert!(verify_dkg_transcript(&dkg_session_3, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_3, &decrypt_key_map).is_ok());
 
     println!("Disabling the feature.");
     let disable_dkg_script = r#"
@@ -80,7 +80,9 @@ script {
         )
         .await
         .expect("Waited too long for epoch 5.");
-    let maybe_last_complete = get_on_chain_resource::<DKGState>(&client).await.last_complete;
+    let maybe_last_complete = get_on_chain_resource::<DKGState>(&client)
+        .await
+        .last_complete;
     assert!(
         maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch < 5
     );
@@ -117,5 +119,5 @@ script {
         .last_complete
         .expect("Starting epoch 7, there should be DKG results again.");
     assert_eq!(7, dkg_session_7.target_epoch);
-    assert!(verify_dkg_transcript(&dkg_session_7, &decrypt_key_map));
+    assert!(verify_dkg_transcript(&dkg_session_7, &decrypt_key_map).is_ok());
 }

@@ -45,3 +45,15 @@ impl OnChainConfig for DKGState {
     const MODULE_IDENTIFIER: &'static str = "dkg";
     const TYPE_IDENTIFIER: &'static str = "DKGState";
 }
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct BlockRandomness {
+    pub epoch: u64,
+    pub round: u64,
+    pub block_randomness: Vec<u8>,
+}
+
+impl OnChainConfig for BlockRandomness {
+    const MODULE_IDENTIFIER: &'static str = "randomness";
+    const TYPE_IDENTIFIER: &'static str = "BlockRandomness";
+}

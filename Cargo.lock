@@ -14206,6 +14206,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs 0.1.4",
  "diesel",
+ "digest 0.9.0",
  "futures",
  "hex",
  "move-core-types",
