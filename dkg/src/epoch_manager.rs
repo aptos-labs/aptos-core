@@ -20,7 +20,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGState, StartDKGEvent},
+    dkg::{DKGState, DKGStartEvent},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -34,7 +34,7 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
-    node_config: NodeConfig,
+    sk: Option<bls12381::PrivateKey>,
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
     reconfig_events: ReconfigNotificationListener<P>,
@@ -44,7 +44,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
     network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
-    start_dkg_event_tx: Option<aptos_channel::Sender<(), StartDKGEvent>>,
+    start_dkg_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
     vtxn_pull_notification_rx_from_pool: vtxn_pool::PullNotificationReceiver,
     vtxn_pull_notification_tx_to_dkgmgr: Option<vtxn_pool::PullNotificationSender>,
@@ -62,7 +62,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            node_config: node_config.clone(),
+            sk: None,//TODO: load from storage
             my_addr,
             epoch_state: None,
             reconfig_events,
@@ -206,19 +206,5 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tx.send(ack_tx).unwrap();
             ack_rx.await.unwrap();
         }
-    }
-
-    fn private_key(&self) -> bls12381::PrivateKey {
-        let backend = &self.node_config.consensus.safety_rules.backend;
-        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        let private_key: bls12381::PrivateKey = storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key");
-
-        private_key
     }
 }

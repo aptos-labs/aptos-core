@@ -3,7 +3,7 @@ use crate::{dkg_manager::agg_node_producer::AggNodeProducer, network::IncomingRp
 use aptos_channels::aptos_channel;
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_types::{
-    dkg::{DKGAggNode, DKGSessionState, StartDKGEvent},
+    dkg::{DKGAggNode, DKGSessionState, DKGStartEvent},
     epoch_state::EpochState,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -47,7 +47,7 @@ impl DKGManager {
     pub async fn run(
         self,
         _in_progress_session: Option<DKGSessionState>,
-        _start_dkg_event_rx: aptos_channel::Receiver<(), StartDKGEvent>,
+        _start_dkg_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
         _rpc_msg_rx: aptos_channel::Receiver<(), (AccountAddress, IncomingRpcRequest)>,
         _dkg_txn_pulled_rx: vtxn_pool::PullNotificationReceiver,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,

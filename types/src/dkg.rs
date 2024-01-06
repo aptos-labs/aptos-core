@@ -6,23 +6,26 @@ use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStruct
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
+/// Reflection of Move type `0x1::dkg::DKGStartEvent`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StartDKGEvent {
+pub struct DKGStartEvent {
     pub target_epoch: u64,
     pub start_time_us: u64,
     pub target_validator_set: ValidatorSet,
 }
 
-impl MoveStructType for StartDKGEvent {
+impl MoveStructType for DKGStartEvent {
     const MODULE_NAME: &'static IdentStr = ident_str!("dkg");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("StartDKGEvent");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
 }
 
+/// DKG parameters.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DKGConfig {
     //TODO
 }
 
+/// Aggregated DKG transcript.
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq, Eq)]
 pub struct DKGAggNode {
     //TODO

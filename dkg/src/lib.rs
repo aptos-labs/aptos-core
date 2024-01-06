@@ -17,7 +17,7 @@ use aptos_event_notifications::{
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use tokio::runtime::Runtime;
-pub use types::{DKGMessage, DKGNode};
+pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
     node_config: &NodeConfig,

@@ -27,28 +27,9 @@ pub struct DKGNetworkClient<NetworkClient> {
 }
 
 impl<NetworkClient: NetworkClientInterface<DKGMessage>> DKGNetworkClient<NetworkClient> {
-    /// Returns a new consensus network client
+    /// Returns a new DKG network client
     pub fn new(network_client: NetworkClient) -> Self {
         Self { network_client }
-    }
-
-    /// Send a single message to the destination peer
-    pub fn send_to(&self, peer: PeerId, message: DKGMessage) -> Result<(), Error> {
-        let peer_network_id = self.get_peer_network_id_for_peer(peer);
-        self.network_client.send_to_peer(message, peer_network_id)
-    }
-
-    /// Send a single message to the destination peers
-    pub fn send_to_many(
-        &self,
-        peers: impl Iterator<Item = PeerId>,
-        message: DKGMessage,
-    ) -> Result<(), Error> {
-        let peer_network_ids: Vec<PeerNetworkId> = peers
-            .map(|peer| self.get_peer_network_id_for_peer(peer))
-            .collect();
-        self.network_client
-            .send_to_peers(message, &peer_network_ids)
     }
 
     /// Send a RPC to the destination peer

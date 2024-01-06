@@ -10,7 +10,7 @@ use futures::future::AbortHandle;
 /// A sub-process of the whole DKG process.
 /// Once invoked by `DKGManager` to `start_produce`,
 /// it starts producing an `AggDKGNode` and returns an abort handle.
-/// Once an `AggDKGNode` is available, it is sent back via a channel given earlier.
+/// Once an `AggDKGNode` is available, it is sent back via channel `agg_node_tx`.
 pub trait AggNodeProducer: Send + Sync {
     fn start_produce(
         &self,
