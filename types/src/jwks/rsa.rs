@@ -3,7 +3,7 @@
 #[cfg(test)]
 use crate::move_any::Any as MoveAny;
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, ensure};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
@@ -41,18 +41,22 @@ impl TryFrom<&serde_json::Value> for RSA_JWK {
     type Error = anyhow::Error;
 
     fn try_from(json_value: &serde_json::Value) -> Result<Self, Self::Error> {
+        let kty = json_value
+            .get("kty")
+            .ok_or_else(|| anyhow!("Field `kty` not found"))?
+            .as_str()
+            .ok_or_else(|| anyhow!("Field `kty` is not a string"))?
+            .to_string();
+
+        ensure!(kty.as_str() == "RSA", "json to rsa jwk conversion failed with incorrect kty");
+
         let ret = Self {
+            kty,
             kid: json_value
                 .get("kid")
                 .ok_or_else(|| anyhow!("Field `kid` not found"))?
                 .as_str()
                 .ok_or_else(|| anyhow!("Field `kid` is not a string"))?
-                .to_string(),
-            kty: json_value
-                .get("kty")
-                .ok_or_else(|| anyhow!("Field `kty` not found"))?
-                .as_str()
-                .ok_or_else(|| anyhow!("Field `kty` is not a string"))?
                 .to_string(),
             alg: json_value
                 .get("alg")
@@ -73,10 +77,6 @@ impl TryFrom<&serde_json::Value> for RSA_JWK {
                 .ok_or_else(|| anyhow!("Field `n` is not a string"))?
                 .to_string(),
         };
-
-        if ret.kty.as_str() != "RSA" {
-            bail!("field `kty` should be `RSA`");
-        }
 
         Ok(ret)
     }
