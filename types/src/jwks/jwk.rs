@@ -8,10 +8,30 @@ use anyhow::anyhow;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 
+/// Reflection of Move type `0x1::jwks::JWK`.
+/// When you load an on-chain config that contains some JWK(s), the JWK will be of this type.
+/// When you call a Move function from rust that takes some JWKs as input, pass in JWKs of this type.
+/// Otherwise, it is recommended to convert this to the rust enum `JWK` below for better rust experience.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct JWKMoveStruct {
+    pub variant: MoveAny,
+}
+
+/// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
 #[derive(Debug, PartialEq)]
 pub enum JWK {
     RSA(RSA_JWK),
     Unsupported(UnsupportedJWK),
+}
+
+impl From<JWK> for JWKMoveStruct {
+    fn from(jwk: JWK) -> Self {
+        let variant = match jwk {
+            JWK::RSA(variant) => variant.as_move_any(),
+            JWK::Unsupported(variant) => variant.as_move_any(),
+        };
+        JWKMoveStruct { variant }
+    }
 }
 
 impl TryFrom<JWKMoveStruct> for JWK {
@@ -77,23 +97,4 @@ fn convert_jwk_to_jwk_move_struct() {
         variant: rsa_jwk.as_move_any(),
     };
     assert_eq!(jwk_move_struct, JWKMoveStruct::from(jwk));
-}
-
-/// Reflection of Move type `0x1::jwks::JWK`.
-/// When you load an on-chain config that contains some JWK(s), the JWK will be of this type.
-/// When you call a Move function from rust that takes some JWKs as input, pass in JWKs of this type.
-/// Otherwise, it is recommended to convert this to the rust enum `JWK` for better rust experience.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct JWKMoveStruct {
-    pub variant: MoveAny,
-}
-
-impl From<JWK> for JWKMoveStruct {
-    fn from(jwk: JWK) -> Self {
-        let variant = match jwk {
-            JWK::RSA(variant) => variant.as_move_any(),
-            JWK::Unsupported(variant) => variant.as_move_any(),
-        };
-        JWKMoveStruct { variant }
-    }
 }
