@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::{agg_node_producer::DummyAggNodeProducer, DKGManager},
+    dkg_manager::{agg_trx_producer::DummyAggTranscriptProducer, DKGManager},
     network::{IncomingRpcRequest, NetworkReceivers},
     network_interface::DKGNetworkClient,
     DKGMessage,
@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::NodeConfig;
-use aptos_crypto::bls12381;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
@@ -20,7 +19,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState},
+    dkg::{DKGStartEvent, DKGState, DKGTrait, DummyDKG},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -34,7 +33,7 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
-    sk: Arc<bls12381::PrivateKey>,
+    dkg_sk: Arc<<DummyDKG as DKGTrait>::PrivateParams>,
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
     reconfig_events: ReconfigNotificationListener<P>,
@@ -62,7 +61,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            sk: Arc::new(Self::load_private_key(node_config)),
+            dkg_sk: Arc::new(Self::load_private_params(node_config)),
             my_addr,
             epoch_state: None,
             reconfig_events,
@@ -153,7 +152,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 ..
             } = payload.get::<DKGState>().unwrap_or_default();
 
-            let agg_node_producer = DummyAggNodeProducer {}; //TODO: replace with real
+            let agg_node_producer = DummyAggTranscriptProducer {}; //TODO: replace with real
 
             let (start_dkg_event_tx, start_dkg_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
@@ -167,8 +166,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::new(
-                self.sk.clone(),
+            let dkg_manager = DKGManager::<DummyDKG>::new(
+                self.dkg_sk.clone(),
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_node_producer),
@@ -202,7 +201,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
     }
 
-    fn load_private_key(node_config: &NodeConfig) -> bls12381::PrivateKey {
+    fn load_private_params(node_config: &NodeConfig) -> <DummyDKG as DKGTrait>::PrivateParams {
         let backend = &node_config.consensus.safety_rules.backend;
         let storage: Storage = backend.try_into().expect("Unable to initialize storage");
         if let Err(error) = storage.available() {

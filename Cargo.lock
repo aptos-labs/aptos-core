@@ -1221,6 +1221,7 @@ dependencies = [
  "aptos-bounded-executor",
  "aptos-channels",
  "aptos-config",
+ "aptos-consensus-types",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-enum-conversion-derive",
