@@ -4,7 +4,6 @@
 use crate::move_any::Any as MoveAny;
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
@@ -12,7 +11,7 @@ use std::str::FromStr;
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RSA_JWK {
     pub kid: String,
     pub kty: String,

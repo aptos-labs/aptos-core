@@ -25,7 +25,7 @@ pub struct SupportedOIDCProviders {
 }
 
 /// Move type `0x1::jwks::ProviderJWKs` in rust.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ProviderJWKs {
     pub issuer: Issuer,
     pub version: u64,
@@ -39,19 +39,19 @@ impl ProviderJWKs {
 }
 
 /// Move type `0x1::jwks::JWKs` in rust.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct AllProvidersJWKs {
     pub entries: Vec<ProviderJWKs>,
 }
 
 /// Move type `0x1::jwks::ObservedJWKs` in rust.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ObservedJWKs {
     pub jwks: AllProvidersJWKs,
 }
 
 /// Reflection of Move type `0x1::jwks::ObservedJWKs`.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
 }

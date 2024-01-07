@@ -4,14 +4,13 @@
 use crate::move_any::Any as MoveAny;
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use aptos_crypto::HashValue;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::str::FromStr;
 
 /// Move type `0x1::jwks::UnsupportedJWK` in rust.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct UnsupportedJWK {
     pub id: Vec<u8>,
     pub payload: Vec<u8>,

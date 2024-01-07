@@ -5,14 +5,13 @@ use crate::{
     move_any::{Any as MoveAny, AsMoveAny},
 };
 use anyhow::anyhow;
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 
 /// Reflection of Move type `0x1::jwks::JWK`.
 /// When you load an on-chain config that contains some JWK(s), the JWK will be of this type.
 /// When you call a Move function from rust that takes some JWKs as input, pass in JWKs of this type.
 /// Otherwise, it is recommended to convert this to the rust enum `JWK` below for better rust experience.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct JWKMoveStruct {
     pub variant: MoveAny,
 }
