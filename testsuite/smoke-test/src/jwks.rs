@@ -1,13 +1,16 @@
+// Copyright © Aptos Foundation
+
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_types::jwks::{
-    rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, JWKMoveStruct, PatchedJWKs,
-    ProviderJWKs, JWK,
+    jwk::{JWKMoveStruct, JWK},
+    unsupported::UnsupportedJWK,
+    AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
 };
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
     let maybe_response = rest_client

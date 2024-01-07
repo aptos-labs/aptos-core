@@ -1,10 +1,14 @@
 // Copyright © Aptos Foundation
 
+#[cfg(test)]
+use crate::move_any::Any as MoveAny;
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
+use std::str::FromStr;
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 #[allow(non_camel_case_types)]
@@ -15,6 +19,19 @@ pub struct RSA_JWK {
     pub alg: String,
     pub e: String,
     pub n: String,
+}
+
+impl RSA_JWK {
+    #[cfg(test)]
+    pub fn new_for_testing(kid: &str, kty: &str, alg: &str, e: &str, n: &str) -> Self {
+        Self {
+            kid: kid.to_string(),
+            kty: kty.to_string(),
+            alg: alg.to_string(),
+            e: e.to_string(),
+            n: n.to_string(),
+        }
+    }
 }
 
 impl AsMoveAny for RSA_JWK {
@@ -58,10 +75,6 @@ impl TryFrom<&serde_json::Value> for RSA_JWK {
                 .to_string(),
         };
 
-        if ret.alg.as_str() != "RS256" {
-            bail!("field `kid` should be `RS256`");
-        }
-
         if ret.kty.as_str() != "RSA" {
             bail!("field `kty` should be `RSA`");
         }
@@ -80,4 +93,94 @@ impl AsMoveValue for RSA_JWK {
             self.n.as_move_value(),
         ]))
     }
+}
+
+#[test]
+fn test_rsa_jwk_from_json() {
+    // Valid JWK JSON should be accepted.
+    let json_str =
+        r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    let actual = RSA_JWK::try_from(&json);
+    let expected = RSA_JWK::new_for_testing("kid1", "RSA", "RS256", "AQAB", "13131");
+    assert_eq!(expected, actual.unwrap());
+
+    // JWK JSON without `kid` should be rejected.
+    let json_str = r#"{"alg": "RS256", "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON with wrong `kid` type should be rejected.
+    let json_str =
+        r#"{"alg": "RS256", "kid": {}, "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON without `alg` should be rejected.
+    let json_str = r#"{"kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON with wrong `alg` type should be rejected.
+    let json_str =
+        r#"{"alg": 0, "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON without `kty` should be rejected.
+    let json_str = r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON with wrong `kty` value should be rejected.
+    let json_str =
+        r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSB", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON without `e` should be rejected.
+    let json_str = r#"{"alg": "RS256", "kid": "kid1", "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON with wrong `e` type should be rejected.
+    let json_str =
+        r#"{"alg": "RS256", "kid": "kid1", "e": 65537, "use": "sig", "kty": "RSA", "n": "13131"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON without `n` should be rejected.
+    let json_str = r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA"}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+
+    // JWK JSON with wrong `n` type should be rejected.
+    let json_str =
+        r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA", "n": false}"#;
+    let json = serde_json::Value::from_str(json_str).unwrap();
+    assert!(RSA_JWK::try_from(&json).is_err());
+}
+
+#[test]
+fn test_rsa_jwk_as_move_value() {
+    let rsa_jwk = RSA_JWK::new_for_testing("kid1", "RSA", "RS256", "AQAB", "13131");
+    let move_value = rsa_jwk.as_move_value();
+    assert_eq!(
+        vec![
+            4, 107, 105, 100, 49, 3, 82, 83, 65, 5, 82, 83, 50, 53, 54, 4, 65, 81, 65, 66, 5, 49,
+            51, 49, 51, 49
+        ],
+        move_value.simple_serialize().unwrap()
+    );
+}
+
+#[test]
+fn test_rsa_jwk_as_move_any() {
+    let rsa_jwk = RSA_JWK::new_for_testing("kid1", "RSA", "RS256", "AQAB", "1313131313131");
+    let actual = rsa_jwk.as_move_any();
+    let expected = MoveAny {
+        type_name: "0x1::jwks::RSA_JWK".to_string(),
+        data: bcs::to_bytes(&rsa_jwk).unwrap(),
+    };
+    assert_eq!(expected, actual);
 }
