@@ -14,8 +14,10 @@ use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::error;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{DKGStartEvent, DKGState},
@@ -32,7 +34,7 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
-    sk: Option<bls12381::PrivateKey>,
+    sk: Arc<bls12381::PrivateKey>,
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
     reconfig_events: ReconfigNotificationListener<P>,
@@ -60,7 +62,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            sk: None, //TODO: load from storage
+            sk: Arc::new(Self::load_private_key(node_config)),
             my_addr,
             epoch_state: None,
             reconfig_events,
@@ -74,12 +76,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pull_notification_tx_to_dkgmgr: None,
             start_dkg_event_tx: None,
         }
-    }
-
-    fn epoch_state(&self) -> &EpochState {
-        self.epoch_state
-            .as_ref()
-            .expect("EpochManager not started yet")
     }
 
     fn process_rpc_request(
@@ -143,11 +139,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get()
             .expect("failed to get ValidatorSet from payload");
 
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
-        };
-        self.epoch_state = Some(Arc::new(epoch_state.clone()));
+        });
+        self.epoch_state = Some(epoch_state.clone());
 
         let features = payload.get::<Features>().unwrap_or_default();
 
@@ -172,8 +168,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
             let dkg_manager = DKGManager::new(
+                self.sk.clone(),
                 self.my_addr,
-                self.epoch_state().clone(),
+                epoch_state,
                 Arc::new(agg_node_producer),
                 self.vtxn_pool_write_cli.clone(),
             );
@@ -203,5 +200,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tx.send(ack_tx).unwrap();
             ack_rx.await.unwrap();
         }
+    }
+
+    fn load_private_key(node_config: &NodeConfig) -> bls12381::PrivateKey {
+        let backend = &node_config.consensus.safety_rules.backend;
+        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        if let Err(error) = storage.available() {
+            panic!("Storage is not available: {:?}", error);
+        }
+        storage
+            .get(CONSENSUS_KEY)
+            .map(|v| v.value)
+            .expect("Unable to get private key")
     }
 }
