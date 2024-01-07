@@ -152,7 +152,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 ..
             } = payload.get::<DKGState>().unwrap_or_default();
 
-            let agg_node_producer = DummyAggTranscriptProducer {}; //TODO: replace with real
+            let agg_trx_producer = DummyAggTranscriptProducer {}; //TODO: replace with real
 
             let (start_dkg_event_tx, start_dkg_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
@@ -170,7 +170,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.dkg_sk.clone(),
                 self.my_addr,
                 epoch_state,
-                Arc::new(agg_node_producer),
+                Arc::new(agg_trx_producer),
                 self.vtxn_pool_write_cli.clone(),
             );
             let (vtxn_pull_notification_tx, vtxn_pull_notification_rx) =

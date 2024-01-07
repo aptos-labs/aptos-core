@@ -31,7 +31,7 @@ impl<S: DKGTrait> AggTranscriptProducer<S> for DummyAggTranscriptProducer {
         &self,
         _epoch_state: Arc<EpochState>,
         _dkg_config: S::PublicParams,
-        _agg_node_tx: Option<Sender<(), S::Transcript>>,
+        _agg_trx_tx: Option<Sender<(), S::Transcript>>,
     ) -> AbortHandle {
         let (abort_handle, _) = AbortHandle::new_pair();
         abort_handle
