@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 use crate::{dkg_manager::agg_node_producer::AggNodeProducer, network::IncomingRpcRequest};
 use aptos_channels::aptos_channel;
-use aptos_crypto::bls12381::PrivateKey;
 use aptos_types::{
     dkg::{DKGAggNode, DKGSessionState, DKGStartEvent},
     epoch_state::EpochState,
@@ -19,10 +18,9 @@ pub struct DKGManager {
     my_addr: AccountAddress,
     epoch_state: EpochState,
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
-    private_key: PrivateKey,
     agg_node_producer: Arc<dyn AggNodeProducer>,
     agg_node_tx: Option<aptos_channel::Sender<(), DKGAggNode>>,
-    //TODO: inner state
+    //TODO: inner state and sk
 }
 
 #[allow(clippy::never_loop)]
@@ -30,7 +28,6 @@ impl DKGManager {
     pub fn new(
         my_addr: AccountAddress,
         epoch_state: EpochState,
-        private_key: PrivateKey,
         agg_node_producer: Arc<dyn AggNodeProducer>,
         vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
     ) -> Self {
@@ -38,7 +35,6 @@ impl DKGManager {
             my_addr,
             epoch_state,
             vtxn_pool_write_cli,
-            private_key,
             agg_node_tx: None,
             agg_node_producer,
         }
@@ -63,7 +59,7 @@ impl DKGManager {
                     }
                     break;
                 }
-            };
+            }
         }
     }
 }

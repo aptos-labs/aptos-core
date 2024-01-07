@@ -14,13 +14,11 @@ use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::error;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGState, DKGStartEvent},
+    dkg::{DKGStartEvent, DKGState},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -62,7 +60,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            sk: None,//TODO: load from storage
+            sk: None, //TODO: load from storage
             my_addr,
             epoch_state: None,
             reconfig_events,
@@ -176,7 +174,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let dkg_manager = DKGManager::new(
                 self.my_addr,
                 self.epoch_state().clone(),
-                self.private_key(),
                 Arc::new(agg_node_producer),
                 self.vtxn_pool_write_cli.clone(),
             );
