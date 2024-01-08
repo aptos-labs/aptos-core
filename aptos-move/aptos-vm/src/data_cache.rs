@@ -130,22 +130,13 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
                 *address,
                 resource_group.clone(),
             ));
+            let buf =
+                self.resource_group_view
+                    .get_resource_from_group(&key, struct_tag, maybe_layout)?;
 
             let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
-            let common_error = |e| -> PartialVMError {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("{}", e))
-            };
-
-            let buf = self
-                .resource_group_view
-                .get_resource_from_group(&key, struct_tag, maybe_layout)
-                .map_err(common_error)?;
             let group_size = if first_access {
-                self.resource_group_view
-                    .resource_group_size(&key)
-                    .map_err(common_error)?
-                    .get()
+                self.resource_group_view.resource_group_size(&key)?.get()
             } else {
                 0
             };
@@ -154,6 +145,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size + group_size as usize))
         } else {
             let access_path = AccessPath::resource_access_path(*address, struct_tag.clone())
+                // TODO: Check the status codem because the error is ude to BCS failure.
                 .map_err(|_| PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES))?;
 
             let buf = self
@@ -232,7 +224,6 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
         let access_path = AccessPath::from(module_id);
         self.executor_view
             .get_module_bytes(&StateKey::access_path(access_path))
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 
@@ -241,18 +232,11 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-        layout: Option<&MoveTypeLayout>,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, PartialVMError> {
+        let state_key = StateKey::table_item((*handle).into(), key.to_vec());
         self.executor_view
-            .get_resource_bytes(
-                &StateKey::table_item((*handle).into(), key.to_vec()),
-                layout,
-            )
-            // TODO: What if th error is speculative?
-            .map_err(|e| {
-                PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
-                    .with_message(format!("remote table resolver failure: {}", e))
-            })
+            .get_resource_bytes(&state_key, maybe_layout)
     }
 }
 
