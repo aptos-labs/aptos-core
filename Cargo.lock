@@ -2995,6 +2995,7 @@ dependencies = [
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-secure-storage",
  "aptos-state-sync-driver",
  "aptos-storage-interface",

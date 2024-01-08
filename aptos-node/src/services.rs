@@ -24,6 +24,7 @@ use aptos_peer_monitoring_service_server::{
     PeerMonitoringServiceServer,
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
@@ -99,6 +100,7 @@ pub fn bootstrap_api_and_indexer(
 /// Starts consensus and returns the runtime
 pub fn start_consensus_runtime(
     node_config: &mut NodeConfig,
+    safety_rules_manager: SafetyRulesManager,
     db_rw: DbReaderWriter,
     consensus_reconfig_subscription: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
     consensus_network_interfaces: ApplicationNetworkInterfaces<ConsensusMsg>,
@@ -109,6 +111,7 @@ pub fn start_consensus_runtime(
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
+        safety_rules_manager,
         consensus_network_interfaces.network_client,
         consensus_network_interfaces.network_service_events,
         Arc::new(consensus_notifier),

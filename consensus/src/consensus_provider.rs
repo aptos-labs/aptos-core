@@ -22,6 +22,7 @@ use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_safety_rules::SafetyRulesManager;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_validator_transaction_pool as vtxn_pool;
 use aptos_vm::AptosVM;
@@ -32,6 +33,7 @@ use tokio::runtime::Runtime;
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(
     node_config: &NodeConfig,
+    safety_rules_manager: SafetyRulesManager,
     network_client: NetworkClient<ConsensusMsg>,
     network_service_events: NetworkServiceEvents<ConsensusMsg>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
@@ -67,6 +69,7 @@ pub fn start_consensus(
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
     let epoch_mgr = EpochManager::new(
         node_config,
+        safety_rules_manager,
         time_service,
         self_sender,
         consensus_network_client,
