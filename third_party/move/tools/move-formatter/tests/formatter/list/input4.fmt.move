@@ -29,7 +29,7 @@ module econia::incentives {
             // Tier 3 parameters
             vector[
                 /*comment*/ FEE_SHARE_DIVISOR_3,
-                TIER_ACTIVATION_FEE_3 /*comment*/ ,
+                TIER_ACTIVATION_FEE_3 /*comment*/,
                 WITHDRAWAL_FEE_3
             ],
             // Tier 4 parameters

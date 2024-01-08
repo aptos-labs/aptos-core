@@ -7,9 +7,7 @@ spec aptos_std::big_vector {
         invariant end_index <= spec_table_len(buckets) * bucket_size;
     }
 
-    spec fun spec_table_len<K, V>(t: TableWithLength<K, V>): u64 {
-        table_with_length::spec_len(t)
-    }
+    spec fun spec_table_len<K, V>(t: TableWithLength<K, V>): u64 {table_with_length::spec_len(t)}
 
     spec fun spec_table_contains<K, V>(t: TableWithLength<K, V>, k: K): bool {
         table_with_length::spec_contains(t, k)

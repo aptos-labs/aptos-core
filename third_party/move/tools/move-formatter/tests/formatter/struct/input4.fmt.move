@@ -1,7 +1,7 @@
 module complex_module {
 
     // Struct with nested comments and complex types
-    struct ComplexStruct2<T, U> {
+    struct ComplexStruct2<T, U>{
 
         field1: /* Pre-comment */ vector<T> /* Inline comment */,
 
@@ -15,6 +15,7 @@ module complex_module {
         // Field 1 comment (single-line)
         field1: u64, // Inline comment (line 1)
         // continued on line 2.
-        /* Field 2 comment (multi-line) */ field2: /* Inline comment (multi-line) */ bool, // Trailing comment (single-line)
+        /* Field 2 comment (multi-line) */
+        field2: /* Inline comment (multi-line) */ bool, // Trailing comment (single-line)
     } // Struct footer comment (single-line)
 }

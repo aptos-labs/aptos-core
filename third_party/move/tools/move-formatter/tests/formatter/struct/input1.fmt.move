@@ -17,7 +17,7 @@ module test_module2 {
 
 module test_module4 {
 
-    struct TestStruct4<T> {
+    struct TestStruct4<T>{
         // This is a comment before complex field
         field: vector<T>, // This is a comment after complex field
     }

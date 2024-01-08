@@ -1,7 +1,10 @@
 module TestFunFormat {
     struct S has store {}
+
     struct R has store {}
+
     struct T has store {}
+
     struct G<T> has store {}
 
     fun f1()

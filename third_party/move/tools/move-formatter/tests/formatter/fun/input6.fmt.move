@@ -13,7 +13,7 @@ module 0xcafe::vectors {
     public entry fun guess_flips_directly(flips: vector<u8>) {
         let i = 0;
         while (i < vector::length(&flips)) {
-            if (*vector::borrow(&flips, i) != 0) {break};
+            if (*vector::borrow(&flips, i) != 0) { break };
             i = i + 1;
         };
         let _v = copy flips; // this is ok
@@ -37,9 +37,7 @@ module 0xcafe::vectors {
     inline fun loops_with_break(flips: &vector<u8>) {
         let i = 0;
         while (i < vector::length(flips)) {
-            if (*vector::borrow(flips, i) != 0) {
-                break
-            };
+            if (*vector::borrow(flips, i) != 0) { break };
             i = i + 1;
         };
     }
@@ -47,7 +45,7 @@ module 0xcafe::vectors {
     fun loops_with_break_no_inline(flips: &vector<u8>) {
         let i = 0;
         while (i < vector::length(flips)) {
-            if (*vector::borrow(flips, i) != 0) {break};
+            if (*vector::borrow(flips, i) != 0) { break };
             i = i + 1;
         };
     }
@@ -55,7 +53,7 @@ module 0xcafe::vectors {
     inline fun loops_without_break(flips: &vector<u8>) {
         let i = 0;
         while (i < vector::length(flips)) {
-            assert!(*vector::borrow(flips, i) == 0, 3);
+            assert !(*vector::borrow(flips, i) == 0, 3);
             i = i + 1;
         };
     }

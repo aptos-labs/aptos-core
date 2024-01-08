@@ -10,8 +10,8 @@ module 0x42::LambdaTest1 {
     public inline fun inline_apply(f: |u64| u64, b: u64): u64 {
         f(b)
     }
-
 }
+
 module 0x42::LambdaTest2 {
     use 0x42::LambdaTest1;
     use std::vector;
@@ -21,7 +21,10 @@ module 0x42::LambdaTest2 {
         LambdaTest1::inline_apply1(
             |z| {
                 let a: u64 = LambdaTest1::inline_mul(z, 1);
-                let b: u64 = LambdaTest1::inline_mul(c, LambdaTest1::inline_apply(|x| x, 2));
+                let b: u64 = LambdaTest1::inline_mul(
+                    c,
+                    LambdaTest1::inline_apply(|x| x, 2)
+                );
                 g(a + b)
             },
 

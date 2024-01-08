@@ -10,9 +10,10 @@ module M {
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, OriginatingAddress {
-            address_map: table::new(),
-        });
+        move_to(
+            aptos_framework,
+            OriginatingAddress {address_map: table::new(),}
+        );
     }
 
     fun create_account_if_does_not_exist(account_address: address) {

@@ -31,8 +31,7 @@ module Test {
         acquires SomeStruct {
         let val = borrow_global<SomeStruct>(addr);
 
-        val
-            .some_field
+        val.some_field
             .some_other_field6
             .some_other_field5
             .some_other_field4
