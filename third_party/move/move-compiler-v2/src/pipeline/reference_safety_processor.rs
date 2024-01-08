@@ -524,6 +524,7 @@ impl LifetimeState {
 }
 
 impl LifetimeState {
+    /// Returns an iterator over the locals borrowed in `self` but not in `after`
     pub fn lifetime_diff<'a>(&'a self, after: &'a Self) -> impl Iterator<Item = TempIndex> + 'a {
         self.local_to_label_map
             .keys()
