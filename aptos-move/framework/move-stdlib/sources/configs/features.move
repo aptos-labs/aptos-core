@@ -365,17 +365,29 @@ module std::features {
         apply_diff(borrow_global_mut<Features>(@std), enable, disable);
     }
 
-    /// Function to enable and disable features. Can only be called by a signer of @std.
+    /// Enable and disable features *for the next epoch*.
+    /// The changes will be effective until the next epoch,
+    /// which can be triggered manually by calling `aptos_governance::reconfigure()`,
+    /// or automatically when the current epoch expires.
+    ///
+    /// Can only be called by a signer of @std.
     public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>)
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+
+        // Figure out the baseline feature flag vec that the diff will be applied to.
         let features = if (config_for_next_epoch::does_exist<Features>()) {
+            // If there is a buffered feature flag vec, use it as the baseline.
             config_for_next_epoch::extract<Features>(framework)
         } else if (exists<Features>(@std)) {
+            // Otherwise, use the currently effective feature flag vec as the baseline, if it exists.
             *borrow_global<Features>(@std)
         } else {
+            // Otherwise, use an empty feature flag vec.
             Features { features: vector[] }
         };
+
+        // Apply the diff and save it to the buffer.
         apply_diff(&mut features, enable, disable);
         config_for_next_epoch::upsert(framework, features);
     }
@@ -420,11 +432,11 @@ module std::features {
     }
 
     fun apply_diff(features: &mut Features, enable: vector<u64>, disable: vector<u64>) {
-        vector::for_each_ref(&enable, |feature| {
-            set(&mut features.features, *feature, true);
+        vector::for_each(enable, |feature| {
+            set(&mut features.features, feature, true);
         });
-        vector::for_each_ref(&disable, |feature| {
-            set(&mut features.features, *feature, false);
+        vector::for_each(disable, |feature| {
+            set(&mut features.features, feature, false);
         });
     }
 
