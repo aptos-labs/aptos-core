@@ -48,6 +48,10 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+Any:
+  STRUCT:
+    - type_name: STR
+    - data: BYTES
 AnyPublicKey:
   ENUM:
     0:
@@ -419,6 +423,10 @@ HashValue:
           SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
+JWKMoveStruct:
+  STRUCT:
+    - variant:
+        TYPENAME: Any
 LedgerInfo:
   STRUCT:
     - commit_info:
@@ -539,6 +547,14 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+ProviderJWKs:
+  STRUCT:
+    - issuer:
+        SEQ: U8
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
 PublicKey:
   NEWTYPESTRUCT: BYTES
 QuorumCert:
@@ -547,6 +563,15 @@ QuorumCert:
         TYPENAME: VoteData
     - signed_ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+QuorumCertifiedUpdate:
+  STRUCT:
+    - authors:
+        SEQ:
+          TYPENAME: AccountAddress
+    - observed:
+        TYPENAME: ProviderJWKs
+    - multi_sig_bytes:
+        SEQ: U8
 RandGenMessage:
   STRUCT:
     - epoch: U64
@@ -839,6 +864,15 @@ ValidatorTransaction:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
     1:
+      ObservedJWKsUpdates:
+        STRUCT:
+          - updates:
+              MAP:
+                KEY:
+                  SEQ: U8
+                VALUE:
+                  TYPENAME: QuorumCertifiedUpdate
+    2:
       DummyTopic2:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction

@@ -47,6 +47,10 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+Any:
+  STRUCT:
+    - type_name: STR
+    - data: BYTES
 AnyPublicKey:
   ENUM:
     0:
@@ -81,12 +85,6 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
-PartialAuthenticatorAssertionResponse:
-  STRUCT:
-    - signature:
-        TYPENAME: AssertionSignature
-    - authenticator_data: BYTES
-    - client_data_json: BYTES
 AssertionSignature:
   ENUM:
     0:
@@ -214,6 +212,10 @@ HashValue:
           SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
+JWKMoveStruct:
+  STRUCT:
+    - variant:
+        TYPENAME: Any
 Module:
   STRUCT:
     - code: BYTES
@@ -260,6 +262,12 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+PartialAuthenticatorAssertionResponse:
+  STRUCT:
+    - signature:
+        TYPENAME: AssertionSignature
+    - authenticator_data: BYTES
+    - client_data_json: BYTES
 Path:
   ENUM:
     0:
@@ -274,6 +282,23 @@ Path:
       ResourceGroup:
         NEWTYPE:
           TYPENAME: StructTag
+ProviderJWKs:
+  STRUCT:
+    - issuer:
+        SEQ: U8
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
+QuorumCertifiedUpdate:
+  STRUCT:
+    - authors:
+        SEQ:
+          TYPENAME: AccountAddress
+    - observed:
+        TYPENAME: ProviderJWKs
+    - multi_sig_bytes:
+        SEQ: U8
 RawTransaction:
   STRUCT:
     - sender:
@@ -563,6 +588,15 @@ ValidatorTransaction:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
     1:
+      ObservedJWKsUpdates:
+        STRUCT:
+          - updates:
+              MAP:
+                KEY:
+                  SEQ: U8
+                VALUE:
+                  TYPENAME: QuorumCertifiedUpdate
+    2:
       DummyTopic2:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction

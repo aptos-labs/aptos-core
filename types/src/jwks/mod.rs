@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 
-use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
 use move_core_types::account_address::AccountAddress;
@@ -64,5 +63,5 @@ pub struct PatchedJWKs {
 pub struct QuorumCertifiedUpdate {
     pub authors: BTreeSet<AccountAddress>,
     pub observed: ProviderJWKs,
-    pub multi_sig: bls12381::Signature,
+    pub multi_sig_bytes: Vec<u8>,
 }
