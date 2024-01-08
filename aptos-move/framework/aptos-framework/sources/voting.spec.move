@@ -118,7 +118,7 @@ spec aptos_framework::voting {
         aborts_if len(early_resolution_vote_threshold.vec) != 0 && min_vote_threshold > early_resolution_vote_threshold.vec[0];
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if !std::string::spec_internal_check_utf8(IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
-        aborts_if len(execution_hash) <= 0;
+        aborts_if len(execution_hash) == 0;
         let execution_key = std::string::spec_utf8(IS_MULTI_STEP_PROPOSAL_KEY);
         aborts_if simple_map::spec_contains_key(metadata, execution_key);
         aborts_if voting_forum.next_proposal_id + 1 > MAX_U64;
