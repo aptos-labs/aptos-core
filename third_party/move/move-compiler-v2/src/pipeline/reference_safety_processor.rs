@@ -524,6 +524,13 @@ impl LifetimeState {
 }
 
 impl LifetimeState {
+    pub fn lifetime_diff<'a>(&'a self, after: &'a Self) -> impl Iterator<Item = TempIndex> + 'a {
+        self.local_to_label_map
+            .keys()
+            .filter(|t| !after.local_to_label_map.contains_key(t))
+            .cloned()
+    }
+
     /// Returns the locals borrowed
     pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
         self.local_to_label_map.keys().cloned()
@@ -1343,10 +1350,7 @@ impl LifetimeInfoAtCodeOffset {
     /// locals being released need to be determined from livevar analysis results.
     pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> + '_ {
         self.before
-            .local_to_label_map
-            .keys()
-            .filter(|t| !self.after.local_to_label_map.contains_key(t))
-            .cloned()
+            .lifetime_diff(&self.after)
     }
 
     /// Returns true if the value in the variable has been moved at this program point.
