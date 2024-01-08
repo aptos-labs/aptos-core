@@ -232,6 +232,12 @@ impl ProofCoordinator {
         Ok(None)
     }
 
+    fn update_counters(state: &IncrementalProofState) {
+        counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.aggregated_signature.len() as f64);
+        counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
+        counters::BATCH_SUCCESSFUL_CREATION.observe(if state.completed { 1.0 } else { 0.0 });
+    }
+
     async fn expire(&mut self) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
@@ -248,12 +254,7 @@ impl ProofCoordinator {
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
                 }
-                counters::BATCH_RECEIVED_REPLIES_COUNT
-                    .observe(state.aggregated_signature.len() as f64);
-                counters::BATCH_RECEIVED_REPLIES_VOTING_POWER
-                    .observe(state.aggregated_voting_power as f64);
-                counters::BATCH_SUCCESSFUL_CREATION
-                    .observe(if state.completed { 1.0 } else { 0.0 });
+                Self::update_counters(&state);
             }
         }
         if self
@@ -288,6 +289,7 @@ impl ProofCoordinator {
                                 let digest = batch.digest();
                                 if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
                                     if batch == *existing_proof.get().batch_info() {
+                                        Self::update_counters(existing_proof.get());
                                         existing_proof.remove();
                                     }
                                 }

@@ -1,8 +1,7 @@
 openapi: 3.0.0
 info:
   title: Aptos Node API
-  description: The Aptos Node API is a RESTful API for client applications to interact
-    with the Aptos blockchain.
+  description: The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.
   version: 1.2.0
   contact:
     name: Aptos Labs
@@ -9172,8 +9171,7 @@ components:
         vm_error_code:
           type: integer
           format: uint64
-          description: A code providing VM error details when submitting transactions
-            to the VM
+          description: A code providing VM error details when submitting transactions to the VM
     AptosErrorCode:
       type: string
       description: |-
@@ -9273,8 +9271,7 @@ components:
           description: Whether the transaction was successful
         vm_status:
           type: string
-          description: The VM status of the transaction, can tell useful information
-            in a failure
+          description: The VM status of the transaction, can tell useful information in a failure
         accumulator_root_hash:
           $ref: '#/components/schemas/HashValue'
         changes:
@@ -9516,8 +9513,7 @@ components:
             $ref: '#/components/schemas/Address'
         secondary_signers:
           type: array
-          description: The associated signatures, in the same order as the secondary
-            addresses
+          description: The associated signatures, in the same order as the secondary addresses
           items:
             $ref: '#/components/schemas/AccountSignature'
         fee_payer_address:
@@ -9601,8 +9597,7 @@ components:
           description: Whether the transaction was successful
         vm_status:
           type: string
-          description: The VM status of the transaction, can tell useful information
-            in a failure
+          description: The VM status of the transaction, can tell useful information in a failure
         accumulator_root_hash:
           $ref: '#/components/schemas/HashValue'
         changes:
@@ -9716,8 +9711,7 @@ components:
           $ref: '#/components/schemas/MoveFunctionVisibility'
         is_entry:
           type: boolean
-          description: Whether the function can be called as an entry function directly
-            in a transaction
+          description: Whether the function can be called as an entry function directly in a transaction
         is_view:
           type: boolean
           description: Whether the function is a view function or not
@@ -9744,8 +9738,7 @@ components:
       properties:
         constraints:
           type: array
-          description: Move abilities tied to the generic type param and associated
-            with the function that uses it
+          description: Move abilities tied to the generic type param and associated with the function that uses it
           items:
             $ref: '#/components/schemas/MoveAbility'
     MoveFunctionVisibility:
@@ -9875,8 +9868,7 @@ components:
       properties:
         constraints:
           type: array
-          description: Move abilities tied to the generic type param and associated
-            with the type that uses it
+          description: Move abilities tied to the generic type param and associated with the type that uses it
           items:
             $ref: '#/components/schemas/MoveAbility'
     MoveStructTag:
@@ -10023,8 +10015,7 @@ components:
             $ref: '#/components/schemas/Address'
         secondary_signers:
           type: array
-          description: The associated signatures, in the same order as the secondary
-            addresses
+          description: The associated signatures, in the same order as the secondary addresses
           items:
             $ref: '#/components/schemas/AccountSignature'
     MultiEd25519Signature:
@@ -10247,8 +10238,7 @@ components:
           description: Whether the transaction was successful
         vm_status:
           type: string
-          description: The VM status of the transaction, can tell useful information
-            in a failure
+          description: The VM status of the transaction, can tell useful information in a failure
         accumulator_root_hash:
           $ref: '#/components/schemas/HashValue'
         changes:
@@ -10600,8 +10590,7 @@ components:
           description: Whether the transaction was successful
         vm_status:
           type: string
-          description: The VM status of the transaction, can tell useful information
-            in a failure
+          description: The VM status of the transaction, can tell useful information in a failure
         accumulator_root_hash:
           $ref: '#/components/schemas/HashValue'
         changes:
@@ -10662,8 +10651,7 @@ components:
           description: Whether the transaction was successful
         vm_status:
           type: string
-          description: The VM status of the transaction, can tell useful information
-            in a failure
+          description: The VM status of the transaction, can tell useful information in a failure
         accumulator_root_hash:
           $ref: '#/components/schemas/HashValue'
         changes:

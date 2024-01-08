@@ -98,7 +98,6 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
-    "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -361,7 +360,6 @@ aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
-aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
@@ -448,6 +446,7 @@ ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
@@ -461,7 +460,7 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
-bigdecimal = { version = "0.3.0", features = ["serde"] }
+bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
@@ -496,7 +495,7 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = "2.1.0"
+diesel = "2.1"
 diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
@@ -562,7 +561,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
-num-bigint = { version = "0.3.2", features = ["rand"] }
+num-bigint = { version = "0.4.4", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
@@ -594,8 +593,8 @@ project-root = "0.2.2"
 prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
+proptest = "1.4.0"
+proptest-derive = "0.4.0"
 prost = "0.12.1"
 prost-types = "0.12.1"
 quanta = "0.10.1"
@@ -629,16 +628,14 @@ sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
-# For more information about why we are pinned to 1.0.152, see this issue:
-# https://github.com/aptos-labs/aptos-core/issues/10424
-serde = { version = "=1.0.152", features = ["derive", "rc"] }
+serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_yaml = "0.8.24"
 shadow-rs = "0.16.2"
 smallvec = "1.8.0"
@@ -762,8 +759,6 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
-# More context here: https://github.com/weiznich/diesel_async/pull/121.
-diesel-async = { git = "https://github.com/banool/diesel_async", rev = "7115c8668b88d56029cb1471e84d2ea0234ff035" }
