@@ -408,7 +408,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // FIXME
+                    // TODO: Revisit this error whether it should be invariant violation
+                    //       or a panic/fallback.
                     Some(Err(PartialVMError::new(
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     )
@@ -422,7 +423,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
             randomly_check_layout_matches(maybe_layout, layout.as_deref()).map_err(|e| {
-                // FIXME
+                // TODO[agg_v2](cleanup): Push into `randomly_check_layout_matches` once Satya's
+                //                        change lands. Consider the error code as well.
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("get_resource_from_group layout check: {:?}", e))
             })?;

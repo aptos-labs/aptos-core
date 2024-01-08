@@ -53,7 +53,7 @@ use claims::assert_ok;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
-    vm_status::{StatusCode, VMStatus},
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     value_transformation::{
@@ -999,8 +999,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn get_raw_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        let ret = self.base_view.get_state_value(state_key);
+    fn get_raw_base_value(&self, state_key: &T::Key) -> PartialVMResult<Option<StateValue>> {
+        let ret = self.base_view.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for {:?}: {:?}",
+                state_key, e
+            ))
+        });
 
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
@@ -1315,7 +1320,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         state_key: &T::Key,
         layout: UnknownOrLayout,
         kind: ReadKind,
-    ) -> anyhow::Result<ReadResult> {
+    ) -> PartialVMResult<ReadResult> {
         debug_assert!(
             state_key.module_path().is_none(),
             "Reading a module {:?} using ResourceView",
@@ -1366,10 +1371,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             // will not log the speculative error,
             // so no actual error will be logged once the execution is halted and
             // the speculative logging is flushed.
-            ReadResult::HaltSpeculativeExecution(msg) => Err(anyhow::Error::new(VMStatus::error(
+            ReadResult::HaltSpeculativeExecution(msg) => Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                Some(msg),
-            ))),
+            )
+            .with_message(msg)),
             ReadResult::Uninitialized => {
                 unreachable!("base value must already be recorded in the MV data structure")
             },
@@ -1378,19 +1383,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 
     fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> PartialVMResult<()> {
-        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) = match self
-            .get_raw_base_value(group_key)
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?
-        {
-            Some(state_value) => (
-                bcs::from_bytes(state_value.bytes()).map_err(|_| {
-                    PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
-                        .with_message("Resource group deserialization error".to_string())
-                })?,
-                TransactionWrite::from_state_value(Some(state_value)),
-            ),
-            None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
-        };
+        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
+            match self.get_raw_base_value(group_key)? {
+                Some(state_value) => (
+                    bcs::from_bytes(state_value.bytes()).map_err(|e| {
+                        PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                            .with_message(format!(
+                                "Failed to deserialize the resource group at {:? }: {:?}",
+                                group_key, e
+                            ))
+                    })?,
+                    TransactionWrite::from_state_value(Some(state_value)),
+                ),
+                None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
+            };
         let base_group_sentinel_ops = base_group
             .into_iter()
             .map(|(t, bytes)| {
@@ -1429,8 +1435,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
             ReadKind::Value,
         )
         .map(|res| res.into_value())
-        // TODO: fixme.
-        .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn get_resource_state_value_metadata(
@@ -1445,8 +1449,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
                     unreachable!("Read result must be Metadata kind")
                 }
             })
-            // TODO: fixme.
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
@@ -1458,8 +1460,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
                     unreachable!("Read result must be Exists kind")
                 }
             })
-            // TODO: fixme.
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 
@@ -1603,10 +1603,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                         // because parallel execution will fall back to sequential anyway.
                         Ok(None)
                     },
-                    Err(NotFound) => self
-                        .get_raw_base_value(state_key)
-                        // TODO: Fix error propagation here.
-                        .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR)),
+                    Err(NotFound) => self.get_raw_base_value(state_key),
                 }
             },
             ViewState::Unsync(state) => {
@@ -1616,11 +1613,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     .module_reads
                     .insert(state_key.clone());
                 state.unsync_map.fetch_module_data(state_key).map_or_else(
-                    || {
-                        // TODO: Fix error propagation here.
-                        self.get_raw_base_value(state_key)
-                            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
-                    },
+                    || self.get_raw_base_value(state_key),
                     |v| Ok(v.as_state_value()),
                 )
             },
@@ -1656,7 +1649,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
         // TODO: Fix error propagation here.
         self.get_resource_state_value(state_key, None)
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 
