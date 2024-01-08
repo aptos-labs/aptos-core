@@ -356,7 +356,7 @@ use 0000000000000000000000000000000000000000000000000000000000000001::vector as 
 
 
 
-public remove<Ty0>(Arg0: &mut vector<Ty0>, Arg1: u64): Ty0 {
+public remove<Ty0>(Arg0: &mut vector<Ty0>, Arg1: u64): Ty0 /* def_idx: 0 */ {
 L0:	loc2: u64
 L1:	loc3: &mut vector<Ty0>
 L2:	loc4: u64
@@ -417,7 +417,7 @@ B8:
 	43: VecPopBack(1)
 	44: Ret
 }
-create(): vector<u64> {
+create(): vector<u64> /* def_idx: 1 */ {
 B0:
 	0: LdU64(1)
 	1: LdU64(2)
@@ -425,7 +425,7 @@ B0:
 	3: VecPack(5, 3)
 	4: Ret
 }
-test_fold() {
+test_fold() /* def_idx: 2 */ {
 L0:	loc0: vector<u64>
 L1:	loc1: vector<u64>
 L2:	loc2: u64

@@ -138,30 +138,18 @@ module 0xABCD::simple {
     // The idea is that `COUNTER_STEP` is one of the few values (if not the only
     // one) that changes across versions.
     public entry fun step_signer(s: &signer) acquires Counter {
-        let counter = borrow_global_mut<Counter>(signer::address_of(s));
+        let addr = signer::address_of(s);
+        assert!(exists<Counter>(addr), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global_mut<Counter>(addr);
         *(&mut counter.count) = counter.count + COUNTER_STEP;
     }
 
     // Get the value behind `Counter`.
     public entry fun get_counter(s: &signer) acquires Counter {
-        let counter = borrow_global<Counter>(signer::address_of(s));
+        let addr = signer::address_of(s);
+        assert!(exists<Counter>(addr), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
+        let counter = borrow_global<Counter>(addr);
         counter.count;
-    }
-
-    public entry fun step_destination(owner: &signer, destination: address) acquires Counter {
-        let value = {
-            assert!(exists<Counter>(destination), error::invalid_argument(ECOUNTER_RESOURCE_NOT_PRESENT));
-
-            let counter = borrow_global_mut<Counter>(destination);
-            *(&mut counter.count) = counter.count + COUNTER_STEP;
-            counter.count
-        };
-        if (exists<Counter>(signer::address_of(owner))) {
-            let counter_owner = borrow_global_mut<Counter>(signer::address_of(owner));
-            *(&mut counter_owner.count) = value;
-        } else {
-            move_to<Counter>(owner, Counter { count: value });
-        }
     }
 
     //

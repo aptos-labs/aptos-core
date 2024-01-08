@@ -1,0 +1,27 @@
+error[E04009]: expected specific type
+  ┌─ tests/move_check/typing/global_invalid.move:4:17
+  │
+4 │         assert!(exists<T>(addr), 0);
+  │                 ^^^^^^^^^^^^^^^
+  │                 │      │
+  │                 │      Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found the type parameter: 'T'
+  │                 Invalid call to exists.
+
+error[E04009]: expected specific type
+  ┌─ tests/move_check/typing/global_invalid.move:5:17
+  │
+5 │         let _ = borrow_global<T>(addr);
+  │                 ^^^^^^^^^^^^^^^^^^^^^^
+  │                 │             │
+  │                 │             Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found the type parameter: 'T'
+  │                 Invalid call to borrow_global.
+
+error[E04009]: expected specific type
+  ┌─ tests/move_check/typing/global_invalid.move:6:9
+  │
+6 │         move_from<T>(addr);
+  │         ^^^^^^^^^^^^^^^^^^
+  │         │         │
+  │         │         Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found the type parameter: 'T'
+  │         Invalid call to move_from.
+

@@ -15,7 +15,7 @@ use aptos_framework::natives::aggregator_natives::aggregator_v2::{
 use aptos_language_e2e_tests::executor::ExecutorMode;
 use proptest::prelude::*;
 
-const STRESSTEST_MODE: bool = true;
+const STRESSTEST_MODE: bool = false;
 
 const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
@@ -342,7 +342,8 @@ proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough for these
         cases: if STRESSTEST_MODE { 1000 } else { 10 },
-        result_cache: if STRESSTEST_MODE { prop::test_runner::noop_result_cache } else {prop::test_runner::basic_result_cache },
+        // TODO: result cache breaks with proptest v1.1 and above because of this change: https://github.com/proptest-rs/proptest/pull/295.
+        // result_cache: if STRESSTEST_MODE { prop::test_runner::noop_result_cache } else {prop::test_runner::basic_result_cache },
         .. ProptestConfig::default()
     })]
 

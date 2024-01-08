@@ -3,7 +3,7 @@ Command `disassemble --name main`:
 script {
 
 
-main() {
+main() /* def_idx: 0 */ {
 B0:
 	0: Ret
 }

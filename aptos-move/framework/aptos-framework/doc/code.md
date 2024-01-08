@@ -895,7 +895,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 <table>
 <tr>
-<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
 </tr>
 
 <tr>

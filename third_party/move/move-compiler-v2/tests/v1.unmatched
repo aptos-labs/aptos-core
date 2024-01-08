@@ -104,6 +104,7 @@ move-compiler/tests/move_check/commands/{
   while_move_local_2.move,
 }
 move-compiler/tests/move_check/control_flow/{
+  for_user.move,
   infinite_loop_with_dead_exits.move,
   loop_after_loop.move,
 }
@@ -125,11 +126,6 @@ move-compiler/tests/move_check/deprecated/{
 move-compiler/tests/move_check/examples/{
   multi_pool_money_market_token.move,
   simple_money_market_token.move,
-}
-move-compiler/tests/move_check/folding/{
-  non_constant_empty_vec.move,
-  unfoldable_constants.move,
-  unfoldable_constants_blocks.move,
 }
 move-compiler/tests/move_check/instantiation_loops/{
   complex_1.move,
@@ -249,9 +245,9 @@ move-compiler/tests/move_check/typing/{
   bind_pop_resource.move,
   borrow_divergent.move,
   borrow_field_non_ref_non_local_root.move,
-  break_constant.move,
   conditional_copy_invalid.move,
   conditional_drop_invalid.move,
+  constant_supported_exps.move,
   constraints_not_satisfied_all_cases.move,
   constraints_not_satisfied_function_parameter.move,
   constraints_not_satisfied_function_return_type.move,
@@ -265,6 +261,7 @@ move-compiler/tests/move_check/typing/{
   declare_pop_resource.move,
   entry_signature_no_warning.move,
   extraneous_acquire.move,
+  global_invalid.move,
   ignore_inferred_resource.move,
   implicit_deref_borrow_field_not_copyable.move,
   infinite_instantiations_invalid.move,

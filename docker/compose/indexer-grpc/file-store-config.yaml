@@ -5,3 +5,4 @@ server_config:
   file_store_config:
     file_store_type: LocalFileStore
     local_file_store_path: /opt/aptos/file-store
+  chain_id: 4

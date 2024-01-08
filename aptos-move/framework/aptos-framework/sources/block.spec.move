@@ -1,7 +1,7 @@
 spec aptos_framework::block {
     /// <high-level-req>
     /// No.: 1
-    /// Property: During the module's initialization, it guarantees that the BlockResource resource moves under the
+    /// Requirement: During the module's initialization, it guarantees that the BlockResource resource moves under the
     /// Aptos framework account with initial values.
     /// Criticality: High
     /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
@@ -11,7 +11,7 @@ spec aptos_framework::block {
     /// Enforcement: Formally Verified via [high-level-req-1](Initialize).
     ///
     /// No.: 2
-    /// Property: Only the Aptos framework address may execute the following functionalities: (1) initialize
+    /// Requirement: Only the Aptos framework address may execute the following functionalities: (1) initialize
     /// BlockResource, and (2) update the epoch interval.
     /// Criticality: Critical
     /// Implementation: The initialize and  update_epoch_interval_microsecs functions ensure that only aptos_framework
@@ -19,21 +19,21 @@ spec aptos_framework::block {
     /// Enforcement: Formally Verified via [high-level-req-2.1](Initialize) and [high-level-req-2.2](update_epoch_interval_microsecs).
     ///
     /// No.: 3
-    /// Property: When updating the epoch interval, its value must be greater than zero and BlockResource must exist.
+    /// Requirement: When updating the epoch interval, its value must be greater than zero and BlockResource must exist.
     /// Criticality: High
     /// Implementation: The update_epoch_interval_microsecs function asserts that new_epoch_interval is greater than
     /// zero and updates BlockResource's state.
     /// Enforcement: Formally verified via [high-level-req-3.1](UpdateEpochIntervalMicrosecs) and [high-level-req-3.2](epoch_interval).
     ///
     /// No.: 4
-    /// Property: Only a valid proposer or the virtual machine is authorized to produce blocks.
+    /// Requirement: Only a valid proposer or the virtual machine is authorized to produce blocks.
     /// Criticality: Critical
     /// Implementation: During the execution of the block_prologue function, the validity of the proposer address is
     /// verified when setting the metadata for the current block.
     /// Enforcement: Formally Verified via [high-level-req-4](block_prologue).
     ///
     /// No.: 5
-    /// Property: While emitting a new block event, the number of them is equal to the current block height.
+    /// Requirement: While emitting a new block event, the number of them is equal to the current block height.
     /// Criticality: Medium
     /// Implementation: The emit_new_block_event function asserts that the number of new block events equals the current
     /// block height.

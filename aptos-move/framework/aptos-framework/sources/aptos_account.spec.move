@@ -1,7 +1,7 @@
 spec aptos_framework::aptos_account {
     /// <high-level-req>
     /// No.: 1
-    /// Property: During the creation of an Aptos account the following rules should hold: (1) the authentication key
+    /// Requirement: During the creation of an Aptos account the following rules should hold: (1) the authentication key
     /// should be 32 bytes in length, (2) an Aptos account should not already exist for that authentication key, and (3)
     /// the address of the authentication key should not be equal to a reserved address (0x0, 0x1, or 0x3).
     /// Criticality: Critical
@@ -10,14 +10,14 @@ spec aptos_framework::aptos_account {
     /// Enforcement: Formally verified via [high-level-req-1](CreateAccountAbortsIf).
     ///
     /// No.: 2
-    /// Property: After creating an Aptos account, the account should become registered to receive AptosCoin.
+    /// Requirement: After creating an Aptos account, the account should become registered to receive AptosCoin.
     /// Criticality: Critical
     /// Implementation: The create_account function creates a new account for the particular address and registers
     /// AptosCoin.
     /// Enforcement: Formally verified via [high-level-req-2](create_account).
     ///
     /// No.: 3
-    /// Property: An account may receive a direct transfer of coins they have not registered for if and only if the
+    /// Requirement: An account may receive a direct transfer of coins they have not registered for if and only if the
     /// transfer of arbitrary coins is enabled. By default the option should always set to be enabled for an account.
     /// Criticality: Low
     /// Implementation: Transfers of a coin to an account that has not yet registered for that coin should abort
@@ -25,7 +25,7 @@ spec aptos_framework::aptos_account {
     /// Enforcement: Formally verified via [high-level-req-3](can_receive_direct_coin_transfers).
     ///
     /// No.: 4
-    /// Property: Setting direct coin transfers may only occur if and only if a direct transfer config is associated
+    /// Requirement: Setting direct coin transfers may only occur if and only if a direct transfer config is associated
     /// with the provided account address.
     /// Criticality: Low
     /// Implementation: The set_allow_direct_coin_transfers function ensures the DirectTransferConfig structure exists
@@ -33,7 +33,7 @@ spec aptos_framework::aptos_account {
     /// Enforcement: Formally verified via [high-level-req-4](set_allow_direct_coin_transfers).
     ///
     /// No.: 5
-    /// Property: The transfer function should ensure an account is created for the provided destination if one does not
+    /// Requirement: The transfer function should ensure an account is created for the provided destination if one does not
     /// exist; then, register AptosCoin for that account if a particular is unregistered before transferring the amount.
     /// Criticality: Critical
     /// Implementation: The transfer function checks if the recipient account exists. If the account does not exist,
@@ -41,7 +41,7 @@ spec aptos_framework::aptos_account {
     /// Enforcement: Formally verified via [high-level-req-5](transfer).
     ///
     /// No.: 6
-    /// Property: Creating an account for the provided destination and registering it for that particular CoinType
+    /// Requirement: Creating an account for the provided destination and registering it for that particular CoinType
     /// should be the only way to enable depositing coins, provided the account does not already exist.
     /// Criticality: Critical
     /// Implementation: The deposit_coins function verifies if the recipient account exists. If the account does not
@@ -49,7 +49,7 @@ spec aptos_framework::aptos_account {
     /// Enforcement: Formally verified via [high-level-req-6](deposit_coins).
     ///
     /// No.: 7
-    /// Property: When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it
+    /// Requirement: When performing a batch transfer of Aptos Coin and/or a batch transfer of a custom coin type, it
     /// should ensure that the vector containing destination addresses and the vector containing the corresponding
     /// amounts are equal in length.
     /// Criticality: Low

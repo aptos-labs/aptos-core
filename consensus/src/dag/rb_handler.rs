@@ -181,7 +181,7 @@ impl RpcHandler for NodeBroadcastHandler {
         let votes_by_peer = self
             .votes_by_round_peer
             .entry(node.metadata().round())
-            .or_insert(BTreeMap::new());
+            .or_default();
         match votes_by_peer.get(node.metadata().author()) {
             None => {
                 let signature = node.sign_vote(&self.signer)?;

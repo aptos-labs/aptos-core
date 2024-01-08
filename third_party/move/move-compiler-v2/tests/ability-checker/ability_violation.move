@@ -1,8 +1,8 @@
 module 0x42::ability {
-	// TODO(#11377): uncomment will result in a crash
-	// fun move_from_no_key<T>(addr: address) {
-	// 	move_from<T>(addr);
-	// }
+
+	inline fun move_from_no_key<T>(addr: address) {
+		move_from<T>(addr);
+	}
 
 	struct Impotent {}
 
@@ -11,7 +11,7 @@ module 0x42::ability {
 	}
 
 	fun no_key(addr: address) {
-		move_from<Impotent>(addr);
+		move_from_no_key<Impotent>(addr);
 		move_from<S<Impotent>>(addr);
 		borrow_global_mut<Impotent>(addr);
 		borrow_global<Impotent>(addr);

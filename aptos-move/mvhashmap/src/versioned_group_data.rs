@@ -98,7 +98,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                         .get(&tag)
                         .expect("Reading twice from storage must be consistent");
                     if let ValueWithLayout::RawFromStorage(prev_v) = prev_v {
-                        assert!(v.bytes().map(|b| b.len()) == prev_v.bytes().map(|b| b.len()));
+                        assert_eq!(v.bytes().map(|b| b.len()), prev_v.bytes().map(|b| b.len()));
                     }
                 }
             },

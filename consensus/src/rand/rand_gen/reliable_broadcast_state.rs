@@ -4,9 +4,8 @@
 use crate::rand::rand_gen::{
     network_messages::RandMessage,
     rand_store::RandStore,
-    storage::interface::RandStorage,
     types::{
-        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck, Proof,
+        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck,
         RandConfig, RandShare, RequestShare, Share,
     },
 };
@@ -95,15 +94,15 @@ impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<
     }
 }
 
-pub struct ShareAggregateState<S, P, Storage> {
+pub struct ShareAggregateState<S> {
     rand_metadata: RandMetadata,
-    rand_store: Arc<Mutex<RandStore<S, P, Storage>>>,
+    rand_store: Arc<Mutex<RandStore<S>>>,
     rand_config: RandConfig,
 }
 
-impl<S, P, Storage> ShareAggregateState<S, P, Storage> {
+impl<S> ShareAggregateState<S> {
     pub fn new(
-        rand_store: Arc<Mutex<RandStore<S, P, Storage>>>,
+        rand_store: Arc<Mutex<RandStore<S>>>,
         metadata: RandMetadata,
         rand_config: RandConfig,
     ) -> Self {
@@ -115,9 +114,8 @@ impl<S, P, Storage> ShareAggregateState<S, P, Storage> {
     }
 }
 
-impl<S: Share, P: Proof<Share = S>, D: AugmentedData, Storage: RandStorage<S, P>>
-    BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
-    for Arc<ShareAggregateState<S, P, Storage>>
+impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+    for Arc<ShareAggregateState<S>>
 {
     type Aggregated = ();
     type Message = RequestShare;

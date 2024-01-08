@@ -1,7 +1,7 @@
 spec aptos_framework::account {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The initialization of the account module should result in the proper system initialization with valid
+    /// Requirement: The initialization of the account module should result in the proper system initialization with valid
     /// and consistent resources.
     /// Criticality: High
     /// Implementation: Initialization of the account module creates a valid address_map table and moves the resources
@@ -10,7 +10,7 @@ spec aptos_framework::account {
     /// values.
     ///
     /// No.: 2
-    /// Property: After successfully creating an account, the account resources should initialize with the default data,
+    /// Requirement: After successfully creating an account, the account resources should initialize with the default data,
     /// ensuring the proper initialization of the account state.
     /// Criticality: High
     /// Implementation: Creating an account via the create_account function validates the state and moves a new account
@@ -18,14 +18,14 @@ spec aptos_framework::account {
     /// Enforcement: Formally verified via [high-level-req-2](create_account).
     ///
     /// No.: 3
-    /// Property: Checking the existence of an account under a given address never results in an abort.
+    /// Requirement: Checking the existence of an account under a given address never results in an abort.
     /// Criticality: Low
     /// Implementation: The exists_at function returns a boolean value indicating the existence of an account under the
     /// given address.
     /// Enforcement: Formally verified by the [high-level-req-3](aborts_if) condition.
     ///
     /// No.: 4
-    /// Property: The account module maintains bounded sequence numbers for all accounts, guaranteeing they remain
+    /// Requirement: The account module maintains bounded sequence numbers for all accounts, guaranteeing they remain
     /// within the specified limit.
     /// Criticality: Medium
     /// Implementation: The sequence number of an account may only increase up to MAX_U64 in a succeeding manner.
@@ -33,7 +33,7 @@ spec aptos_framework::account {
     /// MAX_U64.
     ///
     /// No.: 5
-    /// Property: Only the ed25519 and multied25519 signature schemes are permissible.
+    /// Requirement: Only the ed25519 and multied25519 signature schemes are permissible.
     /// Criticality: Low
     /// Implementation: Exclusively perform key rotation using either the ed25519 or multied25519 signature schemes.
     /// Currently restricts the offering of rotation/signing capabilities to the ed25519 or multied25519 schemes.
@@ -43,7 +43,7 @@ spec aptos_framework::account {
     /// that the scheme enums correspond correctly to signature logic.
     ///
     /// No.: 6
-    /// Property: Exclusively permit the rotation of the authentication key of an account for the account owner or any
+    /// Requirement: Exclusively permit the rotation of the authentication key of an account for the account owner or any
     /// user who possesses rotation capabilities associated with that account.
     /// Criticality: Critical
     /// Implementation: In the rotate_authentication_key function, the authentication key derived from the
@@ -53,7 +53,7 @@ spec aptos_framework::account {
     /// [high-level-req-6.2](rotate_authentication_key_with_rotation_capability).
     ///
     /// No.: 7
-    /// Property: Only the owner of an account may offer or revoke the following capabilities: (1)
+    /// Requirement: Only the owner of an account may offer or revoke the following capabilities: (1)
     /// offer_rotation_capability, (2) offer_signer_capability, (3) revoke_rotation_capability, and (4)
     /// revoke_signer_capability.
     /// Criticality: Critical
@@ -64,7 +64,7 @@ spec aptos_framework::account {
     /// and [high-level-req-7.4](revoke_signer_capability).
     ///
     /// No.: 8
-    /// Property: The capability to create a signer for the account is exclusively reserved for either the account owner
+    /// Requirement: The capability to create a signer for the account is exclusively reserved for either the account owner
     /// or the account that has been granted the signing capabilities.
     /// Criticality: Critical
     /// Implementation: Signer creation for the account may only be successfully executed by explicitly granting the
@@ -72,7 +72,7 @@ spec aptos_framework::account {
     /// Enforcement: Formally verified via [high-level-req-8](create_authorized_signer).
     ///
     /// No.: 9
-    /// Property: Rotating the authentication key requires two valid signatures. With the private key of the current
+    /// Requirement: Rotating the authentication key requires two valid signatures. With the private key of the current
     /// authentication key. With the private key of the new authentication key.
     /// Criticality: Critical
     /// Implementation: The rotate_authentication_key verifies two signatures (current and new) before rotating to the
@@ -82,7 +82,7 @@ spec aptos_framework::account {
     /// [high-level-req-9.2](rotate_authentication_key_with_rotation_capability).
     ///
     /// No.: 10
-    /// Property: The rotation of the authentication key updates the account's authentication key with the newly supplied
+    /// Requirement: The rotation of the authentication key updates the account's authentication key with the newly supplied
     /// one.
     /// Criticality: High
     /// Implementation: The auth_key may only update to the provided new_auth_key after verifying the signature.
@@ -91,13 +91,13 @@ spec aptos_framework::account {
     /// was successful.
     ///
     /// No.: 11
-    /// Property: The creation number is monotonically increasing.
+    /// Requirement: The creation number is monotonically increasing.
     /// Criticality: Low
     /// Implementation: The guid_creation_num in the Account structure is monotonically increasing.
     /// Enforcement: Formally Verified via [high-level-req-11](guid_creation_num).
     ///
     /// No.: 12
-    /// Property: The Account resource is persistent.
+    /// Requirement: The Account resource is persistent.
     /// Criticality: Low
     /// Implementation: The Account structure assigned to the address should be persistent.
     /// Enforcement: Audited that the Account structure is persistent.

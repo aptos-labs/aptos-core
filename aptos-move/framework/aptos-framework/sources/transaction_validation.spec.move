@@ -1,14 +1,14 @@
 spec aptos_framework::transaction_validation {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
+    /// Requirement: The sender of a transaction should have sufficient coin balance to pay the transaction fee.
     /// Criticality: High
     /// Implementation: The prologue_common function asserts that the transaction sender has enough coin balance to be
     /// paid as the max_transaction_fee.
     /// Enforcement: Formally verified via [high-level-req-1](PrologueCommonAbortsIf). Moreover, the native transaction validation patterns have been manually audited.
     ///
     /// No.: 2
-    /// Property: All secondary signer addresses are verified to be authentic through a validation process.
+    /// Requirement: All secondary signer addresses are verified to be authentic through a validation process.
     /// Criticality: Critical
     /// Implementation: The function multi_agent_script_prologue ensures that each secondary signer address undergoes
     /// authentication validation, including verification of account existence and authentication key matching,
@@ -16,7 +16,7 @@ spec aptos_framework::transaction_validation {
     /// Enforcement: Formally verified via [high-level-req-2](multi_agent_script_prologue). Moreover, the native transaction validation patterns have been manually audited.
     ///
     /// No.: 3
-    /// Property: After successful execution, base the transaction fee on the configuration set by the features library.
+    /// Requirement: After successful execution, base the transaction fee on the configuration set by the features library.
     /// Criticality: High
     /// Implementation: The epilogue function collects the transaction fee for either redistribution or burning based on
     /// the feature::collect_and_distribute_gas_fees result.

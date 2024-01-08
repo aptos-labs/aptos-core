@@ -1,7 +1,7 @@
 spec aptos_framework::system_addresses {
     /// <high-level-req>
     /// No.: 1
-    /// Property: Asserting that a provided address corresponds to the Core Resources address should always yield a true
+    /// Requirement: Asserting that a provided address corresponds to the Core Resources address should always yield a true
     /// result when matched.
     /// Criticality: Low
     /// Implementation: The assert_core_resource and assert_core_resource_address functions ensure that the provided
@@ -9,7 +9,7 @@ spec aptos_framework::system_addresses {
     /// Enforcement: Formally verified via [high-level-req-1](AbortsIfNotCoreResource).
     ///
     /// No.: 2
-    /// Property: Asserting that a provided address corresponds to the Aptos Framework Resources address should always
+    /// Requirement: Asserting that a provided address corresponds to the Aptos Framework Resources address should always
     /// yield a true result when matched.
     /// Criticality: High
     /// Implementation: The assert_aptos_framework function ensures that the provided signer belongs to the
@@ -17,7 +17,7 @@ spec aptos_framework::system_addresses {
     /// Enforcement: Formally verified via [high-level-req-2](AbortsIfNotAptosFramework).
     ///
     /// No.: 3
-    /// Property: Asserting that a provided address corresponds to the VM address should always yield a true result when
+    /// Requirement: Asserting that a provided address corresponds to the VM address should always yield a true result when
     /// matched.
     /// Criticality: High
     /// Implementation: The assert_vm function ensure that the provided signer belongs to the @vm_reserved account.

@@ -1,0 +1,10 @@
+processed 4 tasks
+
+task 1 'publish'. lines 4-26:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(STLOC_UNSAFE_TO_DESTROY_ERROR))
+
+task 2 'run'. lines 28-28:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(LINKER_ERROR))
+
+task 3 'run'. lines 30-44:
+Error: Failed to execute transaction. ExecutionStatus: MiscellaneousError(Some(STLOC_UNSAFE_TO_DESTROY_ERROR))

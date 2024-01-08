@@ -269,9 +269,7 @@ impl<'r> WriteOpConverter<'r> {
         };
         Ok(GroupWrite::new(
             self.convert(state_value_metadata_result, metadata_op, false)?,
-            // TODO[agg_v2](fix): Converting the inner ops from Vec to BTreeMap. Try to have
-            // uniform datastructure to represent the inner ops.
-            inner_ops.into_iter().collect(),
+            inner_ops,
             post_group_size.get(),
         ))
     }
