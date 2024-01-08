@@ -538,16 +538,13 @@ module aptos_framework::aptos_governance {
 
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
     ///
-    /// WARNING: often, this function is called in a "update-resource-then-reconfig" script, e.g.
-    /// ```
-    /// consensus_config::set_for_next_epoch(aptos_framework, some_config_payload);
-    /// aptos_governance::reconfigure(aptos_framework);
-    /// ```
-    /// If `RECONFIGURE_WITH_DKG` is disabled, the update takes effect with in this txn, and so does an epoch change.
+    /// WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+    /// - If feature `RECONFIGURE_WITH_DKG` is disabled, it finishes immediately.
+    ///   - At the end of the calling transaction, we will be in a new epoch.
+    /// - If feature `RECONFIGURE_WITH_DKG` is enabled, it finishes in a future transaction (after a DKG is done).
     ///
-    /// If `RECONFIGURE_WITH_DKG` is enabled:
-    /// - The update will be buffered and applied a few seconds later (once a DKG finishes/aborts).
-    /// - If multiple updates are executed in a short period of time, they are likely buffered and applied together (waiting for the same DKG).
+    /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
+    /// since such updates are applied when we enter an new epoch.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (features::reconfigure_with_dkg_enabled()) {
@@ -557,7 +554,9 @@ module aptos_framework::aptos_governance {
         }
     }
 
-    /// Update feature flags and also trigger reconfiguration.
+    /// Update feature flags for the next epoch and also trigger reconfiguration.
+    /// When exactly the update takes effect depends on feature `RECONFIGURE_WITH_DKG`.
+    /// See `reconfigure` for more details.
     public fun toggle_features(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         system_addresses::assert_aptos_framework(aptos_framework);
         features::change_feature_flags_for_next_epoch(aptos_framework, enable, disable);

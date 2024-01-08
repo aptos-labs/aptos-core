@@ -1462,16 +1462,13 @@ Remove an approved proposal's execution script hash.
 
 Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
 
-WARNING: often, this function is called in a "update-resource-then-reconfig" script, e.g.
-```
-consensus_config::set_for_next_epoch(aptos_framework, some_config_payload);
-aptos_governance::reconfigure(aptos_framework);
-```
-If <code>RECONFIGURE_WITH_DKG</code> is disabled, the update takes effect with in this txn, and so does an epoch change.
+WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+- If feature <code>RECONFIGURE_WITH_DKG</code> is disabled, it finishes immediately.
+- At the end of the calling transaction, we will be in a new epoch.
+- If feature <code>RECONFIGURE_WITH_DKG</code> is enabled, it finishes in a future transaction (after a DKG is done).
 
-If <code>RECONFIGURE_WITH_DKG</code> is enabled:
-- The update will be buffered and applied a few seconds later (once a DKG finishes/aborts).
-- If multiple updates are executed in a short period of time, they are likely buffered and applied together (waiting for the same DKG).
+This behavior affects when an update of an on-chain config (e.g. <code>ConsensusConfig</code>, <code>Features</code>) takes effect,
+since such updates are applied when we enter an new epoch.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
@@ -1501,7 +1498,9 @@ If <code>RECONFIGURE_WITH_DKG</code> is enabled:
 
 ## Function `toggle_features`
 
-Update feature flags and also trigger reconfiguration.
+Update feature flags for the next epoch and also trigger reconfiguration.
+When exactly the update takes effect depends on feature <code>RECONFIGURE_WITH_DKG</code>.
+See <code>reconfigure</code> for more details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_toggle_features">toggle_features</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, enable: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
