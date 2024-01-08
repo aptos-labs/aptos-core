@@ -39,12 +39,12 @@ use move_package::{
     CompilerVersion,
 };
 
-const APTOS_PACKAGES_DIR_NAMES: [&str; 5] = [
+const APTOS_PACKAGES_DIR_NAMES: [&str; 4] = [
     "aptos-framework",
     "move-stdlib",
     "aptos-stdlib",
     "aptos-token",
-    "aptos-token-objects",
+    // "aptos-token-objects",
 ];
 
 const STATE_DATA: &str = "state_data";
