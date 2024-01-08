@@ -1418,13 +1418,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Known(maybe_layout),
             ReadKind::Value,
         )
         .map(|res| res.into_value())
+        // TODO: fixme.
+        .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn get_resource_state_value_metadata(
@@ -1443,7 +1445,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
             .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
-    fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
@@ -1452,6 +1454,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
                     unreachable!("Read result must be Exists kind")
                 }
             })
+            // TODO: fixme.
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 
@@ -2910,7 +2914,7 @@ mod test {
             &self,
             state_key: &KeyType<u32>,
             maybe_layout: Option<&MoveTypeLayout>,
-        ) -> anyhow::Result<Option<StateValue>> {
+        ) -> PartialVMResult<Option<StateValue>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value(state_key, maybe_layout);
@@ -2921,7 +2925,7 @@ mod test {
             self.assert_res_eq(seq, par)
         }
 
-        fn resource_exists(&self, state_key: &KeyType<u32>) -> anyhow::Result<bool> {
+        fn resource_exists(&self, state_key: &KeyType<u32>) -> PartialVMResult<bool> {
             let seq = self.latest_view_seq.resource_exists(state_key);
             let par = self.latest_view_par.resource_exists(state_key);
 

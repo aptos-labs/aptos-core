@@ -331,7 +331,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
                 AbstractResourceWriteOp::Write(write_op)

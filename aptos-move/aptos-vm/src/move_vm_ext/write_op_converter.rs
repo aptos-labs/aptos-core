@@ -175,8 +175,7 @@ impl<'r> WriteOpConverter<'r> {
         let result = self.convert(
             self.remote
                 .as_executor_view()
-                .get_resource_state_value_metadata(state_key)
-                .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR)),
+                .get_resource_state_value_metadata(state_key),
             move_storage_op.clone(),
             legacy_creation_as_modification,
         );

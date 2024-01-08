@@ -126,7 +126,6 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             // TODO[agg_v2](fix) pass the layout to resource groups
-
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
                 resource_group.clone(),
@@ -159,8 +158,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
 
             let buf = self
                 .executor_view
-                .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)
-                .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?;
+                .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)?;
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size))
         }
@@ -250,6 +248,7 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
                 &StateKey::table_item((*handle).into(), key.to_vec()),
                 layout,
             )
+            // TODO: What if th error is speculative?
             .map_err(|e| {
                 PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
                     .with_message(format!("remote table resolver failure: {}", e))

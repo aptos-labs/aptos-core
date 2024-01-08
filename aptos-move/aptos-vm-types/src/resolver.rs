@@ -32,13 +32,13 @@ pub trait TResourceView {
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>>;
+    ) -> PartialVMResult<Option<StateValue>>;
 
     fn get_resource_bytes(
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
@@ -50,10 +50,9 @@ pub trait TResourceView {
         // For metadata, layouts are not important.
         self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
-    fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         // For existence, layouts are not important.
         self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.is_some())
@@ -238,8 +237,13 @@ where
         &self,
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
-        self.get_state_value(state_key)
+    ) -> PartialVMResult<Option<StateValue>> {
+        self.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for {:?}: {:?}",
+                state_key, e
+            ))
+        })
     }
 }
 
