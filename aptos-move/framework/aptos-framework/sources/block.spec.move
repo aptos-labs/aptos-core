@@ -126,7 +126,7 @@ spec aptos_framework::block {
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-2.1]
         aborts_if addr != @aptos_framework;
-        aborts_if epoch_interval_microsecs <= 0;
+        aborts_if epoch_interval_microsecs == 0;
         aborts_if exists<BlockResource>(addr);
         ensures exists<BlockResource>(addr);
         ensures global<BlockResource>(addr).height == 0;
@@ -162,7 +162,7 @@ spec aptos_framework::block {
 
         /// [high-level-req-2.2]
         aborts_if addr != @aptos_framework;
-        aborts_if new_epoch_interval <= 0;
+        aborts_if new_epoch_interval == 0;
         aborts_if !exists<BlockResource>(addr);
         let post block_resource = global<BlockResource>(addr);
         ensures block_resource.epoch_interval == new_epoch_interval;

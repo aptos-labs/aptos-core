@@ -714,7 +714,7 @@ The number of new events created does not exceed MAX_U64.
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
     // This enforces <a id="high-level-req-2.1" href="#high-level-req">high level requirement 2</a>:
     <b>aborts_if</b> addr != @aptos_framework;
-    <b>aborts_if</b> epoch_interval_microsecs &lt;= 0;
+    <b>aborts_if</b> epoch_interval_microsecs == 0;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).height == 0;
@@ -768,7 +768,7 @@ The BlockResource existed under the @aptos_framework.
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
     // This enforces <a id="high-level-req-2.2" href="#high-level-req">high level requirement 2</a>:
     <b>aborts_if</b> addr != @aptos_framework;
-    <b>aborts_if</b> new_epoch_interval &lt;= 0;
+    <b>aborts_if</b> new_epoch_interval == 0;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>let</b> <b>post</b> block_resource = <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
     <b>ensures</b> block_resource.epoch_interval == new_epoch_interval;

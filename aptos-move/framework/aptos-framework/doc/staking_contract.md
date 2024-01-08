@@ -2561,7 +2561,7 @@ Only active validator can update locked_until_secs.
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
-<b>aborts_if</b> new_commission_percentage &lt; 0 || new_commission_percentage &gt; 100;
+<b>aborts_if</b> new_commission_percentage == 0 || new_commission_percentage &gt; 100;
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>{staker: staker_address};
 </code></pre>
 
@@ -3004,7 +3004,7 @@ a staking_contract exists for the staker/operator pair.
     amount: u64;
     commission_percentage: u64;
     contract_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>aborts_if</b> <a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt; 0 || commission_percentage &gt; 100;
+    <b>aborts_if</b> commission_percentage == 0 || commission_percentage &gt; 100;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
     <b>let</b> config = <b>global</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>&gt;(@aptos_framework);
     <b>let</b> min_stake_required = config.minimum_stake;
