@@ -161,14 +161,11 @@ fn released_temps(
 ) -> BTreeSet<TempIndex> {
     // use set to avoid duplicate dropping
     let mut released_temps = BTreeSet::new();
-    for t in live_var_info.released_temps() {
-        if !life_time_info.after.is_borrowed(t) {
-            released_temps.insert(t);
-        }
+    for t in dead_and_unborrowed(live_var_info.released_temps(), &life_time_info.after) {
+        released_temps.insert(t);
     }
-    for t in life_time_info.released_temps() {
-        if !live_var_info.after.contains_key(&t) {
-            released_temps.insert(t);
+    for t in unborrowed_and_dead(life_time_info.released_temps(), &live_var_info.after) {
+        released_temps.insert(t);
         }
     }
     // if a temp is moved, then no need to drop
@@ -193,4 +190,20 @@ fn released_temps(
         }
     }
     released_temps
+}
+
+/// Iterates over the locals released by live var analysis, and not borrowed in `lifetime_after`
+fn dead_and_unborrowed<'a>(released_by_live_var: impl Iterator<Item = TempIndex> + 'a, lifetime_after: &'a LifetimeState) -> impl Iterator<Item = TempIndex> + 'a {
+    released_by_live_var.into_iter()
+        .filter(
+            |t| !lifetime_after.is_borrowed(*t)
+        )
+}
+
+/// Iterates over the locals released by live var analysis, and not borrowed in `lifetime_after`
+fn unborrowed_and_dead<'a>(released_by_lifetime: impl Iterator<Item = TempIndex> + 'a, live_var_after: &'a BTreeMap<TempIndex, LiveVarInfo>) -> impl Iterator<Item = TempIndex> + 'a {
+    released_by_lifetime.into_iter()
+        .filter(
+            |t| !live_var_after.contains_key(t)
+        )
 }
