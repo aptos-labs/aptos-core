@@ -4,17 +4,18 @@
 // ! Adds explicit destroy instructions for non-primitive types.
 
 use super::{
-    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
-    reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset},
+    livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset, LiveVarInfo},
+    reference_safety_processor::{LifetimeAnnotation, LifetimeInfoAtCodeOffset, LifetimeState},
 };
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv, ty::Type};
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{AttrId, Bytecode, Operation},
+    stackless_bytecode::{AttrId, Bytecode, Label, Operation},
+    stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub struct ExplicitDrop {}
 
@@ -49,6 +50,12 @@ struct ExplicitDropTransformer<'a> {
     transformed: Vec<Bytecode>,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
+    // backward control flow graph
+    cfg: StacklessControlFlowGraph,
+    // maps code offset of first instruction in block to block ids
+    offset_to_block_id: BTreeMap<CodeOffset, BlockId>,
+    // labels used in the original codes and in the generated codes
+    labels: BTreeSet<Label>,
 }
 
 impl<'a> ExplicitDropTransformer<'a> {
@@ -61,11 +68,17 @@ impl<'a> ExplicitDropTransformer<'a> {
             .get_annotations()
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
+        let cfg = StacklessControlFlowGraph::new_backward(target.get_bytecode(), true);
+        let offset_to_block_id = get_offset_to_block_id(&cfg);
+        let labels = Bytecode::label_offsets(target.get_bytecode()).keys().cloned().collect();
         ExplicitDropTransformer {
             target,
             transformed: Vec::new(),
             live_var_annot,
             lifetime_annot,
+            cfg,
+            offset_to_block_id,
+            labels,
         }
     }
 
@@ -83,6 +96,9 @@ impl<'a> ExplicitDropTransformer<'a> {
     fn explicit_drops_at(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         match bytecode {
             Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
+            },
+            Bytecode::Label(attr_id, _) => {
+                self.drop_temps(&self.released_temps_to(code_offset), *attr_id);
             },
             _ => {
                 let released_temps = self.released_temps_at(code_offset);
@@ -113,6 +129,26 @@ impl<'a> ExplicitDropTransformer<'a> {
         }
     }
 
+    /// Returns the set of locals released by the control flow edge from the predecessors of `suc_offset` to `suc_offset`
+    fn released_temps_to(&self, suc_offset: CodeOffset) -> BTreeSet<TempIndex> {
+        let mut released = BTreeSet::new();
+        let pred_offsets = self.get_pred_instr_offsets(suc_offset);
+        for pred_offset in &pred_offsets {
+            let lifetime_after = &self.get_lifetime_info(suc_offset).before;
+            // TODO: note that this will add any local released from `pred_offset` to `suc_offset`
+            // even when a local is released from `pred_offset_i` to `suc_offset` but not `pred_offset_j` to `suc_offset`
+            // this may cause trouble if dropping a local that is already dropped is a problem
+            for t in dead_and_unborrowed(self.released_by_live_var_between(*pred_offset, suc_offset).into_iter(), lifetime_after) {
+                released.insert(t);
+            }
+            let live_var_after = &self.get_live_var_info(suc_offset).before;
+            for t in unborrowed_and_dead(self.released_by_lifetime_between(*pred_offset, suc_offset).into_iter(), live_var_after) {
+                released.insert(t);
+            }
+        }
+        released
+    }
+
     // Returns a set of locals that can be dropped at given code offset
     // Primitives are filtered out
     fn released_temps_at(&self, code_offset: CodeOffset) -> BTreeSet<TempIndex> {
@@ -125,6 +161,28 @@ impl<'a> ExplicitDropTransformer<'a> {
             .collect()
     }
 
+    /// Returns the locals alive after `pred_offset` and not before `suc_offset`
+    fn released_by_live_var_between(
+        &self,
+        pred_offset: CodeOffset,
+        suc_offset: CodeOffset,
+    ) -> BTreeSet<TempIndex> {
+        let live_before = &self.get_live_var_info(pred_offset).after;
+        let live_after = &self.get_live_var_info(suc_offset).before;
+        LiveVarInfoAtCodeOffset::live_var_diff(live_before, live_after).collect()
+    }
+
+    /// Returns the locals borrowed after `pred_offset` and not before `suc_offset`
+    fn released_by_lifetime_between(
+        &self,
+        pred_offset: CodeOffset,
+        suc_offset: CodeOffset,
+    ) -> BTreeSet<TempIndex> {
+        let lifetime_before = &self.get_lifetime_info(pred_offset).after;
+        let lifetime_after = &self.get_lifetime_info(suc_offset).before;
+        lifetime_before.lifetime_diff(lifetime_after).collect()
+    }
+
     fn get_live_var_info(&self, code_offset: CodeOffset) -> &'a LiveVarInfoAtCodeOffset {
         self.live_var_annot
             .get_live_var_info_at(code_offset)
@@ -133,6 +191,23 @@ impl<'a> ExplicitDropTransformer<'a> {
 
     fn get_lifetime_info(&self, code_offset: CodeOffset) -> &'a LifetimeInfoAtCodeOffset {
         self.lifetime_annot.get_info_at(code_offset)
+    }
+
+    /// Returns the codeoffsets of the predecessors of the given instruction.
+    /// The given instruction should be at the beginning of a block.
+    fn get_pred_instr_offsets(&self, code_offset: CodeOffset) -> Vec<CodeOffset> {
+        let block_id = self.offset_to_block_id.get(&code_offset).expect("block id");
+        self.cfg
+            .successors(*block_id)
+            .iter()
+            .filter_map(|block_id| {
+                if let BlockContent::Basic { upper, .. } = self.cfg.content(*block_id) {
+                    Some(*upper)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId) {
@@ -166,7 +241,6 @@ fn released_temps(
     }
     for t in unborrowed_and_dead(life_time_info.released_temps(), &live_var_info.after) {
         released_temps.insert(t);
-        }
     }
     // if a temp is moved, then no need to drop
     // this should come before the calculation
@@ -190,6 +264,17 @@ fn released_temps(
         }
     }
     released_temps
+}
+
+// Return a map mapping code offsets of the first instruction in blocks to their block id
+fn get_offset_to_block_id(cfg: &StacklessControlFlowGraph) -> BTreeMap<CodeOffset, BlockId> {
+    let mut code_offset_to_block_id = BTreeMap::new();
+    for block_id in cfg.blocks() {
+        if let BlockContent::Basic { lower, .. } = cfg.content(block_id) {
+            assert!(code_offset_to_block_id.insert(*lower, block_id).is_none())
+        }
+    }
+    code_offset_to_block_id
 }
 
 /// Iterates over the locals released by live var analysis, and not borrowed in `lifetime_after`
