@@ -38,12 +38,12 @@ bytes = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
 futures-util = { workspace = true }
+move-core-types = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
-move-core-types = { workspace = true }
 
 [features]
 smoke-test = []
