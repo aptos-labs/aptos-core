@@ -1,7 +1,7 @@
 /// This module defines structs and methods to initialize the gas schedule, which dictates how much
 /// it costs to execute Move on the network.
 module aptos_framework::gas_schedule {
-    use std::config_for_next_epoch;
+    use std::config_buffer;
     use std::error;
     use std::string::String;
     use std::vector;
@@ -78,14 +78,14 @@ module aptos_framework::gas_schedule {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
-        config_for_next_epoch::upsert(aptos_framework, new_gas_schedule);
+        config_buffer::upsert(aptos_framework, new_gas_schedule);
     }
 
     /// Apply the pending gas schedule changes, typically called in `block_prologue_ext()`.
     public(friend) fun on_new_epoch(account: &signer) acquires GasScheduleV2 {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
-        if (config_for_next_epoch::does_exist<GasScheduleV2>()) {
-            let new_gas_schedule: GasScheduleV2 = config_for_next_epoch::extract<GasScheduleV2>(account);
+        if (config_buffer::does_exist<GasScheduleV2>()) {
+            let new_gas_schedule: GasScheduleV2 = config_buffer::extract<GasScheduleV2>(account);
             let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
             *gas_schedule = new_gas_schedule;
         }

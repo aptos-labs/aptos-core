@@ -5,7 +5,7 @@
 module aptos_framework::timestamp {
     use aptos_framework::system_addresses;
     use std::error;
-    use std::signer::address_of;
+    use std::signer;
 
     friend aptos_framework::genesis;
 
@@ -36,7 +36,7 @@ module aptos_framework::timestamp {
         timestamp: u64
     ) acquires CurrentTimeMicroseconds {
         // Can only be invoked by AptosVM signer.
-        system_addresses::is_reserved_address(address_of(account));
+        system_addresses::is_reserved_address(signer::address_of(account));
 
         let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
         let now = global_timer.microseconds;

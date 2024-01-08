@@ -1,3 +1,4 @@
+/// DKG configs, resources and helper functions.
 module aptos_framework::dkg {
     use std::error;
     use std::option;
@@ -28,12 +29,12 @@ module aptos_framework::dkg {
         target_epoch: u64,
         target_validator_set: ValidatorSet,
         result: vector<u8>,
-        deadline_microseconds: u64,
+        deadline_secs: u64,
     }
 
     /// The complete and ongoing DKG sessions.
     struct DKGState has key {
-        last_complete: Option<DKGSessionState>,
+        last_completed: Option<DKGSessionState>,
         in_progress: Option<DKGSessionState>,
     }
 
@@ -42,7 +43,7 @@ module aptos_framework::dkg {
         move_to<DKGState>(
             aptos_framework,
             DKGState {
-                last_complete: std::option::none(),
+                last_completed: std::option::none(),
                 in_progress: std::option::none(),
             }
         );
@@ -63,7 +64,7 @@ module aptos_framework::dkg {
             dealer_validator_set,
             target_epoch,
             target_validator_set,
-            deadline_microseconds: timestamp::now_microseconds() + 9999999999,
+            deadline_secs: timestamp::now_seconds() + 9999999999, //TODO: maybe from DKG config resource
             result: vector[],
         });
 
@@ -89,9 +90,9 @@ module aptos_framework::dkg {
             session.result = dkg_result;
             dkg_completed = true;
         };
-        let dkg_timed_out = timestamp::now_microseconds() >= session.deadline_microseconds;
+        let dkg_timed_out = timestamp::now_microseconds() >= session.deadline_secs;
         if (dkg_timed_out || dkg_completed) {
-            dkg_state.last_complete = option::some(session);
+            dkg_state.last_completed = option::some(session);
             dkg_state.in_progress = option::none();
             true
         } else {

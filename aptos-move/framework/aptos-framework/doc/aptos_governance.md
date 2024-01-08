@@ -507,15 +507,6 @@ This matches the same enum const in voting. We have to duplicate it as Move does
 
 
 
-<a id="0x1_aptos_governance_EAPI_DISABLED"></a>
-
-
-
-<pre><code><b>const</b> <a href="aptos_governance.md#0x1_aptos_governance_EAPI_DISABLED">EAPI_DISABLED</a>: u64 = 15;
-</code></pre>
-
-
-
 <a id="0x1_aptos_governance_EALREADY_VOTED"></a>
 
 The specified stake pool has already been used to vote on the same proposal

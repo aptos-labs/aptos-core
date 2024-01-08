@@ -14,6 +14,7 @@ module aptos_framework::genesis {
     use aptos_framework::chain_status;
     use aptos_framework::coin;
     use aptos_framework::consensus_config;
+    use aptos_framework::dkg;
     use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
@@ -382,7 +383,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_framework::dkg;
 
     #[verify_only]
     fun initialize_for_verification(

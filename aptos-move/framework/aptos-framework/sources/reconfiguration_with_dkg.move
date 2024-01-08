@@ -1,6 +1,6 @@
 /// Reconfiguration with DKG helper functions.
 module aptos_framework::reconfiguration_with_dkg {
-    use std::config_for_next_epoch;
+    use std::config_buffer;
     use std::features;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
@@ -15,7 +15,7 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Do nothing if one is already in progress.
     public(friend) fun try_start(account: &signer) {
         if (dkg::in_progress()) { return };
-        config_for_next_epoch::disable_validator_set_changes(account);
+        config_buffer::disable_validator_set_changes(account);
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
     }
@@ -29,7 +29,7 @@ module aptos_framework::reconfiguration_with_dkg {
         gas_schedule::on_new_epoch(account);
         std::version::on_new_epoch(account);
         features::on_new_epoch(account);
-        config_for_next_epoch::enable_validator_set_changes(account);
+        config_buffer::enable_validator_set_changes(account);
         reconfiguration::reconfigure();
     }
 

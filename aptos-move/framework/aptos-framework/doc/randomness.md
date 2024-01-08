@@ -19,7 +19,7 @@ On-chain randomness utils.
 
 ## Resource `BlockRandomness`
 
-The block-level seed randomness.
+The block-level randomness seed.
 It's updated at the beginning of every block.
 
 

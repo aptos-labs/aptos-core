@@ -1,7 +1,7 @@
 /// Maintains the consensus config for the blockchain. The config is stored in a
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::consensus_config {
-    use std::config_for_next_epoch;
+    use std::config_buffer;
     use std::error;
     use std::vector;
 
@@ -43,13 +43,13 @@ module aptos_framework::consensus_config {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(account);
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
-        std::config_for_next_epoch::upsert<ConsensusConfig>(account, ConsensusConfig {config});
+        std::config_buffer::upsert<ConsensusConfig>(account, ConsensusConfig {config});
     }
 
     public(friend) fun on_new_epoch(account: &signer) acquires ConsensusConfig {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
-        if (config_for_next_epoch::does_exist<ConsensusConfig>()) {
-            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = std::config_for_next_epoch::extract(account);
+        if (config_buffer::does_exist<ConsensusConfig>()) {
+            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = std::config_buffer::extract(account);
         }
     }
 }

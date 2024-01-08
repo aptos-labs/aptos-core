@@ -374,7 +374,7 @@ Return epoch interval in seconds.
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64
 ): u64 <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
     // Operational constraint: can only be invoked by the VM.
-    <a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(address_of(<a href="account.md#0x1_account">account</a>));
+    <a href="system_addresses.md#0x1_system_addresses_is_reserved_address">system_addresses::is_reserved_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 
     // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
     <b>assert</b>!(

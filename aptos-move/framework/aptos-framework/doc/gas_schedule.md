@@ -24,7 +24,7 @@ it costs to execute Move on the network.
     -  [Function `set_storage_gas_config`](#@Specification_1_set_storage_gas_config)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
@@ -262,7 +262,7 @@ Unlike <code><a href="gas_schedule.md#0x1_gas_schedule_set_gas_schedule">set_gas
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&gas_schedule_blob), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_SCHEDULE">EINVALID_GAS_SCHEDULE</a>));
     <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = from_bytes(gas_schedule_blob);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(aptos_framework, new_gas_schedule);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(aptos_framework, new_gas_schedule);
 }
 </code></pre>
 
@@ -288,8 +288,8 @@ Apply the pending gas schedule changes, typically called in <code>block_prologue
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_on_new_epoch">on_new_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
     <b>assert</b>!(std::features::reconfigure_with_dkg_enabled(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="gas_schedule.md#0x1_gas_schedule_EAPI_DISABLED">EAPI_DISABLED</a>));
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;()) {
-        <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;()) {
+        <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(<a href="account.md#0x1_account">account</a>);
         <b>let</b> <a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a> = <b>borrow_global_mut</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
         *<a href="gas_schedule.md#0x1_gas_schedule">gas_schedule</a> = new_gas_schedule;
     }

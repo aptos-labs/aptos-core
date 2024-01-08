@@ -22,7 +22,7 @@ Maintains the version number for the blockchain.
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
@@ -209,7 +209,7 @@ This can be called by on chain governance.
     <b>assert</b>!(<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="version.md#0x1_version_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>));
     <b>let</b> old_major = <b>borrow_global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;
     <b>assert</b>!(old_major &lt; major, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="version.md#0x1_version_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(<a href="account.md#0x1_account">account</a>, <a href="version.md#0x1_version_Version">Version</a> {major});
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="account.md#0x1_account">account</a>, <a href="version.md#0x1_version_Version">Version</a> {major});
 }
 </code></pre>
 
@@ -234,8 +234,8 @@ This can be called by on chain governance.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> {
     <b>assert</b>!(std::features::reconfigure_with_dkg_enabled(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="version.md#0x1_version_EAPI_DISABLED">EAPI_DISABLED</a>));
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;()) {
-        *<b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) = <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;()) {
+        *<b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) = <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(<a href="account.md#0x1_account">account</a>);
     }
 }
 </code></pre>

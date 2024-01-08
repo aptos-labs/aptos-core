@@ -16,7 +16,7 @@ Reconfiguration, and may be updated by root.
     -  [Function `set`](#@Specification_1_set)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
@@ -132,7 +132,7 @@ This can be called by on-chain governance to update on-chain execution configs.
     <b>assert</b>!(std::features::reconfigure_with_dkg_enabled(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="execution_config.md#0x1_execution_config_EAPI_DISABLED">EAPI_DISABLED</a>));
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(<a href="account.md#0x1_account">account</a>);
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&config) &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="execution_config.md#0x1_execution_config_EINVALID_CONFIG">EINVALID_CONFIG</a>));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(<a href="account.md#0x1_account">account</a>, <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> { config });
+    <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="account.md#0x1_account">account</a>, <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> { config });
 }
 </code></pre>
 
@@ -158,8 +158,8 @@ Only used in reconfiguration with DKG.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_on_new_epoch">on_new_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a> {
     <b>assert</b>!(std::features::reconfigure_with_dkg_enabled(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="execution_config.md#0x1_execution_config_EAPI_DISABLED">EAPI_DISABLED</a>));
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;()) {
-        <b>let</b> config = <a href="../../aptos-stdlib/../move-stdlib/doc/config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;()) {
+        <b>let</b> config = <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(<a href="account.md#0x1_account">account</a>);
         *<b>borrow_global_mut</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework) = config;
     }
 }

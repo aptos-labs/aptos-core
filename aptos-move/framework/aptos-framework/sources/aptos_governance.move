@@ -60,7 +60,6 @@ module aptos_framework::aptos_governance {
     const EPARTIAL_VOTING_NOT_INITIALIZED: u64 = 13;
     /// The proposal in the argument is not a partial voting proposal.
     const ENOT_PARTIAL_VOTING_PROPOSAL: u64 = 14;
-    const EAPI_DISABLED: u64 = 15;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;

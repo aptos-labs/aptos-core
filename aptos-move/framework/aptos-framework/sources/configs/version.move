@@ -1,6 +1,6 @@
 /// Maintains the version number for the blockchain.
 module aptos_framework::version {
-    use std::config_for_next_epoch;
+    use std::config_buffer;
     use std::error;
     use std::signer;
 
@@ -56,13 +56,13 @@ module aptos_framework::version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
-        config_for_next_epoch::upsert(account, Version {major});
+        config_buffer::upsert(account, Version {major});
     }
 
     public(friend) fun on_new_epoch(account: &signer) acquires Version {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
-        if (config_for_next_epoch::does_exist<Version>()) {
-            *borrow_global_mut<Version>(@aptos_framework) = config_for_next_epoch::extract<Version>(account);
+        if (config_buffer::does_exist<Version>()) {
+            *borrow_global_mut<Version>(@aptos_framework) = config_buffer::extract<Version>(account);
         }
     }
 

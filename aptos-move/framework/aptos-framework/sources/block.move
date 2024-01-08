@@ -4,7 +4,7 @@ module aptos_framework::block {
     use std::features;
     use std::vector;
     use std::option;
-    use std::signer::address_of;
+    use std::signer;
     use aptos_std::randomness;
 
     use aptos_framework::account;
@@ -111,7 +111,7 @@ module aptos_framework::block {
         timestamp: u64
     ): u64 acquires BlockResource {
         // Operational constraint: can only be invoked by the VM.
-        system_addresses::is_reserved_address(address_of(account));
+        system_addresses::is_reserved_address(signer::address_of(account));
 
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(

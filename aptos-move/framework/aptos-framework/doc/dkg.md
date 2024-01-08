@@ -3,6 +3,7 @@
 
 # Module `0x1::dkg`
 
+DKG configs, resources and helper functions.
 
 
 -  [Struct `DKGStartEvent`](#0x1_dkg_DKGStartEvent)
@@ -108,7 +109,7 @@ The validator set of epoch <code>x</code> works together for an DKG output for t
 
 </dd>
 <dt>
-<code>deadline_microseconds: u64</code>
+<code>deadline_secs: u64</code>
 </dt>
 <dd>
 
@@ -136,7 +137,7 @@ The complete and ongoing DKG sessions.
 
 <dl>
 <dt>
-<code>last_complete: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;</code>
+<code>last_completed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;</code>
 </dt>
 <dd>
 
@@ -204,7 +205,7 @@ The complete and ongoing DKG sessions.
     <b>move_to</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(
         aptos_framework,
         <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-            last_complete: std::option::none(),
+            last_completed: std::option::none(),
             in_progress: std::option::none(),
         }
     );
@@ -245,7 +246,7 @@ Abort if a DKG is already in progress.
         dealer_validator_set,
         target_epoch,
         target_validator_set,
-        deadline_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() + 9999999999,
+        deadline_secs: <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + 9999999999, //TODO: maybe from DKG config resource
         result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
     });
 
@@ -291,9 +292,9 @@ Abort if DKG is not in progress.
         session.result = dkg_result;
         dkg_completed = <b>true</b>;
     };
-    <b>let</b> dkg_timed_out = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() &gt;= session.deadline_microseconds;
+    <b>let</b> dkg_timed_out = <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>() &gt;= session.deadline_secs;
     <b>if</b> (dkg_timed_out || dkg_completed) {
-        dkg_state.last_complete = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(session);
+        dkg_state.last_completed = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(session);
         dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
         <b>true</b>
     } <b>else</b> {

@@ -104,9 +104,10 @@ return true.
     -  [Function `contains`](#@Specification_1_contains)
 
 
-<pre><code><b>use</b> <a href="config_for_next_epoch.md#0x1_config_for_next_epoch">0x1::config_for_next_epoch</a>;
+<pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -1899,7 +1900,12 @@ Function to enable and disable features. Can only be called by a signer of @std.
 
 ## Function `change_feature_flags_for_next_epoch`
 
-Function to enable and disable features. Can only be called by a signer of @std.
+Enable and disable features *for the next epoch*.
+The changes will be effective until the next epoch,
+which can be triggered manually by calling <code>aptos_governance::reconfigure()</code>,
+or automatically when the current epoch expires.
+
+Can only be called by a signer of @std.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
@@ -1914,15 +1920,22 @@ Function to enable and disable features. Can only be called by a signer of @std.
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
-    <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
-        <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework)
+
+    // Figure out the baseline feature flag vec that the diff will be applied <b>to</b>.
+    <b>let</b> <a href="features.md#0x1_features">features</a> = <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
+        // If there is a buffered feature flag vec, <b>use</b> it <b>as</b> the baseline.
+        <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(framework)
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+        // Otherwise, <b>use</b> the currently effective feature flag vec <b>as</b> the baseline, <b>if</b> it <b>exists</b>.
         *<b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)
     } <b>else</b> {
+        // Otherwise, <b>use</b> an empty feature flag vec.
         <a href="features.md#0x1_features_Features">Features</a> { <a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>[] }
     };
+
+    // Apply the diff and save it <b>to</b> the buffer.
     <a href="features.md#0x1_features_apply_diff">apply_diff</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>, enable, disable);
-    <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_upsert">config_for_next_epoch::upsert</a>(framework, <a href="features.md#0x1_features">features</a>);
+    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(framework, <a href="features.md#0x1_features">features</a>);
 }
 </code></pre>
 
@@ -1950,8 +1963,8 @@ who have permission to set the flag that's checked in <code>extract()</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <b>if</b> (<a href="config_for_next_epoch.md#0x1_config_for_next_epoch_does_exist">config_for_next_epoch::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
-        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_for_next_epoch.md#0x1_config_for_next_epoch_extract">config_for_next_epoch::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(account);
+    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;()) {
+        <b>let</b> <a href="features.md#0x1_features">features</a> = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(account);
         *<b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std) = <a href="features.md#0x1_features">features</a>;
     }
 }
@@ -2065,11 +2078,11 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="features.md#0x1_features_Features">Features</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&enable, |feature| {
-        <a href="features.md#0x1_features_set">set</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>.<a href="features.md#0x1_features">features</a>, *feature, <b>true</b>);
+    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(enable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>.<a href="features.md#0x1_features">features</a>, feature, <b>true</b>);
     });
-    <a href="vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&disable, |feature| {
-        <a href="features.md#0x1_features_set">set</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>.<a href="features.md#0x1_features">features</a>, *feature, <b>false</b>);
+    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(disable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(&<b>mut</b> <a href="features.md#0x1_features">features</a>.<a href="features.md#0x1_features">features</a>, feature, <b>false</b>);
     });
 }
 </code></pre>

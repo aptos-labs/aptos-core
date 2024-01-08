@@ -23,7 +23,7 @@
 /// is a public function. However, once the feature flag is disabled, those functions can constantly
 /// return true.
 module std::features {
-    use std::config_for_next_epoch;
+    use std::config_buffer;
     use std::error;
     use std::signer;
     use std::vector;
@@ -376,9 +376,9 @@ module std::features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
 
         // Figure out the baseline feature flag vec that the diff will be applied to.
-        let features = if (config_for_next_epoch::does_exist<Features>()) {
+        let features = if (config_buffer::does_exist<Features>()) {
             // If there is a buffered feature flag vec, use it as the baseline.
-            config_for_next_epoch::extract<Features>(framework)
+            config_buffer::extract<Features>(framework)
         } else if (exists<Features>(@std)) {
             // Otherwise, use the currently effective feature flag vec as the baseline, if it exists.
             *borrow_global<Features>(@std)
@@ -389,7 +389,7 @@ module std::features {
 
         // Apply the diff and save it to the buffer.
         apply_diff(&mut features, enable, disable);
-        config_for_next_epoch::upsert(framework, features);
+        config_buffer::upsert(framework, features);
     }
 
     /// Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
@@ -397,8 +397,8 @@ module std::features {
     /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
     /// who have permission to set the flag that's checked in `extract()`.
     public fun on_new_epoch(account: &signer) acquires Features {
-        if (config_for_next_epoch::does_exist<Features>()) {
-            let features = config_for_next_epoch::extract<Features>(account);
+        if (config_buffer::does_exist<Features>()) {
+            let features = config_buffer::extract<Features>(account);
             *borrow_global_mut<Features>(@std) = features;
         }
     }
