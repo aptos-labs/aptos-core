@@ -23,17 +23,14 @@ use aptos_types::{
     aggregator::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey,
-        state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadata},
+        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         StateView, StateViewId,
     },
     write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
-        StateValueMetadataResolver, TResourceGroupView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -372,26 +369,6 @@ impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
 
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
         self.executor_view.get_usage()
-    }
-}
-
-impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        self.executor_view
-            .get_module_state_value_metadata(state_key)
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
-    }
-
-    fn get_resource_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> PartialVMResult<Option<StateValueMetadata>> {
-        self.executor_view
-            .get_resource_state_value_metadata(state_key)
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 

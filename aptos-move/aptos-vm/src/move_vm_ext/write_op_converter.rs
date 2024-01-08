@@ -39,7 +39,9 @@ macro_rules! convert_impl {
                 MoveStorageOp::Delete => MoveStorageOp::Delete,
             };
             self.convert(
-                self.remote.$get_metadata_callback(state_key),
+                self.remote
+                    .as_executor_view()
+                    .$get_metadata_callback(state_key),
                 move_storage_op,
                 legacy_creation_as_modification,
             )
@@ -171,7 +173,10 @@ impl<'r> WriteOpConverter<'r> {
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<(WriteOp, Option<Arc<MoveTypeLayout>>)> {
         let result = self.convert(
-            self.remote.get_resource_state_value_metadata(state_key),
+            self.remote
+                .as_executor_view()
+                .get_resource_state_value_metadata(state_key)
+                .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR)),
             move_storage_op.clone(),
             legacy_creation_as_modification,
         );
@@ -189,7 +194,10 @@ impl<'r> WriteOpConverter<'r> {
     ) -> PartialVMResult<GroupWrite> {
         // Resource group metadata is stored at the group StateKey, and can be obtained via the
         // same interfaces at for a resource at a given StateKey.
-        let state_value_metadata_result = self.remote.get_resource_state_value_metadata(state_key);
+        let state_value_metadata_result = self
+            .remote
+            .as_executor_view()
+            .get_resource_state_value_metadata(state_key);
         // Currently, due to read-before-write and a gas charge on the first read that is based
         // on the group size, this should simply re-read a cached (speculative) group size.
         let pre_group_size = self.remote.resource_group_size(state_key).map_err(|_| {

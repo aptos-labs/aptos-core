@@ -358,7 +358,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
                 AbstractResourceWriteOp::Write(write_op)
@@ -439,7 +439,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
 impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.module_write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base_executor_view.get_module_state_value(state_key),

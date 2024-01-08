@@ -1430,7 +1430,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -1439,6 +1439,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
                     unreachable!("Read result must be Metadata kind")
                 }
             })
+            // TODO: fixme.
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
@@ -1550,7 +1552,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
 {
     type Key = T::Key;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         debug_assert!(
             state_key.module_path().is_some(),
             "Reading a resource {:?} using ModuleView",
@@ -1570,7 +1572,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                         // because parallel execution will fall back to sequential anyway.
                         Ok(None)
                     },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
+                    Err(NotFound) => self
+                        .get_raw_base_value(state_key)
+                        // TODO: Fix error propagation here.
+                        .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR)),
                 }
             },
             ViewState::Unsync(state) => {
@@ -1580,7 +1585,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
                     .module_reads
                     .insert(state_key.clone());
                 state.unsync_map.fetch_module_data(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
+                    || {
+                        // TODO: Fix error propagation here.
+                        self.get_raw_base_value(state_key)
+                            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
+                    },
                     |v| Ok(v.as_state_value()),
                 )
             },
@@ -2922,7 +2931,7 @@ mod test {
         fn get_resource_state_value_metadata(
             &self,
             state_key: &KeyType<u32>,
-        ) -> anyhow::Result<Option<StateValueMetadata>> {
+        ) -> PartialVMResult<Option<StateValueMetadata>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value_metadata(state_key);

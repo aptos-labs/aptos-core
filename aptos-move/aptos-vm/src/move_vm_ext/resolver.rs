@@ -6,7 +6,6 @@ use aptos_table_natives::TableResolver;
 use aptos_types::{on_chain_config::ConfigStorage, state_store::state_key::StateKey};
 use aptos_vm_types::resolver::{
     ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
-    StateValueMetadataResolver,
 };
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMError;
@@ -22,7 +21,6 @@ pub trait AptosMoveResolver:
     + DelayedFieldResolver
     + MoveResolver<PartialVMError>
     + ResourceGroupResolver
-    + StateValueMetadataResolver
     + StateStorageView
     + TableResolver
     + AsExecutorView

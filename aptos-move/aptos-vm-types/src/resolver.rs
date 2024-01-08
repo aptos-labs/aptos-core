@@ -15,8 +15,8 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMResult;
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use std::collections::{BTreeMap, HashMap};
 
 /// Allows to query resources from the state.
@@ -46,10 +46,11 @@ pub trait TResourceView {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         // For metadata, layouts are not important.
         self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 
     fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
@@ -142,9 +143,9 @@ pub trait TModuleView {
     ///   -  Ok(None)         if the module is not in storage,
     ///   -  Ok(Some(...))    if the module exists in storage,
     ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
 
-    fn get_module_bytes(&self, state_key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
+    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
@@ -152,12 +153,12 @@ pub trait TModuleView {
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn module_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         self.get_module_state_value(state_key)
             .map(|maybe_state_value| maybe_state_value.is_some())
     }
@@ -248,8 +249,13 @@ where
 {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        self.get_state_value(state_key)
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
+        self.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for {:?}: {:?}",
+                state_key, e
+            ))
+        })
     }
 }
 
@@ -264,25 +270,6 @@ where
     fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
         self.get_usage()
     }
-}
-
-/// Allows to query storage metadata in the VM session. Needed for storage refunds.
-/// - Result being Err means storage error or some incostistency (e.g. during speculation,
-/// needing to abort/halt the transaction with an error status).
-/// - Ok(None) means that the corresponding data does not exist / was deleted.
-/// - Ok(Some(_ : MetadataKind)) may be internally None (within Kind) if the metadata was
-/// not previously provided (e.g. Legacy WriteOps).
-pub trait StateValueMetadataResolver {
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> PartialVMResult<Option<StateValueMetadata>>;
-
-    /// Can also be used to get the metadata of a resource group at a provided group key.
-    fn get_resource_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> PartialVMResult<Option<StateValueMetadata>>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
