@@ -247,7 +247,7 @@ impl FileEntry {
         let file_prefix = format!("{:x}", hasher.finalize());
         match storage_format {
             StorageFormat::GzipCompressedProto => {
-                format!("compressed_files/gzip/{}_{}.bin", file_prefix, version)
+                format!("compressed_files/gzip/{}_{}.bin", file_prefix, starting_version)
             },
             StorageFormat::JsonBase64UncompressedProto => {
                 format!("files/{}.json", starting_version)
