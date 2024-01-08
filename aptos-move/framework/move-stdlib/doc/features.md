@@ -1901,9 +1901,9 @@ Function to enable and disable features. Can only be called by a signer of @std.
 ## Function `change_feature_flags_for_next_epoch`
 
 Enable and disable features *for the next epoch*.
-The changes will be effective until the next epoch,
-which can be triggered manually by calling <code>aptos_governance::reconfigure()</code>,
-or automatically when the current epoch expires.
+
+NOTE: when it takes effects depend on feature <code><a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a></code>.
+See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
 
 Can only be called by a signer of @std.
 

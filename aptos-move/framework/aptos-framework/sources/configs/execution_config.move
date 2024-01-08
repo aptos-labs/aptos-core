@@ -36,6 +36,9 @@ module aptos_framework::execution_config {
     }
 
     /// This can be called by on-chain governance to update on-chain execution configs.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
     public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(account);

@@ -72,7 +72,9 @@ module aptos_framework::gas_schedule {
     }
 
     /// Set the gas schedule for the next epoch, typically called by on-chain governance.
-    /// Unlike `set_gas_schedule()`, the change will not take effect until a reconfiguration with DKG is done.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
     public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));
         system_addresses::assert_aptos_framework(aptos_framework);

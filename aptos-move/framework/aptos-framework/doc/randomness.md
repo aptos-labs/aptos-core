@@ -20,7 +20,7 @@ On-chain randomness utils.
 ## Resource `BlockRandomness`
 
 The block-level randomness seed.
-It's updated at the beginning of every block.
+It's updated by BlockMetadata transaction at the beginning of the execution of every block.
 
 
 <pre><code><b>struct</b> <a href="randomness.md#0x1_randomness_BlockRandomness">BlockRandomness</a> <b>has</b> drop, key

@@ -796,6 +796,10 @@ pub enum EntryFunctionCall {
     },
 
     /// Set the major version (to a larger version) for the next epoch.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    ///
     /// This can be called by on chain governance.
     VersionSetForNextEpoch {
         major: u64,
@@ -3685,6 +3689,10 @@ pub fn staking_proxy_set_voter(
 }
 
 /// Set the major version (to a larger version) for the next epoch.
+///
+/// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+/// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+///
 /// This can be called by on chain governance.
 pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(

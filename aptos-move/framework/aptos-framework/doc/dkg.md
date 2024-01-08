@@ -123,7 +123,7 @@ The validator set of epoch <code>x</code> works together for an DKG output for t
 
 ## Resource `DKGState`
 
-The complete and ongoing DKG sessions.
+The completed and ongoing DKG sessions.
 
 
 <pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> <b>has</b> key

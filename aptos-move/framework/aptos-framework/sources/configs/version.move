@@ -50,6 +50,10 @@ module aptos_framework::version {
     }
 
     /// Set the major version (to a larger version) for the next epoch.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    ///
     /// This can be called by on chain governance.
     public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
         assert!(std::features::reconfigure_with_dkg_enabled(), error::invalid_state(EAPI_DISABLED));

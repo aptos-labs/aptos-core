@@ -5,7 +5,7 @@ module aptos_std::randomness {
     friend aptos_framework::block;
 
     /// The block-level randomness seed.
-    /// It's updated at the beginning of every block.
+    /// It's updated by BlockMetadata transaction at the beginning of the execution of every block.
     struct BlockRandomness has drop, key {
         block_randomness: vector<u8>,
     }

@@ -366,9 +366,9 @@ module std::features {
     }
 
     /// Enable and disable features *for the next epoch*.
-    /// The changes will be effective until the next epoch,
-    /// which can be triggered manually by calling `aptos_governance::reconfigure()`,
-    /// or automatically when the current epoch expires.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
     ///
     /// Can only be called by a signer of @std.
     public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>)

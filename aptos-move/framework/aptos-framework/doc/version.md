@@ -192,6 +192,10 @@ This can be called by on chain governance.
 ## Function `set_for_next_epoch`
 
 Set the major version (to a larger version) for the next epoch.
+
+NOTE: when it takes effects depend on feature <code>RECONFIGURE_WITH_DKG</code>.
+See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
+
 This can be called by on chain governance.
 
 

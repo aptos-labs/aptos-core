@@ -245,7 +245,9 @@ This can be called by on-chain governance to update the gas schedule.
 ## Function `set_for_next_epoch`
 
 Set the gas schedule for the next epoch, typically called by on-chain governance.
-Unlike <code><a href="gas_schedule.md#0x1_gas_schedule_set_gas_schedule">set_gas_schedule</a>()</code>, the change will not take effect until a reconfiguration with DKG is done.
+
+NOTE: when it takes effects depend on feature <code>RECONFIGURE_WITH_DKG</code>.
+See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)

@@ -32,7 +32,7 @@ module aptos_framework::dkg {
         deadline_secs: u64,
     }
 
-    /// The complete and ongoing DKG sessions.
+    /// The completed and ongoing DKG sessions.
     struct DKGState has key {
         last_completed: Option<DKGSessionState>,
         in_progress: Option<DKGSessionState>,

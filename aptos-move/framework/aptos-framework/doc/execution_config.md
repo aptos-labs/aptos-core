@@ -118,6 +118,9 @@ This can be called by on-chain governance to update on-chain execution configs.
 
 This can be called by on-chain governance to update on-chain execution configs.
 
+NOTE: when it takes effects depend on feature <code>RECONFIGURE_WITH_DKG</code>.
+See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
