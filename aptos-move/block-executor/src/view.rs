@@ -1044,22 +1044,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok(TransactionWrite::from_state_value(maybe_patched))
     }
 
-    fn get_base_value_with_layout(
-        &self,
-        state_key: &T::Key,
-        layout: UnknownOrLayout,
-    ) -> anyhow::Result<ValueWithLayout<T::Value>> {
-        let state_value = self.get_raw_base_value(state_key)?;
-        let value = TransactionWrite::from_state_value(state_value);
-        Ok(match layout {
-            UnknownOrLayout::Known(l) => {
-                let layout_arc = l.cloned().map(Arc::new);
-                ValueWithLayout::Exchanged(Arc::new(self.patch_base_value(&value, l)?), layout_arc)
-            },
-            UnknownOrLayout::Unknown => ValueWithLayout::RawFromStorage(Arc::new(value)),
-        })
-    }
-
     /// Given a state value, performs deserialization-serialization round-trip
     /// to replace any aggregator / snapshot values.
     fn replace_values_with_identifiers(
@@ -1304,7 +1288,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         {
                             if let Some(metadata_op) = metadata
                                 .extract_value_no_layout()
-                                .clone()
                                 .convert_read_to_modification()
                             {
                                 return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
@@ -1357,8 +1340,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             &|value, layout| self.patch_base_value(value, layout),
         );
         if matches!(ret, ReadResult::Uninitialized) {
-            let from_storage = self.get_base_value_with_layout(state_key, layout.clone())?;
-            state.set_base_value(state_key.clone(), from_storage);
+            let from_storage =
+                TransactionWrite::from_state_value(self.get_raw_base_value(state_key)?);
+            state.set_base_value(
+                state_key.clone(),
+                ValueWithLayout::RawFromStorage(Arc::new(from_storage)),
+            );
 
             // In case of concurrent storage fetches, we cannot use our value,
             // but need to fetch it from versioned_map again.

@@ -104,6 +104,18 @@ and implement the governance voting logic on top.
 -  [Function `num_approvals_and_rejections`](#0x1_multisig_account_num_approvals_and_rejections)
 -  [Function `assert_multisig_account_exists`](#0x1_multisig_account_assert_multisig_account_exists)
 -  [Function `update_owner_schema`](#0x1_multisig_account_update_owner_schema)
+-  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
+    -  [Function `metadata`](#@Specification_1_metadata)
+    -  [Function `num_signatures_required`](#@Specification_1_num_signatures_required)
+    -  [Function `owners`](#@Specification_1_owners)
+    -  [Function `get_transaction`](#@Specification_1_get_transaction)
+    -  [Function `get_next_transaction_payload`](#@Specification_1_get_next_transaction_payload)
+    -  [Function `get_next_multisig_account_address`](#@Specification_1_get_next_multisig_account_address)
+    -  [Function `last_resolved_sequence_number`](#@Specification_1_last_resolved_sequence_number)
+    -  [Function `next_sequence_number`](#@Specification_1_next_sequence_number)
+    -  [Function `vote`](#@Specification_1_vote)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -2789,6 +2801,345 @@ Add new owners, remove owners to remove, update signatures required.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>For every multi-signature account, the range of required signatures should always be in the range of one to the total number of owners.</td>
+<td>Critical</td>
+<td>While creating a MultisigAccount, the function create_with_owners_internal checks that num_signatures_required is in the span from 1 to total count of owners.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The list of owners for a multi-signature account should not contain any duplicate owners, and the multi-signature account itself cannot be listed as one of its owners.</td>
+<td>Critical</td>
+<td>The function validate_owners validates the owner vector that no duplicate entries exists.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>The current value of the next sequence number should not be present in the transaction table, until the next sequence number gets increased.</td>
+<td>Medium</td>
+<td>The add_transaction function increases the next sequence number and only then adds the transaction with the old next sequence number to the transaction table.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>When the last executed sequence number is smaller than the next sequence number by only one unit, no transactions should exist in the multi-signature account's transactions list.</td>
+<td>High</td>
+<td>The get_pending_transactions function retrieves pending transactions by iterating through the transactions table, starting from the last_executed_sequence_number + 1 to the next_sequence_number.</td>
+<td>Audited that MultisigAccount.transactions is empty when last_executed_sequence_number == next_sequence_number -1</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The last executed sequence number is always smaller than the next sequence number.</td>
+<td>Medium</td>
+<td>When creating a new MultisigAccount, the last_executed_sequence_number and next_sequence_number are assigned with 0 and 1 respectively, and from there both these values increase monotonically when a transaction is executed and removed from the table and when new transaction are added respectively.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The number of pending transactions should be equal to the difference between the next sequence number and the last executed sequence number.</td>
+<td>High</td>
+<td>When a transaction is added, next_sequence_number is incremented. And when a transaction is removed after execution, last_executed_sequence_number is incremented.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>Only transactions with valid sequence number should be fetched.</td>
+<td>Medium</td>
+<td>Functions such as: 1. get_transaction 2. can_be_executed 3. can_be_rejected 4. vote always validate the given sequence number and only then fetch the associated transaction.</td>
+<td>Audited that it aborts if the sequence number is not valid.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>The execution or rejection of a transaction should enforce that the minimum number of required signatures is less or equal to the total number of approvals.</td>
+<td>Critical</td>
+<td>The functions can_be_executed and can_be_rejected perform validation on the number of votes required for execution or rejection.</td>
+<td>Audited that these functions return the correct value.</td>
+</tr>
+
+<tr>
+<td>9</td>
+<td>The creation of a multi-signature account properly initializes the resources and then it gets published under the corresponding account.</td>
+<td>Medium</td>
+<td>When creating a MultisigAccount via one of the functions: create_with_existing_account, create_with_existing_account_and_revoke_auth_key, create_with_owners, create, the MultisigAccount data is initialized properly and published to the multisig_account (new or existing).</td>
+<td>Audited that the MultisigAccount is initialized properly.</td>
+</tr>
+
+<tr>
+<td>10</td>
+<td>Creation of a multi-signature account on top of an existing account should revoke auth key and any previous offered capabilities or control.</td>
+<td>Critical</td>
+<td>The function create_with_existing_account_and_revoke_auth_key, after successfully creating the MultisigAccount, rotates the account to ZeroAuthKey and revokes any offered capabilities of that account.</td>
+<td>Audited that the account's auth key and the offered capabilities are revoked.</td>
+</tr>
+
+<tr>
+<td>11</td>
+<td>Upon the creation of a multi-signature account from a bootstrapping account, the ownership of the resultant account should not pertain to the bootstrapping account.</td>
+<td>High</td>
+<td>In create_with_owners_then_remove_bootstrapper function after successful creation of the account the bootstrapping account is removed from the owner vector of the account.</td>
+<td>Audited that the bootstrapping account is not in the owners list.</td>
+</tr>
+
+<tr>
+<td>12</td>
+<td>Performing any changes on the list of owners such as adding new owners, removing owners, swapping owners should ensure that the number of required signature, for the multi-signature account remains valid.</td>
+<td>Critical</td>
+<td>The following function as used to modify the owners list and the required signature of the swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_signatures_required. All of these functions use update_owner_schema function to process these changes, the function validates the owner list while adding and verifies that the account has enough required signatures and updates the owner's schema.</td>
+<td>Audited that the owners are added successfully. (add_owner, add_owners, add_owners_and_update_signatures_required, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the owners are removed successfully. (remove_owner, remove_owners, swap_owner, swap_owners, swap_owners_and_update_signatures_required, update_owner_schema) Audited that the num_signatures_required is updated successfully. (add_owners_and_update_signatures_required, swap_owners_and_update_signatures_required, update_signatures_required, update_owner_schema)</td>
+</tr>
+
+<tr>
+<td>13</td>
+<td>The creation of a transaction should be limited to an account owner, which should be automatically considered a voter; additionally, the account's sequence should increase monotonically.</td>
+<td>Critical</td>
+<td>The following functions can only be called by the owners of the account and create a transaction and uses add_transaction function to gives approval on behalf of the creator and increments the create_transaction.</td>
+<td>Audited it aborts if the caller is not in the owner's list of the account. (create_transaction_with_hash, create_transaction) Audited that the transaction is successfully stored in the MultisigAccount.(create_transaction_with_hash, create_transaction, add_transaction) Audited that the creators voted to approve the transaction. (create_transaction_with_hash, create_transaction, add_transaction) Audited that the next_sequence_number increases monotonically. (create_transaction_with_hash, create_transaction, add_transaction)</td>
+</tr>
+
+<tr>
+<td>14</td>
+<td>Only owners are allowed to vote for a valid transaction.</td>
+<td>Critical</td>
+<td>Any owner of the MultisigAccount can either approve (approve_transaction) or reject (reject_transaction) a transaction. Both these functions use a generic function to vote for the transaction which validates the caller and the transaction id and adds/updates the vote.</td>
+<td>Audited that it aborts if the caller is not in the owner's list (approve_transaction, reject_transaction, vote_transaction, assert_is_owner). Audited that it aborts if the transaction with the given sequence number doesn't exist in the account (approve_transaction, reject_transaction, vote_transaction). Audited that the vote is recorded as intended.</td>
+</tr>
+
+<tr>
+<td>15</td>
+<td>Only owners are allowed to execute a valid transaction, if the number of approvals meets the k-of-n criteria, finally the executed transaction should be removed.</td>
+<td>Critical</td>
+<td>Functions execute_rejected_transaction and validate_multisig_transaction can only be called by the owner which validates the transaction and based on the number of approvals and rejections it proceeds to execute the transactions. For rejected transaction, the transactions are immediately removed from the MultisigAccount via remove_executed_transaction. VM validates the transaction via validate_multisig_transaction and cleans up the transaction via successful_transaction_execution_cleanup and failed_transaction_execution_cleanup.</td>
+<td>Audited that it aborts if the caller is not in the owner's list (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if the transaction with the given sequence number doesn't exist in the account (execute_rejected_transaction, validate_multisig_transaction). Audited that it aborts if the votes (approvals or rejections) are less than num_signatures_required (execute_rejected_transaction, validate_multisig_transaction). Audited that the transaction is removed from the MultisigAccount (execute_rejected_transaction, remove_executed_transaction, successful_transaction_execution_cleanup, failed_transaction_execution_cleanup).</td>
+</tr>
+
+<tr>
+<td>16</td>
+<td>Removing an executed transaction from the transactions list should increase the last sequence number monotonically.</td>
+<td>High</td>
+<td>When transactions are removed via remove_executed_transaction (maybe called by VM cleanup or execute_rejected_transaction), the last_executed_sequence_number increases by 1.</td>
+<td>Audited that last_executed_sequence_number is incremented.</td>
+</tr>
+
+<tr>
+<td>17</td>
+<td>The voting and transaction creation operations should only be available if a multi-signature account exists.</td>
+<td>Low</td>
+<td>The function assert_multisig_account_exists validates the existence of MultisigAccount under the account.</td>
+<td>Audited that it aborts if the MultisigAccount doesn't exist on the account.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
+<a id="@Specification_1_metadata"></a>
+
+### Function `metadata`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_metadata">metadata</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>ensures</b> result == <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>).metadata;
+</code></pre>
+
+
+
+<a id="@Specification_1_num_signatures_required"></a>
+
+### Function `num_signatures_required`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_num_signatures_required">num_signatures_required</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>ensures</b> result == <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>).num_signatures_required;
+</code></pre>
+
+
+
+<a id="@Specification_1_owners"></a>
+
+### Function `owners`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_owners">owners</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>ensures</b> result == <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>).owners;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_transaction"></a>
+
+### Function `get_transaction`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_get_transaction">get_transaction</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64): <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">multisig_account::MultisigTransaction</a>
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> multisig_account_resource = <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> sequence_number == 0 || sequence_number &gt;= multisig_account_resource.next_sequence_number;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(multisig_account_resource.transactions, sequence_number);
+<b>ensures</b> result == <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(multisig_account_resource.transactions, sequence_number);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_next_transaction_payload"></a>
+
+### Function `get_next_transaction_payload`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_get_next_transaction_payload">get_next_transaction_payload</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, provided_payload: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> multisig_account_resource = <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>let</b> sequence_number = multisig_account_resource.last_executed_sequence_number + 1;
+<b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(multisig_account_resource.transactions, sequence_number);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> multisig_account_resource.last_executed_sequence_number + 1 &gt; MAX_U64;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(multisig_account_resource.transactions, sequence_number);
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(transaction.payload) ==&gt; result == provided_payload;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_next_multisig_account_address"></a>
+
+### Function `get_next_multisig_account_address`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_get_next_multisig_account_address">get_next_multisig_account_address</a>(creator: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator);
+<b>let</b> owner_nonce = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(creator).sequence_number;
+</code></pre>
+
+
+
+<a id="@Specification_1_last_resolved_sequence_number"></a>
+
+### Function `last_resolved_sequence_number`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> multisig_account_resource = <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>ensures</b> result == multisig_account_resource.last_executed_sequence_number;
+</code></pre>
+
+
+
+<a id="@Specification_1_next_sequence_number"></a>
+
+### Function `next_sequence_number`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_next_sequence_number">next_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> multisig_account_resource = <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>ensures</b> result == multisig_account_resource.next_sequence_number;
+</code></pre>
+
+
+
+<a id="@Specification_1_vote"></a>
+
+### Function `vote`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote">vote</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64, owner: <b>address</b>): (bool, bool)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> multisig_account_resource = <b>global</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+<b>aborts_if</b> sequence_number == 0 || sequence_number &gt;= multisig_account_resource.next_sequence_number;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(multisig_account_resource.transactions, sequence_number);
+<b>let</b> transaction = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(multisig_account_resource.transactions, sequence_number);
+<b>let</b> votes = transaction.votes;
+<b>let</b> voted = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(votes, owner);
+<b>let</b> vote = voted && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(votes, owner);
+<b>ensures</b> result_1 == voted;
+<b>ensures</b> result_2 == vote;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

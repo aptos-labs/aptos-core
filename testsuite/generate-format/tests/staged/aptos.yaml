@@ -69,12 +69,6 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
-PartialAuthenticatorAssertionResponse:
-  STRUCT:
-    - signature:
-        TYPENAME: AssertionSignature
-    - authenticator_data: BYTES
-    - client_data_json: BYTES
 AssertionSignature:
   ENUM:
     0:
@@ -206,6 +200,12 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+PartialAuthenticatorAssertionResponse:
+  STRUCT:
+    - signature:
+        TYPENAME: AssertionSignature
+    - authenticator_data: BYTES
+    - client_data_json: BYTES
 RawTransaction:
   STRUCT:
     - sender:
