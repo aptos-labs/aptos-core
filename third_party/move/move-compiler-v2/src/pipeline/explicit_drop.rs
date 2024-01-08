@@ -138,11 +138,19 @@ impl<'a> ExplicitDropTransformer<'a> {
             // TODO: note that this will add any local released from `pred_offset` to `suc_offset`
             // even when a local is released from `pred_offset_i` to `suc_offset` but not `pred_offset_j` to `suc_offset`
             // this may cause trouble if dropping a local that is already dropped is a problem
-            for t in dead_and_unborrowed(self.released_by_live_var_between(*pred_offset, suc_offset).into_iter(), lifetime_after) {
+            for t in dead_and_unborrowed(
+                self.released_by_live_var_between(*pred_offset, suc_offset)
+                    .into_iter(),
+                lifetime_after,
+            ) {
                 released.insert(t);
             }
             let live_var_after = &self.get_live_var_info(suc_offset).before;
-            for t in unborrowed_and_dead(self.released_by_lifetime_between(*pred_offset, suc_offset).into_iter(), live_var_after) {
+            for t in unborrowed_and_dead(
+                self.released_by_lifetime_between(*pred_offset, suc_offset)
+                    .into_iter(),
+                live_var_after,
+            ) {
                 released.insert(t);
             }
         }
@@ -210,9 +218,20 @@ impl<'a> ExplicitDropTransformer<'a> {
             .collect()
     }
 
+    fn gen_drop(tmp: TempIndex, attr_id: AttrId) -> Bytecode {
+        Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![tmp], None)
+    }
+
     fn drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId) {
-        let drop_t = Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![tmp], None);
+        let drop_t = Self::gen_drop(tmp, attr_id);
         self.emit_bytecode(drop_t)
+    }
+
+    /// Iterators over instructions dropping all locals in `temps_to_drop`
+    fn gen_drops(temps_to_drop: & BTreeSet<TempIndex>, attr_id: AttrId) -> impl Iterator<Item = Bytecode> + '_ {
+        temps_to_drop
+            .iter()
+            .map(move |t| Self::gen_drop(*t, attr_id))
     }
 
     fn drop_temps(&mut self, temps_to_drop: &BTreeSet<TempIndex>, attr_id: AttrId) {
@@ -278,17 +297,21 @@ fn get_offset_to_block_id(cfg: &StacklessControlFlowGraph) -> BTreeMap<CodeOffse
 }
 
 /// Iterates over the locals released by live var analysis, and not borrowed in `lifetime_after`
-fn dead_and_unborrowed<'a>(released_by_live_var: impl Iterator<Item = TempIndex> + 'a, lifetime_after: &'a LifetimeState) -> impl Iterator<Item = TempIndex> + 'a {
-    released_by_live_var.into_iter()
-        .filter(
-            |t| !lifetime_after.is_borrowed(*t)
-        )
+fn dead_and_unborrowed<'a>(
+    released_by_live_var: impl Iterator<Item = TempIndex> + 'a,
+    lifetime_after: &'a LifetimeState,
+) -> impl Iterator<Item = TempIndex> + 'a {
+    released_by_live_var
+        .into_iter()
+        .filter(|t| !lifetime_after.is_borrowed(*t))
 }
 
 /// Iterates over the locals released by live var analysis, and not borrowed in `lifetime_after`
-fn unborrowed_and_dead<'a>(released_by_lifetime: impl Iterator<Item = TempIndex> + 'a, live_var_after: &'a BTreeMap<TempIndex, LiveVarInfo>) -> impl Iterator<Item = TempIndex> + 'a {
-    released_by_lifetime.into_iter()
-        .filter(
-            |t| !live_var_after.contains_key(t)
-        )
+fn unborrowed_and_dead<'a>(
+    released_by_lifetime: impl Iterator<Item = TempIndex> + 'a,
+    live_var_after: &'a BTreeMap<TempIndex, LiveVarInfo>,
+) -> impl Iterator<Item = TempIndex> + 'a {
+    released_by_lifetime
+        .into_iter()
+        .filter(|t| !live_var_after.contains_key(t))
 }
