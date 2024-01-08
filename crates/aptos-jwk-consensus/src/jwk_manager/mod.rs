@@ -26,13 +26,26 @@ pub mod certified_update_producer;
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
 pub struct JWKManager {
-    signing_key: PrivateKey,
+    /// Some useful metadata.
     my_addr: AccountAddress,
     epoch_state: EpochState,
+
+    /// Used to sign JWK observations before sharing them with peers.
+    signing_key: PrivateKey,
+
+    /// The sub-process that collects JWK updates from peers and aggregate them into a quorum-certified JWK update.
     certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
+
+    /// Used by `certified_update_producer` to send back quorum-certified JWK updates.
     certified_update_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+
+    /// When a quorum-certified JWK update is available, use this to put it into the validator transaction pool.
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+
+    /// The JWK consensus states of all the issuers.
     states_by_issuer: HashMap<Issuer, PerProviderState>,
+
+    /// Whether a CLOSE command has been received.
     _stopped: bool,
 }
 
@@ -93,6 +106,7 @@ impl JWKManager {
     }
 
     /// Invoked on start, or on on-chain JWK updated event.
+    /// TODO: can do per-issuer reset.
     pub fn reset_with_on_chain_state(&mut self, on_chain_state: ObservedJWKs) -> Result<()> {
         self.states_by_issuer = on_chain_state
             .jwks
