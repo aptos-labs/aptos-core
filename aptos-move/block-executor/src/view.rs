@@ -1377,16 +1377,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> anyhow::Result<()> {
-        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
-            match self.get_raw_base_value(group_key)? {
-                Some(state_value) => (
-                    bcs::from_bytes(state_value.bytes())
-                        .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
-                    TransactionWrite::from_state_value(Some(state_value)),
-                ),
-                None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
-            };
+    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> PartialVMResult<()> {
+        let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) = match self
+            .get_raw_base_value(group_key)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?
+        {
+            Some(state_value) => (
+                bcs::from_bytes(state_value.bytes()).map_err(|_| {
+                    PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                        .with_message("Resource group deserialization error".to_string())
+                })?,
+                TransactionWrite::from_state_value(Some(state_value)),
+            ),
+            None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
+        };
         let base_group_sentinel_ops = base_group
             .into_iter()
             .map(|(t, bytes)| {
@@ -1466,19 +1470,38 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
 
-    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<ResourceGroupSize> {
+    fn resource_group_size(
+        &self,
+        group_key: &Self::GroupKey,
+    ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
-            ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
+            // FIXME
+            ViewState::Sync(state) => state
+                .read_group_size(group_key, self.txn_idx)
+                .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?,
+            ViewState::Unsync(state) => state
+                .unsync_map
+                .get_group_size(group_key)
+                .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?,
         };
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
             self.initialize_mvhashmap_base_group_contents(group_key)?;
 
-            group_read = match &self.latest_view {
-                ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
-                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
-            }
+            group_read =
+                match &self.latest_view {
+                    // FIXME
+                    ViewState::Sync(state) => state
+                        .read_group_size(group_key, self.txn_idx)
+                        .map_err(|_| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        })?,
+                    ViewState::Unsync(state) => {
+                        state.unsync_map.get_group_size(group_key).map_err(|_| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        })?
+                    },
+                }
         };
 
         Ok(group_read.into_size())
@@ -1489,7 +1512,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let maybe_layout = maybe_layout.filter(|_| self.is_delayed_field_optimization_capable());
 
         let mut group_read = self
@@ -1501,7 +1524,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 resource_tag,
                 maybe_layout,
                 &|value, layout| self.patch_base_value(value, layout),
-            )?;
+            )
+            // FIXME
+            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
             self.initialize_mvhashmap_base_group_contents(group_key)?;
@@ -1515,7 +1540,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                     resource_tag,
                     maybe_layout,
                     &|value, layout| self.patch_base_value(value, layout),
-                )?;
+                )
+                // FIXME
+                .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
         };
 
         Ok(group_read.into_value().0)
@@ -1525,7 +1552,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         _group_key: &Self::GroupKey,
         _resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<usize> {
+    ) -> PartialVMResult<usize> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
@@ -1533,7 +1560,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         _group_key: &Self::GroupKey,
         _resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<bool> {
+    ) -> PartialVMResult<bool> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 

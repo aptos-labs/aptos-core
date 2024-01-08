@@ -37,7 +37,7 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use move_binary_format::errors::PartialVMResult;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
@@ -74,7 +74,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn spawn(
         vm: &'l AptosVM,
         session_id: SessionId,
-        base: &'r dyn AptosMoveResolver,
+        base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
@@ -388,7 +388,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     fn resource_group_size(
         &self,
         _group_key: &Self::GroupKey,
-    ) -> anyhow::Result<ResourceGroupSize> {
+    ) -> PartialVMResult<ResourceGroupSize> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
         Ok(ResourceGroupSize::zero_concrete())
     }
@@ -398,7 +398,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         use AbstractResourceWriteOp::*;
         if let Some((write_op, layout)) = self
             .change_set
@@ -408,16 +408,24 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    Some(Err(anyhow::anyhow!(
+                    // FIXME
+                    Some(Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    )
+                    .with_message(
                         "Non-ResourceGroup write found for key in get_resource_from_group call"
+                            .to_string(),
                     )))
                 },
             })
             .transpose()?
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            randomly_check_layout_matches(maybe_layout, layout.as_deref())
-                .map_err(|e| anyhow::anyhow!("get_resource_from_group layout check: {:?}", e))?;
+            randomly_check_layout_matches(maybe_layout, layout.as_deref()).map_err(|e| {
+                // FIXME
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("get_resource_from_group layout check: {:?}", e))
+            })?;
 
             Ok(write_op.extract_raw_bytes())
         } else {
