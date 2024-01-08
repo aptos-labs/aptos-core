@@ -492,9 +492,7 @@ impl Bytecode {
                 vec![*src]
             },
             Bytecode::Call(_, _, _, srcs, _) => srcs.clone(),
-            Bytecode::Ret(_, srcs) => {
-                srcs.clone()
-            },
+            Bytecode::Ret(_, srcs) => srcs.clone(),
             Bytecode::Branch(_, _, _, cond) => {
                 vec![*cond]
             },
