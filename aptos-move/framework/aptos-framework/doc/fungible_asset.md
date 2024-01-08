@@ -2295,7 +2295,7 @@ Decrease the supply of a fungible asset by burning.
 <td>It must not be possible to burn an amount of fungible assets larger than their current supply.</td>
 <td>High</td>
 <td>The burn process ensures that the store has enough balance to burn, by asserting that the supply.current >= amount inside the decrease_supply function.</td>
-<td>Audited that it aborts if the provided store doesn't have sufficient balance.</td>
+<td>Formally verified via <a href="#high-level-req-12">decrease_supply</a>.</td>
 </tr>
 
 <tr>
@@ -2319,7 +2319,7 @@ Decrease the supply of a fungible asset by burning.
 <td>Merging two fungible assets should only be possible if both share the same metadata.</td>
 <td>Medium</td>
 <td>The merge function validates the metadata of the src and dst asset.</td>
-<td>Audited that it aborts if the metadata of the src and dst are not the same.</td>
+<td>Verified via <a href="#high-level-req-15">merge</a>.</td>
 </tr>
 
 <tr>
@@ -2327,7 +2327,7 @@ Decrease the supply of a fungible asset by burning.
 <td>Post merging two fungible assets, the source asset should have the amount value equal to the sum of the two.</td>
 <td>High</td>
 <td>The merge function increases dst_fungible_asset.amount by src_fungible_asset.amount.</td>
-<td>Audited that the dst_fungible_asset balance is increased by amount.</td>
+<td>Verified via <a href="#high-level-req-16">merge</a>.</td>
 </tr>
 
 <tr>
@@ -2335,7 +2335,7 @@ Decrease the supply of a fungible asset by burning.
 <td>Fungible assets with zero balance should be destroyed when the amount reaches value 0.</td>
 <td>Medium</td>
 <td>The destroy_zero ensures that the balance of the asset has the value 0 and destroy the asset.</td>
-<td>Audited that it aborts if the balance of the asset is non zero.</td>
+<td>Verified via <a href="#high-level-req-17">destroy_zero</a>.</td>
 </tr>
 
 </table>
@@ -2817,6 +2817,10 @@ Decrease the supply of a fungible asset by burning.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-13" href="#high-level-req">high level requirement 13</a>:
+<b>aborts_if</b> ref.metadata != <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store);
+<b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(store);
+<b>ensures</b> <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).frozen == frozen;
 </code></pre>
 
 
@@ -2949,6 +2953,12 @@ Decrease the supply of a fungible asset by burning.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+// This enforces <a id="high-level-req-15" href="#high-level-req">high level requirement 15</a>:
+<b>aborts_if</b> dst_fungible_asset.metadata != src_fungible_asset.metadata;
+<b>let</b> dst_fungible_asset_amount = dst_fungible_asset.amount;
+<b>let</b> <b>post</b> post_amount = dst_fungible_asset.amount;
+// This enforces <a id="high-level-req-16" href="#high-level-req">high level requirement 16</a>:
+<b>ensures</b> post_amount == dst_fungible_asset_amount + src_fungible_asset.amount;
 </code></pre>
 
 
@@ -2964,7 +2974,8 @@ Decrease the supply of a fungible asset by burning.
 
 
 
-<pre><code><b>pragma</b> aborts_if_is_partial;
+<pre><code>// This enforces <a id="high-level-req-17" href="#high-level-req">high level requirement 17</a>:
+<b>aborts_if</b> <a href="fungible_asset.md#0x1_fungible_asset">fungible_asset</a>.amount != 0;
 </code></pre>
 
 
@@ -3049,6 +3060,12 @@ Decrease the supply of a fungible asset by burning.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> metadata_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(metadata);
+<b>aborts_if</b> amount == 0;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address) && !<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(metadata_address);
+// This enforces <a id="high-level-req-12" href="#high-level-req">high level requirement 12</a>:
+<b>let</b> concurrent_supply = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address);
+<b>let</b> supply = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>&gt;(metadata_address);
 </code></pre>
 
 
