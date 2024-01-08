@@ -48,7 +48,10 @@ impl TryFrom<&serde_json::Value> for RSA_JWK {
             .ok_or_else(|| anyhow!("Field `kty` is not a string"))?
             .to_string();
 
-        ensure!(kty.as_str() == "RSA", "json to rsa jwk conversion failed with incorrect kty");
+        ensure!(
+            kty.as_str() == "RSA",
+            "json to rsa jwk conversion failed with incorrect kty"
+        );
 
         let ret = Self {
             kty,
