@@ -18,8 +18,8 @@ use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
     jwks::{
-        issuer_from_str, unsupported::UnsupportedJWK, Issuer, AllProvidersJWKs, ObservedJWKs, ProviderJWKs,
-        QuorumCertifiedUpdate,
+        issuer_from_str, jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, Issuer,
+        ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate,
     },
     validator_txn::{Topic, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
@@ -31,7 +31,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_types::jwks::jwk::JWK;
 
 #[tokio::test]
 async fn test_jwk_manager_state_transition() {
@@ -69,21 +68,25 @@ async fn test_jwk_manager_state_transition() {
         JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_0",
             "jwk_payload_0",
-        )).into(),
+        ))
+        .into(),
         JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_1",
             "jwk_payload_1",
-        )).into(),
+        ))
+        .into(),
     ];
     let bob_jwks = vec![
         JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "bob_jwk_id_0",
             "jwk_payload_2",
-        )).into(),
+        ))
+        .into(),
         JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "bob_jwk_id_1",
             "jwk_payload_3",
-        )).into(),
+        ))
+        .into(),
     ];
     let on_chain_state_alice_v111 = ProviderJWKs {
         issuer: issuer_alice.clone(),
@@ -165,7 +168,8 @@ async fn test_jwk_manager_state_transition() {
     let alice_jwks_new = vec![JWK::Unsupported(UnsupportedJWK::new_for_testing(
         "alice_jwk_id_1",
         "jwk_payload_1",
-    )).into()];
+    ))
+    .into()];
     assert!(jwk_manager
         .process_new_observation(issuer_alice.clone(), alice_jwks_new.clone())
         .is_ok());
@@ -193,7 +197,8 @@ async fn test_jwk_manager_state_transition() {
     let carl_jwks_new = vec![JWK::Unsupported(UnsupportedJWK::new_for_testing(
         "carl_jwk_id_0",
         "jwk_payload_4",
-    )).into()];
+    ))
+    .into()];
     assert!(jwk_manager
         .process_new_observation(issuer_carl.clone(), carl_jwks_new.clone())
         .is_ok());
@@ -262,11 +267,13 @@ async fn test_jwk_manager_state_transition() {
         JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_1",
             "jwk_payload_1",
-        )).into(),
+        ))
+        .into(),
         JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_3",
             "jwk_payload_5",
-        )).into(),
+        ))
+        .into(),
     ];
     assert!(jwk_manager
         .process_new_observation(issuer_alice.clone(), alice_jwks_new_2.clone())
