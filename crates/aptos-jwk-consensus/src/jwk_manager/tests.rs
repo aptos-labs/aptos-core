@@ -18,8 +18,8 @@ use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
     jwks::{
-        issuer_from_str, unsupported::UnsupportedJWK, Issuer, JWKs, ObservedJWKs, ProviderJWKs,
-        QuorumCertifiedUpdate, JWK,
+        issuer_from_str, unsupported::UnsupportedJWK, Issuer, AllProvidersJWKs, ObservedJWKs, ProviderJWKs,
+        QuorumCertifiedUpdate,
     },
     validator_txn::{Topic, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
@@ -31,6 +31,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_types::jwks::jwk::JWK;
 
 #[tokio::test]
 async fn test_jwk_manager_state_transition() {
@@ -65,24 +66,24 @@ async fn test_jwk_manager_state_transition() {
     let issuer_bob = issuer_from_str("https://bob.io");
     let issuer_carl = issuer_from_str("https://carl.dev");
     let alice_jwks = vec![
-        JWK::new_unsupported(UnsupportedJWK::new_for_test(
+        JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_0",
             "jwk_payload_0",
-        )),
-        JWK::new_unsupported(UnsupportedJWK::new_for_test(
+        )).into(),
+        JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_1",
             "jwk_payload_1",
-        )),
+        )).into(),
     ];
     let bob_jwks = vec![
-        JWK::new_unsupported(UnsupportedJWK::new_for_test(
+        JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "bob_jwk_id_0",
             "jwk_payload_2",
-        )),
-        JWK::new_unsupported(UnsupportedJWK::new_for_test(
+        )).into(),
+        JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "bob_jwk_id_1",
             "jwk_payload_3",
-        )),
+        )).into(),
     ];
     let on_chain_state_alice_v111 = ProviderJWKs {
         issuer: issuer_alice.clone(),
@@ -97,7 +98,7 @@ async fn test_jwk_manager_state_transition() {
     };
 
     let initial_on_chain_state = ObservedJWKs {
-        jwks: JWKs {
+        jwks: AllProvidersJWKs {
             entries: vec![
                 on_chain_state_alice_v111.clone(),
                 on_chain_state_bob_v222.clone(),
@@ -161,10 +162,10 @@ async fn test_jwk_manager_state_transition() {
 
     // When JWK consensus is `NotStarted` for issuer Alice, JWKConsensusManager should:
     // initiate a JWK consensus session if an update was observed.
-    let alice_jwks_new = vec![JWK::new_unsupported(UnsupportedJWK::new_for_test(
+    let alice_jwks_new = vec![JWK::Unsupported(UnsupportedJWK::new_for_testing(
         "alice_jwk_id_1",
         "jwk_payload_1",
-    ))];
+    )).into()];
     assert!(jwk_manager
         .process_new_observation(issuer_alice.clone(), alice_jwks_new.clone())
         .is_ok());
@@ -189,10 +190,10 @@ async fn test_jwk_manager_state_transition() {
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
 
     // If we also found a JWK update for issuer Carl, a separate JWK consensus session should be started.
-    let carl_jwks_new = vec![JWK::new_unsupported(UnsupportedJWK::new_for_test(
+    let carl_jwks_new = vec![JWK::Unsupported(UnsupportedJWK::new_for_testing(
         "carl_jwk_id_0",
         "jwk_payload_4",
-    ))];
+    )).into()];
     assert!(jwk_manager
         .process_new_observation(issuer_carl.clone(), carl_jwks_new.clone())
         .is_ok());
@@ -258,14 +259,14 @@ async fn test_jwk_manager_state_transition() {
 
     // If Alice rotates again while the consensus session for Alice is in progress, the existing session should be discarded and a new session should start.
     let alice_jwks_new_2 = vec![
-        JWK::new_unsupported(UnsupportedJWK::new_for_test(
+        JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_1",
             "jwk_payload_1",
-        )),
-        JWK::new_unsupported(UnsupportedJWK::new_for_test(
+        )).into(),
+        JWK::Unsupported(UnsupportedJWK::new_for_testing(
             "alice_jwk_id_3",
             "jwk_payload_5",
-        )),
+        )).into(),
     ];
     assert!(jwk_manager
         .process_new_observation(issuer_alice.clone(), alice_jwks_new_2.clone())
@@ -416,7 +417,7 @@ async fn test_jwk_manager_state_transition() {
         jwks: carl_jwks_new.clone(),
     };
     let second_on_chain_state = ObservedJWKs {
-        jwks: JWKs {
+        jwks: AllProvidersJWKs {
             entries: vec![on_chain_state_carl_v1.clone()],
         },
     };

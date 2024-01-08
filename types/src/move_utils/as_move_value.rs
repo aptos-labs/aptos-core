@@ -14,17 +14,16 @@ impl<T: AsMoveValue> AsMoveValue for Option<T> {
             vec![]
         };
 
-        MoveValue::Struct(MoveStruct::Runtime(vec![
-            MoveValue::Vector(items)
-        ]))
+        MoveValue::Struct(MoveStruct::Runtime(vec![MoveValue::Vector(items)]))
     }
 }
 
 impl AsMoveValue for String {
     fn as_move_value(&self) -> MoveValue {
-        MoveValue::Struct(MoveStruct::Runtime(vec![
-            self.clone().into_bytes().as_move_value()
-        ]))
+        MoveValue::Struct(MoveStruct::Runtime(vec![self
+            .clone()
+            .into_bytes()
+            .as_move_value()]))
     }
 }
 

@@ -1,13 +1,15 @@
 // Copyright © Aptos Foundation
 
-use crate::move_any::{Any, AsMoveAny};
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use jwk::JWKMoveStruct;
+use serde::{Deserialize, Serialize};
 use aptos_crypto::bls12381;
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::account_address::AccountAddress;
-use crate::jwks::rsa::RSA_JWK;
-use crate::jwks::unsupported::UnsupportedJWK;
+
+pub mod jwk;
+pub mod rsa;
+pub mod unsupported;
 
 pub type Issuer = Vec<u8>;
 
@@ -26,52 +28,37 @@ pub struct SupportedOIDCProviders {
     pub providers: Vec<OIDCProvider>,
 }
 
-/// Move type `0x1::jwks::JWK` in rust.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct JWK {
-    variant: Any,
-}
-
-impl JWK {
-    pub fn new_rsa(rsa: RSA_JWK) -> Self {
-        Self {
-            variant: rsa.as_move_any()
-        }
-    }
-
-    pub fn new_unsupported(unsupported: UnsupportedJWK) -> Self {
-        Self {
-            variant: unsupported.as_move_any()
-        }
-    }
-}
-
 /// Move type `0x1::jwks::ProviderJWKs` in rust.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct ProviderJWKs {
     pub issuer: Issuer,
     pub version: u64,
-    pub jwks: Vec<JWK>,
+    pub jwks: Vec<JWKMoveStruct>,
 }
 
 impl ProviderJWKs {
-    pub fn jwks(&self) -> &Vec<JWK> {
+    pub fn jwks(&self) -> &Vec<JWKMoveStruct> {
         &self.jwks
     }
 }
 
 /// Move type `0x1::jwks::JWKs` in rust.
-pub struct JWKs {
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct AllProvidersJWKs {
     pub entries: Vec<ProviderJWKs>,
 }
 
 /// Move type `0x1::jwks::ObservedJWKs` in rust.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ObservedJWKs {
-    pub jwks: JWKs,
+    pub jwks: AllProvidersJWKs,
 }
 
-pub mod rsa;
-pub mod unsupported;
+/// Reflection of Move type `0x1::jwks::ObservedJWKs`.
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct PatchedJWKs {
+    pub jwks: AllProvidersJWKs,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct QuorumCertifiedUpdate {

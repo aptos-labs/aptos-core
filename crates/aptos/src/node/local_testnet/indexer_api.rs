@@ -24,11 +24,11 @@ use std::{collections::HashSet, path::PathBuf};
 use tracing::{info, warn};
 
 const INDEXER_API_CONTAINER_NAME: &str = "local-testnet-indexer-api";
-const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.35.0";
+const HASURA_IMAGE: &str = "hasura/graphql-engine:v2.36.1";
 
 /// This Hasura metadata originates from the aptos-indexer-processors repo.
 ///
-/// This metadata is from revision: 2d5cb211a89a8705674e9e1e741c841dd899c558.
+/// This metadata is from revision: 4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf.
 ///
 /// The metadata file is not taken verbatim, it is currently edited by hand to remove
 /// any references to tables that aren't created by the Rust processor migrations.

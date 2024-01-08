@@ -23,6 +23,8 @@ mod indexer;
 #[cfg(test)]
 mod inspection_service;
 #[cfg(test)]
+mod jwks;
+#[cfg(test)]
 mod network;
 #[cfg(test)]
 mod rest_api;

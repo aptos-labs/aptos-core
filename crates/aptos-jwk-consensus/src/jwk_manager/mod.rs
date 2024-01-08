@@ -10,7 +10,7 @@ use aptos_crypto::{bls12381::PrivateKey, SigningKey};
 use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
-    jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate, JWK},
+    jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
     validator_txn::ValidatorTransaction,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -20,6 +20,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
 };
+use aptos_types::jwks::jwk::JWKMoveStruct;
 
 pub mod certified_update_producer;
 
@@ -57,7 +58,7 @@ impl JWKManager {
     }
 
     /// Triggered by an observation thread periodically.
-    pub fn process_new_observation(&mut self, issuer: Issuer, jwks: Vec<JWK>) -> Result<()> {
+    pub fn process_new_observation(&mut self, issuer: Issuer, jwks: Vec<JWKMoveStruct>) -> Result<()> {
         let state = self.states_by_issuer.entry(issuer.clone()).or_default();
         state.observed = Some(jwks.clone());
         if state.observed.as_ref() != state.on_chain.as_ref().map(ProviderJWKs::jwks) {
@@ -273,7 +274,7 @@ impl Default for ConsensusState {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct PerProviderState {
     pub on_chain: Option<ProviderJWKs>,
-    pub observed: Option<Vec<JWK>>,
+    pub observed: Option<Vec<JWKMoveStruct>>,
     pub consensus_state: ConsensusState,
 }
 

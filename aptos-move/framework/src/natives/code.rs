@@ -9,7 +9,7 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use aptos_types::{
-    on_chain_config::OnChainConfig, transaction::ModuleBundle, vm_status::StatusCode,
+    move_any::Any, on_chain_config::OnChainConfig, transaction::ModuleBundle, vm_status::StatusCode,
 };
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -26,7 +26,7 @@ use std::{
     fmt,
     str::FromStr,
 };
-use aptos_types::move_any::Any;
+
 
 /// A wrapper around the representation of a Move Option, which is a vector with 0 or 1 element.
 /// TODO: move this elsewhere for reuse?

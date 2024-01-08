@@ -323,6 +323,7 @@ export interface RawDataClient extends Client {
 export const RawDataClient = makeGenericClientConstructor(RawDataService, "aptos.indexer.v1.RawData") as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): RawDataClient;
   service: typeof RawDataService;
+  serviceName: string;
 };
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | bigint | undefined;
