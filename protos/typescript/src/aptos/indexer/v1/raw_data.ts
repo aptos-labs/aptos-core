@@ -64,7 +64,7 @@ export const TransactionsInStorage = {
     }
     if (message.startingVersion !== undefined) {
       if (BigInt.asUintN(64, message.startingVersion) !== message.startingVersion) {
-        throw new globalThis.Error("value provided for field message.startingVersion of type uint64 too large");
+        throw new Error("value provided for field message.startingVersion of type uint64 too large");
       }
       writer.uint32(16).uint64(message.startingVersion.toString());
     }

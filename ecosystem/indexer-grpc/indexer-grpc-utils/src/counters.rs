@@ -23,25 +23,16 @@ pub enum IndexerGrpcStep {
     // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
     DataServiceAllChunksSent,
 
-    // [Indexer Cache] Received transactions from fullnode.
-    CacheWorkerReceivedTxns,
-    // [Indexer Cache] Encoded transactions.
-    CacheWorkerTxnEncoded,
-    // [Indexer Cache] Processed transactions in a batch.
-    CacheWorkerTxnsProcessed,
-    // [Indexer Cache] Successfully process current batch.
-    CacheWorkerBatchProcessed,
+    CacheWorkerReceivedTxns, // [Indexer Cache] Received transactions from fullnode.
+    CacheWorkerTxnEncoded,   // [Indexer Cache] Encoded transactions.
+    CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
+    CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
 
-    // [File worker] Fetch transactions from cache.
-    FilestoreFetchTxns,
-    // [File worker] Upload transactions to filestore.
-    FilestoreUploadTxns,
-    // [File worker] Update metadata to filestore.
-    FilestoreUpdateMetadata,
-    // [File worker] Successfully process current batch.
-    FilestoreProcessedBatch,
-    // [File worker] Encoded transactions.
-    FileStoreEncodedTxns,
+    FilestoreFetchTxns,      // [File worker] Fetch transactions from cache.
+    FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
+    FilestoreUpdateMetadata, // [File worker] Update metadata to filestore.
+    FilestoreProcessedBatch, // [File worker] Successfully process current batch.
+    FileStoreEncodedTxns,    // [File worker] Encoded transactions.
 
     // [Indexer Fullnode] Fetched batch of transactions from fullnode
     FullnodeFetchedBatch,

@@ -15,6 +15,8 @@ pub const CACHE_SIZE_ESTIMATION: u64 = 250_000_u64;
 
 pub const MAX_CACHE_FETCH_SIZE: u64 = 1000_u64;
 
+pub const MAX_CACHE_FETCH_SIZE: u64 = 1000_u64;
+
 // Hard limit for cache lower bound. Only used for active eviction.
 // Cache worker actively evicts the cache entries if the cache entry version is
 // lower than the latest version - CACHE_SIZE_EVICTION_LOWER_BOUND.
@@ -312,10 +314,6 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             Err(err) => Err(err.into()),
         }
     }
-
-    // Fetching from cache
-    // Requested version x
-    // Cache hit x +
 
     // TODO: Remove this
     pub async fn batch_get_encoded_proto_data(
