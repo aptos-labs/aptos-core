@@ -241,7 +241,7 @@ where
     ) -> PartialVMResult<Option<StateValue>> {
         self.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for {:?}: {:?}",
+                "Unexpected storage error for resource at {:?}: {:?}",
                 state_key, e
             ))
         })
@@ -257,7 +257,7 @@ where
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         self.get_state_value(state_key).map_err(|e| {
             PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
-                "Unexpected storage error for {:?}: {:?}",
+                "Unexpected storage error for module at {:?}: {:?}",
                 state_key, e
             ))
         })

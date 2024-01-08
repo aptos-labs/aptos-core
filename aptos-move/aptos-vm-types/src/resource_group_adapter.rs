@@ -48,8 +48,10 @@ pub fn group_tagged_resource_size<T: Serialize + Clone + Debug>(
     value_byte_len: usize,
 ) -> PartialVMResult<u64> {
     Ok((bcs::serialized_size(&tag).map_err(|e| {
-        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
-            .with_message(format!("Tag serialization error for {:?}: {:?}", tag, e))
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR).with_message(format!(
+            "Tag serialization error for tag {:?}: {:?}",
+            tag, e
+        ))
     })? + value_byte_len
         + size_u32_as_uleb128(value_byte_len)) as u64)
 }
@@ -168,9 +170,13 @@ impl<'r> ResourceGroupAdapter<'r> {
         let (group_data, blob_len): (BTreeMap<StructTag, Bytes>, u64) = group_data.map_or_else(
             || Ok::<_, PartialVMError>((BTreeMap::new(), 0)),
             |group_data_blob| {
-                let group_data = bcs::from_bytes(&group_data_blob).map_err(|_| {
-                    PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
-                        .with_message("Resource group deserialization error".to_string())
+                let group_data = bcs::from_bytes(&group_data_blob).map_err(|e| {
+                    PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR).with_message(
+                        format!(
+                            "Failed to deserialize the resource group at {:? }: {:?}",
+                            group_key, e
+                        ),
+                    )
                 })?;
                 Ok((group_data, group_data_blob.len() as u64))
             },
