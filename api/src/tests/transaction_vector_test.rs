@@ -52,7 +52,7 @@ impl Formatter for NumberToStringFormatter {
     }
 
     // Formats u128 as a string
-    fn write_number_str<W>(&mut self, writer: &mut W, value: &str) -> io::Result<()>
+    fn write_u128<W>(&mut self, writer: &mut W, value: u128) -> io::Result<()>
     where
         W: ?Sized + io::Write,
     {
