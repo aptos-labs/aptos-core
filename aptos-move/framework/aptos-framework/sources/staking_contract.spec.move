@@ -242,7 +242,7 @@ spec aptos_framework::staking_contract {
         // TODO: A data invariant not hold happened here involve with 'pool_u64' #L16.
         pragma verify = false;
         let staker_address = signer::address_of(staker);
-        aborts_if new_commission_percentage < 0 || new_commission_percentage > 100;
+        aborts_if new_commission_percentage == 0 || new_commission_percentage > 100;
         include ContractExistsAbortsIf{staker: staker_address};
     }
 
@@ -532,7 +532,7 @@ spec aptos_framework::staking_contract {
         commission_percentage: u64;
         contract_creation_seed: vector<u8>;
 
-        aborts_if commission_percentage < 0 || commission_percentage > 100;
+        aborts_if commission_percentage == 0 || commission_percentage > 100;
         aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
         let config = global<staking_config::StakingConfig>(@aptos_framework);
         let min_stake_required = config.minimum_stake;
