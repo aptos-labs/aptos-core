@@ -263,7 +263,7 @@ spec aptos_framework::aptos_governance {
 
         // verify voting::create_proposal_v2
         aborts_if option::spec_is_some(maybe_supply) && governance_config.min_voting_threshold > early_resolution_vote_threshold_value;
-        aborts_if len(execution_hash) <= 0;
+        aborts_if len(execution_hash) == 0;
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal_id = voting_forum.next_proposal_id;
