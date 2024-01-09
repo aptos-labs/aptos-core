@@ -7,6 +7,7 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
+    use aptos_framework::reconfiguration_state;
     use aptos_framework::stake;
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
@@ -16,6 +17,7 @@ module aptos_framework::reconfiguration_with_dkg {
     public(friend) fun try_start(account: &signer) {
         if (dkg::in_progress()) { return };
         config_buffer::disable_validator_set_changes(account);
+        reconfiguration_state::try_mark_as_in_progress();
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
     }

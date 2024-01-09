@@ -132,6 +132,7 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
+        reconfiguration_state::initialize(&aptos_framework_account);
         dkg::initialize(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
     }
@@ -385,6 +386,7 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
+    use aptos_framework::reconfiguration_state;
 
     #[verify_only]
     fun initialize_for_verification(

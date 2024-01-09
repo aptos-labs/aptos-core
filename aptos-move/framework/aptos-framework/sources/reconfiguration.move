@@ -11,6 +11,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::reconfiguration_state;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
@@ -102,7 +103,6 @@ module aptos_framework::reconfiguration {
 
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
         let current_time = timestamp::now_microseconds();
-
         // Do not do anything if a reconfiguration event is already emitted within this transaction.
         //
         // This is OK because:
@@ -118,6 +118,10 @@ module aptos_framework::reconfiguration {
         if (current_time == config_ref.last_reconfiguration_time) {
             return
         };
+
+        // If `RECONFIGURE_WITH_DKG` is enabled,
+        // `reconfiguration_with_dkg::start()` already marked it correctly, and this invocation becomes a no-op.
+        reconfiguration_state::try_mark_as_in_progress();
 
         // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
         // explicitly so that staking can distribute them.
