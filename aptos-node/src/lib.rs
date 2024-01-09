@@ -674,12 +674,13 @@ pub fn setup_environment_and_start_node(
         let (reconfig_events, dkg_start_events) = dkg_subscriptions
             .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
         let dkg_runtime = start_dkg_runtime(
+            &node_config,
             network_client,
             network_service_events,
-            vtxn_pool_writer_for_dkg,
-            dkg_txn_pulled_rx,
             reconfig_events,
             dkg_start_events,
+            vtxn_pool_writer_for_dkg,
+            dkg_txn_pulled_rx,
         );
         Some(dkg_runtime)
     } else {

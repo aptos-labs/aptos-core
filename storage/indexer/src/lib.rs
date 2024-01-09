@@ -35,7 +35,7 @@ use bytes::Bytes;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::ModuleResolver,
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
@@ -89,7 +89,7 @@ impl Indexer {
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
-    pub fn index_with_annotator<R: MoveResolver>(
+    pub fn index_with_annotator<R: ModuleResolver>(
         &self,
         annotator: &MoveValueAnnotator<R>,
         first_version: Version,
@@ -160,7 +160,7 @@ struct TableInfoParser<'a, R> {
     pending_on: HashMap<TableHandle, Vec<Bytes>>,
 }
 
-impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
+impl<'a, R: ModuleResolver> TableInfoParser<'a, R> {
     pub fn new(indexer: &'a Indexer, annotator: &'a MoveValueAnnotator<R>) -> Self {
         Self {
             indexer,

@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #[cfg(feature = "testing")]
-use anyhow::Error;
-#[cfg(feature = "testing")]
 use aptos_aggregator::resolver::TAggregatorV1View;
 #[cfg(feature = "testing")]
 use aptos_aggregator::{
@@ -36,9 +34,9 @@ use aptos_types::{
 #[cfg(feature = "testing")]
 use bytes::Bytes;
 #[cfg(feature = "testing")]
-use move_core_types::language_storage::StructTag;
+use move_binary_format::errors::PartialVMError;
 #[cfg(feature = "testing")]
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 #[cfg(feature = "testing")]
 use std::{
@@ -142,7 +140,7 @@ impl TableResolver for AptosBlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
+    ) -> Result<Option<Bytes>, PartialVMError> {
         Ok(None)
     }
 }

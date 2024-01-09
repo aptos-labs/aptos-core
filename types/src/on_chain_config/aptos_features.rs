@@ -52,6 +52,7 @@ pub enum FeatureFlag {
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
+    RECONFIGURE_WITH_DKG = 45,
 }
 
 /// Representation of features on chain as a bitset.

@@ -95,6 +95,7 @@ pub enum FeatureFlag {
     CommissionChangeDelegationPool,
     BN254Structures,
     WebAuthnSignature,
+    ReconfigureWithDKG,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -248,6 +249,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::BN254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
+            FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
         }
     }
 }
@@ -324,6 +326,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::BN254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
+            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
         }
     }
 }

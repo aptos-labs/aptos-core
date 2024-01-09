@@ -9,6 +9,7 @@ use aptos_vm_types::resolver::{
     StateValueMetadataResolver,
 };
 use bytes::Bytes;
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::StructTag, resolver::MoveResolver};
 use std::collections::{BTreeMap, HashMap};
 
@@ -19,7 +20,7 @@ pub trait AptosMoveResolver:
     AggregatorV1Resolver
     + ConfigStorage
     + DelayedFieldResolver
-    + MoveResolver
+    + MoveResolver<PartialVMError>
     + ResourceGroupResolver
     + StateValueMetadataResolver
     + StateStorageView

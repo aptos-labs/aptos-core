@@ -137,15 +137,6 @@ pub fn taskify<Command: Debug + Parser>(filename: &Path) -> Result<Vec<TaskInput
             text[text.len() - 1].0
         };
 
-        // Keep fucking this up somehow
-        // let last_non_whitespace = text
-        //     .iter()
-        //     .rposition(|(_, l)| !WHITESPACE.is_match(l))
-        //     .unwrap_or(0);
-        // let initial_text = text
-        //     .into_iter()
-        //     .take_while(|(i, _)| *i < last_non_whitespace)
-        //     .map(|(_, l)| l);
         let file_text_vec = (0..command_lines_stop)
             .map(|_| String::new())
             .chain(text.into_iter().map(|(_ln, l)| l))
