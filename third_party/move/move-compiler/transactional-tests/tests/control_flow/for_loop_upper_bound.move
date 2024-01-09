@@ -6,7 +6,7 @@ module 0x42::m {
         10
     }
 
-    public fun main(): u64 {
+    fun main(): u64 {
         let x = 0;
         for (i in 0..foo(&mut x)) {};
         x
