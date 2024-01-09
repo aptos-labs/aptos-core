@@ -21,9 +21,7 @@ use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{
-    merge_node_config, IdentityBlob, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
-};
+use aptos_config::config::{merge_node_config, IdentityBlob, NodeConfig, PersistableConfig};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -668,18 +666,13 @@ pub fn setup_environment_and_start_node(
     let vtxn_pool_writer_for_jwk = txn_write_clients.pop().unwrap();
     let vtxn_pool_writer_for_dkg = txn_write_clients.pop().unwrap();
 
-    let identity_blob: Option<Arc<IdentityBlob>> = match &node_config
+    let identity_blob: Option<Arc<IdentityBlob>> = node_config
         .consensus
         .safety_rules
         .initial_safety_rules_config
-    {
-        InitialSafetyRulesConfig::FromFile {
-            identity_blob_path, ..
-        } => Some(Arc::new(
-            IdentityBlob::from_file(identity_blob_path).unwrap(),
-        )),
-        InitialSafetyRulesConfig::None => None,
-    };
+        .identity_blob()
+        .ok()
+        .map(Arc::new);
 
     let dkg_runtime = if let Some(obj) = dkg_network_interfaces {
         let ApplicationNetworkInterfaces {

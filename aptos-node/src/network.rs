@@ -4,7 +4,7 @@
 use crate::services::start_netbench_service;
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{InitialSafetyRulesConfig, NetworkConfig, NodeConfig},
+    config::{NetworkConfig, NodeConfig},
     network_id::NetworkId,
 };
 use aptos_consensus::network_interface::ConsensusMsg;
@@ -231,13 +231,11 @@ pub fn setup_networks_and_get_interfaces(
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
 ) {
-    let has_identity_blob = matches!(
-        &node_config
-            .consensus
-            .safety_rules
-            .initial_safety_rules_config,
-        InitialSafetyRulesConfig::FromFile { .. }
-    );
+    let has_identity_blob = node_config
+        .consensus
+        .safety_rules
+        .initial_safety_rules_config
+        .has_identity_blob();
 
     // Gather all network configs
     let network_configs = extract_network_configs(node_config);
