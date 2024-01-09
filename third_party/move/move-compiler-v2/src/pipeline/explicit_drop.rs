@@ -109,8 +109,7 @@ impl<'a> ExplicitDropTransformer<'a> {
             Bytecode::Ret(..) | Bytecode::Abort(..) => self.emit_bytecode(bytecode.clone()),
             _ => {
                 self.emit_bytecode(bytecode.clone());
-                let released_temps = self.released_temps_at(code_offset);
-                self.drop_temps(&released_temps, bytecode.get_attr_id())
+                self.explicit_drops_at(code_offset, bytecode)
             },
         }
     }
