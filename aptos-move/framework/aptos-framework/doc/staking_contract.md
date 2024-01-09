@@ -2498,7 +2498,7 @@ Staking_contract exists the stacker/operator pair.
 <b>let</b> <b>post</b> post_store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
 <b>let</b> <b>post</b> post_staking_contract = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_store.staking_contracts, operator);
 <b>aborts_if</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal + amount &gt; MAX_U64;
-// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> post_staking_contract.principal == <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.principal + amount;
 </code></pre>
 
@@ -2541,7 +2541,7 @@ Only active validator can update locked_until_secs.
 
 
 <pre><code><b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
-// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_ContractExistsAbortsIf">ContractExistsAbortsIf</a>{staker: staker_address};
 <b>include</b> <a href="staking_contract.md#0x1_staking_contract_IncreaseLockupWithCapAbortsIf">IncreaseLockupWithCapAbortsIf</a>{staker: staker_address};
 </code></pre>
@@ -2636,7 +2636,7 @@ Staking_contract exists the stacker/operator pair.
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>requires</b> <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.commission_percentage &gt;= 0 && <a href="staking_contract.md#0x1_staking_contract">staking_contract</a>.<a href="staking_contract.md#0x1_staking_contract_commission_percentage">commission_percentage</a> &lt;= 100;
 <b>let</b> staker_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(staker);
 <b>let</b> staking_contracts = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address).staking_contracts;
@@ -3013,7 +3013,7 @@ a staking_contract exists for the staker/operator pair.
     <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(staker_address);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address) && !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(staker_address);
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address) && <a href="account.md#0x1_account">account</a>.guid_creation_num + 9 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
-    // This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+    // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
     <b>ensures</b> <b>exists</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
     <b>let</b> store = <b>global</b>&lt;<a href="staking_contract.md#0x1_staking_contract_Store">Store</a>&gt;(staker_address);
     <b>let</b> staking_contracts = store.staking_contracts;
