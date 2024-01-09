@@ -26,7 +26,7 @@ use move_core_types::{
     effects::{AccountChanges, Changes, Op as MoveStorageOp},
     language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
+    vm_status::StatusCode,
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
 use move_vm_types::values::Value;
@@ -202,7 +202,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             aggregator_change_set,
             configs,
         )
-        .map_err(|status| PartialVMError::new(status.status_code()).finish(Location::Undefined))?;
+        .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(change_set)
     }
@@ -395,7 +395,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         table_change_set: TableChangeSet,
         aggregator_change_set: AggregatorChangeSet,
         configs: &ChangeSetConfigs,
-    ) -> Result<VMChangeSet, VMStatus> {
+    ) -> PartialVMResult<VMChangeSet> {
         let mut resource_write_set = BTreeMap::new();
         let mut resource_group_write_set = BTreeMap::new();
         let mut module_write_set = BTreeMap::new();

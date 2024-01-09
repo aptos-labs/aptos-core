@@ -671,7 +671,7 @@ new block event for WriteSetPayload.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high level requirement 3</a>:
+<pre><code>// This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
 <b>invariant</b> epoch_interval &gt; 0;
 </code></pre>
 
@@ -694,7 +694,7 @@ Make sure The BlockResource under the caller existed after initializing.
 The number of new events created does not exceed MAX_U64.
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>include</b> <a href="block.md#0x1_block_Initialize">Initialize</a>;
 <b>include</b> <a href="block.md#0x1_block_NewEventHandle">NewEventHandle</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
@@ -712,7 +712,7 @@ The number of new events created does not exceed MAX_U64.
     aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     epoch_interval_microsecs: u64;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-    // This enforces <a id="high-level-req-2.1" href="#high-level-req">high level requirement 2</a>:
+    // This enforces <a id="high-level-req-2.1" href="#high-level-req">high-level requirement 2</a>:
     <b>aborts_if</b> addr != @aptos_framework;
     <b>aborts_if</b> epoch_interval_microsecs == 0;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
@@ -752,7 +752,7 @@ The new_epoch_interval must be greater than 0.
 The BlockResource existed under the @aptos_framework.
 
 
-<pre><code>// This enforces <a id="high-level-req-3.1" href="#high-level-req">high level requirement 3</a>:
+<pre><code>// This enforces <a id="high-level-req-3.1" href="#high-level-req">high-level requirement 3</a>:
 <b>include</b> <a href="block.md#0x1_block_UpdateEpochIntervalMicrosecs">UpdateEpochIntervalMicrosecs</a>;
 </code></pre>
 
@@ -766,7 +766,7 @@ The BlockResource existed under the @aptos_framework.
     aptos_framework: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     new_epoch_interval: u64;
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-    // This enforces <a id="high-level-req-2.2" href="#high-level-req">high level requirement 2</a>:
+    // This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
     <b>aborts_if</b> addr != @aptos_framework;
     <b>aborts_if</b> new_epoch_interval == 0;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
@@ -808,7 +808,7 @@ The BlockResource existed under the @aptos_framework.
 <pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>requires</b> proposer == @vm_reserved || <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(proposer);
 <b>requires</b> <a href="timestamp.md#0x1_timestamp">timestamp</a> &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
 <b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
@@ -856,7 +856,7 @@ The BlockResource existed under the @aptos_framework.
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
 <b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 <b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
-// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>requires</b> <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) == new_block_event.height;
 <b>aborts_if</b> <b>false</b>;
 </code></pre>

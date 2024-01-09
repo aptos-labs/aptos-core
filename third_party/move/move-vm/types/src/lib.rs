@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+#[macro_export]
 macro_rules! debug_write {
     ($($toks: tt)*) => {
         write!($($toks)*).map_err(|_|
@@ -13,6 +14,7 @@ macro_rules! debug_write {
     };
 }
 
+#[macro_export]
 macro_rules! debug_writeln {
     ($($toks: tt)*) => {
         writeln!($($toks)*).map_err(|_|

@@ -4,7 +4,7 @@
 
 use crate::compiler::{as_module, as_script, compile_units};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
@@ -510,28 +510,28 @@ struct BogusStorage {
 }
 
 impl ModuleResolver for BogusStorage {
+    type Error = PartialVMError;
+
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
-        Ok(Err(
-            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
-        )?)
+    fn get_module(&self, _module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+        Err(PartialVMError::new(self.bad_status_code))
     }
 }
 
 impl ResourceResolver for BogusStorage {
+    type Error = PartialVMError;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         _address: &AccountAddress,
         _tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        Ok(Err(
-            PartialVMError::new(self.bad_status_code).finish(Location::Undefined)
-        )?)
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+        Err(PartialVMError::new(self.bad_status_code))
     }
 }
 
@@ -567,7 +567,7 @@ fn test_storage_returns_bogus_error_when_loading_module() {
             )
             .unwrap_err();
 
-        assert_eq!(err.status_type(), StatusType::InvariantViolation);
+        assert_eq!(err.major_status(), *error_code);
     }
 }
 
@@ -649,6 +649,12 @@ fn test_storage_returns_bogus_error_when_loading_resource() {
             )
             .unwrap_err();
 
-        assert_eq!(err.status_type(), StatusType::InvariantViolation);
+        if *error_code == StatusCode::UNKNOWN_VERIFICATION_ERROR {
+            // MoveVM maps `UNKNOWN_VERIFICATION_ERROR` to `VERIFICATION_ERROR` in
+            // `maybe_core_dump` function in interpreter.rs.
+            assert_eq!(err.major_status(), StatusCode::VERIFICATION_ERROR);
+        } else {
+            assert_eq!(err.major_status(), *error_code);
+        }
     }
 }

@@ -7,7 +7,8 @@ use crate::resolver::{
 use anyhow::Error;
 use aptos_types::state_store::state_key::StateKey;
 use bytes::Bytes;
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -46,20 +47,22 @@ impl GroupSizeKind {
 pub fn group_tagged_resource_size<T: Serialize + Clone + Debug>(
     tag: &T,
     value_byte_len: usize,
-) -> anyhow::Result<u64> {
-    Ok((bcs::serialized_size(&tag)? + value_byte_len + size_u32_as_uleb128(value_byte_len)) as u64)
+) -> PartialVMResult<u64> {
+    Ok((bcs::serialized_size(&tag).map_err(|e| {
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+            .with_message(format!("Tag serialization error for {:?}: {:?}", tag, e))
+    })? + value_byte_len
+        + size_u32_as_uleb128(value_byte_len)) as u64)
 }
 
 /// Utility method to compute the size of the group as GroupSizeKind::AsSum.
 pub fn group_size_as_sum<T: Serialize + Clone + Debug>(
     mut group: impl Iterator<Item = (T, usize)>,
-) -> anyhow::Result<ResourceGroupSize> {
-    let (count, len) = group
-        .try_fold((0, 0), |(count, len), (tag, value_byte_len)| {
-            let delta = group_tagged_resource_size(&tag, value_byte_len)?;
-            Ok((count + 1, len + delta))
-        })
-        .map_err(|_: Error| anyhow::Error::msg("Resource group member tag serialization error"))?;
+) -> PartialVMResult<ResourceGroupSize> {
+    let (count, len) = group.try_fold((0, 0), |(count, len), (tag, value_byte_len)| {
+        let delta = group_tagged_resource_size(&tag, value_byte_len)?;
+        Ok::<(usize, u64), PartialVMError>((count + 1, len + delta))
+    })?;
 
     Ok(ResourceGroupSize::Combined {
         num_tagged_resources: count,

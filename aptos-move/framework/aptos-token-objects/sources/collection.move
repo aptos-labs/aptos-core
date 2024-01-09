@@ -321,12 +321,37 @@ module aptos_token_objects::collection {
     public(friend) fun increment_supply(
         collection: &Object<Collection>,
         token: address,
-    ): Option<u64> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
-        let index = increment_concurrent_supply(collection, token);
-        if (option::is_none(&index)) {
-            option::none()
+    ): Option<u64> acquires FixedSupply, UnlimitedSupply {
+        let collection_addr = object::object_address(collection);
+        if (exists<FixedSupply>(collection_addr)) {
+            let supply = borrow_global_mut<FixedSupply>(collection_addr);
+            supply.current_supply = supply.current_supply + 1;
+            supply.total_minted = supply.total_minted + 1;
+            assert!(
+                supply.current_supply <= supply.max_supply,
+                error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
+            );
+            event::emit_event(&mut supply.mint_events,
+                MintEvent {
+                    index: supply.total_minted,
+                    token,
+                },
+            );
+            option::some(supply.total_minted)
+        } else if (exists<UnlimitedSupply>(collection_addr)) {
+            let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
+            supply.current_supply = supply.current_supply + 1;
+            supply.total_minted = supply.total_minted + 1;
+            event::emit_event(
+                &mut supply.mint_events,
+                MintEvent {
+                    index: supply.total_minted,
+                    token,
+                },
+            );
+            option::some(supply.total_minted)
         } else {
-            option::some(aggregator_v2::read_snapshot<u64>(&option::destroy_some(index)))
+            option::none()
         }
     }
 

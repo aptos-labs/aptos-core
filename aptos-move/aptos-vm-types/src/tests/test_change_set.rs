@@ -26,12 +26,13 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use claims::{assert_err, assert_matches, assert_ok, assert_some_eq};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     language_storage::{ModuleId, StructTag},
     value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
+    vm_status::StatusCode,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -246,14 +247,13 @@ fn test_successful_squash() {
 
 macro_rules! assert_invariant_violation {
     ($w1:ident, $w2:ident, $w3:ident, $w4:ident) => {
-        let check = |res: anyhow::Result<(), VMStatus>| {
-            assert_matches!(
-                res,
-                Err(VMStatus::Error {
-                    status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    sub_status: None,
-                    message: Some(_),
-                })
+        let check = |res: PartialVMResult<()>| {
+            let err = assert_err!(res);
+
+            // TODO[agg_v2]: Uniformize errors for write op squashing.
+            assert!(
+                err.major_status() == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                    || err.major_status() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
             );
         };
 
@@ -337,13 +337,10 @@ fn test_unsuccessful_squash_delete_delta() {
         .with_aggregator_v1_delta_set(aggregator_delta_set_2)
         .build();
     let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
-    assert_matches!(
-        res,
-        Err(VMStatus::Error {
-            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
+    let err = assert_err!(res);
+    assert_eq!(
+        err.major_status(),
+        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
     );
 }
 
@@ -360,13 +357,10 @@ fn test_unsuccessful_squash_delta_create() {
         .with_aggregator_v1_write_set(aggregator_write_set_2)
         .build();
     let res = change_set.squash_additional_change_set(additional_change_set, &MockChangeSetChecker);
-    assert_matches!(
-        res,
-        Err(VMStatus::Error {
-            status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            sub_status: None,
-            message: Some(_),
-        })
+    let err = assert_err!(res);
+    assert_eq!(
+        err.major_status(),
+        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
     );
 }
 

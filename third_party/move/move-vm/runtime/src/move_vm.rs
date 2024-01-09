@@ -12,7 +12,7 @@ use crate::{
     session::Session,
 };
 use move_binary_format::{
-    errors::{Location, VMResult},
+    errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
 use move_core_types::{
@@ -48,23 +48,26 @@ impl MoveVM {
     /// Right now it is the caller's responsibility to ensure cache coherence of the Move VM Loader
     ///   - When a module gets published in a Move VM Session, and then gets used by another
     ///     transaction, it will be loaded into the code cache and stay there even if the resulted
-    ///     effects do not get commited back to the storage when the Session ends.
+    ///     effects do not get committed back to the storage when the Session ends.
     ///   - As a result, if one wants to have multiple sessions at a time, one needs to make sure
     ///     none of them will try to publish a module. In other words, if there is a module publishing
     ///     Session it must be the only Session existing.
     ///   - In general, a new Move VM needs to be created whenever the storage gets modified by an
-    ///     outer envrionment, or otherwise the states may be out of sync. There are a few exceptional
+    ///     outer environment, or otherwise the states may be out of sync. There are a few exceptional
     ///     cases where this may not be necessary, with the most notable one being the common module
     ///     publishing flow: you can keep using the same Move VM if you publish some modules in a Session
     ///     and apply the effects to the storage when the Session ends.
-    pub fn new_session<'r>(&self, remote: &'r dyn MoveResolver) -> Session<'r, '_> {
+    pub fn new_session<'r>(
+        &self,
+        remote: &'r impl MoveResolver<PartialVMError>,
+    ) -> Session<'r, '_> {
         self.new_session_with_extensions(remote, NativeContextExtensions::default())
     }
 
     /// Create a new session, as in `new_session`, but provide native context extensions.
     pub fn new_session_with_extensions<'r>(
         &self,
-        remote: &'r dyn MoveResolver,
+        remote: &'r impl MoveResolver<PartialVMError>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {
@@ -78,7 +81,7 @@ impl MoveVM {
     /// Create a new session, as in `new_session`, but provide native context extensions and custome storage for resolved modules.
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
-        remote: &'r dyn MoveResolver,
+        remote: &'r impl MoveResolver<PartialVMError>,
         module_storage: Arc<dyn ModuleStorage>,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
@@ -94,7 +97,7 @@ impl MoveVM {
     pub fn load_module(
         &self,
         module_id: &ModuleId,
-        remote: &dyn MoveResolver,
+        remote: &impl MoveResolver<PartialVMError>,
     ) -> VMResult<Arc<CompiledModule>> {
         self.runtime
             .loader()

@@ -3714,7 +3714,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>invariant</b> consensus_scheme == 0;
 </code></pre>
 
@@ -3725,7 +3725,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_ValidatorOwnerNoChange">ValidatorOwnerNoChange</a> {
-    // This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
     <b>ensures</b> <b>forall</b> addr: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr)):
         <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr)).pool_address == <b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr).pool_address;
 }
@@ -3741,7 +3741,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
     pool_address: <b>address</b>;
     <b>let</b> stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
     <b>let</b> <b>post</b> post_stake_pool = <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
     <b>ensures</b> stake_pool.active.value + stake_pool.inactive.value + stake_pool.pending_active.value + stake_pool.pending_inactive.value ==
         post_stake_pool.active.value + post_stake_pool.inactive.value + post_stake_pool.pending_active.value + post_stake_pool.pending_inactive.value;
 }
@@ -4373,7 +4373,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>include</b> aptos_framework::aptos_coin::ExistsAptosCoin;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
