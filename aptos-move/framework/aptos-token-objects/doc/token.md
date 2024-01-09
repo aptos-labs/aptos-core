@@ -404,7 +404,7 @@ The token name is over the maximum length
     // Flag which controls whether <a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a> functions from <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2">aggregator_v2</a> <b>module</b> can be called.
     <b>let</b> aggregator_api_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_aggregator_v2_api_enabled">features::aggregator_v2_api_enabled</a>();
     // Flag which controls whether we are going <b>to</b> still <b>continue</b> writing <b>to</b> deprecated fields.
-    <b>let</b> concurrent_assets_enabled = aggregator_api_enabled && <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>();
+    <b>let</b> concurrent_assets_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>();
 
     <b>let</b> (deprecated_index, deprecated_name) = <b>if</b> (aggregator_api_enabled) {
         <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_with_default">option::destroy_with_default</a>(
