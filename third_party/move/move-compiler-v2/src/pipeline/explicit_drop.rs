@@ -250,6 +250,9 @@ impl<'a> ExplicitDropTransformer<'a> {
             released.insert(t);
         }
         released
+            .into_iter()
+            .filter(|t| !self.is_primitive(*t))
+            .collect()
     }
 
     // Returns a set of locals that can be dropped at given code offset
