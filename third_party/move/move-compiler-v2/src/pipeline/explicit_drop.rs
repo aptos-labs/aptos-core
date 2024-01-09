@@ -155,7 +155,7 @@ impl<'a> ExplicitDropTransformer<'a> {
     ///     - jumps to `label`
     pub fn process_jump(&mut self, pred_offset: CodeOffset, attr_id: AttrId, label: Label) -> Option<(Label, Vec<Bytecode>)> {
         let suc_offset = self.label_offsets.get(&label).expect("label offset");
-        let temps_to_drop = &self.released_by_lifetime_between(pred_offset, *suc_offset);
+        let temps_to_drop = &self.released_temps_between(pred_offset, *suc_offset);
         if temps_to_drop.is_empty() {
             None
         } else {
