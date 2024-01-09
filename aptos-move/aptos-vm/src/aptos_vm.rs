@@ -1632,7 +1632,8 @@ impl AptosVM {
                 change_set.clone(),
                 &change_set_configs,
                 resolver.is_delayed_field_optimization_capable(),
-            ),
+            )
+            .map_err(|e| e.into_vm_status()),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -2253,7 +2254,7 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
     txn_data: &TransactionMetadata,
     features: &Features,
     resolver: &impl AptosMoveResolver,
-) -> Result<bool, VMError> {
+) -> VMResult<bool> {
     Ok(
         features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
             && txn_data.fee_payer.is_some()
