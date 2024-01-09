@@ -35,7 +35,6 @@ use aptos_network::{
     transport::ConnectionMetadata,
     ProtocolId,
 };
-use aptos_safety_rules::SafetyRulesManager;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
@@ -150,7 +149,6 @@ impl SMRNode {
 
         let epoch_mgr = EpochManager::new(
             &config,
-            SafetyRulesManager::new(&config.consensus.safety_rules),
             time_service,
             self_sender,
             consensus_network_client,

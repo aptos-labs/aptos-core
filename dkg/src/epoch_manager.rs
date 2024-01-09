@@ -8,16 +8,13 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::NodeConfig;
-use aptos_crypto::bls12381;
+use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::error;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{DKGStartEvent, DKGState},
@@ -39,7 +36,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
 
     // some DKG private params
-    sk: Option<bls12381::PrivateKey>,
+    identity_blob: Arc<IdentityBlob>,
 
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
@@ -60,21 +57,21 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
-        node_config: &NodeConfig,
+        my_addr: AccountAddress,
+        identity_blob: Arc<IdentityBlob>,
         reconfig_events: ReconfigNotificationListener<P>,
-        start_dkg_events: EventNotificationListener,
+        dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
         vtxn_pull_notification_rx: vtxn_pool::PullNotificationReceiver,
     ) -> Self {
-        let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            sk: Arc::new(Self::load_private_key(node_config)),
             my_addr,
+            identity_blob,
             epoch_state: None,
             reconfig_events,
-            dkg_start_events: start_dkg_events,
+            dkg_start_events,
             dkg_rpc_msg_tx: None,
             dkg_manager_close_tx: None,
             self_sender,
@@ -163,9 +160,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let agg_node_producer = DummyAggNodeProducer {}; //TODO: replace with real
 
-            let (start_dkg_event_tx, start_dkg_event_rx) =
+            let (dkg_start_event_tx, dkg_start_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.dkg_start_event_tx = Some(start_dkg_event_tx);
+            self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
                 (),
@@ -176,7 +173,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
             let dkg_manager = DKGManager::new(
-                self.sk.clone(),
+                self.identity_blob.clone(),
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_node_producer),
@@ -187,7 +184,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
-                start_dkg_event_rx,
+                dkg_start_event_rx,
                 dkg_rpc_msg_rx,
                 vtxn_pull_notification_rx,
                 dkg_manager_close_rx,
@@ -208,17 +205,5 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tx.send(ack_tx).unwrap();
             ack_rx.await.unwrap();
         }
-    }
-
-    fn load_private_key(node_config: &NodeConfig) -> bls12381::PrivateKey {
-        let backend = &node_config.consensus.safety_rules.backend;
-        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key")
     }
 }

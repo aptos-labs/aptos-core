@@ -168,7 +168,6 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub(crate) fn new(
         node_config: &NodeConfig,
-        safety_rules_manager: SafetyRulesManager,
         time_service: Arc<dyn TimeService>,
         self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
@@ -186,6 +185,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let config = node_config.consensus.clone();
         let execution_config = node_config.execution.clone();
         let dag_config = node_config.dag_consensus.clone();
+        let sr_config = &node_config.consensus.safety_rules;
+        let safety_rules_manager = SafetyRulesManager::new(sr_config);
         Self {
             author,
             config,

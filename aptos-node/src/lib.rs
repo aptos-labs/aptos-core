@@ -26,7 +26,6 @@ use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_safety_rules::SafetyRulesManager;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::{chain_id::ChainId, validator_txn::Topic};
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -667,16 +666,14 @@ pub fn setup_environment_and_start_node(
     let vtxn_pool_writer_for_jwk = txn_write_clients.pop().unwrap();
     let vtxn_pool_writer_for_dkg = txn_write_clients.pop().unwrap();
 
-    // Create safety rules manager. This has to be done before DKG/JWK consensus, so keys can be loaded successfully.
-    let safety_rules_manager = if node_config.base.role.is_validator() {
-        let sr_config = &node_config.consensus.safety_rules;
-        let safety_rules_manager = SafetyRulesManager::new(sr_config);
-        Some(safety_rules_manager)
-    } else {
-        None
-    };
+    let identity_blob = Arc::new(
+        node_config
+            .consensus
+            .safety_rules
+            .initial_safety_rules_config
+            .identity_blob(),
+    );
 
-    // Create the DKG runtime.
     let dkg_runtime = if let Some(obj) = dkg_network_interfaces {
         let ApplicationNetworkInterfaces {
             network_client,
@@ -684,8 +681,10 @@ pub fn setup_environment_and_start_node(
         } = obj;
         let (reconfig_events, dkg_start_events) = dkg_subscriptions
             .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
+        let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         let dkg_runtime = start_dkg_runtime(
-            &node_config,
+            my_addr,
+            identity_blob.clone(),
             network_client,
             network_service_events,
             reconfig_events,
@@ -728,7 +727,6 @@ pub fn setup_environment_and_start_node(
         // Initialize and start consensus
         let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
             &mut node_config,
-            safety_rules_manager.expect("safety rules manager is required by consensus"),
             db_rw,
             consensus_reconfig_subscription,
             consensus_network_interfaces,
