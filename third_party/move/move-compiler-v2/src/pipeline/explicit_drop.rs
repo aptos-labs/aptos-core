@@ -13,7 +13,6 @@ use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{AttrId, Bytecode, Label, Operation},
-    stackless_control_flow_graph::{BlockContent, BlockId, StacklessControlFlowGraph},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -50,10 +49,6 @@ struct ExplicitDropTransformer<'a> {
     transformed: Vec<Bytecode>,
     live_var_annot: &'a LiveVarAnnotation,
     lifetime_annot: &'a LifetimeAnnotation,
-    // backward control flow graph
-    cfg: StacklessControlFlowGraph,
-    // maps code offset of first instruction in block to block ids
-    offset_to_block_id: BTreeMap<CodeOffset, BlockId>,
     label_offsets: BTreeMap<Label, CodeOffset>,
     // labels used in the original codes and in the generated codes
     labels: BTreeSet<Label>,
@@ -69,20 +64,13 @@ impl<'a> ExplicitDropTransformer<'a> {
             .get_annotations()
             .get::<LifetimeAnnotation>()
             .expect("lifetime annotation");
-        let cfg = StacklessControlFlowGraph::new_backward(target.get_bytecode(), true);
-        let offset_to_block_id = get_offset_to_block_id(&cfg);
         let label_offsets = Bytecode::label_offsets(target.get_bytecode());
-        let labels = label_offsets
-            .keys()
-            .cloned()
-            .collect();
+        let labels = label_offsets.keys().cloned().collect();
         ExplicitDropTransformer {
             target,
             transformed: Vec::new(),
             live_var_annot,
             lifetime_annot,
-            cfg,
-            offset_to_block_id,
             label_offsets,
             labels,
         }
@@ -103,9 +91,7 @@ impl<'a> ExplicitDropTransformer<'a> {
             Bytecode::Branch(attr_id, l1, l2, cond) => {
                 self.transform_branch_at(code_offset, *attr_id, *l1, *l2, *cond)
             },
-            Bytecode::Jump(attr_id, label) => {
-                self.transform_jump_at(code_offset, *attr_id, *label)
-            },
+            Bytecode::Jump(attr_id, label) => self.transform_jump_at(code_offset, *attr_id, *label),
             Bytecode::Ret(..) | Bytecode::Abort(..) => self.emit_bytecode(bytecode.clone()),
             _ => {
                 self.emit_bytecode(bytecode.clone());
@@ -116,15 +102,25 @@ impl<'a> ExplicitDropTransformer<'a> {
 
     fn transform_jump_at(&mut self, code_offset: CodeOffset, attr_id: AttrId, l: Label) {
         if let Some((new_l, codes)) = self.process_jump(code_offset, attr_id, l) {
-           self.emit_bytecode(Bytecode::Jump(attr_id, new_l));
-           self.emit_bytecodes(codes.into_iter())
+            self.emit_bytecode(Bytecode::Jump(attr_id, new_l));
+            self.emit_bytecodes(codes.into_iter())
         } else {
             self.emit_bytecode(Bytecode::Jump(attr_id, l))
         }
     }
 
-    fn transform_branch_at(&mut self, code_offset: CodeOffset, attr_id: AttrId, l1: Label, l2: Label, cond: TempIndex) {
-        match (self.process_jump(code_offset, attr_id, l1), self.process_jump(code_offset, attr_id, l2)) {
+    fn transform_branch_at(
+        &mut self,
+        code_offset: CodeOffset,
+        attr_id: AttrId,
+        l1: Label,
+        l2: Label,
+        cond: TempIndex,
+    ) {
+        match (
+            self.process_jump(code_offset, attr_id, l1),
+            self.process_jump(code_offset, attr_id, l2),
+        ) {
             (None, Some((new_l2, codes2))) => {
                 self.emit_bytecode(Bytecode::Branch(attr_id, l1, new_l2, cond));
                 self.emit_bytecodes(codes2.into_iter())
@@ -138,9 +134,7 @@ impl<'a> ExplicitDropTransformer<'a> {
                 self.emit_bytecodes(codes1.into_iter());
                 self.emit_bytecodes(codes2.into_iter())
             },
-            (None, None) => {
-                self.emit_bytecode(Bytecode::Branch(attr_id, l1, l2, cond))
-            },
+            (None, None) => self.emit_bytecode(Bytecode::Branch(attr_id, l1, l2, cond)),
         }
         // TODO: if we need to drop primitives one day, then we need to drop the locals released by the branch instruction as well
     }
@@ -153,7 +147,12 @@ impl<'a> ExplicitDropTransformer<'a> {
     ///     - starts with the fresh label
     ///     - drops inferred locals
     ///     - jumps to `label`
-    pub fn process_jump(&mut self, pred_offset: CodeOffset, attr_id: AttrId, label: Label) -> Option<(Label, Vec<Bytecode>)> {
+    pub fn process_jump(
+        &mut self,
+        pred_offset: CodeOffset,
+        attr_id: AttrId,
+        label: Label,
+    ) -> Option<(Label, Vec<Bytecode>)> {
         let suc_offset = self.label_offsets.get(&label).expect("label offset");
         let temps_to_drop = &self.released_temps_between(pred_offset, *suc_offset);
         if temps_to_drop.is_empty() {
@@ -175,7 +174,12 @@ impl<'a> ExplicitDropTransformer<'a> {
     ///     - starts with the fresh label
     ///     - drops locals in `temps_to_drop`
     ///     - jumps to `label`
-    fn explicit_drops_before_label(&mut self, label: Label, temps_to_drop: &BTreeSet<TempIndex>, attr_id: AttrId) -> (Label, Vec<Bytecode>) {
+    fn explicit_drops_before_label(
+        &mut self,
+        label: Label,
+        temps_to_drop: &BTreeSet<TempIndex>,
+        attr_id: AttrId,
+    ) -> (Label, Vec<Bytecode>) {
         let new_label = self.gen_fresh_label();
         let mut instrs = Vec::new();
         instrs.push(Bytecode::Label(attr_id, new_label));
@@ -223,7 +227,11 @@ impl<'a> ExplicitDropTransformer<'a> {
 
     /// Returns the set of locals released by the control flow edge from `pred_offset` to `suc_offset`
     /// I.e., alive after `pred_offset` but dead before `suc_offset`, and not borrowed before `suc_offset`
-    fn released_temps_between(&self, pred_offset: CodeOffset, suc_offset: CodeOffset) -> BTreeSet<TempIndex> {
+    fn released_temps_between(
+        &self,
+        pred_offset: CodeOffset,
+        suc_offset: CodeOffset,
+    ) -> BTreeSet<TempIndex> {
         let mut released = BTreeSet::new();
         let lifetime_after = &self.get_lifetime_info(suc_offset).before;
         for t in dead_and_unborrowed(
@@ -288,23 +296,6 @@ impl<'a> ExplicitDropTransformer<'a> {
         self.lifetime_annot.get_info_at(code_offset)
     }
 
-    /// Returns the codeoffsets of the predecessors of the given instruction.
-    /// The given instruction should be at the beginning of a block.
-    fn get_pred_instr_offsets(&self, code_offset: CodeOffset) -> Vec<CodeOffset> {
-        let block_id = self.offset_to_block_id.get(&code_offset).expect("block id");
-        self.cfg
-            .successors(*block_id)
-            .iter()
-            .filter_map(|block_id| {
-                if let BlockContent::Basic { upper, .. } = self.cfg.content(*block_id) {
-                    Some(*upper)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
     fn gen_drop(tmp: TempIndex, attr_id: AttrId) -> Bytecode {
         Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![tmp], None)
     }
@@ -315,7 +306,10 @@ impl<'a> ExplicitDropTransformer<'a> {
     }
 
     /// Iterators over instructions dropping all locals in `temps_to_drop`
-    fn gen_drops(temps_to_drop: & BTreeSet<TempIndex>, attr_id: AttrId) -> impl Iterator<Item = Bytecode> + '_ {
+    fn gen_drops(
+        temps_to_drop: &BTreeSet<TempIndex>,
+        attr_id: AttrId,
+    ) -> impl Iterator<Item = Bytecode> + '_ {
         temps_to_drop
             .iter()
             .map(move |t| Self::gen_drop(*t, attr_id))
@@ -376,17 +370,6 @@ fn released_temps(
         }
     }
     released_temps
-}
-
-// Return a map mapping code offsets of the first instruction in blocks to their block id
-fn get_offset_to_block_id(cfg: &StacklessControlFlowGraph) -> BTreeMap<CodeOffset, BlockId> {
-    let mut code_offset_to_block_id = BTreeMap::new();
-    for block_id in cfg.blocks() {
-        if let BlockContent::Basic { lower, .. } = cfg.content(block_id) {
-            assert!(code_offset_to_block_id.insert(*lower, block_id).is_none())
-        }
-    }
-    code_offset_to_block_id
 }
 
 /// Iterates over the locals released by live var analysis, and not borrowed in `lifetime_after`
