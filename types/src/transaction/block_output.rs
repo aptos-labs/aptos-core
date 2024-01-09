@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::fmt::Debug;
-
 use super::block_epilogue::BlockEndInfo;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct BlockOutput<Output: Debug> {

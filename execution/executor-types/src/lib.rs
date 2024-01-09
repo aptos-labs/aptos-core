@@ -445,10 +445,7 @@ impl StateComputeResult {
         let output = itertools::zip_eq(input_txns, self.compute_status_for_input_txns())
             .filter_map(|(txn, status)| {
                 assert!(
-                    !matches!(
-                        txn,
-                        Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_)
-                    ),
+                    !txn.is_non_reconfig_block_ending(),
                     "{:?}: {:?}",
                     txn,
                     status
@@ -473,10 +470,9 @@ impl StateComputeResult {
 
         assert!(
             self.has_reconfiguration()
-                || matches!(
-                    output.last(),
-                    Some(Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_))
-                ),
+                || output
+                    .last()
+                    .map_or(false, Transaction::is_non_reconfig_block_ending),
             "{:?}",
             output.last()
         );

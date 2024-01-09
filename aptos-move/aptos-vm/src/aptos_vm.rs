@@ -2020,10 +2020,15 @@ impl AptosVM {
                 }
                 (vm_status, output, Some(sender))
             },
-            StateCheckpoint(_) | BlockEpilogue(_) => {
+            StateCheckpoint(_) => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
+            },
+            BlockEpilogue(_) => {
+                let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                let output = VMOutput::empty_with_status(status);
+                (VMStatus::Executed, output, Some("block_epilogue".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
                 fail_point!("aptos_vm::execution::validator_transaction");
