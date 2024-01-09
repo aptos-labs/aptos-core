@@ -31,6 +31,7 @@ move-model = { path = "../../move-model" }
 move-mutator = { path = "../move-mutator" }
 move-package = { path = "../move-package" }
 move-prover = { path = "../../move-prover" }
+move-spec-test = { path = "../move-spec-test" }
 move-stdlib = { path = "../../move-stdlib" }
 move-unit-test = { path = "../move-unit-test" }
 move-vm-runtime = { path = "../../move-vm/runtime", features = ["debugging"] }

@@ -1,0 +1,25 @@
+[package]
+name = "move-spec-test"
+version = "0.1.0"
+authors = ["Eiger <hello@eiger.co>"]
+
+description = "Move specification testing tool"
+
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.3", features = ["derive"] }
+log = "0.4"
+pretty_env_logger = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+
+move-command-line-common = { path = "../../move-command-line-common" }
+move-mutator = { path = "../move-mutator" }
+move-package = { path = "../move-package" }
+move-prover = { path = "../../move-prover" }
