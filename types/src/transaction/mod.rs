@@ -1447,14 +1447,22 @@ impl TransactionToCommit {
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn dummy_with_events(events: Vec<ContractEvent>) -> Self {
+    pub fn dummy() -> Self {
         Self {
             transaction: Transaction::StateCheckpoint(HashValue::zero()),
             transaction_info: TransactionInfo::dummy(),
             state_updates: create_empty_sharded_state_updates(),
             write_set: Default::default(),
-            events,
+            events: vec![],
             is_reconfig: false,
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_events(events: Vec<ContractEvent>) -> Self {
+        Self {
+            events,
+            ..Self::dummy()
         }
     }
 

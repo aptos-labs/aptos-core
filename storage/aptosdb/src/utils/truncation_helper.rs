@@ -254,6 +254,7 @@ fn truncate_ledger_db_single_batch(
     let batch = LedgerDbSchemaBatches::new();
 
     delete_transaction_index_data(
+        ledger_db,
         transaction_store,
         start_version,
         &batch.transaction_db_batches,
@@ -284,11 +285,13 @@ fn truncate_ledger_db_single_batch(
 }
 
 fn delete_transaction_index_data(
+    ledger_db: &LedgerDb,
     transaction_store: &TransactionStore,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let transactions = transaction_store
+    let transactions = ledger_db
+        .transaction_db()
         .get_transaction_iter(start_version, MAX_COMMIT_PROGRESS_DIFFERENCE as usize * 2)?
         .collect::<Result<Vec<_>>>()?;
     let num_txns = transactions.len();
@@ -299,7 +302,9 @@ fn delete_transaction_index_data(
             "Truncate transaction index data."
         );
         transaction_store.prune_transaction_by_account(&transactions, batch)?;
-        transaction_store.prune_transaction_by_hash(&transactions, batch)?;
+        ledger_db
+            .transaction_db()
+            .prune_transaction_by_hash_indices(&transactions, batch)?;
     }
 
     Ok(())
@@ -352,7 +357,7 @@ fn delete_per_version_data(
         &batch.transaction_info_db_batches,
     )?;
     delete_per_version_data_impl::<TransactionSchema>(
-        ledger_db.transaction_db(),
+        ledger_db.transaction_db_raw(),
         start_version,
         &batch.transaction_db_batches,
     )?;

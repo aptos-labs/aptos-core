@@ -124,7 +124,9 @@ impl Cmd {
 
         println!(
             "Max Transaction version: {:?}",
-            Self::get_latest_version_for_schema::<TransactionSchema>(ledger_db.transaction_db())?,
+            Self::get_latest_version_for_schema::<TransactionSchema>(
+                ledger_db.transaction_db_raw()
+            )?,
         );
 
         println!(

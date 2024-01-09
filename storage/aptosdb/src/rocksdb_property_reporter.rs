@@ -112,7 +112,7 @@ fn update_rocksdb_properties(
         }
 
         for cf in transaction_db_column_families() {
-            set_property(cf, ledger_db.transaction_db())?;
+            set_property(cf, ledger_db.transaction_db_raw())?;
         }
 
         for cf in event_db_column_families() {
