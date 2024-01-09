@@ -674,27 +674,28 @@ pub fn setup_environment_and_start_node(
         .ok()
         .map(Arc::new);
 
-    let dkg_runtime = if let Some(obj) = dkg_network_interfaces {
-        let ApplicationNetworkInterfaces {
-            network_client,
-            network_service_events,
-        } = obj;
-        let (reconfig_events, dkg_start_events) = dkg_subscriptions
-            .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
-        let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
-        let dkg_runtime = start_dkg_runtime(
-            my_addr,
-            identity_blob.clone().unwrap(),
-            network_client,
-            network_service_events,
-            reconfig_events,
-            dkg_start_events,
-            vtxn_pool_writer_for_dkg,
-            dkg_txn_pulled_rx,
-        );
-        Some(dkg_runtime)
-    } else {
-        None
+    let dkg_runtime = match (dkg_network_interfaces, identity_blob.clone()) {
+        (Some(interfaces), Some(identity_blob)) => {
+            let ApplicationNetworkInterfaces {
+                network_client,
+                network_service_events,
+            } = interfaces;
+            let (reconfig_events, dkg_start_events) = dkg_subscriptions
+                .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
+            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let dkg_runtime = start_dkg_runtime(
+                my_addr,
+                identity_blob,
+                network_client,
+                network_service_events,
+                reconfig_events,
+                dkg_start_events,
+                vtxn_pool_writer_for_dkg,
+                dkg_txn_pulled_rx,
+            );
+            Some(dkg_runtime)
+        }
+        _ => None
     };
 
     let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {

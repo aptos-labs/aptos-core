@@ -231,12 +231,6 @@ pub fn setup_networks_and_get_interfaces(
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     ApplicationNetworkInterfaces<StorageServiceMessage>,
 ) {
-    let has_identity_blob = node_config
-        .consensus
-        .safety_rules
-        .initial_safety_rules_config
-        .has_identity_blob();
-
     // Gather all network configs
     let network_configs = extract_network_configs(node_config);
 
@@ -281,30 +275,26 @@ pub fn setup_networks_and_get_interfaces(
                 ));
             }
 
-            if has_identity_blob {
-                if dkg_network_handle.is_some() {
-                    panic!("There can be at most one validator network!");
-                } else {
-                    dkg_network_handle = Some(register_client_and_service_with_network(
-                        &mut network_builder,
-                        network_id,
-                        &network_config,
-                        dkg_network_configuration(node_config),
-                    ));
-                }
-
-                if jwk_consensus_network_handle.is_some() {
-                    panic!("There can be at most one validator network!");
-                } else {
-                    jwk_consensus_network_handle = Some(register_client_and_service_with_network(
-                        &mut network_builder,
-                        network_id,
-                        &network_config,
-                        jwk_consensus_network_configuration(node_config),
-                    ));
-                }
+            if dkg_network_handle.is_some() {
+                panic!("There can be at most one validator network!");
             } else {
-                // Do not setup DKG/JWK consensus for VFN.
+                dkg_network_handle = Some(register_client_and_service_with_network(
+                    &mut network_builder,
+                    network_id,
+                    &network_config,
+                    dkg_network_configuration(node_config),
+                ));
+            }
+
+            if jwk_consensus_network_handle.is_some() {
+                panic!("There can be at most one validator network!");
+            } else {
+                jwk_consensus_network_handle = Some(register_client_and_service_with_network(
+                    &mut network_builder,
+                    network_id,
+                    &network_config,
+                    jwk_consensus_network_configuration(node_config),
+                ));
             }
         }
 
