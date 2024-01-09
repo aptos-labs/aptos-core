@@ -138,7 +138,7 @@ async fn test_old_indexer() {
     execute_nft_txns(account1, &mut info).await.unwrap();
 
     // Let the test complete! Yes, this does suck.
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
 
     // Get them into the array and sort by type in order to prevent ordering from breaking tests
     let mut transactions = vec![];
