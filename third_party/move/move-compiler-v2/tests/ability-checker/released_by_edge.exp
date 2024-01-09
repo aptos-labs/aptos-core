@@ -198,18 +198,33 @@ fun test::test(): test::Impotent {
   1: $t2 := pack test::Impotent($t3)
   2: $t1 := move($t2)
   3: $t4 := false
-  4: if ($t4) goto 5 else goto 9
-  5: label L0
-  6: $t0 := move($t1)
-  7: return $t0
-  8: goto 10
-  9: label L1
- 10: label L2
- 11: $t5 := false
- 12: $t0 := pack test::Impotent($t5)
- 13: return $t0
- 14: return $t0
+  4: if ($t4) goto 8 else goto 5
+  5: label L3
+  6: destroy($t1)
+  7: goto 12
+  8: label L0
+  9: $t0 := move($t1)
+ 10: return $t0
+ 11: goto 13
+ 12: label L1
+ 13: label L2
+ 14: $t5 := false
+ 15: $t0 := pack test::Impotent($t5)
+ 16: return $t0
+ 17: return $t0
 }
+
+
+Diagnostics:
+error: cannot drop
+   ┌─ tests/ability-checker/released_by_edge.move:6:3
+   │
+ 6 │ ╭         if (false) {
+ 7 │ │             return x;
+ 8 │ │         } else {
+ 9 │ │
+10 │ │         };
+   │ ╰─────────^
 
 ============ after AbilityChecker: ================
 
@@ -225,15 +240,18 @@ fun test::test(): test::Impotent {
   1: $t2 := pack test::Impotent($t3)
   2: $t1 := move($t2)
   3: $t4 := false
-  4: if ($t4) goto 5 else goto 9
-  5: label L0
-  6: $t0 := move($t1)
-  7: return $t0
-  8: goto 10
-  9: label L1
- 10: label L2
- 11: $t5 := false
- 12: $t0 := pack test::Impotent($t5)
- 13: return $t0
- 14: return $t0
+  4: if ($t4) goto 8 else goto 5
+  5: label L3
+  6: destroy($t1)
+  7: goto 12
+  8: label L0
+  9: $t0 := move($t1)
+ 10: return $t0
+ 11: goto 13
+ 12: label L1
+ 13: label L2
+ 14: $t5 := false
+ 15: $t0 := pack test::Impotent($t5)
+ 16: return $t0
+ 17: return $t0
 }
