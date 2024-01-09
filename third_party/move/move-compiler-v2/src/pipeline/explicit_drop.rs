@@ -223,6 +223,7 @@ impl<'a> ExplicitDropTransformer<'a> {
     }
 
     /// Returns the set of locals released by the control flow edge from `pred_offset` to `suc_offset`
+    /// I.e., alive after `pred_offset` but dead before `suc_offset`, and not borrowed before `suc_offset`
     fn released_temps_between(&self, pred_offset: CodeOffset, suc_offset: CodeOffset) -> BTreeSet<TempIndex> {
         let mut released = BTreeSet::new();
         let lifetime_after = &self.get_lifetime_info(suc_offset).before;
