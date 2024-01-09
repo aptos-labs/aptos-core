@@ -113,6 +113,7 @@ pub enum MoveTool {
     RunScript(RunScript),
     #[clap(subcommand, hide = true)]
     Show(show::ShowTool),
+    SpecTest(SpecTestPackage),
     Test(TestPackage),
     VerifyPackage(VerifyPackage),
     View(ViewFunction),
@@ -146,6 +147,7 @@ impl MoveTool {
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::RunScript(tool) => tool.execute_serialized().await,
             MoveTool::Show(tool) => tool.execute_serialized().await,
+            MoveTool::SpecTest(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::VerifyPackage(tool) => tool.execute_serialized().await,
             MoveTool::View(tool) => tool.execute_serialized().await,
@@ -632,16 +634,69 @@ impl CliCommand<&'static str> for MutatePackage {
 
         let path = self.move_options.get_package_path()?;
 
-        let result = move_mutator::run_move_mutator(
-            mutator_options.unwrap_or_default(),
-            config,
-            path,
-        )
-        .map_err(|err| CliError::UnexpectedError(err.to_string()));
+        let result =
+            move_mutator::run_move_mutator(mutator_options.unwrap_or_default(), config, path)
+                .map_err(|err| CliError::UnexpectedError(err.to_string()));
 
         match result {
             Ok(_) => Ok("Success"),
             Err(e) => Err(CliError::MoveMutatorError(format!("{:#}", e))),
+        }
+    }
+}
+
+/// Test specification of a Move package.
+#[derive(Parser)]
+pub struct SpecTestPackage {
+    /// Options for parsing and compiling a move package dir
+    #[clap(flatten)]
+    move_options: MovePackageDir,
+    /// Options specific for the spec-test tool
+    #[clap(flatten)]
+    spec_test_options: Option<move_spec_test::cli::Options>,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for SpecTestPackage {
+    /// Returns the name of the command used in the CLI.
+    fn command_name(&self) -> &'static str {
+        "SpecTestPackage"
+    }
+
+    /// Executes the spec-test command. Internally, it generates mutants with the provided parameters and passes them to the
+    /// Prover.
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let crate::move_tool::SpecTestPackage {
+            move_options: _,
+            spec_test_options,
+        } = self;
+
+        let known_attributes = extended_checks::get_all_attribute_names();
+        let config = BuildConfig {
+            dev_mode: self.move_options.dev,
+            additional_named_addresses: self.move_options.named_addresses(),
+            test_mode: false,
+            full_model_generation: self.move_options.check_test_code,
+            install_dir: self.move_options.output_dir.clone(),
+            skip_fetch_latest_git_deps: self.move_options.skip_fetch_latest_git_deps,
+            compiler_config: CompilerConfig {
+                known_attributes: known_attributes.clone(),
+                skip_attribute_checks: self.move_options.skip_attribute_checks,
+                compiler_version: self.move_options.compiler_version,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let path = self.move_options.get_package_path()?;
+
+        let result =
+            move_spec_test::run_spec_test(spec_test_options.unwrap_or_default(), config, path)
+                .map_err(|err| CliError::UnexpectedError(err.to_string()));
+
+        match result {
+            Ok(_) => Ok("Success"),
+            Err(e) => Err(CliError::MoveSpecTestError(format!("{:#}", e))),
         }
     }
 }
