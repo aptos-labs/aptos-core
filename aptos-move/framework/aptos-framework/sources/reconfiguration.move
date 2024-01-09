@@ -138,7 +138,7 @@ module aptos_framework::reconfiguration {
         };
 
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
-        stake::on_new_epoch();
+        stake::update_validator_set_on_new_epoch(true);
 
         storage_gas::on_reconfig();
 

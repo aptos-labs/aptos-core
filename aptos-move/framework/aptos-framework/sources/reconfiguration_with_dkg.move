@@ -19,7 +19,7 @@ module aptos_framework::reconfiguration_with_dkg {
         config_buffer::disable_validator_set_changes(account);
         reconfiguration_state::try_mark_as_in_progress();
         let cur_epoch = reconfiguration::current_epoch();
-        dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::next_validator_set());
+        dkg::start(cur_epoch, stake::cur_validator_set(), cur_epoch + 1, stake::update_validator_set_on_new_epoch(false));
     }
 
     /// Apply buffered on-chain configs (except for ValidatorSet, which is done inside `reconfiguration::reconfigure()`).

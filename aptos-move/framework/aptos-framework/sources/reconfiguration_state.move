@@ -1,3 +1,4 @@
+/// Reconfiguration meta-state resources and util functions.
 module aptos_framework::reconfiguration_state {
     use std::error;
     use std::string;
@@ -27,7 +28,7 @@ module aptos_framework::reconfiguration_state {
 
     /// A state variant indicating a reconfiguration is in progress.
     struct StateActive has copy, drop, store {
-        start_time_us: u64,
+        start_time_secs: u64,
     }
 
     public(friend) fun initialize(fx: &signer) {
@@ -53,19 +54,19 @@ module aptos_framework::reconfiguration_state {
         let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
         if (variant_type_name == b"0x1::reconfiguration_state::StateInactive") {
             state.variant = copyable_any::pack(StateActive {
-                start_time_us: timestamp::now_microseconds()
+                start_time_secs: timestamp::now_seconds()
             });
         };
     }
 
-    /// Get the reconfiguration start time (microsecond-level timestamp).
+    /// Get the unix time when the currently in-progress reconfiguration started.
     /// Abort if the reconfiguration state is not "in progress".
-    public(friend) fun start_time_us(): u64 acquires State {
+    public(friend) fun start_time_secs(): u64 acquires State {
         let state = borrow_global<State>(@aptos_framework);
         let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
         if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
             let active = copyable_any::unpack<StateActive>(state.variant);
-            active.start_time_us
+            active.start_time_secs
         } else {
             abort(error::invalid_state(ERECONFIG_NOT_IN_PROGRESS))
         }
@@ -96,13 +97,13 @@ module aptos_framework::reconfiguration_state {
         timestamp::fast_forward_seconds(123);
         try_mark_as_in_progress();
         assert!(is_in_progress(), 1);
-        assert!(123000000 == start_time_us(), 1);
+        assert!(123 == start_time_secs(), 1);
 
         // Redundant `try_start` should be no-op.
         timestamp::fast_forward_seconds(1);
         try_mark_as_in_progress();
         assert!(is_in_progress(), 1);
-        assert!(123000000 == start_time_us(), 1);
+        assert!(123 == start_time_secs(), 1);
 
         // A `finish` call should work when the state is marked "in progess".
         timestamp::fast_forward_seconds(10);

@@ -52,6 +52,7 @@
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
 <b>use</b> <a href="jwks.md#0x1_jwks">0x1::jwks</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="staking_config.md#0x1_staking_config">0x1::staking_config</a>;
@@ -366,6 +367,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="block.md#0x1_block_initialize">block::initialize</a>(&aptos_framework_account, epoch_interval_microsecs);
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize">reconfiguration_state::initialize</a>(&aptos_framework_account);
     <a href="dkg.md#0x1_dkg_initialize">dkg::initialize</a>(&aptos_framework_account);
     <a href="jwks.md#0x1_jwks_initialize">jwks::initialize</a>(&aptos_framework_account);
 }
@@ -650,7 +652,7 @@ If it exists, it just returns the signer.
     // validators.
     <a href="aptos_coin.md#0x1_aptos_coin_destroy_mint_cap">aptos_coin::destroy_mint_cap</a>(aptos_framework);
 
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
+    <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">stake::update_validator_set_on_new_epoch</a>(<b>true</b>);
 }
 </code></pre>
 

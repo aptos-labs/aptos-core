@@ -18,6 +18,7 @@ Reconfiguration with DKG helper functions.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="version.md#0x1_version">0x1::version</a>;
 </code></pre>
@@ -44,8 +45,9 @@ Do nothing if one is already in progress.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">try_start</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <b>if</b> (<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>()) { <b>return</b> };
     <a href="../../aptos-stdlib/../move-stdlib/doc/config_buffer.md#0x1_config_buffer_disable_validator_set_changes">config_buffer::disable_validator_set_changes</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">reconfiguration_state::try_mark_as_in_progress</a>();
     <b>let</b> cur_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
-    <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch, <a href="stake.md#0x1_stake_cur_validator_set">stake::cur_validator_set</a>(), cur_epoch + 1, <a href="stake.md#0x1_stake_next_validator_set">stake::next_validator_set</a>());
+    <a href="dkg.md#0x1_dkg_start">dkg::start</a>(cur_epoch, <a href="stake.md#0x1_stake_cur_validator_set">stake::cur_validator_set</a>(), cur_epoch + 1, <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">stake::update_validator_set_on_new_epoch</a>(<b>false</b>));
 }
 </code></pre>
 
