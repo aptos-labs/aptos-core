@@ -8,6 +8,7 @@ use bytes::Bytes;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
+    errors::PartialVMError,
     file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
 };
 use move_bytecode_utils::module_cache::GetModule;
@@ -20,6 +21,7 @@ use move_core_types::{
     parser,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location::Spanned;
@@ -336,24 +338,36 @@ impl OnDiskStateView {
 }
 
 impl ModuleResolver for OnDiskStateView {
+    type Error = PartialVMError;
+
     fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
         vec![]
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
-        self.get_module_bytes(module_id)
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
+        self.get_module_bytes(module_id).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR)
+                .with_message(format!("Storage error: {:?}", e))
+        })
     }
 }
 
 impl ResourceResolver for OnDiskStateView {
+    type Error = PartialVMError;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         _metadata: &[Metadata],
         _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize)> {
-        let buf = self.get_resource_bytes(*address, struct_tag.clone())?;
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+        let buf = self
+            .get_resource_bytes(*address, struct_tag.clone())
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::STORAGE_ERROR)
+                    .with_message(format!("Storage error: {:?}", e))
+            })?;
         let buf_size = resource_size(&buf);
         Ok((buf, buf_size))
     }

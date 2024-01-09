@@ -2,8 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm::MoveVM;
-use bytes::Bytes;
 use move_binary_format::{
     errors::VMResult,
     file_format::{
@@ -18,15 +16,14 @@ use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
-    metadata::Metadata,
-    resolver::{ModuleResolver, ResourceResolver},
+    language_storage::TypeTag,
     u256::U256,
-    value::{serialize_values, MoveTypeLayout, MoveValue},
+    value::{serialize_values, MoveValue},
     vm_status::{StatusCode, StatusType},
 };
+use move_vm_runtime::move_vm::MoveVM;
+use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
-use std::collections::HashMap;
 
 // make a script with a given signature for main.
 fn make_script(parameters: Signature) -> Vec<u8> {
@@ -233,47 +230,6 @@ fn make_script_function(signature: Signature) -> (CompiledModule, Identifier) {
     )
 }
 
-struct RemoteStore {
-    modules: HashMap<ModuleId, Bytes>,
-}
-
-impl RemoteStore {
-    fn new() -> Self {
-        Self {
-            modules: HashMap::new(),
-        }
-    }
-
-    fn add_module(&mut self, compiled_module: CompiledModule) {
-        let id = compiled_module.self_id();
-        let mut bytes = vec![];
-        compiled_module.serialize(&mut bytes).unwrap();
-        self.modules.insert(id, bytes.into());
-    }
-}
-
-impl ModuleResolver for RemoteStore {
-    fn get_module_metadata(&self, _module_id: &ModuleId) -> Vec<Metadata> {
-        vec![]
-    }
-
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, anyhow::Error> {
-        Ok(self.modules.get(module_id).cloned())
-    }
-}
-
-impl ResourceResolver for RemoteStore {
-    fn get_resource_bytes_with_metadata_and_layout(
-        &self,
-        _address: &AccountAddress,
-        _tag: &StructTag,
-        _metadata: &[Metadata],
-        _maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        Ok((None, 0))
-    }
-}
-
 fn combine_signers_and_args(
     signers: Vec<AccountAddress>,
     non_signer_args: Vec<Vec<u8>>,
@@ -292,7 +248,7 @@ fn call_script_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let move_vm = MoveVM::new(vec![]).unwrap();
-    let remote_view = RemoteStore::new();
+    let remote_view = InMemoryStorage::new();
     let mut session = move_vm.new_session(&remote_view);
     session
         .execute_script(
@@ -316,12 +272,16 @@ fn call_script_function_with_args_ty_args_signers(
     signers: Vec<AccountAddress>,
 ) -> VMResult<()> {
     let move_vm = MoveVM::new(vec![]).unwrap();
-    let mut remote_view = RemoteStore::new();
-    let id = module.self_id();
-    remote_view.add_module(module);
+    let mut remote_view = InMemoryStorage::new();
+
+    let module_id = module.self_id();
+    let mut module_blob = vec![];
+    module.serialize(&mut module_blob).unwrap();
+
+    remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
     let mut session = move_vm.new_session(&remote_view);
     session.execute_function_bypass_visibility(
-        &id,
+        &module_id,
         function_name.as_ident_str(),
         ty_args,
         combine_signers_and_args(signers, non_signer_args),
@@ -805,15 +765,18 @@ fn check_script_function() {
 #[test]
 fn call_missing_item() {
     let module = empty_module();
-    let id = &module.self_id();
-    let function_name = ident_str!("foo");
+    let module_id = module.self_id();
+    let mut module_blob = vec![];
+    module.serialize(&mut module_blob).unwrap();
+
     // missing module
+    let function_name = ident_str!("foo");
     let move_vm = MoveVM::new(vec![]).unwrap();
-    let mut remote_view = RemoteStore::new();
+    let mut remote_view = InMemoryStorage::new();
     let mut session = move_vm.new_session(&remote_view);
     let error = session
         .execute_function_bypass_visibility(
-            id,
+            &module_id,
             function_name,
             vec![],
             Vec::<Vec<u8>>::new(),
@@ -831,11 +794,11 @@ fn call_missing_item() {
     drop(session);
 
     // missing function
-    remote_view.add_module(module);
+    remote_view.publish_or_overwrite_module(module_id.clone(), module_blob);
     let mut session = move_vm.new_session(&remote_view);
     let error = session
         .execute_function_bypass_visibility(
-            id,
+            &module_id,
             function_name,
             vec![],
             Vec::<Vec<u8>>::new(),
