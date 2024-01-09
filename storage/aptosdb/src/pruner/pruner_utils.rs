@@ -21,10 +21,7 @@ use aptos_types::transaction::Version;
 
 pub(crate) fn get_ledger_pruner_progress(ledger_db: &LedgerDb) -> Result<Version> {
     Ok(
-        if let Some(version) = get_progress(
-            ledger_db.metadata_db(),
-            &DbMetadataKey::LedgerPrunerProgress,
-        )? {
+        if let Ok(version) = ledger_db.metadata_db().get_pruner_progress() {
             version
         } else {
             let mut iter = ledger_db
