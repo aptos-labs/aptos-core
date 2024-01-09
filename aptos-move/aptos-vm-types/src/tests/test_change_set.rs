@@ -249,9 +249,11 @@ macro_rules! assert_invariant_violation {
     ($w1:ident, $w2:ident, $w3:ident, $w4:ident) => {
         let check = |res: PartialVMResult<()>| {
             let err = assert_err!(res);
-            assert_eq!(
-                err.major_status(),
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+
+            // TODO[agg_v2]: Uniformize errors for write op squashing.
+            assert!(
+                err.major_status() == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                    || err.major_status() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
             );
         };
 
