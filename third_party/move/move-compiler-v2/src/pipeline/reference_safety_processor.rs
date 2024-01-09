@@ -1350,8 +1350,7 @@ impl LifetimeInfoAtCodeOffset {
     /// any longer. Notice that this is only for locals which are actually borrowed, other
     /// locals being released need to be determined from livevar analysis results.
     pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> + '_ {
-        self.before
-            .lifetime_diff(&self.after)
+        self.before.lifetime_diff(&self.after)
     }
 
     /// Returns true if the value in the variable has been moved at this program point.

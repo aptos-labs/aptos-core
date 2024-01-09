@@ -56,12 +56,12 @@ pub struct LiveVarInfoAtCodeOffset {
 
 impl LiveVarInfoAtCodeOffset {
     /// Returns the locals that are alive in `before` and dead in `after`
-    pub fn live_var_diff<'a>(before: &'a BTreeMap<TempIndex, LiveVarInfo>, after: &'a BTreeMap<TempIndex, LiveVarInfo>) -> impl Iterator<Item = TempIndex> + 'a {
+    pub fn live_var_diff<'a>(
+        before: &'a BTreeMap<TempIndex, LiveVarInfo>,
+        after: &'a BTreeMap<TempIndex, LiveVarInfo>,
+    ) -> impl Iterator<Item = TempIndex> + 'a {
         // TODO: make this linear
-        before
-            .keys()
-            .filter(|t| !after.contains_key(t))
-            .cloned()
+        before.keys().filter(|t| !after.contains_key(t)).cloned()
     }
 
     /// Returns the temporaries that are alive before the program point and dead after.
