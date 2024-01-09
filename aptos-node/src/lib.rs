@@ -694,8 +694,8 @@ pub fn setup_environment_and_start_node(
                 dkg_txn_pulled_rx,
             );
             Some(dkg_runtime)
-        }
-        _ => None
+        },
+        _ => None,
     };
 
     let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {
