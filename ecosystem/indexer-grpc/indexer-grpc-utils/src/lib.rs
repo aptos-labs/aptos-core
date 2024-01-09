@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod cache_operator;
+pub mod compression_util;
 pub mod config;
 pub mod constants;
 pub mod counters;
@@ -19,6 +20,12 @@ use std::time::Duration;
 use url::Url;
 
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
+
+/// The default file storage format is JsonBase64UncompressedProto.
+/// This is only used in file store metadata for backward compatibility.
+pub fn default_file_storage_format() -> compression_util::StorageFormat {
+    compression_util::StorageFormat::JsonBase64UncompressedProto
+}
 
 /// Create a gRPC client with exponential backoff.
 pub async fn create_grpc_client(address: Url) -> GrpcClientType {
@@ -81,22 +88,6 @@ pub async fn create_data_service_grpc_client(
     .await
     .context("Failed to create data service GRPC client")?;
     Ok(client)
-}
-
-// (Protobuf encoded transaction, version)
-type Version = u64;
-pub type EncodedTransactionWithVersion = (String, Version);
-/// Build the EncodedTransactionWithVersion from the encoded transactions and starting version.
-#[inline]
-pub fn build_protobuf_encoded_transaction_wrappers(
-    encoded_transactions: Vec<String>,
-    starting_version: u64,
-) -> Vec<EncodedTransactionWithVersion> {
-    encoded_transactions
-        .into_iter()
-        .enumerate()
-        .map(|(ind, encoded_transaction)| (encoded_transaction, starting_version + ind as u64))
-        .collect()
 }
 
 pub fn time_diff_since_pb_timestamp_in_secs(timestamp: &Timestamp) -> f64 {
