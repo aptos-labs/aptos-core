@@ -9912,9 +9912,9 @@ dependencies = [
 
 [[package]]
 name = "mini-moka"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23e0b72e7c9042467008b10279fc732326bd605459ae03bda88825909dd19b56"
+checksum = "c325dfab65f261f386debee8b0969da215b3fa0037e74c8a1234db7ba986d803"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-utils",
