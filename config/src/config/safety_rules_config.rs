@@ -11,6 +11,7 @@ use crate::{
     },
     keys::ConfigKey,
 };
+use anyhow::bail;
 use aptos_crypto::{bls12381, Uniform};
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, waypoint::Waypoint, PeerId};
 use rand::rngs::StdRng;
@@ -142,12 +143,21 @@ impl InitialSafetyRulesConfig {
         }
     }
 
-    pub fn identity_blob(&self) -> IdentityBlob {
+    pub fn has_identity_blob(&self) -> bool {
+        match self {
+            InitialSafetyRulesConfig::FromFile { .. } => true,
+            InitialSafetyRulesConfig::None => false,
+        }
+    }
+
+    pub fn identity_blob(&self) -> anyhow::Result<IdentityBlob> {
         match self {
             InitialSafetyRulesConfig::FromFile {
                 identity_blob_path, ..
-            } => IdentityBlob::from_file(identity_blob_path).unwrap(),
-            InitialSafetyRulesConfig::None => panic!("Must have an identity blob"),
+            } => IdentityBlob::from_file(identity_blob_path),
+            InitialSafetyRulesConfig::None => {
+                bail!("loading identity blob failed with missing initial safety rules config")
+            },
         }
     }
 }

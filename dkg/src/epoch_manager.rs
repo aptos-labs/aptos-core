@@ -8,8 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::NodeConfig;
-use aptos_crypto::bls12381;
+use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
@@ -37,7 +36,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
 
     // some DKG private params
-    sk: Option<bls12381::PrivateKey>,
+    identity_blob: Arc<IdentityBlob>,
 
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
@@ -58,21 +57,21 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
-        node_config: &NodeConfig,
+        my_addr: AccountAddress,
+        identity_blob: Arc<IdentityBlob>,
         reconfig_events: ReconfigNotificationListener<P>,
-        start_dkg_events: EventNotificationListener,
+        dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
         vtxn_pull_notification_rx: vtxn_pool::PullNotificationReceiver,
     ) -> Self {
-        let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            sk: None, //TODO: load from storage
             my_addr,
+            identity_blob,
             epoch_state: None,
             reconfig_events,
-            dkg_start_events: start_dkg_events,
+            dkg_start_events,
             dkg_rpc_msg_tx: None,
             dkg_manager_close_tx: None,
             self_sender,
@@ -82,12 +81,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pull_notification_tx_to_dkgmgr: None,
             dkg_start_event_tx: None,
         }
-    }
-
-    fn epoch_state(&self) -> &EpochState {
-        self.epoch_state
-            .as_ref()
-            .expect("EpochManager not started yet")
     }
 
     fn process_rpc_request(
@@ -151,11 +144,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get()
             .expect("failed to get ValidatorSet from payload");
 
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
-        };
-        self.epoch_state = Some(Arc::new(epoch_state.clone()));
+        });
+        self.epoch_state = Some(epoch_state.clone());
 
         let features = payload.get::<Features>().unwrap_or_default();
 
@@ -167,9 +160,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let agg_node_producer = DummyAggNodeProducer {}; //TODO: replace with real
 
-            let (start_dkg_event_tx, start_dkg_event_rx) =
+            let (dkg_start_event_tx, dkg_start_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.dkg_start_event_tx = Some(start_dkg_event_tx);
+            self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
                 (),
@@ -180,8 +173,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
             let dkg_manager = DKGManager::new(
+                self.identity_blob.clone(),
                 self.my_addr,
-                self.epoch_state().clone(),
+                epoch_state,
                 Arc::new(agg_node_producer),
                 self.vtxn_pool_write_cli.clone(),
             );
@@ -190,7 +184,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
-                start_dkg_event_rx,
+                dkg_start_event_rx,
                 dkg_rpc_msg_rx,
                 vtxn_pull_notification_rx,
                 dkg_manager_close_rx,

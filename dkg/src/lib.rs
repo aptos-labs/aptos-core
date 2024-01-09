@@ -11,30 +11,35 @@ pub mod types;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
-use aptos_config::config::NodeConfig;
+use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use move_core_types::account_address::AccountAddress;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
-    node_config: &NodeConfig,
+    my_addr: AccountAddress,
+    identity_blob: Arc<IdentityBlob>,
     network_client: NetworkClient<DKGMessage>,
     network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
-    start_dkg_events: EventNotificationListener,
+    dkg_start_events: EventNotificationListener,
     dkg_txn_writer: aptos_validator_transaction_pool::SingleTopicWriteClient,
     dkg_pulled_rx: aptos_validator_transaction_pool::PullNotificationReceiver,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
     let dkg_network_client = DKGNetworkClient::new(network_client);
+
     let dkg_epoch_manager = EpochManager::new(
-        node_config,
+        my_addr,
+        identity_blob.clone(),
         reconfig_events,
-        start_dkg_events,
+        dkg_start_events,
         self_sender,
         dkg_network_client,
         dkg_txn_writer,
