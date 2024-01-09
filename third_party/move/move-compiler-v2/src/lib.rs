@@ -84,7 +84,12 @@ pub fn run_move_compiler(
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
             .unwrap_or_else(|| "dump".to_owned());
-        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, options.debug)
+        pipeline.run_with_dump(
+            &env,
+            &mut targets,
+            &dump_base_name,
+            options.debug && options.dump_bytecode,
+        )
     } else {
         pipeline.run(&env, &mut targets)
     }
