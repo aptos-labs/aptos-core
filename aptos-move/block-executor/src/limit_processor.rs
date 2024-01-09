@@ -259,7 +259,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     self.get_accumulated_approx_output_size() >= per_block_output_limit
                 })
                 .unwrap_or(false),
-            block_effective_block_gas: self.get_effective_accumulated_block_gas(),
+            block_effective_block_gas_units: self.get_effective_accumulated_block_gas(),
             block_approx_output_size: self.get_accumulated_approx_output_size(),
         }
     }

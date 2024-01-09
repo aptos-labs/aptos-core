@@ -32,9 +32,9 @@ pub struct BlockEndInfo {
     pub block_gas_limit_reached: bool,
     /// Whether block output limit was reached
     pub block_output_limit_reached: bool,
-
-    pub block_effective_block_gas: u64,
-
+    /// Total gas_units block consumed
+    pub block_effective_block_gas_units: u64,
+    /// Total output size block produced
     pub block_approx_output_size: u64,
 }
 

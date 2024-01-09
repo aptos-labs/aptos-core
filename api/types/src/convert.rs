@@ -200,6 +200,7 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
             BlockMetadataExt(txn) => (&txn, info, events).into(),
+            // TODO [fix] Create separate transaction type for API
             StateCheckpoint(_) | BlockEpilogue { .. } => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,

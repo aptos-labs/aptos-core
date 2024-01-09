@@ -1284,7 +1284,7 @@ impl Arbitrary for BlockEndInfo {
                     BlockEndInfo {
                         block_gas_limit_reached,
                         block_output_limit_reached,
-                        block_effective_block_gas,
+                        block_effective_block_gas_units: block_effective_block_gas,
                         block_approx_output_size,
                     }
                 },

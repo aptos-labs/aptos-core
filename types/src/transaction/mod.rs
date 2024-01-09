@@ -2034,13 +2034,6 @@ impl Transaction {
         }
     }
 
-    pub fn try_as_block_epilogue(&self) -> Option<&BlockEpiloguePayload> {
-        match self {
-            Transaction::BlockEpilogue(v1) => Some(v1),
-            _ => None,
-        }
-    }
-
     pub fn try_as_validator_txn(&self) -> Option<&ValidatorTransaction> {
         match self {
             Transaction::ValidatorTransaction(t) => Some(t),
@@ -2063,6 +2056,16 @@ impl Transaction {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
+    }
+
+    pub fn is_non_reconfig_block_ending(&self) -> bool {
+        match self {
+            Transaction::BlockMetadata(_) | Transaction::BlockEpilogue(_) => true,
+            Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::StateCheckpoint(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
     }
 }
 
