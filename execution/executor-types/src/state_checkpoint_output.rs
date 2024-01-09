@@ -135,4 +135,74 @@ impl StateCheckpointOutput {
             Ok(())
         })
     }
+
+    pub fn check_aborts_discards_retries(
+        &self,
+        allow_aborts: bool,
+        allow_discards: bool,
+        allow_retries: bool,
+    ) {
+        let aborts = self
+            .txns
+            .to_commit
+            .iter()
+            .flat_map(|(txn, output)| match output.status().status() {
+                Ok(execution_status) => {
+                    if execution_status.is_success() {
+                        None
+                    } else {
+                        Some(format!("{:?}: {:?}", txn, output.status()))
+                    }
+                },
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>();
+
+        let discards_3 = self
+            .txns
+            .to_discard
+            .iter()
+            .take(3)
+            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .collect::<Vec<_>>();
+        let retries_3 = self
+            .txns
+            .to_retry
+            .iter()
+            .take(3)
+            .map(|(txn, output)| format!("{:?}: {:?}", txn, output.status()))
+            .collect::<Vec<_>>();
+
+        if !aborts.is_empty() || !discards_3.is_empty() || !retries_3.is_empty() {
+            println!(
+                "Some transactions were not successful: {} aborts, {} discards and {} retries out of {}, examples: aborts: {:?}, discards: {:?}, retries: {:?}",
+                aborts.len(),
+                self.txns.to_discard.len(),
+                self.txns.to_retry.len(),
+                self.input_txns_len(),
+                &aborts[..(aborts.len().min(3))],
+                discards_3,
+                retries_3,
+            )
+        }
+
+        assert!(
+            allow_aborts || aborts.is_empty(),
+            "No aborts allowed, {}, examples: {:?}",
+            aborts.len(),
+            &aborts[..(aborts.len().min(3))]
+        );
+        assert!(
+            allow_discards || discards_3.is_empty(),
+            "No discards allowed, {}, examples: {:?}",
+            self.txns.to_discard.len(),
+            discards_3,
+        );
+        assert!(
+            allow_retries || retries_3.is_empty(),
+            "No retries allowed, {}, examples: {:?}",
+            self.txns.to_retry.len(),
+            retries_3,
+        );
+    }
 }
