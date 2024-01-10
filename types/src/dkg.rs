@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::on_chain_config::{OnChainConfig, ValidatorSet};
+use crate::{
+    epoch_state::EpochState,
+    on_chain_config::{OnChainConfig, ValidatorSet},
+};
 use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
@@ -77,8 +80,14 @@ impl OnChainConfig for DKGState {
 
 pub trait DKGTrait {
     type PrivateParams;
-    type PublicParams: Send + Sync;
+    type PublicParams: Clone + Send + Sync;
     type Transcript: Clone + Default + Send + Sync + for<'a> Deserialize<'a>;
+
+    fn new_public_params(
+        epoch_state: &EpochState,
+        my_addr: AccountAddress,
+        target_validator_set: &ValidatorSet,
+    ) -> Self::PublicParams;
 
     fn generate_transcript<R: CryptoRng>(
         rng: &mut R,
@@ -93,6 +102,8 @@ pub trait DKGTrait {
         base: &mut Self::Transcript,
         extra: &Self::Transcript,
     );
+
+    fn serialize_transcript(trx: &Self::Transcript) -> Vec<u8>;
 }
 
 pub trait DKGPrivateParamsProvider<DKG: DKGTrait> {

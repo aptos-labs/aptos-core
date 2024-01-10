@@ -20,6 +20,12 @@ pub enum TransactionFilter {
 }
 
 impl TransactionFilter {
+    pub fn no_op() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
+}
+
+impl TransactionFilter {
     pub fn should_exclude(&self, txn: &ValidatorTransaction) -> bool {
         match self {
             TransactionFilter::PendingTxnHashSet(set) => set.contains(&txn.hash()),

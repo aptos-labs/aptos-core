@@ -2,7 +2,12 @@
 
 use aptos_config::config::IdentityBlob;
 use aptos_crypto::bls12381;
-use aptos_types::dkg::{DKGPrivateParamsProvider, DKGTrait};
+use aptos_types::{
+    dkg::{DKGPrivateParamsProvider, DKGTrait},
+    epoch_state::EpochState,
+    on_chain_config::ValidatorSet,
+};
+use move_core_types::account_address::AccountAddress;
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -13,6 +18,14 @@ impl DKGTrait for DummyDKG {
     type PrivateParams = bls12381::PrivateKey;
     type PublicParams = ();
     type Transcript = DummyDKGTranscript;
+
+    fn new_public_params(
+        _epoch_state: &EpochState,
+        _my_addr: AccountAddress,
+        _target_validator_set: &ValidatorSet,
+    ) -> Self::PublicParams {
+        ()
+    }
 
     fn generate_transcript<R: CryptoRng>(
         _rng: &mut R,
@@ -35,6 +48,10 @@ impl DKGTrait for DummyDKG {
         _extra: &Self::Transcript,
     ) {
     }
+
+    fn serialize_transcript(trx: &Self::Transcript) -> Vec<u8> {
+        trx.data.clone()
+    }
 }
 
 impl DKGPrivateParamsProvider<DummyDKG> for Arc<IdentityBlob> {
@@ -53,5 +70,11 @@ impl Default for DummyDKGTranscript {
         Self {
             data: b"data".to_vec(),
         }
+    }
+}
+
+impl DKGPrivateParamsProvider<DummyDKG> for Arc<bls12381::PrivateKey> {
+    fn dkg_private_params(&self) -> &<DummyDKG as DKGTrait>::PrivateParams {
+        self.as_ref()
     }
 }

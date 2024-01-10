@@ -53,4 +53,5 @@ pub fn start_dkg_runtime(
 }
 
 //TODO(zjma): make this test-only after real dkg.
+pub mod agg_trx_producer;
 pub(crate) mod dummy_dkg;

@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::{agg_trx_producer::RealAggTranscriptProducer, DKGManager},
+    agg_trx_producer::RealAggTranscriptProducer,
+    dkg_manager::DKGManager,
     dummy_dkg::DummyDKG,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
@@ -89,24 +90,42 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn process_rpc_request(
         &mut self,
-        _peer_id: AccountAddress,
-        _dkg_request: IncomingRpcRequest,
+        peer_id: AccountAddress,
+        dkg_request: IncomingRpcRequest,
     ) -> Result<()> {
-        //TODO
+        if Some(dkg_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
+            // Forward to DKGManager if it is alive.
+            if let Some(tx) = &self.dkg_rpc_msg_tx {
+                tx.push((), (peer_id, dkg_request));
+            }
+        }
         Ok(())
     }
 
-    fn on_dkg_start_notification(&mut self, _notification: EventNotification) -> Result<()> {
-        //TODO
+    fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
+        let EventNotification {
+            subscribed_events, ..
+        } = notification;
+        for event in subscribed_events {
+            let dkg_start_event = DKGStartEvent::try_from(&event).unwrap();
+            // Forward to DKGManager if it is alive.
+            if let Some(tx) = self.dkg_start_event_tx.as_ref() {
+                let _ = tx.push((), dkg_start_event);
+            }
+        }
         Ok(())
     }
 
     fn process_vtxn_pull_notification(
         &mut self,
-        _pulled_txn: Arc<ValidatorTransaction>,
+        pulled_txn: Arc<ValidatorTransaction>,
     ) -> Result<()> {
-        //TODO
-        Ok(())
+        // Forward to DKGManager if it is alive.
+        if let Some(tx) = self.vtxn_pull_notification_tx_to_dkgmgr.as_mut() {
+            tx.push((), pulled_txn)
+        } else {
+            Ok(())
+        }
     }
 
     pub async fn start(mut self, mut network_receivers: NetworkReceivers) {
