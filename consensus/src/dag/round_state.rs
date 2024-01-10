@@ -68,7 +68,7 @@ pub trait ResponsiveCheck: Send {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
-        minimum_delay: Duration,
+        health_backoff_delay: Duration,
     );
 
     fn reset(&mut self);
@@ -91,7 +91,7 @@ impl ResponsiveCheck for OptimisticResponsive {
         &mut self,
         highest_strong_links_round: Round,
         _strong_links: Vec<NodeCertificate>,
-        _minimum_delay: Duration,
+        _health_backoff_delay: Duration,
     ) {
         let new_round = highest_strong_links_round + 1;
         let _ = self.event_sender.send(new_round).await;
@@ -107,9 +107,9 @@ enum State {
 }
 
 /// More sophisticated strategy to move round forward given 2f+1 strong links
-/// Delay if backpressure is triggered. (TODO)
+/// Delay if backpressure is triggered.
 /// Move as soon as 3f+1 is ready. (TODO: make it configurable)
-/// Move if minimal wait time is reached. (TODO: make it configurable)
+/// Move if minimal wait time is reached.
 pub struct AdaptiveResponsive {
     epoch_state: Arc<EpochState>,
     start_time: Duration,
@@ -140,7 +140,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
         &mut self,
         highest_strong_links_round: Round,
         strong_links: Vec<NodeCertificate>,
-        minimum_delay: Duration,
+        health_backoff_delay: Duration,
     ) {
         if matches!(self.state, State::Sent) {
             return;
@@ -156,12 +156,16 @@ impl ResponsiveCheck for AdaptiveResponsive {
             .sum_voting_power(strong_links.iter().map(|cert| cert.metadata().author()))
             .expect("Unable to sum voting power from strong links");
 
-        let wait_time = self.minimal_wait_time.max(minimum_delay);
-        
-        // voting power == 3f+1 or pass minimal wait time
+        let (wait_time, is_health_backoff) = if self.minimal_wait_time < health_backoff_delay {
+            (health_backoff_delay, true)
+        } else {
+            (self.minimal_wait_time, false)
+        };
+
+        // voting power == 3f+1 and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(self.start_time);
         if voting_power == self.epoch_state.verifier.total_voting_power()
-            || duration_since_start >= wait_time
+            && (duration_since_start >= wait_time || !is_health_backoff)
         {
             let _ = self.event_sender.send(new_round).await;
             if let State::Scheduled(handle) = std::mem::replace(&mut self.state, State::Sent) {
