@@ -143,7 +143,6 @@ impl DbWriter for AptosDB {
             restore_utils::save_transactions(
                 self.ledger_store.clone(),
                 self.transaction_store.clone(),
-                self.event_store.clone(),
                 self.state_store.clone(),
                 self.ledger_db.clone(),
                 version,
@@ -486,7 +485,7 @@ impl AptosDB {
             .with_min_len(optimal_min_len(num_txns, 128))
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
-                self.event_store.put_events(
+                self.ledger_db.event_db().put_events(
                     first_version + i as u64,
                     txn_to_commit.events(),
                     skip_index,

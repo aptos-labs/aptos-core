@@ -5,7 +5,6 @@
 
 use crate::{
     common::NUM_STATE_SHARDS,
-    event_store::EventStore,
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -72,11 +71,10 @@ pub(crate) fn get_state_merkle_commit_progress(
 }
 
 pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {
-    let event_store = EventStore::new(ledger_db.event_db_arc());
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
     let start_version = target_version + 1;
-    truncate_ledger_db_single_batch(&ledger_db, &event_store, &transaction_store, start_version)?;
+    truncate_ledger_db_single_batch(&ledger_db, &transaction_store, start_version)?;
     Ok(())
 }
 
@@ -247,7 +245,6 @@ fn truncate_transaction_accumulator(
 
 fn truncate_ledger_db_single_batch(
     ledger_db: &LedgerDb,
-    event_store: &EventStore,
     transaction_store: &TransactionStore,
     start_version: Version,
 ) -> Result<()> {
@@ -266,7 +263,7 @@ fn truncate_ledger_db_single_batch(
     )?;
     delete_per_version_data(ledger_db, start_version, &batch)?;
 
-    delete_event_data(event_store, start_version, &batch.event_db_batches)?;
+    delete_event_data(ledger_db, start_version, &batch.event_db_batches)?;
 
     truncate_transaction_accumulator(
         ledger_db.transaction_accumulator_db(),
@@ -402,18 +399,20 @@ where
 }
 
 fn delete_event_data(
-    event_store: &EventStore,
+    ledger_db: &LedgerDb,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    if let Some(latest_version) = event_store.latest_version()? {
+    if let Some(latest_version) = ledger_db.event_db().latest_version()? {
         if latest_version >= start_version {
             info!(
                 start_version = start_version,
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            event_store.prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db
+                .event_db()
+                .prune_events(start_version, latest_version + 1, batch)?;
         }
     }
     Ok(())

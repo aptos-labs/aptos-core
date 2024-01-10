@@ -5,7 +5,6 @@ use crate::{
     db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
-        event_accumulator::EventAccumulatorSchema,
         ledger_info::LedgerInfoSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
@@ -150,16 +149,6 @@ impl Cmd {
                 "# of frozen nodes in TransactionAccumulator: {:?}",
                 num_frozen_nodes
             );
-        }
-
-        {
-            let mut iter = ledger_db
-                .event_db()
-                .iter::<EventAccumulatorSchema>(ReadOptions::default())?;
-            iter.seek_to_last();
-            let key = iter.next().transpose()?.map(|kv| kv.0);
-            let version = key.map(|k| k.0);
-            println!("Max EventAccumulator version: {:?}", version)
         }
 
         Ok(())

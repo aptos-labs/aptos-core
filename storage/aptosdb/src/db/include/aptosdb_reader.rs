@@ -151,7 +151,7 @@ impl DbReader for AptosDB {
             let events = if fetch_events {
                 Some(
                     (start_version..start_version + limit)
-                        .map(|version| self.event_store.get_events_by_version(version))
+                        .map(|version| self.ledger_db.event_db().get_events_by_version(version))
                         .collect::<Result<Vec<_>>>()?,
                 )
             } else {
@@ -222,7 +222,7 @@ impl DbReader for AptosDB {
             let (txn_infos, txns_and_outputs) = (start_version..start_version + limit)
                 .map(|version| {
                     let txn_info = self.ledger_store.get_transaction_info(version)?;
-                    let events = self.event_store.get_events_by_version(version)?;
+                    let events = self.ledger_db.event_db().get_events_by_version(version)?;
                     let write_set = self.transaction_store.get_write_set(version)?;
                     let txn = self.ledger_db.transaction_db().get_transaction(version)?;
                     let txn_output = TransactionOutput::new(
@@ -309,7 +309,8 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let iter = self
-                .event_store
+                .ledger_db
+                .event_db()
                 .get_events_by_version_iter(start_version, limit as usize)?;
             Ok(Box::new(iter)
                 as Box<
@@ -550,7 +551,8 @@ impl DbReader for AptosDB {
                 let (block_height, block_info) = item?;
                 let first_version = block_info.first_version();
                 let event = self
-                    .event_store
+                    .ledger_db
+                    .event_db()
                     .get_events_by_version(first_version)?
                     .into_iter()
                     .find(|event| {
@@ -651,7 +653,8 @@ impl DbReader for AptosDB {
 
             // TODO(grao): Consider return BlockInfo instead of NewBlockEvent.
             let new_block_event = self
-                .event_store
+                .ledger_db
+                .event_db()
                 .get_events_by_version(first_version)?
                 .into_iter()
                 .find(|event| {
@@ -917,7 +920,7 @@ impl AptosDB {
 
         // If events were requested, also fetch those.
         let events = if fetch_events {
-            Some(self.event_store.get_events_by_version(version)?)
+            Some(self.ledger_db.event_db().get_events_by_version(version)?)
         } else {
             None
         };
