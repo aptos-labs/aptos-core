@@ -34,14 +34,21 @@ use move_package::BuildConfig;
 pub fn generate_ast(
     mutator_config: &Configuration,
     config: &BuildConfig,
-    _package_path: PathBuf,
+    package_path: PathBuf,
 ) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
-    let source_files = mutator_config
+    let mut source_files = mutator_config
         .project
         .move_sources
         .iter()
         .map(|p| p.to_str().unwrap_or(""))
         .collect::<Vec<_>>();
+
+    // If -m option is specified we should only `move_sources`. However, if `move_sources` is empty
+    // we should add a package path. This path should be always set by the calling function.
+    // In case of any error we should use current directory as package root.
+    if source_files.is_empty() {
+        source_files.push(package_path.to_str().unwrap_or("."));
+    }
 
     debug!("Source files and folders: {:?}", source_files);
 

@@ -5,7 +5,7 @@ use std::path::PathBuf;
 pub const DEFAULT_OUTPUT_DIR: &str = "mutants_output";
 
 /// Command line options for mutator
-#[derive(Parser, Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Parser, Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
     /// The paths to the Move sources.
@@ -32,4 +32,22 @@ pub struct Options {
     /// Optional configuration file. If provided, it will override the default configuration.
     #[clap(long, short, value_parser)]
     pub configuration_file: Option<PathBuf>,
+}
+
+impl Default for Options {
+    // We need to implement default just because we need to specify the default value for out_mutant_dir.
+    // Otherwise, out_mutant_dir would be empty. This is special case, when user won't specify any Options
+    // (so the default value would be used), but define package_path (which is passed using other mechanism).
+    fn default() -> Self {
+        Self {
+            move_sources: vec![],
+            include_only_files: None,
+            exclude_files: None,
+            out_mutant_dir: PathBuf::from(DEFAULT_OUTPUT_DIR),
+            verify_mutants: true,
+            no_overwrite: None,
+            downsample_filter: None,
+            configuration_file: None,
+        }
+    }
 }
