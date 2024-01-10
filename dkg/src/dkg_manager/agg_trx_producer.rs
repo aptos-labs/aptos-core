@@ -24,6 +24,7 @@ pub trait AggTranscriptProducer<S: DKGTrait>: Send + Sync {
     ) -> AbortHandle;
 }
 
+//TODO(zjma): make it test-only once real producer is available.
 pub struct DummyAggTranscriptProducer {}
 
 impl<S: DKGTrait> AggTranscriptProducer<S> for DummyAggTranscriptProducer {

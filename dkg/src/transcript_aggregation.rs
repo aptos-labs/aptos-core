@@ -46,7 +46,7 @@ pub struct TranscriptAggregationState<DKG: DKGTrait> {
 
 impl<DKG: DKGTrait> TranscriptAggregationState<DKG> {
     pub fn new(dkg_pub_params: DKG::PublicParams, epoch_state: Arc<EpochState>) -> Self {
-        //TODO: take threshold as a parameter.
+        //TODO(zjma): take DKG threshold as a parameter.
         Self {
             trx_aggregator: Mutex::new(TranscriptAggregator::default()),
             dkg_pub_params,

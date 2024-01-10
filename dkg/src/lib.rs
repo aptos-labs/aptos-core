@@ -52,4 +52,5 @@ pub fn start_dkg_runtime(
     runtime
 }
 
+//TODO(zjma): make this test-only after real dkg.
 pub(crate) mod dummy_dkg;
