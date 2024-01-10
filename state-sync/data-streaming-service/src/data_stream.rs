@@ -761,6 +761,13 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 self.notification_id_generator.clone(),
             )?
         {
+            // Update the metrics for the data notification send latency
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                data_client_request.get_label(),
+                response_context.creation_time,
+            );
+
             // Save the response context for this notification ID
             let notification_id = data_notification.notification_id;
             self.insert_notification_response_mapping(notification_id, response_context)?;
