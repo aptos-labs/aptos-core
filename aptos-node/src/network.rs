@@ -8,7 +8,7 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_consensus::network_interface::ConsensusMsg;
-use aptos_dkg_runtime::DKGMsg;
+use aptos_dkg_runtime::DKGMessage;
 use aptos_event_notifications::EventSubscriptionService;
 use aptos_jwk_consensus::types::JWKConsensusMsg;
 use aptos_logger::debug;
@@ -225,7 +225,7 @@ pub fn setup_networks_and_get_interfaces(
 ) -> (
     Vec<Runtime>,
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<DKGMsg>>,
+    Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
@@ -427,7 +427,7 @@ fn register_client_and_service_with_network<
 fn transform_network_handles_into_interfaces(
     node_config: &NodeConfig,
     consensus_network_handle: Option<ApplicationNetworkHandle<ConsensusMsg>>,
-    dkg_network_handle: Option<ApplicationNetworkHandle<DKGMsg>>,
+    dkg_network_handle: Option<ApplicationNetworkHandle<DKGMessage>>,
     jwk_consensus_network_handle: Option<ApplicationNetworkHandle<JWKConsensusMsg>>,
     mempool_network_handles: Vec<ApplicationNetworkHandle<MempoolSyncMsg>>,
     peer_monitoring_service_network_handles: Vec<
@@ -437,7 +437,7 @@ fn transform_network_handles_into_interfaces(
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Option<ApplicationNetworkInterfaces<ConsensusMsg>>,
-    Option<ApplicationNetworkInterfaces<DKGMsg>>,
+    Option<ApplicationNetworkInterfaces<DKGMessage>>,
     Option<ApplicationNetworkInterfaces<JWKConsensusMsg>>,
     ApplicationNetworkInterfaces<MempoolSyncMsg>,
     ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,

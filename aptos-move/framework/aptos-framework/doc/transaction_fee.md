@@ -763,7 +763,7 @@ Only called during genesis.
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
-// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_AptosCoinCapabilities">AptosCoinCapabilities</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -802,7 +802,7 @@ Only called during genesis.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+<pre><code>// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>invariant</b> burn_percentage &lt;= 100;
 </code></pre>
 
@@ -819,11 +819,11 @@ Only called during genesis.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework);
 <b>aborts_if</b> burn_percentage &gt; 100;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
-// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
 <b>aborts_if</b> <b>exists</b>&lt;ValidatorFees&gt;(aptos_addr);
 <b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a> { <a href="account.md#0x1_account">account</a>: aptos_framework };
@@ -849,7 +849,7 @@ Only called during genesis.
 <pre><code><b>aborts_if</b> new_burn_percentage &gt; 100;
 <b>let</b> aptos_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(aptos_addr);
-// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a> and <a id="high-level-req-6.3" href="#high-level-req">high level requirement 6</a>:
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a> and <a id="high-level-req-6.3" href="#high-level-req">high-level requirement 6</a>:
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;
 <b>ensures</b> <b>exists</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework) ==&gt;
     <b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).burn_percentage == new_burn_percentage;
@@ -869,7 +869,7 @@ Only called during genesis.
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
-// This enforces <a id="high-level-req-6.1" href="#high-level-req">high level requirement 6</a>:
+// This enforces <a id="high-level-req-6.1" href="#high-level-req">high-level requirement 6</a>:
 <b>ensures</b> <a href="transaction_fee.md#0x1_transaction_fee_is_fees_collection_enabled">is_fees_collection_enabled</a>() ==&gt;
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<b>global</b>&lt;<a href="transaction_fee.md#0x1_transaction_fee_CollectedFeesPerBlock">CollectedFeesPerBlock</a>&gt;(@aptos_framework).proposer) == proposer_addr;
 </code></pre>
@@ -974,7 +974,7 @@ Only called during genesis.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high level requirement 6</a>:
+<pre><code>// This enforces <a id="high-level-req-6.2" href="#high-level-req">high-level requirement 6</a>:
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_ProcessCollectedFeesRequiresAndEnsures">ProcessCollectedFeesRequiresAndEnsures</a>;
 </code></pre>
 

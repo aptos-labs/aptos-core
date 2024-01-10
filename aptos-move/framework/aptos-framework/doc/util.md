@@ -141,7 +141,7 @@ owned.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> [abstract] len(bytes) != 32;
 </code></pre>
 

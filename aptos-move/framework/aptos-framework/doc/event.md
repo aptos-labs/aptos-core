@@ -400,7 +400,7 @@ Native function use opaque.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>ensures</b> [concrete] handle_ref.counter == <b>old</b>(handle_ref.counter) + 1;
 </code></pre>
 
@@ -418,7 +418,7 @@ Native function use opaque.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high level requirement 5</a>:
+<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -436,7 +436,7 @@ Native function use opaque.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high level requirement 5</a>:
+<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -472,7 +472,7 @@ Native function use opaque.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high level requirement 5</a>:
+<pre><code>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

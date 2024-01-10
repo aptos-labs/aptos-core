@@ -1,4 +1,34 @@
 spec aptos_framework::storage_gas {
+    // -----------------
+    // Struct invariants
+    // -----------------
+
+    spec Point {
+        invariant x <= BASIS_POINT_DENOMINATION;
+        invariant y <= BASIS_POINT_DENOMINATION;
+    }
+
+    spec GasCurve {
+        /// Invariant 1: The minimum gas charge does not exceed the maximum gas charge.
+        invariant min_gas <= max_gas;
+        /// Invariant 2: The maximum gas charge is capped by MAX_U64 scaled down by the basis point denomination.
+        invariant max_gas <= MAX_U64 / BASIS_POINT_DENOMINATION;
+        /// Invariant 3: The x-coordinate increases monotonically and the y-coordinate increasing strictly monotonically,
+        /// that is, the gas-curve is a monotonically increasing function.
+        invariant (len(points) > 0 ==> points[0].x > 0)
+            && (len(points) > 0 ==> points[len(points) - 1].x < BASIS_POINT_DENOMINATION)
+            && (forall i in 0..len(points) - 1: (points[i].x < points[i + 1].x && points[i].y <= points[i + 1].y));
+    }
+
+    spec UsageGasConfig {
+        invariant target_usage > 0;
+        invariant target_usage <= MAX_U64 / BASIS_POINT_DENOMINATION;
+    }
+
+
+    // -----------------
+    // Global invariants
+    // -----------------
     /// <high-level-req>
     /// No.: 1
     /// Requirement: The module's initialization guarantees the creation of the StorageGasConfig resource with a precise
@@ -6,7 +36,7 @@ spec aptos_framework::storage_gas {
     /// Criticality: Medium
     /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
     /// the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its
-    /// existence within the module's context, and (2) the configuration of the StorageGasConfig resource includes the
+    /// existence witqhin the module's context, and (2) the configuration of the StorageGasConfig resource includes the
     /// precise gas curves that define the behavior of per-item and per-byte operations.
     /// Enforcement: Formally verified via [high-level-req-1](initialize). Moreover, the native gas logic has been manually audited.
     ///
@@ -31,33 +61,6 @@ spec aptos_framework::storage_gas {
     /// Enforcement: Formally verified via [high-level-req-4](new_usage_gas_config).
     /// </high-level-req>
     ///
-    // -----------------
-    // Struct invariants
-    // -----------------
-
-    spec Point {
-        invariant x <= BASIS_POINT_DENOMINATION;
-        invariant y <= BASIS_POINT_DENOMINATION;
-    }
-
-    spec GasCurve {
-        invariant min_gas <= max_gas;
-        invariant max_gas <= MAX_U64 / BASIS_POINT_DENOMINATION;
-        invariant (len(points) > 0 ==> points[0].x > 0)
-            && (len(points) > 0 ==> points[len(points) - 1].x < BASIS_POINT_DENOMINATION)
-            && (forall i in 0..len(points) - 1: (points[i].x < points[i + 1].x && points[i].y <= points[i + 1].y));
-    }
-
-    spec UsageGasConfig {
-        invariant target_usage > 0;
-        invariant target_usage <= MAX_U64 / BASIS_POINT_DENOMINATION;
-    }
-
-
-    // -----------------
-    // Global invariants
-    // -----------------
-
     spec module {
         use aptos_framework::chain_status;
         pragma verify = true;

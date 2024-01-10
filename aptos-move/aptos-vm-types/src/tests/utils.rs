@@ -25,14 +25,13 @@ use move_core_types::{
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
-    vm_status::VMStatus,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct MockChangeSetChecker;
 
 impl CheckChangeSet for MockChangeSetChecker {
-    fn check_change_set(&self, _change_set: &VMChangeSet) -> anyhow::Result<(), VMStatus> {
+    fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
         Ok(())
     }
 }
@@ -57,6 +56,7 @@ macro_rules! as_bytes {
 }
 
 pub(crate) use as_bytes;
+use move_binary_format::errors::PartialVMResult;
 
 pub(crate) fn raw_metadata(v: u64) -> StateValueMetadata {
     StateValueMetadata::legacy(v, &CurrentTimeMicroseconds { microseconds: v })
@@ -383,7 +383,7 @@ impl ExpandedVMChangeSetBuilder {
         self
     }
 
-    pub(crate) fn try_build(self) -> Result<VMChangeSet, VMStatus> {
+    pub(crate) fn try_build(self) -> PartialVMResult<VMChangeSet> {
         VMChangeSet::new_expanded(
             self.resource_write_set,
             self.resource_group_write_set,

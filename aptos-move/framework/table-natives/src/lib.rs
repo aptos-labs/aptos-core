@@ -217,7 +217,7 @@ impl Table {
             Entry::Vacant(entry) => {
                 // If there is an identifier mapping, we need to pass layout to
                 // ensure it gets recorded.
-                let resolved_data = context.resolver.resolve_table_entry_bytes_with_layout(
+                let data = context.resolver.resolve_table_entry_bytes_with_layout(
                     &self.handle,
                     entry.key(),
                     if self.value_layout_info.has_identifier_mappings {
@@ -225,10 +225,7 @@ impl Table {
                     } else {
                         None
                     },
-                );
-                let data = resolved_data.map_err(|err| {
-                    partial_extension_error(format!("remote table resolver failure: {}", err))
-                })?;
+                )?;
 
                 let (gv, loaded) = match data {
                     Some(val_bytes) => {

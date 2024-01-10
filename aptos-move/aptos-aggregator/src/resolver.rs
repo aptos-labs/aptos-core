@@ -19,14 +19,14 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use move_binary_format::errors::Location;
+use move_binary_format::errors::{Location, PartialVMError, VMError, VMResult};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, CORE_CODE_ADDRESS},
     value::MoveTypeLayout,
-    vm_status::{StatusCode, VMStatus},
+    vm_status::StatusCode,
 };
 use std::{
     collections::{BTreeMap, HashSet},
@@ -78,25 +78,32 @@ pub trait TAggregatorV1View {
         &self,
         id: &Self::Identifier,
         delta_op: &DeltaOp,
-    ) -> anyhow::Result<WriteOp, VMStatus> {
+    ) -> VMResult<WriteOp> {
+        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can
+        // be constructed.
+        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
+        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
+        let vm_error = |e: PartialVMError| -> VMError {
+            e.finish(Location::Module(ModuleId::new(
+                AGGREGATOR_V1_ADDRESS,
+                AGGREGATOR_V1_MODULE_NAME.into(),
+            )))
+        };
+
         let base = self
             .get_aggregator_v1_value(id)
             .map_err(|e| {
-                VMStatus::error(
-                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                    Some(e.to_string()),
+                vm_error(
+                    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                        .with_message(e.to_string()),
                 )
             })?
             .ok_or_else(|| {
-                VMStatus::error(
-                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                    Some("Cannot convert delta for deleted aggregator".to_string()),
+                vm_error(
+                    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                        .with_message("Cannot convert delta for deleted aggregator".to_string()),
                 )
             })?;
-
-        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can be constructed.
-        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
-        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
 
         delta_op
             .apply_to(base)
@@ -112,14 +119,7 @@ pub trait TAggregatorV1View {
                 _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
                     .into(),
             })
-            .map_err(|partial_error| {
-                partial_error
-                    .finish(Location::Module(ModuleId::new(
-                        AGGREGATOR_V1_ADDRESS,
-                        AGGREGATOR_V1_MODULE_NAME.into(),
-                    )))
-                    .into_vm_status()
-            })
+            .map_err(vm_error)
             .map(|result| WriteOp::legacy_modification(serialize(&result).into()))
     }
 }
