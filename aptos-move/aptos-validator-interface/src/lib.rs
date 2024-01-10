@@ -34,6 +34,7 @@ pub struct FilterCondition {
     pub skip_failed_txns: bool,
     pub skip_publish_txns: bool,
     pub check_source_code: bool,
+    pub target_account: Option<AccountAddress>,
 }
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store

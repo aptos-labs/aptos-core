@@ -45,6 +45,7 @@ impl DataCollection {
         skip_publish_txns: bool,
         dump_write_set: bool,
         skip_source_code: bool,
+        target_account: Option<AccountAddress>,
     ) -> Self {
         Self {
             debugger,
@@ -55,6 +56,7 @@ impl DataCollection {
                 skip_failed_txns,
                 skip_publish_txns,
                 check_source_code: !skip_source_code,
+                target_account,
             },
         }
     }
@@ -67,6 +69,7 @@ impl DataCollection {
         skip_publish_txns: bool,
         dump_write_set: bool,
         skip_source_code: bool,
+        target_account: Option<AccountAddress>,
     ) -> Result<Self> {
         Ok(Self::new(
             Arc::new(RestDebuggerInterface::new(rest_client)),
@@ -76,6 +79,7 @@ impl DataCollection {
             skip_publish_txns,
             dump_write_set,
             skip_source_code,
+            target_account,
         ))
     }
 

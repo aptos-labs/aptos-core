@@ -7,6 +7,7 @@ use aptos_comparison_testing::{
 };
 use aptos_rest_client::Client;
 use clap::{Parser, Subcommand};
+use move_core_types::account_address::AccountAddress;
 use std::path::PathBuf;
 use url::Url;
 
@@ -35,6 +36,9 @@ pub enum Cmd {
         /// Dump the write set of txns
         #[clap(long, default_value_t = false)]
         dump_write_set: bool,
+        /// Target account
+        #[clap(long)]
+        target_account: Option<AccountAddress>,
     },
     /// Execution of txns
     Execute {
@@ -72,6 +76,7 @@ async fn main() -> Result<()> {
             skip_publish_txns,
             skip_source_code_check: skip_source_code,
             dump_write_set,
+            target_account,
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -93,6 +98,7 @@ async fn main() -> Result<()> {
                 skip_publish_txns,
                 dump_write_set,
                 skip_source_code,
+                target_account,
             )?;
             data_collector
                 .dump_data(args.begin_version, args.limit)

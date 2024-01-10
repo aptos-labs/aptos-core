@@ -374,7 +374,7 @@ fn generate_compiled_blob(
     if compiled_blobs.contains_key(package_info) {
         return;
     }
-    let root_modules = compiled_package.all_modules();
+    let root_modules = &compiled_package.root_compiled_units;
     let mut blob_map = HashMap::new();
     for compiled_module in root_modules {
         if let CompiledUnitEnum::Module(module) = &compiled_module.unit {

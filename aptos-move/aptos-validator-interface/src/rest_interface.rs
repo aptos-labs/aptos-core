@@ -298,6 +298,11 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 if let Some(entry_function) = extract_entry_fun(payload) {
                     let m = entry_function.module();
                     let addr = m.address();
+                    if filter_condition.target_account.is_some()
+                        && filter_condition.target_account.unwrap() != *addr
+                    {
+                        continue;
+                    }
                     if filter_condition.skip_publish_txns
                         && entry_function.function().as_str() == "publish_package_txn"
                     {
