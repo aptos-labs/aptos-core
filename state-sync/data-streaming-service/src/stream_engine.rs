@@ -2184,7 +2184,7 @@ fn update_response_chunk_size_metrics(
     client_request: &DataClientRequest,
     client_response_payload: &ResponsePayload,
 ) {
-    metrics::observe_value(
+    metrics::observe_values(
         &metrics::RECEIVED_DATA_RESPONSE_CHUNK_SIZE,
         client_request.get_label(),
         client_response_payload.get_label(),
