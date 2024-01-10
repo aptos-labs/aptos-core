@@ -184,12 +184,14 @@ impl StateComputer for ExecutionProxy {
         randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         let block_id = block.id();
+        let payload = block.payload().cloned();
         debug!(
             block = %block,
             parent_id = parent_block_id,
             "Executing block",
         );
 
+        let payload_manager = self.payload_manager.lock().clone();
         let txn_notifier = self.txn_notifier.clone();
         let transaction_generator = BlockPreparer::new(
             self.payload_manager.lock().as_ref().unwrap().clone(),
@@ -229,6 +231,10 @@ impl StateComputer for ExecutionProxy {
 
             observe_block(timestamp, BlockStage::EXECUTED);
 
+            // notify quorum store about executed block
+            if let Some(payload_manager) = payload_manager {
+                payload_manager.notify_executed_block(block_id, payload);
+            }
             // notify mempool about failed transaction
             if let Err(e) = txn_notifier.notify_failed_txn(input_txns, result).await {
                 error!(

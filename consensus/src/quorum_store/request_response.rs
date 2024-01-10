@@ -1,10 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{Payload, PayloadFilter};
+use crate::block_storage::BlockReader;
 use anyhow::Result;
+use aptos_consensus_types::common::{Payload, PayloadFilter};
 use futures::channel::oneshot;
-use std::{fmt, fmt::Formatter};
+use std::{fmt, fmt::Formatter, sync::Arc};
 
 pub enum GetPayloadCommand {
     /// Request to pull block to submit to consensus.
@@ -16,7 +17,7 @@ pub enum GetPayloadCommand {
         // return non full
         bool,
         // block payloads to exclude from the requested block
-        PayloadFilter,
+        Arc<dyn BlockReader + Send + Sync>,
         // callback to respond to
         oneshot::Sender<Result<GetPayloadResponse>>,
     ),
@@ -34,8 +35,8 @@ impl fmt::Display for GetPayloadCommand {
             ) => {
                 write!(
                     f,
-                    "GetPayloadRequest [max_txns: {}, max_bytes: {}, return_non_full: {},  excluded: {}]",
-                    max_txns, max_bytes, return_non_full, excluded
+                    "GetPayloadRequest [max_txns: {}, max_bytes: {}, return_non_full: {}]",
+                    max_txns, max_bytes, return_non_full,
                 )
             },
         }

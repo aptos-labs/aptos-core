@@ -581,6 +581,17 @@ impl BlockReader for BlockStore {
         self.inner.read().path_from_commit_root(block_id)
     }
 
+    fn path_from_root_to_block(
+        &self,
+        block_id: HashValue,
+        root_id: HashValue,
+        root_round: Round,
+    ) -> Option<Vec<Arc<ExecutedBlock>>> {
+        self.inner
+            .read()
+            .path_from_root_to_block(block_id, root_id, root_round)
+    }
+
     fn highest_certified_block(&self) -> Arc<ExecutedBlock> {
         self.inner.read().highest_certified_block()
     }

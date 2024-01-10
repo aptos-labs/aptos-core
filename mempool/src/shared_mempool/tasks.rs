@@ -520,12 +520,13 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                 counters::GET_BLOCK_LABEL,
             )
         },
-        QuorumStoreRequest::RejectNotification(transactions, callback) => {
+        QuorumStoreRequest::ExecutedTransactionsNotification(executed, rejected, callback) => {
             counters::mempool_service_transactions(
                 counters::COMMIT_CONSENSUS_LABEL,
-                transactions.len(),
+                rejected.len(),
             );
-            process_rejected_transactions(&smp.mempool, transactions);
+            process_executed_transactions(&smp.mempool, executed);
+            process_rejected_transactions(&smp.mempool, rejected);
             (
                 QuorumStoreResponse::CommitResponse(),
                 callback,
@@ -570,6 +571,18 @@ pub(crate) fn process_committed_transactions(
     }
 }
 
+pub(crate) fn process_executed_transactions(
+    mempool: &Mutex<CoreMempool>,
+    transactions: Vec<TransactionSummary>,
+) {
+    let mut pool = mempool.lock();
+
+    for transaction in transactions {
+        // TODO: log
+        pool.executed_transaction(&transaction.sender, transaction.sequence_number);
+    }
+}
+
 pub(crate) fn process_rejected_transactions(
     mempool: &Mutex<CoreMempool>,
     transactions: Vec<RejectedTransactionSummary>,
@@ -577,7 +590,7 @@ pub(crate) fn process_rejected_transactions(
     let mut pool = mempool.lock();
 
     for transaction in transactions {
-        pool.reject_transaction(
+        pool.rejected_transaction(
             &transaction.sender,
             transaction.sequence_number,
             &transaction.hash,

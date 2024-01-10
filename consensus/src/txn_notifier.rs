@@ -3,7 +3,7 @@
 
 use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
-use aptos_consensus_types::common::RejectedTransactionSummary;
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
@@ -52,6 +52,7 @@ impl TxnNotifier for MempoolNotifier {
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
+        let mut executed_txns = vec![];
 
         if user_txns.is_empty() {
             return Ok(());
@@ -81,15 +82,21 @@ impl TxnNotifier for MempoolNotifier {
                     hash: txn.clone().committed_hash(),
                     reason: *reason,
                 });
+            } else {
+                executed_txns.push(TransactionSummary::new(txn.sender(), txn.sequence_number()));
             }
         }
 
-        if rejected_txns.is_empty() {
+        if rejected_txns.is_empty() && executed_txns.is_empty() {
             return Ok(());
         }
 
         let (callback, callback_rcv) = oneshot::channel();
-        let req = QuorumStoreRequest::RejectNotification(rejected_txns, callback);
+        let req = QuorumStoreRequest::ExecutedTransactionsNotification(
+            executed_txns,
+            rejected_txns,
+            callback,
+        );
 
         // send to shared mempool
         self.consensus_to_mempool_sender

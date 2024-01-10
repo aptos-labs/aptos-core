@@ -96,7 +96,13 @@ impl Mempool {
         }
     }
 
-    pub(crate) fn reject_transaction(
+    pub(crate) fn executed_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
+        // TODO: log
+        self.transactions
+            .executed_transaction(sender, sequence_number);
+    }
+
+    pub(crate) fn rejected_transaction(
         &mut self,
         sender: &AccountAddress,
         sequence_number: u64,

@@ -41,7 +41,7 @@ async fn test_consensus_events_rejected_txns() {
         reason: DiscardedVMStatus::MALFORMED,
     }];
     let (callback, callback_rcv) = oneshot::channel();
-    let req = QuorumStoreRequest::RejectNotification(transactions, callback);
+    let req = QuorumStoreRequest::ExecutedTransactionsNotification(transactions, callback);
     let mut consensus_sender = smp.consensus_to_mempool_sender.clone();
     assert!(consensus_sender.send(req).await.is_ok());
     assert!(callback_rcv.await.is_ok());

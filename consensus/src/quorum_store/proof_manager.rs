@@ -3,13 +3,18 @@
 
 use crate::{
     monitor,
-    quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
+    quorum_store::{
+        batch_generator::BackPressure,
+        counters,
+        request_response::{GetPayloadCommand, GetPayloadResponse},
+        utils::ProofQueue,
+    },
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
 };
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
@@ -19,6 +24,7 @@ use std::collections::HashSet;
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
+    ExecutedBlockNotification(HashValue, Option<Payload>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -29,6 +35,7 @@ pub struct ProofManager {
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
+    latest_executed_block_id: Option<HashValue>,
 }
 
 impl ProofManager {
@@ -43,6 +50,7 @@ impl ProofManager {
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
+            latest_executed_block_id: None,
         }
     }
 
@@ -77,9 +85,14 @@ impl ProofManager {
                 max_txns,
                 max_bytes,
                 return_non_full,
-                filter,
+                block_store,
                 callback,
             ) => {
+                if let Some(latest_executed_block_id) = self.latest_executed_block_id {
+                    let mut pending_blocks = block_store.path_from_commit_root()
+                }
+
+
                 let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
@@ -160,6 +173,13 @@ impl ProofManager {
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
                                 self.receive_proofs(proofs.take());
+                            },
+                            ProofManagerCommand::ExecutedBlockNotification(_block_id, payload) => {
+                                // TODO: implement
+                                // self.executed_block_id = block_id;
+                                if let Some(_payload) = payload {
+                                //     self.proofs_for_consensus.mark_executed(block_id, payload);
+                                }
                             },
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 self.handle_commit_notification(

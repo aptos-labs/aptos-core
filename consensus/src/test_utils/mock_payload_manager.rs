@@ -4,12 +4,12 @@
 use crate::{
     error::QuorumStoreError,
     payload_client::{user::quorum_store_client::QuorumStoreClient, PayloadClient},
+    quorum_store::request_response::GetPayloadCommand,
 };
 use anyhow::Result;
 use aptos_consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, PayloadFilter},
-    request_response::GetPayloadCommand,
 };
 use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},

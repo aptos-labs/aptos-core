@@ -61,6 +61,23 @@ impl PayloadManager {
         receivers
     }
 
+    pub fn notify_executed_block(&self, block_id: HashValue, payload: Option<Payload>) {
+        match self {
+            PayloadManager::DirectMempool => {},
+            PayloadManager::InQuorumStore(_, coordinator_tx) => {
+                let mut tx = coordinator_tx.clone();
+                if let Err(e) = tx.try_send(CoordinatorCommand::ExecutedBlockNotification(
+                    block_id, payload,
+                )) {
+                    warn!(
+                        "ExecutedBlockNotification failed. Is the epoch shutting down? error: {}",
+                        e
+                    );
+                }
+            },
+        }
+    }
+
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
     pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
