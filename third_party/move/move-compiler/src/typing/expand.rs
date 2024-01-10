@@ -324,6 +324,12 @@ pub fn exp(context: &mut Context, e: &mut T::Exp) {
             exp(context, eb);
             exp(context, eloop);
         },
+        E::For(eiter, elb, eub, eloop) => {
+            exp(context, eiter);
+            exp(context, elb);
+            exp(context, eub);
+            exp(context, eloop);
+        },
         E::Loop { body: eloop, .. } => exp(context, eloop),
         E::Block(seq) => sequence(context, seq),
         E::Lambda(args, body) => {

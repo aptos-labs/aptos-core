@@ -2495,6 +2495,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             EE::IfElse(eb, et, ef)
         },
         PE::While(pb, ploop) => EE::While(exp(context, *pb), exp(context, *ploop)),
+        PE::For(piter, plb, pupb, ploop) => EE::For(exp(context, *piter), exp(context, *plb), exp(context, *pupb), exp(context, *ploop)),
         PE::Loop(ploop) => EE::Loop(exp(context, *ploop)),
         PE::Block(seq) => EE::Block(sequence(context, loc, seq)),
         PE::Lambda(pbs, pe) => {
@@ -3016,6 +3017,12 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
         EE::While(econd, eloop) => {
             unbound_names_exp(unbound, eloop);
             unbound_names_exp(unbound, econd)
+        },
+        EE::For(eiter, elb, eub,eloop) => {
+            unbound_names_exp(unbound, eloop);
+            unbound_names_exp(unbound, eiter);
+            unbound_names_exp(unbound, elb);
+            unbound_names_exp(unbound, eub)
         },
         EE::Loop(eloop) => unbound_names_exp(unbound, eloop),
 

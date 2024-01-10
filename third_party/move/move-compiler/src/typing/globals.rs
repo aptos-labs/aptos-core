@@ -94,6 +94,12 @@ fn exp(context: &mut Context, annotated_acquires: &BTreeMap<StructName, Loc>, e:
             exp(context, annotated_acquires, eb);
             exp(context, annotated_acquires, eloop);
         },
+        E::For(eiter, elb, eub, eloop) => {
+            exp(context, annotated_acquires, eiter);
+            exp(context, annotated_acquires, elb);
+            exp(context, annotated_acquires, eub);
+            exp(context, annotated_acquires, eloop);
+        },
         E::Loop { body: eloop, .. } => exp(context, annotated_acquires, eloop),
         E::Block(seq) => sequence(context, annotated_acquires, seq),
         E::Lambda(_, body) => exp(context, annotated_acquires, body.as_ref()),

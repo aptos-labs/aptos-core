@@ -502,6 +502,12 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             eopt.iter().for_each(|e| exp(context, e));
             exp(context, e)
         },
+        E::For(e1, e2, e3, e4) => {
+            exp(context, e1);
+            exp(context, e2);
+            exp(context, e3);
+            exp(context, e4);
+        },
     }
 }
 

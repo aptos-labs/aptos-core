@@ -179,6 +179,12 @@ pub enum Statement_ {
         cond: (Block, Box<Exp>),
         block: Block,
     },
+    For {
+        iter: Box<Exp>,
+        lb: Box<Exp>,
+        ub: Box<Exp>,
+        block: Block,
+    },
     Loop {
         block: Block,
         has_break: bool,

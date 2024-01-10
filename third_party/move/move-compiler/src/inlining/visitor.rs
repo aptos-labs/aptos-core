@@ -135,6 +135,12 @@ impl<'l, V: Visitor> Dispatcher<'l, V> {
                 self.exp(cex.as_mut());
                 self.exp(bex.as_mut());
             },
+            UnannotatedExp_::For(iterex, lbex, ubex, bex) => {
+                self.exp(iterex.as_mut());
+                self.exp(lbex.as_mut());
+                self.exp(ubex.as_mut());
+                self.exp(bex.as_mut());
+            },
             UnannotatedExp_::Block(seq) => self.sequence(seq),
             UnannotatedExp_::Mutate(dex, sex) => {
                 self.exp(dex.as_mut());

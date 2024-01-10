@@ -932,7 +932,8 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
         EE::IfElse(eb, et, ef) => {
             NE::IfElse(exp(context, *eb), exp(context, *et), exp(context, *ef))
         },
-        EE::While(eb, el) => NE::While(exp(context, *eb), exp(context, *el)),
+        EE::While(eb, eloop) => NE::While(exp(context, *eb), exp(context, *eloop)),
+        EE::For(eiter, elb,eub, eloop) => NE::For(exp(context, *eiter), exp(context, *elb), exp(context, *eub), exp(context, *eloop)),
         EE::Loop(el) => NE::Loop(exp(context, *el)),
         EE::Block(seq) => NE::Block(sequence(context, seq)),
         EE::Lambda(args, body) => {

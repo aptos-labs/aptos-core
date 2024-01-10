@@ -432,6 +432,13 @@ mod check_valid_constant {
                 exp(context, eloop);
                 "'while' expressions are"
             },
+            E::For(eiter, elb, eub, eloop) => {
+                exp(context, eiter);
+                exp(context, elb);
+                exp(context, eub);
+                exp(context, eloop);
+                "'for' expressions are"
+            },
             E::Loop { body: eloop, .. } => {
                 exp(context, eloop);
                 "'loop' expressions are"
@@ -1329,6 +1336,21 @@ fn exp_inner(context: &mut Context, sp!(eloc, ne_): N::Exp) -> T::Exp {
             );
             let (_has_break, ty, body) = loop_body(context, eloc, false, nloop);
             (sp(eloc, ty.value), TE::While(eb, body))
+        },
+        NE::For(niter, nlb, nub, nloop) => {
+            let eiter = exp(context, niter);
+            let elb = exp(context, nlb);
+            let eub = exp(context, nub);
+            let bloc = elb.exp.loc;
+            subtype(
+                context,
+                bloc,
+                || "The upper and lower bounds have different types",
+                elb.clone().ty,
+                eub.clone().ty,
+            );
+            let (_has_break, ty, body) = loop_body(context, eloc, false, nloop);
+            (sp(eloc, ty.value), TE::For(eiter, elb, eub, body))
         },
         NE::Loop(nloop) => {
             let (has_break, ty, body) = loop_body(context, eloc, true, nloop);

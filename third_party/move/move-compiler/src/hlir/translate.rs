@@ -1097,6 +1097,9 @@ fn exp_impl(
                 case: H::UnitCase::Implicit,
             }
         },
+        TE::For(titer, tlb, tub, loop_body) => {
+            // TODO
+        },
         TE::Loop {
             has_break,
             body: loop_body,
@@ -1770,6 +1773,7 @@ fn bind_for_short_circuit(e: &T::Exp) -> bool {
         | TE::Continue
         | TE::IfElse(_, _, _)
         | TE::While(_, _)
+        | TE::For(_, _, _, _)
         | TE::Loop { .. }
         | TE::Return(_)
         | TE::Abort(_)

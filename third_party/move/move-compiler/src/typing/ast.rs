@@ -180,6 +180,7 @@ pub enum UnannotatedExp_ {
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
     While(Box<Exp>, Box<Exp>),
+    For(Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>),
     Loop { has_break: bool, body: Box<Exp> },
     Block(Sequence),
     Lambda(LValueList, Box<Exp>),
@@ -540,6 +541,16 @@ impl AstDebug for UnannotatedExp_ {
             E::While(b, e) => {
                 w.write("while (");
                 b.ast_debug(w);
+                w.write(")");
+                e.ast_debug(w);
+            },
+            E::For(i, l, u, e) => {
+                w.write("for (");
+                i.ast_debug(w);
+                w.write(" in ");
+                l.ast_debug(w);
+                w.write("..");
+                u.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
             },

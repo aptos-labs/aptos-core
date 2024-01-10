@@ -448,6 +448,7 @@ pub enum Exp_ {
 
     IfElse(Box<Exp>, Box<Exp>, Box<Exp>),
     While(Box<Exp>, Box<Exp>),
+    For(Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>),
     Loop(Box<Exp>),
     Block(Sequence),
     Lambda(LValueList, Box<Exp>),
@@ -1568,6 +1569,16 @@ impl AstDebug for Exp_ {
             E::While(b, e) => {
                 w.write("while (");
                 b.ast_debug(w);
+                w.write(")");
+                e.ast_debug(w);
+            },
+            E::For(i, u, l, e) => {
+                w.write("for (");
+                i.ast_debug(w);
+                w.write(" in ");
+                u.ast_debug(w);
+                w.write("..");
+                l.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
             },

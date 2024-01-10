@@ -616,6 +616,8 @@ pub enum Exp_ {
     IfElse(Box<Exp>, Box<Exp>, Option<Box<Exp>>),
     // while (eb) eloop
     While(Box<Exp>, Box<Exp>),
+    // for (eiter in elb..eub) eloop
+    For(Box<Exp>, Box<Exp>, Box<Exp>, Box<Exp>),
     // loop eloop
     Loop(Box<Exp>),
 
@@ -1775,6 +1777,16 @@ impl AstDebug for Exp_ {
             E::While(b, e) => {
                 w.write("while (");
                 b.ast_debug(w);
+                w.write(")");
+                e.ast_debug(w);
+            },
+            E::For(i, l, u, e) => {
+                w.write("for (");
+                i.ast_debug(w);
+                w.write(" in ");
+                l.ast_debug(w);
+                w.write("..");
+                u.ast_debug(w);
                 w.write(")");
                 e.ast_debug(w);
             },
