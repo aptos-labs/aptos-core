@@ -10,7 +10,6 @@ mod transaction_pruner;
 mod write_set_pruner;
 
 use crate::{
-    event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::PRUNER_VERSIONS,
     pruner::{
@@ -128,8 +127,7 @@ impl LedgerPruner {
         let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&ledger_db)));
 
         let event_store_pruner = Box::new(EventStorePruner::new(
-            Arc::new(EventStore::new(ledger_db.event_db_arc())),
-            ledger_db.event_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
