@@ -91,7 +91,7 @@ impl ResponsiveCheck for OptimisticResponsive {
         &mut self,
         highest_strong_links_round: Round,
         _strong_links: Vec<NodeCertificate>,
-        minimum_delay: Duration,
+        _minimum_delay: Duration,
     ) {
         let new_round = highest_strong_links_round + 1;
         let _ = self.event_sender.send(new_round).await;

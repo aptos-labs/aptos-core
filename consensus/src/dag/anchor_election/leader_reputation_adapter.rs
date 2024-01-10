@@ -2,9 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::{anchor_election::AnchorElection, storage::CommitEvent},
+    dag::{
+        anchor_election::{AnchorElection, CommitHistory},
+        storage::CommitEvent,
+    },
     liveness::{
-        leader_reputation::{LeaderReputation, MetadataBackend, ReputationHeuristic, VotingPowerRatio},
+        leader_reputation::{
+            LeaderReputation, MetadataBackend, ReputationHeuristic, VotingPowerRatio,
+        },
         proposer_election::ProposerElection,
     },
 };
@@ -121,16 +126,6 @@ impl LeaderReputationAdapter {
             data_source: backend,
         }
     }
-
-    pub(crate) fn get_voting_power_participation_ratio(&self, round: u64) -> VotingPowerRatio {
-        let mut voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
-        // TODO: fix this once leader reputation is fixed
-        if voting_power_ratio < 0.67 {
-            voting_power_ratio = 1.0;
-        }
-
-        voting_power_ratio
-    }
 }
 
 impl AnchorElection for LeaderReputationAdapter {
@@ -140,5 +135,17 @@ impl AnchorElection for LeaderReputationAdapter {
 
     fn update_reputation(&self, commit_event: CommitEvent) {
         self.data_source.push(commit_event)
+    }
+}
+
+impl CommitHistory for LeaderReputationAdapter {
+    fn get_voting_power_participation_ratio(&self, round: Round) -> VotingPowerRatio {
+        let mut voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
+        // TODO: fix this once leader reputation is fixed
+        if voting_power_ratio < 0.67 {
+            voting_power_ratio = 1.0;
+        }
+
+        voting_power_ratio
     }
 }

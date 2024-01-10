@@ -1,6 +1,6 @@
 use crate::{
     counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
-    dag::anchor_election::LeaderReputationAdapter,
+    dag::anchor_election::CommitHistory,
     liveness::{leader_reputation::VotingPowerRatio, proposal_generator::ChainHealthBackoffConfig},
 };
 use aptos_config::config::ChainHealthBackoffValues;
@@ -39,19 +39,24 @@ impl TChainHealth for NoChainHealth {
 
 pub struct ChainHealthBackoff {
     config: ChainHealthBackoffConfig,
-    adapter: Arc<LeaderReputationAdapter>,
+    commit_history: Arc<dyn CommitHistory>,
 }
 
 impl ChainHealthBackoff {
     pub fn new(
         config: ChainHealthBackoffConfig,
-        adapter: Arc<LeaderReputationAdapter>,
+        commit_history: Arc<dyn CommitHistory>,
     ) -> Arc<Self> {
-        Arc::new(Self { adapter, config })
+        Arc::new(Self {
+            commit_history,
+            config,
+        })
     }
 
     fn get_chain_health_backoff(&self, round: Round) -> Option<&ChainHealthBackoffValues> {
-        let voting_power_ratio = self.adapter.get_voting_power_participation_ratio(round);
+        let voting_power_ratio = self
+            .commit_history
+            .get_voting_power_participation_ratio(round);
         let chain_health_backoff = self.config.get_backoff(voting_power_ratio);
 
         chain_health_backoff
@@ -83,6 +88,7 @@ impl TChainHealth for ChainHealthBackoff {
     }
 
     fn voting_power_ratio(&self, round: Round) -> VotingPowerRatio {
-        self.adapter.get_voting_power_participation_ratio(round)
+        self.commit_history
+            .get_voting_power_participation_ratio(round)
     }
 }
