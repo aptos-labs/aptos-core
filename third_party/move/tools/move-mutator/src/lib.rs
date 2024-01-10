@@ -154,8 +154,8 @@ fn setup_mutant_path(output_dir: &Path, filename: &str, index: u64) -> PathBuf {
 ///
 /// * `anyhow::Result<PathBuf>` - Returns the path to the output directory if successful, or an error if any error occurs.
 fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow::Result<PathBuf> {
-    trace!("Setting up output directory");
     let output_dir = mutator_configuration.project.out_mutant_dir.clone();
+    trace!("Trying to set up output directory to: {:?}", output_dir);
 
     // Check if output directory exists and if it should be overwritten
     if output_dir.exists() && mutator_configuration.project.no_overwrite.unwrap_or(false) {
