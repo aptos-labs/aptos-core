@@ -805,10 +805,7 @@ impl AptosDataClient {
                     peer,
                     request,
                 };
-                let context = ResponseContext {
-                    id,
-                    response_callback: Box::new(response_callback),
-                };
+                let context = ResponseContext::new(id, Box::new(response_callback));
                 Ok(Response::new(context, response))
             },
             Err(error) => {

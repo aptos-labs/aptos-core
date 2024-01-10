@@ -863,11 +863,7 @@ impl ResponseCallback for NoopResponseCallback {
 /// Creates a data client response using a specified payload and random id
 pub fn create_data_client_response<T>(payload: T) -> Response<T> {
     let id = create_random_u64(MAX_RESPONSE_ID);
-    let response_callback = Box::new(NoopResponseCallback);
-    let context = ResponseContext {
-        id,
-        response_callback,
-    };
+    let context = ResponseContext::new(id, Box::new(NoopResponseCallback));
     Response::new(context, payload)
 }
 
