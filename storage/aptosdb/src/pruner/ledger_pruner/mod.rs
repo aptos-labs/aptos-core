@@ -144,7 +144,7 @@ impl LedgerPruner {
         )?);
         let transaction_pruner = Box::new(TransactionPruner::new(
             Arc::clone(&transaction_store),
-            ledger_db.transaction_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let write_set_pruner = Box::new(WriteSetPruner::new(

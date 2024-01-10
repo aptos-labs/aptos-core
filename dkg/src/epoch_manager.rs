@@ -2,24 +2,23 @@
 
 use crate::{
     dkg_manager::{agg_trx_producer::DummyAggTranscriptProducer, DKGManager},
+    dummy_dkg::DummyDKG,
     network::{IncomingRpcRequest, NetworkReceivers},
     network_interface::DKGNetworkClient,
     DKGMessage,
 };
 use anyhow::Result;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::NodeConfig;
+use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::error;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
-use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState, DKGTrait, DummyDKG},
+    dkg::{DKGStartEvent, DKGState},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -33,39 +32,47 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
-    dkg_sk: Arc<<DummyDKG as DKGTrait>::PrivateParams>,
+    // Some useful metadata
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
+
+    // some DKG private params
+    identity_blob: Arc<IdentityBlob>,
+
+    // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
-    start_dkg_events: EventNotificationListener,
+    dkg_start_events: EventNotificationListener,
+    vtxn_pull_notification_rx_from_pool: vtxn_pool::PullNotificationReceiver,
+
+    // Msgs to DKG manager
     dkg_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
+    dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
+    vtxn_pull_notification_tx_to_dkgmgr: Option<vtxn_pool::PullNotificationSender>,
+    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
 
+    // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
     network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
-    start_dkg_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
-    vtxn_pull_notification_rx_from_pool: vtxn_pool::PullNotificationReceiver,
-    vtxn_pull_notification_tx_to_dkgmgr: Option<vtxn_pool::PullNotificationSender>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
-        node_config: &NodeConfig,
+        my_addr: AccountAddress,
+        identity_blob: Arc<IdentityBlob>,
         reconfig_events: ReconfigNotificationListener<P>,
-        start_dkg_events: EventNotificationListener,
+        dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
         vtxn_pull_notification_rx: vtxn_pool::PullNotificationReceiver,
     ) -> Self {
-        let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            dkg_sk: Arc::new(Self::load_private_params(node_config)),
             my_addr,
+            identity_blob,
             epoch_state: None,
             reconfig_events,
-            start_dkg_events,
+            dkg_start_events,
             dkg_rpc_msg_tx: None,
             dkg_manager_close_tx: None,
             self_sender,
@@ -73,7 +80,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pool_write_cli: Arc::new(vtxn_pool_write_cli),
             vtxn_pull_notification_rx_from_pool: vtxn_pull_notification_rx,
             vtxn_pull_notification_tx_to_dkgmgr: None,
-            start_dkg_event_tx: None,
+            dkg_start_event_tx: None,
         }
     }
 
@@ -103,7 +110,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.await_reconfig_notification().await;
         loop {
             let handling_result = tokio::select! {
-                notification = self.start_dkg_events.select_next_some() => {
+                notification = self.dkg_start_events.select_next_some() => {
                     self.on_dkg_start_notification(notification)
                 },
                 reconfig_notification = self.reconfig_events.select_next_some() => {
@@ -154,9 +161,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let agg_trx_producer = DummyAggTranscriptProducer {}; //TODO: replace with real
 
-            let (start_dkg_event_tx, start_dkg_event_rx) =
+            let (dkg_start_event_tx, dkg_start_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.start_dkg_event_tx = Some(start_dkg_event_tx);
+            self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
                 (),
@@ -166,8 +173,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::<DummyDKG>::new(
-                self.dkg_sk.clone(),
+            let dkg_manager = DKGManager::<DummyDKG, _>::new(
+                self.identity_blob.clone(),
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_trx_producer),
@@ -178,7 +185,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
-                start_dkg_event_rx,
+                dkg_start_event_rx,
                 dkg_rpc_msg_rx,
                 vtxn_pull_notification_rx,
                 dkg_manager_close_rx,
@@ -199,17 +206,5 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tx.send(ack_tx).unwrap();
             ack_rx.await.unwrap();
         }
-    }
-
-    fn load_private_params(node_config: &NodeConfig) -> <DummyDKG as DKGTrait>::PrivateParams {
-        let backend = &node_config.consensus.safety_rules.backend;
-        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
-        if let Err(error) = storage.available() {
-            panic!("Storage is not available: {:?}", error);
-        }
-        storage
-            .get(CONSENSUS_KEY)
-            .map(|v| v.value)
-            .expect("Unable to get private key")
     }
 }

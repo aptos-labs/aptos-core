@@ -2,7 +2,6 @@
 
 use crate::on_chain_config::{OnChainConfig, ValidatorSet};
 use anyhow::Result;
-use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
@@ -28,6 +27,12 @@ pub struct DKGStartEvent {
 impl MoveStructType for DKGStartEvent {
     const MODULE_NAME: &'static IdentStr = ident_str!("dkg");
     const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
+}
+
+/// DKG parameters.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct DKGConfig {
+    //TODO
 }
 
 /// DKG transcript and its metadata.
@@ -90,42 +95,6 @@ pub trait DKGTrait {
     );
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct DummyDKGTranscript {
-    data: Vec<u8>,
-}
-
-impl Default for DummyDKGTranscript {
-    fn default() -> Self {
-        Self {
-            data: b"data".to_vec(),
-        }
-    }
-}
-
-pub struct DummyDKG {}
-
-impl DKGTrait for DummyDKG {
-    type PrivateParams = bls12381::PrivateKey;
-    type PublicParams = ();
-    type Transcript = DummyDKGTranscript;
-
-    fn generate_transcript<R: CryptoRng>(
-        _rng: &mut R,
-        _sk: &Self::PrivateParams,
-        _params: &Self::PublicParams,
-    ) -> Self::Transcript {
-        DummyDKGTranscript::default()
-    }
-
-    fn verify_transcript(_params: &Self::PublicParams, _trx: &Self::Transcript) -> Result<()> {
-        Ok(())
-    }
-
-    fn aggregate_transcripts(
-        _params: &Self::PublicParams,
-        _base: &mut Self::Transcript,
-        _extra: &Self::Transcript,
-    ) {
-    }
+pub trait DKGSkProvider<DKG: DKGTrait> {
+    fn dkg_sk(&self) -> &DKG::PrivateParams;
 }

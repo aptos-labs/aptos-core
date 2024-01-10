@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::bail;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -28,5 +27,16 @@ impl Any {
         } else {
             bail!("type mismatch")
         }
+    }
+}
+
+pub trait AsMoveAny: Serialize {
+    const MOVE_TYPE_NAME: &'static str;
+
+    fn as_move_any(&self) -> Any
+    where
+        Self: Sized,
+    {
+        Any::pack(Self::MOVE_TYPE_NAME, self)
     }
 }

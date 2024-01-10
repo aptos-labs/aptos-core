@@ -17,7 +17,7 @@ from aptos.transaction.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\x1f\x61ptos/indexer/v1/raw_data.proto\x12\x10\x61ptos.indexer.v1\x1a&aptos/transaction/v1/transaction.proto"\xb4\x01\n\x16GetTransactionsRequest\x12!\n\x10starting_version\x18\x01 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x12#\n\x12transactions_count\x18\x02 \x01(\x04\x42\x02\x30\x01H\x01\x88\x01\x01\x12\x17\n\nbatch_size\x18\x03 \x01(\x04H\x02\x88\x01\x01\x42\x13\n\x11_starting_versionB\x15\n\x13_transactions_countB\r\n\x0b_batch_size"w\n\x14TransactionsResponse\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x19\n\x08\x63hain_id\x18\x02 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x42\x0b\n\t_chain_id2p\n\x07RawData\x12\x65\n\x0fGetTransactions\x12(.aptos.indexer.v1.GetTransactionsRequest\x1a&.aptos.indexer.v1.TransactionsResponse0\x01\x62\x06proto3'
+    b'\n\x1f\x61ptos/indexer/v1/raw_data.proto\x12\x10\x61ptos.indexer.v1\x1a&aptos/transaction/v1/transaction.proto"\x84\x01\n\x15TransactionsInStorage\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x1d\n\x10starting_version\x18\x02 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_starting_version"\xb4\x01\n\x16GetTransactionsRequest\x12!\n\x10starting_version\x18\x01 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x12#\n\x12transactions_count\x18\x02 \x01(\x04\x42\x02\x30\x01H\x01\x88\x01\x01\x12\x17\n\nbatch_size\x18\x03 \x01(\x04H\x02\x88\x01\x01\x42\x13\n\x11_starting_versionB\x15\n\x13_transactions_countB\r\n\x0b_batch_size"w\n\x14TransactionsResponse\x12\x37\n\x0ctransactions\x18\x01 \x03(\x0b\x32!.aptos.transaction.v1.Transaction\x12\x19\n\x08\x63hain_id\x18\x02 \x01(\x04\x42\x02\x30\x01H\x00\x88\x01\x01\x42\x0b\n\t_chain_id2p\n\x07RawData\x12\x65\n\x0fGetTransactions\x12(.aptos.indexer.v1.GetTransactionsRequest\x1a&.aptos.indexer.v1.TransactionsResponse0\x01\x62\x06proto3'
 )
 
 _globals = globals()
@@ -37,10 +37,12 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     ]._serialized_options = b"0\001"
     _TRANSACTIONSRESPONSE.fields_by_name["chain_id"]._options = None
     _TRANSACTIONSRESPONSE.fields_by_name["chain_id"]._serialized_options = b"0\001"
-    _globals["_GETTRANSACTIONSREQUEST"]._serialized_start = 94
-    _globals["_GETTRANSACTIONSREQUEST"]._serialized_end = 274
-    _globals["_TRANSACTIONSRESPONSE"]._serialized_start = 276
-    _globals["_TRANSACTIONSRESPONSE"]._serialized_end = 395
-    _globals["_RAWDATA"]._serialized_start = 397
-    _globals["_RAWDATA"]._serialized_end = 509
+    _globals["_TRANSACTIONSINSTORAGE"]._serialized_start = 94
+    _globals["_TRANSACTIONSINSTORAGE"]._serialized_end = 226
+    _globals["_GETTRANSACTIONSREQUEST"]._serialized_start = 229
+    _globals["_GETTRANSACTIONSREQUEST"]._serialized_end = 409
+    _globals["_TRANSACTIONSRESPONSE"]._serialized_start = 411
+    _globals["_TRANSACTIONSRESPONSE"]._serialized_end = 530
+    _globals["_RAWDATA"]._serialized_start = 532
+    _globals["_RAWDATA"]._serialized_end = 644
 # @@protoc_insertion_point(module_scope)

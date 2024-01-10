@@ -34,8 +34,9 @@ pub struct PipelineConfig {
     pub delay_execution_start: bool,
     pub split_stages: bool,
     pub skip_commit: bool,
-    pub allow_discards: bool,
     pub allow_aborts: bool,
+    pub allow_discards: bool,
+    pub allow_retries: bool,
     #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
     pub use_global_executor: bool,
@@ -113,15 +114,17 @@ where
         let mut partitioning_stage =
             BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
 
-        let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
-
-        let mut ledger_update_stage = LedgerUpdateStage::new(
-            executor_2,
-            Some(commit_sender),
-            version,
-            config.allow_discards,
+        let mut exe = TransactionExecutor::new(
+            executor_1,
+            parent_block_id,
+            ledger_update_sender,
             config.allow_aborts,
+            config.allow_discards,
+            config.allow_retries,
         );
+
+        let mut ledger_update_stage =
+            LedgerUpdateStage::new(executor_2, Some(commit_sender), version);
 
         let (executable_block_sender, executable_block_receiver) =
             mpsc::sync_channel::<ExecuteBlockMessage>(3);

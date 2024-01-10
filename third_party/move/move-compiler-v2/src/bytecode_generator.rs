@@ -368,7 +368,10 @@ impl<'env> Generator<'env> {
                 self.scopes.pop();
             },
             ExpData::Mutate(id, lhs, rhs) => {
-                let rhs_temp = self.gen_escape_auto_ref_arg(rhs, false);
+                // Notice that we cannot be in reference mode here for reasons
+                // of typing: the result of the Mutate operator is `()` and cannot
+                // appear where references are processed.
+                let rhs_temp = self.gen_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
                 if !self.temp_type(lhs_temp).is_mutable_reference() {
                     self.error(

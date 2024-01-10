@@ -97,7 +97,8 @@ impl DbReader for AptosDB {
         fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
         gauged_api("get_transaction_by_hash", || {
-            self.transaction_store
+            self.ledger_db
+                .transaction_db()
                 .get_transaction_version_by_hash(&hash, ledger_version)?
                 .map(|v| self.get_transaction_with_proof(v, ledger_version, fetch_events))
                 .transpose()
@@ -142,7 +143,7 @@ impl DbReader for AptosDB {
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
             let txns = (start_version..start_version + limit)
-                .map(|version| self.transaction_store.get_transaction(version))
+                .map(|version| self.ledger_db.transaction_db().get_transaction(version))
                 .collect::<Result<Vec<_>>>()?;
             let txn_infos = (start_version..start_version + limit)
                 .map(|version| self.ledger_store.get_transaction_info(version))
@@ -223,7 +224,7 @@ impl DbReader for AptosDB {
                     let txn_info = self.ledger_store.get_transaction_info(version)?;
                     let events = self.event_store.get_events_by_version(version)?;
                     let write_set = self.transaction_store.get_write_set(version)?;
-                    let txn = self.transaction_store.get_transaction(version)?;
+                    let txn = self.ledger_db.transaction_db().get_transaction(version)?;
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
@@ -275,7 +276,8 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let iter = self
-                .transaction_store
+                .ledger_db
+                .transaction_db()
                 .get_transaction_iter(start_version, limit as usize)?;
             Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<Transaction>> + '_>)
         })
@@ -911,7 +913,7 @@ impl AptosDB {
         let proof = self
             .ledger_store
             .get_transaction_info_with_proof(version, ledger_version)?;
-        let transaction = self.transaction_store.get_transaction(version)?;
+        let transaction = self.ledger_db.transaction_db().get_transaction(version)?;
 
         // If events were requested, also fetch those.
         let events = if fetch_events {

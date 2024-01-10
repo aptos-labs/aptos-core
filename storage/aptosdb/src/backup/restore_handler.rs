@@ -5,6 +5,7 @@
 use crate::{
     backup::restore_utils,
     event_store::EventStore,
+    ledger_db::LedgerDb,
     ledger_store::LedgerStore,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
@@ -33,6 +34,7 @@ pub struct RestoreHandler {
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     event_store: Arc<EventStore>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl RestoreHandler {
@@ -44,6 +46,7 @@ impl RestoreHandler {
         event_store: Arc<EventStore>,
     ) -> Self {
         Self {
+            ledger_db: Arc::clone(&aptosdb.ledger_db),
             aptosdb,
             ledger_store,
             transaction_store,
@@ -107,6 +110,7 @@ impl RestoreHandler {
             self.transaction_store.clone(),
             self.event_store.clone(),
             self.state_store.clone(),
+            self.ledger_db.clone(),
             first_version,
             txns,
             txn_infos,
@@ -130,6 +134,7 @@ impl RestoreHandler {
             self.transaction_store.clone(),
             self.event_store.clone(),
             self.state_store.clone(),
+            self.ledger_db.clone(),
             first_version,
             txns,
             txn_infos,

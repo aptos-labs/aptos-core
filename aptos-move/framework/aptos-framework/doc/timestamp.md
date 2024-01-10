@@ -268,7 +268,7 @@ Gets the current time in seconds.
 ### Module-level Specification
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a> and <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a> and <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -300,9 +300,9 @@ Gets the current time in seconds.
     <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
     proposer: <b>address</b>;
     <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64;
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
     <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(<a href="account.md#0x1_account">account</a>);
-    // This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
     <b>aborts_if</b> (proposer == @vm_reserved) && (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() != <a href="timestamp.md#0x1_timestamp">timestamp</a>);
     <b>aborts_if</b> (proposer != @vm_reserved) && (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">spec_now_microseconds</a>() &gt;= <a href="timestamp.md#0x1_timestamp">timestamp</a>);
 }

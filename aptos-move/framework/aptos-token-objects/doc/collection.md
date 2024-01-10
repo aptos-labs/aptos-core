@@ -903,12 +903,37 @@ increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="collection.md#0x4_collection_increment_supply">increment_supply</a>(
     <a href="collection.md#0x4_collection">collection</a>: &Object&lt;<a href="collection.md#0x4_collection_Collection">Collection</a>&gt;,
     <a href="token.md#0x4_token">token</a>: <b>address</b>,
-): Option&lt;u64&gt; <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>, <a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a> {
-    <b>let</b> index = <a href="collection.md#0x4_collection_increment_concurrent_supply">increment_concurrent_supply</a>(<a href="collection.md#0x4_collection">collection</a>, <a href="token.md#0x4_token">token</a>);
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(&index)) {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+): Option&lt;u64&gt; <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a> {
+    <b>let</b> collection_addr = <a href="../../aptos-framework/doc/object.md#0x1_object_object_address">object::object_address</a>(<a href="collection.md#0x4_collection">collection</a>);
+    <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_addr)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_addr);
+        supply.current_supply = supply.current_supply + 1;
+        supply.total_minted = supply.total_minted + 1;
+        <b>assert</b>!(
+            supply.current_supply &lt;= supply.max_supply,
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_ECOLLECTION_SUPPLY_EXCEEDED">ECOLLECTION_SUPPLY_EXCEEDED</a>),
+        );
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> supply.mint_events,
+            <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
+                index: supply.total_minted,
+                <a href="token.md#0x4_token">token</a>,
+            },
+        );
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(supply.total_minted)
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr)) {
+        <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr);
+        supply.current_supply = supply.current_supply + 1;
+        supply.total_minted = supply.total_minted + 1;
+        <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
+            &<b>mut</b> supply.mint_events,
+            <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
+                index: supply.total_minted,
+                <a href="token.md#0x4_token">token</a>,
+            },
+        );
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(supply.total_minted)
     } <b>else</b> {
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>&lt;u64&gt;(&<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(index)))
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
 }
 </code></pre>

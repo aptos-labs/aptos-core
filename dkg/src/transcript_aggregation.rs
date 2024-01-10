@@ -1,15 +1,25 @@
 // Copyright © Aptos Foundation
 
+#[cfg(test)]
+use crate::dummy_dkg::DummyDKG;
+#[cfg(test)]
+use crate::dummy_dkg::DummyDKGTranscript;
 use crate::{types::DKGNodeRequest, DKGMessage};
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
+#[cfg(test)]
 use aptos_crypto::{bls12381, Uniform};
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
+#[cfg(test)]
+use aptos_types::dkg::DKGTranscriptMetadata;
+#[cfg(test)]
+use aptos_types::validator_verifier::ValidatorConsensusInfo;
+#[cfg(test)]
+use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{
-    dkg::{DKGNode, DKGTrait, DKGTranscriptMetadata, DummyDKG, DummyDKGTranscript},
+    dkg::{DKGNode, DKGTrait},
     epoch_state::EpochState,
-    validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashSet, sync::Arc};
@@ -58,7 +68,7 @@ fn test_transcript_aggregation_state() {
     let public_keys: Vec<bls12381::PublicKey> = (0..num_validators)
         .map(|i| bls12381::PublicKey::from(&private_keys[i]))
         .collect();
-    let voting_powers = vec![1, 1, 1, 6, 6]; // total voting power: 15, default threshold: 11
+    let voting_powers = [1, 1, 1, 6, 6]; // total voting power: 15, default threshold: 11
     let validator_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
@@ -77,7 +87,7 @@ fn test_transcript_aggregation_state() {
         },
         transcript_bytes: good_trx_bytes.clone(),
     });
-    assert!(matches!(result, Err(_)));
+    assert!(result.is_err());
 
     // Node authored by X but sent by Y should be rejected.
     let result = trx_agg_state.add(addrs[1], DKGNode {
@@ -87,7 +97,7 @@ fn test_transcript_aggregation_state() {
         },
         transcript_bytes: good_trx_bytes.clone(),
     });
-    assert!(matches!(result, Err(_)));
+    assert!(result.is_err());
 
     // Node with invalid transcript should be rejected.
     let mut bad_trx_bytes = good_trx_bytes.clone();
@@ -99,7 +109,7 @@ fn test_transcript_aggregation_state() {
         },
         transcript_bytes: vec![],
     });
-    assert!(matches!(result, Err(_)));
+    assert!(result.is_err());
 
     // Good node should be accepted.
     let result = trx_agg_state.add(addrs[3], DKGNode {

@@ -26,6 +26,3 @@ pub mod config;
 // Only include debugging functionality in debug builds
 #[cfg(any(debug_assertions, feature = "debugging"))]
 mod debug;
-
-#[cfg(test)]
-mod unit_tests;
