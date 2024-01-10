@@ -84,13 +84,10 @@ fn run_test_impl(path: &Path, v2_flag: bool) -> datatest_stable::Result<String> 
                 },
                 Err(error) => format!("{:#}\n", error),
             },
-            (_, true) => match ModelBuilder::create(
-                resolved_package,
-                ModelConfig {
-                    all_files_as_targets: false,
-                    target_filter: None,
-                },
-            )
+            (_, true) => match ModelBuilder::create(resolved_package, ModelConfig {
+                all_files_as_targets: false,
+                target_filter: None,
+            })
             .build_model()
             {
                 Ok(_) => "Built model".to_string(),
