@@ -2,17 +2,14 @@
 
 use super::{
     adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
-    anchor_election::{AnchorElection, RoundRobinAnchorElection},
+    anchor_election::{AnchorElection, CommitHistory, RoundRobinAnchorElection},
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
     dag_state_sync::{DagStateSynchronizer, StateSyncTrigger},
     dag_store::Dag,
-    health::{
-        ChainHealthBackoff, HealthBackoff, NoChainHealth, PipelineLatencyBasedBackpressure,
-        TChainHealth,
-    },
+    health::{ChainHealthBackoff, HealthBackoff, PipelineLatencyBasedBackpressure, TChainHealth},
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
     storage::{CommitEvent, DAGStorage},
@@ -77,7 +74,7 @@ struct BootstrapBaseState {
     order_rule: OrderRule,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
-    may_be_leader_reputation: Option<Arc<LeaderReputationAdapter>>,
+    commit_history: Arc<dyn CommitHistory>,
 }
 
 #[enum_dispatch(TDagMode)]
@@ -435,7 +432,7 @@ impl DagBootstrapper {
         &self,
     ) -> (
         Arc<dyn AnchorElection>,
-        Option<Arc<LeaderReputationAdapter>>,
+        Arc<dyn CommitHistory>,
         Option<Vec<CommitEvent>>,
     ) {
         match &self.onchain_config.anchor_election_mode {
@@ -443,7 +440,7 @@ impl DagBootstrapper {
                 let election = Arc::new(RoundRobinAnchorElection::new(
                     self.epoch_state.verifier.get_ordered_account_addresses(),
                 ));
-                (election, None, None)
+                (election.clone(), election, None)
             },
             AnchorElectionMode::LeaderReputation(reputation_type) => {
                 let (commit_events, leader_reputation) = match reputation_type {
@@ -465,7 +462,7 @@ impl DagBootstrapper {
 
                 (
                     leader_reputation.clone(),
-                    Some(leader_reputation),
+                    leader_reputation,
                     Some(commit_events),
                 )
             },
@@ -475,6 +472,7 @@ impl DagBootstrapper {
     fn bootstrap_dag_store(
         &self,
         anchor_election: Arc<dyn AnchorElection>,
+        commit_history: Arc<dyn CommitHistory>,
         commit_events: Option<Vec<CommitEvent>>,
         dag_window_size_config: u64,
     ) -> BootstrapBaseState {
@@ -530,7 +528,7 @@ impl DagBootstrapper {
             order_rule,
             ledger_info_provider,
             ordered_notifier,
-            may_be_leader_reputation: None,
+            commit_history,
         }
     }
 
@@ -560,7 +558,7 @@ impl DagBootstrapper {
             ledger_info_provider,
             order_rule,
             ordered_notifier,
-            may_be_leader_reputation,
+            commit_history,
         } = base_state;
 
         let state_sync_trigger = StateSyncTrigger::new(
@@ -591,13 +589,10 @@ impl DagBootstrapper {
             )),
         );
 
-        let chain_health: Arc<dyn TChainHealth> = match may_be_leader_reputation {
-            Some(adapter) => ChainHealthBackoff::new(
-                ChainHealthBackoffConfig::new(self.config.chain_backoff_config.clone()),
-                adapter.clone(),
-            ),
-            None => NoChainHealth::new(),
-        };
+        let chain_health: Arc<dyn TChainHealth> = ChainHealthBackoff::new(
+            ChainHealthBackoffConfig::new(self.config.chain_backoff_config.clone()),
+            commit_history.clone(),
+        );
         let pipeline_health = PipelineLatencyBasedBackpressure::new(
             PipelineBackpressureConfig::new(self.config.pipeline_backpressure_config.clone()),
             ordered_notifier.clone(),
@@ -647,15 +642,14 @@ impl DagBootstrapper {
     }
 
     fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
-        let (anchor_election, may_be_leader_reputation, commit_events) =
-            self.build_anchor_election();
+        let (anchor_election, commit_history, commit_events) = self.build_anchor_election();
 
-        let mut base_state = self.bootstrap_dag_store(
+        let base_state = self.bootstrap_dag_store(
             anchor_election.clone(),
+            commit_history,
             commit_events,
             self.onchain_config.dag_ordering_causal_history_window as u64,
         );
-        base_state.may_be_leader_reputation = may_be_leader_reputation;
 
         let (handler, fetch_service) = self.bootstrap_components(&base_state);
         (base_state, handler, fetch_service)

@@ -38,7 +38,7 @@ impl HealthBackoff {
             .unwrap_or((u64::MAX, u64::MAX));
         let voting_power_ratio = self.chain_health.voting_power_ratio(round);
 
-        let max_txns_per_round = vec![
+        let max_txns_per_round = [
             payload_config.max_sending_txns_per_round,
             chain_backoff.0,
             pipeline_backoff.0,
@@ -47,7 +47,7 @@ impl HealthBackoff {
         .min()
         .expect("must not be empty");
 
-        let max_size_per_round_bytes = vec![
+        let max_size_per_round_bytes = [
             payload_config.max_sending_size_per_round_bytes,
             chain_backoff.1,
             pipeline_backoff.1,
