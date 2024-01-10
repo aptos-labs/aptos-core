@@ -414,10 +414,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     async fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
         // Create end of stream notification
         let notification_id = self.notification_id_generator.next();
-        let data_notification = DataNotification {
-            notification_id,
-            data_payload: DataPayload::EndOfStream,
-        };
+        let data_notification = DataNotification::new(notification_id, DataPayload::EndOfStream);
 
         // Send the data notification
         info!(
