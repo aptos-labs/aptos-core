@@ -2,7 +2,7 @@
 use crate::{dkg_manager::agg_trx_producer::AggTranscriptProducer, network::IncomingRpcRequest};
 use aptos_channels::aptos_channel;
 use aptos_types::{
-    dkg::{DKGNode, DKGSessionState, DKGSkProvider, DKGStartEvent, DKGTrait},
+    dkg::{DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait},
     epoch_state::EpochState,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -14,8 +14,8 @@ use std::sync::Arc;
 pub mod agg_trx_producer;
 
 #[allow(dead_code)]
-pub struct DKGManager<DKG: DKGTrait, SkHolder: DKGSkProvider<DKG>> {
-    sk: SkHolder,
+pub struct DKGManager<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> {
+    private_params_provider: P,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
@@ -25,16 +25,16 @@ pub struct DKGManager<DKG: DKGTrait, SkHolder: DKGSkProvider<DKG>> {
 }
 
 #[allow(clippy::never_loop)]
-impl<DKG: DKGTrait, SkHolder: DKGSkProvider<DKG>> DKGManager<DKG, SkHolder> {
+impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     pub fn new(
-        sk: SkHolder,
+        private_params_provider: P,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
         vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
     ) -> Self {
         Self {
-            sk,
+            private_params_provider,
             my_addr,
             epoch_state,
             vtxn_pool_write_cli,

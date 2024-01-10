@@ -95,6 +95,6 @@ pub trait DKGTrait {
     );
 }
 
-pub trait DKGSkProvider<DKG: DKGTrait> {
-    fn dkg_sk(&self) -> &DKG::PrivateParams;
+pub trait DKGPrivateParamsProvider<DKG: DKGTrait> {
+    fn dkg_private_params(&self) -> &DKG::PrivateParams;
 }

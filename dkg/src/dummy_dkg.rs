@@ -2,7 +2,7 @@
 
 use aptos_config::config::IdentityBlob;
 use aptos_crypto::bls12381;
-use aptos_types::dkg::{DKGSkProvider, DKGTrait};
+use aptos_types::dkg::{DKGPrivateParamsProvider, DKGTrait};
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -37,8 +37,8 @@ impl DKGTrait for DummyDKG {
     }
 }
 
-impl DKGSkProvider<DummyDKG> for Arc<IdentityBlob> {
-    fn dkg_sk(&self) -> &<DummyDKG as DKGTrait>::PrivateParams {
+impl DKGPrivateParamsProvider<DummyDKG> for Arc<IdentityBlob> {
+    fn dkg_private_params(&self) -> &<DummyDKG as DKGTrait>::PrivateParams {
         self.consensus_private_key.as_ref().unwrap()
     }
 }
