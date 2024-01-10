@@ -1,8 +1,4 @@
 spec aptos_framework::aggregator_v2 {
-    use aptos_framework::aggregator;
-    spec module {
-        pragma verify = true;
-    }
 
     spec create_aggregator {
         // TODO: temporary mockup.
@@ -15,38 +11,36 @@ spec aptos_framework::aggregator_v2 {
         pragma opaque;
     }
 
-
-    spec try_add<IntElement>(aggregator: Aggregator<IntElement>, value: IntElement) {
+    spec try_add<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool {
         // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
-        ensures aggregator::spec_aggregator_get_val(aggregator) + value > aggregator::spec_get_limit(aggregator)
-            ==> result == false;
-        ensures aggregator::spec_aggregator_get_val(aggregator) + value > MAX_U128 ==> result == false;
-        ensures aggregator::spec_aggregator_get_val(aggregator) + value <= aggregator::spec_get_limit(aggregator)
-            && aggregator::spec_aggregator_get_val(aggregator) + value <= MAX_U128
-            ==> result == true && aggregator == aggregator::spec_aggregator_set_val(old(aggregator),
-            aggregator::spec_aggregator_get_val(old(aggregator)) + value);
-        ensures aggregator::spec_get_limit(aggregator) == aggregator::spec_get_limit(old(aggregator));
+        ensures spec_aggregator_get_val<IntElement>(aggregator) + value > spec_get_limit<IntElement>(aggregator) ==> result == false;
+        ensures spec_aggregator_get_val<IntElement>(aggregator) + value > MAX_U128 ==> result == false;
+        ensures spec_aggregator_get_val<IntElement>(aggregator) + value <= spec_get_limit<IntElement>(aggregator)
+            && spec_aggregator_get_val<IntElement>(aggregator) + value <= MAX_U128 ==> result == true
+            && aggregator == spec_aggregator_set_val<IntElement>(old(aggregator),
+            spec_aggregator_get_val<IntElement>(old(aggregator)) + value);
+        ensures spec_get_limit<IntElement>(aggregator) == spec_get_limit<IntElement>(old(aggregator));
     }
 
-    spec try_sub {
+    spec try_sub<IntElement>(aggregator: &mut Aggregator<IntElement>, value: IntElement): bool {
         // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
-        ensures aggregator::spec_aggregator_get_val(aggregator) < value ==> result == false;
-        ensures aggregator::spec_aggregator_get_val(aggregator) >= value ==> result == true &&
-            aggregator == aggregator::spec_aggregator_set_val(old(aggregator),
-                aggregator::spec_aggregator_get_val(old(aggregator)) - value);
-        ensures aggregator::spec_get_limit(aggregator) == aggregator::spec_get_limit(old(aggregator));
+        ensures spec_aggregator_get_val<IntElement>(aggregator) < value ==> result == false;
+        ensures spec_aggregator_get_val<IntElement>(aggregator) >= value ==> result == true &&
+            aggregator == spec_aggregator_set_val<IntElement>(old(aggregator),
+                spec_aggregator_get_val<IntElement>(old(aggregator)) - value);
+        ensures spec_get_limit<IntElement>(aggregator) == spec_get_limit<IntElement>(old(aggregator));
     }
 
-    spec read {
+    spec read<IntElement>(aggregator: &Aggregator<IntElement>): IntElement {
         // TODO: temporary mockup.
         pragma opaque;
         aborts_if false;
-        ensures result == aggregator::spec_read(aggregator);
-        ensures result <= aggregator::spec_get_limit(aggregator);
+        ensures result == spec_read(aggregator);
+        ensures result <= spec_get_limit(aggregator);
     }
 
     spec snapshot {
@@ -68,4 +62,9 @@ spec aptos_framework::aggregator_v2 {
         // TODO: temporary mockup.
         pragma opaque;
     }
+
+    spec native fun spec_aggregator_get_val<IntElement>(a: Aggregator<IntElement>): IntElement;
+    spec native fun spec_aggregator_set_val<IntElement>(a: Aggregator<IntElement>, v: IntElement): Aggregator<IntElement>;
+    spec native fun spec_get_limit<IntElement>(a: Aggregator<IntElement>): IntElement;
+    spec native fun spec_read<IntElement>(aggregator: Aggregator<IntElement>): IntElement;
 }
