@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::{agg_trx_producer::DummyAggTranscriptProducer, DKGManager},
+    dkg_manager::{agg_trx_producer::RealAggTranscriptProducer, DKGManager},
     dummy_dkg::DummyDKG,
-    network::{IncomingRpcRequest, NetworkReceivers},
+    network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
 };
 use anyhow::Result;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
@@ -16,6 +17,7 @@ use aptos_event_notifications::{
 };
 use aptos_logger::error;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{DKGStartEvent, DKGState},
@@ -28,7 +30,8 @@ use aptos_types::{
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::StreamExt;
 use futures_channel::oneshot;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+use tokio_retry::strategy::ExponentialBackoff;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
@@ -159,7 +162,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 ..
             } = payload.get::<DKGState>().unwrap_or_default();
 
-            let agg_trx_producer = DummyAggTranscriptProducer {}; //TODO: replace with real
+            let network_sender = self.create_network_sender();
+            let rb = ReliableBroadcast::new(
+                epoch_state.verifier.get_ordered_account_addresses(),
+                Arc::new(network_sender),
+                ExponentialBackoff::from_millis(5),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(1000),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+            );
+            let agg_trx_producer = RealAggTranscriptProducer::new(rb);
 
             let (dkg_start_event_tx, dkg_start_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
@@ -206,5 +218,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tx.send(ack_tx).unwrap();
             ack_rx.await.unwrap();
         }
+    }
+
+    fn create_network_sender(&self) -> NetworkSender {
+        NetworkSender::new(
+            self.my_addr,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+        )
     }
 }

@@ -24,27 +24,11 @@ pub trait AggTranscriptProducer<S: DKGTrait>: Send + Sync {
     ) -> AbortHandle;
 }
 
-//TODO(zjma): make it test-only once real producer is available.
-pub struct DummyAggTranscriptProducer {}
-
-impl<S: DKGTrait> AggTranscriptProducer<S> for DummyAggTranscriptProducer {
-    fn start_produce(
-        &self,
-        _epoch_state: Arc<EpochState>,
-        _dkg_config: S::PublicParams,
-        _agg_trx_tx: Option<Sender<(), S::Transcript>>,
-    ) -> AbortHandle {
-        let (abort_handle, _) = AbortHandle::new_pair();
-        abort_handle
-    }
-}
-
 /// The real implementation of `AggTranscriptProducer` that broadcasts a `NodeRequest`, collects and verifies nodes from network.
 pub struct RealAggTranscriptProducer {
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
 }
 
-#[allow(dead_code)]
 impl RealAggTranscriptProducer {
     pub fn new(reliable_broadcast: ReliableBroadcast<DKGMessage, ExponentialBackoff>) -> Self {
         Self {
@@ -53,16 +37,16 @@ impl RealAggTranscriptProducer {
     }
 }
 
-impl<S: DKGTrait + 'static> AggTranscriptProducer<S> for RealAggTranscriptProducer {
+impl<DKG: DKGTrait + 'static> AggTranscriptProducer<DKG> for RealAggTranscriptProducer {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
-        params: S::PublicParams,
-        agg_trx_tx: Option<Sender<(), S::Transcript>>,
+        params: DKG::PublicParams,
+        agg_trx_tx: Option<Sender<(), DKG::Transcript>>,
     ) -> AbortHandle {
         let rb = self.reliable_broadcast.clone();
         let req = DKGNodeRequest::new(epoch_state.epoch);
-        let agg_state = Arc::new(TranscriptAggregationState::<S>::new(params, epoch_state));
+        let agg_state = Arc::new(TranscriptAggregationState::<DKG>::new(params, epoch_state));
         let task = async move {
             let agg_trx = rb.broadcast(req, agg_state).await;
             if let Some(tx) = agg_trx_tx {
@@ -71,6 +55,22 @@ impl<S: DKGTrait + 'static> AggTranscriptProducer<S> for RealAggTranscriptProduc
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
+        abort_handle
+    }
+}
+
+#[cfg(test)]
+pub struct DummyAggTranscriptProducer {}
+
+#[cfg(test)]
+impl<DKG: DKGTrait> AggTranscriptProducer<DKG> for DummyAggTranscriptProducer {
+    fn start_produce(
+        &self,
+        _epoch_state: Arc<EpochState>,
+        _dkg_config: DKG::PublicParams,
+        _agg_trx_tx: Option<Sender<(), DKG::Transcript>>,
+    ) -> AbortHandle {
+        let (abort_handle, _) = AbortHandle::new_pair();
         abort_handle
     }
 }
