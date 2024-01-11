@@ -109,7 +109,8 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             sources: options.dependencies.clone(),
             address_map: addrs.clone(),
         }],
-        options.skip_attribute_checks,
+        // TODO: Enable attribute checks again once we have a general solution
+        true,
         if !options.skip_attribute_checks && options.known_attributes.is_empty() {
             KnownAttribute::get_all_attribute_names()
         } else {
