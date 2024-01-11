@@ -18,7 +18,7 @@ use aptos_types::{
     aggregate_signature::PartialSignatures, validator_verifier::ValidatorVerifier, PeerId,
 };
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::Duration,
 };
@@ -142,6 +142,7 @@ pub(crate) struct ProofCoordinator {
     digest_to_time: HashMap<HashValue, u64>,
     // to record the batch creation time
     timeouts: Timeouts<BatchInfo>,
+    committed_batches: HashSet<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
     broadcast_proofs: bool,
@@ -162,6 +163,7 @@ impl ProofCoordinator {
             digest_to_proof: HashMap::new(),
             digest_to_time: HashMap::new(),
             timeouts: Timeouts::new(),
+            committed_batches: HashSet::new(),
             batch_reader,
             batch_generator_cmd_tx,
             broadcast_proofs,
@@ -182,6 +184,12 @@ impl ProofCoordinator {
             .ok_or(SignedBatchInfoError::WrongAuthor)?;
         if batch_author != signed_batch_info.author() {
             return Err(SignedBatchInfoError::WrongAuthor);
+        }
+        if self
+            .committed_batches
+            .contains(signed_batch_info.batch_info())
+        {
+            return Err(SignedBatchInfoError::AlreadyCommitted);
         }
 
         self.timeouts.add(
@@ -241,6 +249,7 @@ impl ProofCoordinator {
     async fn expire(&mut self) {
         let mut batch_ids = vec![];
         for signed_batch_info_info in self.timeouts.expire() {
+            self.committed_batches.remove(&signed_batch_info_info);
             if let Some(state) = self.digest_to_proof.remove(signed_batch_info_info.digest()) {
                 if !state.completed {
                     batch_ids.push(signed_batch_info_info.batch_id());
@@ -302,6 +311,7 @@ impl ProofCoordinator {
                                         }
                                         Self::update_counters(incremental_proof);
                                         existing_proof.remove();
+                                        self.committed_batches.insert(batch);
                                     }
                                 }
                             }

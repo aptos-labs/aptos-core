@@ -238,6 +238,7 @@ pub enum SignedBatchInfoError {
     WrongInfo((u64, u64)),
     DuplicatedSignature,
     InvalidAuthor,
+    AlreadyCommitted,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
