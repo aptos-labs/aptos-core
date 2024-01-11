@@ -424,10 +424,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
     async fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
         // Create end of stream notification
         let notification_id = self.notification_id_generator.next();
-        let data_notification = DataNotification {
-            notification_id,
-            data_payload: DataPayload::EndOfStream,
-        };
+        let data_notification = DataNotification::new(notification_id, DataPayload::EndOfStream);
 
         // Send the data notification
         info!(
@@ -471,20 +468,13 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     Ok(client_response) => {
                         // Sanity check and process the response
                         if sanity_check_client_response_type(client_request, &client_response) {
-                            // The response is valid, send the data notification to the client
-                            let client_response_payload = client_response.payload.clone();
-                            self.send_data_notification_to_client(client_request, client_response)
-                                .await?;
-
                             // If the response wasn't enough to satisfy the original request (e.g.,
                             // it was truncated), missing data should be requested.
-                            match self
-                                .request_missing_data(client_request, &client_response_payload)
+                            let mut head_of_line_blocked = match self
+                                .request_missing_data(client_request, &client_response.payload)
                             {
                                 Ok(missing_data_requested) => {
-                                    if missing_data_requested {
-                                        break; // We're now head of line blocked on the missing data
-                                    }
+                                    missing_data_requested // We might be head of line blocked on the missing data
                                 },
                                 Err(error) => {
                                     warn!(LogSchema::new(LogEntry::ReceivedDataResponse)
@@ -494,8 +484,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                                         .message(
                                             "Failed to determine if missing data was requested!"
                                         ));
+                                    false // Continue to the next response
                                 },
-                            }
+                            };
 
                             // If the request was a subscription request and the subscription
                             // stream is lagging behind the data advertisements, the stream
@@ -503,11 +494,20 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                             if client_request.is_subscription_request() {
                                 if let Err(error) = self.check_subscription_stream_lag(
                                     &global_data_summary,
-                                    &client_response_payload,
+                                    &client_response.payload,
                                 ) {
                                     self.notify_new_data_request_error(client_request, error)?;
-                                    break; // We're now head of line blocked on the failed stream
+                                    head_of_line_blocked = true; // We're now head of line blocked on the failed stream
                                 }
+                            }
+
+                            // Send the data notification to the client
+                            self.send_data_notification_to_client(client_request, client_response)
+                                .await?;
+
+                            // If we're head of line blocked, we should stop processing responses
+                            if head_of_line_blocked {
+                                break;
                             }
                         } else {
                             // The sanity check failed
@@ -774,6 +774,13 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 self.notification_id_generator.clone(),
             )?
         {
+            // Update the metrics for the data notification send latency
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                data_client_request.get_label(),
+                response_context.creation_time,
+            );
+
             // Save the response context for this notification ID
             let notification_id = data_notification.notification_id;
             self.insert_notification_response_mapping(notification_id, response_context)?;
