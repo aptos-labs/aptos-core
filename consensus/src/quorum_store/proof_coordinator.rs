@@ -254,6 +254,13 @@ impl ProofCoordinator {
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
                 }
+                if !state.completed {
+                    info!(
+                        "QS: received expire for batch that did not complete: {}, self_voted: {}",
+                        signed_batch_info_info.digest(),
+                        state.self_voted
+                    );
+                }
                 Self::update_counters(&state);
             }
         }
@@ -289,7 +296,11 @@ impl ProofCoordinator {
                                 let digest = batch.digest();
                                 if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
                                     if batch == *existing_proof.get().batch_info() {
-                                        Self::update_counters(existing_proof.get());
+                                        let incremental_proof = existing_proof.get();
+                                        if !incremental_proof.completed {
+                                            info!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
+                                        }
+                                        Self::update_counters(incremental_proof);
                                         existing_proof.remove();
                                     }
                                 }
