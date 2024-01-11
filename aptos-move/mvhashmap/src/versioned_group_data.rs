@@ -355,6 +355,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                     })
             })
             .collect::<Result<Vec<_>, MVGroupError>>()?;
+        // TODO[agg_v2]: we should be able to propagate the error out?
         group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)
     }
 }
@@ -436,7 +437,7 @@ impl<
         key: &K,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Version, ValueWithLayout<V>), MVGroupError> {
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),

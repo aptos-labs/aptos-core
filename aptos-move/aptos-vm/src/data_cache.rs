@@ -10,8 +10,6 @@ use crate::{
         AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver,
     },
 };
-#[allow(unused_imports)]
-use anyhow::{bail, Error};
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
@@ -42,7 +40,6 @@ use move_core_types::{
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
-    vm_status::StatusCode,
 };
 use std::{
     cell::RefCell,

@@ -26,7 +26,9 @@ pub(crate) fn resource_state_key(
     address: AccountAddress,
     tag: StructTag,
 ) -> PartialVMResult<StateKey> {
-    let access_path = AccessPath::resource_access_path(address, tag)
-        .map_err(|e| PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR))?;
+    let access_path = AccessPath::resource_access_path(address, tag).map_err(|e| {
+        PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+            .with_message(format!("Failed to serialize struct tag: {}", e))
+    })?;
     Ok(StateKey::access_path(access_path))
 }

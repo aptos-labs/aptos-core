@@ -11,7 +11,6 @@ use crate::{
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
 };
-use anyhow::bail;
 use aptos_aggregator::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
     delta_change_set::serialize,
@@ -138,7 +137,7 @@ trait ResourceState<T: Transaction> {
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult;
 }
 
@@ -151,8 +150,8 @@ trait ResourceGroupState<T: Transaction> {
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult>;
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult>;
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
@@ -478,7 +477,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         &self,
         group_key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<GroupReadResult> {
+    ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
         if let Some(group_size) = self.captured_reads.borrow().group_size(group_key) {
@@ -509,11 +508,15 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
                 Err(TagSerializationError) => {
-                    bail!("Resource tag bcs serialization error");
+                    return Err(PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
+                        .with_message("Resource tag bcs serialization error".to_string()));
                 },
             }
         }
@@ -533,7 +536,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult {
         use MVDataError::*;
         use MVDataOutput::*;
@@ -661,8 +664,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult> {
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
         if let Some(DataRead::Versioned(_, v, layout)) =
@@ -683,6 +686,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     match value_with_layout {
                         ValueWithLayout::RawFromStorage(v) => {
+                            // TODO: we should halt if patch_base_value fails!
                             let patched_value = patch_base_value(v.as_ref(), maybe_layout)?;
                             self.versioned_map
                                 .group_data()
@@ -692,7 +696,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                                     patched_value,
                                     maybe_layout.cloned().map(Arc::new),
                                 );
-                            // Refetch in case a concurrent change went through.
+                            // Re-fetch in case a concurrent change went through.
                             continue;
                         },
                         ValueWithLayout::Exchanged(value, layout) => {
@@ -735,7 +739,11 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
+                        // TODO[agg_v2]: halting should be handled like ReadResult.
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
                 Err(TagSerializationError) => {
@@ -792,7 +800,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult {
         match self.unsync_map.fetch_data(key) {
             Some(mut value) => {
@@ -812,6 +820,9 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
                                 value = exchanged_value;
                             },
                             Err(_) => {
+                                // TODO[agg_v2]: `patch_base_value` already marks as incorrect use
+                                //               and logs an error! We need to make this uniform across
+                                //               resources and groups.
                                 *self.incorrect_use.borrow_mut() = true;
                                 error!("Unsync map couldn't patch base value");
                                 return ReadResult::HaltSpeculativeExecution(
@@ -859,8 +870,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult> {
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult> {
         match self
             .unsync_map
             .fetch_group_tagged_data(group_key, resource_tag)
@@ -868,6 +879,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
             Ok(mut value) => {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let ValueWithLayout::RawFromStorage(v) = value {
+                    // TODO[agg_v2]: Can patching fail here, and should we do something about it directly?
+                    //               Probably yes, e.g. fallback?
                     let patched_value = patch_base_value(v.as_ref(), maybe_layout)?;
                     let maybe_layout = maybe_layout.cloned().map(Arc::new);
                     self.unsync_map.update_tagged_base_value_with_layout(
@@ -1026,7 +1039,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         value: &T::Value,
         layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<T::Value> {
+    ) -> PartialVMResult<T::Value> {
         let maybe_patched = match (value.as_state_value(), layout) {
             (Some(state_value), Some(layout)) => {
                 let res = self.replace_values_with_identifiers(state_value, layout);
@@ -1041,7 +1054,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             err
                         );
                         self.mark_incorrect_use();
-                        return Err(err);
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(format!("{}", err)));
                     },
                 }
             },
@@ -1299,6 +1315,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
                             }
                         } else {
+                            // TODO: `get_group_size` can fail on group tag serialization. Do
+                            //       we want to propagate this error? This is somewhat an invariant
+                            //       violation so PanicError is also ok?
                             return Some(Err(code_invariant_error(format!(
                                 "Cannot compute metadata op size for the group read {:?}",
                                 key
@@ -1475,33 +1494,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
-            // FIXME
-            ViewState::Sync(state) => state
-                .read_group_size(group_key, self.txn_idx)
-                .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?,
-            ViewState::Unsync(state) => state
-                .unsync_map
-                .get_group_size(group_key)
-                .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?,
+            ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
+            ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
         };
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
             self.initialize_mvhashmap_base_group_contents(group_key)?;
 
-            group_read =
-                match &self.latest_view {
-                    // FIXME
-                    ViewState::Sync(state) => state
-                        .read_group_size(group_key, self.txn_idx)
-                        .map_err(|_| {
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        })?,
-                    ViewState::Unsync(state) => {
-                        state.unsync_map.get_group_size(group_key).map_err(|_| {
-                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        })?
-                    },
-                }
+            group_read = match &self.latest_view {
+                ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
+                ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
+            }
         };
 
         Ok(group_read.into_size())
@@ -1524,9 +1527,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                 resource_tag,
                 maybe_layout,
                 &|value, layout| self.patch_base_value(value, layout),
-            )
-            // FIXME
-            .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+            )?;
 
         if matches!(group_read, GroupReadResult::Uninitialized) {
             self.initialize_mvhashmap_base_group_contents(group_key)?;
@@ -1540,9 +1541,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
                     resource_tag,
                     maybe_layout,
                     &|value, layout| self.patch_base_value(value, layout),
-                )
-                // FIXME
-                .map_err(|_| PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))?;
+                )?;
         };
 
         Ok(group_read.into_value().0)
@@ -1647,7 +1646,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
         // from the state item by passing the right layout here. This can
         // be useful for cross-testing the old and the new flows.
         // self.get_resource_state_value(state_key, Some(&MoveTypeLayout::U128))
-        // TODO: Fix error propagation here.
         self.get_resource_state_value(state_key, None)
     }
 }

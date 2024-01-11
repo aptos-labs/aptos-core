@@ -92,6 +92,8 @@ pub trait TAggregatorV1View {
                     reason: DeltaApplicationFailureReason::Underflow,
                     ..
                 }) => subtraction_v1_error(e),
+                // TODO[agg_v2]: what if we return ExpectedOverflow or ExpectedUnderflow? This should not be
+                //               mapped to code_invariant_error.
                 _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
                     .into(),
             })
