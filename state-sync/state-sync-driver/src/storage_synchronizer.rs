@@ -41,6 +41,7 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
+    time::Instant,
 };
 use tokio::{
     runtime::{Handle, Runtime},
@@ -56,7 +57,7 @@ pub trait StorageSynchronizerInterface {
     /// Note: this assumes that the ledger infos have already been verified.
     async fn apply_transaction_outputs(
         &mut self,
-        notification_id: NotificationId,
+        notification_metadata: NotificationMetadata,
         output_list_with_proof: TransactionOutputListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -67,7 +68,7 @@ pub trait StorageSynchronizerInterface {
     /// Note: this assumes that the ledger infos have already been verified.
     async fn execute_transactions(
         &mut self,
-        notification_id: NotificationId,
+        notification_metadata: NotificationMetadata,
         transaction_list_with_proof: TransactionListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -107,6 +108,28 @@ pub trait StorageSynchronizerInterface {
     /// Finish the chunk executor at this round of state sync by releasing
     /// any in-memory resources to prevent memory leak.
     fn finish_chunk_executor(&self);
+}
+
+/// A simple struct that holds metadata related to data notifications
+#[derive(Copy, Clone, Debug)]
+pub struct NotificationMetadata {
+    pub creation_time: Instant,
+    pub notification_id: NotificationId,
+}
+
+impl NotificationMetadata {
+    pub fn new(creation_time: Instant, notification_id: NotificationId) -> Self {
+        Self {
+            creation_time,
+            notification_id,
+        }
+    }
+
+    #[cfg(test)]
+    /// Returns a new metadata struct for test purposes
+    pub fn new_for_test(notification_id: NotificationId) -> Self {
+        Self::new(Instant::now(), notification_id)
+    }
 }
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
@@ -299,13 +322,21 @@ impl<
 {
     async fn apply_transaction_outputs(
         &mut self,
-        notification_id: NotificationId,
+        notification_metadata: NotificationMetadata,
         output_list_with_proof: TransactionOutputListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
+        // Update the metrics for the data notification apply latency
+        metrics::observe_duration(
+            &metrics::DATA_NOTIFICATION_LATENCIES,
+            metrics::NOTIFICATION_CREATE_TO_APPLY,
+            notification_metadata.creation_time,
+        );
+
+        // Notify the executor of the new transaction output chunk
         let storage_data_chunk = StorageDataChunk::TransactionOutputs(
-            notification_id,
+            notification_metadata,
             output_list_with_proof,
             target_ledger_info,
             end_of_epoch_ledger_info,
@@ -315,13 +346,21 @@ impl<
 
     async fn execute_transactions(
         &mut self,
-        notification_id: NotificationId,
+        notification_metadata: NotificationMetadata,
         transaction_list_with_proof: TransactionListWithProof,
         target_ledger_info: LedgerInfoWithSignatures,
         end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     ) -> Result<(), Error> {
+        // Update the metrics for the data notification execute latency
+        metrics::observe_duration(
+            &metrics::DATA_NOTIFICATION_LATENCIES,
+            metrics::NOTIFICATION_CREATE_TO_EXECUTE,
+            notification_metadata.creation_time,
+        );
+
+        // Notify the executor of the new transaction chunk
         let storage_data_chunk = StorageDataChunk::Transactions(
-            notification_id,
+            notification_metadata,
             transaction_list_with_proof,
             target_ledger_info,
             end_of_epoch_ledger_info,
@@ -413,13 +452,13 @@ pub struct StorageSynchronizerHandles {
 enum StorageDataChunk {
     States(NotificationId, StateValueChunkWithProof),
     Transactions(
-        NotificationId,
+        NotificationMetadata,
         TransactionListWithProof,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
     ),
     TransactionOutputs(
-        NotificationId,
+        NotificationMetadata,
         TransactionOutputListWithProof,
         LedgerInfoWithSignatures,
         Option<LedgerInfoWithSignatures>,
@@ -431,7 +470,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     mut executor_listener: mpsc::Receiver<StorageDataChunk>,
-    mut ledger_updater_notifier: mpsc::Sender<NotificationId>,
+    mut ledger_updater_notifier: mpsc::Sender<NotificationMetadata>,
     pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
@@ -439,7 +478,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
     let executor = async move {
         while let Some(storage_data_chunk) = executor_listener.next().await {
             // Execute/apply the storage data chunk
-            let (notification_id, result, executed_chunk) = match storage_data_chunk {
+            let (notification_metadata, result, executed_chunk) = match storage_data_chunk {
                 StorageDataChunk::Transactions(
                     notification_id,
                     transactions_with_proof,
@@ -538,12 +577,20 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
             // Notify the ledger updater of the new executed/applied chunks
             match result {
                 Ok(()) => {
-                    if let Err(error) = ledger_updater_notifier.send(notification_id).await {
+                    // Update the metrics for the data notification ledger update latency
+                    metrics::observe_duration(
+                        &metrics::DATA_NOTIFICATION_LATENCIES,
+                        metrics::NOTIFICATION_CREATE_TO_UPDATE_LEDGER,
+                        notification_metadata.creation_time,
+                    );
+
+                    // Notify the ledger updater
+                    if let Err(error) = ledger_updater_notifier.send(notification_metadata).await {
                         let error =
                             format!("Failed to notify the ledger updater! Error: {:?}", error);
                         send_storage_synchronizer_error(
                             error_notification_sender.clone(),
-                            notification_id,
+                            notification_metadata.notification_id,
                             error,
                         )
                         .await;
@@ -558,7 +605,7 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     };
                     send_storage_synchronizer_error(
                         error_notification_sender.clone(),
-                        notification_id,
+                        notification_metadata.notification_id,
                         error,
                     )
                     .await;
@@ -576,14 +623,14 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
 fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
-    mut ledger_updater_listener: mpsc::Receiver<NotificationId>,
-    mut committer_notifier: mpsc::Sender<NotificationId>,
+    mut ledger_updater_listener: mpsc::Receiver<NotificationMetadata>,
+    mut committer_notifier: mpsc::Sender<NotificationMetadata>,
     pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a ledger updater
     let ledger_updater = async move {
-        while let Some(notification_id) = ledger_updater_listener.next().await {
+        while let Some(notification_metadata) = ledger_updater_listener.next().await {
             // Update the storage ledger
             let _timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
@@ -598,16 +645,23 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     debug!(
                         LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
                             "Updated the ledger for notification ID {:?}!",
-                            notification_id,
+                            notification_metadata.notification_id,
                         ))
                     );
 
+                    // Update the metrics for the data notification commit latency
+                    metrics::observe_duration(
+                        &metrics::DATA_NOTIFICATION_LATENCIES,
+                        metrics::NOTIFICATION_CREATE_TO_COMMIT,
+                        notification_metadata.creation_time,
+                    );
+
                     // Notify the committer of the update
-                    if let Err(error) = committer_notifier.send(notification_id).await {
+                    if let Err(error) = committer_notifier.send(notification_metadata).await {
                         let error = format!("Failed to notify the committer! Error: {:?}", error);
                         send_storage_synchronizer_error(
                             error_notification_sender.clone(),
-                            notification_id,
+                            notification_metadata.notification_id,
                             error,
                         )
                         .await;
@@ -618,7 +672,7 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     let error = format!("Failed to update the ledger! Error: {:?}", error);
                     send_storage_synchronizer_error(
                         error_notification_sender.clone(),
-                        notification_id,
+                        notification_metadata.notification_id,
                         error,
                     )
                     .await;
@@ -636,14 +690,14 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
 fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
-    mut committer_listener: mpsc::Receiver<NotificationId>,
+    mut committer_listener: mpsc::Receiver<NotificationMetadata>,
     mut commit_post_processor_notifier: mpsc::Sender<ChunkCommitNotification>,
     pending_data_chunks: Arc<AtomicU64>,
     runtime: Option<Handle>,
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
-        while let Some(notification_id) = committer_listener.next().await {
+        while let Some(notification_metadata) = committer_listener.next().await {
             // Commit the executed chunk
             let _timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
@@ -670,6 +724,13 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         utils::update_new_epoch_metrics();
                     }
 
+                    // Update the metrics for the data notification commit post-process latency
+                    metrics::observe_duration(
+                        &metrics::DATA_NOTIFICATION_LATENCIES,
+                        metrics::NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS,
+                        notification_metadata.creation_time,
+                    );
+
                     // Notify the commit post-processor of the committed chunk
                     if let Err(error) = commit_post_processor_notifier.send(notification).await {
                         let error = format!(
@@ -678,7 +739,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         );
                         send_storage_synchronizer_error(
                             error_notification_sender.clone(),
-                            notification_id,
+                            notification_metadata.notification_id,
                             error,
                         )
                         .await;
@@ -689,7 +750,7 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     let error = format!("Failed to commit executed chunk! Error: {:?}", error);
                     send_storage_synchronizer_error(
                         error_notification_sender.clone(),
-                        notification_id,
+                        notification_metadata.notification_id,
                         error,
                     )
                     .await;
