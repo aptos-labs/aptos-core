@@ -1180,6 +1180,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
+            let max_batch_expiry_gap_usecs =
+                self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             self.bounded_executor
                 .spawn(async move {
@@ -1191,6 +1193,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             quorum_store_enabled,
                             peer_id == my_peer_id,
                             max_num_batches,
+                            max_batch_expiry_gap_usecs,
                         )
                     ) {
                         Ok(verified_event) => {

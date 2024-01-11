@@ -79,6 +79,7 @@ impl UnverifiedEvent {
         _quorum_store_enabled: bool,
         _self_message: bool,
         _max_num_batches: usize,
+        _max_batch_expiry_gap_usecs: u64,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
@@ -104,7 +105,12 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::SignedBatchInfo(sd) => {
                 // if !self_message {
-                //     sd.verify(peer_id, max_num_batches, validator)?;
+                //     sd.verify(
+                //         peer_id,
+                //         max_num_batches,
+                //         max_batch_expiry_gap_usecs,
+                //         validator,
+                //     )?;
                 // }
                 VerifiedEvent::SignedBatchInfo(sd)
             },
