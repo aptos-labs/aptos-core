@@ -6,8 +6,8 @@
 use crate::{
     gas::get_gas_config_from_storage,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
-        AsResourceGroupView, ResourceGroupResolver,
+        get_max_binary_format_version, get_max_identifier_size, resource_state_key,
+        AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver,
     },
 };
 #[allow(unused_imports)]
@@ -144,13 +144,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size + group_size as usize))
         } else {
-            let access_path = AccessPath::resource_access_path(*address, struct_tag.clone())
-                // TODO: Check the status codem because the error is ude to BCS failure.
-                .map_err(|_| PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES))?;
-
+            let state_key = resource_state_key(*address, struct_tag.clone())?;
             let buf = self
                 .executor_view
-                .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)?;
+                .get_resource_bytes(&state_key, maybe_layout)?;
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size))
         }

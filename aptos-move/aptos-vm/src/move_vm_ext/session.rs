@@ -36,6 +36,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use crate::move_vm_ext::resource_state_key;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
@@ -405,10 +406,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_and_layout_op) in resources {
-                let state_key = StateKey::access_path(
-                    AccessPath::resource_access_path(addr, struct_tag)
-                        .unwrap_or_else(|_| AccessPath::undefined()),
-                );
+                let state_key = resource_state_key(addr, struct_tag)?;
                 let op = woc.convert_resource(
                     &state_key,
                     blob_and_layout_op,
