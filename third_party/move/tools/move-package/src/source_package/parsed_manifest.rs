@@ -5,7 +5,7 @@
 use crate::Architecture;
 use move_core_types::account_address::AccountAddress;
 use move_symbol_pool::symbol::Symbol;
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{collections::BTreeMap, fmt, fmt::Debug, path::PathBuf};
 
 pub type NamedAddress = Symbol;
 pub type PackageName = Symbol;
@@ -28,6 +28,28 @@ pub struct SourceManifest {
     pub dev_dependencies: Dependencies,
 }
 
+impl fmt::Display for SourceManifest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "[package]")?;
+        writeln!(f, "{}", self.package)?;
+        writeln!(f, "[addresses]")?;
+        if let Some(address_map) = &self.addresses {
+            for (named, addr_opt) in address_map.iter() {
+                if let Some(addr) = addr_opt {
+                    writeln!(f, "{} = \"{}\"", named.as_str(), addr)?;
+                } else {
+                    writeln!(f, "{} = \"_\"", named.as_str())?;
+                }
+            }
+        }
+        writeln!(f, "[dependencies]")?;
+        for (package_name, dep) in self.dependencies.clone().into_iter() {
+            writeln!(f, "{} = {{ local = {} }}", package_name, dep)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PackageInfo {
     pub name: PackageName,
@@ -35,6 +57,18 @@ pub struct PackageInfo {
     pub authors: Vec<Symbol>,
     pub license: Option<Symbol>,
     pub custom_properties: BTreeMap<Symbol, String>,
+}
+
+impl fmt::Display for PackageInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "name = \"{}\"", self.name.as_str())?;
+        writeln!(
+            f,
+            "version = \"{}.{}.{}\"",
+            self.version.0, self.version.1, self.version.2
+        )?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -45,6 +79,13 @@ pub struct Dependency {
     pub digest: Option<PackageDigest>,
     pub git_info: Option<GitInfo>,
     pub node_info: Option<CustomDepInfo>,
+}
+
+impl fmt::Display for Dependency {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.local.as_os_str())?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

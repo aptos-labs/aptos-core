@@ -20,8 +20,8 @@ use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::{
-        ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
-        ProposerElectionType,
+        ConsensusConfigV1, ConsensusConfigV1Ext, LeaderReputationType, OnChainConsensusConfig,
+        ProposerAndVoterConfig, ProposerElectionType,
     },
     PeerId,
 };
@@ -777,8 +777,9 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
             let consensus_config = match genesis_config.consensus_config.clone() {
                 OnChainConsensusConfig::V1(consensus_config) => consensus_config,
                 OnChainConsensusConfig::V2(consensus_config) => consensus_config,
+                OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main, .. }) => main,
                 config => unimplemented!(
-                    "This test requires a V1 or V2 consensus config, but got: {:?}",
+                    "This test requires a V1/V2/V3 consensus config, but got: {:?}",
                     config
                 ),
             };

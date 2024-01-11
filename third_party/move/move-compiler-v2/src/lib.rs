@@ -5,11 +5,15 @@
 mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
+pub mod function_checker;
+pub mod inliner;
 mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    livevar_analysis_processor::LiveVarAnalysisProcessor, visibility_checker::VisibilityChecker,
+    ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
+    livevar_analysis_processor::LiveVarAnalysisProcessor,
+    reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -44,14 +48,31 @@ pub fn run_move_compiler(
     options: Options,
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
     // Run context check.
-    let env = run_checker(options.clone())?;
+    let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
+
+    function_checker::check_for_function_typed_parameters(&mut env);
+    function_checker::check_access_and_use(&mut env);
+    check_errors(&env, error_writer, "checking errors")?;
+
+    if options.debug {
+        eprintln!("After error check, GlobalEnv={}", env.dump_env());
+    }
+
+    // Run inlining.
+    inliner::run_inlining(&mut env);
+    check_errors(&env, error_writer, "inlining")?;
+
+    if options.debug {
+        eprintln!("After inlining, GlobalEnv={}", env.dump_env());
+    }
+
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
-    if options.dump_bytecode {
+    if options.debug || options.dump_bytecode {
         // Dump bytecode to files, using a basename for the individual sources derived
         // from the first input file.
         let dump_base_name = options
@@ -63,7 +84,7 @@ pub fn run_move_compiler(
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
             .unwrap_or_else(|| "dump".to_owned());
-        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, false)
+        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, options.debug)
     } else {
         pipeline.run(&env, &mut targets)
     }
@@ -123,10 +144,10 @@ pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
     }
     while let Some(id) = todo.pop_first() {
         done.insert(id);
+        let func_env = env.get_function(id);
         let data = bytecode_generator::generate_bytecode(env, id);
         targets.insert_target_data(&id, FunctionVariant::Baseline, data);
-        for callee in env
-            .get_function(id)
+        for callee in func_env
             .get_called_functions()
             .expect("called functions available")
         {
@@ -143,10 +164,26 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 }
 
 /// Returns the bytecode processing pipeline.
-pub fn bytecode_pipeline(_env: &GlobalEnv) -> FunctionTargetPipeline {
+pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
+    let options = env.get_extension::<Options>().expect("options");
+    let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
-    pipeline.add_processor(Box::new(VisibilityChecker()));
+    if safety_on {
+        pipeline.add_processor(Box::new(VisibilityChecker()));
+    }
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: true,
+    }));
+    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    pipeline.add_processor(Box::new(ExplicitDrop {}));
+    if safety_on {
+        // Ability checker is functionally not relevant so can be completely skipped if safety is off
+        pipeline.add_processor(Box::new(AbilityChecker {}));
+    }
+    // Run live var again because it is invalidated by ExplicitDrop but needed by file format generator
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
     pipeline
 }
 

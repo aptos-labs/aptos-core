@@ -128,7 +128,7 @@ impl MockTransactionAccumulator {
             let mut left_subtrees = self.frozen_subtrees(left);
             let right_subtrees = maybe_right
                 .map(|right| self.frozen_subtrees(right))
-                .unwrap_or_else(Vec::new);
+                .unwrap_or_default();
             left_subtrees.extend(right_subtrees);
             left_subtrees
         }
@@ -225,7 +225,7 @@ impl MockTransactionAccumulator {
                 let mut left_subtrees = self.frozen_subtree_diff(Some(old_left), new_left, 0);
                 let right_subtrees = maybe_new_right
                     .map(|new_right| self.frozen_subtree_diff(maybe_old_right, new_right, 0))
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
                 left_subtrees.extend(right_subtrees);
                 left_subtrees
             }

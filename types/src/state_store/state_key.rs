@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(clippy::non_canonical_partial_ord_impl)]
+
 use crate::{access_path::AccessPath, state_store::table::TableHandle};
 use anyhow::Result;
 use aptos_crypto::{

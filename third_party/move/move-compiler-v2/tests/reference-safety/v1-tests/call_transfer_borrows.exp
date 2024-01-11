@@ -1,0 +1,21 @@
+
+Diagnostics:
+error: cannot dereference local `x_ref` which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/call_transfer_borrows.move:16:9
+   │
+15 │         let r = take_imm_mut_give_mut(x_ref, y_ref);
+   │                 ----------------------------------- previous mutable call result
+16 │         *x_ref;
+   │         ^^^^^^ dereferenced here
+
+error: cannot move local `x` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/call_transfer_borrows.move:17:9
+   │
+13 │         let x_ref = &x;
+   │                     -- previous local borrow
+14 │         let y_ref = &mut y;
+15 │         let r = take_imm_mut_give_mut(x_ref, y_ref);
+   │                 ----------------------------------- used by mutable call result
+16 │         *x_ref;
+17 │         move x; // error in v2 (bug in v1)?
+   │         ^^^^^^ moved here

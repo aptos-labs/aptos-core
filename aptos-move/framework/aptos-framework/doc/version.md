@@ -1,5 +1,5 @@
 
-<a name="0x1_version"></a>
+<a id="0x1_version"></a>
 
 # Module `0x1::version`
 
@@ -13,6 +13,8 @@ Maintains the version number for the blockchain.
 -  [Function `set_version`](#0x1_version_set_version)
 -  [Function `initialize_for_test`](#0x1_version_initialize_for_test)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set_version`](#@Specification_1_set_version)
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
@@ -26,7 +28,7 @@ Maintains the version number for the blockchain.
 
 
 
-<a name="0x1_version_Version"></a>
+<a id="0x1_version_Version"></a>
 
 ## Resource `Version`
 
@@ -53,7 +55,7 @@ Maintains the version number for the blockchain.
 
 </details>
 
-<a name="0x1_version_SetVersionCapability"></a>
+<a id="0x1_version_SetVersionCapability"></a>
 
 ## Resource `SetVersionCapability`
 
@@ -80,12 +82,12 @@ Maintains the version number for the blockchain.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_version_EINVALID_MAJOR_VERSION_NUMBER"></a>
+<a id="0x1_version_EINVALID_MAJOR_VERSION_NUMBER"></a>
 
 Specified major version number must be greater than current version number.
 
@@ -95,7 +97,7 @@ Specified major version number must be greater than current version number.
 
 
 
-<a name="0x1_version_ENOT_AUTHORIZED"></a>
+<a id="0x1_version_ENOT_AUTHORIZED"></a>
 
 Account is not authorized to make this change.
 
@@ -105,7 +107,7 @@ Account is not authorized to make this change.
 
 
 
-<a name="0x1_version_initialize"></a>
+<a id="0x1_version_initialize"></a>
 
 ## Function `initialize`
 
@@ -136,7 +138,7 @@ Publishes the Version config.
 
 </details>
 
-<a name="0x1_version_set_version"></a>
+<a id="0x1_version_set_version"></a>
 
 ## Function `set_version`
 
@@ -171,7 +173,7 @@ This can be called by on chain governance.
 
 </details>
 
-<a name="0x1_version_initialize_for_test"></a>
+<a id="0x1_version_initialize_for_test"></a>
 
 ## Function `initialize_for_test`
 
@@ -198,10 +200,46 @@ to update the version.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>During genesis, the Version resource should be initialized with the initial version and stored along with its capability under the aptos framework account.</td>
+<td>Medium</td>
+<td>The initialize function ensures that the signer is the aptos framework account and stores the Version and SetVersionCapability resources in it.</td>
+<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The version should be updateable after initialization, but only by the Aptos framework account and with an increasing version number.</td>
+<td>Medium</td>
+<td>The version number for the blockchain should be updatable whenever necessary. This functionality is provided by the set_version function which ensures that the new version is greater than the previous one.</td>
+<td>Formally verified via <a href="#high-level-req-2">set_version</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -210,7 +248,7 @@ to update the version.
 
 
 
-<a name="@Specification_1_initialize"></a>
+<a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
 
@@ -222,16 +260,19 @@ to update the version.
 Abort if resource already exists in <code>@aptos_framwork</code> when initializing.
 
 
-<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework) != @aptos_framework;
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework) != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);
 <b>aborts_if</b> <b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);
 <b>ensures</b> <b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) == <a href="version.md#0x1_version_Version">Version</a> { major: initial_version };
+<b>ensures</b> <b>global</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(@aptos_framework) == <a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a> {};
 </code></pre>
 
 
 
-<a name="@Specification_1_set_version"></a>
+<a id="@Specification_1_set_version"></a>
 
 ### Function `set_version`
 
@@ -252,13 +293,14 @@ Abort if resource already exists in <code>@aptos_framwork</code> when initializi
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>));
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework);
 <b>let</b> old_major = <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> !(old_major &lt; major);
 <b>ensures</b> <b>global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major == major;
 </code></pre>
 
 
 
-<a name="@Specification_1_initialize_for_test"></a>
+<a id="@Specification_1_initialize_for_test"></a>
 
 ### Function `initialize_for_test`
 

@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot mutably borrow local `v` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:13:17
+   │
+12 │         let x = &mut v;
+   │                 ------ previous mutable local borrow
+13 │         let y = &mut v; // error in v2
+   │                 ^^^^^^ mutable borrow attempted here
+
+error: cannot mutably borrow local `v` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:18:17
+   │
+17 │         let x = id_mut(&mut v);
+   │                        ------ previous mutable local borrow
+18 │         let y = &mut v; // error in v2
+   │                 ^^^^^^ mutable borrow attempted here
+
+error: cannot mutably borrow local `v` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:23:17
+   │
+22 │         let x = &v;
+   │                 -- previous local borrow
+23 │         let y = &mut v;
+   │                 ^^^^^^ mutable borrow attempted here

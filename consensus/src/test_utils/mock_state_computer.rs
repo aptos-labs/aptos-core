@@ -4,9 +4,9 @@
 
 use crate::{
     error::StateSyncError,
-    experimental::buffer_manager::OrderedBlocks,
     payload_manager::PayloadManager,
-    state_computer::StateComputeResultFut,
+    pipeline::buffer_manager::OrderedBlocks,
+    state_computer::{PipelineExecutionResult, StateComputeResultFut},
     state_replication::{StateComputer, StateComputerCommitCallBackType},
     test_utils::mock_storage::MockStorage,
     transaction_deduper::TransactionDeduper,
@@ -86,12 +86,12 @@ impl StateComputer for MockStateComputer {
         &self,
         block: &Block,
         _parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
+    ) -> ExecutorResult<PipelineExecutionResult> {
         self.block_cache.lock().insert(
             block.id(),
             block.payload().unwrap_or(&Payload::empty(false)).clone(),
         );
-        let result = StateComputeResult::new_dummy();
+        let result = PipelineExecutionResult::new_dummy();
         Ok(result)
     }
 
@@ -157,8 +157,8 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
-    ) -> ExecutorResult<StateComputeResult> {
-        Ok(StateComputeResult::new_dummy())
+    ) -> ExecutorResult<PipelineExecutionResult> {
+        Ok(PipelineExecutionResult::new_dummy())
     }
 
     async fn commit(
@@ -221,7 +221,8 @@ impl StateComputer for RandomComputeResultStateComputer {
                 self.random_compute_result_root_hash,
             ))
         };
-        Box::pin(async move { res })
+        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(vec![], res));
+        Box::pin(async move { pipeline_execution_res })
     }
 
     async fn commit(

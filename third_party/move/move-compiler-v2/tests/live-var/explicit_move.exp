@@ -1,0 +1,122 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::f1_fail() {
+     var $t0: m::R
+     var $t1: m::R
+     var $t2: u64
+     var $t3: m::R
+     var $t4: m::R
+  0: $t2 := 0
+  1: $t1 := pack m::R($t2)
+  2: $t0 := infer($t1)
+  3: $t4 := move($t0)
+  4: $t3 := infer($t4)
+  5: m::some($t3)
+  6: m::some($t0)
+  7: return ()
+}
+
+
+[variant baseline]
+fun m::f1_ok() {
+     var $t0: m::R
+     var $t1: m::R
+     var $t2: u64
+     var $t3: m::R
+     var $t4: m::R
+  0: $t2 := 0
+  1: $t1 := pack m::R($t2)
+  2: $t0 := infer($t1)
+  3: $t4 := move($t0)
+  4: $t3 := infer($t4)
+  5: m::some($t3)
+  6: m::some($t3)
+  7: return ()
+}
+
+
+[variant baseline]
+fun m::some($t0: m::R) {
+  0: return ()
+}
+
+
+Diagnostics:
+error: cannot copy local `x` implicitly
+   ┌─ tests/live-var/explicit_move.move:12:9
+   │
+12 │         some(x);
+   │         ^^^^^^^
+
+error: cannot move local `r` since it is used later
+   ┌─ tests/live-var/explicit_move.move:18:17
+   │
+18 │         let x = move r; // expected to fail
+   │                 ^^^^^^ attempted to move here
+19 │         some(x);
+20 │         some(r);
+   │         ------- used here
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f1_fail() {
+     var $t0: m::R
+     var $t1: m::R
+     var $t2: u64
+     var $t3: m::R
+     var $t4: m::R
+     # live vars:
+  0: $t2 := 0
+     # live vars: $t2
+  1: $t1 := pack m::R($t2)
+     # live vars: $t1
+  2: $t0 := move($t1)
+     # live vars: $t0
+  3: $t4 := move($t0)
+     # live vars: $t0, $t4
+  4: $t3 := move($t4)
+     # live vars: $t0, $t3
+  5: m::some($t3)
+     # live vars: $t0
+  6: m::some($t0)
+     # live vars:
+  7: return ()
+}
+
+
+[variant baseline]
+fun m::f1_ok() {
+     var $t0: m::R
+     var $t1: m::R
+     var $t2: u64
+     var $t3: m::R
+     var $t4: m::R
+     var $t5: m::R
+     # live vars:
+  0: $t2 := 0
+     # live vars: $t2
+  1: $t1 := pack m::R($t2)
+     # live vars: $t1
+  2: $t0 := move($t1)
+     # live vars: $t0
+  3: $t4 := move($t0)
+     # live vars: $t4
+  4: $t3 := move($t4)
+     # live vars: $t3
+  5: $t5 := copy($t3)
+     # live vars: $t3, $t5
+  6: m::some($t5)
+     # live vars: $t3
+  7: m::some($t3)
+     # live vars:
+  8: return ()
+}
+
+
+[variant baseline]
+fun m::some($t0: m::R) {
+     # live vars:
+  0: return ()
+}

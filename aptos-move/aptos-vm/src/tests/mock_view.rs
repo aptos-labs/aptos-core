@@ -5,7 +5,7 @@ use aptos_aggregator::types::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use bytes::Bytes;
-use move_binary_format::errors::{Location, PartialVMError};
+use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
@@ -131,19 +131,20 @@ macro_rules! patch_blob_from_db {
             .ok_or_else(|| {
                 PartialVMError::new(StatusCode::VALUE_DESERIALIZATION_ERROR)
                     .with_message("Failed to deserialize and replace with identifiers".to_string())
-                    .finish(Location::Undefined)
             })
     };
 }
 
 impl ResourceResolver for MockStateView {
+    type Error = PartialVMError;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         typ: &StructTag,
         _metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
         let ap = AccessPath::resource_access_path(*address, typ.clone())
             .expect("Access path for resource have to be valid");
         let state_key = StateKey::access_path(ap);
@@ -176,7 +177,7 @@ impl TableResolver for MockStateView {
         handle: &TableHandle,
         key: &[u8],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> Result<Option<Bytes>, PartialVMError> {
         let state_key = StateKey::table_item((*handle).into(), key.to_vec());
         Ok(match self.in_memory_cache.get(&state_key) {
             Some(blob) => Some(blob.clone()),

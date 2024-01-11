@@ -1,5 +1,5 @@
 
-<a name="0x1_ristretto255_bulletproofs"></a>
+<a id="0x1_ristretto255_bulletproofs"></a>
 
 # Module `0x1::ristretto255_bulletproofs`
 
@@ -30,7 +30,7 @@ $n \in \{8, 16, 32, 64\}$ for the number of bits.
 
 
 
-<a name="0x1_ristretto255_bulletproofs_RangeProof"></a>
+<a id="0x1_ristretto255_bulletproofs_RangeProof"></a>
 
 ## Struct `RangeProof`
 
@@ -59,12 +59,12 @@ Represents a zero-knowledge range proof that a value committed inside a Pedersen
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE"></a>
+<a id="0x1_ristretto255_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE"></a>
 
 The native functions have not been rolled out yet.
 
@@ -74,7 +74,7 @@ The native functions have not been rolled out yet.
 
 
 
-<a name="0x1_ristretto255_bulletproofs_E_DESERIALIZE_RANGE_PROOF"></a>
+<a id="0x1_ristretto255_bulletproofs_E_DESERIALIZE_RANGE_PROOF"></a>
 
 There was an error deserializing the range proof.
 
@@ -84,7 +84,7 @@ There was an error deserializing the range proof.
 
 
 
-<a name="0x1_ristretto255_bulletproofs_E_RANGE_NOT_SUPPORTED"></a>
+<a id="0x1_ristretto255_bulletproofs_E_RANGE_NOT_SUPPORTED"></a>
 
 The range proof system only supports proving ranges of type $[0, 2^b)$ where $b \in \{8, 16, 32, 64\}$.
 
@@ -94,7 +94,7 @@ The range proof system only supports proving ranges of type $[0, 2^b)$ where $b 
 
 
 
-<a name="0x1_ristretto255_bulletproofs_E_VALUE_OUTSIDE_RANGE"></a>
+<a id="0x1_ristretto255_bulletproofs_E_VALUE_OUTSIDE_RANGE"></a>
 
 The committed value given to the prover is too large.
 
@@ -104,7 +104,7 @@ The committed value given to the prover is too large.
 
 
 
-<a name="0x1_ristretto255_bulletproofs_MAX_RANGE_BITS"></a>
+<a id="0x1_ristretto255_bulletproofs_MAX_RANGE_BITS"></a>
 
 The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
 
@@ -114,7 +114,7 @@ The maximum range supported by the Bulletproofs library is $[0, 2^{64})$.
 
 
 
-<a name="0x1_ristretto255_bulletproofs_get_max_range_bits"></a>
+<a id="0x1_ristretto255_bulletproofs_get_max_range_bits"></a>
 
 ## Function `get_max_range_bits`
 
@@ -139,7 +139,7 @@ Returns the maximum # of bits that the range proof system can verify proofs for.
 
 </details>
 
-<a name="0x1_ristretto255_bulletproofs_range_proof_from_bytes"></a>
+<a id="0x1_ristretto255_bulletproofs_range_proof_from_bytes"></a>
 
 ## Function `range_proof_from_bytes`
 
@@ -167,7 +167,7 @@ the zkcrypto's <code>bulletproofs</code> library (https://docs.rs/bulletproofs/4
 
 </details>
 
-<a name="0x1_ristretto255_bulletproofs_range_proof_to_bytes"></a>
+<a id="0x1_ristretto255_bulletproofs_range_proof_to_bytes"></a>
 
 ## Function `range_proof_to_bytes`
 
@@ -192,7 +192,7 @@ Returns the byte-representation of a range proof.
 
 </details>
 
-<a name="0x1_ristretto255_bulletproofs_verify_range_proof_pedersen"></a>
+<a id="0x1_ristretto255_bulletproofs_verify_range_proof_pedersen"></a>
 
 ## Function `verify_range_proof_pedersen`
 
@@ -231,7 +231,7 @@ WARNING: The DST check is VERY important for security as it prevents proofs comp
 
 </details>
 
-<a name="0x1_ristretto255_bulletproofs_verify_range_proof"></a>
+<a id="0x1_ristretto255_bulletproofs_verify_range_proof"></a>
 
 ## Function `verify_range_proof`
 
@@ -267,7 +267,7 @@ for some randomness <code>r</code>) satisfies <code>v</code> in <code>[0, 2^num_
 
 </details>
 
-<a name="0x1_ristretto255_bulletproofs_verify_range_proof_internal"></a>
+<a id="0x1_ristretto255_bulletproofs_verify_range_proof_internal"></a>
 
 ## Function `verify_range_proof_internal`
 
@@ -298,12 +298,12 @@ Aborts with <code><a href="../../move-stdlib/doc/error.md#0x1_error_invalid_argu
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_verify_range_proof_internal"></a>
+<a id="@Specification_1_verify_range_proof_internal"></a>
 
 ### Function `verify_range_proof_internal`
 

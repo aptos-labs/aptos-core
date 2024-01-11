@@ -230,7 +230,8 @@ impl RunConfig {
     /// run by the Aptos CLI.
     pub fn build_for_cli(
         api_url: Url,
-        faucet_port: u16,
+        listen_address: String,
+        listen_port: u16,
         funder_key: FunderKeyEnum,
         do_not_delegate: bool,
         chain_id: Option<ChainId>,
@@ -241,8 +242,8 @@ impl RunConfig {
         };
         Self {
             server_config: ServerConfig {
-                listen_address: "0.0.0.0".to_string(),
-                listen_port: faucet_port,
+                listen_address,
+                listen_port,
                 api_path_base: "".to_string(),
             },
             metrics_server_config: MetricsServerConfig {
@@ -344,6 +345,7 @@ impl RunSimple {
             .context("Failed to load private key")?;
         let run_config = RunConfig::build_for_cli(
             self.api_connection_config.node_url.clone(),
+            self.listen_address.clone(),
             self.listen_port,
             FunderKeyEnum::Key(ConfigKey::new(key)),
             self.do_not_delegate,

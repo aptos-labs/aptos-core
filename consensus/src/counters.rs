@@ -233,6 +233,14 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// Counts when chain_health backoff is triggered
+pub static CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_withold_vote_backpressure_triggered",
+        "Counts when consensus vote_backpressure is triggered",
+    )
+});
+
+/// Counts when chain_health backoff is triggered
 pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "aptos_chain_health_backoff_triggered",
@@ -594,12 +602,23 @@ pub static NUM_TXNS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+// Histogram buckets that expand DEFAULT_BUCKETS with more granularity:
+// * 0.3 to 2.0: step 0.1
+// * 2.0 to 4.0: step 0.2
+// * 4.0 to 7.5: step 0.5
+const BLOCK_TRACING_BUCKETS: &[f64] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1,
+    1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0,
+    4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 10.0,
+];
+
 /// Traces block movement throughout the node
 pub static BLOCK_TRACING: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_consensus_block_tracing",
         "Histogram for different stages of a block",
-        &["stage"]
+        &["stage"],
+        BLOCK_TRACING_BUCKETS.to_vec()
     )
     .unwrap()
 });
@@ -815,11 +834,20 @@ pub static BUFFER_MANAGER_PHASE_PROCESS_SECONDS: Lazy<HistogramVec> = Lazy::new(
     .unwrap()
 });
 
+/// Count of the number of `ProposalExt` blocks received while the feature is disabled.
+pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_unexpected_proposal_ext_count",
+        "Count of the number of `ProposalExt` blocks received while the feature is disabled."
+    )
+    .unwrap()
+});
+
 /// Update various counters for committed blocks
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
     for block in blocks_to_commit {
         observe_block(block.block().timestamp_usecs(), BlockStage::COMMITTED);
-        let txn_status = block.compute_result().compute_status();
+        let txn_status = block.compute_result().compute_status_for_input_txns();
         NUM_TXNS_PER_BLOCK.observe(txn_status.len() as f64);
         COMMITTED_BLOCKS_COUNT.inc();
         LAST_COMMITTED_ROUND.set(block.round() as i64);

@@ -23,7 +23,7 @@ fun loops::nested_loop($t0: u64): u64 {
   9: label L7
  10: $t7 := 1
  11: $t6 := -($t0, $t7)
- 12: $t0 := move($t6)
+ 12: $t0 := infer($t6)
  13: goto 19
  14: goto 17
  15: label L8
@@ -33,7 +33,7 @@ fun loops::nested_loop($t0: u64): u64 {
  19: label L6
  20: $t9 := 1
  21: $t8 := -($t0, $t9)
- 22: $t0 := move($t8)
+ 22: $t0 := infer($t8)
  23: goto 0
  24: goto 27
  25: label L3
@@ -41,7 +41,7 @@ fun loops::nested_loop($t0: u64): u64 {
  27: label L4
  28: goto 0
  29: label L1
- 30: $t1 := move($t0)
+ 30: $t1 := infer($t0)
  31: return $t1
 }
 
@@ -60,14 +60,14 @@ fun loops::while_loop($t0: u64): u64 {
   4: label L2
   5: $t5 := 1
   6: $t4 := -($t0, $t5)
-  7: $t0 := move($t4)
+  7: $t0 := infer($t4)
   8: goto 11
   9: label L3
  10: goto 13
  11: label L4
  12: goto 0
  13: label L1
- 14: $t1 := move($t0)
+ 14: $t1 := infer($t0)
  15: return $t1
 }
 
@@ -106,14 +106,14 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
  20: label L10
  21: $t9 := 1
  22: $t8 := -($t0, $t9)
- 23: $t0 := move($t8)
+ 23: $t0 := infer($t8)
  24: goto 27
  25: label L3
  26: goto 29
  27: label L4
  28: goto 0
  29: label L1
- 30: $t1 := move($t0)
+ 30: $t1 := infer($t0)
  31: return $t1
 }
 
@@ -155,7 +155,7 @@ fun loops::nested_loop($t0: u64): u64 {
      # live vars: $t0, $t7
  11: $t6 := -($t0, $t7)
      # live vars: $t6
- 12: $t0 := move($t6)
+ 12: $t0 := copy($t6)
      # live vars: $t0
  13: goto 19
      # live vars: $t0
@@ -175,7 +175,7 @@ fun loops::nested_loop($t0: u64): u64 {
      # live vars: $t0, $t9
  21: $t8 := -($t0, $t9)
      # live vars: $t8
- 22: $t0 := move($t8)
+ 22: $t0 := copy($t8)
      # live vars: $t0
  23: goto 0
      # live vars: $t0
@@ -191,7 +191,7 @@ fun loops::nested_loop($t0: u64): u64 {
      # live vars: $t0
  29: label L1
      # live vars: $t0
- 30: $t1 := move($t0)
+ 30: $t1 := copy($t0)
      # live vars: $t1
  31: return $t1
 }
@@ -219,7 +219,7 @@ fun loops::while_loop($t0: u64): u64 {
      # live vars: $t0, $t5
   6: $t4 := -($t0, $t5)
      # live vars: $t4
-  7: $t0 := move($t4)
+  7: $t0 := copy($t4)
      # live vars: $t0
   8: goto 11
      # live vars: $t0
@@ -233,7 +233,7 @@ fun loops::while_loop($t0: u64): u64 {
      # live vars: $t0
  13: label L1
      # live vars: $t0
- 14: $t1 := move($t0)
+ 14: $t1 := copy($t0)
      # live vars: $t1
  15: return $t1
 }
@@ -297,7 +297,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
      # live vars: $t0, $t9
  22: $t8 := -($t0, $t9)
      # live vars: $t8
- 23: $t0 := move($t8)
+ 23: $t0 := copy($t8)
      # live vars: $t0
  24: goto 27
      # live vars: $t0
@@ -311,7 +311,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
      # live vars: $t0
  29: label L1
      # live vars: $t0
- 30: $t1 := move($t0)
+ 30: $t1 := copy($t0)
      # live vars: $t1
  31: return $t1
 }
@@ -322,7 +322,7 @@ fun loops::while_loop_with_break_and_continue($t0: u64): u64 {
 module 42.loops {
 
 
-nested_loop(Arg0: u64): u64 {
+nested_loop(Arg0: u64): u64 /* def_idx: 0 */ {
 L0:	loc1: u64
 L1:	loc2: u64
 L2:	loc3: u64
@@ -370,12 +370,12 @@ B8:
 B9:
 	31: Branch(0)
 B10:
-	32: MoveLoc[0](Arg0: u64)
+	32: CopyLoc[0](Arg0: u64)
 	33: StLoc[5](loc4: u64)
 	34: MoveLoc[5](loc4: u64)
 	35: Ret
 }
-while_loop(Arg0: u64): u64 {
+while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
 L0:	loc1: u64
 L1:	loc2: u64
 B0:
@@ -398,12 +398,12 @@ B2:
 B3:
 	14: Branch(0)
 B4:
-	15: MoveLoc[0](Arg0: u64)
+	15: CopyLoc[0](Arg0: u64)
 	16: StLoc[3](loc2: u64)
 	17: MoveLoc[3](loc2: u64)
 	18: Ret
 }
-while_loop_with_break_and_continue(Arg0: u64): u64 {
+while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
 L0:	loc1: u64
 L1:	loc2: u64
 L2:	loc3: u64
@@ -450,7 +450,7 @@ B8:
 B9:
 	30: Branch(0)
 B10:
-	31: MoveLoc[0](Arg0: u64)
+	31: CopyLoc[0](Arg0: u64)
 	32: StLoc[5](loc4: u64)
 	33: MoveLoc[5](loc4: u64)
 	34: Ret

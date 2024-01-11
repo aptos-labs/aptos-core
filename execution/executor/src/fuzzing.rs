@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_executor_types::BlockExecutorTrait;
-use aptos_state_view::StateView;
 use aptos_storage_interface::{
     cached_state_view::{CachedStateView, ShardedStateCache},
     state_delta::StateDelta,
@@ -21,13 +20,13 @@ use aptos_types::{
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
     ledger_info::LedgerInfoWithSignatures,
-    state_store::ShardedStateUpdates,
+    state_store::{ShardedStateUpdates, StateView},
     test_helpers::transaction_test_helpers::TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Transaction, TransactionOutput, TransactionToCommit, Version,
+        BlockOutput, Transaction, TransactionOutput, TransactionToCommit, Version,
     },
     vm_status::VMStatus,
 };
@@ -93,8 +92,8 @@ impl VMExecutor for FakeVM {
         _transactions: &[SignatureVerifiedTransaction],
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
-    ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        Ok(Vec::new())
+    ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        Ok(BlockOutput::new(vec![]))
     }
 }
 

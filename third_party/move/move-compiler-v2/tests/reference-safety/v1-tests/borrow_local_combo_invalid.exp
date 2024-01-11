@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: cannot mutably borrow local `s` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:47:17
+   │
+46 │         if (cond) x = &mut s else x = other;
+   │                       ------ previous mutable local borrow
+47 │         let y = &mut s;
+   │                 ^^^^^^ mutable borrow attempted here
+
+error: cannot immutably borrow local `s` since other mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:38:17
+   │
+37 │         if (cond) x = &mut s else x = other;
+   │                       ------ previous mutable local borrow
+38 │         let y = &s;
+   │                 ^^ immutable borrow attempted here
+
+error: cannot immutably borrow local `s` since other mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:30:17
+   │
+29 │         if (cond) f = &mut s.f else f = &mut s.g;
+   │                            -                 - previous mutable local borrow
+   │                            │
+   │                            previous mutable local borrow
+30 │         let x = &s;
+   │                 ^^ immutable borrow attempted here
+
+error: cannot mutably borrow local `s` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:21:17
+   │
+20 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                            - previous mutable local borrow
+21 │         let x = &mut s;
+   │                 ^^^^^^ mutable borrow attempted here
+
+error: cannot immutably borrow local `s` since other mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:13:17
+   │
+12 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                            - previous mutable local borrow
+13 │         let x = &s;
+   │                 ^^ immutable borrow attempted here

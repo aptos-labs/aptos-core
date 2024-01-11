@@ -1,5 +1,5 @@
 
-<a name="0x1_optional_aggregator"></a>
+<a id="0x1_optional_aggregator"></a>
 
 # Module `0x1::optional_aggregator`
 
@@ -29,6 +29,8 @@ aggregator (parallelizable) or via normal integers.
 -  [Function `read`](#0x1_optional_aggregator_read)
 -  [Function `is_parallelizable`](#0x1_optional_aggregator_is_parallelizable)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Struct `OptionalAggregator`](#@Specification_1_OptionalAggregator)
     -  [Function `new_integer`](#@Specification_1_new_integer)
     -  [Function `add_integer`](#@Specification_1_add_integer)
@@ -57,7 +59,7 @@ aggregator (parallelizable) or via normal integers.
 
 
 
-<a name="0x1_optional_aggregator_Integer"></a>
+<a id="0x1_optional_aggregator_Integer"></a>
 
 ## Struct `Integer`
 
@@ -91,7 +93,7 @@ Wrapper around integer with a custom overflow limit. Supports add, subtract and 
 
 </details>
 
-<a name="0x1_optional_aggregator_OptionalAggregator"></a>
+<a id="0x1_optional_aggregator_OptionalAggregator"></a>
 
 ## Struct `OptionalAggregator`
 
@@ -125,12 +127,12 @@ Contains either an aggregator or a normal integer, both overflowing on limit.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_optional_aggregator_EAGGREGATOR_OVERFLOW"></a>
+<a id="0x1_optional_aggregator_EAGGREGATOR_OVERFLOW"></a>
 
 The value of aggregator underflows (goes below zero). Raised by native code.
 
@@ -140,7 +142,7 @@ The value of aggregator underflows (goes below zero). Raised by native code.
 
 
 
-<a name="0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW"></a>
+<a id="0x1_optional_aggregator_EAGGREGATOR_UNDERFLOW"></a>
 
 Aggregator feature is not supported. Raised by native code.
 
@@ -150,7 +152,7 @@ Aggregator feature is not supported. Raised by native code.
 
 
 
-<a name="0x1_optional_aggregator_new_integer"></a>
+<a id="0x1_optional_aggregator_new_integer"></a>
 
 ## Function `new_integer`
 
@@ -178,7 +180,7 @@ Creates a new integer which overflows on exceeding a <code>limit</code>.
 
 </details>
 
-<a name="0x1_optional_aggregator_add_integer"></a>
+<a id="0x1_optional_aggregator_add_integer"></a>
 
 ## Function `add_integer`
 
@@ -207,7 +209,7 @@ Adds <code>value</code> to integer. Aborts on overflowing the limit.
 
 </details>
 
-<a name="0x1_optional_aggregator_sub_integer"></a>
+<a id="0x1_optional_aggregator_sub_integer"></a>
 
 ## Function `sub_integer`
 
@@ -233,7 +235,7 @@ Subtracts <code>value</code> from integer. Aborts on going below zero.
 
 </details>
 
-<a name="0x1_optional_aggregator_limit"></a>
+<a id="0x1_optional_aggregator_limit"></a>
 
 ## Function `limit`
 
@@ -258,7 +260,7 @@ Returns an overflow limit of integer.
 
 </details>
 
-<a name="0x1_optional_aggregator_read_integer"></a>
+<a id="0x1_optional_aggregator_read_integer"></a>
 
 ## Function `read_integer`
 
@@ -283,7 +285,7 @@ Returns a value stored in this integer.
 
 </details>
 
-<a name="0x1_optional_aggregator_destroy_integer"></a>
+<a id="0x1_optional_aggregator_destroy_integer"></a>
 
 ## Function `destroy_integer`
 
@@ -308,7 +310,7 @@ Destroys an integer.
 
 </details>
 
-<a name="0x1_optional_aggregator_new"></a>
+<a id="0x1_optional_aggregator_new"></a>
 
 ## Function `new`
 
@@ -343,7 +345,7 @@ Creates a new optional aggregator.
 
 </details>
 
-<a name="0x1_optional_aggregator_switch"></a>
+<a id="0x1_optional_aggregator_switch"></a>
 
 ## Function `switch`
 
@@ -370,7 +372,7 @@ Switches between parallelizable and non-parallelizable implementations.
 
 </details>
 
-<a name="0x1_optional_aggregator_switch_and_zero_out"></a>
+<a id="0x1_optional_aggregator_switch_and_zero_out"></a>
 
 ## Function `switch_and_zero_out`
 
@@ -400,7 +402,7 @@ the value of the new optional aggregator to zero.
 
 </details>
 
-<a name="0x1_optional_aggregator_switch_to_integer_and_zero_out"></a>
+<a id="0x1_optional_aggregator_switch_to_integer_and_zero_out"></a>
 
 ## Function `switch_to_integer_and_zero_out`
 
@@ -433,7 +435,7 @@ the value.
 
 </details>
 
-<a name="0x1_optional_aggregator_switch_to_aggregator_and_zero_out"></a>
+<a id="0x1_optional_aggregator_switch_to_aggregator_and_zero_out"></a>
 
 ## Function `switch_to_aggregator_and_zero_out`
 
@@ -466,7 +468,7 @@ the value.
 
 </details>
 
-<a name="0x1_optional_aggregator_destroy"></a>
+<a id="0x1_optional_aggregator_destroy"></a>
 
 ## Function `destroy`
 
@@ -495,7 +497,7 @@ Destroys optional aggregator.
 
 </details>
 
-<a name="0x1_optional_aggregator_destroy_optional_aggregator"></a>
+<a id="0x1_optional_aggregator_destroy_optional_aggregator"></a>
 
 ## Function `destroy_optional_aggregator`
 
@@ -524,7 +526,7 @@ Destroys parallelizable optional aggregator and returns its limit.
 
 </details>
 
-<a name="0x1_optional_aggregator_destroy_optional_integer"></a>
+<a id="0x1_optional_aggregator_destroy_optional_integer"></a>
 
 ## Function `destroy_optional_integer`
 
@@ -553,7 +555,7 @@ Destroys non-parallelizable optional aggregator and returns its limit.
 
 </details>
 
-<a name="0x1_optional_aggregator_add"></a>
+<a id="0x1_optional_aggregator_add"></a>
 
 ## Function `add`
 
@@ -584,7 +586,7 @@ Adds <code>value</code> to optional aggregator, aborting on exceeding the <code>
 
 </details>
 
-<a name="0x1_optional_aggregator_sub"></a>
+<a id="0x1_optional_aggregator_sub"></a>
 
 ## Function `sub`
 
@@ -615,7 +617,7 @@ Subtracts <code>value</code> from optional aggregator, aborting on going below z
 
 </details>
 
-<a name="0x1_optional_aggregator_read"></a>
+<a id="0x1_optional_aggregator_read"></a>
 
 ## Function `read`
 
@@ -646,7 +648,7 @@ Returns the value stored in optional aggregator.
 
 </details>
 
-<a name="0x1_optional_aggregator_is_parallelizable"></a>
+<a id="0x1_optional_aggregator_is_parallelizable"></a>
 
 ## Function `is_parallelizable`
 
@@ -671,10 +673,53 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>When creating a new integer instance, it guarantees that the limit assigned is a value passed into the function as an argument, and the value field becomes zero.</td>
+<td>High</td>
+<td>The new_integer function sets the limit field to the argument passed in, and the value field is set to zero.</td>
+<td>Formally verified via <a href="#high-level-req-1">new_integer</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>For a given integer instance it should always be possible to: (1) return the limit value of the integer resource, (2) return the current value stored in that particular instance, and (3) destroy the integer instance.</td>
+<td>Low</td>
+<td>The following functions should not abort if the Integer instance exists: limit(), read_integer(), destroy_integer().</td>
+<td>Formally verified via: <a href="#high-level-req-2.1">read_integer</a>, <a href="#high-level-req-2.2">limit</a>, and <a href="#high-level-req-2.3">destroy_integer</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Every successful switch must end with the aggregator type changed from non-parallelizable to parallelizable or vice versa.</td>
+<td>High</td>
+<td>The switch function run, if successful, should always change the aggregator type.</td>
+<td>Formally verified via <a href="#high-level-req-3">switch_and_zero_out</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -683,7 +728,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 
 
-<a name="@Specification_1_OptionalAggregator"></a>
+<a id="@Specification_1_OptionalAggregator"></a>
 
 ### Struct `OptionalAggregator`
 
@@ -719,7 +764,7 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 
 
-<a name="@Specification_1_new_integer"></a>
+<a id="@Specification_1_new_integer"></a>
 
 ### Function `new_integer`
 
@@ -732,12 +777,13 @@ Returns true if optional aggregator uses parallelizable implementation.
 
 <pre><code><b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result.limit == limit;
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>ensures</b> result.value == 0;
 </code></pre>
 
 
 
-<a name="@Specification_1_add_integer"></a>
+<a id="@Specification_1_add_integer"></a>
 
 ### Function `add_integer`
 
@@ -757,7 +803,7 @@ Check for overflow.
 
 
 
-<a name="@Specification_1_sub_integer"></a>
+<a id="@Specification_1_sub_integer"></a>
 
 ### Function `sub_integer`
 
@@ -774,7 +820,7 @@ Check for overflow.
 
 
 
-<a name="@Specification_1_limit"></a>
+<a id="@Specification_1_limit"></a>
 
 ### Function `limit`
 
@@ -785,12 +831,13 @@ Check for overflow.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
 
-<a name="@Specification_1_read_integer"></a>
+<a id="@Specification_1_read_integer"></a>
 
 ### Function `read_integer`
 
@@ -801,12 +848,13 @@ Check for overflow.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
 
-<a name="@Specification_1_destroy_integer"></a>
+<a id="@Specification_1_destroy_integer"></a>
 
 ### Function `destroy_integer`
 
@@ -817,12 +865,13 @@ Check for overflow.
 
 
 
-<pre><code><b>aborts_if</b> <b>false</b>;
+<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
 
-<a name="@Specification_1_new"></a>
+<a id="@Specification_1_new"></a>
 
 ### Function `new`
 
@@ -842,7 +891,7 @@ Check for overflow.
 
 
 
-<a name="@Specification_1_switch"></a>
+<a id="@Specification_1_switch"></a>
 
 ### Function `switch`
 
@@ -862,7 +911,7 @@ Check for overflow.
 
 
 
-<a name="@Specification_1_switch_and_zero_out"></a>
+<a id="@Specification_1_switch_and_zero_out"></a>
 
 ### Function `switch_and_zero_out`
 
@@ -880,6 +929,7 @@ The AggregatorFactory is under the @aptos_framework when Option<Aggregator> does
 <b>aborts_if</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) && len(vec_ref) != 0;
 <b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) && len(vec_ref) == 0;
 <b>aborts_if</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) && !<b>exists</b>&lt;<a href="aggregator_factory.md#0x1_aggregator_factory_AggregatorFactory">aggregator_factory::AggregatorFactory</a>&gt;(@aptos_framework);
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) ==&gt; !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);
 <b>ensures</b> !<a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<b>old</b>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>)) ==&gt; <a href="optional_aggregator.md#0x1_optional_aggregator_is_parallelizable">is_parallelizable</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>);
 <b>ensures</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>) == 0;
@@ -887,7 +937,7 @@ The AggregatorFactory is under the @aptos_framework when Option<Aggregator> does
 
 
 
-<a name="@Specification_1_switch_to_integer_and_zero_out"></a>
+<a id="@Specification_1_switch_to_integer_and_zero_out"></a>
 
 ### Function `switch_to_integer_and_zero_out`
 
@@ -909,7 +959,7 @@ The aggregator exists and the integer dosex not exist when Switches from paralle
 
 
 
-<a name="@Specification_1_switch_to_aggregator_and_zero_out"></a>
+<a id="@Specification_1_switch_to_aggregator_and_zero_out"></a>
 
 ### Function `switch_to_aggregator_and_zero_out`
 
@@ -933,7 +983,7 @@ The AggregatorFactory is under the @aptos_framework.
 
 
 
-<a name="@Specification_1_destroy"></a>
+<a id="@Specification_1_destroy"></a>
 
 ### Function `destroy`
 
@@ -950,7 +1000,7 @@ The AggregatorFactory is under the @aptos_framework.
 
 
 
-<a name="@Specification_1_destroy_optional_aggregator"></a>
+<a id="@Specification_1_destroy_optional_aggregator"></a>
 
 ### Function `destroy_optional_aggregator`
 
@@ -969,7 +1019,7 @@ The aggregator exists and the integer does not exist when destroy the aggregator
 
 
 
-<a name="@Specification_1_destroy_optional_integer"></a>
+<a id="@Specification_1_destroy_optional_integer"></a>
 
 ### Function `destroy_optional_integer`
 
@@ -989,7 +1039,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="0x1_optional_aggregator_optional_aggregator_value"></a>
+<a id="0x1_optional_aggregator_optional_aggregator_value"></a>
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_value">optional_aggregator_value</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 {
@@ -1004,7 +1054,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="0x1_optional_aggregator_optional_aggregator_limit"></a>
+<a id="0x1_optional_aggregator_optional_aggregator_limit"></a>
 
 
 <pre><code><b>fun</b> <a href="optional_aggregator.md#0x1_optional_aggregator_optional_aggregator_limit">optional_aggregator_limit</a>(<a href="optional_aggregator.md#0x1_optional_aggregator">optional_aggregator</a>: <a href="optional_aggregator.md#0x1_optional_aggregator_OptionalAggregator">OptionalAggregator</a>): u128 {
@@ -1018,7 +1068,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="@Specification_1_add"></a>
+<a id="@Specification_1_add"></a>
 
 ### Function `add`
 
@@ -1036,7 +1086,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="0x1_optional_aggregator_AddAbortsIf"></a>
+<a id="0x1_optional_aggregator_AddAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="optional_aggregator.md#0x1_optional_aggregator_AddAbortsIf">AddAbortsIf</a> {
@@ -1055,7 +1105,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="@Specification_1_sub"></a>
+<a id="@Specification_1_sub"></a>
 
 ### Function `sub`
 
@@ -1073,7 +1123,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="0x1_optional_aggregator_SubAbortsIf"></a>
+<a id="0x1_optional_aggregator_SubAbortsIf"></a>
 
 
 <pre><code><b>schema</b> <a href="optional_aggregator.md#0x1_optional_aggregator_SubAbortsIf">SubAbortsIf</a> {
@@ -1088,7 +1138,7 @@ The integer exists and the aggregator does not exist when destroy the integer.
 
 
 
-<a name="@Specification_1_read"></a>
+<a id="@Specification_1_read"></a>
 
 ### Function `read`
 

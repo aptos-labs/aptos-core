@@ -1,5 +1,5 @@
 
-<a name="0x1_math64"></a>
+<a id="0x1_math64"></a>
 
 # Module `0x1::math64`
 
@@ -33,12 +33,12 @@ Standard math utilities missing in the Move Language.
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_math64_EINVALID_ARG_FLOOR_LOG2"></a>
+<a id="0x1_math64_EINVALID_ARG_FLOOR_LOG2"></a>
 
 Cannot log2 the value 0
 
@@ -48,7 +48,7 @@ Cannot log2 the value 0
 
 
 
-<a name="0x1_math64_max"></a>
+<a id="0x1_math64_max"></a>
 
 ## Function `max`
 
@@ -73,7 +73,7 @@ Return the largest of two numbers.
 
 </details>
 
-<a name="0x1_math64_min"></a>
+<a id="0x1_math64_min"></a>
 
 ## Function `min`
 
@@ -98,7 +98,7 @@ Return the smallest of two numbers.
 
 </details>
 
-<a name="0x1_math64_average"></a>
+<a id="0x1_math64_average"></a>
 
 ## Function `average`
 
@@ -127,7 +127,7 @@ Return the average of two.
 
 </details>
 
-<a name="0x1_math64_mul_div"></a>
+<a id="0x1_math64_mul_div"></a>
 
 ## Function `mul_div`
 
@@ -154,7 +154,7 @@ Returns a * b / c going through u128 to prevent intermediate overflow
 
 </details>
 
-<a name="0x1_math64_clamp"></a>
+<a id="0x1_math64_clamp"></a>
 
 ## Function `clamp`
 
@@ -179,7 +179,7 @@ Return x clamped to the interval [lower, upper].
 
 </details>
 
-<a name="0x1_math64_pow"></a>
+<a id="0x1_math64_pow"></a>
 
 ## Function `pow`
 
@@ -216,7 +216,7 @@ Return the value of n raised to power e
 
 </details>
 
-<a name="0x1_math64_floor_log2"></a>
+<a id="0x1_math64_floor_log2"></a>
 
 ## Function `floor_log2`
 
@@ -252,7 +252,7 @@ Returns floor(lg2(x))
 
 </details>
 
-<a name="0x1_math64_log2"></a>
+<a id="0x1_math64_log2"></a>
 
 ## Function `log2`
 
@@ -294,7 +294,7 @@ Returns floor(lg2(x))
 
 </details>
 
-<a name="0x1_math64_sqrt"></a>
+<a id="0x1_math64_sqrt"></a>
 
 ## Function `sqrt`
 
@@ -333,7 +333,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 </details>
 
-<a name="0x1_math64_ceil_div"></a>
+<a id="0x1_math64_ceil_div"></a>
 
 ## Function `ceil_div`
 
@@ -364,12 +364,12 @@ Returns square root of x, precisely floor(sqrt(x))
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_max"></a>
+<a id="@Specification_1_max"></a>
 
 ### Function `max`
 
@@ -387,7 +387,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="@Specification_1_min"></a>
+<a id="@Specification_1_min"></a>
 
 ### Function `min`
 
@@ -405,7 +405,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="@Specification_1_average"></a>
+<a id="@Specification_1_average"></a>
 
 ### Function `average`
 
@@ -423,7 +423,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="@Specification_1_clamp"></a>
+<a id="@Specification_1_clamp"></a>
 
 ### Function `clamp`
 
@@ -443,7 +443,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="@Specification_1_pow"></a>
+<a id="@Specification_1_pow"></a>
 
 ### Function `pow`
 
@@ -461,7 +461,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="@Specification_1_floor_log2"></a>
+<a id="@Specification_1_floor_log2"></a>
 
 ### Function `floor_log2`
 
@@ -480,7 +480,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="@Specification_1_sqrt"></a>
+<a id="@Specification_1_sqrt"></a>
 
 ### Function `sqrt`
 
@@ -500,7 +500,7 @@ Returns square root of x, precisely floor(sqrt(x))
 
 
 
-<a name="0x1_math64_spec_pow"></a>
+<a id="0x1_math64_spec_pow"></a>
 
 
 <pre><code><b>fun</b> <a href="math64.md#0x1_math64_spec_pow">spec_pow</a>(n: u64, e: u64): u64 {

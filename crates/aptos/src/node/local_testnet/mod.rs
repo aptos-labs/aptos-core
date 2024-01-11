@@ -42,6 +42,7 @@ use clap::Parser;
 use std::{
     collections::HashSet,
     fs::{create_dir_all, remove_dir_all},
+    net::Ipv4Addr,
     path::{Path, PathBuf},
     pin::Pin,
 };
@@ -92,6 +93,12 @@ pub struct RunLocalTestnet {
 
     #[clap(flatten)]
     prompt_options: PromptOptions,
+
+    /// By default all services running on the host system will be bound to 127.0.0.1,
+    /// unless you're running the CLI inside a container, in which case it will run
+    /// them on 0.0.0.0. You can use this flag to override this behavior in both cases.
+    #[clap(long, hide = true)]
+    bind_to: Option<Ipv4Addr>,
 
     /// By default, tracing output goes to files. With this set, it goes to stdout.
     #[clap(long, hide = true)]
@@ -222,10 +229,27 @@ impl CliCommand<()> for RunLocalTestnet {
             setup_logging(Some(Box::new(make_writer)));
         }
 
+        // If the CLI is running inside a container, bind services not running inside a
+        // container to 0.0.0.0 (so they can be accessed from outside the container).
+        // Otherwise bind them to 127.0.0.1. This is necessary because Windows
+        // complains about services binding to 0.0.0.0 sometimes.
+        let running_inside_container = Path::new(".dockerenv").exists();
+        let bind_to = match self.bind_to {
+            Some(bind_to) => bind_to,
+            None => {
+                if running_inside_container {
+                    Ipv4Addr::new(0, 0, 0, 0)
+                } else {
+                    Ipv4Addr::new(127, 0, 0, 1)
+                }
+            },
+        };
+        info!("Binding host services to {}", bind_to);
+
         let mut managers: Vec<Box<dyn ServiceManager>> = Vec::new();
 
         // Build the node manager. We do this unconditionally.
-        let node_manager = NodeManager::new(&self, test_dir.clone())
+        let node_manager = NodeManager::new(&self, bind_to, test_dir.clone())
             .context("Failed to build node service manager")?;
         let node_health_checkers = node_manager.get_health_checkers();
 
@@ -234,6 +258,7 @@ impl CliCommand<()> for RunLocalTestnet {
             let faucet_manager = FaucetManager::new(
                 &self,
                 node_health_checkers.clone(),
+                bind_to,
                 test_dir.clone(),
                 node_manager.get_node_api_url(),
             )
@@ -296,6 +321,7 @@ impl CliCommand<()> for RunLocalTestnet {
         // it use the health checkers from all the other services.
         managers.push(Box::new(ReadyServerManager::new(
             &self,
+            bind_to,
             health_checkers.clone(),
         )?));
 
@@ -315,8 +341,8 @@ impl CliCommand<()> for RunLocalTestnet {
         }
 
         eprintln!(
-            "\nReadiness endpoint: http://0.0.0.0:{}/\n",
-            self.ready_server_args.ready_server_listen_port,
+            "\nReadiness endpoint: http://{}:{}/\n",
+            bind_to, self.ready_server_args.ready_server_listen_port,
         );
 
         // Collect post healthy steps to run after the services start.

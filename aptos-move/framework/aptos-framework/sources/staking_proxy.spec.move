@@ -1,4 +1,44 @@
 spec aptos_framework::staking_proxy {
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: When updating the Vesting operator, it should be updated throughout all depending units.
+    /// Criticality: Medium
+    /// Implementation: The VestingContract contains a StakingInfo object that has an operator field, and this operator
+    /// is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.
+    /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update.
+    ///
+    /// No.: 2
+    /// Requirement: When updating the Vesting voter, it should be updated throughout all depending units.
+    /// Criticality: Medium
+    /// Implementation: The VestingContract contains a StakingInfo object that has an operator field, and this operator
+    /// is mapped to a StakingContract object that in turn encompasses a StakePool object where the operator matches.
+    /// Enforcement: Audited that it ensures the two operator fields hold the new value after the update.
+    ///
+    /// No.: 3
+    /// Requirement: The operator and voter of a Vesting Contract should only be updated by the owner of the contract.
+    /// Criticality: High
+    /// Implementation: The owner-operator-voter model, as defined in the documentation, grants distinct abilities to
+    /// each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or
+    /// voter, to prevent the compromise of the StakePool.
+    /// Enforcement: Audited that it ensures the signer owns the AdminStore resource and that the operator or voter
+    /// intended for the update actually exists.
+    ///
+    /// No.: 4
+    /// Requirement: The operator and voter of a Staking Contract should only be updated by the owner of the contract.
+    /// Criticality: High
+    /// Implementation: The owner-operator-voter model, as defined in the documentation, grants distinct abilities to
+    /// each role. Therefore, it's crucial to ensure that only the owner has the authority to modify the operator or
+    /// voter, to prevent the compromise of the StakePool.
+    /// Enforcement: Audited the patterns of updating operators and voters in the staking contract.
+    ///
+    /// No.: 5
+    /// Requirement: Staking Contract's operators should be unique inside a store.
+    /// Criticality: Medium
+    /// Implementation: Duplicates among operators could result in incorrectly updating the operator or voter
+    /// associated with the incorrect StakingContract.
+    /// Enforcement: Enforced via [https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/staking_contract.move#L87](SimpleMap).
+    /// </high-level-req>
+    ///
     spec module {
         pragma verify = true;
         pragma aborts_if_is_strict;
@@ -29,7 +69,7 @@ spec aptos_framework::staking_proxy {
 
     spec set_staking_contract_operator(owner: &signer, old_operator: address, new_operator: address) {
         pragma aborts_if_is_partial;
-        pragma verify_duration_estimate = 120;
+        pragma verify = false;
         // TODO: Verify timeout and can't verify `staking_contract::switch_operator`.
         include SetStakingContractOperator;
     }

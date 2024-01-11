@@ -1,5 +1,5 @@
 
-<a name="0x1_type_info"></a>
+<a id="0x1_type_info"></a>
 
 # Module `0x1::type_info`
 
@@ -34,7 +34,7 @@
 
 
 
-<a name="0x1_type_info_TypeInfo"></a>
+<a id="0x1_type_info_TypeInfo"></a>
 
 ## Struct `TypeInfo`
 
@@ -73,12 +73,12 @@
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_type_info_E_NATIVE_FUN_NOT_AVAILABLE"></a>
+<a id="0x1_type_info_E_NATIVE_FUN_NOT_AVAILABLE"></a>
 
 
 
@@ -87,7 +87,7 @@
 
 
 
-<a name="0x1_type_info_account_address"></a>
+<a id="0x1_type_info_account_address"></a>
 
 ## Function `account_address`
 
@@ -111,7 +111,7 @@
 
 </details>
 
-<a name="0x1_type_info_module_name"></a>
+<a id="0x1_type_info_module_name"></a>
 
 ## Function `module_name`
 
@@ -135,7 +135,7 @@
 
 </details>
 
-<a name="0x1_type_info_struct_name"></a>
+<a id="0x1_type_info_struct_name"></a>
 
 ## Function `struct_name`
 
@@ -159,7 +159,7 @@
 
 </details>
 
-<a name="0x1_type_info_chain_id"></a>
+<a id="0x1_type_info_chain_id"></a>
 
 ## Function `chain_id`
 
@@ -190,7 +190,7 @@ return whichever ID was passed to <code>aptos_framework::chain_id::initialize_fo
 
 </details>
 
-<a name="0x1_type_info_type_of"></a>
+<a id="0x1_type_info_type_of"></a>
 
 ## Function `type_of`
 
@@ -213,7 +213,7 @@ Return the <code><a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a></cod
 
 </details>
 
-<a name="0x1_type_info_type_name"></a>
+<a id="0x1_type_info_type_name"></a>
 
 ## Function `type_name`
 
@@ -238,7 +238,7 @@ Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 
 </details>
 
-<a name="0x1_type_info_chain_id_internal"></a>
+<a id="0x1_type_info_chain_id_internal"></a>
 
 ## Function `chain_id_internal`
 
@@ -260,7 +260,7 @@ Or: 0x1::table::Table<0x1::string::String, 0x1::string::String>
 
 </details>
 
-<a name="0x1_type_info_size_of_val"></a>
+<a id="0x1_type_info_size_of_val"></a>
 
 ## Function `size_of_val`
 
@@ -292,7 +292,7 @@ analysis of vector size dynamism.
 
 </details>
 
-<a name="0x1_type_info_verify_type_of"></a>
+<a id="0x1_type_info_verify_type_of"></a>
 
 ## Function `verify_type_of`
 
@@ -325,7 +325,7 @@ analysis of vector size dynamism.
 
 </details>
 
-<a name="0x1_type_info_verify_type_of_generic"></a>
+<a id="0x1_type_info_verify_type_of_generic"></a>
 
 ## Function `verify_type_of_generic`
 
@@ -358,12 +358,12 @@ analysis of vector size dynamism.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_chain_id"></a>
+<a id="@Specification_1_chain_id"></a>
 
 ### Function `chain_id`
 
@@ -380,7 +380,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="@Specification_1_type_of"></a>
+<a id="@Specification_1_type_of"></a>
 
 ### Function `type_of`
 
@@ -391,7 +391,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="@Specification_1_type_name"></a>
+<a id="@Specification_1_type_name"></a>
 
 ### Function `type_name`
 
@@ -402,7 +402,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="@Specification_1_chain_id_internal"></a>
+<a id="@Specification_1_chain_id_internal"></a>
 
 ### Function `chain_id_internal`
 
@@ -421,7 +421,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="0x1_type_info_spec_chain_id_internal"></a>
+<a id="0x1_type_info_spec_chain_id_internal"></a>
 
 
 <pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_chain_id_internal">spec_chain_id_internal</a>(): u8;
@@ -430,7 +430,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="0x1_type_info_spec_size_of_val"></a>
+<a id="0x1_type_info_spec_size_of_val"></a>
 
 
 <pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref: T): u64 {
@@ -440,7 +440,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="@Specification_1_size_of_val"></a>
+<a id="@Specification_1_size_of_val"></a>
 
 ### Function `size_of_val`
 
@@ -457,7 +457,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="@Specification_1_verify_type_of_generic"></a>
+<a id="@Specification_1_verify_type_of_generic"></a>
 
 ### Function `verify_type_of_generic`
 
@@ -475,7 +475,7 @@ analysis of vector size dynamism.
 
 
 
-<a name="0x1_type_info_spec_is_struct"></a>
+<a id="0x1_type_info_spec_is_struct"></a>
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;

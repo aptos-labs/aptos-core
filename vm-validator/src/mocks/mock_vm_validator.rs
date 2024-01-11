@@ -4,9 +4,9 @@
 
 use crate::vm_validator::TransactionValidation;
 use anyhow::Result;
-use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
+    state_store::StateView,
     transaction::{SignedTransaction, VMValidatorResult},
     vm_status::StatusCode,
 };

@@ -9,7 +9,10 @@ use crate::{
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript, CompiledModule,
+    compatibility::Compatibility,
+    errors::{PartialVMError, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
 };
 use move_command_line_common::{
     address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
@@ -52,7 +55,7 @@ struct SimpleVMTestAdapter<'a> {
 }
 
 pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver,
+    storage: &impl MoveResolver<PartialVMError>,
     address: AccountAddress,
     module: &ModuleId,
     resource: &IdentStr,
@@ -230,7 +233,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Err(vm_error) => Err(anyhow!(
                 "Unable to publish module '{}'. Got VMError: {}",
                 module.self_id(),
-                vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
+                vm_error.format_test_output(
+                    move_test_debug() || verbose,
+                    !move_test_debug() && self.comparison_mode
+                )
             )),
         }
     }
@@ -274,7 +280,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Script execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
+                    vm_error.format_test_output(
+                        move_test_debug() || verbose,
+                        !move_test_debug() && self.comparison_mode
+                    )
                 )
             })?;
         Ok((None, serialized_return_values))
@@ -319,7 +328,10 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .map_err(|vm_error| {
                 anyhow!(
                     "Function execution failed with VMError: {}",
-                    vm_error.format_test_output(move_test_debug() || verbose, self.comparison_mode)
+                    vm_error.format_test_output(
+                        move_test_debug() || verbose,
+                        !move_test_debug() && self.comparison_mode
+                    )
                 )
             })?;
         Ok((None, serialized_return_values))

@@ -151,10 +151,19 @@ impl ModuleGenerator {
             let acquires_list = &acquires_map[&fun_env.get_id()];
             FunctionGenerator::run(self, ctx, fun_env, acquires_list);
         }
+
+        // At handles of friend modules
+        for mid in module_env.get_friend_modules() {
+            let handle = self.module_handle(ctx, &module_env.get_loc(), &ctx.env.get_module(mid));
+            self.module.friend_decls.push(handle)
+        }
     }
 
     /// Generate information for a struct.
     fn gen_struct(&mut self, ctx: &ModuleContext, struct_env: &StructEnv<'_>) {
+        if struct_env.is_ghost_memory() {
+            return;
+        }
         let loc = &struct_env.get_loc();
         let struct_handle = self.struct_index(ctx, loc, struct_env);
         let field_information = FF::StructFieldInformation::Declared(
@@ -227,12 +236,12 @@ impl ModuleGenerator {
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
                 Num | Range | EventStore => {
-                    ctx.internal_error(loc, "unexpected specification type");
+                    ctx.internal_error(loc, format!("unexpected specification type {:#?}", ty));
                     FF::SignatureToken::Bool
                 },
             },
             Tuple(_) => {
-                ctx.internal_error(loc, "unexpected tuple type");
+                ctx.internal_error(loc, format!("unexpected tuple type {:#?}", ty));
                 FF::SignatureToken::Bool
             },
             Vector(ty) => FF::SignatureToken::Vector(Box::new(self.signature_token(ctx, loc, ty))),
@@ -333,10 +342,7 @@ impl ModuleGenerator {
         if let Some(idx) = self.module_to_idx.get(&id) {
             return *idx;
         }
-        let name = module_env.get_name();
-        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
-        let name = self.name_index(ctx, loc, name.name());
-        let handle = FF::ModuleHandle { address, name };
+        let handle = self.module_handle(ctx, loc, module_env);
         let idx = if module_env.is_script_module() {
             self.script_handle = Some(handle);
             FF::ModuleHandleIndex(TableIndex::MAX)
@@ -354,6 +360,18 @@ impl ModuleGenerator {
         idx
     }
 
+    fn module_handle(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        module_env: &ModuleEnv,
+    ) -> ModuleHandle {
+        let name = module_env.get_name();
+        let address = self.address_index(ctx, loc, name.addr().expect_numerical());
+        let name = self.name_index(ctx, loc, name.name());
+        FF::ModuleHandle { address, name }
+    }
+
     /// Obtains or generates a function index.
     pub fn function_index(
         &mut self,
@@ -369,7 +387,7 @@ impl ModuleGenerator {
         let type_parameters = fun_env
             .get_type_parameters()
             .into_iter()
-            .map(|TypeParameter(_, TypeParameterKind { abilities, .. })| abilities)
+            .map(|TypeParameter(_, TypeParameterKind { abilities, .. }, _)| abilities)
             .collect::<Vec<_>>();
         let parameters = self.signature(
             ctx,
@@ -377,7 +395,7 @@ impl ModuleGenerator {
             fun_env
                 .get_parameters()
                 .iter()
-                .map(|Parameter(_, ty)| ty.to_owned())
+                .map(|Parameter(_, ty, _)| ty.to_owned())
                 .collect(),
         );
         let return_ = self.signature(
@@ -459,7 +477,7 @@ impl ModuleGenerator {
                     let param_index = fun_env
                         .get_parameters()
                         .iter()
-                        .position(|Parameter(n, _)| n == name)
+                        .position(|Parameter(n, _ty, _)| n == name)
                         .expect("parameter defined") as u8;
                     FF::AddressSpecifier::Parameter(param_index, None)
                 },
@@ -467,7 +485,7 @@ impl ModuleGenerator {
                     let param_index = fun_env
                         .get_parameters()
                         .iter()
-                        .position(|Parameter(n, _)| n == name)
+                        .position(|Parameter(n, _ty, _)| n == name)
                         .expect("parameter defined") as u8;
                     let fun_index = self.function_instantiation_index(
                         ctx,
@@ -540,9 +558,11 @@ impl ModuleGenerator {
                             abilities,
                             is_phantom,
                         },
+                        _loc,
                     )| FF::StructTypeParameter {
                         constraints: *abilities,
                         is_phantom: *is_phantom,
+                        // TODO: use _loc here?
                     },
                 )
                 .collect(),

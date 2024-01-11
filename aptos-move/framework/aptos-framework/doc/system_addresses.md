@@ -1,5 +1,5 @@
 
-<a name="0x1_system_addresses"></a>
+<a id="0x1_system_addresses"></a>
 
 # Module `0x1::system_addresses`
 
@@ -19,6 +19,8 @@
 -  [Function `is_vm_address`](#0x1_system_addresses_is_vm_address)
 -  [Function `is_reserved_address`](#0x1_system_addresses_is_reserved_address)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `assert_core_resource`](#@Specification_1_assert_core_resource)
     -  [Function `assert_core_resource_address`](#@Specification_1_assert_core_resource_address)
     -  [Function `is_core_resource_address`](#@Specification_1_is_core_resource_address)
@@ -34,12 +36,12 @@
 
 
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_system_addresses_ENOT_APTOS_FRAMEWORK_ADDRESS"></a>
+<a id="0x1_system_addresses_ENOT_APTOS_FRAMEWORK_ADDRESS"></a>
 
 The address/account did not correspond to the core framework address
 
@@ -49,7 +51,7 @@ The address/account did not correspond to the core framework address
 
 
 
-<a name="0x1_system_addresses_ENOT_CORE_RESOURCE_ADDRESS"></a>
+<a id="0x1_system_addresses_ENOT_CORE_RESOURCE_ADDRESS"></a>
 
 The address/account did not correspond to the core resource address
 
@@ -59,7 +61,7 @@ The address/account did not correspond to the core resource address
 
 
 
-<a name="0x1_system_addresses_ENOT_FRAMEWORK_RESERVED_ADDRESS"></a>
+<a id="0x1_system_addresses_ENOT_FRAMEWORK_RESERVED_ADDRESS"></a>
 
 The address is not framework reserved address
 
@@ -69,7 +71,7 @@ The address is not framework reserved address
 
 
 
-<a name="0x1_system_addresses_EVM"></a>
+<a id="0x1_system_addresses_EVM"></a>
 
 The operation can only be performed by the VM
 
@@ -79,7 +81,7 @@ The operation can only be performed by the VM
 
 
 
-<a name="0x1_system_addresses_assert_core_resource"></a>
+<a id="0x1_system_addresses_assert_core_resource"></a>
 
 ## Function `assert_core_resource`
 
@@ -103,7 +105,7 @@ The operation can only be performed by the VM
 
 </details>
 
-<a name="0x1_system_addresses_assert_core_resource_address"></a>
+<a id="0x1_system_addresses_assert_core_resource_address"></a>
 
 ## Function `assert_core_resource_address`
 
@@ -127,7 +129,7 @@ The operation can only be performed by the VM
 
 </details>
 
-<a name="0x1_system_addresses_is_core_resource_address"></a>
+<a id="0x1_system_addresses_is_core_resource_address"></a>
 
 ## Function `is_core_resource_address`
 
@@ -151,7 +153,7 @@ The operation can only be performed by the VM
 
 </details>
 
-<a name="0x1_system_addresses_assert_aptos_framework"></a>
+<a id="0x1_system_addresses_assert_aptos_framework"></a>
 
 ## Function `assert_aptos_framework`
 
@@ -178,7 +180,7 @@ The operation can only be performed by the VM
 
 </details>
 
-<a name="0x1_system_addresses_assert_framework_reserved_address"></a>
+<a id="0x1_system_addresses_assert_framework_reserved_address"></a>
 
 ## Function `assert_framework_reserved_address`
 
@@ -202,7 +204,7 @@ The operation can only be performed by the VM
 
 </details>
 
-<a name="0x1_system_addresses_assert_framework_reserved"></a>
+<a id="0x1_system_addresses_assert_framework_reserved"></a>
 
 ## Function `assert_framework_reserved`
 
@@ -229,7 +231,7 @@ The operation can only be performed by the VM
 
 </details>
 
-<a name="0x1_system_addresses_is_framework_reserved_address"></a>
+<a id="0x1_system_addresses_is_framework_reserved_address"></a>
 
 ## Function `is_framework_reserved_address`
 
@@ -263,7 +265,7 @@ Return true if <code>addr</code> is 0x0 or under the on chain governance's contr
 
 </details>
 
-<a name="0x1_system_addresses_is_aptos_framework_address"></a>
+<a id="0x1_system_addresses_is_aptos_framework_address"></a>
 
 ## Function `is_aptos_framework_address`
 
@@ -288,7 +290,7 @@ Return true if <code>addr</code> is 0x1.
 
 </details>
 
-<a name="0x1_system_addresses_assert_vm"></a>
+<a id="0x1_system_addresses_assert_vm"></a>
 
 ## Function `assert_vm`
 
@@ -313,7 +315,7 @@ Assert that the signer has the VM reserved address.
 
 </details>
 
-<a name="0x1_system_addresses_is_vm"></a>
+<a id="0x1_system_addresses_is_vm"></a>
 
 ## Function `is_vm`
 
@@ -338,7 +340,7 @@ Return true if <code>addr</code> is a reserved address for the VM to call system
 
 </details>
 
-<a name="0x1_system_addresses_is_vm_address"></a>
+<a id="0x1_system_addresses_is_vm_address"></a>
 
 ## Function `is_vm_address`
 
@@ -363,7 +365,7 @@ Return true if <code>addr</code> is a reserved address for the VM to call system
 
 </details>
 
-<a name="0x1_system_addresses_is_reserved_address"></a>
+<a id="0x1_system_addresses_is_reserved_address"></a>
 
 ## Function `is_reserved_address`
 
@@ -388,10 +390,54 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Asserting that a provided address corresponds to the Core Resources address should always yield a true result when matched.</td>
+<td>Low</td>
+<td>The assert_core_resource and assert_core_resource_address functions ensure that the provided signer or address belong to the @core_resources account.</td>
+<td>Formally verified via <a href="#high-level-req-1">AbortsIfNotCoreResource</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Asserting that a provided address corresponds to the Aptos Framework Resources address should always yield a true result when matched.</td>
+<td>High</td>
+<td>The assert_aptos_framework function ensures that the provided signer belongs to the @aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-2">AbortsIfNotAptosFramework</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Asserting that a provided address corresponds to the VM address should always yield a true result when matched.</td>
+<td>High</td>
+<td>The assert_vm function ensure that the provided signer belongs to the @vm_reserved account.</td>
+<td>Formally verified via <a href="#high-level-req-3">AbortsIfNotVM</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -400,7 +446,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
-<a name="@Specification_1_assert_core_resource"></a>
+<a id="@Specification_1_assert_core_resource"></a>
 
 ### Function `assert_core_resource`
 
@@ -417,7 +463,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
-<a name="@Specification_1_assert_core_resource_address"></a>
+<a id="@Specification_1_assert_core_resource_address"></a>
 
 ### Function `assert_core_resource_address`
 
@@ -434,7 +480,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
-<a name="@Specification_1_is_core_resource_address"></a>
+<a id="@Specification_1_is_core_resource_address"></a>
 
 ### Function `is_core_resource_address`
 
@@ -452,7 +498,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
-<a name="@Specification_1_assert_aptos_framework"></a>
+<a id="@Specification_1_assert_aptos_framework"></a>
 
 ### Function `assert_aptos_framework`
 
@@ -469,7 +515,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
-<a name="@Specification_1_assert_framework_reserved_address"></a>
+<a id="@Specification_1_assert_framework_reserved_address"></a>
 
 ### Function `assert_framework_reserved_address`
 
@@ -485,7 +531,7 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
-<a name="@Specification_1_assert_framework_reserved"></a>
+<a id="@Specification_1_assert_framework_reserved"></a>
 
 ### Function `assert_framework_reserved`
 
@@ -500,8 +546,22 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 </code></pre>
 
 
+Specifies that a function aborts if the account does not have the aptos framework address.
 
-<a name="@Specification_1_assert_vm"></a>
+
+<a id="0x1_system_addresses_AbortsIfNotAptosFramework"></a>
+
+
+<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a> {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) != @aptos_framework <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_assert_vm"></a>
 
 ### Function `assert_vm`
 
@@ -514,6 +574,20 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotVM">AbortsIfNotVM</a>;
+</code></pre>
+
+
+Specifies that a function aborts if the account does not have the VM reserved address.
+
+
+<a id="0x1_system_addresses_AbortsIfNotVM"></a>
+
+
+<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotVM">AbortsIfNotVM</a> {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) != @vm_reserved <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
+}
 </code></pre>
 
 

@@ -24,7 +24,7 @@ use crate::{
     peer_manager::{PeerManagerError, TransportNotification},
     protocols::{
         direct_send::Message,
-        rpc::{InboundRpcRequest, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
+        rpc::{error::RpcError, InboundRpcRequest, InboundRpcs, OutboundRpcRequest, OutboundRpcs},
         stream::{InboundStreamBuffer, OutboundStream, StreamMessage},
         wire::messaging::v1::{
             DirectSendMsg, ErrorCode, MultiplexMessage, MultiplexMessageSink,
@@ -270,12 +270,36 @@ where
                 // Drive the queue of pending inbound rpcs. When one is fulfilled
                 // by an upstream protocol, send the response to the remote peer.
                 maybe_response = self.inbound_rpcs.next_completed_response() => {
-                    if let Err(err) = self.inbound_rpcs.send_outbound_response(&mut write_reqs_tx, maybe_response).await {
-                        warn!(
-                            NetworkSchema::new(&self.network_context).connection_metadata(&self.connection_metadata),
-                            error = %err,
-                            "{} Error in handling inbound rpc request, error: {}", self.network_context, err,
-                        );
+                    // Extract the relevant metadata from the message
+                    let message_metadata = match &maybe_response {
+                        Ok((response, protocol_id)) => Some((response.request_id, *protocol_id)),
+                        _ => None,
+                    };
+
+                    // Send the response to the remote peer
+                    if let Err(error) = self.inbound_rpcs.send_outbound_response(&mut write_reqs_tx, maybe_response).await {
+                        // It's quite common for applications to drop an RPC request.
+                        // If this happens, we want to avoid logging a warning/error
+                        // (as it makes the logs noisy). Otherwise, we log normally.
+                        let network_schema = NetworkSchema::new(&self.network_context)
+                            .connection_metadata(&self.connection_metadata);
+                        let error_string = format!("{} Error in handling inbound rpc request (metadata: {:?}), error: {}", self.network_context,  message_metadata, error);
+                        match error {
+                            RpcError::UnexpectedResponseChannelCancel => {
+                                debug!(
+                                    network_schema,
+                                    error = %error,
+                                    "{}", error_string
+                                );
+                            },
+                            error => {
+                                warn!(
+                                    network_schema,
+                                    error = %error,
+                                    "{}", error_string
+                                );
+                            }
+                        }
                     }
                 },
                 // Poll the queue of pending outbound rpc tasks for the next

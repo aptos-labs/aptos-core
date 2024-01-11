@@ -1,5 +1,5 @@
 
-<a name="0x1_fungible_asset"></a>
+<a id="0x1_fungible_asset"></a>
 
 # Module `0x1::fungible_asset`
 
@@ -65,6 +65,8 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `borrow_store_resource`](#0x1_fungible_asset_borrow_store_resource)
 -  [Function `upgrade_to_concurrent`](#0x1_fungible_asset_upgrade_to_concurrent)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
 
 
 <pre><code><b>use</b> <a href="aggregator_v2.md#0x1_aggregator_v2">0x1::aggregator_v2</a>;
@@ -79,7 +81,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 
 
 
-<a name="0x1_fungible_asset_Supply"></a>
+<a id="0x1_fungible_asset_Supply"></a>
 
 ## Resource `Supply`
 
@@ -113,7 +115,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 
 </details>
 
-<a name="0x1_fungible_asset_ConcurrentSupply"></a>
+<a id="0x1_fungible_asset_ConcurrentSupply"></a>
 
 ## Resource `ConcurrentSupply`
 
@@ -141,7 +143,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 
 </details>
 
-<a name="0x1_fungible_asset_Metadata"></a>
+<a id="0x1_fungible_asset_Metadata"></a>
 
 ## Resource `Metadata`
 
@@ -198,7 +200,7 @@ Metadata of a Fungible asset
 
 </details>
 
-<a name="0x1_fungible_asset_FungibleStore"></a>
+<a id="0x1_fungible_asset_FungibleStore"></a>
 
 ## Resource `FungibleStore`
 
@@ -239,7 +241,7 @@ The store object that holds fungible assets of a specific type associated with a
 
 </details>
 
-<a name="0x1_fungible_asset_FungibleAssetEvents"></a>
+<a id="0x1_fungible_asset_FungibleAssetEvents"></a>
 
 ## Resource `FungibleAssetEvents`
 
@@ -279,7 +281,7 @@ The store object that holds fungible assets of a specific type associated with a
 
 </details>
 
-<a name="0x1_fungible_asset_FungibleAsset"></a>
+<a id="0x1_fungible_asset_FungibleAsset"></a>
 
 ## Struct `FungibleAsset`
 
@@ -314,7 +316,7 @@ FungibleAsset is ephemeral and cannot be stored directly. It must be deposited b
 
 </details>
 
-<a name="0x1_fungible_asset_MintRef"></a>
+<a id="0x1_fungible_asset_MintRef"></a>
 
 ## Struct `MintRef`
 
@@ -342,7 +344,7 @@ MintRef can be used to mint the fungible asset into an account's store.
 
 </details>
 
-<a name="0x1_fungible_asset_TransferRef"></a>
+<a id="0x1_fungible_asset_TransferRef"></a>
 
 ## Struct `TransferRef`
 
@@ -371,7 +373,7 @@ and allow the holder of TransferRef to transfer fungible assets from any account
 
 </details>
 
-<a name="0x1_fungible_asset_BurnRef"></a>
+<a id="0x1_fungible_asset_BurnRef"></a>
 
 ## Struct `BurnRef`
 
@@ -399,7 +401,7 @@ BurnRef can be used to burn fungible assets from a given holder account.
 
 </details>
 
-<a name="0x1_fungible_asset_DepositEvent"></a>
+<a id="0x1_fungible_asset_DepositEvent"></a>
 
 ## Struct `DepositEvent`
 
@@ -427,7 +429,7 @@ Emitted when fungible assets are deposited into a store.
 
 </details>
 
-<a name="0x1_fungible_asset_WithdrawEvent"></a>
+<a id="0x1_fungible_asset_WithdrawEvent"></a>
 
 ## Struct `WithdrawEvent`
 
@@ -455,7 +457,7 @@ Emitted when fungible assets are withdrawn from a store.
 
 </details>
 
-<a name="0x1_fungible_asset_FrozenEvent"></a>
+<a id="0x1_fungible_asset_FrozenEvent"></a>
 
 ## Struct `FrozenEvent`
 
@@ -483,12 +485,12 @@ Emitted when a store's frozen status is updated.
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_fungible_asset_MAX_U128"></a>
+<a id="0x1_fungible_asset_MAX_U128"></a>
 
 Maximum possible coin supply.
 
@@ -498,7 +500,7 @@ Maximum possible coin supply.
 
 
 
-<a name="0x1_fungible_asset_EINSUFFICIENT_BALANCE"></a>
+<a id="0x1_fungible_asset_EINSUFFICIENT_BALANCE"></a>
 
 Insufficient balance to withdraw or transfer.
 
@@ -508,7 +510,7 @@ Insufficient balance to withdraw or transfer.
 
 
 
-<a name="0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO"></a>
+<a id="0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO"></a>
 
 Amount cannot be zero.
 
@@ -518,7 +520,7 @@ Amount cannot be zero.
 
 
 
-<a name="0x1_fungible_asset_EAMOUNT_IS_NOT_ZERO"></a>
+<a id="0x1_fungible_asset_EAMOUNT_IS_NOT_ZERO"></a>
 
 Cannot destroy non-empty fungible assets.
 
@@ -528,7 +530,7 @@ Cannot destroy non-empty fungible assets.
 
 
 
-<a name="0x1_fungible_asset_EBALANCE_IS_NOT_ZERO"></a>
+<a id="0x1_fungible_asset_EBALANCE_IS_NOT_ZERO"></a>
 
 Cannot destroy fungible stores with a non-zero balance.
 
@@ -538,7 +540,7 @@ Cannot destroy fungible stores with a non-zero balance.
 
 
 
-<a name="0x1_fungible_asset_EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH"></a>
+<a id="0x1_fungible_asset_EBURN_REF_AND_FUNGIBLE_ASSET_MISMATCH"></a>
 
 Burn ref and fungible asset do not match.
 
@@ -548,7 +550,7 @@ Burn ref and fungible asset do not match.
 
 
 
-<a name="0x1_fungible_asset_EBURN_REF_AND_STORE_MISMATCH"></a>
+<a id="0x1_fungible_asset_EBURN_REF_AND_STORE_MISMATCH"></a>
 
 Burn ref and store do not match.
 
@@ -558,7 +560,7 @@ Burn ref and store do not match.
 
 
 
-<a name="0x1_fungible_asset_ECONCURRENT_SUPPLY_NOT_ENABLED"></a>
+<a id="0x1_fungible_asset_ECONCURRENT_SUPPLY_NOT_ENABLED"></a>
 
 Flag for Concurrent Supply not enabled
 
@@ -568,7 +570,7 @@ Flag for Concurrent Supply not enabled
 
 
 
-<a name="0x1_fungible_asset_EDECIMALS_TOO_LARGE"></a>
+<a id="0x1_fungible_asset_EDECIMALS_TOO_LARGE"></a>
 
 Decimals is over the maximum of 32
 
@@ -578,7 +580,7 @@ Decimals is over the maximum of 32
 
 
 
-<a name="0x1_fungible_asset_EFUNGIBLE_ASSET_AND_STORE_MISMATCH"></a>
+<a id="0x1_fungible_asset_EFUNGIBLE_ASSET_AND_STORE_MISMATCH"></a>
 
 Fungible asset and store do not match.
 
@@ -588,7 +590,7 @@ Fungible asset and store do not match.
 
 
 
-<a name="0x1_fungible_asset_EFUNGIBLE_ASSET_MISMATCH"></a>
+<a id="0x1_fungible_asset_EFUNGIBLE_ASSET_MISMATCH"></a>
 
 Fungible asset do not match when merging.
 
@@ -598,7 +600,7 @@ Fungible asset do not match when merging.
 
 
 
-<a name="0x1_fungible_asset_EMAX_SUPPLY_EXCEEDED"></a>
+<a id="0x1_fungible_asset_EMAX_SUPPLY_EXCEEDED"></a>
 
 The fungible asset's supply has exceeded maximum.
 
@@ -608,7 +610,7 @@ The fungible asset's supply has exceeded maximum.
 
 
 
-<a name="0x1_fungible_asset_EMINT_REF_AND_STORE_MISMATCH"></a>
+<a id="0x1_fungible_asset_EMINT_REF_AND_STORE_MISMATCH"></a>
 
 The mint ref and the the store do not match.
 
@@ -618,7 +620,7 @@ The mint ref and the the store do not match.
 
 
 
-<a name="0x1_fungible_asset_ENAME_TOO_LONG"></a>
+<a id="0x1_fungible_asset_ENAME_TOO_LONG"></a>
 
 Name of the fungible asset metadata is too long
 
@@ -628,7 +630,7 @@ Name of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_ENOT_STORE_OWNER"></a>
+<a id="0x1_fungible_asset_ENOT_STORE_OWNER"></a>
 
 Account is not the store's owner.
 
@@ -638,7 +640,7 @@ Account is not the store's owner.
 
 
 
-<a name="0x1_fungible_asset_EOBJECT_IS_DELETABLE"></a>
+<a id="0x1_fungible_asset_EOBJECT_IS_DELETABLE"></a>
 
 Fungibility is only available for non-deletable objects.
 
@@ -648,7 +650,7 @@ Fungibility is only available for non-deletable objects.
 
 
 
-<a name="0x1_fungible_asset_ESTORE_IS_FROZEN"></a>
+<a id="0x1_fungible_asset_ESTORE_IS_FROZEN"></a>
 
 Store is disabled from sending and receiving this fungible asset.
 
@@ -658,7 +660,7 @@ Store is disabled from sending and receiving this fungible asset.
 
 
 
-<a name="0x1_fungible_asset_ESUPPLY_NOT_FOUND"></a>
+<a id="0x1_fungible_asset_ESUPPLY_NOT_FOUND"></a>
 
 Supply resource is not found for a metadata object.
 
@@ -668,7 +670,7 @@ Supply resource is not found for a metadata object.
 
 
 
-<a name="0x1_fungible_asset_ESUPPLY_UNDERFLOW"></a>
+<a id="0x1_fungible_asset_ESUPPLY_UNDERFLOW"></a>
 
 The fungible asset's supply will be negative which should be impossible.
 
@@ -678,7 +680,7 @@ The fungible asset's supply will be negative which should be impossible.
 
 
 
-<a name="0x1_fungible_asset_ESYMBOL_TOO_LONG"></a>
+<a id="0x1_fungible_asset_ESYMBOL_TOO_LONG"></a>
 
 Symbol of the fungible asset metadata is too long
 
@@ -688,7 +690,7 @@ Symbol of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH"></a>
+<a id="0x1_fungible_asset_ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH"></a>
 
 The transfer ref and the fungible asset do not match.
 
@@ -698,7 +700,7 @@ The transfer ref and the fungible asset do not match.
 
 
 
-<a name="0x1_fungible_asset_ETRANSFER_REF_AND_STORE_MISMATCH"></a>
+<a id="0x1_fungible_asset_ETRANSFER_REF_AND_STORE_MISMATCH"></a>
 
 Transfer ref and store do not match.
 
@@ -708,7 +710,7 @@ Transfer ref and store do not match.
 
 
 
-<a name="0x1_fungible_asset_EURI_TOO_LONG"></a>
+<a id="0x1_fungible_asset_EURI_TOO_LONG"></a>
 
 URI for the icon of the fungible asset metadata is too long
 
@@ -718,7 +720,7 @@ URI for the icon of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_MAX_DECIMALS"></a>
+<a id="0x1_fungible_asset_MAX_DECIMALS"></a>
 
 
 
@@ -727,7 +729,7 @@ URI for the icon of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_MAX_NAME_LENGTH"></a>
+<a id="0x1_fungible_asset_MAX_NAME_LENGTH"></a>
 
 
 
@@ -736,7 +738,7 @@ URI for the icon of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_MAX_SYMBOL_LENGTH"></a>
+<a id="0x1_fungible_asset_MAX_SYMBOL_LENGTH"></a>
 
 
 
@@ -745,7 +747,7 @@ URI for the icon of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_MAX_URI_LENGTH"></a>
+<a id="0x1_fungible_asset_MAX_URI_LENGTH"></a>
 
 
 
@@ -754,7 +756,7 @@ URI for the icon of the fungible asset metadata is too long
 
 
 
-<a name="0x1_fungible_asset_add_fungibility"></a>
+<a id="0x1_fungible_asset_add_fungibility"></a>
 
 ## Function `add_fungibility`
 
@@ -826,7 +828,7 @@ if option::some(MAX_U128) is used, it is treated as unlimited supply.
 
 </details>
 
-<a name="0x1_fungible_asset_generate_mint_ref"></a>
+<a id="0x1_fungible_asset_generate_mint_ref"></a>
 
 ## Function `generate_mint_ref`
 
@@ -853,7 +855,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 </details>
 
-<a name="0x1_fungible_asset_generate_burn_ref"></a>
+<a id="0x1_fungible_asset_generate_burn_ref"></a>
 
 ## Function `generate_burn_ref`
 
@@ -880,7 +882,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 </details>
 
-<a name="0x1_fungible_asset_generate_transfer_ref"></a>
+<a id="0x1_fungible_asset_generate_transfer_ref"></a>
 
 ## Function `generate_transfer_ref`
 
@@ -908,7 +910,7 @@ This can only be called at object creation time as constructor_ref is only avail
 
 </details>
 
-<a name="0x1_fungible_asset_supply"></a>
+<a id="0x1_fungible_asset_supply"></a>
 
 ## Function `supply`
 
@@ -943,7 +945,7 @@ Get the current supply from the <code>metadata</code> object.
 
 </details>
 
-<a name="0x1_fungible_asset_maximum"></a>
+<a id="0x1_fungible_asset_maximum"></a>
 
 ## Function `maximum`
 
@@ -984,7 +986,7 @@ If supply is unlimited (or set explicitly to MAX_U128), none is returned
 
 </details>
 
-<a name="0x1_fungible_asset_name"></a>
+<a id="0x1_fungible_asset_name"></a>
 
 ## Function `name`
 
@@ -1010,7 +1012,7 @@ Get the name of the fungible asset from the <code>metadata</code> object.
 
 </details>
 
-<a name="0x1_fungible_asset_symbol"></a>
+<a id="0x1_fungible_asset_symbol"></a>
 
 ## Function `symbol`
 
@@ -1036,7 +1038,7 @@ Get the symbol of the fungible asset from the <code>metadata</code> object.
 
 </details>
 
-<a name="0x1_fungible_asset_decimals"></a>
+<a id="0x1_fungible_asset_decimals"></a>
 
 ## Function `decimals`
 
@@ -1062,7 +1064,7 @@ Get the decimals from the <code>metadata</code> object.
 
 </details>
 
-<a name="0x1_fungible_asset_store_exists"></a>
+<a id="0x1_fungible_asset_store_exists"></a>
 
 ## Function `store_exists`
 
@@ -1088,7 +1090,7 @@ Return whether the provided address has a store initialized.
 
 </details>
 
-<a name="0x1_fungible_asset_metadata_from_asset"></a>
+<a id="0x1_fungible_asset_metadata_from_asset"></a>
 
 ## Function `metadata_from_asset`
 
@@ -1113,7 +1115,7 @@ Return the underlying metadata object
 
 </details>
 
-<a name="0x1_fungible_asset_store_metadata"></a>
+<a id="0x1_fungible_asset_store_metadata"></a>
 
 ## Function `store_metadata`
 
@@ -1139,7 +1141,7 @@ Return the underlying metadata object.
 
 </details>
 
-<a name="0x1_fungible_asset_amount"></a>
+<a id="0x1_fungible_asset_amount"></a>
 
 ## Function `amount`
 
@@ -1164,7 +1166,7 @@ Return the <code>amount</code> of a given fungible asset.
 
 </details>
 
-<a name="0x1_fungible_asset_balance"></a>
+<a id="0x1_fungible_asset_balance"></a>
 
 ## Function `balance`
 
@@ -1194,7 +1196,7 @@ Get the balance of a given store.
 
 </details>
 
-<a name="0x1_fungible_asset_is_frozen"></a>
+<a id="0x1_fungible_asset_is_frozen"></a>
 
 ## Function `is_frozen`
 
@@ -1222,7 +1224,7 @@ If the store has not been created, we default to returning false so deposits can
 
 </details>
 
-<a name="0x1_fungible_asset_asset_metadata"></a>
+<a id="0x1_fungible_asset_asset_metadata"></a>
 
 ## Function `asset_metadata`
 
@@ -1246,7 +1248,7 @@ If the store has not been created, we default to returning false so deposits can
 
 </details>
 
-<a name="0x1_fungible_asset_mint_ref_metadata"></a>
+<a id="0x1_fungible_asset_mint_ref_metadata"></a>
 
 ## Function `mint_ref_metadata`
 
@@ -1271,7 +1273,7 @@ Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1
 
 </details>
 
-<a name="0x1_fungible_asset_transfer_ref_metadata"></a>
+<a id="0x1_fungible_asset_transfer_ref_metadata"></a>
 
 ## Function `transfer_ref_metadata`
 
@@ -1296,7 +1298,7 @@ Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1
 
 </details>
 
-<a name="0x1_fungible_asset_burn_ref_metadata"></a>
+<a id="0x1_fungible_asset_burn_ref_metadata"></a>
 
 ## Function `burn_ref_metadata`
 
@@ -1321,7 +1323,7 @@ Get the underlying metadata object from the <code><a href="fungible_asset.md#0x1
 
 </details>
 
-<a name="0x1_fungible_asset_transfer"></a>
+<a id="0x1_fungible_asset_transfer"></a>
 
 ## Function `transfer`
 
@@ -1353,7 +1355,7 @@ Note: it does not move the underlying object.
 
 </details>
 
-<a name="0x1_fungible_asset_create_store"></a>
+<a id="0x1_fungible_asset_create_store"></a>
 
 ## Function `create_store`
 
@@ -1396,7 +1398,7 @@ Applications can use this to create multiple stores for isolating fungible asset
 
 </details>
 
-<a name="0x1_fungible_asset_remove_store"></a>
+<a id="0x1_fungible_asset_remove_store"></a>
 
 ## Function `remove_store`
 
@@ -1433,7 +1435,7 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
 
 </details>
 
-<a name="0x1_fungible_asset_withdraw"></a>
+<a id="0x1_fungible_asset_withdraw"></a>
 
 ## Function `withdraw`
 
@@ -1464,7 +1466,7 @@ Withdraw <code>amount</code> of the fungible asset from <code>store</code> by th
 
 </details>
 
-<a name="0x1_fungible_asset_deposit"></a>
+<a id="0x1_fungible_asset_deposit"></a>
 
 ## Function `deposit`
 
@@ -1490,7 +1492,7 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.
 
 </details>
 
-<a name="0x1_fungible_asset_mint"></a>
+<a id="0x1_fungible_asset_mint"></a>
 
 ## Function `mint`
 
@@ -1522,7 +1524,7 @@ Mint the specified <code>amount</code> of the fungible asset.
 
 </details>
 
-<a name="0x1_fungible_asset_mint_to"></a>
+<a id="0x1_fungible_asset_mint_to"></a>
 
 ## Function `mint_to`
 
@@ -1548,7 +1550,7 @@ Mint the specified <code>amount</code> of the fungible asset to a destination st
 
 </details>
 
-<a name="0x1_fungible_asset_set_frozen_flag"></a>
+<a id="0x1_fungible_asset_set_frozen_flag"></a>
 
 ## Function `set_frozen_flag`
 
@@ -1585,7 +1587,7 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
 
 </details>
 
-<a name="0x1_fungible_asset_burn"></a>
+<a id="0x1_fungible_asset_burn"></a>
 
 ## Function `burn`
 
@@ -1615,7 +1617,7 @@ Burns a fungible asset
 
 </details>
 
-<a name="0x1_fungible_asset_burn_from"></a>
+<a id="0x1_fungible_asset_burn_from"></a>
 
 ## Function `burn_from`
 
@@ -1647,7 +1649,7 @@ Burn the <code>amount</code> of the fungible asset from the given store.
 
 </details>
 
-<a name="0x1_fungible_asset_withdraw_with_ref"></a>
+<a id="0x1_fungible_asset_withdraw_with_ref"></a>
 
 ## Function `withdraw_with_ref`
 
@@ -1680,7 +1682,7 @@ Withdraw <code>amount</code> of the fungible asset from the <code>store</code> i
 
 </details>
 
-<a name="0x1_fungible_asset_deposit_with_ref"></a>
+<a id="0x1_fungible_asset_deposit_with_ref"></a>
 
 ## Function `deposit_with_ref`
 
@@ -1713,7 +1715,7 @@ Deposit the fungible asset into the <code>store</code> ignoring <code>frozen</co
 
 </details>
 
-<a name="0x1_fungible_asset_transfer_with_ref"></a>
+<a id="0x1_fungible_asset_transfer_with_ref"></a>
 
 ## Function `transfer_with_ref`
 
@@ -1744,7 +1746,7 @@ Transfer <code>amount</code> of the fungible asset with <code><a href="fungible_
 
 </details>
 
-<a name="0x1_fungible_asset_zero"></a>
+<a id="0x1_fungible_asset_zero"></a>
 
 ## Function `zero`
 
@@ -1773,7 +1775,7 @@ This can be useful when starting a series of computations where the initial valu
 
 </details>
 
-<a name="0x1_fungible_asset_extract"></a>
+<a id="0x1_fungible_asset_extract"></a>
 
 ## Function `extract`
 
@@ -1803,7 +1805,7 @@ Extract a given amount from the given fungible asset and return a new one.
 
 </details>
 
-<a name="0x1_fungible_asset_merge"></a>
+<a id="0x1_fungible_asset_merge"></a>
 
 ## Function `merge`
 
@@ -1831,7 +1833,7 @@ equal to the sum of the two (<code>dst_fungible_asset</code> and <code>src_fungi
 
 </details>
 
-<a name="0x1_fungible_asset_destroy_zero"></a>
+<a id="0x1_fungible_asset_destroy_zero"></a>
 
 ## Function `destroy_zero`
 
@@ -1857,7 +1859,7 @@ Destroy an empty fungible asset.
 
 </details>
 
-<a name="0x1_fungible_asset_deposit_internal"></a>
+<a id="0x1_fungible_asset_deposit_internal"></a>
 
 ## Function `deposit_internal`
 
@@ -1891,7 +1893,7 @@ Destroy an empty fungible asset.
 
 </details>
 
-<a name="0x1_fungible_asset_withdraw_internal"></a>
+<a id="0x1_fungible_asset_withdraw_internal"></a>
 
 ## Function `withdraw_internal`
 
@@ -1928,7 +1930,7 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
 
 </details>
 
-<a name="0x1_fungible_asset_increase_supply"></a>
+<a id="0x1_fungible_asset_increase_supply"></a>
 
 ## Function `increase_supply`
 
@@ -1974,7 +1976,7 @@ Increase the supply of a fungible asset by minting.
 
 </details>
 
-<a name="0x1_fungible_asset_decrease_supply"></a>
+<a id="0x1_fungible_asset_decrease_supply"></a>
 
 ## Function `decrease_supply`
 
@@ -2019,7 +2021,7 @@ Decrease the supply of a fungible asset by burning.
 
 </details>
 
-<a name="0x1_fungible_asset_borrow_fungible_metadata"></a>
+<a id="0x1_fungible_asset_borrow_fungible_metadata"></a>
 
 ## Function `borrow_fungible_metadata`
 
@@ -2046,7 +2048,7 @@ Decrease the supply of a fungible asset by burning.
 
 </details>
 
-<a name="0x1_fungible_asset_borrow_fungible_metadata_mut"></a>
+<a id="0x1_fungible_asset_borrow_fungible_metadata_mut"></a>
 
 ## Function `borrow_fungible_metadata_mut`
 
@@ -2073,7 +2075,7 @@ Decrease the supply of a fungible asset by burning.
 
 </details>
 
-<a name="0x1_fungible_asset_borrow_store_resource"></a>
+<a id="0x1_fungible_asset_borrow_store_resource"></a>
 
 ## Function `borrow_store_resource`
 
@@ -2097,7 +2099,7 @@ Decrease the supply of a fungible asset by burning.
 
 </details>
 
-<a name="0x1_fungible_asset_upgrade_to_concurrent"></a>
+<a id="0x1_fungible_asset_upgrade_to_concurrent"></a>
 
 ## Function `upgrade_to_concurrent`
 
@@ -2143,10 +2145,166 @@ Decrease the supply of a fungible asset by burning.
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The metadata associated with the fungible asset is subject to precise size constraints.</td>
+<td>Medium</td>
+<td>The add_fungibility function has size limitations for the name, symbol, number of decimals, icon_uri, and project_uri field of the Metadata resource.</td>
+<td>This has been audited.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Adding fungibility to an existing object should initialize the metadata and supply resources and store them under the metadata object address.</td>
+<td>Low</td>
+<td>The add_fungibility function initializes the Metadata and Supply resources and moves them under the metadata object.</td>
+<td>Audited that the Metadata and Supply resources are initialized properly.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Generating mint, burn and transfer references can only be done at object creation time and if the object was added fungibility.</td>
+<td>Low</td>
+<td>The following functions generate the related references of the Metadata object: 1. generate_mint_ref 2. generate_burn_ref 3. generate_transfer_ref</td>
+<td>Audited that the Metadata object exists within the constructor ref.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>Only the owner of a store should be allowed to withdraw fungible assets from it.</td>
+<td>High</td>
+<td>The fungible_asset::withdraw function ensures that the signer owns the store by asserting that the object address matches the address of the signer.</td>
+<td>Audited that the address of the signer owns the object.</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>The transfer, withdrawal and deposit operation should never change the current supply of the fungible asset.</td>
+<td>High</td>
+<td>The transfer function withdraws the fungible assets from the store and deposits them to the receiver. The withdraw function extracts the fungible asset from the fungible asset store. The deposit function adds the balance to the fungible asset store.</td>
+<td>Audited that the supply before and after the operation remains constant.</td>
+</tr>
+
+<tr>
+<td>6</td>
+<td>The owner of the store should only be able to withdraw a certain amount if its store has sufficient balance and is not frozen, unless the withdrawal is performed with a reference, and afterwards the store balance should be decreased.</td>
+<td>High</td>
+<td>The withdraw function ensures that the store is not frozen before calling withdraw_internal which ensures that the withdrawing amount is greater than 0 and less than the total balance from the store. The withdraw_with_ref ensures that the reference's metadata matches the store metadata.</td>
+<td>Audited that it aborts if the withdrawing store is frozen. Audited that it aborts if the store doesn't have sufficient balance. Audited that the balance of the withdrawing store is reduced by amount.</td>
+</tr>
+
+<tr>
+<td>7</td>
+<td>Only the same type of fungible assets should be deposited in a fungible asset store, if the store is not frozen, unless the deposit is performed with a reference, and afterwards the store balance should be increased.</td>
+<td>High</td>
+<td>The deposit function ensures that store is not frozen and proceeds to call the deposit_internal function which validates the store's metadata and the depositing asset's metadata followed by increasing the store balance by the given amount. The deposit_with_ref ensures that the reference's metadata matches the depositing asset's metadata.</td>
+<td>Audited that it aborts if the store is frozen. Audited that it aborts if the asset and asset store are different. Audited that the store's balance is increased by the deposited amount.</td>
+</tr>
+
+<tr>
+<td>8</td>
+<td>An object should only be allowed to hold one store for fungible assets.</td>
+<td>Medium</td>
+<td>The create_store function initializes a new FungibleStore resource and moves it under the object address.</td>
+<td>Audited that the resource was moved under the object.</td>
+</tr>
+
+<tr>
+<td>9</td>
+<td>When a new store is created, the balance should be set by default to the value zero.</td>
+<td>High</td>
+<td>The create_store function initializes a new fungible asset store with zero balance and stores it under the given construtorRef object.</td>
+<td>Audited that the store is properly initialized with zero balance.</td>
+</tr>
+
+<tr>
+<td>10</td>
+<td>A store should only be deleted if it's balance is zero.</td>
+<td>Medium</td>
+<td>The remove_store function validates the store's balance and removes the store under the object address.</td>
+<td>Audited that aborts if the balance of the store is not zero. Audited that store is removed from the object address.</td>
+</tr>
+
+<tr>
+<td>11</td>
+<td>Minting and burning should alter the total supply value, and the store balances.</td>
+<td>High</td>
+<td>The mint process increases the total supply by the amount minted using the increase_supply function. The burn process withdraws the burn amount from the given store and decreases the total supply by the amount burned using the decrease_supply function.</td>
+<td>Audited the mint and burn functions that the supply was adjusted accordingly.</td>
+</tr>
+
+<tr>
+<td>12</td>
+<td>It must not be possible to burn an amount of fungible assets larger than their current supply.</td>
+<td>High</td>
+<td>The burn process ensures that the store has enough balance to burn, by asserting that the supply.current >= amount inside the decrease_supply function.</td>
+<td>Audited that it aborts if the provided store doesn't have sufficient balance.</td>
+</tr>
+
+<tr>
+<td>13</td>
+<td>Enabling or disabling store's frozen status should only be done with a valid transfer reference.</td>
+<td>High</td>
+<td>The set_frozen_flag function ensures that the TransferRef is provided via function argument and that the store's metadata matches the metadata from the reference. It then proceeds to update the frozen flag of the store.</td>
+<td>Audited that it aborts if the metadata doesn't match. Audited that the frozen flag is updated properly.</td>
+</tr>
+
+<tr>
+<td>14</td>
+<td>Extracting a specific amount from the fungible asset should be possible only if the total amount that it holds is greater or equal to the provided amount.</td>
+<td>High</td>
+<td>The extract function validates that the fungible asset has enough balance to extract and then updates it by subtracting the extracted amount.</td>
+<td>Audited that it aborts if the asset didn't have sufficient balance. Audited that the balance of the asset is updated. Audited that the extract function returns the extracted asset.</td>
+</tr>
+
+<tr>
+<td>15</td>
+<td>Merging two fungible assets should only be possible if both share the same metadata.</td>
+<td>Medium</td>
+<td>The merge function validates the metadata of the src and dst asset.</td>
+<td>Audited that it aborts if the metadata of the src and dst are not the same.</td>
+</tr>
+
+<tr>
+<td>16</td>
+<td>Post merging two fungible assets, the source asset should have the amount value equal to the sum of the two.</td>
+<td>High</td>
+<td>The merge function increases dst_fungible_asset.amount by src_fungible_asset.amount.</td>
+<td>Audited that the dst_fungible_asset balance is increased by amount.</td>
+</tr>
+
+<tr>
+<td>17</td>
+<td>Fungible assets with zero balance should be destroyed when the amount reaches value 0.</td>
+<td>Medium</td>
+<td>The destroy_zero ensures that the balance of the asset has the value 0 and destroy the asset.</td>
+<td>Audited that it aborts if the balance of the asset is non zero.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify=<b>false</b>;

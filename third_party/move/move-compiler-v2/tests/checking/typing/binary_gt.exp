@@ -12,7 +12,7 @@ module 0x8675309::M {
         Gt<u128>(0, 1);
         Gt<u128>(0, 1);
         Gt<u64>(0, 1);
-        Gt<u64>(x, x);
+        Gt<u64>(Copy(x), Move(x));
         Gt<u64>(select M::R.f(r), select M::R.f(r));
         And(Gt<u64>(1, select M::R.f(r)), Gt<u64>(select M::R.f(r), 0));
         {

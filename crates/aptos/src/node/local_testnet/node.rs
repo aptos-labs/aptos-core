@@ -11,7 +11,13 @@ use clap::Parser;
 use maplit::hashset;
 use rand::{rngs::StdRng, SeedableRng};
 use reqwest::Url;
-use std::{collections::HashSet, path::PathBuf, thread, time::Duration};
+use std::{
+    collections::HashSet,
+    net::{IpAddr, Ipv4Addr},
+    path::PathBuf,
+    thread,
+    time::Duration,
+};
 
 /// Args specific to running a node (and its components, e.g. the txn stream) in the
 /// local testnet.
@@ -57,7 +63,7 @@ pub struct NodeManager {
 }
 
 impl NodeManager {
-    pub fn new(args: &RunLocalTestnet, test_dir: PathBuf) -> Result<Self> {
+    pub fn new(args: &RunLocalTestnet, bind_to: Ipv4Addr, test_dir: PathBuf) -> Result<Self> {
         let rng = args
             .node_args
             .seed
@@ -92,6 +98,12 @@ impl NodeManager {
         // So long as the indexer relies on storage indexing tables, this must be set
         // for the indexer GRPC stream on the node to work.
         node_config.storage.enable_indexer = run_txn_stream;
+
+        // Bind to the requested address.
+        node_config.api.address.set_ip(IpAddr::V4(bind_to));
+        node_config.indexer_grpc.address.set_ip(IpAddr::V4(bind_to));
+        node_config.admin_service.address = bind_to.to_string();
+        node_config.inspection_service.address = bind_to.to_string();
 
         Ok(NodeManager {
             config: node_config,

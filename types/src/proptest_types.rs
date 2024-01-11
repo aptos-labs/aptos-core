@@ -20,7 +20,6 @@ use crate::{
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
-    system_txn::{DummySystemTransaction, SystemTransaction},
     transaction::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
@@ -29,6 +28,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -59,11 +59,11 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::Modification(bytes.into()))
+        vec(any::<u8>(), 0..64).prop_map(|bytes| WriteOp::legacy_modification(bytes.into()))
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
-        Just(WriteOp::Deletion)
+        Just(WriteOp::legacy_deletion())
     }
 }
 
@@ -812,7 +812,7 @@ impl TransactionToCommitGen {
                                 state_key.clone(),
                                 Some(StateValue::new_legacy(Bytes::copy_from_slice(&value))),
                             ),
-                            (state_key, WriteOp::Modification(value.into())),
+                            (state_key, WriteOp::legacy_modification(value.into())),
                         )
                     })
             })
@@ -1215,13 +1215,18 @@ impl Arbitrary for ValidatorVerifier {
     }
 }
 
-impl Arbitrary for SystemTransaction {
+#[cfg(any(test, feature = "fuzzing"))]
+impl Arbitrary for ValidatorTransaction {
     type Parameters = SizeRange;
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         Just(Value::Null)
-            .prop_map(|_| SystemTransaction::DummyTopic(DummySystemTransaction { nonce: 0 }))
+            .prop_map(|_| {
+                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction {
+                    payload: vec![0xFF; 16],
+                })
+            })
             .boxed()
     }
 }

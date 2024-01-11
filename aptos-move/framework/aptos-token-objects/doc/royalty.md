@@ -1,5 +1,5 @@
 
-<a name="0x4_royalty"></a>
+<a id="0x4_royalty"></a>
 
 # Module `0x4::royalty`
 
@@ -30,7 +30,7 @@ royalty.
 
 
 
-<a name="0x4_royalty_Royalty"></a>
+<a id="0x4_royalty_Royalty"></a>
 
 ## Resource `Royalty`
 
@@ -75,7 +75,7 @@ by (numerator / denominator) * 100%
 
 </details>
 
-<a name="0x4_royalty_MutatorRef"></a>
+<a id="0x4_royalty_MutatorRef"></a>
 
 ## Struct `MutatorRef`
 
@@ -103,12 +103,12 @@ This enables creating or overwriting a <code><a href="royalty.md#0x4_royalty_Mut
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO"></a>
+<a id="0x4_royalty_EROYALTY_DENOMINATOR_IS_ZERO"></a>
 
 The royalty denominator cannot be 0
 
@@ -118,7 +118,7 @@ The royalty denominator cannot be 0
 
 
 
-<a name="0x4_royalty_EROYALTY_DOES_NOT_EXIST"></a>
+<a id="0x4_royalty_EROYALTY_DOES_NOT_EXIST"></a>
 
 Royalty does not exist
 
@@ -128,7 +128,7 @@ Royalty does not exist
 
 
 
-<a name="0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM"></a>
+<a id="0x4_royalty_EROYALTY_EXCEEDS_MAXIMUM"></a>
 
 The royalty cannot be greater than 100%
 
@@ -138,7 +138,7 @@ The royalty cannot be greater than 100%
 
 
 
-<a name="0x4_royalty_init"></a>
+<a id="0x4_royalty_init"></a>
 
 ## Function `init`
 
@@ -164,7 +164,7 @@ Add a royalty, given a ConstructorRef.
 
 </details>
 
-<a name="0x4_royalty_update"></a>
+<a id="0x4_royalty_update"></a>
 
 ## Function `update`
 
@@ -195,7 +195,7 @@ Set the royalty if it does not exist, replace it otherwise.
 
 </details>
 
-<a name="0x4_royalty_create"></a>
+<a id="0x4_royalty_create"></a>
 
 ## Function `create`
 
@@ -223,7 +223,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_generate_mutator_ref"></a>
+<a id="0x4_royalty_generate_mutator_ref"></a>
 
 ## Function `generate_mutator_ref`
 
@@ -247,7 +247,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_exists_at"></a>
+<a id="0x4_royalty_exists_at"></a>
 
 ## Function `exists_at`
 
@@ -271,7 +271,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_delete"></a>
+<a id="0x4_royalty_delete"></a>
 
 ## Function `delete`
 
@@ -296,7 +296,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_get"></a>
+<a id="0x4_royalty_get"></a>
 
 ## Function `get`
 
@@ -325,7 +325,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_denominator"></a>
+<a id="0x4_royalty_denominator"></a>
 
 ## Function `denominator`
 
@@ -349,7 +349,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_numerator"></a>
+<a id="0x4_royalty_numerator"></a>
 
 ## Function `numerator`
 
@@ -373,7 +373,7 @@ Creates a new royalty, verifying that it is a valid percentage
 
 </details>
 
-<a name="0x4_royalty_payee_address"></a>
+<a id="0x4_royalty_payee_address"></a>
 
 ## Function `payee_address`
 

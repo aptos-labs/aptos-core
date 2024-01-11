@@ -1,5 +1,5 @@
 
-<a name="0x1_ristretto255_elgamal"></a>
+<a id="0x1_ristretto255_elgamal"></a>
 
 # Module `0x1::ristretto255_elgamal`
 
@@ -46,7 +46,7 @@ are the randomness of the ciphertexts.
 
 
 
-<a name="0x1_ristretto255_elgamal_Ciphertext"></a>
+<a id="0x1_ristretto255_elgamal_Ciphertext"></a>
 
 ## Struct `Ciphertext`
 
@@ -80,7 +80,7 @@ An ElGamal ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_CompressedCiphertext"></a>
+<a id="0x1_ristretto255_elgamal_CompressedCiphertext"></a>
 
 ## Struct `CompressedCiphertext`
 
@@ -114,7 +114,7 @@ A compressed ElGamal ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_CompressedPubkey"></a>
+<a id="0x1_ristretto255_elgamal_CompressedPubkey"></a>
 
 ## Struct `CompressedPubkey`
 
@@ -142,7 +142,7 @@ An ElGamal public key.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_new_pubkey_from_bytes"></a>
+<a id="0x1_ristretto255_elgamal_new_pubkey_from_bytes"></a>
 
 ## Function `new_pubkey_from_bytes`
 
@@ -175,7 +175,7 @@ Creates a new public key from a serialized Ristretto255 point.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_pubkey_to_bytes"></a>
+<a id="0x1_ristretto255_elgamal_pubkey_to_bytes"></a>
 
 ## Function `pubkey_to_bytes`
 
@@ -200,7 +200,7 @@ Given an ElGamal public key <code>pubkey</code>, returns the byte representation
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_pubkey_to_point"></a>
+<a id="0x1_ristretto255_elgamal_pubkey_to_point"></a>
 
 ## Function `pubkey_to_point`
 
@@ -225,7 +225,7 @@ Given a public key <code>pubkey</code>, returns the underlying <code>RistrettoPo
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_pubkey_to_compressed_point"></a>
+<a id="0x1_ristretto255_elgamal_pubkey_to_compressed_point"></a>
 
 ## Function `pubkey_to_compressed_point`
 
@@ -250,7 +250,7 @@ Given a public key, returns the underlying <code>CompressedRistretto</code> poin
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_new_ciphertext_from_bytes"></a>
+<a id="0x1_ristretto255_elgamal_new_ciphertext_from_bytes"></a>
 
 ## Function `new_ciphertext_from_bytes`
 
@@ -292,7 +292,7 @@ next 32 bytes store <code>v * G + r * Y</code>, where <code>Y</code> is the publ
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_new_ciphertext_no_randomness"></a>
+<a id="0x1_ristretto255_elgamal_new_ciphertext_no_randomness"></a>
 
 ## Function `new_ciphertext_no_randomness`
 
@@ -321,7 +321,7 @@ and the randomness is set to zero.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_from_points"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_from_points"></a>
 
 ## Function `ciphertext_from_points`
 
@@ -349,7 +349,7 @@ Moves a pair of Ristretto points into an ElGamal ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_from_compressed_points"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_from_compressed_points"></a>
 
 ## Function `ciphertext_from_compressed_points`
 
@@ -377,7 +377,7 @@ Moves a pair of <code>CompressedRistretto</code> points into an ElGamal cipherte
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_to_bytes"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_to_bytes"></a>
 
 ## Function `ciphertext_to_bytes`
 
@@ -407,7 +407,7 @@ Given a ciphertext <code>ct</code>, serializes that ciphertext into bytes.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_into_points"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_into_points"></a>
 
 ## Function `ciphertext_into_points`
 
@@ -433,7 +433,7 @@ Moves the ciphertext into a pair of <code>RistrettoPoint</code>'s.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_as_points"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_as_points"></a>
 
 ## Function `ciphertext_as_points`
 
@@ -458,7 +458,7 @@ Returns the pair of <code>RistrettoPoint</code>'s representing the ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_compress_ciphertext"></a>
+<a id="0x1_ristretto255_elgamal_compress_ciphertext"></a>
 
 ## Function `compress_ciphertext`
 
@@ -486,7 +486,7 @@ Creates a new compressed ciphertext from a decompressed ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_decompress_ciphertext"></a>
+<a id="0x1_ristretto255_elgamal_decompress_ciphertext"></a>
 
 ## Function `decompress_ciphertext`
 
@@ -514,7 +514,7 @@ Creates a new decompressed ciphertext from a compressed ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_add"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_add"></a>
 
 ## Function `ciphertext_add`
 
@@ -543,7 +543,7 @@ Useful for re-randomizing the ciphertext or updating the committed value.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_add_assign"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_add_assign"></a>
 
 ## Function `ciphertext_add_assign`
 
@@ -569,7 +569,7 @@ Like <code>ciphertext_add</code> but assigns <code>lhs = lhs + rhs</code>.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_sub"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_sub"></a>
 
 ## Function `ciphertext_sub`
 
@@ -598,7 +598,7 @@ Useful for re-randomizing the ciphertext or updating the committed value.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_sub_assign"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_sub_assign"></a>
 
 ## Function `ciphertext_sub_assign`
 
@@ -624,7 +624,7 @@ Like <code>ciphertext_add</code> but assigns <code>lhs = lhs - rhs</code>.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_clone"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_clone"></a>
 
 ## Function `ciphertext_clone`
 
@@ -652,7 +652,7 @@ Creates a copy of this ciphertext.
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_ciphertext_equals"></a>
+<a id="0x1_ristretto255_elgamal_ciphertext_equals"></a>
 
 ## Function `ciphertext_equals`
 
@@ -678,7 +678,7 @@ Returns true if the two ciphertexts are identical: i.e., same value and same ran
 
 </details>
 
-<a name="0x1_ristretto255_elgamal_get_value_component"></a>
+<a id="0x1_ristretto255_elgamal_get_value_component"></a>
 
 ## Function `get_value_component`
 

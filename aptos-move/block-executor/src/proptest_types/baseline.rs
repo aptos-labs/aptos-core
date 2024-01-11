@@ -18,10 +18,12 @@ use crate::{
     },
 };
 use aptos_aggregator::delta_change_set::serialize;
-use aptos_types::{contract_event::TransactionEvent, write_set::TransactionWrite};
+use aptos_types::{
+    contract_event::TransactionEvent, transaction::BlockOutput, write_set::TransactionWrite,
+};
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use bytes::Bytes;
-use claims::{assert_matches, assert_none, assert_ok_eq, assert_some, assert_some_eq};
+use claims::{assert_matches, assert_none, assert_some, assert_some_eq};
 use itertools::izip;
 use std::{collections::HashMap, fmt::Debug, hash::Hash, result::Result, sync::atomic::Ordering};
 
@@ -220,13 +222,14 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Debug>(
         &self,
-        results: &BlockExecutorResult<Vec<MockOutput<K, E>>, usize>,
+        results: &BlockExecutorResult<BlockOutput<MockOutput<K, E>>, usize>,
     ) {
         let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
         let mut group_world = HashMap::new();
 
         match results {
-            Ok(results) => {
+            Ok(block_output) => {
+                let results = block_output.get_transaction_outputs_forced();
                 let committed = self.read_values.len();
                 assert_eq!(self.resolved_deltas.len(), committed);
 
@@ -270,8 +273,10 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     for (group_key, size) in output.read_group_sizes.iter() {
                         let group_map = group_world.entry(group_key).or_insert(base_map.clone());
 
-                        assert_ok_eq!(
-                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len()))),
+                        assert_eq!(
+                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
+                                .unwrap()
+                                .get(),
                             *size
                         );
                     }

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    event_store::EventStore,
+    ledger_db::LedgerDb,
     ledger_store::LedgerStore,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
@@ -31,7 +31,7 @@ pub struct BackupHandler {
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
-    event_store: Arc<EventStore>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl BackupHandler {
@@ -39,13 +39,13 @@ impl BackupHandler {
         ledger_store: Arc<LedgerStore>,
         transaction_store: Arc<TransactionStore>,
         state_store: Arc<StateStore>,
-        event_store: Arc<EventStore>,
+        ledger_db: Arc<LedgerDb>,
     ) -> Self {
         Self {
             ledger_store,
             transaction_store,
             state_store,
-            event_store,
+            ledger_db,
         }
     }
 
@@ -58,13 +58,15 @@ impl BackupHandler {
         impl Iterator<Item = Result<(Transaction, TransactionInfo, Vec<ContractEvent>, WriteSet)>> + '_,
     > {
         let txn_iter = self
-            .transaction_store
+            .ledger_db
+            .transaction_db()
             .get_transaction_iter(start_version, num_transactions)?;
         let mut txn_info_iter = self
             .ledger_store
             .get_transaction_info_iter(start_version, num_transactions)?;
         let mut event_vec_iter = self
-            .event_store
+            .ledger_db
+            .event_db()
             .get_events_by_version_iter(start_version, num_transactions)?;
         let mut write_set_iter = self
             .transaction_store

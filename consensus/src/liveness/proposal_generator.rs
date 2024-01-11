@@ -12,7 +12,7 @@ use crate::{
         PROPOSER_DELAY_PROPOSAL, PROPOSER_PENDING_BLOCKS_COUNT,
         PROPOSER_PENDING_BLOCKS_FILL_FRACTION,
     },
-    state_replication::PayloadClient,
+    payload_client::PayloadClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -23,9 +23,16 @@ use aptos_consensus_types::{
     common::{Author, Payload, PayloadFilter, Round},
     quorum_cert::QuorumCert,
 };
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(test)]
 #[path = "proposal_generator_test.rs"]
@@ -168,6 +175,7 @@ pub struct ProposalGenerator {
     // Last round that a proposal was generated
     last_round_generated: Round,
     quorum_store_enabled: bool,
+    validator_txn_enabled: bool,
 }
 
 impl ProposalGenerator {
@@ -183,6 +191,7 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
+        validator_txn_enabled: bool,
     ) -> Self {
         Self {
             author,
@@ -197,6 +206,7 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
+            validator_txn_enabled,
         }
     }
 
@@ -245,10 +255,11 @@ impl ProposalGenerator {
 
         let hqc = self.ensure_highest_quorum_cert(round)?;
 
-        let (payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
+        let (validator_txns, payload, timestamp) = if hqc.certified_block().has_reconfiguration() {
             // Reconfiguration rule - we propose empty blocks with parents' timestamp
             // after reconfiguration until it's committed
             (
+                vec![],
                 Payload::empty(self.quorum_store_enabled),
                 hqc.certified_block().timestamp_usecs(),
             )
@@ -286,7 +297,7 @@ impl ProposalGenerator {
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
             let (max_block_txns, max_block_bytes, proposal_delay) = self
-                .calculate_max_block_sizes(voting_power_ratio, timestamp)
+                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
                 .await;
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
@@ -309,12 +320,22 @@ impl ProposalGenerator {
                 .max(max_pending_block_bytes as f32 / self.max_block_bytes as f32);
             PROPOSER_PENDING_BLOCKS_COUNT.set(pending_blocks.len() as i64);
             PROPOSER_PENDING_BLOCKS_FILL_FRACTION.set(max_fill_fraction as f64);
-            let payload = self
+
+            let pending_validator_txn_hashes: HashSet<HashValue> = pending_blocks
+                .iter()
+                .filter_map(|block| block.validator_txns())
+                .flatten()
+                .map(ValidatorTransaction::hash)
+                .collect();
+            let validator_txn_filter =
+                vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
+            let (validator_txns, payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
+                    validator_txn_filter,
                     payload_filter,
                     wait_callback,
                     pending_ordering,
@@ -324,7 +345,7 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            (payload, timestamp.as_micros() as u64)
+            (validator_txns, payload, timestamp.as_micros() as u64)
         };
 
         let quorum_cert = hqc.as_ref().clone();
@@ -334,21 +355,36 @@ impl ProposalGenerator {
             false,
             proposer_election,
         );
-        // create block proposal
-        Ok(BlockData::new_proposal(
-            payload,
-            self.author,
-            failed_authors,
-            round,
-            timestamp,
-            quorum_cert,
-        ))
+
+        let block = if self.validator_txn_enabled {
+            BlockData::new_proposal_ext(
+                validator_txns,
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        } else {
+            BlockData::new_proposal(
+                payload,
+                self.author,
+                failed_authors,
+                round,
+                timestamp,
+                quorum_cert,
+            )
+        };
+
+        Ok(block)
     }
 
     async fn calculate_max_block_sizes(
         &mut self,
         voting_power_ratio: f64,
         timestamp: Duration,
+        round: Round,
     ) -> (u64, u64, Duration) {
         let mut values_max_block_txns = vec![self.max_block_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
@@ -384,12 +420,13 @@ impl ProposalGenerator {
 
         if pipeline_backpressure.is_some() || chain_health_backoff.is_some() {
             warn!(
-                "Generating proposal: reducing limits to {} txns and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms",
+                "Generating proposal: reducing limits to {} txns and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms. Round: {}",
                 max_block_txns,
                 max_block_bytes,
                 pipeline_backpressure.is_some(),
                 chain_health_backoff.is_some(),
                 proposal_delay.as_millis(),
+                round,
             );
         }
         (max_block_txns, max_block_bytes, proposal_delay)

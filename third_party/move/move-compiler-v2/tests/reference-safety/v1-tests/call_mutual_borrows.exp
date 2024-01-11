@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: cannot copy mutable reference in local `s1` which is still borrowed
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows.move:14:29
+   │
+14 │         imm_imm(freeze(s1), freeze(s1));
+   │                 ----------  ^^^^^^^^^^ copied here
+   │                 │
+   │                 previous call result
+
+error: cannot pass mutable reference in local, which is still borrowed, as function argument
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows.move:14:29
+   │
+14 │         imm_imm(freeze(s1), freeze(s1));
+   │                 ----------  ^^^^^^^^^^ passed here
+   │                 │
+   │                 previous call result

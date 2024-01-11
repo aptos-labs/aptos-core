@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: cannot mutably borrow local `v` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_local_field_invalid.move:13:17
+   │
+12 │         let f = &v.f;
+   │                  - previous local borrow
+13 │         let s = &mut v;
+   │                 ^^^^^^ mutable borrow attempted here
+
+error: cannot immutably borrow local `v` since other mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_field_invalid.move:19:17
+   │
+18 │         let f = &mut v.f;
+   │                      - previous mutable local borrow
+19 │         let s = &v;
+   │                 ^^ immutable borrow attempted here

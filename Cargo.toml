@@ -9,6 +9,7 @@ members = [
     "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
     "aptos-move/aptos-debugger",
+    "aptos-move/aptos-e2e-comparison-testing",
     "aptos-move/aptos-gas-algebra",
     "aptos-move/aptos-gas-calibration",
     "aptos-move/aptos-gas-meter",
@@ -21,6 +22,7 @@ members = [
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",
+    "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
     "aptos-move/aptos-vm-benchmarks",
@@ -67,6 +69,7 @@ members = [
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
+    "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
     "crates/aptos-ledger",
     "crates/aptos-log-derive",
@@ -95,7 +98,6 @@ members = [
     "crates/crash-handler",
     "crates/fallible",
     "crates/indexer",
-    "crates/moving-average",
     "crates/node-resource-metrics",
     "crates/num-variants",
     "crates/proxy",
@@ -104,14 +106,17 @@ members = [
     "crates/transaction-emitter",
     "crates/transaction-emitter-lib",
     "crates/transaction-generator-lib",
+    "crates/validator-transaction-pool",
+    "devtools/aptos-cargo-cli",
+    "dkg",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
     "ecosystem/indexer-grpc/indexer-grpc-file-store",
     "ecosystem/indexer-grpc/indexer-grpc-fullnode",
     "ecosystem/indexer-grpc/indexer-grpc-integration-tests",
-    "ecosystem/indexer-grpc/indexer-grpc-post-processor",
     "ecosystem/indexer-grpc/indexer-grpc-server-framework",
+    "ecosystem/indexer-grpc/indexer-grpc-table-info",
     "ecosystem/indexer-grpc/indexer-grpc-utils",
     "ecosystem/nft-metadata-crawler-parser",
     "ecosystem/node-checker",
@@ -160,7 +165,6 @@ members = [
     "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
-    "storage/state-view",
     "storage/storage-interface",
     "testsuite/aptos-fuzzer",
     "testsuite/aptos-fuzzer/fuzz",
@@ -191,6 +195,7 @@ members = [
     "third_party/move/move-command-line-common",
     "third_party/move/move-compiler",
     "third_party/move/move-compiler-v2",
+    "third_party/move/move-compiler-v2/tools/testdiff",
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
@@ -263,7 +268,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.72.1"
+rust-version = "1.74.1"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -299,6 +304,7 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
+aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
 aptos-executable-store = { path = "storage/executable-store" }
@@ -335,13 +341,14 @@ aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
 aptos-indexer-grpc-data-access = { path = "ecosystem/indexer-grpc/indexer-grpc-data-access" }
 aptos-indexer-grpc-file-store = { path = "ecosystem/indexer-grpc/indexer-grpc-file-store" }
-aptos-indexer-grpc-post-processor = { path = "ecosystem/indexer-grpc/indexer-grpc-post-processor" }
 aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-fullnode" }
+aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }
+aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-keygen = { path = "crates/aptos-keygen" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
@@ -354,7 +361,6 @@ aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
-aptos-moving-average = { path = "crates/moving-average" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
@@ -398,7 +404,6 @@ aptos-secure-storage = { path = "secure/storage" }
 aptos-short-hex-str = { path = "crates/short-hex-str" }
 aptos-speculative-state-helper = { path = "crates/aptos-speculative-state-helper" }
 aptos-state-sync-driver = { path = "state-sync/state-sync-driver" }
-aptos-state-view = { path = "storage/state-view" }
 aptos-storage-interface = { path = "storage/storage-interface" }
 aptos-storage-service-client = { path = "state-sync/storage-service/client" }
 aptos-storage-service-notifications = { path = "state-sync/inter-component/storage-service-notifications" }
@@ -413,9 +418,11 @@ aptos-time-service = { path = "crates/aptos-time-service", features = [
 ] }
 aptos-transaction-emitter-lib = { path = "crates/transaction-emitter-lib" }
 aptos-transaction-generator-lib = { path = "crates/transaction-generator-lib" }
+aptos-transactional-test-harness = { path = "aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "types" }
 aptos-utils = { path = "aptos-utils" }
 aptos-validator-interface = { path = "aptos-move/aptos-validator-interface" }
+aptos-validator-transaction-pool = { path = "crates/validator-transaction-pool" }
 aptos-vault-client = { path = "secure/storage/vault" }
 aptos-vm = { path = "aptos-move/aptos-vm" }
 aptos-vm-logging = { path = "aptos-move/aptos-vm-logging" }
@@ -424,6 +431,7 @@ aptos-vm-types = { path = "aptos-move/aptos-vm-types" }
 aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
+aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -435,14 +443,17 @@ anstyle = "1.0.1"
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
 ark-bls12-381 = "0.4.0"
+ark-bn254 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
+aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
 assert_approx_eq = "1.1.0"
 assert_unordered = "0.3.5"
 async-channel = "1.7.1"
 async-mutex = "1.4.0"
+async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"
@@ -451,7 +462,7 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
-bigdecimal = { version = "0.3.0", features = ["serde"] }
+bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
@@ -464,8 +475,10 @@ bytes = { version = "1.4.0", features = ["serde"] }
 chrono = { version = "0.4.19", features = ["clock", "serde"] }
 cfg_block = "0.1.1"
 cfg-if = "1.0.0"
+ciborium = "0.2"
 claims = "0.7"
 clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
+clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
 cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
 codespan-reporting = "0.11.1"
@@ -473,6 +486,7 @@ concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
 const_format = "0.2.26"
 core_affinity = "0.8.1"
+coset = "0.3"
 criterion = "0.3.5"
 criterion-cpu-time = "0.1.0"
 crossbeam = "0.8.1"
@@ -484,7 +498,8 @@ dashmap = "5.2.0"
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
-diesel = "2.1.0"
+determinator = "0.12.0"
+diesel = "2.1"
 diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
@@ -501,19 +516,19 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 field_count = "0.1.1"
 flate2 = "1.0.24"
-futures = "0.3.24"
-futures-channel = "0.3.24"
-futures-core = "0.3.25"
-futures-util = "0.3.21"
+futures = "0.3.29"
+futures-channel = "0.3.29"
+futures-core = "0.3.29"
+futures-util = "0.3.29"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
-google-cloud-pubsub = "0.18.0"
 google-cloud-storage = "0.13.0"
+guppy = "0.17.0"
 handlebars = "4.2.2"
-heck = "0.3.2"
+heck = "0.4.1"
 hex = "0.4.3"
 hkdf = "0.10.0"
 hostname = "0.3.1"
@@ -545,13 +560,13 @@ lz4 = "1.24.0"
 maplit = "1.0.2"
 merlin = "3"
 mime = "0.3.16"
-mini-moka = { version = "0.10.2", features = ["sync"] }
+mini-moka = { version = "0.10.3", features = ["sync"] }
 mirai-annotations = "1.12.0"
 mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
-num-bigint = { version = "0.3.2", features = ["rand"] }
+num-bigint = { version = "0.4.4", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
@@ -566,6 +581,9 @@ signature = "2.1.0"
 sec1 = "0.7.0"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+passkey-authenticator = { version = "0.2.0", features = ["testable"] }
+passkey-client = { version = "0.2.0" }
+passkey-types = { version = "0.2.0" }
 pbjson = "0.5.1"
 percent-encoding = "2.1.0"
 pin-project = "1.0.10"
@@ -580,8 +598,8 @@ project-root = "0.2.2"
 prometheus = { version = "0.13.3", default-features = false }
 prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
-proptest = "1.0.0"
-proptest-derive = "0.3.0"
+proptest = "1.4.0"
+proptest-derive = "0.4.0"
 prost = "0.12.1"
 prost-types = "0.12.1"
 quanta = "0.10.1"
@@ -607,6 +625,7 @@ rocksdb = { version = "0.21.0", features = ["lz4"] }
 rstack-self =  { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
+rustversion = "1.0.14"
 scopeguard = "1.2.0"
 sha-1 = "0.10.0"
 sha2 = "0.9.3"
@@ -614,16 +633,14 @@ sha256 = "1.4.0"
 sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
-# For more information about why we are pinned to 1.0.152, see this issue:
-# https://github.com/aptos-labs/aptos-core/issues/10424
-serde = { version = "=1.0.152", features = ["derive", "rc"] }
+serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
-serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde_yaml = "0.8.24"
 shadow-rs = "0.16.2"
 smallvec = "1.8.0"
@@ -747,8 +764,6 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
-serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" }
-# More context here: https://github.com/weiznich/diesel_async/pull/121.
-diesel-async = { git = "https://github.com/banool/diesel_async", rev = "7115c8668b88d56029cb1471e84d2ea0234ff035" }

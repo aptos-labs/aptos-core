@@ -19,6 +19,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   const client = new AptosClient(NODE_URL);
   const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
+  console.log("Creating and funding owner accounts...");
   // Create and fund 3 accounts that will be the owners of the multisig account.
   const owner1 = new AptosAccount();
   const owner2 = new AptosAccount();
@@ -26,7 +27,11 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   await faucetClient.fundAccount(owner1.address(), 100_000_000);
   await faucetClient.fundAccount(owner2.address(), 100_000_000);
   await faucetClient.fundAccount(owner3.address(), 100_000_000);
-
+  console.log(`owner1: ${owner1.address()}`);
+  console.log(`owner2: ${owner2.address()}`);
+  console.log(`owner3: ${owner3.address()}`);
+  console.log();
+  console.log("Setting up a 2-of-3 multisig account...");
   // Step 1: Setup a 2-of-3 multisig account
   // ===========================================================================================
   // Get the next multisig account address. This will be the same as the account address of the multisig account we'll
@@ -47,10 +52,22 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   await client.generateSignSubmitWaitForTransaction(owner1, createMultisig.payload);
   assert((await getSignatureThreshold(client, multisigAddress)) == 2);
   assert((await getNumberOfOwners(client, multisigAddress)) == 3);
+  console.log("Multisig Account Address:", multisigAddress);
+  console.log("Signature Threshold:", await getSignatureThreshold(client, multisigAddress));
+  console.log("Number of Owners:", await getNumberOfOwners(client, multisigAddress));
+  console.log();
 
+  console.log("Funding the multisig account...");
   // Fund the multisig account for transfers.
-  await faucetClient.fundAccount(multisigAddress, 100_000_000);
+  try {
+    await faucetClient.fundAccount(multisigAddress, 100_000_000);
+    console.log(`Multisig account ${multisigAddress} successfully funded.`);
+  } catch (error) {
+    console.error("Error funding multisig account:", error);
+  }
+  console.log();
 
+  console.log("Creating a multisig transaction to transfer coins...");
   // Step 2: Create a multisig transaction to send 1_000_000 coins to an account.
   // We'll be including the full payload to be stored on chain.
   // ===========================================================================================
@@ -89,7 +106,10 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   let accountResource = await client.getAccountResource(recipient.address(), aptosCoinStore);
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 1_000_000);
+  console.log("Recipient's balance after transfer:", balance);
+  console.log();
 
+  console.log("Creating another multisig transaction using payload hash...");
   // Step 3: Create another multisig transaction to send 1_000_000 coins but use payload hash instead.
   // ===========================================================================================
   const transferTxPayloadHash = sha3Hash.create();
@@ -109,7 +129,10 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   accountResource = await client.getAccountResource(recipient.address(), aptosCoinStore);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 2_000_000);
+  console.log("Recipient's balance after second transfer:", balance);
+  console.log();
 
+  console.log("Adding and then removing an owner from the multisig account...");
   // Step 4: Create 2 multisig transactions: one to add a new owner and another one to remove it.
   // ===========================================================================================
   const owner_4 = new AptosAccount();
@@ -134,6 +157,7 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   );
   // The multisig account should now have 4 owners.
   assert((await getNumberOfOwners(client, multisigAddress)) == 4);
+  console.log("Number of Owners after addition:", await getNumberOfOwners(client, multisigAddress));
 
   const removeOwnerPayload = new MultiSigTransactionPayload(
     EntryFunction.natural(
@@ -156,7 +180,10 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   );
   // The multisig account should now have 3 owners.
   assert((await getNumberOfOwners(client, multisigAddress)) == 3);
+  console.log("Number of Owners after removal:", await getNumberOfOwners(client, multisigAddress));
+  console.log();
 
+  console.log("Changing the signature threshold to 3-of-3...");
   // Step 5: Create a multisig transactions to change the signature threshold to 3-of-3.
   // ===========================================================================================
   const changeSigThresholdPayload = new MultiSigTransactionPayload(
@@ -175,6 +202,8 @@ const { AccountAddress, EntryFunction, MultiSig, MultiSigTransactionPayload, Tra
   );
   // The multisig account should now be 3-of-3.
   assert((await getSignatureThreshold(client, multisigAddress)) == 3);
+  console.log("New Signature Threshold:", await getSignatureThreshold(client, multisigAddress));
+  console.log("Multisig setup and transactions complete.");
 })();
 
 const rejectAndApprove = async (

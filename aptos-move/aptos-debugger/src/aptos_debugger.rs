@@ -8,12 +8,11 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
-    block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
+    state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
@@ -29,7 +28,9 @@ use aptos_vm::{
     AptosVM, VMExecutor,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput, storage::ChangeSetConfigs};
+use aptos_vm_types::{
+    change_set::VMChangeSet, output::VMOutput, storage::change_set_configs::ChangeSetConfigs,
+};
 use move_binary_format::errors::VMResult;
 use std::{path::Path, sync::Arc};
 
@@ -60,12 +61,8 @@ impl AptosDebugger {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block(
-            &sig_verified_txns,
-            &state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
-        )
-        .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(
@@ -229,6 +226,24 @@ impl AptosDebugger {
             .await
     }
 
+    pub async fn get_committed_transaction_at_version(
+        &self,
+        version: Version,
+    ) -> Result<(Transaction, TransactionInfo)> {
+        let (mut txns, mut info) = self.debugger.get_committed_transactions(version, 1).await?;
+
+        let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
+        let info = info
+            .pop()
+            .expect("there must be exactly 1 txn info in the vec");
+
+        Ok((txn, info))
+    }
+
+    pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {
+        DebuggerStateView::new(self.debugger.clone(), version)
+    }
+
     pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<VMChangeSet>
     where
         F: FnOnce(&mut SessionExt) -> VMResult<()>,
@@ -249,10 +264,9 @@ impl AptosDebugger {
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
         f(&mut session).map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         let change_set = session
-            .finish(
-                &mut (),
-                &ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION),
-            )
+            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
+                LATEST_GAS_FEATURE_VERSION,
+            ))
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
         Ok(change_set)
     }

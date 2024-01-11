@@ -17,6 +17,7 @@ runs:
       with:
         IMAGE_TAG: ${{ inputs.NETWORK }}
         GCP_DOCKER_ARTIFACT_REPO: ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+        WITH_INDEXER_API: "false"
 
     # Run the tests.
     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main

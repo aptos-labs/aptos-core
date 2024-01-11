@@ -41,6 +41,17 @@ impl QuorumCert {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Self {
+            vote_data: VoteData::dummy(),
+            signed_ledger_info: LedgerInfoWithSignatures::new(
+                LedgerInfo::dummy(),
+                AggregateSignature::empty(),
+            ),
+        }
+    }
+
     pub fn vote_data(&self) -> &VoteData {
         &self.vote_data
     }

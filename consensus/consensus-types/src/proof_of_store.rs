@@ -235,7 +235,7 @@ impl Deref for SignedBatchInfo {
 #[derive(Debug, PartialEq)]
 pub enum SignedBatchInfoError {
     WrongAuthor,
-    WrongInfo,
+    WrongInfo((u64, u64)),
     DuplicatedSignature,
     InvalidAuthor,
 }

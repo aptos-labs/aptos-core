@@ -219,6 +219,20 @@ impl Transaction {
             APITransaction::PendingTransaction(..) => {
                 unreachable!()
             },
+            APITransaction::ValidatorTransaction(validator_txn) => (
+                Self::from_transaction_info(
+                    &validator_txn.info,
+                    None,
+                    transaction.type_str().to_string(),
+                    0,
+                    block_height,
+                    epoch,
+                ),
+                None,
+                vec![],
+                vec![],
+                vec![],
+            ),
         }
     }
 

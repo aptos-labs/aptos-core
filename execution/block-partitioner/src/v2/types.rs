@@ -22,7 +22,7 @@ impl Ord for SubBlockIdx {
 
 impl PartialOrd for SubBlockIdx {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.round_id, self.shard_id).partial_cmp(&(other.round_id, other.shard_id))
+        Some(self.cmp(other))
     }
 }
 
@@ -70,8 +70,7 @@ impl Ord for ShardedTxnIndexV2 {
 
 impl PartialOrd for ShardedTxnIndexV2 {
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        (self.sub_block_idx, self.pre_partitioned_txn_idx)
-            .partial_cmp(&(other.sub_block_idx, other.pre_partitioned_txn_idx))
+        Some(self.cmp(other))
     }
 }
 

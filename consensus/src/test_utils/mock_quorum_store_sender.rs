@@ -4,7 +4,7 @@
 use crate::{
     network::QuorumStoreSender,
     network_interface::ConsensusMsg,
-    quorum_store::types::{Batch, BatchRequest},
+    quorum_store::types::{Batch, BatchRequest, BatchResponse},
 };
 use aptos_consensus_types::{
     common::Author,
@@ -38,7 +38,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         _request: BatchRequest,
         _recipient: Author,
         _timeout: Duration,
-    ) -> anyhow::Result<Batch> {
+    ) -> anyhow::Result<BatchResponse> {
         unimplemented!();
     }
 

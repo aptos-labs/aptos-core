@@ -151,10 +151,10 @@ fn create_node_for_fuzzing() -> RoundManager {
 
     let (self_sender, _self_receiver) = aptos_channels::new_test(8);
 
-    let epoch_state = EpochState {
+    let epoch_state = Arc::new(EpochState {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
-    };
+    });
     let network = NetworkSender::new(
         signer.author(),
         consensus_network_client,
@@ -181,6 +181,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
+        false,
         false,
     );
 

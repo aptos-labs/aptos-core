@@ -1,5 +1,5 @@
 
-<a name="0x1_comparator"></a>
+<a id="0x1_comparator"></a>
 
 # Module `0x1::comparator`
 
@@ -27,7 +27,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="0x1_comparator_Result"></a>
+<a id="0x1_comparator_Result"></a>
 
 ## Struct `Result`
 
@@ -54,12 +54,12 @@ Provides a framework for comparing two elements
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_comparator_EQUAL"></a>
+<a id="0x1_comparator_EQUAL"></a>
 
 
 
@@ -68,7 +68,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="0x1_comparator_GREATER"></a>
+<a id="0x1_comparator_GREATER"></a>
 
 
 
@@ -77,7 +77,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="0x1_comparator_SMALLER"></a>
+<a id="0x1_comparator_SMALLER"></a>
 
 
 
@@ -86,7 +86,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="0x1_comparator_is_equal"></a>
+<a id="0x1_comparator_is_equal"></a>
 
 ## Function `is_equal`
 
@@ -110,7 +110,7 @@ Provides a framework for comparing two elements
 
 </details>
 
-<a name="0x1_comparator_is_smaller_than"></a>
+<a id="0x1_comparator_is_smaller_than"></a>
 
 ## Function `is_smaller_than`
 
@@ -134,7 +134,7 @@ Provides a framework for comparing two elements
 
 </details>
 
-<a name="0x1_comparator_is_greater_than"></a>
+<a id="0x1_comparator_is_greater_than"></a>
 
 ## Function `is_greater_than`
 
@@ -158,7 +158,7 @@ Provides a framework for comparing two elements
 
 </details>
 
-<a name="0x1_comparator_compare"></a>
+<a id="0x1_comparator_compare"></a>
 
 ## Function `compare`
 
@@ -185,7 +185,7 @@ Provides a framework for comparing two elements
 
 </details>
 
-<a name="0x1_comparator_compare_u8_vector"></a>
+<a id="0x1_comparator_compare_u8_vector"></a>
 
 ## Function `compare_u8_vector`
 
@@ -232,12 +232,12 @@ Provides a framework for comparing two elements
 
 </details>
 
-<a name="@Specification_1"></a>
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a name="@Specification_1_Result"></a>
+<a id="@Specification_1_Result"></a>
 
 ### Struct `Result`
 
@@ -263,7 +263,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="@Specification_1_is_equal"></a>
+<a id="@Specification_1_is_equal"></a>
 
 ### Function `is_equal`
 
@@ -281,7 +281,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="@Specification_1_is_smaller_than"></a>
+<a id="@Specification_1_is_smaller_than"></a>
 
 ### Function `is_smaller_than`
 
@@ -299,7 +299,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="@Specification_1_is_greater_than"></a>
+<a id="@Specification_1_is_greater_than"></a>
 
 ### Function `is_greater_than`
 
@@ -317,7 +317,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="@Specification_1_compare"></a>
+<a id="@Specification_1_compare"></a>
 
 ### Function `compare`
 
@@ -336,7 +336,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="0x1_comparator_spec_compare_u8_vector"></a>
+<a id="0x1_comparator_spec_compare_u8_vector"></a>
 
 
 <pre><code><b>fun</b> <a href="comparator.md#0x1_comparator_spec_compare_u8_vector">spec_compare_u8_vector</a>(left: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, right: <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="comparator.md#0x1_comparator_Result">Result</a>;
@@ -344,7 +344,7 @@ Provides a framework for comparing two elements
 
 
 
-<a name="@Specification_1_compare_u8_vector"></a>
+<a id="@Specification_1_compare_u8_vector"></a>
 
 ### Function `compare_u8_vector`
 

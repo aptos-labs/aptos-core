@@ -11,13 +11,14 @@ use crate::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
         batch_requester::BatchRequester,
-        batch_store::BatchStore,
+        batch_store::{BatchReader, BatchReaderImpl, BatchStore},
         counters,
         direct_mempool_quorum_store::DirectMempoolQuorumStore,
         network_listener::NetworkListener,
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
+        types::{Batch, BatchResponse},
     },
     round_manager::VerifiedEvent,
 };
@@ -137,7 +138,8 @@ pub struct InnerBuilder {
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, VerifiedEvent>>,
     remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
     remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
-    batch_store: Option<Arc<BatchStore<NetworkSender>>>,
+    batch_store: Option<Arc<BatchStore>>,
+    batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
 }
 
@@ -208,11 +210,12 @@ impl InnerBuilder {
             remote_batch_coordinator_cmd_tx,
             remote_batch_coordinator_cmd_rx,
             batch_store: None,
+            batch_reader: None,
             broadcast_proofs,
         }
     }
 
-    fn create_batch_store(&mut self) -> Arc<BatchStore<NetworkSender>> {
+    fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
         let backend = &self.backend;
         let storage: Storage = backend.try_into().expect("Unable to initialize storage");
         if let Err(error) = storage.available() {
@@ -238,6 +241,7 @@ impl InnerBuilder {
             self.config.batch_request_retry_interval_ms,
             self.config.batch_request_rpc_timeout_ms,
             self.network_sender.clone(),
+            self.verifier.clone(),
         );
         let batch_store = Arc::new(BatchStore::new(
             self.epoch,
@@ -246,13 +250,13 @@ impl InnerBuilder {
             self.config.memory_quota,
             self.config.db_quota,
             self.config.batch_quota,
-            batch_requester,
             signer,
-            self.verifier.clone(),
         ));
         self.batch_store = Some(batch_store.clone());
+        let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
+        self.batch_reader = Some(batch_reader.clone());
 
-        batch_store
+        batch_reader
     }
 
     fn spawn_quorum_store(
@@ -324,7 +328,7 @@ impl InnerBuilder {
         let proof_coordinator = ProofCoordinator::new(
             self.config.proof_timeout_ms,
             self.author,
-            self.batch_store.clone().unwrap(),
+            self.batch_reader.clone().unwrap(),
             self.batch_generator_cmd_tx.clone(),
             self.broadcast_proofs,
         );
@@ -372,13 +376,36 @@ impl InnerBuilder {
                 10,
                 Some(&counters::BATCH_RETRIEVAL_TASK_MSGS),
             );
+        let aptos_db_clone = self.aptos_db.clone();
+        // TODO: Once v2 handler is released, remove this flag and always use v2
+        let use_v2 = false;
         spawn_named!("batch_serve", async move {
             info!(epoch = epoch, "Batch retrieval task starts");
             while let Some(rpc_request) = batch_retrieval_rx.next().await {
                 counters::RECEIVED_BATCH_REQUEST_COUNT.inc();
-                if let Ok(value) = batch_store.get_batch_from_local(&rpc_request.req.digest()) {
-                    let batch = value.try_into().unwrap();
-                    let msg = ConsensusMsg::BatchResponse(Box::new(batch));
+                let response = if let Ok(value) =
+                    batch_store.get_batch_from_local(&rpc_request.req.digest())
+                {
+                    let batch: Batch = value.try_into().unwrap();
+                    BatchResponse::Batch(batch)
+                } else {
+                    match aptos_db_clone.get_latest_ledger_info() {
+                        Ok(ledger_info) => BatchResponse::NotFound(ledger_info),
+                        Err(e) => {
+                            error!(epoch = epoch, error = ?e, kind = error_kind(&e));
+                            continue;
+                        },
+                    }
+                };
+                let msg = if use_v2 {
+                    Some(ConsensusMsg::BatchResponseV2(Box::new(response)))
+                } else if let BatchResponse::Batch(batch) = response {
+                    Some(ConsensusMsg::BatchResponse(Box::new(batch)))
+                } else {
+                    None
+                };
+
+                if let Some(msg) = msg {
                     let bytes = rpc_request.protocol.to_bytes(&msg).unwrap();
                     if let Err(e) = rpc_request
                         .response_sender
@@ -401,11 +428,11 @@ impl InnerBuilder {
         Arc<PayloadManager>,
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
-        let batch_store = self.create_batch_store();
+        let batch_reader = self.create_batch_store();
 
         (
             Arc::from(PayloadManager::InQuorumStore(
-                batch_store,
+                batch_reader,
                 // TODO: remove after splitting out clean requests
                 self.coordinator_tx.clone(),
             )),

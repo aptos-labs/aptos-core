@@ -20,7 +20,6 @@ use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, warn};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
-use aptos_state_view::TStateView;
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order, MAX_REQUEST_LIMIT,
@@ -39,16 +38,16 @@ use aptos_types::{
         state_key::{StateKey, StateKeyInner},
         state_key_prefix::StateKeyPrefix,
         state_value::StateValue,
+        TStateView,
     },
     transaction::{SignedTransaction, TransactionWithProof, Version},
 };
 use aptos_utils::aptos_try;
-use aptos_vm::data_cache::AsMoveResolver;
+use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
 use move_core_types::{
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
-    resolver::ModuleResolver,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -63,7 +62,7 @@ pub struct Context {
     chain_id: ChainId,
     pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-    pub node_config: NodeConfig,
+    pub node_config: Arc<NodeConfig>,
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
@@ -86,7 +85,7 @@ impl Context {
             chain_id,
             db,
             mp_sender,
-            node_config,
+            node_config: Arc::new(node_config),
             gas_schedule_cache: Arc::new(RwLock::new(GasScheduleCache {
                 last_updated_epoch: None,
                 gas_schedule_params: None,
@@ -413,7 +412,7 @@ impl Context {
             .into_iter()
             .map(|(key, value)| {
                 let is_resource_group =
-                    |resolver: &dyn ModuleResolver, struct_tag: &StructTag| -> bool {
+                    |resolver: &dyn AptosMoveResolver, struct_tag: &StructTag| -> bool {
                         aptos_try!({
                             let md = aptos_framework::get_metadata(
                                 &resolver.get_module_metadata(&struct_tag.module_id()),
@@ -1029,8 +1028,14 @@ impl Context {
                     } else if let Some(full_block_gas_used) =
                         block_config.block_gas_limit_type.block_gas_limit()
                     {
-                        prices_and_used.iter().map(|(_, used)| *used).sum::<u64>()
-                            >= full_block_gas_used
+                        // be pessimistic for conflicts, as such information is not onchain
+                        let gas_used = prices_and_used.iter().map(|(_, used)| *used).sum::<u64>();
+                        let max_conflict_multiplier = block_config
+                            .block_gas_limit_type
+                            .conflict_penalty_window()
+                            .unwrap_or(1)
+                            as u64;
+                        gas_used * max_conflict_multiplier >= full_block_gas_used
                     } else {
                         false
                     };

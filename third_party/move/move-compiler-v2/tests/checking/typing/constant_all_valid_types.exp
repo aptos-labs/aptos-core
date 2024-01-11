@@ -43,7 +43,7 @@ module 0x42::M {
         [97, 98, 99, 100]
     }
 } // end 0x42::M
-module <SELF> {
+module <SELF>_0 {
     private fun t() {
         0;
         0;
@@ -55,4 +55,4 @@ module <SELF> {
         Tuple()
     }
     spec fun $t();
-} // end <SELF>
+} // end <SELF>_0

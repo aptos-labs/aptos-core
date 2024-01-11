@@ -17,8 +17,13 @@ use std::collections::BTreeMap;
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
         .change_set()
-        .write_set_iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
+        .concrete_write_set_iter()
+        .map(|(k, v)| {
+            (
+                k.clone(),
+                v.expect("expect only concrete write ops").clone(),
+            )
+        })
         .collect::<BTreeMap<StateKey, WriteOp>>();
 
     // A way to obtain a reference to the map inside a WriteSet.
@@ -35,10 +40,9 @@ fn test_ok_output_equality_no_deltas() {
     let state_view = FakeDataStore::default();
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
-        vec![],
         vec![mock_modify("1", 1)],
-        vec![mock_modify("2", 2)],
         vec![],
+        vec![mock_modify("2", 2)],
         vec![],
     );
 
@@ -47,16 +51,14 @@ fn test_ok_output_equality_no_deltas() {
     //   2. `try_into_transaction_output` changes the type and returns a result.
     //   3. `into_transaction_output_with_materialized_write_set` changes the type and
     //       simply merges writes for materialized deltas & combined groups.
-    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
-    let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
-    let txn_output_2 = vm_output
+    let mut materialized_vm_output = vm_output.clone();
+    assert_ok!(materialized_vm_output.try_materialize(&state_view));
+    let txn_output_1 = assert_ok!(vm_output
         .clone()
-        .into_transaction_output_with_materialized_write_set(
-            vec![],
-            BTreeMap::new(),
-            vec![],
-            vec![],
-        );
+        .try_materialize_into_transaction_output(&state_view));
+    let txn_output_2 = assert_ok!(vm_output
+        .clone()
+        .into_transaction_output_with_materialized_write_set(vec![], vec![], vec![]));
 
     // Because there are no deltas, we should not see any difference in write sets and
     // also all calls must succeed.
@@ -73,20 +75,21 @@ fn test_ok_output_equality_with_deltas() {
 
     let vm_output = build_vm_output(
         vec![mock_create_with_layout("0", 0, None)],
-        vec![],
         vec![mock_modify("1", 1)],
+        vec![],
         vec![mock_modify("2", 2)],
         vec![mock_add(delta_key, 300)],
-        vec![],
     );
 
-    let materialized_vm_output = assert_ok!(vm_output.clone().try_materialize(&state_view));
-    let txn_output_1 = assert_ok!(vm_output.clone().try_into_transaction_output(&state_view));
+    let mut materialized_vm_output = vm_output.clone();
+    assert_ok!(materialized_vm_output.try_materialize(&state_view));
+    let txn_output_1 = assert_ok!(vm_output
+        .clone()
+        .try_materialize_into_transaction_output(&state_view));
     let txn_output_2 = vm_output
         .clone()
         .into_transaction_output_with_materialized_write_set(
             vec![mock_modify("3", 400)],
-            BTreeMap::new(),
             vec![],
             vec![],
         );
@@ -117,7 +120,7 @@ fn test_ok_output_equality_with_deltas() {
     );
     assert_eq!(vm_output.status(), materialized_vm_output.status());
     assert_eq_outputs(&materialized_vm_output, txn_output_1);
-    assert_eq_outputs(&materialized_vm_output, txn_output_2);
+    assert_eq_outputs(&materialized_vm_output, txn_output_2.unwrap());
 }
 
 #[test]
@@ -126,17 +129,12 @@ fn test_err_output_equality_with_deltas() {
     let mut state_view = FakeDataStore::default();
     state_view.set_legacy(as_state_key!(delta_key), serialize(&900));
 
-    let vm_output = build_vm_output(
-        vec![],
-        vec![],
-        vec![],
-        vec![],
-        vec![mock_add(delta_key, 300)],
-        vec![],
-    );
+    let vm_output = build_vm_output(vec![], vec![], vec![], vec![], vec![mock_add(
+        delta_key, 300,
+    )]);
 
     let vm_status_1 = assert_err!(vm_output.clone().try_materialize(&state_view));
-    let vm_status_2 = assert_err!(vm_output.try_into_transaction_output(&state_view));
+    let vm_status_2 = assert_err!(vm_output.try_materialize_into_transaction_output(&state_view));
 
     // Error should be consistent.
     assert_eq!(vm_status_1, vm_status_2);

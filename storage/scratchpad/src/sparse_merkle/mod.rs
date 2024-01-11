@@ -100,7 +100,6 @@ use aptos_types::{
     state_store::state_storage_usage::StateStorageUsage,
 };
 use std::{
-    borrow::Borrow,
     collections::{BTreeMap, HashMap},
     sync::{Arc, MutexGuard, Weak},
 };
@@ -497,7 +496,7 @@ where
         // at or below it belongs to the requested shard.
         for i in (0..4).rev() {
             if let Some(node) = subtree.get_node_if_in_mem(since_generation) {
-                match node.inner().borrow() {
+                match node.inner() {
                     NodeInner::Internal(internal_node) => {
                         subtree = match (shard_id >> i) & 1 {
                             0 => {
@@ -549,7 +548,7 @@ where
             } else {
                 false
             };
-            match node.inner().borrow() {
+            match node.inner() {
                 NodeInner::Internal(internal_node) => {
                     let depth = pos.len();
                     pos.push(false);

@@ -7,8 +7,8 @@
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation, Spec,
-        TempIndex, TraceKind,
+        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation,
+        RewriteResult, Spec, TempIndex, TraceKind,
     },
     exp_generator::ExpGenerator,
     exp_rewriter::ExpRewriterFunctions,
@@ -109,7 +109,7 @@ impl TranslatedSpec {
                         .mk_join_opt_bool(
                             Operation::And,
                             Some(exp.clone()),
-                            code.as_ref().map(|c| eq_code(c)),
+                            code.as_ref().map(eq_code),
                         )
                         .unwrap()
                 })
@@ -117,7 +117,7 @@ impl TranslatedSpec {
                     self.aborts_with
                         .iter()
                         .flat_map(|(_, codes)| codes.iter())
-                        .map(|c| eq_code(c)),
+                        .map(eq_code),
                 ),
         )
     }
@@ -467,8 +467,8 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
     fn translate_lets(&mut self, post_state: bool, spec: &Spec) {
         for cond in &spec.conditions {
             let sym = match &cond.kind {
-                ConditionKind::LetPost(sym) if post_state => sym,
-                ConditionKind::LetPre(sym) if !post_state => sym,
+                ConditionKind::LetPost(sym, _) if post_state => sym,
+                ConditionKind::LetPre(sym, _) if !post_state => sym,
                 _ => continue,
             };
             let exp = self.translate_exp(&self.auto_trace(&cond.loc, &cond.exp), false);
@@ -524,10 +524,10 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             if trace_this {
                 let l = self.builder.global_env().get_node_loc(e.node_id());
                 let traced = self.auto_trace_exp(&l, e, TraceKind::SubAuto);
-                Ok(traced)
+                RewriteResult::Rewritten(traced)
             } else {
                 // descent
-                Err(e)
+                RewriteResult::Unchanged(e)
             }
         })
     }
@@ -609,14 +609,14 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                             && cont.span().start() >= loc.span().start()
                             && cont.span().end() <= loc.span().end()
                     };
-                    arg.visit_pre_post(&mut |up: bool, e: &ExpData| {
+                    arg.visit_pre_order(&mut |e: &ExpData| {
                         let sub_loc = self.builder.global_env().get_node_loc(e.node_id());
-                        if !up
-                            && !loc_contained(&loc, &sub_loc)
+                        if !loc_contained(&loc, &sub_loc)
                             && !labels.iter().any(|(l, _)| loc_contained(l, &sub_loc))
                         {
                             labels.push((sub_loc, "substituted sub-expression".to_owned()))
                         }
+                        true // continue visit
                     });
                     self.builder.global_env().diag_with_labels(
                         Severity::Error,
@@ -631,7 +631,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, 'b
                 // allowed, i.e. if there are free LocalVar terms, excluding locals from lets.
                 let loc = env.get_node_loc(*id);
                 let has_free_vars = args[0]
-                    .free_vars(env)
+                    .free_vars_with_types(env)
                     .iter()
                     .any(|(s, _)| !self.let_locals.contains_key(s));
                 if has_free_vars {

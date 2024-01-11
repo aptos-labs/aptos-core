@@ -89,7 +89,7 @@ impl DocgenOptions {
                 .landing_page_template
                 .as_ref()
                 .map(|s| vec![s.clone()])
-                .unwrap_or_else(Vec::new),
+                .unwrap_or_default(),
             references_file: self.references_file.clone(),
             include_dep_diagrams: self.include_dep_diagram,
             include_call_diagrams: false,

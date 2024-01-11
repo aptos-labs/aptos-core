@@ -78,6 +78,7 @@ export type { Transaction_GenesisTransaction } from './models/Transaction_Genesi
 export type { Transaction_PendingTransaction } from './models/Transaction_PendingTransaction';
 export type { Transaction_StateCheckpointTransaction } from './models/Transaction_StateCheckpointTransaction';
 export type { Transaction_UserTransaction } from './models/Transaction_UserTransaction';
+export type { Transaction_ValidatorTransaction } from './models/Transaction_ValidatorTransaction';
 export type { TransactionPayload } from './models/TransactionPayload';
 export type { TransactionPayload_EntryFunctionPayload } from './models/TransactionPayload_EntryFunctionPayload';
 export type { TransactionPayload_ModuleBundlePayload } from './models/TransactionPayload_ModuleBundlePayload';
@@ -95,6 +96,7 @@ export type { U128 } from './models/U128';
 export type { U256 } from './models/U256';
 export type { U64 } from './models/U64';
 export type { UserTransaction } from './models/UserTransaction';
+export type { ValidatorTransaction } from './models/ValidatorTransaction';
 export type { VersionedEvent } from './models/VersionedEvent';
 export type { ViewRequest } from './models/ViewRequest';
 export type { WriteModule } from './models/WriteModule';

@@ -212,7 +212,7 @@ impl<'input> Lexer<'input> {
     /// Block comments can be nested.
     ///
     /// Documentation comments are comments which start with
-    /// `///` or `/**`, but not `////` or `/***`. The actually comment delimiters
+    /// `///` or `/**`, but not `////` or `/***`. The actual comment delimiters
     /// (`/// .. <newline>` and `/** .. */`) will be not included in extracted comment string. The
     /// span in the returned map, however, covers the whole region of the comment, including the
     /// delimiters.
@@ -257,10 +257,12 @@ impl<'input> Lexer<'input> {
                         let start = get_offset(text);
                         text = &text[2..];
 
-                        // Check if this is a documentation comment: '/**', but not '/***'.
+                        // Check if this is a documentation comment: '/**', but neither '/***' nor '/**/'.
                         // A documentation comment cannot be nested within another comment.
-                        let is_doc =
-                            text.starts_with('*') && !text.starts_with("**") && locs.is_empty();
+                        let is_doc = text.starts_with('*')
+                            && !text.starts_with("**")
+                            && !text.starts_with("*/")
+                            && locs.is_empty();
 
                         locs.push((start, is_doc));
                     } else if text.starts_with("*/") {
@@ -341,6 +343,22 @@ impl<'input> Lexer<'input> {
         let offset2 = self.text.len() - text2.len();
         let (second, _) = find_token(self.file_hash, text2, offset2)?;
         Ok((first, second))
+    }
+
+    // Look ahead to the nth token after the current one and return it without advancing
+    // the state of the lexer.
+    pub fn lookahead_nth(&mut self, n: usize) -> Result<Tok, Box<Diagnostic>> {
+        let mut current_offset = self.cur_end;
+        let mut token = Tok::EOF;
+
+        for _ in 0..=n {
+            let text = self.trim_whitespace_and_comments(current_offset)?;
+            let offset = self.text.len() - text.len();
+            let (found_token, length) = find_token(self.file_hash, text, offset)?;
+            token = found_token;
+            current_offset += length;
+        }
+        Ok(token)
     }
 
     // Matches the doc comments after the last token (or the beginning of the file) to the position

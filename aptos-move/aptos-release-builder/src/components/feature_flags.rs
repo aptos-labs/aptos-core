@@ -93,6 +93,9 @@ pub enum FeatureFlag {
     VMBinaryFormatV7,
     ResourceGroupsChargeAsSizeSum,
     CommissionChangeDelegationPool,
+    BN254Structures,
+    WebAuthnSignature,
+    ReconfigureWithDKG,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -229,7 +232,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::SaferMetadata => AptosFeatureFlag::SAFER_METADATA,
             FeatureFlag::SingleSenderAuthenticator => AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
             FeatureFlag::SponsoredAutomaticAccountCreation => {
-                AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION
+                AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION
             },
             FeatureFlag::FeePayerAccountOptional => AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
             FeatureFlag::AggregatorV2DelayedFields => {
@@ -244,6 +247,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CommissionChangeDelegationPool => {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
+            FeatureFlag::BN254Structures => AptosFeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
+            FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
         }
     }
 }
@@ -302,7 +308,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::SAFER_RESOURCE_GROUPS => FeatureFlag::SaferResourceGroups,
             AptosFeatureFlag::SAFER_METADATA => FeatureFlag::SaferMetadata,
             AptosFeatureFlag::SINGLE_SENDER_AUTHENTICATOR => FeatureFlag::SingleSenderAuthenticator,
-            AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_CREATION => {
+            AptosFeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION => {
                 FeatureFlag::SponsoredAutomaticAccountCreation
             },
             AptosFeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL => FeatureFlag::FeePayerAccountOptional,
@@ -318,6 +324,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
                 FeatureFlag::CommissionChangeDelegationPool
             },
+            AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::BN254Structures,
+            AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
+            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
         }
     }
 }

@@ -418,43 +418,49 @@ mod test {
         );
 
         let tag: usize = 5;
-        let tag_len = bcs::serialized_size(&tag).unwrap();
         let one_entry_len = TestValue::creation_with_len(1).bytes().unwrap().len();
         let two_entry_len = TestValue::creation_with_len(2).bytes().unwrap().len();
         let three_entry_len = TestValue::creation_with_len(3).bytes().unwrap().len();
         let four_entry_len = TestValue::creation_with_len(4).bytes().unwrap().len();
 
-        let exp_size = 4 * one_entry_len + 4 * tag_len;
-        assert_ok_eq!(
-            map.get_group_size(&ap),
-            GroupReadResult::Size(exp_size as u64)
-        );
+        let exp_size = group_size_as_sum(vec![(&tag, one_entry_len); 4].into_iter()).unwrap();
+        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
 
         assert_err!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(2), None));
         assert_ok!(map.insert_group_op(&ap, 0, TestValue::creation_with_len(2), None));
         assert_err!(map.insert_group_op(&ap, 1, TestValue::creation_with_len(2), None));
         assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(2), None));
-        let exp_size = 2 * two_entry_len + 3 * one_entry_len + 5 * tag_len;
-        assert_ok_eq!(
-            map.get_group_size(&ap),
-            GroupReadResult::Size(exp_size as u64)
-        );
+        let exp_size = group_size_as_sum(vec![(&tag, two_entry_len); 2].into_iter().chain(vec![
+            (
+                &tag,
+                one_entry_len
+            );
+            3
+        ]))
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
 
         assert_ok!(map.insert_group_op(&ap, 4, TestValue::modification_with_len(3), None));
         assert_ok!(map.insert_group_op(&ap, 5, TestValue::creation_with_len(3), None));
-        let exp_size = exp_size + 2 * three_entry_len + tag_len - one_entry_len;
-        assert_ok_eq!(
-            map.get_group_size(&ap),
-            GroupReadResult::Size(exp_size as u64)
-        );
+        let exp_size = group_size_as_sum(
+            vec![(&tag, one_entry_len); 2]
+                .into_iter()
+                .chain(vec![(&tag, two_entry_len); 2])
+                .chain(vec![(&tag, three_entry_len); 2]),
+        )
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
 
         assert_ok!(map.insert_group_op(&ap, 0, TestValue::modification_with_len(4), None));
         assert_ok!(map.insert_group_op(&ap, 1, TestValue::modification_with_len(4), None));
-        let exp_size = 2 * four_entry_len + 2 * three_entry_len + 2 * one_entry_len + 6 * tag_len;
-        assert_ok_eq!(
-            map.get_group_size(&ap),
-            GroupReadResult::Size(exp_size as u64)
-        );
+        let exp_size = group_size_as_sum(
+            vec![(&tag, one_entry_len); 2]
+                .into_iter()
+                .chain(vec![(&tag, three_entry_len); 2])
+                .chain(vec![(&tag, four_entry_len); 2]),
+        )
+        .unwrap();
+        assert_ok_eq!(map.get_group_size(&ap), GroupReadResult::Size(exp_size));
     }
 
     #[test]

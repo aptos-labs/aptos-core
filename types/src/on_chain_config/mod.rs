@@ -6,6 +6,7 @@ use crate::{
     access_path::AccessPath,
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
+    state_store::{state_key::StateKey, StateView},
 };
 use anyhow::{format_err, Result};
 use bytes::Bytes;
@@ -37,8 +38,8 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     consensus_config::{
-        ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig,
-        ProposerAndVoterConfig, ProposerElectionType,
+        ConsensusConfigV1, ConsensusConfigV1Ext, ConsensusExtraFeature, DagConsensusConfigV1,
+        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig,
@@ -176,6 +177,15 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
 
     fn struct_tag() -> StructTag {
         struct_tag_for_config(Self::CONFIG_ID)
+    }
+}
+
+impl<S: StateView> ConfigStorage for S {
+    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
+        let state_key = StateKey::access_path(access_path);
+        self.get_state_value(&state_key)
+            .ok()?
+            .map(|s| s.bytes().clone())
     }
 }
 

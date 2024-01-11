@@ -26,6 +26,10 @@ class Flow(Flag):
     PREVIEWNET = auto()
     # Tests used for previewnet evaluation
     PREVIEWNET_LARGE_DB = auto()
+    # Tests for Agg V2 performance
+    AGG_V2 = auto()
+    # Test resource groups
+    RESOURCE_GROUPS = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -77,6 +81,8 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # Axiom: https://app.axiom.co/aptoslabs-hghf/explorer?qid=88fegG0H1si-s3x8pv&relative=1
 # Humio: https://gist.github.com/igor-aptos/7b12ca28de03894cddda8e415f37889e
 # Local machine numbers will be higher.
+# For charts over time, you can modify the following query:
+# https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
     RunGroupConfig(expected_tps=25300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
@@ -98,19 +104,35 @@ TESTS = [
     RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
-    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C, waived=True),
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
-    RunGroupConfig(expected_tps=20, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
-    RunGroupConfig(expected_tps=50, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
-    RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
-    RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=17, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=82, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=3, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    RunGroupConfig(expected_tps=12, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
 
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
+
+    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
+    
     RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=8800, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5900, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
@@ -120,10 +142,10 @@ TESTS = [
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=24000, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=25500, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
     RunGroupConfig(expected_tps=1710, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=5800, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=6900, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
@@ -222,6 +244,7 @@ def execute_command(command):
 class RunResults:
     tps: float
     gps: float
+    effective_gps: float
     io_gps: float
     execution_gps: float
     gpt: float
@@ -251,6 +274,9 @@ def extract_run_results(
     if execution_only:
         tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
         gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
+        effective_gps = float(
+            re.findall(r"Overall execution effectiveGPS: (\d+\.?\d*) gas/s", output)[-1]
+        )
         io_gps = float(
             re.findall(r"Overall execution ioGPS: (\d+\.?\d*) gas/s", output)[-1]
         )
@@ -273,6 +299,7 @@ def extract_run_results(
             )
         )
         gps = 0
+        effective_gps = 0
         io_gps = 0
         execution_gps = 0
         gpt = 0
@@ -280,6 +307,9 @@ def extract_run_results(
     else:
         tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
         gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
+        effective_gps = float(
+            get_only(re.findall(r"Overall effectiveGPS: (\d+\.?\d*) gas/s", output))
+        )
         io_gps = float(
             get_only(re.findall(r"Overall ioGPS: (\d+\.?\d*) gas/s", output))
         )
@@ -311,6 +341,7 @@ def extract_run_results(
     return RunResults(
         tps=tps,
         gps=gps,
+        effective_gps=effective_gps,
         io_gps=io_gps,
         execution_gps=execution_gps,
         gpt=gpt,
@@ -351,6 +382,7 @@ def print_table(
                 "vm/exe",
                 "commit/total",
                 "g/s",
+                "eff g/s",
                 "io g/s",
                 "exe g/s",
                 "g/t",
@@ -384,6 +416,7 @@ def print_table(
             row.append(round(result.single_node_result.fraction_of_execution_in_vm, 3))
             row.append(round(result.single_node_result.fraction_in_commit, 3))
             row.append(int(round(result.single_node_result.gps)))
+            row.append(int(round(result.single_node_result.effective_gps)))
             row.append(int(round(result.single_node_result.io_gps)))
             row.append(int(round(result.single_node_result.execution_gps)))
             row.append(int(round(result.single_node_result.gpt)))
@@ -400,7 +433,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
 
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
-    create_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
+    create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
 
     results = []
@@ -457,14 +490,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         number_of_threads_results = {}
 
         for execution_threads in EXECUTION_ONLY_NUMBER_OF_THREADS:
-            test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}"
+            test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {execution_threads} {common_command_suffix} --skip-commit --blocks {NUM_BLOCKS_DETAILED}"
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
                 output, execution_only=True
             )
 
-        test_db_command = f"{BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
+        test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
         single_node_result = extract_run_results(output, execution_only=False)

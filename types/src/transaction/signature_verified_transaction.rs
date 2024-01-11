@@ -65,6 +65,15 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
     type Key = StateKey;
     type Tag = StructTag;
     type Value = WriteOp;
+
+    fn user_txn_bytes_len(&self) -> usize {
+        match self {
+            SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => {
+                txn.txn_bytes_len()
+            },
+            _ => 0,
+        }
+    }
 }
 
 impl From<Transaction> for SignatureVerifiedTransaction {

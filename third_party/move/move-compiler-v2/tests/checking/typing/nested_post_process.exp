@@ -1,0 +1,54 @@
+// ---- Model Dump
+module 0x42::simple_map {
+    use std::error;
+    use std::option;
+    use std::vector;
+    struct Element {
+        key: #0,
+        value: #1,
+    }
+    struct SimpleMap {
+        data: vector<simple_map::Element<#0, #1>>,
+    }
+    public fun borrow<Key,Value>(map: &simple_map::SimpleMap<#0, #1>,key: &#0): &#1 {
+        {
+          let maybe_idx: option::Option<u64> = simple_map::find<Key, Value>(map, key);
+          if option::is_some<u64>(Borrow(Immutable)(maybe_idx)) {
+            Tuple()
+          } else {
+            Abort(error::invalid_argument(2))
+          };
+          {
+            let idx: u64 = option::extract<u64>(Borrow(Mutable)(maybe_idx));
+            Borrow(Immutable)(select simple_map::Element.value(vector::borrow<simple_map::Element<Key, Value>>(Borrow(Immutable)(select simple_map::SimpleMap.data(map)), idx)))
+          }
+        }
+    }
+    private fun find<Key,Value>(map: &simple_map::SimpleMap<#0, #1>,key: &#0): option::Option<u64> {
+        {
+          let leng: u64 = vector::length<simple_map::Element<Key, Value>>(Borrow(Immutable)(select simple_map::SimpleMap.data(map)));
+          {
+            let i: u64 = 0;
+            loop {
+              if Lt<u64>(i, leng) {
+                {
+                  let element: &simple_map::Element<Key, Value> = vector::borrow<simple_map::Element<Key, Value>>(Borrow(Immutable)(select simple_map::SimpleMap.data(map)), i);
+                  if Eq<&Key>(Borrow(Immutable)(select simple_map::Element.key(element)), key) {
+                    return option::some<u64>(i)
+                  } else {
+                    Tuple()
+                  };
+                  i: u64 = Add<u64>(i, 1);
+                  Tuple()
+                }
+              } else {
+                break
+              }
+            };
+            option::none<u64>()
+          }
+        }
+    }
+    spec fun $borrow<Key,Value>(map: &simple_map::SimpleMap<#0, #1>,key: &#0): &#1;
+    spec fun $find<Key,Value>(map: &simple_map::SimpleMap<#0, #1>,key: &#0): option::Option<u64>;
+} // end 0x42::simple_map

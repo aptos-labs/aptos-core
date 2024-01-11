@@ -11,6 +11,7 @@ pub fn derive_enum_converters(input: TokenStream) -> TokenStream {
 
     // Get the name of the enum type
     let enum_name = &input.ident;
+    let generics = &input.generics;
 
     // Check if the input is an enum
     if let Data::Enum(enum_data) = &input.data {
@@ -25,16 +26,16 @@ pub fn derive_enum_converters(input: TokenStream) -> TokenStream {
                 if let syn::Fields::Unnamed(fields) = &variant.fields {
                     if let Some(struct_name) = fields.unnamed.first() {
                         let expanded = quote! {
-                            impl From<#struct_name> for #enum_name {
+                            impl #generics From<#struct_name> for #enum_name #generics {
                                 fn from(struct_value: #struct_name) -> Self {
                                     Self::#variant_name(struct_value)
                                 }
                             }
 
-                            impl TryFrom<#enum_name> for #struct_name {
+                            impl #generics TryFrom<#enum_name #generics> for #struct_name {
                                 type Error = anyhow::Error;
 
-                                fn try_from(msg: #enum_name) -> Result<Self, Self::Error> {
+                                fn try_from(msg: #enum_name #generics) -> Result<Self, Self::Error> {
                                     match msg {
                                         #enum_name::#variant_name(m) => Ok(m),
                                         _ => Err(anyhow::anyhow!("invalid message type")),

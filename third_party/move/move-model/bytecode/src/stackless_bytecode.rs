@@ -71,6 +71,8 @@ pub enum AssignKind {
     // currently makes a difference of this case. It originates from stack code where Copy
     // and Move push on the stack and Store pops.
     Store,
+    /// The assign kind should be inferred based on livevar analysis
+    Inferred,
 }
 
 /// The type of variable that is being havoc-ed
@@ -136,7 +138,7 @@ impl Constant {
 
 /// An operation -- target of a call. This contains user functions, builtin functions, and
 /// operators.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Operation {
     // ==============================================================
     // Core Bytecodes (part of the programming language)
@@ -480,6 +482,28 @@ impl Bytecode {
 
     pub fn is_branch(&self) -> bool {
         self.is_conditional_branch() || self.is_unconditional_branch()
+    }
+
+    /// Return the destinations of the instruction
+    pub fn dests(&self) -> Vec<TempIndex> {
+        match self {
+            Bytecode::Assign(_, dst, _, _) => {
+                vec![*dst]
+            },
+            Bytecode::Load(_, dst, _) => {
+                vec![*dst]
+            },
+            Bytecode::Call(_, dsts, _, _, _) => dsts.clone(),
+            Bytecode::Ret(_, _)
+            | Bytecode::Branch(_, _, _, _)
+            | Bytecode::Jump(_, _)
+            | Bytecode::Label(_, _)
+            | Bytecode::Abort(_, _)
+            | Bytecode::Nop(_)
+            | Bytecode::SaveMem(_, _, _)
+            | Bytecode::SaveSpecVar(_, _, _)
+            | Bytecode::Prop(_, _, _) => Vec::new(),
+        }
     }
 
     /// Return the destination(s) if self is a branch/jump instruction
@@ -834,6 +858,9 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
             },
             Assign(_, dst, src, AssignKind::Store) => {
                 write!(f, "{} := {}", self.lstr(*dst), self.lstr(*src))?
+            },
+            Assign(_, dst, src, AssignKind::Inferred) => {
+                write!(f, "{} := infer({})", self.lstr(*dst), self.lstr(*src))?
             },
             Call(_, dsts, oper, args, aa) => {
                 if !dsts.is_empty() {

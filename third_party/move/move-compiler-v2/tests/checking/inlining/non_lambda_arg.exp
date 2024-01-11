@@ -1,0 +1,26 @@
+
+Diagnostics:
+error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort` has some:
+  ┌─ tests/checking/inlining/non_lambda_arg.move:4:5
+  │
+4 │ ╭     public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T| bool) {
+5 │ │         let n = vector::length(arr);
+6 │ │         incorrect_sort_recursive<T>(arr, 0, n - 1, a_less_b)
+7 │ │     }
+  │ ╰─────^
+  │
+  = Parameter `a_less_b` has a function type `|(T, T)|bool`.
+
+error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort_recursive` has some:
+   ┌─ tests/checking/inlining/non_lambda_arg.move:9:5
+   │
+ 9 │ ╭     public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T| bool) {
+10 │ │         if (low < high) {
+11 │ │             let pi = low + high / 2;
+12 │ │             incorrect_sort_recursive(arr, low, pi - 1, a_less_b);
+13 │ │             incorrect_sort_recursive(arr, pi + 1, high, a_less_b);
+14 │ │         };
+15 │ │     }
+   │ ╰─────^
+   │
+   = Parameter `a_less_b` has a function type `|(T, T)|bool`.

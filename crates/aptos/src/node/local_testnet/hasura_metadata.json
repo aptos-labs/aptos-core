@@ -1,5 +1,5 @@
 {
-  "resource_version": 288,
+  "resource_version": 296,
   "metadata": {
     "version": 3,
     "sources": [
@@ -93,7 +93,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["account_address", "transaction_version"],
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -209,7 +212,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["account_address", "transaction_version"],
+                  "columns": [
+                    "account_address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -288,7 +294,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["address", "transaction_version"],
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -725,6 +734,7 @@
               "name": "current_collections_v2",
               "schema": "public"
             },
+            "object_relationships": [],
             "select_permissions": [
               {
                 "role": "anonymous",
@@ -1469,7 +1479,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["delegator_address", "pool_address"],
+                  "columns": [
+                    "delegator_address",
+                    "pool_address"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1608,7 +1621,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["db", "is_indexer_up"],
+                  "columns": [
+                    "db",
+                    "is_indexer_up"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1624,7 +1640,9 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["chain_id"],
+                  "columns": [
+                    "chain_id"
+                  ],
                   "filter": {}
                 }
               }
@@ -1639,7 +1657,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["address", "transaction_version"],
+                  "columns": [
+                    "address",
+                    "transaction_version"
+                  ],
                   "filter": {},
                   "limit": 100,
                   "allow_aggregations": true
@@ -1656,7 +1677,10 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["num_active_delegator", "pool_address"],
+                  "columns": [
+                    "num_active_delegator",
+                    "pool_address"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -1740,7 +1764,11 @@
               {
                 "role": "anonymous",
                 "permission": {
-                  "columns": ["handle", "key_type", "value_type"],
+                  "columns": [
+                    "handle",
+                    "key_type",
+                    "value_type"
+                  ],
                   "filter": {},
                   "limit": 100
                 }
@@ -2042,6 +2070,13 @@
               "from_env": "INDEXER_V2_POSTGRES_URL"
             },
             "isolation_level": "read-committed",
+            "pool_settings": {
+              "connection_lifetime": 600,
+              "idle_timeout": 180,
+              "max_connections": 100,
+              "total_max_connections": 1500,
+              "pool_timeout": 120
+            },
             "use_prepared_statements": false
           }
         }
@@ -2077,7 +2112,9 @@
             "query_name": "Latest Processor Status"
           }
         },
-        "methods": ["GET"],
+        "methods": [
+          "GET"
+        ],
         "name": "Latest Processor Status",
         "url": "get_lastest_processor_status"
       }

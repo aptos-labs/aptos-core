@@ -1,0 +1,143 @@
+// ---- Model Dump
+module 0x42::LambdaTest1 {
+    spec fun $inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    spec fun $inline_apply1(f: |u64|u64,b: u64): u64 {
+        LambdaTest1::$inline_mul(Add((f)(b), 1), LambdaTest1::$inline_mul(3, 4))
+    }
+    spec fun $inline_mul(a: u64,b: u64): u64 {
+        Mul(a, b)
+    }
+} // end 0x42::LambdaTest1
+module 0x42::LambdaTest2 {
+    use 0x42::LambdaTest1; // resolved as: 0x42::LambdaTest1
+    use std::vector;
+    public fun test_inline_lambda() {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let product: u64 = 1;
+            {
+              let (v: &vector<u64>) = Tuple(Borrow(Immutable)(v));
+              {
+                let i: u64 = 0;
+                loop {
+                  if Lt<u64>(i, vector::length<u64>(v)) {
+                    {
+                      let (e: &u64) = Tuple(vector::borrow<u64>(v, i));
+                      product: u64 = {
+                        let (a: u64, b: u64) = Tuple(product, Deref(e));
+                        Mul<u64>(a, b)
+                      }
+                    };
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  } else {
+                    break
+                  }
+                }
+              }
+            };
+            Tuple()
+          }
+        }
+    }
+    spec fun $foreach<T>(v: &vector<#0>,action: |&#0|());
+    spec fun $inline_apply2(g: |u64|u64,c: u64): u64 {
+        Add(LambdaTest1::$inline_apply1(|z: u64| z, (g)(LambdaTest1::$inline_mul(c, LambdaTest1::$inline_apply(|x: u64| x, 3)))), 2)
+    }
+    spec fun $inline_apply3(g: |u64|u64,c: u64): u64 {
+        Add(LambdaTest1::$inline_apply1(g, LambdaTest1::$inline_mul(c, LambdaTest1::$inline_apply(|x: u64| LambdaTest1::$inline_apply(|y: u64| y, x), 3))), 4)
+    }
+    spec fun $test_inline_lambda();
+} // end 0x42::LambdaTest2
+module 0x42::LambdaTest {
+    use 0x42::LambdaTest2; // resolved as: 0x42::LambdaTest2
+    private fun test_lambda() {
+        {
+          let a: u64 = {
+            let ();
+            Add<u64>({
+              let (c: u64) = Tuple(3);
+              Add<u64>({
+                let (b: u64) = Tuple({
+                  let (x: u64) = Tuple({
+                    let (a: u64, b: u64) = Tuple(c, {
+                      let (b: u64) = Tuple(3);
+                      {
+                        let (x: u64) = Tuple(b);
+                        x
+                      }
+                    });
+                    Mul<u64>(a, b)
+                  });
+                  Add<u64>(x, 1)
+                });
+                {
+                  let (a: u64, b: u64) = Tuple(Add<u64>({
+                    let (z: u64) = Tuple(b);
+                    z
+                  }, 1), {
+                    let (a: u64, b: u64) = Tuple(3, 4);
+                    Mul<u64>(a, b)
+                  });
+                  Mul<u64>(a, b)
+                }
+              }, 2)
+            }, {
+              let (c: u64) = Tuple({
+                let (b: u64) = Tuple(3);
+                {
+                  let (y: u64) = Tuple(b);
+                  y
+                }
+              });
+              Add<u64>({
+                let (b: u64) = Tuple({
+                  let (x: u64) = Tuple({
+                    let (a: u64, b: u64) = Tuple(c, {
+                      let (b: u64) = Tuple(3);
+                      {
+                        let (x: u64) = Tuple(b);
+                        x
+                      }
+                    });
+                    Mul<u64>(a, b)
+                  });
+                  Mul<u64>(x, x)
+                });
+                {
+                  let (a: u64, b: u64) = Tuple(Add<u64>({
+                    let (z: u64) = Tuple(b);
+                    z
+                  }, 1), {
+                    let (a: u64, b: u64) = Tuple(3, 4);
+                    Mul<u64>(a, b)
+                  });
+                  Mul<u64>(a, b)
+                }
+              }, 2)
+            })
+          };
+          if Eq<u64>(a, 1) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    spec fun $inline_apply(f: |u64|u64,b: u64): u64 {
+        (f)(b)
+    }
+    spec fun $inline_apply_test(): u64 {
+        Add(LambdaTest2::$inline_apply2(|x: num| Add(x, 1), 3), LambdaTest2::$inline_apply2(|x: num| Mul(x, x), LambdaTest::$inline_apply(|y: u64| y, 3)))
+    }
+    spec fun $test_lambda() {
+        {
+          let a: u64 = LambdaTest::$inline_apply_test();
+          Tuple()
+        }
+    }
+} // end 0x42::LambdaTest

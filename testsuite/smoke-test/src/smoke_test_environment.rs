@@ -203,6 +203,7 @@ pub fn launch_faucet(
 ) -> JoinHandle<anyhow::Result<()>> {
     let faucet_config = RunConfig::build_for_cli(
         endpoint,
+        "0.0.0.0".to_string(),
         port,
         FunderKeyEnum::Key(ConfigKey::new(mint_key)),
         true,

@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: cannot mutably borrow local `inner` since other references exists
+    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:104:18
+    │
+103 │         let c; if (cond) c = &mut inner.f1 else c = &mut inner.f2;
+    │                              ------------- previous mutable field borrow
+104 │         let f1 = &mut inner.f1; // no error in v1, but should error.
+    │                  ^^^^^^^^^^^^^ mutable borrow attempted here
+
+error: cannot mutably borrow local `inner` since other references exists
+    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:113:18
+    │
+112 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f2;
+    │                                     ------------- previous mutable field borrow
+113 │         let f1 = &mut inner.f1; // no error in v1, but should error
+    │                  ^^^^^^^^^^^^^ mutable borrow attempted here

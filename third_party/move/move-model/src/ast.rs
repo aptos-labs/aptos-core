@@ -93,8 +93,8 @@ impl Attribute {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum ConditionKind {
-    LetPost(Symbol),
-    LetPre(Symbol),
+    LetPost(Symbol, Loc),
+    LetPre(Symbol, Loc),
     Assert,
     Assume,
     Decreases,
@@ -108,10 +108,10 @@ pub enum ConditionKind {
     StructInvariant,
     FunctionInvariant,
     LoopInvariant,
-    GlobalInvariant(Vec<Symbol>),
-    GlobalInvariantUpdate(Vec<Symbol>),
+    GlobalInvariant(Vec<(Symbol, Loc)>),
+    GlobalInvariantUpdate(Vec<(Symbol, Loc)>),
     SchemaInvariant,
-    Axiom(Vec<Symbol>),
+    Axiom(Vec<(Symbol, Loc)>),
     Update,
 }
 
@@ -177,7 +177,10 @@ impl ConditionKind {
 
 impl std::fmt::Display for ConditionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        fn display_ty_params(f: &mut Formatter<'_>, ty_params: &[Symbol]) -> std::fmt::Result {
+        fn display_ty_params(
+            f: &mut Formatter<'_>,
+            ty_params: &[(Symbol, Loc)],
+        ) -> std::fmt::Result {
             if !ty_params.is_empty() {
                 write!(
                     f,
@@ -190,8 +193,8 @@ impl std::fmt::Display for ConditionKind {
 
         use ConditionKind::*;
         match self {
-            LetPost(sym) => write!(f, "let({:?})", sym),
-            LetPre(sym) => write!(f, "let old({:?})", sym),
+            LetPost(sym, _loc) => write!(f, "let({:?})", sym),
+            LetPre(sym, _loc) => write!(f, "let old({:?})", sym),
             Assert => write!(f, "assert"),
             Assume => write!(f, "assume"),
             Decreases => write!(f, "decreases"),
@@ -457,6 +460,8 @@ pub enum ExpData {
     LocalVar(NodeId, Symbol),
     /// Represents a reference to a temporary used in bytecode, if this expression is associated
     /// with bytecode.
+    /// When compiling from Move source code, represents a parameter to a function: TempIndex
+    /// indicates the index into the list of function parameters.
     Temporary(NodeId, TempIndex),
     /// Represents a call to an operation. The `Operation` enum covers all builtin functions
     /// (including operators, constants, ...) as well as user functions.
@@ -495,7 +500,9 @@ pub enum ExpData {
     /// Represents a loop continuation for the enclosing loop. The bool indicates whether the
     /// loop is continued (true) or broken (false).
     LoopCont(NodeId, bool),
-    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.
+    /// Assignment to a pattern. Can be a tuple pattern and a tuple expression.  Note that Assign
+    /// does *not* introduce new variables; they apparently be introduced by a Block or Lambda, or
+    /// as a function formal parameter.
     Assign(NodeId, Pattern, Exp),
     /// Mutation of a lhs reference, as in `*lhs = rhs`.
     Mutate(NodeId, Exp, Exp),
@@ -550,6 +557,16 @@ impl From<Exp> for ExpData {
     fn from(exp: Exp) -> ExpData {
         exp.as_ref().to_owned()
     }
+}
+
+/// Rewrite result
+pub enum RewriteResult {
+    // A new expression, stopping descending into sub expressions
+    Rewritten(Exp),
+    // A new expression, descending into sub-expressions of the new one.
+    RewrittenAndDescend(Exp),
+    // The original expression, descend into sub-expressions
+    Unchanged(Exp),
 }
 
 impl ExpData {
@@ -607,18 +624,51 @@ impl ExpData {
 
     pub fn node_ids(&self) -> Vec<NodeId> {
         let mut ids = vec![];
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             ids.push(e.node_id());
+            true // keep going
         });
         ids
     }
 
     /// Returns the free local variables, inclusive their types, used in this expression.
     /// Result is ordered by occurrence.
-    pub fn free_vars(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
+    pub fn free_vars_with_types(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
         let mut vars = vec![];
-        let mut shadowed = vec![]; // Should be multiset but don't have this
-        let mut visitor = |up: bool, e: &ExpData| {
+        let var_collector = |id: &NodeId, sym: &Symbol| {
+            if !vars.iter().any(|(s, _)| s == sym) {
+                vars.push((*sym, env.get_node_type(*id)));
+            }
+        };
+        self.visit_free_local_vars(var_collector);
+        vars
+    }
+
+    /// Returns the bound local variables with node id in this expression
+    pub fn bound_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
+        let mut vars = BTreeMap::new();
+        let mut visitor = |post: bool, e: &ExpData| {
+            use ExpData::*;
+            if post {
+                if let LocalVar(id, sym) = e {
+                    if !vars.iter().any(|(s, _)| s == sym) {
+                        vars.insert(*sym, *id);
+                    }
+                }
+            }
+            true // keep going
+        };
+        self.visit_pre_post(&mut visitor);
+        vars
+    }
+
+    /// Visits free local variables with node id in this expression.
+    fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
+    where
+        F: FnMut(&NodeId, &Symbol),
+    {
+        let mut shadowed: BTreeMap<Symbol, usize> = BTreeMap::new();
+        let mut visitor = |post: bool, e: &ExpData| {
             use ExpData::*;
             let decls = match e {
                 Lambda(_, pat, _) | Block(_, pat, _, _) => {
@@ -630,41 +680,48 @@ impl ExpData {
                     .collect_vec(),
                 _ => vec![],
             };
-            if !up {
-                shadowed.extend(decls.iter());
-            } else {
-                for sym in decls {
-                    if let Some(pos) = shadowed.iter().position(|s| *s == sym) {
-                        // Remove one instance of this symbol. The same symbol can appear
-                        // multiple times in `shadowed`.
-                        shadowed.remove(pos);
+            if !post {
+                // Visit the Assigned pat on the way down, before visiting the RHS expression
+                if let Assign(_, pat, _) = e {
+                    for (id, sym) in pat.vars().iter() {
+                        if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                            node_symbol_visitor(id, sym);
+                        }
                     }
-                }
-                if let LocalVar(id, sym) = e {
-                    if !shadowed.contains(sym) && !vars.iter().any(|(s, _)| s == sym) {
-                        vars.push((*sym, env.get_node_type(*id)));
+                } else {
+                    for sym in &decls {
+                        shadowed
+                            .entry(*sym)
+                            .and_modify(|curr| *curr += 1)
+                            .or_insert(1);
                     }
                 }
             }
+            if post {
+                if let LocalVar(id, sym) = e {
+                    if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
+                        node_symbol_visitor(id, sym);
+                    }
+                } else {
+                    for sym in &decls {
+                        if let Some(x) = shadowed.get_mut(sym) {
+                            *x -= 1;
+                        }
+                    }
+                }
+            }
+            true // keep going
         };
         self.visit_pre_post(&mut visitor);
-        vars
     }
 
-    /// Returns the free local variables with node id in this expression
-    pub fn free_local_vars_with_node_id(&self) -> BTreeMap<Symbol, NodeId> {
-        let mut vars = BTreeMap::new();
-        let mut visitor = |up: bool, e: &ExpData| {
-            use ExpData::*;
-            if up {
-                if let LocalVar(id, sym) = e {
-                    if !vars.iter().any(|(s, _)| s == sym) {
-                        vars.insert(*sym, *id);
-                    }
-                }
-            }
+    /// Returns just the free local variables in this expression.
+    pub fn free_vars(&self) -> BTreeSet<Symbol> {
+        let mut vars = BTreeSet::new();
+        let just_vars_collector = |_id: &NodeId, sym: &Symbol| {
+            vars.insert(*sym);
         };
-        self.visit_pre_post(&mut visitor);
+        self.visit_free_local_vars(just_vars_collector);
         vars
     }
 
@@ -696,8 +753,9 @@ impl ExpData {
                 },
                 _ => {},
             }
+            true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         result
     }
 
@@ -710,8 +768,9 @@ impl ExpData {
                     temps.push((*idx, env.get_node_type(*id)));
                 }
             }
+            true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         temps
     }
 
@@ -722,56 +781,111 @@ impl ExpData {
             if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
                 called.insert(mid.qualified(*fid));
             }
+            true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_post_order(&mut visitor);
         called
     }
 
-    pub fn has_exit(&self) -> bool {
-        // TODO: we currently cannot break out of a visitor, so we maintain a state when we
-        // are inside a loop.
-        let mut in_loop = false;
+    /// Returns the Move functions called by this expression, along with nodes of call sites.
+    pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
+        let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = e {
+                called
+                    .entry(mid.qualified(*fid))
+                    .or_default()
+                    .insert(*node_id);
+            }
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        called
+    }
+
+    /// Given that this expression is (part of) a loop body, returns `true` if
+    /// there is an early exit from the body of the nearest enclosing loop,
+    /// i.e., the expression contains a `continue` or `break` statement outside
+    /// of any nested loop.
+    pub fn has_loop_exit(&self) -> bool {
+        let mut loop_count = 0; // Count internal nested loops.
         let mut has_exit = false;
-        let mut visitor = |post: bool, e: &ExpData| match e {
-            ExpData::Loop(_, _) => in_loop = !post,
-            ExpData::LoopCont(_, _) if !in_loop => has_exit = true,
-            _ => {},
+        let mut visitor = |post: bool, e: &ExpData| {
+            match e {
+                ExpData::Loop(_, _) => loop_count += if post { -1 } else { 1 },
+                ExpData::LoopCont(_, _) if loop_count == 0 => {
+                    has_exit = true;
+                    return false; // found an exit, exit visit early
+                },
+                _ => {},
+            }
+            true
         };
         self.visit_pre_post(&mut visitor);
         has_exit
     }
 
     /// Returns true of the given expression is valid for a constant expression.
+    /// If not valid, then returns false and adds reasons why not to the argument reasons.
+    ///
     /// TODO: this mimics the current allowed expression forms the v1 compiler allows,
     /// but is not documented as such in the book
-    pub fn is_valid_for_constant(&self) -> bool {
+    pub fn is_valid_for_constant(&self, env: &GlobalEnv, reasons: &mut Vec<(Loc, String)>) -> bool {
         let mut valid = true;
-        let mut visitor = |e: &ExpData| match e {
-            ExpData::Value(..) | ExpData::Invalid(_) => {},
-            ExpData::Call(_, oper, args) => {
-                if !oper.is_builtin_op() || !args.iter().all(|e| e.is_valid_for_constant()) {
+        let mut visitor = |e: &ExpData| {
+            match e {
+                ExpData::Value(..) | ExpData::Invalid(_) | ExpData::Sequence(_, _) => {},
+                ExpData::Call(id, oper, _args) => {
+                    // Note that _args are visited separately.  No need to check them here.
+                    if !oper.is_builtin_op() {
+                        reasons.push((
+                            env.get_node_loc(*id),
+                            "Invalid call or operation in constant".to_owned(),
+                        ));
+                        valid = false;
+                    }
+                },
+                _ => {
+                    let id = e.node_id();
+                    reasons.push((
+                        env.get_node_loc(id),
+                        "Invalid statement or expression in constant".to_owned(),
+                    ));
                     valid = false;
-                }
-            },
-            ExpData::Sequence(_, items) => {
-                if !items.iter().all(|e| e.is_valid_for_constant()) {
-                    valid = false
-                }
-            },
-            _ => valid = false,
+                },
+            }
+            true // Always keep going, to add all problematic subexpressions to reasons.
         };
-        self.visit(&mut visitor);
+        self.visit_pre_order(&mut visitor);
         valid
     }
 
     /// Visits expression, calling visitor on each sub-expression, depth first.
-    pub fn visit<F>(&self, visitor: &mut F)
+    /// `visitor` returns false to indicate that visit should stop early.
+    pub fn visit_post_order<F>(&self, visitor: &mut F)
     where
-        F: FnMut(&ExpData),
+        F: FnMut(&ExpData) -> bool,
     {
-        self.visit_pre_post(&mut |up, e| {
-            if up {
-                visitor(e);
+        self.visit_pre_post(&mut |post, e| {
+            if post {
+                visitor(e)
+            } else {
+                true // keep going
+            }
+        });
+    }
+
+    /// Visits expression, calling visitor parent expression, then subexpressions, depth first.
+    /// `visitor` returns false to indicate that visit should stop early.
+    pub fn visit_pre_order<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(&ExpData) -> bool,
+    {
+        self.visit_pre_post(&mut |post, e| {
+            if !post {
+                visitor(e)
+            } else {
+                true // keep going
             }
         });
     }
@@ -781,11 +895,12 @@ impl ExpData {
         P: FnMut(&ExpData) -> bool,
     {
         let mut found = false;
-        self.visit(&mut |e| {
-            if !found {
-                // This still continues to visit after a match is found, may want to
-                // optimize if it becomes an issue.
-                found = predicate(e)
+        self.visit_pre_order(&mut |e| {
+            if predicate(e) {
+                found = true;
+                false // stop visiting; we're done
+            } else {
+                true // keep looking
             }
         });
         found
@@ -795,105 +910,138 @@ impl ExpData {
     /// be called before descending into expression, and `visitor(true, ..)` after. Notice
     /// we use one function instead of two so a lambda can be passed which encapsulates mutable
     /// references.
+    /// - `visitor` returns `false` to indicate that visit should stop early, and `true` to continue.
     pub fn visit_pre_post<F>(&self, visitor: &mut F)
     where
-        F: FnMut(bool, &ExpData),
+        F: FnMut(bool, &ExpData) -> bool,
+    {
+        let _ = self.visit_pre_post_impl(&mut |x, e| if visitor(x, e) { Some(()) } else { None });
+    }
+
+    /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
+    /// - `visitor` returns `None` to indicate that visit should stop early, and `Some(())` to continue.
+    /// - `visit_pre_post` returns `None` if visitor returned `None`.
+    fn visit_pre_post_impl<F>(&self, visitor: &mut F) -> Option<()>
+    where
+        F: FnMut(bool, &ExpData) -> Option<()>,
     {
         use ExpData::*;
-        visitor(false, self);
+        visitor(false, self)?;
         match self {
             Call(_, _, args) => {
                 for exp in args {
-                    exp.visit_pre_post(visitor);
+                    exp.visit_pre_post_impl(visitor)?;
                 }
             },
             Invoke(_, target, args) => {
-                target.visit_pre_post(visitor);
+                target.visit_pre_post_impl(visitor)?;
                 for exp in args {
-                    exp.visit_pre_post(visitor);
+                    exp.visit_pre_post_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body) => body.visit_pre_post(visitor),
+            Lambda(_, _, body) => body.visit_pre_post_impl(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
-                    range.visit_pre_post(visitor);
+                    range.visit_pre_post_impl(visitor)?;
                 }
                 for trigger in triggers {
                     for e in trigger {
-                        e.visit_pre_post(visitor);
+                        e.visit_pre_post_impl(visitor)?;
                     }
                 }
                 if let Some(exp) = condition {
-                    exp.visit_pre_post(visitor);
+                    exp.visit_pre_post_impl(visitor)?;
                 }
-                body.visit_pre_post(visitor);
+                body.visit_pre_post_impl(visitor)?;
             },
             Block(_, _, binding, body) => {
                 if let Some(exp) = binding {
-                    exp.visit_pre_post(visitor)
+                    exp.visit_pre_post_impl(visitor)?;
                 }
-                body.visit_pre_post(visitor)
+                body.visit_pre_post_impl(visitor)?;
             },
             IfElse(_, c, t, e) => {
-                c.visit_pre_post(visitor);
-                t.visit_pre_post(visitor);
-                e.visit_pre_post(visitor);
+                c.visit_pre_post_impl(visitor)?;
+                t.visit_pre_post_impl(visitor)?;
+                e.visit_pre_post_impl(visitor)?;
             },
-            Loop(_, e) => e.visit_pre_post(visitor),
-            Return(_, e) => e.visit_pre_post(visitor),
+            Loop(_, e) => e.visit_pre_post_impl(visitor)?,
+            Return(_, e) => e.visit_pre_post_impl(visitor)?,
             Sequence(_, es) => {
                 for e in es {
-                    e.visit_pre_post(visitor)
+                    e.visit_pre_post_impl(visitor)?;
                 }
             },
-            Assign(_, _, e) => e.visit_pre_post(visitor),
+            Assign(_, _, e) => e.visit_pre_post_impl(visitor)?,
             Mutate(_, lhs, rhs) => {
-                lhs.visit_pre_post(visitor);
-                rhs.visit_pre_post(visitor);
+                lhs.visit_pre_post_impl(visitor)?;
+                rhs.visit_pre_post_impl(visitor)?;
             },
-            SpecBlock(_, spec) => Self::visit_pre_post_spec(spec, visitor),
+            SpecBlock(_, spec) => Self::visit_pre_post_spec_impl(spec, visitor)?,
             // Explicitly list all enum variants
             LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
-        visitor(true, self);
+        visitor(true, self)
     }
 
-    fn visit_pre_post_spec<F>(spec: &Spec, visitor: &mut F)
+    fn visit_pre_post_spec_impl<F>(spec: &Spec, visitor: &mut F) -> Option<()>
     where
-        F: FnMut(bool, &ExpData),
+        F: FnMut(bool, &ExpData) -> Option<()>,
     {
         for cond in &spec.conditions {
-            Self::visit_pre_post_cond(cond, visitor)
+            Self::visit_pre_post_cond_impl(cond, visitor)?;
         }
         for impl_spec in spec.on_impl.values() {
-            Self::visit_pre_post_spec(impl_spec, visitor)
+            Self::visit_pre_post_spec_impl(impl_spec, visitor)?;
         }
         for cond in spec.update_map.values() {
-            Self::visit_pre_post_cond(cond, visitor)
+            Self::visit_pre_post_cond_impl(cond, visitor)?;
         }
+        Some(())
     }
 
-    fn visit_pre_post_cond<F>(cond: &Condition, visitor: &mut F)
+    fn visit_pre_post_cond_impl<F>(cond: &Condition, visitor: &mut F) -> Option<()>
     where
-        F: FnMut(bool, &ExpData),
+        F: FnMut(bool, &ExpData) -> Option<()>,
     {
-        cond.exp.visit_pre_post(visitor);
+        cond.exp.visit_pre_post_impl(visitor)?;
         for exp in &cond.additional_exps {
-            exp.visit_pre_post(visitor);
+            exp.visit_pre_post_impl(visitor)?;
         }
+        Some(())
     }
 
-    /// Rewrites this expression and sub-expression based on the rewriter function. The
-    /// function returns `Ok(e)` if the expression is rewritten, and passes back ownership
-    /// using `Err(e)` if the expression stays unchanged. This function stops traversing
-    /// on `Ok(e)` and descents into sub-expressions on `Err(e)`.
+    /// Rewrites this expression and sub-expression based on the rewriter function. The function
+    /// returns `RewriteResult:Rewritten(e)` if the expression is rewritten, and passes back
+    /// ownership using `RewriteResult:Unchanged(e)` if the expression stays unchanged. This
+    /// function stops traversing on `RewriteResult::Rewritten(e)` and descents into sub-expressions
+    /// on `RewriteResult::Unchanged(e)`. In order to continue into sub-expressions after rewrite, use
+    /// `RewriteResult::RewrittenAndDescend(e)`.
     pub fn rewrite<F>(exp: Exp, exp_rewriter: &mut F) -> Exp
     where
-        F: FnMut(Exp) -> Result<Exp, Exp>,
+        F: FnMut(Exp) -> RewriteResult,
     {
         ExpRewriter {
             exp_rewriter,
             node_rewriter: &mut |_| None,
+            pattern_rewriter: &mut |_, _| None,
+        }
+        .rewrite_exp(exp)
+    }
+
+    pub fn rewrite_exp_and_pattern<F, G>(
+        exp: Exp,
+        exp_rewriter: &mut F,
+        pattern_rewriter: &mut G,
+    ) -> Exp
+    where
+        F: FnMut(Exp) -> RewriteResult,
+        G: FnMut(&Pattern, bool) -> Option<Pattern>,
+    {
+        ExpRewriter {
+            exp_rewriter,
+            node_rewriter: &mut |_| None,
+            pattern_rewriter,
         }
         .rewrite_exp(exp)
     }
@@ -905,8 +1053,9 @@ impl ExpData {
         F: FnMut(NodeId) -> Option<NodeId>,
     {
         ExpRewriter {
-            exp_rewriter: &mut Err,
+            exp_rewriter: &mut RewriteResult::Unchanged,
             node_rewriter,
+            pattern_rewriter: &mut |_, _| None,
         }
         .rewrite_exp(exp)
     }
@@ -918,18 +1067,19 @@ impl ExpData {
         node_rewriter: &mut G,
     ) -> Exp
     where
-        F: FnMut(Exp) -> Result<Exp, Exp>,
+        F: FnMut(Exp) -> RewriteResult,
         G: FnMut(NodeId) -> Option<NodeId>,
     {
         ExpRewriter {
             exp_rewriter,
             node_rewriter,
+            pattern_rewriter: &mut |_, _| None,
         }
         .rewrite_exp(exp)
     }
 
-    /// A function which can be used for `Exp::rewrite_node_id` to instantiate types in
-    /// an expression based on a type parameter instantiation.
+    /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
+    /// instantiate types in an expression based on a type parameter instantiation.
     pub fn instantiate_node(env: &GlobalEnv, id: NodeId, targs: &[Type]) -> Option<NodeId> {
         if targs.is_empty() {
             // shortcut
@@ -951,9 +1101,34 @@ impl ExpData {
         }
     }
 
+    /// A function which can be used by a `node_rewriter` argument to `ExpData::rewrite_node_id` to
+    /// update node location (`Loc`), in addition to instantiating types.  This is currently only
+    /// useful in inlining, but is cleaner to implement here.
+    pub fn instantiate_node_new_loc(
+        env: &GlobalEnv,
+        id: NodeId,
+        targs: &[Type],
+        new_loc: &Loc,
+    ) -> Option<NodeId> {
+        let loc = env.get_node_loc(id);
+        if loc != *new_loc {
+            let node_ty = env.get_node_type(id);
+            let new_node_ty = node_ty.instantiate(targs);
+            let node_inst = env.get_node_instantiation_opt(id);
+            let new_node_inst = node_inst.clone().map(|i| Type::instantiate_vec(i, targs));
+            let new_id = env.new_node(new_loc.clone(), new_node_ty);
+            if let Some(inst) = new_node_inst {
+                env.set_node_instantiation(new_id, inst);
+            }
+            Some(new_id)
+        } else {
+            ExpData::instantiate_node(env, id, targs)
+        }
+    }
+
     /// Returns the set of module ids used by this expression.
     pub fn module_usage(&self, usage: &mut BTreeSet<ModuleId>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -966,6 +1141,7 @@ impl ExpData {
                     _ => {},
                 }
             }
+            true // keep going
         });
     }
 
@@ -997,7 +1173,7 @@ impl ExpData {
 
     /// Collect struct-related operations
     pub fn struct_usage(&self, usage: &mut BTreeSet<QualifiedId<StructId>>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1007,12 +1183,13 @@ impl ExpData {
                     _ => {},
                 }
             }
+            true // keep going.
         });
     }
 
     /// Collect field-related operations
     pub fn field_usage(&self, usage: &mut BTreeSet<(QualifiedId<StructId>, FieldId)>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1022,12 +1199,13 @@ impl ExpData {
                     _ => {},
                 }
             }
+            true // keep going.
         });
     }
 
     /// Collect vector-related operations
     pub fn vector_usage(&self, usage: &mut HashSet<Operation>) {
-        self.visit(&mut |e| {
+        self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
@@ -1038,25 +1216,42 @@ impl ExpData {
                     _ => {},
                 }
             }
+            true // keep going.
         });
+    }
+
+    /// Returns the node id of the inner expression which delivers the result. For blocks,
+    /// this traverses into the body.
+    pub fn result_node_id(&self) -> NodeId {
+        if let ExpData::Block(_, _, _, body) = self {
+            body.result_node_id()
+        } else {
+            self.node_id()
+        }
     }
 }
 
 struct ExpRewriter<'a> {
-    exp_rewriter: &'a mut dyn FnMut(Exp) -> Result<Exp, Exp>,
+    exp_rewriter: &'a mut dyn FnMut(Exp) -> RewriteResult,
     node_rewriter: &'a mut dyn FnMut(NodeId) -> Option<NodeId>,
+    pattern_rewriter: &'a mut dyn FnMut(&Pattern, bool) -> Option<Pattern>,
 }
 
 impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         match (*self.exp_rewriter)(exp) {
-            Ok(new_exp) => new_exp,
-            Err(old_exp) => self.rewrite_exp_descent(old_exp),
+            RewriteResult::Rewritten(new_exp) => new_exp,
+            RewriteResult::RewrittenAndDescend(new_exp) => self.rewrite_exp_descent(new_exp),
+            RewriteResult::Unchanged(old_exp) => self.rewrite_exp_descent(old_exp),
         }
     }
 
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
         (*self.node_rewriter)(id)
+    }
+
+    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+        (*self.pattern_rewriter)(pat, entering_scope)
     }
 }
 
@@ -1097,6 +1292,10 @@ pub enum Operation {
     Gt,
     Le,
     Ge,
+
+    // Copy and Move
+    Copy,
+    Move,
 
     // Unary operators
     Not,
@@ -1214,7 +1413,7 @@ impl Pattern {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum TraceKind {
     /// A user level TRACE(..) in the source.
     User,
@@ -1267,7 +1466,7 @@ impl<'a> fmt::Display for EnvDisplay<'a, Value> {
 
 impl Operation {
     /// Determines whether this operation depends on global memory
-    pub fn uses_memory<F>(&self, check_pure: &F) -> bool
+    pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
         F: Fn(ModuleId, SpecFunId) -> bool,
     {
@@ -1312,6 +1511,7 @@ impl Operation {
                 | Not
                 | Cast
                 | Len
+                | Vector
         )
     }
 
@@ -1324,15 +1524,22 @@ impl Operation {
 
 impl ExpData {
     /// Determines whether this expression depends on global memory
-    pub fn uses_memory<F>(&self, check_pure: &F) -> bool
+    pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
         F: Fn(ModuleId, SpecFunId) -> bool,
     {
         use ExpData::*;
         let mut no_use = true;
-        self.visit(&mut |exp: &ExpData| {
+        self.visit_pre_order(&mut |exp: &ExpData| {
             if let Call(_, oper, _) = exp {
-                no_use = no_use && oper.uses_memory(check_pure);
+                if !oper.uses_no_memory(check_pure) {
+                    no_use = false;
+                    false // we're done, stop visiting
+                } else {
+                    true // keep looking
+                }
+            } else {
+                true // keep looking
             }
         });
         no_use
@@ -1351,6 +1558,7 @@ impl ExpData {
                 Temporary(id, _) => {
                     if env.get_node_type(*id).is_mutable_reference() {
                         is_pure = false;
+                        return false; // done visiting
                     }
                 },
                 Call(_, oper, _) => match oper {
@@ -1360,14 +1568,16 @@ impl ExpData {
                         let fun = module.get_spec_fun(*fid);
                         if !fun.used_memory.is_empty() {
                             is_pure = false;
+                            return false; // done visiting
                         }
                     },
                     _ => {},
                 },
                 _ => {},
             }
+            true // keep going
         };
-        self.visit(&mut visitor);
+        self.visit_pre_order(&mut visitor);
         is_pure
     }
 }
@@ -1443,19 +1653,16 @@ impl ModuleName {
         self.1
     }
 
-    /// Return the pseudo module name used for scripts. The move-compiler infrastructure uses MAX_ADDR
-    /// for pseudo modules created from scripts.
-    pub fn pseudo_script_name(pool: &SymbolPool) -> ModuleName {
-        let name = pool.make(SCRIPT_MODULE_NAME);
-        ModuleName(
-            Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH])),
-            name,
-        )
+    /// Return the pseudo module name used for scripts, incorporating the `index`.
+    /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
+    pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
+        let name = pool.make(format!("{}_{}", SCRIPT_MODULE_NAME, index).as_str());
+        ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
     }
 
     /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
-        self.0 == Address::Numerical(AccountAddress::new([0xFF; AccountAddress::LENGTH]))
+        self.0 == Address::Numerical(AccountAddress::MAX_ADDRESS)
     }
 }
 
@@ -1571,6 +1778,7 @@ impl ExpData {
             env,
             exp: self,
             fun_env: None,
+            verbose: false,
         }
     }
 
@@ -1581,6 +1789,7 @@ impl ExpData {
             env: fun_env.module_env.env,
             exp: self,
             fun_env: Some(fun_env),
+            verbose: false,
         }
     }
 
@@ -1589,6 +1798,17 @@ impl ExpData {
             env: other.env,
             exp: self,
             fun_env: other.fun_env.clone(),
+            verbose: other.verbose,
+        }
+    }
+
+    #[allow(unused)]
+    pub fn display_verbose<'a>(&'a self, env: &'a GlobalEnv) -> ExpDisplay<'a> {
+        ExpDisplay {
+            env,
+            exp: self,
+            fun_env: None,
+            verbose: true,
         }
     }
 }
@@ -1598,11 +1818,15 @@ pub struct ExpDisplay<'a> {
     env: &'a GlobalEnv,
     exp: &'a ExpData,
     fun_env: Option<FunctionEnv<'a>>,
+    verbose: bool,
 }
 
 impl<'a> fmt::Display for ExpDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use ExpData::*;
+        if self.verbose {
+            write!(f, "(")?;
+        }
         match self.exp {
             Invalid(_) => write!(f, "*invalid*"),
             Value(_, v) => write!(f, "{}", self.env.display(v)),
@@ -1701,6 +1925,14 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
             SpecBlock(_, spec) => {
                 write!(f, "{}", self.env.display(spec))
             },
+        }?;
+        if self.verbose {
+            let node_id = self.exp.node_id();
+            let node_type = self.env.get_node_type(node_id);
+            let type_ctx = self.type_ctx();
+            write!(f, ") : {}", node_type.display(&type_ctx))
+        } else {
+            Ok(())
         }
     }
 }
@@ -1929,13 +2161,13 @@ impl fmt::Display for MemoryLabel {
 impl<'a> fmt::Display for EnvDisplay<'a, Condition> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self.val.kind {
-            ConditionKind::LetPre(name) => write!(
+            ConditionKind::LetPre(name, _loc) => write!(
                 f,
                 "let {} = {};",
                 name.display(self.env.symbol_pool()),
                 self.val.exp.display(self.env)
             )?,
-            ConditionKind::LetPost(name) => write!(
+            ConditionKind::LetPost(name, _loc) => write!(
                 f,
                 "let post {} = {};",
                 name.display(self.env.symbol_pool()),

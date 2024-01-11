@@ -125,7 +125,7 @@ module aptos_token_objects::token {
         // Flag which controls whether any functions from aggregator_v2 module can be called.
         let aggregator_api_enabled = features::aggregator_v2_api_enabled();
         // Flag which controls whether we are going to still continue writing to deprecated fields.
-        let concurrent_assets_enabled = aggregator_api_enabled && features::concurrent_assets_enabled();
+        let concurrent_assets_enabled = features::concurrent_assets_enabled();
 
         let (deprecated_index, deprecated_name) = if (aggregator_api_enabled) {
             let index = option::destroy_with_default(
@@ -221,14 +221,14 @@ module aptos_token_objects::token {
         creator: &signer,
         collection_name: String,
         description: String,
-        name_with_index_preffix: String,
+        name_with_index_prefix: String,
         name_with_index_suffix: String,
         royalty: Option<Royalty>,
         uri: String,
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
-        create_common(&constructor_ref, creator_address, collection_name, description, name_with_index_preffix, option::some(name_with_index_suffix), royalty, uri);
+        create_common(&constructor_ref, creator_address, collection_name, description, name_with_index_prefix, option::some(name_with_index_suffix), royalty, uri);
         constructor_ref
     }
 
@@ -768,9 +768,10 @@ module aptos_token_objects::token {
         use std::debug;
 
         let feature = features::get_concurrent_assets_feature();
+        let agg_feature = features::get_aggregator_v2_api_feature();
         let auid_feature = features::get_auids();
         let module_event_feature = features::get_module_event_feature();
-        features::change_feature_flags(fx, vector[auid_feature, module_event_feature], vector[feature]);
+        features::change_feature_flags(fx, vector[auid_feature, module_event_feature], vector[feature, agg_feature]);
 
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -781,7 +782,7 @@ module aptos_token_objects::token {
         debug::print(&token_1_name);
         assert!(token_1_name == std::string::utf8(b"token name1"), 1);
 
-        features::change_feature_flags(fx, vector[feature], vector[]);
+        features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
         collection::upgrade_to_concurrent(&extend_ref);
 
         let token_2_ref = create_numbered_token_helper(creator, collection_name, token_name);

@@ -1,0 +1,31 @@
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        dummy_field: bool,
+    }
+    struct X {
+        dummy_field: bool,
+    }
+    private fun t0()
+        acquires M::R(*)
+        acquires M::X(*)
+        acquires M::R(*)
+     {
+        BorrowGlobal(Mutable)<M::R>(0x1);
+        BorrowGlobal(Mutable)<M::X>(0x1);
+        Tuple()
+    }
+    private fun t1()
+        acquires M::R(*)
+        acquires M::X(*)
+        acquires M::R(*)
+        acquires M::R(*)
+        acquires M::R(*)
+     {
+        BorrowGlobal(Mutable)<M::R>(0x1);
+        BorrowGlobal(Mutable)<M::X>(0x1);
+        Tuple()
+    }
+    spec fun $t0();
+    spec fun $t1();
+} // end 0x8675309::M
