@@ -14,6 +14,8 @@ use aptos_types::write_set::WriteSet;
 use std::{sync::Arc, time::Duration};
 use tonic::Status;
 
+use crate::backup_restore::gcs::GcsBackupRestoreOperator;
+
 type EndVersion = u64;
 const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
 const SERVICE_TYPE: &str = "table_info_service";
@@ -24,6 +26,7 @@ pub struct TableInfoService {
     pub parser_batch_size: u16,
     pub context: Arc<Context>,
     pub enable_expensive_logging: bool,
+    pub backup_restore_operator: Arc<GcsBackupRestoreOperator>,
 }
 
 impl TableInfoService {
@@ -33,6 +36,7 @@ impl TableInfoService {
         parser_task_count: u16,
         parser_batch_size: u16,
         enable_expensive_logging: bool,
+        backup_restore_operator: Arc<GcsBackupRestoreOperator>,
     ) -> Self {
         Self {
             current_version: request_start_version,
@@ -40,6 +44,7 @@ impl TableInfoService {
             parser_batch_size,
             context,
             enable_expensive_logging,
+            backup_restore_operator,
         }
     }
 
@@ -100,6 +105,7 @@ impl TableInfoService {
                 ledger_version,
                 batch,
                 false, /* end_early_if_pending_on_empty */
+                self.backup_restore_operator.clone(),
                 self.enable_expensive_logging,
             ));
             tasks.push(task);
@@ -144,6 +150,7 @@ impl TableInfoService {
                         ledger_version,
                         retry_batch,
                         true, /* end_early_if_pending_on_empty */
+                        self.backup_restore_operator.clone(),
                         self.enable_expensive_logging,
                     )
                     .await
@@ -183,6 +190,7 @@ impl TableInfoService {
         ledger_version: u64,
         batch: TransactionBatchInfo,
         end_early_if_pending_on_empty: bool,
+        backup_restore_operator: Arc<GcsBackupRestoreOperator>,
         _enable_verbose_logging: bool,
     ) -> Result<EndVersion, Status> {
         let start_time = std::time::Instant::now();
@@ -199,7 +207,8 @@ impl TableInfoService {
             raw_txns.clone(),
             db_writer.clone(),
             end_early_if_pending_on_empty,
-        )
+            backup_restore_operator,
+        ).await
         .expect("[Table Info] Failed to parse table info");
 
         log_grpc_step(
@@ -267,11 +276,12 @@ impl TableInfoService {
     /// Parse table info from write sets,
     /// end_early_if_pending_on_empty flag will be true if we couldn't parse all table infos in the first try with multithread,
     /// in the second try with sequential looping, to make parsing efficient, we end early if all table infos are parsed
-    fn parse_table_info(
+    async fn parse_table_info(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
         db_writer: Arc<dyn DbWriter>,
         end_early_if_pending_on_empty: bool,
+        backup_restore_operator: Arc<GcsBackupRestoreOperator>,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
             return Ok(());
@@ -291,6 +301,35 @@ impl TableInfoService {
             .expect(
                 "[Table Info] Failed to process write sets and index to the table info rocksdb",
             );
+
+        let metadata_epoch = backup_restore_operator.clone().get_metadata_epoch().await;
+        let (_, _, block_event) = context
+            .db
+            .get_block_info_by_version(first_version)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Could not get block_info for start version {}",
+                    first_version,
+                )
+            });
+        let block_event_epoch = block_event.epoch();
+        let ledger_chain_id = context.chain_id().id();
+        if metadata_epoch < block_event_epoch {
+            let checkpoint_path = context
+            .node_config
+            .storage
+            .get_dir_paths()
+            .default_root_path().join(block_event_epoch.to_string());
+            backup_restore_operator
+                .try_upload_snapshot(
+                    ledger_chain_id as u64,
+                    block_event_epoch,
+                    db_writer.clone(),
+                    checkpoint_path.clone(),
+                )
+                .await
+                .expect("Failed to upload snapshot");
+        }
 
         info!(
             table_info_first_version = first_version,

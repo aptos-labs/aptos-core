@@ -239,6 +239,15 @@ impl DbWriter for AptosDB {
                 .unwrap_or(Ok(()))
         })
     }
+
+    fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
+        gauged_api("create_checkpoint", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.create_checkpoint(path))
+                .unwrap_or(Ok(()))
+        })
+    }
 }
 
 impl AptosDB {

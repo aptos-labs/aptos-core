@@ -36,7 +36,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, path::PathBuf};
 use thiserror::Error;
 
 pub mod async_proof_fetcher;
@@ -597,6 +597,13 @@ pub trait DbWriter: Send + Sync {
     }
 
     fn update_next_version(&self, end_version: u64) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn create_checkpoint(
+        &self,
+        path: PathBuf,
+    ) -> Result<()> {
         unimplemented!()
     }
 }

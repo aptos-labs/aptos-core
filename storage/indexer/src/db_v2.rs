@@ -43,8 +43,9 @@ use std::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
-    time::Duration,
+    time::Duration, path::PathBuf, fs,
 };
+
 
 pub const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
@@ -226,6 +227,16 @@ impl IndexerAsyncV2 {
 
     pub fn is_indexer_async_v2_pending_on_empty(&self) -> bool {
         self.pending_on.is_empty()
+    }
+
+    pub fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
+        if path.exists() {
+            fs::remove_dir_all(&path)?;
+        }
+        if !path.exists() {
+            fs::create_dir_all(&path)?;
+        }
+        self.db.create_checkpoint(path.as_path())
     }
 }
 

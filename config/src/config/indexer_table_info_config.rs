@@ -20,6 +20,9 @@ pub struct IndexerTableInfoConfig {
     pub parser_batch_size: u16,
 
     pub enable_expensive_logging: bool,
+
+    /// Backup and restore config with gcs bucket name
+    pub gcs_bucket_name: String,
 }
 
 // Reminder, #[serde(default)] on IndexerTableInfoConfig means that the default values for
@@ -32,6 +35,7 @@ impl Default for IndexerTableInfoConfig {
             parser_task_count: DEFAULT_PARSER_TASK_COUNT,
             parser_batch_size: DEFAULT_PARSER_BATCH_SIZE,
             enable_expensive_logging: false,
+            gcs_bucket_name: "".to_owned(),
         }
     }
 }

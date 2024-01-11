@@ -3,3 +3,4 @@
 
 pub mod runtime;
 pub mod table_info_service;
+pub mod backup_restore;
