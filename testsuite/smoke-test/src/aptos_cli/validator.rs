@@ -198,6 +198,7 @@ async fn test_onchain_config_change() {
             let inner = match genesis_config.consensus_config.clone() {
                 OnChainConsensusConfig::V1(inner) => inner,
                 OnChainConsensusConfig::V2(inner) => inner,
+                OnChainConsensusConfig::V3(inner) => inner.main,
                 _ => unimplemented!(),
             };
 

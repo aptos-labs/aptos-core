@@ -82,6 +82,8 @@ return true.
 -  [Function `operator_beneficiary_change_enabled`](#0x1_features_operator_beneficiary_change_enabled)
 -  [Function `get_commission_change_delegation_pool_feature`](#0x1_features_get_commission_change_delegation_pool_feature)
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
+-  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
+-  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -203,6 +205,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_BLS12_381_STRUCTURES">BLS12_381_STRUCTURES</a>: u64 = 13;
+</code></pre>
+
+
+
+<a id="0x1_features_BN254_STRUCTURES"></a>
+
+Whether the generic algebra implementation for BN254 operations are enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a>: u64 = 43;
 </code></pre>
 
 
@@ -1639,7 +1653,8 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>)
+    // concurrent assets cannot be used <b>if</b> aggregator v2 api is not enabled.
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
 }
 </code></pre>
 
@@ -1732,6 +1747,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_commission_change_delegation_pool_enabled">commission_change_delegation_pool_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_COMMISSION_CHANGE_DELEGATION_POOL">COMMISSION_CHANGE_DELEGATION_POOL</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_bn254_strutures_feature"></a>
+
+## Function `get_bn254_strutures_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bn254_strutures_feature">get_bn254_strutures_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_bn254_strutures_feature">get_bn254_strutures_feature</a>(): u64 { <a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_bn254_structures_enabled"></a>
+
+## Function `bn254_structures_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bn254_structures_enabled">bn254_structures_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bn254_structures_enabled">bn254_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a>)
 }
 </code></pre>
 

@@ -5,8 +5,9 @@
 use crate::protocols::wire::handshake::v1::ProtocolId;
 use aptos_config::network_id::NetworkContext;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
-    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::AsShortHexStr;
@@ -20,6 +21,7 @@ pub const RESPONSE_LABEL: &str = "response";
 // some state labels
 pub const CANCELED_LABEL: &str = "canceled";
 pub const DECLINED_LABEL: &str = "declined";
+pub const EXPIRED_LABEL: &str = "expired";
 pub const RECEIVED_LABEL: &str = "received";
 pub const SENT_LABEL: &str = "sent";
 pub const SUCCEEDED_LABEL: &str = "succeeded";
@@ -583,7 +585,8 @@ pub static NETWORK_APPLICATION_SERIALIZATION_METRIC: Lazy<HistogramVec> = Lazy::
     register_histogram_vec!(
         "aptos_network_serialization_metric",
         "Time it takes to perform message serialization and deserialization",
-        &["protocol_id", "operation"]
+        &["protocol_id", "operation"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });

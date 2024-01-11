@@ -30,8 +30,11 @@ module 0x42::n {
 
 
 Diagnostics:
-error: function `0x42::m::bar` cannot be called here because it is private to module `0x42::m`
-  ┌─ tests/checking/inlining/private_call.move:4:9
-  │
-4 │         bar()
-  │         ^^^^^
+error: function `0x42::m::bar` cannot be called from `0x42::n::test` because it is private to module `0x42::m`
+   ┌─ tests/checking/inlining/private_call.move:4:9
+   │
+ 4 │         bar()
+   │         ^^^^^
+   ·
+14 │         assert!(m::foo() == 42, 1);
+   │                 -------- in a call inlined at this callsite

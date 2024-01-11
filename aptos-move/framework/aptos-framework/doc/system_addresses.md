@@ -19,6 +19,8 @@
 -  [Function `is_vm_address`](#0x1_system_addresses_is_vm_address)
 -  [Function `is_reserved_address`](#0x1_system_addresses_is_reserved_address)
 -  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `assert_core_resource`](#@Specification_1_assert_core_resource)
     -  [Function `assert_core_resource_address`](#@Specification_1_assert_core_resource_address)
     -  [Function `is_core_resource_address`](#@Specification_1_is_core_resource_address)
@@ -394,6 +396,50 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Asserting that a provided address corresponds to the Core Resources address should always yield a true result when matched.</td>
+<td>Low</td>
+<td>The assert_core_resource and assert_core_resource_address functions ensure that the provided signer or address belong to the @core_resources account.</td>
+<td>Formally verified via <a href="#high-level-req-1">AbortsIfNotCoreResource</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>Asserting that a provided address corresponds to the Aptos Framework Resources address should always yield a true result when matched.</td>
+<td>High</td>
+<td>The assert_aptos_framework function ensures that the provided signer belongs to the @aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-2">AbortsIfNotAptosFramework</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Asserting that a provided address corresponds to the VM address should always yield a true result when matched.</td>
+<td>High</td>
+<td>The assert_vm function ensure that the provided signer belongs to the @vm_reserved account.</td>
+<td>Formally verified via <a href="#high-level-req-3">AbortsIfNotVM</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -500,6 +546,20 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 </code></pre>
 
 
+Specifies that a function aborts if the account does not have the aptos framework address.
+
+
+<a id="0x1_system_addresses_AbortsIfNotAptosFramework"></a>
+
+
+<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a> {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) != @aptos_framework <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
+}
+</code></pre>
+
+
 
 <a id="@Specification_1_assert_vm"></a>
 
@@ -514,6 +574,20 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotVM">AbortsIfNotVM</a>;
+</code></pre>
+
+
+Specifies that a function aborts if the account does not have the VM reserved address.
+
+
+<a id="0x1_system_addresses_AbortsIfNotVM"></a>
+
+
+<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotVM">AbortsIfNotVM</a> {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) != @vm_reserved <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
+}
 </code></pre>
 
 

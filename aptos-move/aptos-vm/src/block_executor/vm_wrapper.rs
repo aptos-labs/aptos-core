@@ -8,9 +8,11 @@ use crate::{
 use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_state_view::StateView;
-use aptos_types::transaction::{
-    signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+use aptos_types::{
+    state_store::StateView,
+    transaction::{
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
+    },
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
@@ -45,7 +47,6 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         executor_with_group_view: &(impl ExecutorView + ResourceGroupView),
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
-        materialize_deltas: bool,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         if (executor_with_group_view.is_delayed_field_optimization_capable()
             || executor_with_group_view.is_resource_group_split_in_change_set_capable())
@@ -62,14 +63,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
         {
-            Ok((vm_status, mut vm_output, sender)) => {
-                // TODO[agg_v2](cleanup): move materialize deltas outside, into sequential execution.
-                if materialize_deltas {
-                    vm_output = vm_output
-                        .try_materialize(&resolver)
-                        .expect("Delta materialization failed");
-                }
-
+            Ok((vm_status, vm_output, sender)) => {
                 if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(

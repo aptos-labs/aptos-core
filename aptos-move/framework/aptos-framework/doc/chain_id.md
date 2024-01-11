@@ -12,6 +12,8 @@ This code provides a container for storing a chain id and functions to initializ
 -  [Function `initialize`](#0x1_chain_id_initialize)
 -  [Function `get`](#0x1_chain_id_get)
 -  [Specification](#@Specification_0)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_0_initialize)
     -  [Function `get`](#@Specification_0_get)
 
@@ -107,6 +109,42 @@ Return the chain ID of this instance.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>During genesis, the ChainId resource should be created and moved under the Aptos framework account with the specified chain id.</td>
+<td>Medium</td>
+<td>The chain_id::initialize function is responsible for generating the ChainId resource and then storing it under the aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-1">initialize</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The chain id can only be fetched if the chain id resource exists under the Aptos framework account.</td>
+<td>Low</td>
+<td>The chain_id::get function fetches the chain id by borrowing the ChainId resource from the aptos_framework account.</td>
+<td>Formally verified via <a href="#high-level-req-2">get</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -127,7 +165,9 @@ Return the chain ID of this instance.
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr);
+<b>ensures</b> <b>global</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(addr).id == id;
 </code></pre>
 
 
@@ -144,7 +184,8 @@ Return the chain ID of this instance.
 
 
 
-<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="chain_id.md#0x1_chain_id_ChainId">ChainId</a>&gt;(@aptos_framework);
 </code></pre>
 
 

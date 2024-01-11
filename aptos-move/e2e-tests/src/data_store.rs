@@ -6,12 +6,12 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
-use aptos_state_view::{in_memory_state_view::InMemoryStateView, TStateView};
 use aptos_types::{
     access_path::AccessPath,
     account_config::CoinInfoResource,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        in_memory_state_view::InMemoryStateView, state_key::StateKey,
+        state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
     },
     transaction::ChangeSet,
     write_set::{TransactionWrite, WriteSet},
@@ -55,6 +55,11 @@ impl FakeDataStore {
         }
     }
 
+    /// Creates a new `FakeDataStore` with the provided initial data.
+    pub fn new_with_state_value(data: HashMap<StateKey, StateValue>) -> Self {
+        FakeDataStore { state_data: data }
+    }
+
     /// Adds a [`WriteSet`] to this data store.
     pub fn add_write_set(&mut self, write_set: &WriteSet) {
         for (state_key, write_op) in write_set {
@@ -78,6 +83,12 @@ impl FakeDataStore {
     /// Returns the previous data if the key was occupied.
     pub fn set(&mut self, state_key: StateKey, state_value: StateValue) -> Option<StateValue> {
         self.state_data.insert(state_key, state_value)
+    }
+
+    /// Checks whether the state_key is in this data store
+    ///
+    pub fn contains_key(&self, state_key: &StateKey) -> bool {
+        self.state_data.contains_key(state_key)
     }
 
     /// Deletes a key from this data store.

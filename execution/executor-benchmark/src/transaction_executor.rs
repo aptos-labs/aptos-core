@@ -16,11 +16,7 @@ use std::{
 };
 
 pub const BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG: BlockExecutorConfigFromOnchain =
-    BlockExecutorConfigFromOnchain {
-    block_gas_limit_type:
-        // present, but large to not limit blocks
-        aptos_types::on_chain_config::BlockGasLimitType::Limit(1_000_000_000),
-};
+    BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
 pub struct TransactionExecutor<V> {
     num_blocks_processed: usize,
@@ -28,6 +24,9 @@ pub struct TransactionExecutor<V> {
     parent_block_id: HashValue,
     maybe_first_block_start_time: Option<Instant>,
     ledger_update_sender: mpsc::SyncSender<LedgerUpdateMessage>,
+    allow_aborts: bool,
+    allow_discards: bool,
+    allow_retries: bool,
 }
 
 impl<V> TransactionExecutor<V>
@@ -38,6 +37,9 @@ where
         executor: Arc<BlockExecutor<V>>,
         parent_block_id: HashValue,
         ledger_update_sender: mpsc::SyncSender<LedgerUpdateMessage>,
+        allow_aborts: bool,
+        allow_discards: bool,
+        allow_retries: bool,
     ) -> Self {
         Self {
             num_blocks_processed: 0,
@@ -45,6 +47,9 @@ where
             parent_block_id,
             maybe_first_block_start_time: None,
             ledger_update_sender,
+            allow_aborts,
+            allow_discards,
+            allow_retries,
         }
     }
 
@@ -73,12 +78,15 @@ where
             )
             .unwrap();
 
-        let diff = if BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG.has_any_block_gas_limit() {
-            1
-        } else {
-            0
-        };
-        assert_eq!(output.txn_statuses().len(), num_txns + diff);
+        assert_eq!(output.input_txns_len(), num_txns);
+        output.check_aborts_discards_retries(
+            self.allow_aborts,
+            self.allow_discards,
+            self.allow_retries,
+        );
+        if !self.allow_retries {
+            assert_eq!(output.txns_to_commit_len(), num_txns + 1);
+        }
 
         let msg = LedgerUpdateMessage {
             current_block_start_time,

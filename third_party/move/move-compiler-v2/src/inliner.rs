@@ -618,6 +618,7 @@ struct InlinedRewriter<'env, 'rewriter> {
 
     /// Track loop nesting, 0 outside a loop
     in_loop: usize,
+    call_site_loc: &'rewriter Loc,
 }
 
 impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
@@ -627,6 +628,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         inlined_formal_params: Vec<Parameter>,
         lambda_param_map: BTreeMap<Symbol, &'rewriter Exp>,
         lambda_free_vars: BTreeSet<Symbol>,
+        call_site_loc: &'rewriter Loc,
     ) -> Self {
         let shadow_stack = ShadowStack::new(env, &lambda_free_vars);
         Self {
@@ -636,6 +638,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             inlined_formal_params,
             shadow_stack,
             in_loop: 0,
+            call_site_loc,
         }
     }
 
@@ -665,10 +668,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         for arg_exp in non_lambda_function_args {
             env.error(
                 &env.get_node_loc(arg_exp.as_ref().node_id()),
-                concat!(
-                    "Currently, a function-typed parameter to an inline function",
-                    " must be a literal lambda expression",
-                ),
+                "Currently, a function-typed parameter to an inline function \
+                 must be a literal lambda expression",
             );
         }
 
@@ -706,6 +707,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             })
             .collect();
 
+        let call_site_loc = env.get_node_loc(call_node_id);
+
         // rewrite body with type_args, lambda params, and var renames to keep lambda free vars
         // free.
         let mut rewriter = InlinedRewriter::new(
@@ -714,6 +717,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             parameters.clone(),
             lambda_param_map,
             all_lambda_free_vars,
+            &call_site_loc,
         );
 
         // For now, just copy the actuals.  If FreezeRef is needed, we'll do it in
@@ -722,7 +726,8 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
         // Turn list of parameters into a pattern.  Also rewrite types as needed.
         // Shadow param vars as if we are in a let.
-        let params_pattern = rewriter.parameter_list_to_pattern(env, func_loc, regular_params);
+        let params_pattern =
+            rewriter.parameter_list_to_pattern(env, func_loc, &call_site_loc, regular_params);
 
         // Enter the scope defined by the params.
         rewriter.shadowing_enter_scope(regular_params_overlapping_free_vars);
@@ -730,11 +735,9 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // Rewrite body types, shadowed vars, replace invoked lambda params, etc.
         let rewritten_body = rewriter.rewrite_exp(body.clone());
 
-        let call_loc = env.get_node_loc(call_node_id);
-
         InlinedRewriter::construct_inlined_call_expression(
             env,
-            &call_loc,
+            &call_site_loc,
             rewritten_body,
             params_pattern,
             rewritten_actuals,
@@ -752,37 +755,36 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// Also check for Break or Continue inside a lambda and not inside a loop.
     fn check_for_return_break_continue_in_lambda(env: &GlobalEnv, lambda_body: &Exp) {
         let mut in_loop = 0;
-        lambda_body.visit_pre_post(&mut |up, e| match e {
-            ExpData::Loop(..) if !up => {
-                in_loop += 1;
-            },
-            ExpData::Loop(..) if up => {
-                in_loop -= 1;
-            },
-            ExpData::Return(node_id, _) if !up => {
-                let node_loc = env.get_node_loc(*node_id);
-                env.error(
-                    &node_loc,
-                    concat!(
-                        "Return not currently supported in function-typed arguments",
-                        " (lambda expressions)"
-                    ),
-                )
-            },
-            ExpData::LoopCont(node_id, is_continue) if !up && in_loop == 0 => {
-                let node_loc = env.get_node_loc(*node_id);
-                env.error(
-                    &node_loc,
-                    &format!(
-                        concat!(
-                            "{} outside of a loop not supported in function-typed arguments",
-                            " (lambda expressions)"
+        lambda_body.visit_pre_post(&mut |post, e| {
+            match e {
+                ExpData::Loop(..) if !post => {
+                    in_loop += 1;
+                },
+                ExpData::Loop(..) if post => {
+                    in_loop -= 1;
+                },
+                ExpData::Return(node_id, _) if !post => {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
+                        "Return not currently supported in function-typed arguments \
+                         (lambda expressions)",
+                    )
+                },
+                ExpData::LoopCont(node_id, is_continue) if !post && in_loop == 0 => {
+                    let node_loc = env.get_node_loc(*node_id);
+                    env.error(
+                        &node_loc,
+                        &format!(
+                            "{} outside of a loop not supported in function-typed arguments \
+                             (lambda expressions)",
+                            if *is_continue { "Continue" } else { "Break" }
                         ),
-                        if *is_continue { "Continue" } else { "Break" }
-                    ),
-                )
-            },
-            _ => {},
+                    )
+                },
+                _ => {},
+            }
+            true // keep going
         });
     }
 
@@ -794,16 +796,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         &mut self,
         env: &'env GlobalEnv,
         function_loc: &Loc,
+        call_site_loc: &Loc,
         parameters: Vec<&Parameter>,
     ) -> Pattern {
         let tuple_args: Vec<Pattern> = parameters
             .iter()
             .map(|param| {
-                let Parameter(sym, ty) = *param;
-                // TODO(10731): ideally, each Parameter has its own loc.  For now, we use the
-                // function location.  body should have types rewritten, other inlining complete,
-                // lambdas inlined, etc.
-                let id = env.new_node(function_loc.clone(), ty.instantiate(self.type_args));
+                let Parameter(sym, ty, loc) = *param;
+                let id = env.new_node(loc.clone(), ty.instantiate(self.type_args));
                 if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(*sym, true) {
                     Pattern::Var(id, new_sym)
                 } else {
@@ -816,7 +816,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             .map(|param| param.1.instantiate(self.type_args))
             .collect();
         let tuple_type: Type = Type::Tuple(tuple_type_list);
-        let id = env.new_node(function_loc.clone(), tuple_type);
+        let id = env.new_node(function_loc.clone().inlined_from(call_site_loc), tuple_type);
         Pattern::Tuple(id, tuple_args)
     }
 
@@ -829,7 +829,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
     /// types).
     fn construct_inlined_call_expression(
         env: &'env GlobalEnv,
-        invocation_loc: &Loc,
+        call_site_loc: &Loc,
         body: Exp,
         pattern: Pattern,
         args: Vec<Exp>,
@@ -837,7 +837,10 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         // Process Body
         let body_node_id = body.as_ref().node_id();
         let body_type = env.get_node_type(body_node_id);
-        let body_loc = env.get_node_loc(body_node_id);
+        let body_loc = env
+            .get_node_loc(body_node_id)
+            .clone()
+            .inlined_from(call_site_loc);
 
         let new_body_id = env.new_node(body_loc, body_type.clone());
 
@@ -891,7 +894,16 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
 
             let args_type = Type::Tuple(args_types);
 
-            let args_loc = invocation_loc.clone();
+            // TODO: try to find a more precise source code location corresponding to set of actual arguments.
+            // E.g.,:
+            //   let args_locs: Vec<Loc> = args_node_ids.iter().map(|node_id| env.get_node_loc(*node_id)).collect();
+            //   let args_loc: Loc = Loc::merge(Vec<Loc>); or something  similar
+            // For now, we just use the location of the first arg for the entire list.
+            let args_loc = args_node_ids
+                .first()
+                .map(|node_id| env.get_node_loc(*node_id))
+                .unwrap_or_else(|| call_site_loc.clone());
+
             let new_args_id = env.new_node(args_loc, args_type);
             let new_args_expr =
                 ExpData::Call(new_args_id, Operation::Tuple, rewritten_args).into_exp();
@@ -966,38 +978,14 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         }
     }
 
-    /// If one or more elements of a vector of `Pattern` can be rewritten, then do so
-    /// and also copy the others so the whole thing can be replaced.
-    /// (Helper function for `rewrite_pattern` in trait `ExpRewriterFunctions` below.)
-    fn rewrite_pattern_vector(
-        &mut self,
-        pat_vec: &[Pattern],
-        entering_scope: bool,
-    ) -> Option<Vec<Pattern>> {
-        let rewritten_part: Vec<_> = pat_vec
-            .iter()
-            .map(|pat| self.rewrite_pattern(pat, entering_scope))
-            .collect();
-        if rewritten_part.iter().any(|opt_pat| opt_pat.is_some()) {
-            // if any subpattern was simplified, then rebuild the vector
-            // with a combination of original and new patterns.
-            let rewritten_vec: Vec<_> = pat_vec
-                .iter()
-                .zip(rewritten_part)
-                .map(|(org_pat, opt_new_pat)| opt_new_pat.unwrap_or(org_pat.clone()))
-                .collect();
-            Some(rewritten_vec)
-        } else {
-            None
-        }
-    }
-
-    /// Convert a single-variable pattern into a `Pattern::Tuple` if needed.
+    /// Convert any non-`Tuple` pattern `pat` into a a singleton `Pattern::Tuple` if needed,
+    /// for convenience in matching it to a `Tuple` of expressions.
     fn make_lambda_pattern_a_tuple(&mut self, pat: &Pattern) -> Pattern {
-        if let Pattern::Var(id, _) = pat {
+        if !matches!(pat, Pattern::Tuple(..)) {
+            let id = pat.node_id();
             let new_id = self.env.new_node(
-                self.env.get_node_loc(*id),
-                Type::Tuple(vec![self.env.get_node_type(*id)]),
+                self.env.get_node_loc(id),
+                Type::Tuple(vec![self.env.get_node_type(id)]),
             );
             Pattern::Tuple(new_id, vec![pat.clone()])
         } else {
@@ -1017,7 +1005,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 let node_loc = self.env.get_node_loc(*node_id);
                 self.env.error(
                     &node_loc,
-                    concat!("Return not currently supported in inline functions"),
+                    "Return not currently supported in inline functions",
                 );
                 false
             },
@@ -1064,9 +1052,13 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
         self.shadow_stack.exit_scope();
     }
 
-    /// Instantiates `self.type_args` on every node in the inlined function
+    /// Instantiates `self.type_args` on a node in an inlined function
+    /// Also updates the `Loc` for the node to indicate the inlined
+    /// call site.
     fn rewrite_node_id(&mut self, id: NodeId) -> Option<NodeId> {
-        ExpData::instantiate_node(self.env, id, self.type_args)
+        let loc = self.env.get_node_loc(id);
+        let new_loc = loc.inlined_from(self.call_site_loc);
+        ExpData::instantiate_node_new_loc(self.env, id, self.type_args, &new_loc)
     }
 
     /// Replaces symbol uses that are shadowed with the shadow symbol.
@@ -1083,7 +1075,8 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
             let param = &self.inlined_formal_params[idx];
             let sym = param.0;
             let param_type = &param.1;
-            let new_node_id = self.env.new_node(loc, param_type.clone());
+            let instantiated_param_type = param_type.instantiate(self.type_args);
+            let new_node_id = self.env.new_node(loc, instantiated_param_type);
             if let Some(new_sym) = self.shadow_stack.get_shadow_symbol(sym, false) {
                 Some(ExpData::LocalVar(new_node_id, new_sym).into())
             } else {
@@ -1094,10 +1087,8 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 Severity::Bug,
                 &loc,
                 &format!(
-                    concat!(
-                        "Temporary with invalid index `{}` during inlining",
-                        " of function with `{}` parameters"
-                    ),
+                    "Temporary with invalid index `{}` during inlining \
+                     of function with `{}` parameters",
                     idx,
                     self.inlined_formal_params.len()
                 ),
@@ -1111,15 +1102,10 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     /// convert the body, formal parameters, and actual arguments into a let expression which
     /// can be used in place of the call.
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
-        let mut target_id = None;
         let optional_lambda_target: Option<&Exp> = match target.as_ref() {
-            ExpData::LocalVar(node_id, symbol) => {
-                target_id = Some(node_id);
-                self.lambda_param_map.get(symbol).copied()
-            },
-            ExpData::Temporary(node_id, idx) => {
+            ExpData::LocalVar(_, symbol) => self.lambda_param_map.get(symbol).copied(),
+            ExpData::Temporary(_, idx) => {
                 if *idx < self.inlined_formal_params.len() {
-                    target_id = Some(node_id);
                     let param = &self.inlined_formal_params[*idx];
                     let sym = param.0;
                     self.lambda_param_map.get(&sym).copied()
@@ -1151,17 +1137,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 None
             }
         } else {
-            let target_loc = target_id
-                .map(|id| self.env.get_node_loc(*id))
-                .unwrap_or(call_loc);
-            self.env.error(
-                &target_loc,
-                concat!(
-                    "Invalid call target: currently indirect call must be",
-                    " a parameter to an inline function called with an argument",
-                    " which is a literal lambda expression"
-                ),
-            );
+            // This is an error, but it is flagged elsewhere.
             None
         }
     }
@@ -1177,21 +1153,10 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
                 .get_shadow_symbol(*sym, entering_scope)
                 .map(|new_sym| Pattern::Var(new_id, new_sym))
                 .or_else(|| new_id_opt.map(|id| Pattern::Var(id, *sym))),
-            Pattern::Tuple(_, pattern_vec) => self
-                .rewrite_pattern_vector(pattern_vec, entering_scope)
-                .map(|rewritten_vec| Pattern::Tuple(new_id, rewritten_vec))
-                .or_else(|| new_id_opt.map(|id| Pattern::Tuple(id, pattern_vec.clone()))),
+            Pattern::Tuple(_, pattern_vec) => Some(Pattern::Tuple(new_id, pattern_vec.clone())),
             Pattern::Struct(_, struct_id, pattern_vec) => {
                 let new_struct_id = struct_id.clone().instantiate(self.type_args);
-                self.rewrite_pattern_vector(pattern_vec, entering_scope)
-                    .map(|rewritten_vec| {
-                        Pattern::Struct(new_id, new_struct_id.clone(), rewritten_vec)
-                    })
-                    .or_else(|| {
-                        // Always create a new struct, both the node id and the struct id may
-                        // have changed
-                        Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
-                    })
+                Some(Pattern::Struct(new_id, new_struct_id, pattern_vec.clone()))
             },
             Pattern::Wildcard(_) => None,
             Pattern::Error(_) => None,
@@ -1245,7 +1210,6 @@ mod tests {
             (9, BTreeSet::new()),
         ]);
         let result = postorder(&entries, &call_graph);
-        eprintln!("result is {:#?}", &result);
         assert!(
             result == vec![8, 7, 5, 6, 4, 3, 2, 1]
                 || result == vec![8, 7, 6, 5, 4, 3, 2, 1]

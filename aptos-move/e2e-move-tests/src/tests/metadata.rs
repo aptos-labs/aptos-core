@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_vm_status, MoveHarness};
+use crate::{assert_vm_status, build_package, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{
-    BuildOptions, BuiltPackage, RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
+    BuildOptions, RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
     APTOS_METADATA_KEY_V1,
 };
 use aptos_package_builder::PackageBuilder;
@@ -109,7 +109,7 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
     );
     let path = builder.write_to_temp().unwrap();
 
-    let package = BuiltPackage::build(path.path().to_path_buf(), BuildOptions::default())
+    let package = build_package(path.path().to_path_buf(), BuildOptions::default())
         .expect("building package must succeed");
     let origin_code = package.extract_code();
     let mut compiled_module = CompiledModule::deserialize(&origin_code[0]).unwrap();

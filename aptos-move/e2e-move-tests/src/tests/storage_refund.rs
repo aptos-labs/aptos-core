@@ -23,6 +23,7 @@ fn test_refunds() {
         ],
         vec![],
     );
+    h.modify_gas_schedule(|params| params.vm.txn.max_execution_gas = 40_000_000_000.into());
     let mod_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
     let user_addr = AccountAddress::from_hex_literal("0x100").unwrap();
     let mod_acc = h.new_account_at(mod_addr);
@@ -153,10 +154,14 @@ fn assert_result(
     let mut deletes = 0;
     for (_state_key, write_op) in txn_out.write_set() {
         match write_op {
-            WriteOp::CreationWithMetadata { .. } | WriteOp::Creation(_) => creates += 1,
-            WriteOp::DeletionWithMetadata { .. } => deletes += 1,
-            WriteOp::Deletion => panic!("This test expects all deletions to have metadata"),
-            WriteOp::Modification(_) | WriteOp::ModificationWithMetadata { .. } => (),
+            WriteOp::Creation { .. } => creates += 1,
+            WriteOp::Deletion { metadata } => {
+                if metadata.is_none() {
+                    panic!("This test expects all deletions to have metadata")
+                }
+                deletes += 1
+            },
+            WriteOp::Modification { .. } => (),
         }
     }
     if expect_success {

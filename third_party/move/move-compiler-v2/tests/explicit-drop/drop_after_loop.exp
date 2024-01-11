@@ -1,0 +1,387 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::drop_after_loop() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: bool
+     var $t5: bool
+     var $t6: u64
+     var $t7: bool
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: $t1 := 1
+  1: $t0 := infer($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := infer($t3)
+  4: $t5 := true
+  5: $t4 := infer($t5)
+  6: label L0
+  7: if ($t4) goto 8 else goto 14
+  8: label L2
+  9: $t6 := 2
+ 10: write_ref($t2, $t6)
+ 11: $t7 := false
+ 12: $t4 := infer($t7)
+ 13: goto 16
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 6
+ 18: label L1
+ 19: $t9 := 2
+ 20: $t8 := ==($t0, $t9)
+ 21: if ($t8) goto 22 else goto 24
+ 22: label L5
+ 23: goto 27
+ 24: label L6
+ 25: $t10 := 0
+ 26: abort($t10)
+ 27: label L7
+ 28: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::drop_after_loop() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: bool
+     var $t5: bool
+     var $t6: u64
+     var $t7: bool
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t0 := copy($t1)
+     # live vars: $t0
+  2: $t3 := borrow_local($t0)
+     # live vars: $t0, $t3
+  3: $t2 := move($t3)
+     # live vars: $t0, $t2
+  4: $t5 := true
+     # live vars: $t0, $t2, $t5
+  5: $t4 := copy($t5)
+     # live vars: $t0, $t2, $t4
+  6: label L0
+     # live vars: $t0, $t2, $t4
+  7: if ($t4) goto 8 else goto 14
+     # live vars: $t0, $t2
+  8: label L2
+     # live vars: $t0, $t2
+  9: $t6 := 2
+     # live vars: $t0, $t2, $t6
+ 10: write_ref($t2, $t6)
+     # live vars: $t0, $t2
+ 11: $t7 := false
+     # live vars: $t0, $t2, $t7
+ 12: $t4 := copy($t7)
+     # live vars: $t0, $t2, $t4
+ 13: goto 16
+     # live vars: $t0
+ 14: label L3
+     # live vars: $t0
+ 15: goto 18
+     # live vars: $t0, $t2, $t4
+ 16: label L4
+     # live vars: $t0, $t2, $t4
+ 17: goto 6
+     # live vars: $t0
+ 18: label L1
+     # live vars: $t0
+ 19: $t9 := 2
+     # live vars: $t0, $t9
+ 20: $t8 := ==($t0, $t9)
+     # live vars: $t8
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+ 22: label L5
+     # live vars:
+ 23: goto 27
+     # live vars:
+ 24: label L6
+     # live vars:
+ 25: $t10 := 0
+     # live vars: $t10
+ 26: abort($t10)
+     # live vars:
+ 27: label L7
+     # live vars:
+ 28: return ()
+}
+
+============ after MemorySafetyProcessor: ================
+
+[variant baseline]
+fun m::drop_after_loop() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: bool
+     var $t5: bool
+     var $t6: u64
+     var $t7: bool
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t1 := 1
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: $t0 := copy($t1)
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  2: $t3 := borrow_local($t0)
+     # live vars: $t0, $t3
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[]}
+     # local_to_label: {$t0=L512,$t3=L513}
+     # global_to_label: {}
+     # moved: {}
+     #
+  3: $t2 := move($t3)
+     # live vars: $t0, $t2
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3}
+     #
+  4: $t5 := true
+     # live vars: $t0, $t2, $t5
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3}
+     #
+  5: $t4 := copy($t5)
+     # live vars: $t0, $t2, $t4
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+  6: label L0
+     # live vars: $t0, $t2, $t4
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+  7: if ($t4) goto 8 else goto 14
+     # live vars: $t0, $t2
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+  8: label L2
+     # live vars: $t0, $t2
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+  9: $t6 := 2
+     # live vars: $t0, $t2, $t6
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3}
+     #
+ 10: write_ref($t2, $t6)
+     # live vars: $t0, $t2
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 11: $t7 := false
+     # live vars: $t0, $t2, $t7
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 12: $t4 := copy($t7)
+     # live vars: $t0, $t2, $t4
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 13: goto 16
+     # live vars: $t0
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 14: label L3
+     # live vars: $t0
+     # graph: {L512=local($t0)[]}
+     # local_to_label: {$t0=L512}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 15: goto 18
+     # live vars: $t0, $t2, $t4
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 16: label L4
+     # live vars: $t0, $t2, $t4
+     # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
+     # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 17: goto 6
+     # live vars: $t0
+     # graph: {L512=local($t0)[]}
+     # local_to_label: {$t0=L512}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 18: label L1
+     # live vars: $t0
+     # graph: {L512=local($t0)[]}
+     # local_to_label: {$t0=L512}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 19: $t9 := 2
+     # live vars: $t0, $t9
+     # graph: {L512=local($t0)[]}
+     # local_to_label: {$t0=L512}
+     # global_to_label: {}
+     # moved: {$t3,$t6}
+     #
+ 20: $t8 := ==($t0, $t9)
+     # live vars: $t8
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 21: if ($t8) goto 22 else goto 24
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 22: label L5
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 23: goto 27
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 24: label L6
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 25: $t10 := 0
+     # live vars: $t10
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 26: abort($t10)
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 27: label L7
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t0,$t3,$t6,$t9}
+     #
+ 28: return ()
+}
+
+============ after ExplicitDrop: ================
+
+[variant baseline]
+fun m::drop_after_loop() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: bool
+     var $t5: bool
+     var $t6: u64
+     var $t7: bool
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+  0: $t1 := 1
+  1: $t0 := copy($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := move($t3)
+  4: $t5 := true
+  5: $t4 := copy($t5)
+  6: label L0
+  7: if ($t4) goto 8 else goto 14
+  8: label L2
+  9: $t6 := 2
+ 10: write_ref($t2, $t6)
+ 11: $t7 := false
+ 12: $t4 := copy($t7)
+ 13: goto 17
+ 14: label L3
+ 15: destroy($t2)
+ 16: goto 19
+ 17: label L4
+ 18: goto 6
+ 19: label L1
+ 20: $t9 := 2
+ 21: $t8 := ==($t0, $t9)
+ 22: if ($t8) goto 23 else goto 25
+ 23: label L5
+ 24: goto 28
+ 25: label L6
+ 26: $t10 := 0
+ 27: abort($t10)
+ 28: label L7
+ 29: return ()
+}

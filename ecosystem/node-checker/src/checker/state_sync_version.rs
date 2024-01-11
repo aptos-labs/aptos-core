@@ -45,7 +45,7 @@ impl StateSyncVersionChecker {
         // We convert to i64 to avoid potential overflow if somehow the ledger version went backwards.
         let target_progress = latest_target_version as i64 - previous_target_version as i64;
         match target_progress {
-            target_progress if (target_progress == 0) => Self::build_result(
+            0 => Self::build_result(
                 "Ledger version is not increasing".to_string(),
                 25,
                 format!(

@@ -13,8 +13,8 @@ use std::collections::HashMap;
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
-    DagV1(DagConsensusConfigV1),
     V3(ConsensusConfigV1Ext),
+    DagV1(DagConsensusConfigV1),
 }
 
 /// The public interface that exposes all values with safe fallback.
@@ -84,11 +84,11 @@ impl OnChainConsensusConfig {
         }
     }
 
-    pub fn should_propose_system_txns(&self) -> bool {
+    pub fn validator_txn_enabled(&self) -> bool {
         match self {
-            OnChainConsensusConfig::V3(obj) => {
-                obj.is_enabled(ConsensusExtraFeature::ProposalWithSystemTransactions)
-            },
+            OnChainConsensusConfig::V3(obj) => obj
+                .extra_features
+                .is_enabled(ConsensusExtraFeature::ValidatorTransaction),
             _ => false,
         }
     }
@@ -156,37 +156,29 @@ impl Default for ConsensusConfigV1 {
     }
 }
 
+/// An extensible feature flag vector indexed by `ConsensusExtraFeature`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
-pub struct ConsensusConfigV1Ext {
-    pub main: ConsensusConfigV1,
-    pub extra_feature_flags: Vec<bool>,
+pub struct ConsensusExtraFeatures {
+    features: Vec<bool>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[allow(non_camel_case_types)]
-pub enum ConsensusExtraFeature {
-    ProposalWithSystemTransactions = 0,
-}
-
-impl ConsensusConfigV1Ext {
+impl ConsensusExtraFeatures {
     pub fn is_enabled(&self, feature: ConsensusExtraFeature) -> bool {
-        self.extra_feature_flags
+        self.features
             .get(feature as usize)
             .copied()
             .unwrap_or(false)
     }
 
     pub fn default_for_genesis() -> Self {
-        ConsensusConfigV1Ext {
-            main: ConsensusConfigV1::default(),
-            extra_feature_flags: vec![true],
+        Self {
+            features: vec![true],
         }
     }
 
     pub fn default_if_missing() -> Self {
-        ConsensusConfigV1Ext {
-            main: ConsensusConfigV1::default(),
-            extra_feature_flags: vec![false],
+        Self {
+            features: vec![false],
         }
     }
 
@@ -206,11 +198,39 @@ impl ConsensusConfigV1Ext {
 
     fn get_feature_status_mut(&mut self, feature: ConsensusExtraFeature) -> &mut bool {
         let idx = feature as usize;
-        if idx >= self.extra_feature_flags.len() {
-            self.extra_feature_flags.resize(idx + 1, false);
+        if idx >= self.features.len() {
+            self.features.resize(idx + 1, false);
         }
-        self.extra_feature_flags.get_mut(idx).unwrap()
+        self.features.get_mut(idx).unwrap()
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConsensusConfigV1Ext {
+    pub main: ConsensusConfigV1,
+    pub extra_features: ConsensusExtraFeatures,
+}
+
+impl ConsensusConfigV1Ext {
+    pub fn default_for_genesis() -> Self {
+        Self {
+            main: ConsensusConfigV1::default(),
+            extra_features: ConsensusExtraFeatures::default_for_genesis(),
+        }
+    }
+
+    pub fn default_if_missing() -> Self {
+        Self {
+            main: ConsensusConfigV1::default(),
+            extra_features: ConsensusExtraFeatures::default_if_missing(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(non_camel_case_types)]
+pub enum ConsensusExtraFeature {
+    ValidatorTransaction = 0,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -285,12 +305,15 @@ pub struct ProposerAndVoterConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DagConsensusConfigV1 {
     pub dag_ordering_causal_history_window: usize,
+    pub extra_features: ConsensusExtraFeatures,
 }
 
 impl Default for DagConsensusConfigV1 {
+    /// It is primarily used as `default_if_missing()`.
     fn default() -> Self {
         Self {
             dag_ordering_causal_history_window: 10,
+            extra_features: ConsensusExtraFeatures::default_if_missing(),
         }
     }
 }

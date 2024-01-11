@@ -5,17 +5,15 @@
 //! database restore operations, as required by restore and
 //! state sync v2.
 use crate::{
-    event_store::EventStore,
-    ledger_db::LedgerDbSchemaBatches,
+    ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     ledger_store::LedgerStore,
-    new_sharded_kv_schema_batch,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator::TransactionAccumulatorSchema,
     },
     state_store::StateStore,
     transaction_store::TransactionStore,
-    ShardedStateKvSchemaBatch,
+    utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
 };
 use anyhow::{ensure, Result};
 use aptos_crypto::HashValue;
@@ -112,8 +110,8 @@ pub fn confirm_or_save_frozen_subtrees(
 pub(crate) fn save_transactions(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
-    event_store: Arc<EventStore>,
     state_store: Arc<StateStore>,
+    ledger_db: Arc<LedgerDb>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
@@ -130,8 +128,8 @@ pub(crate) fn save_transactions(
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
-            event_store,
             state_store,
+            ledger_db,
             first_version,
             txns,
             txn_infos,
@@ -149,8 +147,8 @@ pub(crate) fn save_transactions(
         save_transactions_impl(
             Arc::clone(&ledger_store),
             transaction_store,
-            event_store,
             Arc::clone(&state_store),
+            Arc::clone(&ledger_db),
             first_version,
             txns,
             txn_infos,
@@ -170,7 +168,7 @@ pub(crate) fn save_transactions(
             sharded_kv_schema_batch,
         )?;
 
-        ledger_store.ledger_db.write_schemas(ledger_db_batch)?;
+        ledger_db.write_schemas(ledger_db_batch)?;
     }
 
     Ok(())
@@ -224,8 +222,8 @@ fn save_ledger_infos_impl(
 pub(crate) fn save_transactions_impl(
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
-    event_store: Arc<EventStore>,
     state_store: Arc<StateStore>,
+    ledger_db: Arc<LedgerDb>,
     first_version: Version,
     txns: &[Transaction],
     txn_infos: &[TransactionInfo],
@@ -237,7 +235,7 @@ pub(crate) fn save_transactions_impl(
     kv_replay: bool,
 ) -> Result<()> {
     for (idx, txn) in txns.iter().enumerate() {
-        transaction_store.put_transaction(
+        ledger_db.transaction_db().put_transaction(
             first_version + idx as Version,
             txn,
             /*skip_index=*/ false,
@@ -252,7 +250,7 @@ pub(crate) fn save_transactions_impl(
         &ledger_db_batch.transaction_accumulator_db_batches,
     )?;
 
-    event_store.put_events_multiple_versions(
+    ledger_db.event_db().put_events_multiple_versions(
         first_version,
         events,
         &ledger_db_batch.event_db_batches,

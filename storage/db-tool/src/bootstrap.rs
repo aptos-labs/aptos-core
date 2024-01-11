@@ -57,6 +57,7 @@ impl Command {
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false, /* indexer async v2 */
         )
         .expect("Failed to open DB.");
         let db = DbReaderWriter::new(db);

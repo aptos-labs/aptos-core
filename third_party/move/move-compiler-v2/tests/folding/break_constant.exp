@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: Not a valid constant expression.
+  ┌─ tests/folding/break_constant.move:3:21
+  │
+3 │     const C : u64 = break;
+  │                     ^^^^^
+  │                     │
+  │                     Invalid statement or expression in constant

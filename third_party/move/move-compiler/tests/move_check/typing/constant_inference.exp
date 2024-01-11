@@ -1,0 +1,12 @@
+error[E04021]: invalid number after type inference
+   ┌─ tests/move_check/typing/constant_inference.move:19:21
+   │
+17 │     fun f4(x: u8) : u8 {
+   │               -- Expected a literal of type `u8`, but the value is too large.
+18 │         let r = x + 1 + 2;
+19 │         let error = 257 + r; // Should error
+   │                     ^^^
+   │                     │
+   │                     Invalid numerical literal
+   │                     Annotating the literal might help inference: `257u16`
+

@@ -1,0 +1,13 @@
+
+Diagnostics:
+warning: Function `0x42::m::borrow_wrong_type` is unused: it has no current callers and is private to its module.
+   ┌─ tests/reference-safety/v1-tests/unused_ref.move:23:1
+   │
+23 │ ╭ fun borrow_wrong_type() {
+24 │ │     let sender = @0x0;
+25 │ │     let scenario = begin(sender);
+26 │ │     let x = new(&mut scenario);
+   · │
+29 │ │     abort 42
+30 │ │ }
+   │ ╰─^

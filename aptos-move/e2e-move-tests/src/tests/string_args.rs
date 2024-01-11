@@ -657,3 +657,26 @@ fn string_args_generic_instantiation() {
 
     success_generic(vec![string_type, address_type], tests);
 }
+
+#[test]
+fn huge_string_args_are_not_allowed() {
+    let mut tests = vec![];
+    let mut len: u64 = 1_000_000_000_000;
+    let mut big_str_arg = vec![];
+    loop {
+        let cur = len & 0x7F;
+        if cur != len {
+            big_str_arg.push((cur | 0x80) as u8);
+            len >>= 7;
+        } else {
+            big_str_arg.push(cur as u8);
+            break;
+        }
+    }
+    tests.push((
+        "0xcafe::test::hi",
+        vec![big_str_arg],
+        deserialization_failure(),
+    ));
+    fail(tests);
+}

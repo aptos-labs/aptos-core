@@ -2,16 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    common::NUM_STATE_SHARDS,
     db_options::{gen_state_merkle_cfds, state_merkle_db_column_families},
     lru_node_cache::LruNodeCache,
-    metrics::NODE_CACHE_SECONDS,
-    schema::jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-    stale_node_index::StaleNodeIndexSchema,
-    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+    metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+        stale_node_index::StaleNodeIndexSchema,
+        stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+    },
     utils::truncation_helper::{get_state_merkle_commit_progress, truncate_state_merkle_db_shards},
     versioned_node_cache::VersionedNodeCache,
-    NUM_STATE_SHARDS, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs, StorageDirPaths};

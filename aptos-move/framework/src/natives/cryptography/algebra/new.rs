@@ -47,6 +47,18 @@ pub fn from_u64_internal(
             ark_bls12_381::Fq12,
             ALGEBRA_ARK_BLS12_381_FQ12_FROM_U64
         ),
+        Some(Structure::BN254Fr) => {
+            from_u64_internal!(context, args, ark_bn254::Fr, ALGEBRA_ARK_BN254_FR_FROM_U64)
+        },
+        Some(Structure::BN254Fq) => {
+            from_u64_internal!(context, args, ark_bn254::Fq, ALGEBRA_ARK_BN254_FQ_FROM_U64)
+        },
+        Some(Structure::BN254Fq12) => from_u64_internal!(
+            context,
+            args,
+            ark_bn254::Fq12,
+            ALGEBRA_ARK_BN254_FQ12_FROM_U64
+        ),
         _ => Err(SafeNativeError::Abort {
             abort_code: MOVE_ABORT_CODE_NOT_IMPLEMENTED,
         }),

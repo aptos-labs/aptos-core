@@ -7,10 +7,9 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_state_view::StateViewId;
 use aptos_types::{
     proof::accumulator::{InMemoryAccumulator, InMemoryTransactionAccumulator},
-    state_store::state_storage_usage::StateStorageUsage,
+    state_store::{state_storage_usage::StateStorageUsage, StateViewId},
     transaction::Version,
 };
 use std::sync::Arc;

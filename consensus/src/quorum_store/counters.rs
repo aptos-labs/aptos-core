@@ -163,6 +163,30 @@ pub static EXCLUDED_TXNS_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
         .unwrap()
 });
 
+pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_committed",
+        "Number of batches that are removed from in progress by a commit."
+    )
+    .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_expired",
+        "Number of batches that are removed from in progress by a block timestamp expiration."
+    )
+    .unwrap()
+});
+
+pub static BATCH_IN_PROGRESS_TIMEOUT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_timeout",
+        "Number of batches that are removed from in progress by a proof collection timeout."
+    )
+    .unwrap()
+});
+
 pub static GAP_BETWEEN_BATCH_EXPIRATION_AND_CURRENT_TIME_WHEN_SAVE: Lazy<Histogram> = Lazy::new(
     || {
         register_histogram!(
@@ -400,6 +424,15 @@ pub static RECEIVED_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of the received batches that failed max limit check.
+pub static RECEIVED_BATCH_MAX_LIMIT_FAILED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_max_limit_failed",
+        "Count of the received batches that failed max limit check."
+    )
+    .unwrap()
+});
+
 /// Count of the missed batches when execute.
 pub static MISSED_BATCHES_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -496,6 +529,33 @@ pub static RECEIVED_BATCH_RESPONSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_received_batch_response_count",
         "Count of the number of batches received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch not found responses received from other nodes.
+pub static RECEIVED_BATCH_NOT_FOUND_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_not_found_count",
+        "Count of the number of batch not found responses received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of batch expired responses received from other nodes.
+pub static RECEIVED_BATCH_EXPIRED_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_expired_count",
+        "Count of the number of batch expired responses received from other nodes."
+    )
+    .unwrap()
+});
+
+/// Count of the number of error batches received from other nodes.
+pub static RECEIVED_BATCH_RESPONSE_ERROR_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_received_batch_response_error_count",
+        "Count of the number of error batches received from other nodes."
     )
     .unwrap()
 });

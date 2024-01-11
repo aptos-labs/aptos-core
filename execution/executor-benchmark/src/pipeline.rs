@@ -34,8 +34,9 @@ pub struct PipelineConfig {
     pub delay_execution_start: bool,
     pub split_stages: bool,
     pub skip_commit: bool,
-    pub allow_discards: bool,
     pub allow_aborts: bool,
+    pub allow_discards: bool,
+    pub allow_retries: bool,
     #[derivative(Default(value = "0"))]
     pub num_executor_shards: usize,
     pub use_global_executor: bool,
@@ -113,15 +114,17 @@ where
         let mut partitioning_stage =
             BlockPreparationStage::new(num_partitioner_shards, &config.partitioner_config);
 
-        let mut exe = TransactionExecutor::new(executor_1, parent_block_id, ledger_update_sender);
-
-        let mut ledger_update_stage = LedgerUpdateStage::new(
-            executor_2,
-            Some(commit_sender),
-            version,
-            config.allow_discards,
+        let mut exe = TransactionExecutor::new(
+            executor_1,
+            parent_block_id,
+            ledger_update_sender,
             config.allow_aborts,
+            config.allow_discards,
+            config.allow_retries,
         );
+
+        let mut ledger_update_stage =
+            LedgerUpdateStage::new(executor_2, Some(commit_sender), version);
 
         let (executable_block_sender, executable_block_receiver) =
             mpsc::sync_channel::<ExecuteBlockMessage>(3);
@@ -181,6 +184,11 @@ where
                     executed
                 );
                 info!(
+                    "Overall execution effectiveGPS: {} gas/s (over {} txns)",
+                    delta_gas.effective_block_gas / elapsed,
+                    executed
+                );
+                info!(
                     "Overall execution ioGPS: {} gas/s (over {} txns)",
                     delta_gas.io_gas / elapsed,
                     executed
@@ -196,6 +204,10 @@ where
                     executed
                 );
                 info!(
+                    "Overall execution approx_output: {} bytes/s",
+                    delta_gas.approx_block_output / elapsed
+                );
+                info!(
                     "Overall execution output: {} bytes/s",
                     delta_output_size / elapsed
                 );
@@ -209,13 +221,11 @@ where
             .name("ledger_update".to_string())
             .spawn(move || {
                 while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
-                    let block_size = ledger_update_msg
-                        .state_checkpoint_output
-                        .txn_statuses()
-                        .len();
+                    let input_block_size =
+                        ledger_update_msg.state_checkpoint_output.input_txns_len();
                     NUM_TXNS
                         .with_label_values(&["ledger_update"])
-                        .inc_by(block_size as u64);
+                        .inc_by(input_block_size as u64);
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
             })

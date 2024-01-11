@@ -1057,7 +1057,9 @@ pub struct MovePackageDir {
     pub bytecode_version: Option<u32>,
 
     /// Specify the version of the compiler.
-    #[clap(long)]
+    ///
+    /// Currently hidden until the official launch of Compiler V2
+    #[clap(long, hide = true)]
     pub compiler_version: Option<CompilerVersion>,
 
     /// Do not complain about unknown attributes in Move code.
@@ -1334,6 +1336,18 @@ impl From<&Transaction> for TransactionSummary {
                 gas_unit_price: None,
                 pending: None,
                 sequence_number: None,
+            },
+            Transaction::ValidatorTransaction(txn) => TransactionSummary {
+                transaction_hash: txn.info.hash,
+                gas_used: None,
+                gas_unit_price: None,
+                pending: None,
+                sender: None,
+                sequence_number: None,
+                success: Some(txn.info.success),
+                timestamp_us: Some(txn.timestamp.0),
+                version: Some(txn.info.version.0),
+                vm_status: Some(txn.info.vm_status.clone()),
             },
         }
     }

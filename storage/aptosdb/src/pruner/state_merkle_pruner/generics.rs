@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    schema::db_metadata::DbMetadataKey,
-    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
+use crate::schema::{
+    db_metadata::DbMetadataKey, stale_node_index::StaleNodeIndexSchema,
+    stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
 };
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_schemadb::schema::{KeyCodec, Schema};

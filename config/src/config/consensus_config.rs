@@ -4,7 +4,7 @@
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    QuorumStoreConfig, SafetyRulesConfig,
+    QuorumStoreConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
@@ -66,6 +66,11 @@ pub struct ConsensusConfig {
     pub window_for_chain_health: usize,
     pub chain_health_backoff: Vec<ChainHealthBackoffValues>,
     pub qc_aggregator_type: QcAggregatorType,
+    // Max blocks allowed for block retrieval requests
+    pub max_blocks_per_sending_request: u64,
+    pub max_blocks_per_sending_request_quorum_store_override: u64,
+    pub max_blocks_per_receiving_request: u64,
+    pub max_blocks_per_receiving_request_quorum_store_override: u64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -174,42 +179,62 @@ impl Default for ConsensusConfig {
 
             // Voting backpressure is only used as a backup, to make sure pending rounds don't
             // increase uncontrollably, and we know when to go to state sync.
-            vote_back_pressure_limit: 30,
+            // Considering block gas limit and pipeline backpressure should keep number of blocks
+            // in the pipline very low, we can keep this limit pretty low, too.
+            vote_back_pressure_limit: 7,
             pipeline_backpressure: vec![
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1000,
+                    // pipeline_latency looks how long has the oldest block still in pipeline
+                    // been in the pipeline.
+                    // Block enters the pipeline after consensus orders it, and leaves the
+                    // pipeline once quorum on execution result among validators has been reached
+                    // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
+                    back_pressure_pipeline_latency_limit_ms: 800,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1500,
+                    back_pressure_pipeline_latency_limit_ms: 1100,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2500,
+                    back_pressure_pipeline_latency_limit_ms: 1400,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 300,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 4000,
+                    back_pressure_pipeline_latency_limit_ms: 1700,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 400,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 2000,
+                    max_sending_block_txns_override: 600,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 500,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 2300,
+                    max_sending_block_txns_override: 400,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 500,
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 2600,
                     // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~1000 TPS
+                    // meaning that most aggressively we limit to ~500 TPS
                     // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 500,
+                    // instead rely on max gas per block to limit latency.
+                    // We cannot reduce this further currently, as it needs to be larger than batch size.
+                    max_sending_block_txns_override: 250,
                     // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    backpressure_proposal_delay_ms: 500,
                 },
             ],
             window_for_chain_health: 100,
@@ -223,20 +248,20 @@ impl Default for ConsensusConfig {
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 77,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
                     max_sending_block_txns_override: 1000,
                     // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
                     max_sending_block_txns_override: 500,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
@@ -246,12 +271,18 @@ impl Default for ConsensusConfig {
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
                     max_sending_block_txns_override: 250,
-                    max_sending_block_bytes_override: 1024 * 1024,
+                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backoff_proposal_delay_ms: 300,
                 },
             ],
 
             qc_aggregator_type: QcAggregatorType::default(),
+            // This needs to fit into the network message size, so with quorum store it can be much bigger
+            max_blocks_per_sending_request: 10,
+            // TODO: this is for release compatibility, after release we can configure it to match the receiving max
+            max_blocks_per_sending_request_quorum_store_override: 10,
+            max_blocks_per_receiving_request: 10,
+            max_blocks_per_receiving_request_quorum_store_override: 100,
         }
     }
 }
@@ -259,6 +290,22 @@ impl Default for ConsensusConfig {
 impl ConsensusConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.safety_rules.set_data_dir(data_dir);
+    }
+
+    pub fn max_blocks_per_sending_request(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_blocks_per_sending_request_quorum_store_override
+        } else {
+            self.max_blocks_per_sending_request
+        }
+    }
+
+    pub fn max_blocks_per_receiving_request(&self, quorum_store_enabled: bool) -> u64 {
+        if quorum_store_enabled {
+            self.max_blocks_per_receiving_request_quorum_store_override
+        } else {
+            self.max_blocks_per_receiving_request
+        }
     }
 
     pub fn max_sending_block_txns(&self, quorum_store_enabled: bool) -> u64 {

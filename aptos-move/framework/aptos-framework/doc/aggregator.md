@@ -26,6 +26,8 @@ at the moment.**
 -  [Function `destroy`](#0x1_aggregator_destroy)
 -  [Specification](#@Specification_1)
     -  [Struct `Aggregator`](#@Specification_1_Aggregator)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `limit`](#@Specification_1_limit)
     -  [Function `add`](#@Specification_1_add)
     -  [Function `sub`](#@Specification_1_sub)
@@ -268,6 +270,50 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>For a given aggregator, it should always be possible to: Return the limit value of the aggregator. Return the current value stored in the aggregator. Destroy an aggregator, removing it from its AggregatorFactory.</td>
+<td>Low</td>
+<td>The following functions should not abort if EventHandle exists: limit(), read(), destroy().</td>
+<td>Formally verified via <a href="#high-level-req-1.1">read</a>, <a href="#high-level-req-1.2">destroy</a>, and <a href="#high-level-req-1.3">limit</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>If the value during addition exceeds the limit, an overflow occurs.</td>
+<td>High</td>
+<td>The native add() function checks the value of the addition to ensure it does not pass the defined limit and results in aggregator overflow.</td>
+<td>Formally verified via <a href="#high-level-req-2">add</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>Operations over aggregators should be correct.</td>
+<td>High</td>
+<td>The implementation of the add, sub, read and destroy functions is correct.</td>
+<td>The native implementation of the add, sub, read and destroy functions have been manually audited.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> intrinsic;
 </code></pre>
 
@@ -285,6 +331,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 </code></pre>
@@ -358,6 +405,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">spec_aggregator_get_val</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) + value &gt; MAX_U128;
 <b>ensures</b> <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>) == <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>));
 <b>ensures</b> <a href="aggregator.md#0x1_aggregator">aggregator</a> == <a href="aggregator.md#0x1_aggregator_spec_aggregator_set_val">spec_aggregator_set_val</a>(<b>old</b>(<a href="aggregator.md#0x1_aggregator">aggregator</a>),
@@ -398,6 +446,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-1.1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <a href="aggregator.md#0x1_aggregator_spec_read">spec_read</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
 <b>ensures</b> result &lt;= <a href="aggregator.md#0x1_aggregator_spec_get_limit">spec_get_limit</a>(<a href="aggregator.md#0x1_aggregator">aggregator</a>);
@@ -417,6 +466,7 @@ Destroys an aggregator and removes it from its <code>AggregatorFactory</code>.
 
 
 <pre><code><b>pragma</b> opaque;
+// This enforces <a id="high-level-req-1.2" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

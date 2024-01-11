@@ -16,10 +16,7 @@ use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedBatchInfo};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
-use aptos_types::{
-    transaction::SignedTransaction, validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorVerifier, PeerId,
-};
+use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,
@@ -400,19 +397,13 @@ pub trait BatchReader: Send + Sync {
 pub struct BatchReaderImpl<T> {
     batch_store: Arc<BatchStore>,
     batch_requester: Arc<BatchRequester<T>>,
-    validator_verifier: Arc<ValidatorVerifier>,
 }
 
 impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReaderImpl<T> {
-    pub(crate) fn new(
-        batch_store: Arc<BatchStore>,
-        batch_requester: BatchRequester<T>,
-        validator_verifier: ValidatorVerifier,
-    ) -> Self {
+    pub(crate) fn new(batch_store: Arc<BatchStore>, batch_requester: BatchRequester<T>) -> Self {
         Self {
             batch_store,
             batch_requester: Arc::new(batch_requester),
-            validator_verifier: Arc::new(validator_verifier),
         }
     }
 }
@@ -439,15 +430,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
             counters::MISSED_BATCHES_COUNT.inc();
             let batch_store = self.batch_store.clone();
             let batch_requester = self.batch_requester.clone();
-            let validator_verifier = self.validator_verifier.clone();
             tokio::spawn(async move {
-                if let Some((batch_info, payload)) = batch_requester
-                    .request_batch(
-                        *proof.digest(),
-                        proof.shuffled_signers(&validator_verifier),
-                        tx,
-                    )
-                    .await
+                if let Some((batch_info, payload)) = batch_requester.request_batch(proof, tx).await
                 {
                     batch_store.persist(vec![PersistedValue::new(batch_info, Some(payload))]);
                 }

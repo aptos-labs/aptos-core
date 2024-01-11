@@ -14,4 +14,29 @@ module 0x42::m {
         let Option { vec } = t;
         vector::destroy_empty(vec)
     }
+
+    struct E<Key> has copy, drop, store {
+        key: Key,
+    }
+
+    public inline fun h<Key: store + drop>(x: E<Key>, v: |Key| E<Key>): E<Key> {
+        let E { key } = x;
+        v(key)
+    }
+
+    public inline fun g<Key: store + drop>(x: E<Key>, v: |E<Key>|) {
+        v(x)
+    }
+
+    public fun foo<Key: store + drop>(
+        data: E<Key>, v: &mut Key) {
+        let f = h(data, |e| {
+            E {key: e}
+        });
+        g(f, |e| {
+            let (E { key }, _x) = (e, 3);
+            *v = key;
+        });
+    }
+
 }

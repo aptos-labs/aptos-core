@@ -16,7 +16,7 @@ use move_core_types::{
 };
 use std::{fs::ReadDir, path::PathBuf, string::String, time::Instant};
 
-//// CONSTANTS
+// CONSTANTS
 const PREFIX: &str = "calibrate_";
 
 /// Generate a TransactionPayload for modules

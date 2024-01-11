@@ -90,8 +90,7 @@ jobs:
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:build-') ||
       contains(join(github.event.pull_request.labels.*.name, ','), 'CICD:run-') ||
       github.event.pull_request.auto_merge != null ||
-      contains(github.event.pull_request.body, '#e2e') ||
-      github.event.pull_request.user.login != 'dependabot[bot]'
+      contains(github.event.pull_request.body, '#e2e')
     runs-on: ubuntu-latest
     steps:
       - name: Check repository permission for user which triggered workflow
@@ -303,7 +302,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: compat
-      IMAGE_TAG: aptos-node-v1.7.3 # test against a previous testnet release
+      IMAGE_TAG: aptos-node-v1.8.3 # test against a previous testnet release
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-compat
       FORGE_NAMESPACE: forge-compat-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
@@ -332,7 +331,7 @@ jobs:
     with:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
-      IMAGE_TAG: aptos-node-v1.7.3 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
+      IMAGE_TAG: aptos-node-v1.8.3 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
       FORGE_RUNNER_DURATION_SECS: 300
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}

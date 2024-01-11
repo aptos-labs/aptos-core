@@ -30,8 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        NoUnificationContext, PrimitiveType, ReferenceKind, Type, TypeDisplayContext,
-        TypeUnificationAdapter, Variance,
+        gen_get_ty_param_kinds, infer_abilities, NoUnificationContext, PrimitiveType,
+        ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -75,6 +75,7 @@ use std::{
     any::{Any, TypeId},
     backtrace::{Backtrace, BacktraceStatus},
     cell::{Ref, RefCell, RefMut},
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet, VecDeque},
     ffi::OsStr,
     fmt::{self, Formatter, Write},
@@ -101,6 +102,7 @@ pub const GHOST_MEMORY_PREFIX: &str = "Ghost$";
 pub struct Loc {
     file_id: FileId,
     span: Span,
+    inlined_from_loc: Option<Box<Loc>>,
 }
 
 impl AsRef<Loc> for Loc {
@@ -111,7 +113,33 @@ impl AsRef<Loc> for Loc {
 
 impl Loc {
     pub fn new(file_id: FileId, span: Span) -> Loc {
-        Loc { file_id, span }
+        Loc {
+            file_id,
+            span,
+            inlined_from_loc: None,
+        }
+    }
+
+    pub fn inlined_from(&self, inlined_from: &Loc) -> Loc {
+        Loc {
+            file_id: self.file_id,
+            span: self.span,
+            inlined_from_loc: Some(Box::new(match &self.inlined_from_loc {
+                None => inlined_from.clone(),
+                Some(locbox) => (*locbox.clone()).inlined_from(inlined_from),
+            })),
+        }
+    }
+
+    // If `self` is an inlined `Loc`, then add the same
+    // inlining info to the parameter `loc`.
+    fn inline_if_needed(&self, loc: Loc) -> Loc {
+        if let Some(locbox) = &self.inlined_from_loc {
+            let source_loc = locbox.as_ref();
+            loc.inlined_from(source_loc)
+        } else {
+            loc
+        }
     }
 
     pub fn span(&self) -> Span {
@@ -125,10 +153,10 @@ impl Loc {
     // Delivers a location pointing to the end of this one.
     pub fn at_end(&self) -> Loc {
         if self.span.end() > ByteIndex(0) {
-            Loc::new(
+            self.inline_if_needed(Loc::new(
                 self.file_id,
                 Span::new(self.span.end() - ByteOffset(1), self.span.end()),
-            )
+            ))
         } else {
             self.clone()
         }
@@ -136,10 +164,10 @@ impl Loc {
 
     // Delivers a location pointing to the start of this one.
     pub fn at_start(&self) -> Loc {
-        Loc::new(
+        self.inline_if_needed(Loc::new(
             self.file_id,
             Span::new(self.span.start(), self.span.start() + ByteOffset(1)),
-        )
+        ))
     }
 
     /// Creates a location which encloses all the locations in the provided slice,
@@ -155,12 +183,14 @@ impl Loc {
                 end = std::cmp::max(end, l.span().end());
             }
         }
-        Loc::new(loc.file_id(), Span::new(start, end))
+        loc.inline_if_needed(Loc::new(loc.file_id(), Span::new(start, end)))
     }
 
     /// Returns true if the other location is enclosed by this location.
     pub fn is_enclosing(&self, other: &Loc) -> bool {
-        self.file_id == other.file_id && GlobalEnv::enclosing_span(self.span, other.span)
+        self.file_id == other.file_id
+            && self.inlined_from_loc == other.inlined_from_loc
+            && GlobalEnv::enclosing_span(self.span, other.span)
     }
 }
 
@@ -797,21 +827,43 @@ impl GlobalEnv {
         self.diag_with_notes(Severity::Error, loc, msg, notes)
     }
 
+    /// Adds an error to this environment, with notes.
+    pub fn error_with_labels(&self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
+        self.diag_with_labels(Severity::Error, loc, msg, labels)
+    }
+
+    /// Add a label to `labels` to specify "inlined from loc" for the `loc` in `inlined_from`,
+    /// and, if that is inlined from someplace, repeat as needed, etc.
+    fn add_inlined_from_labels(labels: &mut Vec<Label<FileId>>, inlined_from: &Option<Box<Loc>>) {
+        let mut inlined_from = inlined_from;
+        while let Some(boxed_loc) = inlined_from {
+            let loc = boxed_loc.as_ref();
+            let new_label = Label::secondary(loc.file_id, loc.span)
+                .with_message("in a call inlined at this callsite");
+            labels.push(new_label);
+            inlined_from = &loc.inlined_from_loc;
+        }
+    }
+
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
+        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(labels);
         self.add_diag(diag);
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
+        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = Diagnostic::new(severity)
             .with_message(new_msg)
-            .with_labels(vec![Label::primary(loc.file_id, loc.span)]);
+            .with_labels(labels);
         let diag = diag.with_notes(notes);
         self.add_diag(diag);
     }
@@ -842,10 +894,11 @@ impl GlobalEnv {
             .with_labels(vec![
                 Label::primary(loc.file_id, loc.span).with_message(primary)
             ]);
-        let labels = labels
+        let mut labels = labels
             .into_iter()
             .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
             .collect_vec();
+        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
         let diag = diag.with_labels(labels);
         self.add_diag(diag);
     }
@@ -887,10 +940,8 @@ impl GlobalEnv {
                 loc.file_hash()
             )
         });
-        Loc {
-            file_id,
-            span: Span::new(loc.start(), loc.end()),
-        }
+        // Note that move-compiler doesn't use "inlined from"
+        Loc::new(file_id, Span::new(loc.start(), loc.end()))
     }
 
     /// Converts a location back into a MoveIrLoc. If the location is not convertible, unknown
@@ -1036,6 +1087,20 @@ impl GlobalEnv {
         mut filter: F,
     ) {
         let mut shown = BTreeSet::new();
+        self.diags.borrow_mut().sort_by(|a, b| match a.1.cmp(&b.1) {
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Equal => match a.0.severity.partial_cmp(&b.0.severity) {
+                Some(Ordering::Less) => Ordering::Less,
+                Some(Ordering::Greater) => Ordering::Greater,
+                None | Some(Ordering::Equal) => match (&a.0.code, &b.0.code) {
+                    (None, None) => Ordering::Equal,
+                    (None, Some(_)) => Ordering::Less,
+                    (Some(_), None) => Ordering::Greater,
+                    (Some(acode), Some(bcode)) => acode.cmp(bcode),
+                },
+            },
+        });
         for (diag, reported) in self
             .diags
             .borrow_mut()
@@ -1060,7 +1125,7 @@ impl GlobalEnv {
         for memory in &inv.mem_usage {
             self.global_invariants_for_memory
                 .entry(memory.clone())
-                .or_insert_with(BTreeSet::new)
+                .or_default()
                 .insert(id);
         }
         self.global_invariants.insert(id, inv);
@@ -1158,45 +1223,11 @@ impl GlobalEnv {
 
     /// Computes the abilities associated with the given type.
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        match ty {
-            Type::Primitive(p) => match p {
-                PrimitiveType::Bool
-                | PrimitiveType::U8
-                | PrimitiveType::U16
-                | PrimitiveType::U32
-                | PrimitiveType::U64
-                | PrimitiveType::U128
-                | PrimitiveType::U256
-                | PrimitiveType::Num
-                | PrimitiveType::Range
-                | PrimitiveType::EventStore
-                | PrimitiveType::Address => AbilitySet::PRIMITIVES,
-                PrimitiveType::Signer => AbilitySet::SIGNER,
-            },
-            Type::Vector(et) => AbilitySet::VECTOR.intersect(self.type_abilities(et, ty_params)),
-            Type::Struct(mid, sid, inst) => {
-                let struct_env = self.get_struct(mid.qualified(*sid));
-                let mut abilities = struct_env.get_abilities();
-                for inst_ty in inst {
-                    abilities = abilities.intersect(self.type_abilities(inst_ty, ty_params))
-                }
-                abilities
-            },
-            Type::TypeParameter(i) => {
-                if let Some(tp) = ty_params.get(*i as usize) {
-                    tp.1.abilities
-                } else {
-                    AbilitySet::EMPTY
-                }
-            },
-            Type::Reference(_, _) => AbilitySet::REFERENCES,
-            Type::Fun(_, _)
-            | Type::Tuple(_)
-            | Type::TypeDomain(_)
-            | Type::ResourceDomain(_, _, _)
-            | Type::Error
-            | Type::Var(_) => AbilitySet::EMPTY,
-        }
+        infer_abilities(
+            ty,
+            gen_get_ty_param_kinds(ty_params),
+            self.gen_get_struct_sig(),
+        )
     }
 
     /// Returns associated intrinsics.
@@ -1556,6 +1587,27 @@ impl GlobalEnv {
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Generates a function that given module id, struct id,
+    /// returns the struct signature
+    pub fn gen_get_struct_sig(
+        &self,
+    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
+        |mid, sid| {
+            let qid = QualifiedId {
+                module_id: mid,
+                id: sid,
+            };
+            let struct_env = self.get_struct(qid);
+            let struct_abilities = struct_env.get_abilities();
+            let ty_param_kinds = struct_env
+                .get_type_parameters()
+                .iter()
+                .map(|tp| tp.1.clone())
+                .collect_vec();
+            (ty_param_kinds, struct_abilities)
+        }
     }
 
     // Gets the number of modules in this environment.
@@ -2243,9 +2295,14 @@ impl<'env> ModuleEnv<'env> {
         &self.data.use_decls
     }
 
-    /// Does this module have a friend with `module_id`?
+    /// Does this module declare `module_id` as a friend?
     pub fn has_friend(&self, module_id: &ModuleId) -> bool {
         self.data.friend_modules.contains(module_id)
+    }
+
+    /// Does this module have any friends?
+    pub fn has_no_friends(&self) -> bool {
+        self.data.friend_modules.is_empty()
     }
 
     /// Returns full name as a string.
@@ -3219,14 +3276,35 @@ impl<'env> NamedConstantEnv<'env> {
 // =================================================================================================
 /// # Function Environment
 
+pub trait EqIgnoringLoc {
+    fn eq_ignoring_loc(&self, other: &Self) -> bool;
+}
+
+impl<T: EqIgnoringLoc> EqIgnoringLoc for Vec<T> {
+    fn eq_ignoring_loc(&self, other: &Self) -> bool {
+        self.len() == other.len()
+            && self
+                .iter()
+                .zip(other.iter())
+                .all(|(a, b)| a.eq_ignoring_loc(b))
+    }
+}
+
 /// Represents a type parameter.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct TypeParameter(pub Symbol, pub TypeParameterKind);
+pub struct TypeParameter(pub Symbol, pub TypeParameterKind, pub Loc);
+
+impl EqIgnoringLoc for TypeParameter {
+    /// equal ignoring Loc
+    fn eq_ignoring_loc(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
 
 impl TypeParameter {
     /// Creates a new type parameter of given name.
-    pub fn new_named(sym: &Symbol) -> Self {
-        Self(*sym, TypeParameterKind::default())
+    pub fn new_named(sym: &Symbol, loc: &Loc) -> Self {
+        Self(*sym, TypeParameterKind::default(), loc.clone())
     }
 
     /// Turns an ordered list of type parameters into a vector of type parameters
@@ -3238,9 +3316,11 @@ impl TypeParameter {
             .collect()
     }
 
-    pub fn from_symbols<'a>(symbols: impl Iterator<Item = &'a Symbol>) -> Vec<TypeParameter> {
+    pub fn from_symbols<'a>(
+        symbols: impl Iterator<Item = &'a (Symbol, Loc)>,
+    ) -> Vec<TypeParameter> {
         symbols
-            .map(|name| TypeParameter(*name, TypeParameterKind::default()))
+            .map(|(name, loc)| TypeParameter(*name, TypeParameterKind::default(), loc.clone()))
             .collect()
     }
 }
@@ -3277,7 +3357,14 @@ impl Default for TypeParameterKind {
 
 /// Represents a parameter.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Parameter(pub Symbol, pub Type);
+pub struct Parameter(pub Symbol, pub Type, pub Loc);
+
+impl EqIgnoringLoc for Parameter {
+    /// equal ignoring Loc
+    fn eq_ignoring_loc(&self, other: &Self) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
 
 #[derive(Debug)]
 pub struct FunctionData {
@@ -3668,7 +3755,7 @@ impl<'env> FunctionEnv<'env> {
     pub fn is_mutating(&self) -> bool {
         self.get_parameters()
             .iter()
-            .any(|Parameter(_, ty)| ty.is_mutable_reference())
+            .any(|Parameter(_, ty, _)| ty.is_mutable_reference())
     }
 
     /// Returns the name of the friend(the only allowed caller) of this function, if there is one.
@@ -3728,7 +3815,7 @@ impl<'env> FunctionEnv<'env> {
     pub fn get_parameter_types(&self) -> Vec<Type> {
         self.get_parameters()
             .into_iter()
-            .map(|Parameter(_, ty)| ty)
+            .map(|Parameter(_, ty, _)| ty)
             .collect()
     }
 
@@ -3883,7 +3970,7 @@ impl<'env> FunctionEnv<'env> {
                 let type_name = mid.qualified(sid);
                 modify_targets
                     .entry(type_name)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(target.clone());
             });
         }

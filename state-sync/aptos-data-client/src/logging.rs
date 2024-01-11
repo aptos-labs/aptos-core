@@ -60,6 +60,7 @@ pub enum LogEvent {
     PeerRequestResponseCounts,
     PeerSelectionError,
     PriorityAndRegularPeers,
+    PriorityPeerCategories,
     ResponseError,
     ResponseSuccess,
     SendRequest,

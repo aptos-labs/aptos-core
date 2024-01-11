@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::OTHER_TIMERS_SECONDS;
+use crate::metrics::OTHER_TIMERS_SECONDS;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;

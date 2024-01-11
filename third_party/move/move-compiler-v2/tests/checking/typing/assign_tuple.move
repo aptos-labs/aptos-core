@@ -1,18 +1,15 @@
-module 0xc0ffee::dummy1 {
-    fun baz() {}
+module 0x42::tuple_invalid {
 
-    fun bar(b: bool) {
-        let () = if (b) { baz() } else { () };
-    }
-}
-
-
-module 0xc0ffee::dummy2 {
-    struct State has key {
-        value: u64
+    struct S {
+        f: u64,
     }
 
-    fun tuple_assignments(s: &signer, state: State) {
-        let () = move_to<State>(s, state);
+    fun tuple(x: u64): (u64, S) {
+        (x, S{f: x + 1})
+    }
+
+    fun use_tuple1(x: u64): u64 {
+        let x = tuple(x);
+        1
     }
 }

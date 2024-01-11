@@ -1,0 +1,115 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun explicate_drop::drop_at_branch($t0: bool): u8 {
+     var $t1: u8
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t1 := 1
+  3: goto 6
+  4: label L1
+  5: $t1 := 0
+  6: label L2
+  7: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun explicate_drop::drop_at_branch($t0: bool): u8 {
+     var $t1: u8
+     # live vars: $t0
+  0: if ($t0) goto 1 else goto 4
+     # live vars:
+  1: label L0
+     # live vars:
+  2: $t1 := 1
+     # live vars: $t1
+  3: goto 6
+     # live vars:
+  4: label L1
+     # live vars:
+  5: $t1 := 0
+     # live vars: $t1
+  6: label L2
+     # live vars: $t1
+  7: return $t1
+}
+
+============ after MemorySafetyProcessor: ================
+
+[variant baseline]
+fun explicate_drop::drop_at_branch($t0: bool): u8 {
+     var $t1: u8
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: if ($t0) goto 1 else goto 4
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: label L0
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  2: $t1 := 1
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  3: goto 6
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  4: label L1
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  5: $t1 := 0
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  6: label L2
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  7: return $t1
+}
+
+============ after ExplicitDrop: ================
+
+[variant baseline]
+fun explicate_drop::drop_at_branch($t0: bool): u8 {
+     var $t1: u8
+  0: if ($t0) goto 1 else goto 4
+  1: label L0
+  2: $t1 := 1
+  3: goto 6
+  4: label L1
+  5: $t1 := 0
+  6: label L2
+  7: return $t1
+}

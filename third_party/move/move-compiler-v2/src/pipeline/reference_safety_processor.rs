@@ -36,7 +36,10 @@
 //! applying independently for such sub-locations. Thus one can have `&s.f` and `&mut s.g` at the
 //! same time.
 
-use crate::pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset};
+use crate::{
+    pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
+    Experiment, Options,
+};
 use codespan_reporting::diagnostic::Severity;
 use im::ordmap::Entry;
 use itertools::Itertools;
@@ -178,13 +181,15 @@ impl BorrowEdgeKind {
 /// which is used to merge information from multiple incoming paths during data
 /// flow analysis.
 #[derive(Clone, Default, Debug)]
-struct LifetimeState {
+pub struct LifetimeState {
     /// Contains the borrow graph at the current program point.
     graph: MapDomain<LifetimeLabel, LifetimeNode>,
     /// A map from locals to labels. Represents root states of the active graph.
     local_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
     /// A map from globals to labels. Represents root states of the active graph.
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
+    /// Contains the set of variables whose values have been moved to somewhere else.
+    moved: SetDomain<TempIndex>,
 }
 
 impl AbstractDomain for LifetimeNode {
@@ -215,6 +220,8 @@ impl AbstractDomain for LifetimeState {
         ));
         self.local_to_label_map = new_local_to_label_map;
         self.global_to_label_map = new_global_to_label_map;
+
+        change = change.combine(self.moved.join(&other.moved));
         change
     }
 }
@@ -406,7 +413,12 @@ impl LifetimeState {
 
     /// Drops a node. The parents are recursively dropped if their children go down to
     /// zero. Collects the locations of the removed nodes.
-    fn drop_node(&mut self, label: &LifetimeLabel, removed: &mut BTreeSet<MemoryLocation>) {
+    fn drop_node(
+        &mut self,
+        label: &LifetimeLabel,
+        alive: &BTreeSet<TempIndex>,
+        removed: &mut BTreeSet<MemoryLocation>,
+    ) {
         match self.graph.entry(label.clone()) {
             Entry::Occupied(entry) => {
                 let current: LifetimeNode = entry.remove();
@@ -414,13 +426,21 @@ impl LifetimeState {
                 removed.insert(current.location);
                 for parent in current.parents.iter() {
                     let node = self.node_mut(parent);
+                    // Remove the dropped node from the children list.
                     let children = std::mem::take(&mut node.children);
                     node.children = children
                         .into_iter()
                         .filter(|e| &e.target != label)
                         .collect();
+                    // Decide whether the parent node should be dropped as well
+                    if let MemoryLocation::Local(temp) = &node.location {
+                        if alive.contains(temp) {
+                            // Do not drop this node, since it is referenced from a temp
+                            continue;
+                        }
+                    }
                     if node.children.is_empty() {
-                        self.drop_node(parent, removed)
+                        self.drop_node(parent, alive, removed)
                     }
                 }
             },
@@ -432,11 +452,11 @@ impl LifetimeState {
 
     /// Releases graph resources related to the local, for example, since the local
     /// is overwritten or not longer used.
-    fn release_local(&mut self, temp: TempIndex) {
+    fn release_local(&mut self, temp: TempIndex, alive: &BTreeSet<TempIndex>) {
         if let Some(label) = self.label_for_local(temp).cloned() {
             if self.is_leaf(&label) {
                 let mut removed = BTreeSet::new();
-                self.drop_node(&label, &mut removed);
+                self.drop_node(&label, alive, &mut removed);
                 for location in removed {
                     use MemoryLocation::*;
                     match location {
@@ -459,10 +479,11 @@ impl LifetimeState {
     fn replace_local(
         &mut self,
         temp: TempIndex,
+        alive: &BTreeSet<TempIndex>,
         code_offset: CodeOffset,
         qualifier: u8,
     ) -> LifetimeLabel {
-        self.release_local(temp);
+        self.release_local(temp, alive);
         if let Some(label) = self.label_for_local(temp).cloned() {
             // Set the location to be 'replaced'. That means while the node logically still
             // exists, it is not longer associated with a specific temporary.
@@ -502,11 +523,23 @@ impl LifetimeState {
     }
 }
 
+impl LifetimeState {
+    /// Returns the locals borrowed
+    pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
+        self.local_to_label_map.keys().cloned()
+    }
+
+    /// Checks if the given local is borrowed
+    pub fn is_borrowed(&self, temp: TempIndex) -> bool {
+        self.borrowed_locals().contains(&temp)
+    }
+}
+
 // -------------------------------------------------------------------------------------------------
 // Lifetime Analysis
 
 /// Used to distinguish how a local is read
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ReadMode {
     /// The local is moved
     Move,
@@ -523,6 +556,8 @@ enum ReadMode {
 struct LifeTimeAnalysis<'env> {
     target: &'env FunctionTarget<'env>,
     live_var_annotation: &'env LiveVarAnnotation,
+    // If true, any errors generated by this analysis will be suppressed
+    suppress_errors: bool,
 }
 
 impl<'env> LifeTimeAnalysis<'env> {
@@ -595,7 +630,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.error_with_hints(
                     edge.loc.as_ref().expect("only Skip edge has no location"),
                     format!(
-                        "cannot mutable borrow {} since other references exists",
+                        "cannot mutably borrow {} since other references exists",
                         msg_for_source()
                     ),
                     "mutable borrow attempted here",
@@ -608,7 +643,7 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.error_with_hints(
                     edge.loc.as_ref().expect("only Skip edge has no location"),
                     format!(
-                        "cannot immutable borrow {} since other mutable references exist",
+                        "cannot immutably borrow {} since other mutable references exist",
                         msg_for_source()
                     ),
                     "immutable borrow attempted here",
@@ -626,13 +661,15 @@ impl<'env> LifeTimeAnalysis<'env> {
         primary: impl AsRef<str>,
         hints: impl Iterator<Item = (Loc, String)>,
     ) {
-        self.target.global_env().diag_with_primary_and_labels(
-            Severity::Error,
-            loc,
-            msg.as_ref(),
-            primary.as_ref(),
-            hints.collect(),
-        )
+        if !self.suppress_errors {
+            self.target.global_env().diag_with_primary_and_labels(
+                Severity::Error,
+                loc,
+                msg.as_ref(),
+                primary.as_ref(),
+                hints.collect(),
+            )
+        }
     }
 
     fn borrow_info(
@@ -725,7 +762,7 @@ impl<'env> LifeTimeAnalysis<'env> {
             // Track reference in the graph as a Skip edge.
             let loc = self.loc(id);
             let label = state.make_local(src, code_offset, 0);
-            let child = state.replace_local(dest, code_offset, 1);
+            let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
             state.add_edge(
                 &label,
                 BorrowEdge::new(
@@ -736,6 +773,11 @@ impl<'env> LifeTimeAnalysis<'env> {
                 ),
             );
         }
+        // Track whether the variable content is moved
+        if kind == AssignKind::Move {
+            state.moved.insert(src);
+        }
+        state.moved.remove(&dest);
     }
 
     /// Check validness of reading a local. The read is not allowed if the local is borrowed,
@@ -754,14 +796,20 @@ impl<'env> LifeTimeAnalysis<'env> {
             if ty.is_reference() {
                 if ty.is_mutable_reference() {
                     match read_mode {
-                        ReadMode::Move => {
+                        ReadMode::Move | ReadMode::Copy => {
+                            let (op_str, verb_str) = if read_mode == ReadMode::Move {
+                                ("move", "moved")
+                            } else {
+                                ("copy", "copied")
+                            };
                             self.error_with_hints(
                                 &loc,
                                 format!(
-                                    "cannot move mutable reference in {} which is still borrowed",
+                                    "cannot {} mutable reference in {} which is still borrowed",
+                                    op_str,
                                     self.display(local)
                                 ),
-                                "moved here",
+                                format!("{} here", verb_str),
                                 self.borrow_info(state, label, false, alive).into_iter(),
                             );
                             false
@@ -777,11 +825,6 @@ impl<'env> LifeTimeAnalysis<'env> {
                                 self.borrow_info(state, label, false, alive).into_iter(),
                             );
                             false
-                        },
-                        ReadMode::Copy => {
-                            // This has been checked in live-var analysis (during copy
-                            // transformation)
-                            true
                         },
                     }
                 } else {
@@ -880,7 +923,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         let label = state.make_local(src, code_offset, 0);
-        let child = state.replace_local(dest, code_offset, 1);
+        let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
         let loc = self.loc(id);
         let is_mut = self.ty(dest).is_mutable_reference();
         self.check_and_add_edge(
@@ -888,7 +931,8 @@ impl<'env> LifeTimeAnalysis<'env> {
             &label,
             BorrowEdge::new(BorrowEdgeKind::BorrowLocal, is_mut, Some(loc), child),
             alive,
-        )
+        );
+        state.moved.remove(&dest);
     }
 
     /// Process a borrow global instruction. This checks whether the borrow is allowed and
@@ -903,7 +947,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         let label = state.make_global(struct_.clone(), code_offset, 0);
-        let child = state.replace_local(dest, code_offset, 1);
+        let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
         let loc = self.loc(id);
         let is_mut = self.ty(dest).is_mutable_reference();
         self.check_and_add_edge(
@@ -911,7 +955,8 @@ impl<'env> LifeTimeAnalysis<'env> {
             &label,
             BorrowEdge::new(BorrowEdgeKind::BorrowGlobal, is_mut, Some(loc), child),
             alive,
-        )
+        );
+        state.moved.remove(&dest);
     }
 
     /// Process a borrow field instruction. This checks whether the borrow is allowed and
@@ -928,7 +973,7 @@ impl<'env> LifeTimeAnalysis<'env> {
         alive: &LiveVarInfoAtCodeOffset,
     ) {
         let label = state.make_local(src, code_offset, 0);
-        let child = state.replace_local(dest, code_offset, 1);
+        let child = state.replace_local(dest, &alive.after_set(), code_offset, 1);
         let loc = self.loc(id);
         let is_mut = self.ty(dest).is_mutable_reference();
         let struct_env = self
@@ -946,7 +991,8 @@ impl<'env> LifeTimeAnalysis<'env> {
                 child,
             ),
             alive,
-        )
+        );
+        state.moved.remove(&dest);
     }
 
     /// Process a function call. For now we implement standard Move semantics, where every
@@ -978,7 +1024,12 @@ impl<'env> LifeTimeAnalysis<'env> {
             .iter()
             .filter(|d| self.ty(**d).is_reference())
             .enumerate()
-            .map(|(i, t)| (*t, state.replace_local(*t, code_offset, i as u8)))
+            .map(|(i, t)| {
+                (
+                    *t,
+                    state.replace_local(*t, &alive.after_set(), code_offset, i as u8),
+                )
+            })
             .collect::<BTreeMap<_, _>>();
         let src_qualifier_offset = dest_labels.len();
         let loc = self.loc(id);
@@ -1011,12 +1062,17 @@ impl<'env> LifeTimeAnalysis<'env> {
                 }
             }
         }
+        // All sources are moved into a call
+        state.moved.extend(srcs.iter().cloned());
+        for dest in dests {
+            state.moved.remove(dest);
+        }
     }
 
     /// Process a MoveFrom instruction.
     fn move_from(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         dest: TempIndex,
         resource: &QualifiedInstId<StructId>,
@@ -1036,12 +1092,14 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, &label, false, alive).into_iter(),
             )
         }
+        state.moved.insert(src);
+        state.moved.remove(&dest);
     }
 
     /// Process a return instruction.
     fn return_(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         srcs: &[TempIndex],
         alive: &LiveVarInfoAtCodeOffset,
@@ -1081,13 +1139,14 @@ impl<'env> LifeTimeAnalysis<'env> {
                 }
             }
         }
+        state.moved.extend(srcs.iter().cloned())
     }
 
     /// Process a ReadRef instruction. In contrast to `self.check_read_local`, this needs
     /// to check the value behind the reference.
     fn read_ref(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         dest: TempIndex,
         src: TempIndex,
@@ -1107,13 +1166,15 @@ impl<'env> LifeTimeAnalysis<'env> {
                 )
             }
         }
+        state.moved.insert(src);
+        state.moved.remove(&dest);
     }
 
     /// Process a WriteRef instruction. In contrast to `self.check_write_local`, this needs
     /// to check the value behind the reference.
     fn write_ref(
         &self,
-        state: &LifetimeState,
+        state: &mut LifetimeState,
         id: AttrId,
         dest: TempIndex,
         src: TempIndex,
@@ -1131,6 +1192,9 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, label, false, alive).into_iter(),
             )
         }
+        state.moved.insert(src);
+        // The destination variable is not overridden, only what it is pointing to, so
+        // no removal from moved
     }
 
     /// Get the location associated with bytecode attribute.
@@ -1163,12 +1227,16 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             .expect("livevar annotation");
         // Before processing the instruction, release all temps in the label map
         // which are not longer alive at this point.
+        let alive_temps = alive.before_set();
         for temp in state.local_to_label_map.keys().cloned().collect::<Vec<_>>() {
-            if !alive.before.contains_key(&temp) {
-                state.release_local(temp)
+            if !alive_temps.contains(&temp) {
+                state.release_local(temp, &alive_temps)
             }
         }
         match instr {
+            Load(_, dest, _) => {
+                state.moved.remove(dest);
+            },
             Assign(id, dest, src, kind) => {
                 self.assign(state, code_offset, *id, *dest, *src, *kind, alive);
             },
@@ -1226,9 +1294,17 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             _ => {},
         }
         // After processing, release any locals which are dying at this program point.
-        for released in alive.before.keys() {
-            if !alive.after.contains_key(released) {
-                state.release_local(*released)
+        // Variables which are introduced in this step but not alive after need to be released as well, as they
+        // are not in the before set.
+        let after_set = alive.after_set();
+        for released in alive.before.keys().chain(
+            instr
+                .dests()
+                .iter()
+                .filter(|t| !alive.before.contains_key(t)),
+        ) {
+            if !after_set.contains(released) {
+                state.release_local(*released, &after_set)
             }
         }
     }
@@ -1254,10 +1330,10 @@ impl LifetimeAnnotation {
 }
 
 /// Annotation present at each code offset
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LifetimeInfoAtCodeOffset {
-    before: LifetimeState,
-    after: LifetimeState,
+    pub before: LifetimeState,
+    pub after: LifetimeState,
 }
 
 /// Public functions on lifetime info
@@ -1271,6 +1347,11 @@ impl LifetimeInfoAtCodeOffset {
             .keys()
             .filter(|t| !self.after.local_to_label_map.contains_key(t))
             .cloned()
+    }
+
+    /// Returns true if the value in the variable has been moved at this program point.
+    pub fn is_moved(&self, temp: TempIndex) -> bool {
+        self.after.moved.contains(&temp)
     }
 }
 
@@ -1290,14 +1371,22 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("livevar annotation");
+        let suppress_errors = fun_env
+            .module_env
+            .env
+            .get_extension::<Options>()
+            .unwrap_or_default()
+            .experiment_on(Experiment::NO_SAFETY);
         let analyzer = LifeTimeAnalysis {
             target: &target,
             live_var_annotation,
+            suppress_errors,
         };
-        let cfg = StacklessControlFlowGraph::new_forward(target.get_bytecode());
+        let code = target.get_bytecode();
+        let cfg = StacklessControlFlowGraph::new_forward(code);
         let state_map =
             analyzer.analyze_function(LifetimeState::default(), target.get_bytecode(), &cfg);
-        let annotation = LifetimeAnnotation(analyzer.state_per_instruction(
+        let mut state_map_per_instr = analyzer.state_per_instruction(
             state_map,
             target.get_bytecode(),
             &cfg,
@@ -1305,7 +1394,15 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
                 before: before.clone(),
                 after: after.clone(),
             },
-        ));
+        );
+        // For dead code, there may be holes in the map. Identify those and populate with default so
+        // that each code offset actually has an annotation.
+        for offset in 0..code.len() {
+            state_map_per_instr
+                .entry(offset as CodeOffset)
+                .or_insert_with(LifetimeInfoAtCodeOffset::default);
+        }
+        let annotation = LifetimeAnnotation(state_map_per_instr);
         data.annotations.set(annotation, true);
         data
     }
@@ -1415,7 +1512,9 @@ impl<'a> Display for LifetimeDomainDisplay<'a> {
             graph,
             local_to_label_map,
             global_to_label_map,
+            moved,
         } = &self.1;
+        let pool = self.0.global_env().symbol_pool();
         writeln!(
             f,
             "graph: {}",
@@ -1428,9 +1527,7 @@ impl<'a> Display for LifetimeDomainDisplay<'a> {
                 .iter()
                 .map(|(temp, label)| format!(
                     "{}={}",
-                    self.0
-                        .get_local_raw_name(*temp)
-                        .display(self.0.global_env().symbol_pool()),
+                    self.0.get_local_raw_name(*temp).display(pool),
                     label
                 ))
                 .join(",")
@@ -1441,6 +1538,14 @@ impl<'a> Display for LifetimeDomainDisplay<'a> {
             global_to_label_map
                 .iter()
                 .map(|(str, label)| format!("{}={}", self.0.global_env().display(str), label))
+                .join(",")
+        )?;
+        writeln!(
+            f,
+            "moved: {{{}}}",
+            moved
+                .iter()
+                .map(|t| self.0.get_local_raw_name(*t).display(pool).to_string())
                 .join(",")
         )
     }

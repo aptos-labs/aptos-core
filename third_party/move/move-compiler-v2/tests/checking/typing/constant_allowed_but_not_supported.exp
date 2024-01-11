@@ -1,12 +1,14 @@
 
 Diagnostics:
-error: not a valid constant expression
+error: Not a valid constant expression.
    ┌─ tests/checking/typing/constant_allowed_but_not_supported.move:6:20
    │
  6 │       const C: u64 = {
    │ ╭────────────────────^
  7 │ │         move X;
+   │ │         ------ Invalid call or operation in constant
  8 │ │         copy Y;
+   │ │         ------ Invalid call or operation in constant
  9 │ │         Z;
 10 │ │         0
 11 │ │     };

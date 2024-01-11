@@ -8,9 +8,11 @@
 //! After transformation, this also runs copy inference transformation, which inserts
 //! copies as needed, and reports errors for invalid copies.
 
+use super::ability_checker::check_copy;
+use crate::pipeline::ability_checker::has_ability;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::CodeOffset;
+use move_binary_format::file_format::{Ability, CodeOffset};
 use move_model::{
     ast::TempIndex,
     model::{FunctionEnv, Loc},
@@ -52,24 +54,48 @@ pub struct LiveVarInfoAtCodeOffset {
     pub after: BTreeMap<TempIndex, LiveVarInfo>,
 }
 
+impl LiveVarInfoAtCodeOffset {
+    /// Returns the temporaries that are alive before the program point and dead after.
+    pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> + '_ {
+        // TODO: make this linear
+        self.before
+            .keys()
+            .filter(|t| !self.after.contains_key(t))
+            .cloned()
+    }
+
+    /// Creates a set of the temporaries alive before this program point.
+    pub fn before_set(&self) -> BTreeSet<TempIndex> {
+        self.before.keys().cloned().collect()
+    }
+
+    /// Creates a set of the temporaries alive after this program point.
+    pub fn after_set(&self) -> BTreeSet<TempIndex> {
+        self.after.keys().cloned().collect()
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
 pub struct LiveVarInfo {
     /// The usage of a given temporary after this program point, inclusive of locations where
-    /// the usage happens.
+    /// the usage happens. This set contains at least one element.
     pub usages: BTreeSet<Loc>,
 }
 
 // =================================================================================================
 // Processor
 
-pub struct LiveVarAnalysisProcessor();
+pub struct LiveVarAnalysisProcessor {
+    // If set, run copy and move inference. Otherwise only compute livevar annotation.
+    pub with_copy_inference: bool,
+}
 
 impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv,
-        data: FunctionData,
+        mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
         if fun_env.is_native() {
@@ -77,14 +103,19 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
         }
         let target = FunctionTarget::new(fun_env, &data);
         let offset_to_live_refs = LiveVarAnnotation(self.analyze(&target));
-        let mut transformer = CopyTransformation { fun_env, data };
-        transformer.transform(&offset_to_live_refs);
-        // Now run the analyze a 2nd time, as we modified the code
-        let target = FunctionTarget::new(fun_env, &transformer.data);
-        let offset_to_live_refs = LiveVarAnnotation(self.analyze(&target));
-        // Annotate the result on the function data.
-        transformer.data.annotations.set(offset_to_live_refs, true);
-        transformer.data
+        if self.with_copy_inference {
+            let mut transformer = CopyTransformation { fun_env, data };
+            transformer.transform(&offset_to_live_refs);
+            // Now run the analyze a 2nd time, as we modified the code
+            let target = FunctionTarget::new(fun_env, &transformer.data);
+            let offset_to_live_refs = LiveVarAnnotation(self.analyze(&target));
+            // Annotate the result on the function data.
+            transformer.data.annotations.set(offset_to_live_refs, true);
+            transformer.data
+        } else {
+            data.annotations.set(offset_to_live_refs, true);
+            data
+        }
     }
 
     fn name(&self) -> String {
@@ -166,12 +197,8 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
         use Bytecode::*;
         match instr {
             Assign(id, dst, src, _) => {
-                // Only if dst is used afterwards account for usage. Otherwise this is dead
-                // code.
-                if state.livevars.contains_key(dst) {
-                    state.livevars.remove(dst);
-                    state.livevars.insert(*src, self.livevar_info(id));
-                }
+                state.livevars.remove(dst);
+                state.livevars.insert(*src, self.livevar_info(id));
             },
             Load(_, dst, _) => {
                 state.livevars.remove(dst);
@@ -261,9 +288,19 @@ impl<'a> CopyTransformation<'a> {
                     self.data.code.push(Assign(id, dst, src, AssignKind::Move))
                 },
             },
-            Call(_, _, Operation::BorrowLoc, _, _) => {
-                // Borrow does not consume its operand and need no copy
+            Call(_, _, Operation::BorrowLoc, _, _)
+            | Call(_, _, Operation::BorrowField(..), _, _)
+            | Call(_, _, Operation::ReadRef, _, _) => {
+                // Borrow and ReadRef does not consume its operand and need no copy
                 self.data.code.push(bc)
+            },
+            Call(id, dsts, Operation::WriteRef, srcs, ai) => {
+                // The reference parameter is not consumed and does not need copy
+                let mut new_srcs = self.copy_arg_if_needed(alive, id, vec![srcs[1]]);
+                new_srcs.insert(0, srcs[0]);
+                self.data
+                    .code
+                    .push(Call(id, dsts, Operation::WriteRef, new_srcs, ai))
             },
             Call(id, dsts, oper, srcs, ai) => {
                 let srcs = self.copy_arg_if_needed(alive, id, srcs);
@@ -306,35 +343,36 @@ impl<'a> CopyTransformation<'a> {
         &self,
         alive: &LiveVarInfoAtCodeOffset,
         id: AttrId,
-        is_updated: bool,
+        _is_updated: bool,
         temp: TempIndex,
     ) -> bool {
-        if let Some(info) = alive.after.get(&temp) {
-            let target = self.target();
-            if target.get_local_type(temp).is_mutable_reference() {
-                if !is_updated {
-                    // If this is a &mut which is not updated (e.g. a function call argument)
-                    // produce an error. &mut arguments play a special role, they are used
-                    // and updated at the same time. Therefore subsequent usage without copy is
-                    // fine, as it conceptually refers to a new instance for the same variable.
-                    self.error_with_hints(
-                        &target.get_bytecode_loc(id),
-                        format!(
-                            "implicit copy of mutable reference in {} which is used later",
-                            target.get_local_name_for_error_message(temp)
-                        ),
-                        "implicitly copied here",
-                        self.make_hints_from_usage(info),
-                    );
-                }
-                // Don't copy &mut
-                false
-            } else {
-                // TODO(#10723): insert ability check here
-                true
-            }
+        let target = self.target();
+        let ty = target.get_local_type(temp);
+        if !ty.is_reference()
+            && has_ability(&target, ty, Ability::Copy)
+            && has_ability(&target, ty, Ability::Drop)
+        {
+            // TODO(#11223): Until we have info about whether a var may have had a reference
+            // taken, be very conservative here and always copy if the type has both drop
+            // and copy ability. Notice we also need drop ability as with too many copies we
+            // may end up with the need to destroy a value, which requires drop.
+            // If conditions don't hold, reference analysis should give us an error if we move
+            // the value and references still exist.
+            true
         } else {
-            false
+            let needed = alive.after.contains_key(&temp);
+            if needed {
+                check_copy(
+                    &target,
+                    ty,
+                    &target.get_bytecode_loc(id),
+                    &format!(
+                        "cannot copy {} implicitly",
+                        target.get_local_name_for_error_message(temp)
+                    ),
+                );
+            }
+            needed
         }
     }
 
@@ -345,6 +383,20 @@ impl<'a> CopyTransformation<'a> {
         info.usages
             .iter()
             .map(|loc| (loc.clone(), "used here".to_owned()))
+    }
+
+    /// Checks whether the given temp has copy ability
+    /// add diagnostics if not
+    fn check_copy_for_temp(&self, target: &FunctionTarget, temp: TempIndex, id: AttrId) {
+        check_copy(
+            target,
+            target.get_local_type(temp),
+            &target.get_bytecode_loc(id),
+            &format!(
+                "cannot copy {} implicitly",
+                target.get_local_name_for_error_message(temp)
+            ),
+        );
     }
 
     /// Checks whether an implicit copy is needed because the value is used again in
@@ -372,7 +424,7 @@ impl<'a> CopyTransformation<'a> {
                 );
                 false
             } else {
-                // TODO(#10723): insert ability check here
+                self.check_copy_for_temp(&target, temp, id);
                 true
             }
         } else {
@@ -383,18 +435,10 @@ impl<'a> CopyTransformation<'a> {
     /// Checks whether an explicit copy is allowed.
     fn check_explicit_copy(&self, id: AttrId, temp: TempIndex) {
         let target = self.target();
-        if target.get_local_type(temp).is_mutable_reference() {
-            self.error_with_hints(
-                &target.get_bytecode_loc(id),
-                format!(
-                    "cannot copy mutable reference in {}",
-                    target.get_local_name_for_error_message(temp)
-                ),
-                "copied here",
-                empty(),
-            );
+        if !target.get_local_type(temp).is_mutable_reference() {
+            // Copy of mutable refs is checked in reference analysis
+            self.check_copy_for_temp(&target, temp, id)
         }
-        // TODO(#10723): insert ability check here
     }
 
     /// Checks whether an explicit move is allowed.

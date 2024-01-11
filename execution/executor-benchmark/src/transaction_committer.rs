@@ -86,6 +86,7 @@ where
             NUM_TXNS
                 .with_label_values(&["commit"])
                 .inc_by(num_txns as u64);
+
             self.version += num_txns as u64;
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);

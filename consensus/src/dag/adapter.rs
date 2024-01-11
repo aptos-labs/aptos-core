@@ -10,7 +10,7 @@ use crate::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
-    experimental::buffer_manager::OrderedBlocks,
+    pipeline::buffer_manager::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
@@ -24,9 +24,9 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::error;
-use aptos_storage_interface::{DbReader, Order};
+use aptos_storage_interface::DbReader;
 use aptos_types::{
-    account_config::{new_block_event_key, NewBlockEvent},
+    account_config::NewBlockEvent,
     aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
@@ -120,9 +120,11 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let round = anchor.round();
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
+        let mut validator_txns = vec![];
         let mut payload = Payload::empty(!anchor.payload().is_direct());
         let mut node_digests = vec![];
         for node in &ordered_nodes {
+            validator_txns.extend(node.validator_txns().clone());
             payload.extend(node.payload().clone());
             node_digests.push(node.digest());
         }
@@ -155,6 +157,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 epoch,
                 round,
                 block_timestamp,
+                validator_txns,
                 payload,
                 author,
                 failed_author,
@@ -162,6 +165,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 parents_bitvec,
                 node_digests,
             ),
+            vec![],
             StateComputeResult::new_dummy(),
         );
         let block_info = block.block_info();
@@ -320,15 +324,8 @@ impl DAGStorage for StorageAdapter {
     }
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
-        let latest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         let mut commit_events = vec![];
-        for event in self.aptos_db.get_events(
-            &new_block_event_key(),
-            u64::MAX,
-            Order::Descending,
-            k,
-            latest_db_version,
-        )? {
+        for event in self.aptos_db.get_latest_block_events(k as usize)? {
             let new_block_event = bcs::from_bytes::<NewBlockEvent>(event.event.event_data())?;
             if self
                 .epoch_to_validators

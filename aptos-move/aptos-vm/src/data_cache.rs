@@ -4,7 +4,7 @@
 //! Scratchpad for on chain values during the execution.
 
 use crate::{
-    aptos_vm_impl::gas_config,
+    gas::get_gas_config_from_storage,
     move_vm_ext::{
         get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
         AsResourceGroupView, ResourceGroupResolver,
@@ -17,7 +17,6 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
-use aptos_state_view::{StateView, StateViewId};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
@@ -26,14 +25,15 @@ use aptos_types::{
     state_store::{
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
-        state_value::{StateValue, StateValueMetadataKind},
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
     },
     write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupView, StateStorageView, StateValueMetadataResolver,
-        TResourceGroupView, TResourceView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
+        StateValueMetadataResolver, TResourceGroupView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -63,16 +63,6 @@ pub(crate) fn get_resource_group_from_metadata(
         .get(struct_tag.name.as_ident_str().as_str())?
         .iter()
         .find_map(|attr| attr.get_resource_group_member())
-}
-
-struct ConfigAdapter<'a, K, L>(&'a dyn TResourceView<Key = K, Layout = L>);
-
-impl<'a> ConfigStorage for ConfigAdapter<'a, StateKey, MoveTypeLayout> {
-    fn fetch_config(&self, access_path: AccessPath) -> Option<Bytes> {
-        self.0
-            .get_resource_bytes(&StateKey::access_path(access_path), None)
-            .ok()?
-    }
 }
 
 /// Adapter to convert a `ExecutorView` into a `AptosMoveResolver`.
@@ -135,7 +125,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         metadata: &[Metadata],
         // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> Result<(Option<Bytes>, usize), VMError> {
+    ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
             // TODO[agg_v2](fix) pass the layout to resource groups
@@ -146,10 +136,9 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             ));
 
             let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
-            let common_error = |e| -> VMError {
+            let common_error = |e| -> PartialVMError {
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("{}", e))
-                    .finish(Location::Undefined)
             };
 
             let buf = self
@@ -160,6 +149,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
                 self.resource_group_view
                     .resource_group_size(&key)
                     .map_err(common_error)?
+                    .get()
             } else {
                 0
             };
@@ -168,16 +158,12 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             Ok((buf, buf_size + group_size as usize))
         } else {
             let access_path = AccessPath::resource_access_path(*address, struct_tag.clone())
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).finish(Location::Undefined)
-                })?;
+                .map_err(|_| PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES))?;
 
             let buf = self
                 .executor_view
                 .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)
-                .map_err(|_| {
-                    PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-                })?;
+                .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?;
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size))
         }
@@ -191,7 +177,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         self.resource_group_view.release_group_cache()
     }
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<u64> {
+    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSize> {
         self.resource_group_view.resource_group_size(group_key)
     }
 
@@ -199,7 +185,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<u64> {
+    ) -> anyhow::Result<usize> {
         self.resource_group_view
             .resource_size_in_group(group_key, resource_tag)
     }
@@ -217,18 +203,22 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
 impl<'e, E: ExecutorView> AptosMoveResolver for StorageAdapter<'e, E> {}
 
 impl<'e, E: ExecutorView> ResourceResolver for StorageAdapter<'e, E> {
+    type Error = PartialVMError;
+
     fn get_resource_bytes_with_metadata_and_layout(
         &self,
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
         maybe_layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<(Option<Bytes>, usize)> {
-        Ok(self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)?)
+    ) -> Result<(Option<Bytes>, usize), Self::Error> {
+        self.get_any_resource_with_layout(address, struct_tag, metadata, maybe_layout)
     }
 }
 
 impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
+    type Error = PartialVMError;
+
     fn get_module_metadata(&self, module_id: &ModuleId) -> Vec<Metadata> {
         let module_bytes = match self.get_module(module_id) {
             Ok(Some(bytes)) => bytes,
@@ -243,14 +233,11 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
         module.metadata
     }
 
-    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Error> {
+    fn get_module(&self, module_id: &ModuleId) -> Result<Option<Bytes>, Self::Error> {
         let access_path = AccessPath::from(module_id);
-        Ok(self
-            .executor_view
+        self.executor_view
             .get_module_bytes(&StateKey::access_path(access_path))
-            .map_err(|_| {
-                PartialVMError::new(StatusCode::STORAGE_ERROR).finish(Location::Undefined)
-            })?)
+            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 
@@ -260,11 +247,16 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         handle: &TableHandle,
         key: &[u8],
         layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, Error> {
-        self.executor_view.get_resource_bytes(
-            &StateKey::table_item((*handle).into(), key.to_vec()),
-            layout,
-        )
+    ) -> Result<Option<Bytes>, PartialVMError> {
+        self.executor_view
+            .get_resource_bytes(
+                &StateKey::table_item((*handle).into(), key.to_vec()),
+                layout,
+            )
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                    .with_message(format!("remote table resolver failure: {}", e))
+            })
     }
 }
 
@@ -353,9 +345,8 @@ pub trait AsMoveResolver<S> {
 
 impl<S: StateView> AsMoveResolver<S> for S {
     fn as_move_resolver(&self) -> StorageAdapter<S> {
-        let config_view = ConfigAdapter(self);
-        let (_, gas_feature_version) = gas_config(&config_view);
-        let features = Features::fetch_config(&config_view).unwrap_or_default();
+        let (_, gas_feature_version) = get_gas_config_from_storage(self);
+        let features = Features::fetch_config(self).unwrap_or_default();
         let max_binary_version =
             get_max_binary_format_version(&features, Some(gas_feature_version));
         let resource_group_adapter = ResourceGroupAdapter::new(
@@ -388,7 +379,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     fn get_module_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         self.executor_view
             .get_module_state_value_metadata(state_key)
     }
@@ -396,7 +387,7 @@ impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadataKind>> {
+    ) -> anyhow::Result<Option<StateValueMetadata>> {
         self.executor_view
             .get_resource_state_value_metadata(state_key)
     }

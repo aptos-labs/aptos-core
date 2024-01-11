@@ -284,7 +284,10 @@ impl Diagnostic {
         notes: impl IntoIterator<Item = impl ToString>,
     ) -> Self {
         let info = code.into_info();
-        let label = Diagnostic::add_backtrace(&label.to_string(), info.severity() == Severity::Bug);
+        let label = Diagnostic::add_backtrace(
+            &label.to_string(),
+            false, /*info.severity() == Severity::Bug*/
+        );
         Diagnostic {
             info,
             primary_label: (loc, label.to_string()),

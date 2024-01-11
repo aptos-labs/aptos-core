@@ -1,15 +1,5 @@
 
 Diagnostics:
-error: implicit copy of mutable reference in local `x` which is used later
-   ┌─ tests/reference-safety/v1-tests/mutate_full_invalid.move:12:13
-   │
-12 │         let f = x; // error in v2 because of copy
-   │             ^ implicitly copied here
-13 │         *x = 0;
-   │         ------ used here
-
-
-Diagnostics:
 error: cannot write to reference in local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_full_invalid.move:18:9
    │

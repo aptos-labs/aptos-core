@@ -54,6 +54,7 @@ x25519-dalek = { workspace = true }
 
 [dev-dependencies]
 ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 bitvec = { workspace = true }
@@ -72,6 +73,7 @@ default = []
 assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
+testing = []
 
 [[bench]]
 name = "ark_bls12_381"
@@ -79,6 +81,10 @@ harness = false
 
 [[bench]]
 name = "bls12381"
+harness = false
+
+[[bench]]
+name = "ark_bn254"
 harness = false
 
 [[bench]]

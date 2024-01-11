@@ -10,8 +10,8 @@ module 0xABCD::vector_picture {
     /// The caller tried to mutate an item outside the bounds of the vector.
     const E_INDEX_OUT_OF_BOUNDS: u64 = 1;
 
-    /// The caller tried to create palette for non-initialized account.
-    const E_ALL_PALETTES_NOT_INIT: u64 = 2;
+    /// Color checked is max.
+    const E_MAX_COLOR: u64 = 3;
 
     struct AllPalettes has key {
         all: vector<address>,
@@ -68,10 +68,20 @@ module 0xABCD::vector_picture {
         let object_signer = object::generate_signer(&constructor_ref);
         move_to(&object_signer, palette);
 
-        assert!(exists<AllPalettes>(caller_addr), error::invalid_argument(E_ALL_PALETTES_NOT_INIT));
+        if (!exists<AllPalettes>(caller_addr)) {
+            let vec = vector::empty();
+            vector::push_back(&mut vec, object::address_from_constructor_ref(&constructor_ref));
 
-        let all_palettes = borrow_global_mut<AllPalettes>(caller_addr);
-        vector::push_back(&mut all_palettes.all, object::address_from_constructor_ref(&constructor_ref));
+            move_to<AllPalettes>(
+                caller,
+                AllPalettes {
+                    all: vec,
+                },
+            );
+        } else {
+            let all_palettes = borrow_global_mut<AllPalettes>(caller_addr);
+            vector::push_back(&mut all_palettes.all, object::address_from_constructor_ref(&constructor_ref));
+        }
     }
 
     /// Update an element in the vector.
@@ -86,13 +96,30 @@ module 0xABCD::vector_picture {
         let all_palettes = borrow_global<AllPalettes>(palette_addr);
         let palette_addr = vector::borrow(&all_palettes.all, palette_index);
 
-        let palette_ = borrow_global_mut<Palette>(*palette_addr);
+        let palette = borrow_global_mut<Palette>(*palette_addr);
 
         // Confirm the index is not out of bounds.
-        assert!(index < vector::length(&palette_.vec), error::invalid_argument(E_INDEX_OUT_OF_BOUNDS));
+        assert!(index < vector::length(&palette.vec), error::invalid_argument(E_INDEX_OUT_OF_BOUNDS));
 
         // Write the pixel.
         let color = Color { r, g, b };
-        *vector::borrow_mut(&mut palette_.vec, index) = color;
+        *vector::borrow_mut(&mut palette.vec, index) = color;
+    }
+
+    public entry fun check(
+        palette_addr: address,
+        palette_index: u64,
+        index: u64,
+    ) acquires Palette, AllPalettes {
+        let all_palettes = borrow_global<AllPalettes>(palette_addr);
+        let palette_addr = vector::borrow(&all_palettes.all, palette_index);
+
+        let palette = borrow_global_mut<Palette>(*palette_addr);
+
+        // Confirm the index is not out of bounds.
+        assert!(index < vector::length(&palette.vec), error::invalid_argument(E_INDEX_OUT_OF_BOUNDS));
+
+        let color = vector::borrow(&mut palette.vec, index);
+        assert!(color.r != 255 || color.g != 255 || color.b != 255, error::invalid_argument(E_MAX_COLOR));
     }
 }

@@ -6,8 +6,8 @@ error: Currently, a function-typed parameter to an inline function must be a lit
 7 │     inline_apply(f, b)
   │                  ^
 
-error: Invalid call target: currently indirect call must be a parameter to an inline function called with an argument which is a literal lambda expression
-  ┌─ tests/checking/inlining/lambda_param.move:3:2
-  │
-3 │     f(b)
-  │     ^
+error: Currently, a function-typed parameter to an inline function must be a literal lambda expression
+   ┌─ tests/checking/inlining/lambda_param.move:11:16
+   │
+11 │     inline_apply4(f, b)
+   │                   ^

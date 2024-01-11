@@ -17,6 +17,8 @@ on account to have access to this.
 
 -  [Function `create_signer`](#0x1_create_signer_create_signer)
 -  [Specification](#@Specification_0)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `create_signer`](#@Specification_0_create_signer)
 
 
@@ -50,6 +52,58 @@ on account to have access to this.
 
 ## Specification
 
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>Obtaining a signer for an arbitrary account should only be available within the Aptos Framework.</td>
+<td>Critical</td>
+<td>The create_signer::create_signer function only allows friend modules to retrieve the signer for an arbitrarily address.</td>
+<td>Enforced through function visibility.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>The account owner should have the ability to create a signer for their account.</td>
+<td>Medium</td>
+<td>Before an Account resource is created, a signer is created for the specified new_address, and later, the Account resource is assigned to this signer.</td>
+<td>Enforced by the <a href="https://github.com/aptos-labs/aptos-core/blob/main/third_party/move/move-vm/types/src/values/values_impl.rs#L1129">move vm</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>An account should only be able to create a signer for another account if that account has granted it signing capabilities.</td>
+<td>Critical</td>
+<td>The Account resource holds a signer_capability_offer field which allows the owner to share the signer capability with other accounts.</td>
+<td>Formally verified via <a href="account.md#high-level-spec-3">AccountContainsAddr</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>A signer should be returned for addresses that are not registered as accounts.</td>
+<td>Low</td>
+<td>The signer is just a struct that wraps an address, allows for non-accounts to have a signer.</td>
+<td>Formally verified via <a href="#0x1_create_signer_create_signer">create_signer</a>.</td>
+</tr>
+
+</table>
+
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;

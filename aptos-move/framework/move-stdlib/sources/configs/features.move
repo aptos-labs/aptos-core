@@ -145,6 +145,7 @@ module std::features {
         is_enabled(BLS12_381_STRUCTURES)
     }
 
+
     /// Whether native_public_key_validate aborts when a public key of the wrong length is given
     /// Lifetime: ephemeral
     const ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH: u64 = 14;
@@ -291,7 +292,8 @@ module std::features {
     public fun get_concurrent_assets_feature(): u64 { CONCURRENT_ASSETS }
 
     public fun concurrent_assets_enabled(): bool acquires Features {
-        is_enabled(CONCURRENT_ASSETS)
+        // concurrent assets cannot be used if aggregator v2 api is not enabled.
+        is_enabled(CONCURRENT_ASSETS) && aggregator_v2_api_enabled()
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
@@ -318,6 +320,17 @@ module std::features {
 
     public fun commission_change_delegation_pool_enabled(): bool acquires Features {
         is_enabled(COMMISSION_CHANGE_DELEGATION_POOL)
+    }
+
+    /// Whether the generic algebra implementation for BN254 operations are enabled.
+    ///
+    /// Lifetime: transient
+    const BN254_STRUCTURES: u64 = 43;
+
+    public fun get_bn254_strutures_feature(): u64 { BN254_STRUCTURES }
+
+    public fun bn254_structures_enabled(): bool acquires Features {
+        is_enabled(BN254_STRUCTURES)
     }
 
     // ============================================================================================
