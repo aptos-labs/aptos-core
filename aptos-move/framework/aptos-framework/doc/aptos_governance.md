@@ -2146,7 +2146,7 @@ Address @aptos_framework must exist GovernanceEvents.
     <b>let</b> stake_balance_2 = 0;
     <b>let</b> governance_config = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_GovernanceConfig">GovernanceConfig</a>&gt;(@aptos_framework);
     <b>let</b> required_proposer_stake = governance_config.required_proposer_stake;
-    // This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
     <b>aborts_if</b> allow_validator_set_change && stake_balance_0 &lt; required_proposer_stake;
     <b>aborts_if</b> !allow_validator_set_change && <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(stake_pool) && stake_balance_1 &lt; required_proposer_stake;
     <b>aborts_if</b> !allow_validator_set_change && !<a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(stake_pool) && stake_balance_2 &lt; required_proposer_stake;
@@ -2162,7 +2162,7 @@ Address @aptos_framework must exist GovernanceEvents.
     <b>let</b> total_supply = aptos_framework::optional_aggregator::optional_aggregator_value(supply);
     <b>let</b> early_resolution_vote_threshold_value = total_supply / 2 + 1;
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(maybe_supply) && governance_config.min_voting_threshold &gt; early_resolution_vote_threshold_value;
-    <b>aborts_if</b> len(execution_hash) &lt;= 0;
+    <b>aborts_if</b> len(execution_hash) == 0;
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
     <b>let</b> voting_forum = <b>global</b>&lt;<a href="voting.md#0x1_voting_VotingForum">voting::VotingForum</a>&lt;GovernanceProposal&gt;&gt;(@aptos_framework);
     <b>let</b> proposal_id = voting_forum.next_proposal_id;
@@ -2366,7 +2366,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
                                      post_proposal.yes_votes + post_proposal.no_votes &gt;= proposal.min_vote_threshold;
     <b>let</b> execution_hash = proposal.execution_hash;
     <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
     <b>aborts_if</b>
         <b>if</b> (should_pass) {
             proposal_state_successed_0 && !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework)
@@ -2424,7 +2424,7 @@ Address @aptos_framework must exist VotingRecordsV2 if partial_governance_voting
                                                                            proposal.no_votes &gt;= early_resolution_threshold)) &&
         (proposal.yes_votes &lt;= proposal.no_votes || proposal.yes_votes + proposal.no_votes &lt; proposal.min_vote_threshold);
     <b>let</b> <b>post</b> post_approved_hashes = <b>global</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_ApprovedExecutionHashes">ApprovedExecutionHashes</a>&gt;(@aptos_framework);
-    // This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
     <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_approved_hashes.hashes, proposal_id) &&
         <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_approved_hashes.hashes, proposal_id) == proposal.execution_hash;
 }

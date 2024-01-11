@@ -47,42 +47,6 @@ impl EventStore {
         Self { event_db }
     }
 
-    /// Get all of the events given a transaction version.
-    /// We don't need a proof for this because it's only used to get all events
-    /// for a version which can be proved from the root hash of the event tree.
-    pub fn get_events_by_version(&self, version: Version) -> Result<Vec<ContractEvent>> {
-        let mut events = vec![];
-
-        let mut iter = self.event_db.iter::<EventSchema>(ReadOptions::default())?;
-        // Grab the first event and then iterate until we get all events for this version.
-        iter.seek(&version)?;
-        while let Some(((ver, index), event)) = iter.next().transpose()? {
-            if ver != version {
-                break;
-            }
-            events.push(event);
-        }
-
-        Ok(events)
-    }
-
-    pub fn get_events_by_version_iter(
-        &self,
-        start_version: Version,
-        num_versions: usize,
-    ) -> Result<EventsByVersionIter> {
-        let mut iter = self.event_db.iter::<EventSchema>(Default::default())?;
-        iter.seek(&start_version)?;
-
-        Ok(EventsByVersionIter::new(
-            iter,
-            start_version,
-            start_version
-                .checked_add(num_versions as u64)
-                .ok_or_else(|| format_err!("Too many versions requested."))?,
-        ))
-    }
-
     pub fn get_event_by_version_and_index(
         &self,
         version: Version,
@@ -303,67 +267,6 @@ impl EventStore {
         Ok((first_version, payload))
     }
 
-    /// Save contract events yielded by the transaction at `version` and return root hash of the
-    /// event accumulator formed by these events.
-    pub fn put_events(
-        &self,
-        version: u64,
-        events: &[ContractEvent],
-        skip_index: bool,
-        batch: &SchemaBatch,
-    ) -> Result<()> {
-        // Event table and indices updates
-        events
-            .iter()
-            .enumerate()
-            .try_for_each::<_, Result<_>>(|(idx, event)| {
-                if let ContractEvent::V1(v1) = event {
-                    if !skip_index {
-                        batch.put::<EventByKeySchema>(
-                            &(*v1.key(), v1.sequence_number()),
-                            &(version, idx as u64),
-                        )?;
-                        batch.put::<EventByVersionSchema>(
-                            &(*v1.key(), version, v1.sequence_number()),
-                            &(idx as u64),
-                        )?;
-                    }
-                }
-                batch.put::<EventSchema>(&(version, idx as u64), event)
-            })?;
-
-        if !skip_index {
-            // EventAccumulatorSchema updates
-            let event_hashes: Vec<HashValue> = events.iter().map(ContractEvent::hash).collect();
-            let (_root_hash, writes) =
-                MerkleAccumulator::<EmptyReader, EventAccumulatorHasher>::append(
-                    &EmptyReader,
-                    0,
-                    &event_hashes,
-                )?;
-
-            writes.into_iter().try_for_each(|(pos, hash)| {
-                batch.put::<EventAccumulatorSchema>(&(version, pos), &hash)
-            })?;
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn put_events_multiple_versions(
-        &self,
-        first_version: u64,
-        event_vecs: &[Vec<ContractEvent>],
-        batch: &SchemaBatch,
-    ) -> Result<()> {
-        event_vecs.iter().enumerate().try_for_each(|(idx, events)| {
-            let version = first_version
-                .checked_add(idx as Version)
-                .ok_or_else(|| format_err!("version overflow"))?;
-            self.put_events(version, events, /*skip_index=*/ false, batch)
-        })
-    }
-
     /// Finds the first event sequence number in a specified stream on which `comp` returns false.
     /// (assuming the whole stream is partitioned by `comp`)
     fn search_for_event_lower_bound<C>(
@@ -443,7 +346,7 @@ impl EventStore {
     }
 
     /// Prunes events by accumulator store for a range of version in [begin, end)
-    fn prune_event_accumulator(
+    pub(crate) fn prune_event_accumulator(
         &self,
         begin: Version,
         end: Version,
@@ -459,42 +362,6 @@ impl EventStore {
             }
             db_batch.delete::<EventAccumulatorSchema>(&(version, position))?;
         }
-        Ok(())
-    }
-
-    pub fn latest_version(&self) -> Result<Option<Version>> {
-        let mut iter = self.event_db.iter::<EventSchema>(ReadOptions::default())?;
-        iter.seek_to_last();
-        if let Some(((version, _), _)) = iter.next().transpose()? {
-            Ok(Some(version))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Prune a set of candidate events in the range of version in [begin, end) and all related indices
-    pub fn prune_events(
-        &self,
-        start: Version,
-        end: Version,
-        db_batch: &SchemaBatch,
-    ) -> anyhow::Result<()> {
-        let mut current_version = start;
-        for events in self.get_events_by_version_iter(start, (end - start) as usize)? {
-            for (idx, event) in (events?).into_iter().enumerate() {
-                if let ContractEvent::V1(v1) = event {
-                    db_batch.delete::<EventByVersionSchema>(&(
-                        *v1.key(),
-                        current_version,
-                        v1.sequence_number(),
-                    ))?;
-                    db_batch.delete::<EventByKeySchema>(&(*v1.key(), v1.sequence_number()))?;
-                }
-                db_batch.delete::<EventSchema>(&(current_version, idx as u64))?;
-            }
-            current_version += 1;
-        }
-        self.prune_event_accumulator(start, end, db_batch)?;
         Ok(())
     }
 }
@@ -519,7 +386,7 @@ impl<'a> HashReader for EventHashReader<'a> {
     }
 }
 
-struct EmptyReader;
+pub(crate) struct EmptyReader;
 
 // Asserts `get()` is never called.
 impl HashReader for EmptyReader {

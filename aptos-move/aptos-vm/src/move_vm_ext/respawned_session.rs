@@ -438,6 +438,7 @@ mod test {
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
     use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
+    use move_binary_format::errors::PartialVMResult;
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
@@ -448,7 +449,7 @@ mod test {
     struct NoOpChangeSetChecker;
 
     impl CheckChangeSet for NoOpChangeSetChecker {
-        fn check_change_set(&self, _change_set: &VMChangeSet) -> anyhow::Result<(), VMStatus> {
+        fn check_change_set(&self, _change_set: &VMChangeSet) -> PartialVMResult<()> {
             Ok(())
         }
     }
@@ -552,13 +553,13 @@ mod test {
         let aggregator_v1_delta_set =
             BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
-        // TODO: Layout hardcoded to None. Test with layout = Some(..)
+        // TODO[agg_v2]: Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = BTreeMap::from([
             (
                 key("resource_group_both"),
                 GroupWrite::new(
                     WriteOp::legacy_deletion(),
-                    vec![
+                    BTreeMap::from([
                         (
                             mock_tag_0(),
                             (WriteOp::legacy_modification(serialize(&1000).into()), None),
@@ -567,7 +568,7 @@ mod test {
                             mock_tag_2(),
                             (WriteOp::legacy_modification(serialize(&300).into()), None),
                         ),
-                    ],
+                    ]),
                     0,
                 ),
             ),
@@ -575,10 +576,10 @@ mod test {
                 key("resource_group_write_set"),
                 GroupWrite::new(
                     WriteOp::legacy_deletion(),
-                    vec![(
+                    BTreeMap::from([(
                         mock_tag_1(),
                         (WriteOp::legacy_modification(serialize(&5000).into()), None),
-                    )],
+                    )]),
                     0,
                 ),
             ),

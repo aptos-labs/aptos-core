@@ -2637,7 +2637,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>).guid_creation_num == <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1;
@@ -2836,7 +2836,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != ref.owner;
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner == <b>to</b>;
 </code></pre>

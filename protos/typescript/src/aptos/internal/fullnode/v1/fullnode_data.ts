@@ -595,6 +595,7 @@ export const FullnodeDataClient = makeGenericClientConstructor(
 ) as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): FullnodeDataClient;
   service: typeof FullnodeDataService;
+  serviceName: string;
 };
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | bigint | undefined;

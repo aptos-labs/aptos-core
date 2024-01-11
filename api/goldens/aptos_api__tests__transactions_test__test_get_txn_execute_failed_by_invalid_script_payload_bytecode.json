@@ -4,7 +4,7 @@
   "state_change_hash": "",
   "event_root_hash": "",
   "state_checkpoint_hash": null,
-  "gas_used": "4",
+  "gas_used": "3",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error CODE_DESERIALIZATION_ERROR",
   "accumulator_root_hash": "",
@@ -79,11 +79,11 @@
       "sequence_number": "0",
       "type": "0x1::transaction_fee::FeeStatement",
       "data": {
-        "execution_gas_units": "4",
+        "execution_gas_units": "3",
         "io_gas_units": "0",
         "storage_fee_octas": "0",
         "storage_fee_refund_octas": "0",
-        "total_charge_gas_units": "4"
+        "total_charge_gas_units": "3"
       }
     }
   ],

@@ -223,7 +223,7 @@ mod test {
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
     };
-    use claims::{assert_err, assert_matches, assert_ok, assert_ok_eq};
+    use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
     use move_core_types::{
         value::MoveTypeLayout,
         vm_status::{StatusCode, VMStatus},
@@ -481,14 +481,14 @@ mod test {
     fn test_failed_write_op_conversion_because_of_empty_storage() {
         let state_view = FakeAggregatorView::default();
         let delta_op = delta_add(10, 1000);
-        assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op,),
-            Err(VMStatus::Error {
-                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                message: Some(_),
-                sub_status: None
-            })
+
+        let err =
+            assert_err!(state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op));
+        assert_eq!(
+            err.major_status(),
+            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
         );
+        assert_none!(err.sub_status());
     }
 
     struct BadStorage;
@@ -569,14 +569,14 @@ mod test {
     fn test_failed_write_op_conversion_because_of_speculative_error() {
         let state_view = BadStorage;
         let delta_op = delta_add(10, 1000);
-        assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op,),
-            Err(VMStatus::Error {
-                status_code: StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                message: Some(_),
-                sub_status: None
-            })
+
+        let err =
+            assert_err!(state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &delta_op));
+        assert_eq!(
+            err.major_status(),
+            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
         );
+        assert_none!(err.sub_status());
     }
 
     #[test]
@@ -610,13 +610,14 @@ mod test {
         let add_op = delta_add(15, 100);
         let sub_op = delta_sub(101, 1000);
 
-        assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op,),
-            Err(VMStatus::MoveAbort(_, EADD_OVERFLOW))
-        );
-        assert_matches!(
-            state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op,),
-            Err(VMStatus::MoveAbort(_, ESUB_UNDERFLOW))
-        );
+        let err =
+            assert_err!(state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &add_op));
+        assert_eq!(err.major_status(), StatusCode::ABORTED);
+        assert_some_eq!(err.sub_status(), EADD_OVERFLOW);
+
+        let err =
+            assert_err!(state_view.try_convert_aggregator_v1_delta_into_write_op(&KEY, &sub_op));
+        assert_eq!(err.major_status(), StatusCode::ABORTED);
+        assert_some_eq!(err.sub_status(), ESUB_UNDERFLOW);
     }
 }

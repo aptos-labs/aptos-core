@@ -324,7 +324,9 @@ impl<'r, 'l> Session<'r, 'l> {
 
     /// Get the serialized format of a `CompiledModule` given a `ModuleId`.
     pub fn load_module(&self, module_id: &ModuleId) -> VMResult<Bytes> {
-        self.data_cache.load_module(module_id)
+        self.data_cache
+            .load_module(module_id)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Check if this module exists.

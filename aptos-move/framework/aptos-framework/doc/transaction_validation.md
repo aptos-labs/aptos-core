@@ -789,7 +789,7 @@ Give some constraints that may abort according to the conditions.
     <b>let</b> max_transaction_fee = txn_gas_price * txn_max_gas_units;
     <b>aborts_if</b> max_transaction_fee &gt; <a href="transaction_validation.md#0x1_transaction_validation_MAX_U64">MAX_U64</a>;
     <b>aborts_if</b> !<b>exists</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer);
-    // This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+    // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
     <b>aborts_if</b> !(<b>global</b>&lt;CoinStore&lt;AptosCoin&gt;&gt;(gas_payer).<a href="coin.md#0x1_coin">coin</a>.value &gt;= max_transaction_fee);
 }
 </code></pre>
@@ -859,7 +859,7 @@ Give some constraints that may abort according to the conditions.
     secondary_signer_public_key_hashes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
     <b>let</b> num_secondary_signers = len(secondary_signer_addresses);
     <b>aborts_if</b> len(secondary_signer_public_key_hashes) != num_secondary_signers;
-    // This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
     <b>aborts_if</b> <b>exists</b> i in 0..num_secondary_signers:
         !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(secondary_signer_addresses[i])
             || secondary_signer_public_key_hashes[i] !=
@@ -1019,7 +1019,7 @@ Skip transaction_fee::burn_fee verification.
     <b>let</b> aggr = collected_fees.value;
     <b>let</b> aggr_val = <a href="aggregator.md#0x1_aggregator_spec_aggregator_get_val">aggregator::spec_aggregator_get_val</a>(aggr);
     <b>let</b> aggr_lim = <a href="aggregator.md#0x1_aggregator_spec_get_limit">aggregator::spec_get_limit</a>(aggr);
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
     <b>aborts_if</b> collect_fee_enabled && !<b>exists</b>&lt;CollectedFeesPerBlock&gt;(@aptos_framework);
     <b>aborts_if</b> collect_fee_enabled && transaction_fee_amount &gt; 0 && aggr_val + transaction_fee_amount &gt; aggr_lim;
     <b>let</b> amount_to_burn= <b>if</b> (collect_fee_enabled) {

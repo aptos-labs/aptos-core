@@ -226,6 +226,24 @@ impl AptosDebugger {
             .await
     }
 
+    pub async fn get_committed_transaction_at_version(
+        &self,
+        version: Version,
+    ) -> Result<(Transaction, TransactionInfo)> {
+        let (mut txns, mut info) = self.debugger.get_committed_transactions(version, 1).await?;
+
+        let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
+        let info = info
+            .pop()
+            .expect("there must be exactly 1 txn info in the vec");
+
+        Ok((txn, info))
+    }
+
+    pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {
+        DebuggerStateView::new(self.debugger.clone(), version)
+    }
+
     pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<VMChangeSet>
     where
         F: FnOnce(&mut SessionExt) -> VMResult<()>,

@@ -75,7 +75,7 @@ spec aptos_framework::managed_coin {
         let addr =  type_info::type_of<CoinType>().account_address;
         let maybe_supply = global<coin::CoinInfo<CoinType>>(addr).supply;
         // Ensure the amount won't be overflow.
-        aborts_if amount <= 0;
+        aborts_if amount == 0;
         aborts_if !exists<coin::CoinInfo<CoinType>>(addr);
         include coin::CoinSubAbortsIf<CoinType> { amount:amount };
 

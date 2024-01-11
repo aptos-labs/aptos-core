@@ -44,7 +44,7 @@ impl AptosDB {
         AptosDB {
             ledger_db: Arc::clone(&ledger_db),
             state_kv_db: Arc::clone(&state_kv_db),
-            event_store: Arc::new(EventStore::new(ledger_db.event_db_arc())),
+            event_store: Arc::new(EventStore::new(ledger_db.event_db().db_arc())),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&ledger_db))),
             state_store,
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&ledger_db))),

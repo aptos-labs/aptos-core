@@ -1,0 +1,485 @@
+// Copyright © Aptos Foundation
+
+use crate::default_file_storage_format;
+use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
+use flate2::read::{GzDecoder, GzEncoder};
+use prost::Message;
+use ripemd::{Digest, Ripemd128};
+use serde::{Deserialize, Serialize};
+use std::io::Read;
+
+pub const FILE_ENTRY_TRANSACTION_COUNT: u64 = 1000;
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, Eq, PartialEq)]
+pub enum StorageFormat {
+    GzipCompressedProto,
+    // Only used for legacy file format.
+    // Use by cache only.
+    Base64UncompressedProto,
+    // Only used for legacy file format.
+    // Use by file store only.
+    JsonBase64UncompressedProto,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TransactionsLegacyFile {
+    /// The version of the first transaction in the blob.
+    pub starting_version: u64,
+    /// The transactions in the blob.
+    #[serde(rename = "transactions")]
+    pub transactions_in_base64: Vec<String>,
+}
+
+/// FileStoreMetadata is the metadata for the file store.
+/// It's a JSON file with name: metadata.json.
+#[derive(Serialize, Deserialize, Copy, Clone, Debug, PartialEq, Eq)]
+pub struct FileStoreMetadata {
+    pub chain_id: u64,
+    // The size of each file folder, BLOB_STORAGE_SIZE, i.e., 1_000.
+    pub file_folder_size: usize,
+    // The current version of the file store.
+    pub version: u64,
+    // Storage format; backward compatible.
+    #[serde(default = "default_file_storage_format")]
+    pub storage_format: StorageFormat,
+}
+
+impl FileStoreMetadata {
+    pub fn new(chain_id: u64, version: u64, storage_format: StorageFormat) -> Self {
+        Self {
+            chain_id,
+            file_folder_size: FILE_ENTRY_TRANSACTION_COUNT as usize,
+            version,
+            storage_format,
+        }
+    }
+
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
+        serde_json::from_slice(bytes.as_slice())
+            .expect("FileStoreMetadata json deserialization failed.")
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        serde_json::to_vec(&self).expect("FileStoreMetadata json serialization failed.")
+    }
+}
+
+pub enum CacheEntry {
+    GzipCompressionProto(Vec<u8>),
+    // Only used for legacy cache entry.
+    Base64UncompressedProto(Vec<u8>),
+}
+
+impl CacheEntry {
+    pub fn new(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
+        match storage_format {
+            StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
+            // Legacy format.
+            StorageFormat::Base64UncompressedProto => Self::Base64UncompressedProto(bytes),
+            StorageFormat::JsonBase64UncompressedProto => {
+                panic!("JsonBase64UncompressedProto is not supported.")
+            },
+        }
+    }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        match self {
+            CacheEntry::GzipCompressionProto(bytes) => bytes,
+            CacheEntry::Base64UncompressedProto(bytes) => bytes,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            CacheEntry::GzipCompressionProto(bytes) => bytes.len(),
+            CacheEntry::Base64UncompressedProto(bytes) => bytes.len(),
+        }
+    }
+
+    pub fn from_transaction(transaction: Transaction, storage_format: StorageFormat) -> Self {
+        let mut bytes = Vec::new();
+        transaction
+            .encode(&mut bytes)
+            .expect("proto serialization failed.");
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
+                let mut result = Vec::new();
+                compressed
+                    .read_to_end(&mut result)
+                    .expect("Gzip compression failed.");
+                CacheEntry::GzipCompressionProto(result)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                let base64 = base64::encode(bytes).into_bytes();
+                CacheEntry::Base64UncompressedProto(base64)
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                // This is fatal to see that we are using legacy file format in cache side.
+                panic!("JsonBase64UncompressedProto is not supported in cache.")
+            },
+        }
+    }
+
+    pub fn build_key(version: u64, storage_format: StorageFormat) -> String {
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                format!("gz:{}", version)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                format!("{}", version)
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                // This is fatal to see that we are using legacy file format in cache side.
+                panic!("JsonBase64UncompressedProto is not supported in cache.")
+            },
+        }
+    }
+
+    pub fn into_transaction(self) -> Transaction {
+        match self {
+            CacheEntry::GzipCompressionProto(bytes) => {
+                let mut decompressor = GzDecoder::new(&bytes[..]);
+                let mut decompressed = Vec::new();
+                decompressor
+                    .read_to_end(&mut decompressed)
+                    .expect("Gzip decompression failed.");
+                Transaction::decode(decompressed.as_slice()).expect("proto deserialization failed.")
+            },
+            CacheEntry::Base64UncompressedProto(bytes) => {
+                let bytes: Vec<u8> = base64::decode(bytes).expect("base64 decoding failed.");
+                Transaction::decode(bytes.as_slice()).expect("proto deserialization failed.")
+            },
+        }
+    }
+}
+
+pub enum FileEntry {
+    GzipCompressionProto(Vec<u8>),
+    // Only used for legacy file format.
+    JsonBase64UncompressedProto(Vec<u8>),
+}
+
+impl FileEntry {
+    pub fn new(bytes: Vec<u8>, storage_format: StorageFormat) -> Self {
+        match storage_format {
+            StorageFormat::GzipCompressedProto => Self::GzipCompressionProto(bytes),
+            StorageFormat::Base64UncompressedProto => {
+                panic!("Base64UncompressedProto is not supported.")
+            },
+            StorageFormat::JsonBase64UncompressedProto => Self::JsonBase64UncompressedProto(bytes),
+        }
+    }
+
+    pub fn into_inner(self) -> Vec<u8> {
+        match self {
+            FileEntry::GzipCompressionProto(bytes) => bytes,
+            FileEntry::JsonBase64UncompressedProto(bytes) => bytes,
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            FileEntry::GzipCompressionProto(bytes) => bytes.len(),
+            FileEntry::JsonBase64UncompressedProto(bytes) => bytes.len(),
+        }
+    }
+
+    pub fn from_transactions(
+        transactions: Vec<Transaction>,
+        storage_format: StorageFormat,
+    ) -> Self {
+        let mut bytes = Vec::new();
+        let starting_version = transactions
+            .first()
+            .expect("Cannot build empty file")
+            .version;
+        let transactions_count = transactions.len();
+        if transactions_count % FILE_ENTRY_TRANSACTION_COUNT as usize != 0 {
+            panic!("The number of transactions to upload has to be a multiple of FILE_ENTRY_TRANSACTION_COUNT.")
+        }
+        if starting_version % FILE_ENTRY_TRANSACTION_COUNT != 0 {
+            panic!("Starting version has to be a multiple of FILE_ENTRY_TRANSACTION_COUNT.")
+        }
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                let t = TransactionsInStorage {
+                    starting_version: Some(transactions.first().unwrap().version),
+                    transactions,
+                };
+                t.encode(&mut bytes).expect("proto serialization failed.");
+                let mut compressed = GzEncoder::new(bytes.as_slice(), flate2::Compression::fast());
+                let mut result = Vec::new();
+                compressed
+                    .read_to_end(&mut result)
+                    .expect("Gzip compression failed.");
+                FileEntry::GzipCompressionProto(result)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                panic!("Base64UncompressedProto is not supported.")
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                let transactions_in_base64 = transactions
+                    .into_iter()
+                    .map(|transaction| {
+                        let mut bytes = Vec::new();
+                        transaction
+                            .encode(&mut bytes)
+                            .expect("proto serialization failed.");
+                        base64::encode(bytes)
+                    })
+                    .collect::<Vec<String>>();
+                let file = TransactionsLegacyFile {
+                    starting_version,
+                    transactions_in_base64,
+                };
+                let json = serde_json::to_vec(&file).expect("json serialization failed.");
+                FileEntry::JsonBase64UncompressedProto(json)
+            },
+        }
+    }
+
+    pub fn build_key(version: u64, storage_format: StorageFormat) -> String {
+        let starting_version =
+            version / FILE_ENTRY_TRANSACTION_COUNT * FILE_ENTRY_TRANSACTION_COUNT;
+        let mut hasher = Ripemd128::new();
+        hasher.update(starting_version.to_string());
+        let file_prefix = format!("{:x}", hasher.finalize());
+        match storage_format {
+            StorageFormat::GzipCompressedProto => {
+                format!(
+                    "compressed_files/gzip/{}_{}.bin",
+                    file_prefix, starting_version
+                )
+            },
+            StorageFormat::JsonBase64UncompressedProto => {
+                format!("files/{}.json", starting_version)
+            },
+            StorageFormat::Base64UncompressedProto => {
+                panic!("Base64UncompressedProto is not supported.")
+            },
+        }
+    }
+
+    pub fn into_transactions_in_storage(self) -> TransactionsInStorage {
+        match self {
+            FileEntry::GzipCompressionProto(bytes) => {
+                let mut decompressor = GzDecoder::new(&bytes[..]);
+                let mut decompressed = Vec::new();
+                decompressor
+                    .read_to_end(&mut decompressed)
+                    .expect("Gzip decompression failed.");
+                TransactionsInStorage::decode(decompressed.as_slice())
+                    .expect("proto deserialization failed.")
+            },
+            FileEntry::JsonBase64UncompressedProto(bytes) => {
+                let file: TransactionsLegacyFile =
+                    serde_json::from_slice(bytes.as_slice()).expect("json deserialization failed.");
+                let transactions = file
+                    .transactions_in_base64
+                    .into_iter()
+                    .map(|base64| {
+                        let bytes: Vec<u8> =
+                            base64::decode(base64).expect("base64 decoding failed.");
+                        Transaction::decode(bytes.as_slice())
+                            .expect("proto deserialization failed.")
+                    })
+                    .collect::<Vec<Transaction>>();
+                TransactionsInStorage {
+                    starting_version: Some(file.starting_version),
+                    transactions,
+                }
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cache_entry_builder_base64_uncompressed_proto() {
+        let transaction = Transaction {
+            version: 42,
+            epoch: 333,
+            ..Transaction::default()
+        };
+        let transaction_clone = transaction.clone();
+        let transaction_size = transaction.encoded_len();
+        let cache_entry =
+            CacheEntry::from_transaction(transaction, StorageFormat::Base64UncompressedProto);
+        // Make sure data is compressed.
+        assert_ne!(cache_entry.size(), transaction_size);
+        let deserialized_transaction = cache_entry.into_transaction();
+        assert_eq!(transaction_clone, deserialized_transaction);
+    }
+
+    #[test]
+    fn test_cache_entry_builder_gzip_compressed_proto() {
+        let transaction = Transaction {
+            version: 42,
+            epoch: 333,
+            ..Transaction::default()
+        };
+        let transaction_clone = transaction.clone();
+        let proto_size = transaction.encoded_len();
+        let cache_entry =
+            CacheEntry::from_transaction(transaction, StorageFormat::GzipCompressedProto);
+        let compressed_size = cache_entry.size();
+        assert!(compressed_size != proto_size);
+        let deserialized_transaction = cache_entry.into_transaction();
+        assert_eq!(transaction_clone, deserialized_transaction);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_cache_entry_builder_json_base64_uncompressed_proto() {
+        let transaction = Transaction {
+            version: 42,
+            epoch: 333,
+            ..Transaction::default()
+        };
+        let _cache_entry =
+            CacheEntry::from_transaction(transaction, StorageFormat::JsonBase64UncompressedProto);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_file_entry_builder_base64_uncompressed_proto_not_supported() {
+        let transactions = (1000..2000)
+            .map(|version| Transaction {
+                version,
+                epoch: 333,
+                ..Transaction::default()
+            })
+            .collect::<Vec<Transaction>>();
+        let _file_entry =
+            FileEntry::from_transactions(transactions, StorageFormat::Base64UncompressedProto);
+    }
+
+    #[test]
+    fn test_file_entry_builder_json_base64_uncompressed_proto() {
+        let transactions = (1000..2000)
+            .map(|version| Transaction {
+                version,
+                epoch: 333,
+                ..Transaction::default()
+            })
+            .collect::<Vec<Transaction>>();
+        let file_entry = FileEntry::from_transactions(
+            transactions.clone(),
+            StorageFormat::JsonBase64UncompressedProto,
+        );
+        let deserialized_transactions = file_entry.into_transactions_in_storage();
+        for (i, transaction) in transactions.iter().enumerate() {
+            assert_eq!(transaction, &deserialized_transactions.transactions[i]);
+        }
+    }
+
+    #[test]
+    fn test_file_entry_builder_gzip_compressed_proto() {
+        let transactions = (1000..2000)
+            .map(|version| Transaction {
+                version,
+                epoch: 333,
+                ..Transaction::default()
+            })
+            .collect::<Vec<Transaction>>();
+        let transactions_in_storage = TransactionsInStorage {
+            starting_version: Some(1000),
+            transactions: transactions.clone(),
+        };
+        let transactions_in_storage_size = transactions_in_storage.encoded_len();
+        let file_entry =
+            FileEntry::from_transactions(transactions.clone(), StorageFormat::GzipCompressedProto);
+        assert_ne!(file_entry.size(), transactions_in_storage_size);
+        let deserialized_transactions = file_entry.into_transactions_in_storage();
+        for (i, transaction) in transactions.iter().enumerate() {
+            assert_eq!(transaction, &deserialized_transactions.transactions[i]);
+        }
+    }
+
+    #[test]
+    fn test_cache_entry_key_to_string_gzip_compressed_proto() {
+        assert_eq!(
+            CacheEntry::build_key(42, StorageFormat::GzipCompressedProto),
+            "gz:42"
+        );
+    }
+
+    #[test]
+    fn test_cache_entry_key_to_string_base64_uncompressed_proto() {
+        assert_eq!(
+            CacheEntry::build_key(42, StorageFormat::Base64UncompressedProto),
+            "42"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_cache_entry_key_to_string_json_base64_uncompressed_proto() {
+        let _key = CacheEntry::build_key(42, StorageFormat::JsonBase64UncompressedProto);
+    }
+
+    #[test]
+    fn test_file_entry_key_to_string_gzip_compressed_proto() {
+        assert_eq!(
+            FileEntry::build_key(42, StorageFormat::GzipCompressedProto),
+            "compressed_files/gzip/3d1bff1ba654ca5fdb6ac1370533d876_0.bin"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_file_entry_key_to_string_base64_uncompressed_proto() {
+        let _key = FileEntry::build_key(42, StorageFormat::Base64UncompressedProto);
+    }
+
+    #[test]
+    fn test_file_entry_key_to_string_json_base64_uncompressed_proto() {
+        assert_eq!(
+            FileEntry::build_key(42, StorageFormat::JsonBase64UncompressedProto),
+            "files/0.json"
+        );
+    }
+
+    #[test]
+    fn test_new_format_not_break_existing_metadata() {
+        let file_metadata_serialized_json = r#"{
+            "chain_id": 1,
+            "file_folder_size": 1000,
+            "version": 1
+        }"#;
+
+        let file_metadata: FileStoreMetadata = serde_json::from_str(file_metadata_serialized_json)
+            .expect("FileStoreMetadata deserialization failed.");
+
+        assert_eq!(
+            file_metadata.storage_format,
+            StorageFormat::JsonBase64UncompressedProto
+        );
+        assert_eq!(file_metadata.chain_id, 1);
+        assert_eq!(file_metadata.file_folder_size, 1000);
+    }
+
+    #[test]
+    fn test_new_format_can_be_parse() {
+        let file_metadata_serialized_json = r#"{
+            "chain_id": 1,
+            "file_folder_size": 1000,
+            "version": 1,
+            "storage_format": "GzipCompressedProto"
+        }"#;
+
+        let file_metadata: FileStoreMetadata = serde_json::from_str(file_metadata_serialized_json)
+            .expect("FileStoreMetadata deserialization failed.");
+
+        assert_eq!(
+            file_metadata.storage_format,
+            StorageFormat::GzipCompressedProto
+        );
+        assert_eq!(file_metadata.chain_id, 1);
+        assert_eq!(file_metadata.file_folder_size, 1000);
+    }
+}

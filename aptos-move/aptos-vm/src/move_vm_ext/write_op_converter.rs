@@ -13,11 +13,10 @@ use aptos_vm_types::{
     resource_group_adapter::group_tagged_resource_size,
 };
 use bytes::Bytes;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    effects::Op as MoveStorageOp,
-    language_storage::StructTag,
-    value::MoveTypeLayout,
-    vm_status::{err_msg, StatusCode, VMStatus},
+    effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
+    vm_status::StatusCode,
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -33,7 +32,7 @@ macro_rules! convert_impl {
             state_key: &StateKey,
             move_storage_op: MoveStorageOp<Bytes>,
             legacy_creation_as_modification: bool,
-        ) -> Result<WriteOp, VMStatus> {
+        ) -> PartialVMResult<WriteOp> {
             let move_storage_op = match move_storage_op {
                 MoveStorageOp::New(data) => MoveStorageOp::New((data, None)),
                 MoveStorageOp::Modify(data) => MoveStorageOp::Modify((data, None)),
@@ -52,21 +51,21 @@ macro_rules! convert_impl {
 // speculative reads (and in a non-speculative context, e.g. during commit, it
 // is a more serious error and block execution must abort).
 // BlockExecutor is responsible with handling this error.
-fn group_size_arithmetics_error() -> VMStatus {
-    VMStatus::error(
-        StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-        err_msg("Group size arithmetics error while applying updates"),
-    )
+fn group_size_arithmetics_error() -> PartialVMError {
+    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+        .with_message("Group size arithmetics error while applying updates".to_string())
 }
 
 fn decrement_size_for_remove_tag(
     size: &mut ResourceGroupSize,
     old_tagged_resource_size: u64,
-) -> Result<(), VMStatus> {
+) -> PartialVMResult<()> {
     match size {
-        ResourceGroupSize::Concrete(_) => Err(VMStatus::error(
+        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err_msg("Unexpected ResourceGroupSize::Concrete in convert_resource_group_v1"),
+        )
+        .with_message(
+            "Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag".to_string(),
         )),
         ResourceGroupSize::Combined {
             num_tagged_resources,
@@ -86,11 +85,13 @@ fn decrement_size_for_remove_tag(
 fn increment_size_for_add_tag(
     size: &mut ResourceGroupSize,
     new_tagged_resource_size: u64,
-) -> Result<(), VMStatus> {
+) -> PartialVMResult<()> {
     match size {
-        ResourceGroupSize::Concrete(_) => Err(VMStatus::error(
+        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err_msg("Unexpected ResourceGroupSize::Concrete in convert_resource_group_v1"),
+        )
+        .with_message(
+            "Unexpected ResourceGroupSize::Concrete in increment_size_for_add_tag".to_string(),
         )),
         ResourceGroupSize::Combined {
             num_tagged_resources,
@@ -107,31 +108,33 @@ fn increment_size_for_add_tag(
     }
 }
 
-fn check_size_and_existance_match(
+fn check_size_and_existence_match(
     size: &ResourceGroupSize,
     exists: bool,
     state_key: &StateKey,
-) -> Result<(), VMStatus> {
+) -> PartialVMResult<()> {
     if exists {
         if size.get() == 0 {
-            Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg(format!(
-                    "Group tag count/size shouldn't be 0 for an existing group: {:?}",
-                    state_key
-                )),
-            ))
+            Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "Group tag count/size shouldn't be 0 for an existing group: {:?}",
+                        state_key
+                    ),
+                ),
+            )
         } else {
             Ok(())
         }
     } else if size.get() > 0 {
-        Err(VMStatus::error(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err_msg(format!(
-                "Group tag count/size should be 0 for a new group: {:?}",
-                state_key
-            )),
-        ))
+        Err(
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                format!(
+                    "Group tag count/size should be 0 for a new group: {:?}",
+                    state_key
+                ),
+            ),
+        )
     } else {
         Ok(())
     }
@@ -166,7 +169,7 @@ impl<'r> WriteOpConverter<'r> {
         state_key: &StateKey,
         move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
         legacy_creation_as_modification: bool,
-    ) -> Result<(WriteOp, Option<Arc<MoveTypeLayout>>), VMStatus> {
+    ) -> PartialVMResult<(WriteOp, Option<Arc<MoveTypeLayout>>)> {
         let result = self.convert(
             self.remote.get_resource_state_value_metadata(state_key),
             move_storage_op.clone(),
@@ -183,32 +186,22 @@ impl<'r> WriteOpConverter<'r> {
         &self,
         state_key: &StateKey,
         group_changes: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
-    ) -> Result<GroupWrite, VMStatus> {
+    ) -> PartialVMResult<GroupWrite> {
         // Resource group metadata is stored at the group StateKey, and can be obtained via the
         // same interfaces at for a resource at a given StateKey.
         let state_value_metadata_result = self.remote.get_resource_state_value_metadata(state_key);
         // Currently, due to read-before-write and a gas charge on the first read that is based
         // on the group size, this should simply re-read a cached (speculative) group size.
         let pre_group_size = self.remote.resource_group_size(state_key).map_err(|_| {
-            VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg("Error querying resource group size"),
-            )
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("Error querying resource group size".to_string())
         })?;
 
         if let Ok(v) = &state_value_metadata_result {
-            check_size_and_existance_match(&pre_group_size, v.is_some(), state_key)?;
+            check_size_and_existence_match(&pre_group_size, v.is_some(), state_key)?;
         }
 
         let mut inner_ops = BTreeMap::new();
-
-        let tag_serialization_error = |_| {
-            VMStatus::error(
-                StatusCode::VALUE_SERIALIZATION_ERROR,
-                err_msg("Tag serialization error"),
-            )
-        };
-
         let mut post_group_size = pre_group_size;
 
         for (tag, current_op) in group_changes {
@@ -216,7 +209,7 @@ impl<'r> WriteOpConverter<'r> {
             // For each tagged resource in the change set, we subtract the previous size tagged resource size,
             // and then add new tagged resource size.
             //
-            // The reason we do not insteat get and add the sizes of the resources in the group,
+            // The reason we do not instead get and add the sizes of the resources in the group,
             // but not in the change-set, is to avoid creating unnecessary R/W conflicts (the resources
             // in the change-set are already read, but the other resources are not).
             if !matches!(current_op, MoveStorageOp::New(_)) {
@@ -224,20 +217,16 @@ impl<'r> WriteOpConverter<'r> {
                     .remote
                     .resource_size_in_group(state_key, &tag)
                     .map_err(|_| {
-                        VMStatus::error(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                            err_msg("Error querying resource group size"),
-                        )
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message("Error querying resource group size".to_string())
                     })?;
-                let old_size = group_tagged_resource_size(&tag, old_tagged_value_size)
-                    .map_err(tag_serialization_error)?;
+                let old_size = group_tagged_resource_size(&tag, old_tagged_value_size)?;
                 decrement_size_for_remove_tag(&mut post_group_size, old_size)?;
             }
 
             match &current_op {
                 MoveStorageOp::Modify((data, _)) | MoveStorageOp::New((data, _)) => {
-                    let new_size = group_tagged_resource_size(&tag, data.len())
-                        .map_err(tag_serialization_error)?;
+                    let new_size = group_tagged_resource_size(&tag, data.len())?;
                     increment_size_for_add_tag(&mut post_group_size, new_size)?;
                 },
                 MoveStorageOp::Delete => {},
@@ -269,9 +258,7 @@ impl<'r> WriteOpConverter<'r> {
         };
         Ok(GroupWrite::new(
             self.convert(state_value_metadata_result, metadata_op, false)?,
-            // TODO[agg_v2](fix): Converting the inner ops from Vec to BTreeMap. Try to have
-            // uniform datastructure to represent the inner ops.
-            inner_ops.into_iter().collect(),
+            inner_ops,
             post_group_size.get(),
         ))
     }
@@ -281,31 +268,33 @@ impl<'r> WriteOpConverter<'r> {
         state_value_metadata_result: anyhow::Result<Option<StateValueMetadata>>,
         move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
         legacy_creation_as_modification: bool,
-    ) -> Result<WriteOp, VMStatus> {
+    ) -> PartialVMResult<WriteOp> {
         use MoveStorageOp::*;
         use WriteOp::*;
 
         let maybe_existing_metadata = state_value_metadata_result.map_err(|_| {
-            VMStatus::error(
-                StatusCode::STORAGE_ERROR,
-                err_msg("Storage read failed when converting change set."),
-            )
+            PartialVMError::new(StatusCode::STORAGE_ERROR)
+                .with_message("Storage read failed when converting change set.".to_string())
         })?;
 
         let write_op = match (maybe_existing_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning speculative error waiting for re-execution
-                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                    err_msg("When converting write op: updating non-existent value."),
-                ));
+                // Possible under speculative execution, returning speculative error waiting for re-execution.
+                return Err(
+                    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                        .with_message(
+                            "When converting write op: updating non-existent value.".to_string(),
+                        ),
+                );
             },
             (Some(_), New(_)) => {
-                return Err(VMStatus::error(
-                    // Possible under speculative execution, returning speculative error waiting for re-execution
-                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                    err_msg("When converting write op: Recreating existing value."),
-                ));
+                // Possible under speculative execution, returning speculative error waiting for re-execution.
+                return Err(
+                    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                        .with_message(
+                            "When converting write op: Recreating existing value.".to_string(),
+                        ),
+                );
             },
             (None, New((data, _))) => match &self.new_slot_metadata {
                 None => {
@@ -341,15 +330,13 @@ impl<'r> WriteOpConverter<'r> {
         &self,
         state_key: &StateKey,
         value: u128,
-    ) -> Result<WriteOp, VMStatus> {
+    ) -> PartialVMResult<WriteOp> {
         let maybe_existing_metadata = self
             .remote
             .get_aggregator_v1_state_value_metadata(state_key)
             .map_err(|e| {
-                VMStatus::error(
-                    StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                    Some(format!("convert_aggregator_modification failed {:?}", e).to_string()),
-                )
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                    .with_message(format!("convert_aggregator_modification failed {:?}", e))
             })?;
         let data = serialize(&value).into();
 

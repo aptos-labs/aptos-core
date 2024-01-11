@@ -9,7 +9,10 @@ use crate::{
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use move_binary_format::{
-    compatibility::Compatibility, errors::VMResult, file_format::CompiledScript, CompiledModule,
+    compatibility::Compatibility,
+    errors::{PartialVMError, VMResult},
+    file_format::CompiledScript,
+    CompiledModule,
 };
 use move_command_line_common::{
     address::ParsedAddress, env::read_bool_env_var, files::verify_and_create_named_address_mapping,
@@ -52,7 +55,7 @@ struct SimpleVMTestAdapter<'a> {
 }
 
 pub fn view_resource_in_move_storage(
-    storage: &impl MoveResolver,
+    storage: &impl MoveResolver<PartialVMError>,
     address: AccountAddress,
     module: &ModuleId,
     resource: &IdentStr,
