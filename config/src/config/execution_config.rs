@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use super::WaypointConfig;
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType,
     transaction_filter_type::Filter, utils::RootPath, Error, NodeConfig,
@@ -36,6 +37,8 @@ pub struct ExecutionConfig {
     pub processed_transactions_detailed_counters: bool,
     /// Enables filtering of transactions before they are sent to execution
     pub transaction_filter: Filter,
+    /// Used during DB bootstrapping
+    pub genesis_waypoint: Option<WaypointConfig>,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -66,6 +69,7 @@ impl Default for ExecutionConfig {
             paranoid_hot_potato_verification: true,
             processed_transactions_detailed_counters: false,
             transaction_filter: Filter::empty(),
+            genesis_waypoint: None,
         }
     }
 }
