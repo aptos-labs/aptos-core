@@ -6,8 +6,6 @@ use aptos_logger::info;
 use aptos_types::jwks::{jwk::JWK, Issuer};
 use futures::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
-#[cfg(feature = "smoke-test")]
-use reqwest::header;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::{sync::oneshot, task::JoinHandle, time::MissedTickBehavior};
@@ -23,34 +21,35 @@ struct JWKsResponse {
     keys: Vec<serde_json::Value>,
 }
 
-#[cfg(feature = "smoke-test")]
+/// Given an Open ID configuration URL, fetch its JWKs.
 pub async fn fetch_jwks(my_addr: AccountAddress, config_url: Vec<u8>) -> Result<Vec<JWK>> {
-    let maybe_url = String::from_utf8(config_url);
-    let config_url = maybe_url?;
-    let client = reqwest::Client::new();
-    let JWKsResponse { keys } = client
-        .get(config_url.as_str())
-        .header(header::COOKIE, my_addr.to_hex())
-        .send()
-        .await?
-        .json()
-        .await?;
-    let jwks = keys.into_iter().map(JWK::from).collect();
-    Ok(jwks)
+    if cfg!(feature = "smoke-test") {
+        use reqwest::header;
+        let maybe_url = String::from_utf8(config_url);
+        let jwk_url = maybe_url?;
+        let client = reqwest::Client::new();
+        let JWKsResponse { keys } = client
+            .get(jwk_url.as_str())
+            .header(header::COOKIE, my_addr.to_hex())
+            .send()
+            .await?
+            .json()
+            .await?;
+        let jwks = keys.into_iter().map(JWK::from).collect();
+        Ok(jwks)
+    } else {
+        let maybe_url = String::from_utf8(config_url);
+        let config_url = maybe_url?;
+        let client = reqwest::Client::new();
+        let OpenIDConfiguration { jwks_uri, .. } =
+            client.get(config_url.as_str()).send().await?.json().await?;
+        let JWKsResponse { keys } = client.get(jwks_uri.as_str()).send().await?.json().await?;
+        let jwks = keys.into_iter().map(JWK::from).collect();
+        Ok(jwks)
+    }
 }
 
-#[cfg(not(feature = "smoke-test"))]
-pub async fn fetch_jwks(_my_addr: AccountAddress, config_url: Vec<u8>) -> Result<Vec<JWK>> {
-    let maybe_url = String::from_utf8(config_url);
-    let config_url = maybe_url?;
-    let client = reqwest::Client::new();
-    let OpenIDConfiguration { jwks_uri, .. } =
-        client.get(config_url.as_str()).send().await?.json().await?;
-    let JWKsResponse { keys } = client.get(jwks_uri.as_str()).send().await?.json().await?;
-    let jwks = keys.into_iter().map(JWK::from).collect();
-    Ok(jwks)
-}
-
+/// Controls a thread that periodically fetch JWKs of a provider.
 pub struct JWKObserver {
     close_tx: oneshot::Sender<()>,
     join_handle: JoinHandle<()>,

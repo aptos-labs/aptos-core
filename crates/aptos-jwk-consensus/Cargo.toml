@@ -17,11 +17,11 @@ anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
-aptos-consensus-types = { workspace = true }
 aptos-config = { workspace = true }
+aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-event-notifications = { workspace = true }
 aptos-enum-conversion-derive = { workspace = true }
+aptos-event-notifications = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }

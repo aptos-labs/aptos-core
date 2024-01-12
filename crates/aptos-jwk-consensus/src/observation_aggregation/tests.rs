@@ -54,7 +54,6 @@ fn test_observation_aggregation_state() {
         ))],
     };
     let ob_agg_state = Arc::new(ObservationAggregationState::new(
-        addrs[0],
         epoch_state.clone(),
         view_0.clone(),
     ));

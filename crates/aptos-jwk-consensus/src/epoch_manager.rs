@@ -16,7 +16,7 @@ use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_logger::{debug, error, info};
+use aptos_logger::{error, info};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
@@ -34,18 +34,27 @@ use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
+    // some useful metadata
     my_addr: AccountAddress,
-    identity_blob: Arc<IdentityBlob>,
     epoch_state: Option<Arc<EpochState>>,
+
+    // credential
+    identity_blob: Arc<IdentityBlob>,
+
+    // events we subscribe
     reconfig_events: ReconfigNotificationListener<P>,
     jwk_updated_events: EventNotificationListener,
+
+    // message channels to JWK manager
     jwk_updated_event_txs: Option<aptos_channel::Sender<(), ObservedJWKsUpdated>>,
     jwk_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
     jwk_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 
+    // network utils
     self_sender: aptos_channels::Sender<Event<JWKConsensusMsg>>,
     network_sender: JWKConsensusNetworkClient<NetworkClient<JWKConsensusMsg>>,
 
+    // vtxn pool handle
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
 }
 
@@ -79,7 +88,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         peer_id: Author,
         rpc_request: IncomingRpcRequest,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         if Some(rpc_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
             if let Some(tx) = &self.jwk_rpc_msg_tx {
                 let _ = tx.push((), (peer_id, rpc_request));
@@ -94,9 +103,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             subscribed_events, ..
         } = notification;
         for event in subscribed_events {
-            let jwk_event = ObservedJWKsUpdated::try_from(&event).unwrap();
-            if let Some(tx) = self.jwk_updated_event_txs.as_ref() {
-                let _ = tx.push((), jwk_event);
+            if let Ok(jwk_event) = ObservedJWKsUpdated::try_from(&event) {
+                if let Some(tx) = self.jwk_updated_event_txs.as_ref() {
+                    let _ = tx.push((), jwk_event);
+                }
             }
         }
         Ok(())
@@ -143,17 +153,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
         self.epoch_state = Some(epoch_state.clone());
-        debug!("[JWK] start_new_epoch: new_epoch={}", epoch_state.epoch);
+        info!("[JWK] start_new_epoch: new_epoch={}", epoch_state.epoch);
 
         let features = payload.get::<Features>().unwrap_or_default();
 
         if features.is_enabled(FeatureFlag::JWK_CONSENSUS) {
             let onchain_oidc_provider_set = payload.get::<SupportedOIDCProviders>().ok();
             let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
-            debug!(
-                "[JWK] JWK manager init, epoch={}",
-                self.epoch_state.as_ref().unwrap().epoch
-            );
+            info!("[JWK] JWK manager init, epoch={}", epoch_state.epoch);
             let network_sender = NetworkSender::new(
                 self.my_addr,
                 self.network_sender.clone(),
@@ -167,7 +174,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Duration::from_millis(1000),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
-            let qc_update_producer = RealCertifiedUpdateProducer::new(self.my_addr, rb);
+            let qc_update_producer = RealCertifiedUpdateProducer::new(rb);
 
             let jwk_consensus_manager = JWKManager::new(
                 self.identity_blob.clone(),

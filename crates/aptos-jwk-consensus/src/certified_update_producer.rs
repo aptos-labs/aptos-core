@@ -11,7 +11,6 @@ use aptos_types::{
     jwks::{ProviderJWKs, QuorumCertifiedUpdate},
 };
 use futures_util::future::{AbortHandle, Abortable};
-use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
 
@@ -29,17 +28,12 @@ pub trait CertifiedUpdateProducer: Send + Sync {
 }
 
 pub struct RealCertifiedUpdateProducer {
-    my_addr: AccountAddress,
     reliable_broadcast: Arc<ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>>,
 }
 
 impl RealCertifiedUpdateProducer {
-    pub fn new(
-        my_addr: AccountAddress,
-        reliable_broadcast: ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>,
-    ) -> Self {
+    pub fn new(reliable_broadcast: ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>) -> Self {
         Self {
-            my_addr,
             reliable_broadcast: Arc::new(reliable_broadcast),
         }
     }
@@ -57,11 +51,7 @@ impl CertifiedUpdateProducer for RealCertifiedUpdateProducer {
             epoch: epoch_state.epoch,
             issuer: payload.issuer.clone(),
         };
-        let agg_state = Arc::new(ObservationAggregationState::new(
-            self.my_addr,
-            epoch_state,
-            payload,
-        ));
+        let agg_state = Arc::new(ObservationAggregationState::new(epoch_state, payload));
         let task = async move {
             let qc_update = rb.broadcast(req, agg_state).await;
             if let Some(tx) = qc_update_tx {

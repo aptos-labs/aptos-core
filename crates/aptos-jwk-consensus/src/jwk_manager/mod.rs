@@ -165,7 +165,7 @@ impl<P: SigningKeyProvider> JWKManager<P> {
             };
             let signature = self
                 .signing_key_provider
-                .signing_key()
+                .signing_key()?
                 .sign(&observed)
                 .map_err(|e| anyhow!("crypto material error occurred duing signing: {}", e))?;
             let abort_handle = self.certified_update_producer.start_produce(
