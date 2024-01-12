@@ -24,7 +24,7 @@ use aptos_types::{
     delayed_fields::PanicError,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
-    state_store::{state_key::StateKey, StateView, StateViewId},
+    state_store::{state_key::StateKey, state_value::StateValueMetadata, StateView, StateViewId},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,
@@ -145,7 +145,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn resource_write_set(&self) -> Vec<(StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))> {
+    fn resource_write_set(&self) -> Vec<(StateKey, Arc<WriteOp>, Option<Arc<MoveTypeLayout>>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -155,11 +155,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .iter()
             .flat_map(|(key, write)| match write {
                 AbstractResourceWriteOp::Write(write_op) => {
-                    Some((key.clone(), (write_op.clone(), None)))
+                    Some((key.clone(), Arc::new(write_op.clone()), None))
                 },
                 AbstractResourceWriteOp::WriteWithDelayedFields(write) => Some((
                     key.clone(),
-                    (write.write_op.clone(), Some(write.layout.clone())),
+                    Arc::new(write.write_op.clone()),
+                    Some(write.layout.clone()),
                 )),
                 _ => None,
             })
@@ -189,14 +190,16 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<StateKey, DeltaOp> {
+    fn aggregator_v1_delta_set(&self) -> Vec<(StateKey, DeltaOp)> {
         self.vm_output
             .lock()
             .as_ref()
             .expect("Output must be set to get deltas")
             .change_set()
             .aggregator_v1_delta_set()
-            .clone()
+            .iter()
+            .map(|(key, op)| (key.clone(), *op))
+            .collect()
     }
 
     /// Should never be called after incorporating materialized output, as that consumes vm_output.
@@ -228,7 +231,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .collect()
     }
 
-    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, WriteOp)> {
+    fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -240,7 +243,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                 if let AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(change) =
                     write
                 {
-                    Some((key.clone(), change.metadata_op.clone()))
+                    Some((key.clone(), change.metadata.clone()))
                 } else {
                     None
                 }

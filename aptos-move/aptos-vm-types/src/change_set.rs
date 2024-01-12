@@ -147,8 +147,11 @@ impl VMChangeSet {
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-        reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-        group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
+        reads_needing_delayed_field_exchange: BTreeMap<
+            StateKey,
+            (StateValueMetadata, u64, Arc<MoveTypeLayout>),
+        >,
+        group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> PartialVMResult<Self> {
@@ -166,39 +169,27 @@ impl VMChangeSet {
                         .into_iter()
                         .map(|(k, w)| Ok((k, AbstractResourceWriteOp::WriteResourceGroup(w)))),
                 )
-                .chain(
-                    reads_needing_delayed_field_exchange
-                        .into_iter()
-                        .map(|(k, (w, layout))| {
-                            Ok((
-                                k,
-                                AbstractResourceWriteOp::InPlaceDelayedFieldChange(
-                                    InPlaceDelayedFieldChangeOp {
-                                        layout,
-                                        materialized_size: WriteOpSize::from(&w)
-                                            .write_len()
-                                            .ok_or_else(|| {
-                                                PartialVMError::new(
-                                                    StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
-                                                )
-                                                .with_message(
-                                                    "Read with exchange cannot be a delete."
-                                                        .to_string(),
-                                                )
-                                            })?,
-                                        metadata: w.into_metadata(),
-                                    },
-                                ),
-                            ))
-                        }),
-                )
+                .chain(reads_needing_delayed_field_exchange.into_iter().map(
+                    |(k, (metadata, size, layout))| {
+                        Ok((
+                            k,
+                            AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                                InPlaceDelayedFieldChangeOp {
+                                    layout,
+                                    materialized_size: size,
+                                    metadata,
+                                },
+                            ),
+                        ))
+                    },
+                ))
                 .chain(group_reads_needing_delayed_field_exchange.into_iter().map(
-                    |(k, (metadata_op, materialized_size))| {
+                    |(k, (metadata, materialized_size))| {
                         Ok((
                             k,
                             AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(
                                 ResourceGroupInPlaceDelayedFieldChangeOp {
-                                    metadata_op,
+                                    metadata,
                                     materialized_size,
                                 },
                             ),
@@ -361,7 +352,7 @@ impl VMChangeSet {
                 self.module_write_set()
                     .iter()
                     .chain(self.aggregator_v1_write_set().iter())
-                    .map(|(k, v)| (k, WriteOpSize::from(v))),
+                    .map(|(k, v)| (k, v.write_op_size())),
             )
     }
 
@@ -383,7 +374,7 @@ impl VMChangeSet {
                 self.module_write_set
                     .iter_mut()
                     .chain(self.aggregator_v1_write_set.iter_mut())
-                    .map(|(k, v)| (k, WriteOpSize::from(v as &WriteOp), v.get_metadata_mut())),
+                    .map(|(k, v)| (k, v.write_op_size(), v.get_metadata_mut())),
             )
     }
 
@@ -424,7 +415,7 @@ impl VMChangeSet {
                 )));
             }
 
-            let new_length = WriteOpSize::from(&new_write).write_len();
+            let new_length = new_write.write_op_size().write_len();
             let old_length = abstract_write.materialized_size().write_len();
             if new_length != old_length {
                 return Err(code_invariant_error(format!(
