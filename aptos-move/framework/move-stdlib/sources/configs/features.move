@@ -333,6 +333,28 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
+    /// The on-chain randomness feature.
+    ///
+    /// Lifetime: permanent
+    const ON_CHAIN_RANDOMNESS: u64 = 45;
+
+    public fun get_on_chain_randomness_feature(): u64 { ON_CHAIN_RANDOMNESS }
+
+    public fun on_chain_randomness_enabled(): bool acquires Features {
+        is_enabled(ON_CHAIN_RANDOMNESS)
+    }
+
+    /// The JWK consensus feature.
+    ///
+    /// Lifetime: permanent
+    const JWK_CONSENSUS: u64 = 46;
+
+    public fun get_jwk_consensus_feature(): u64 { JWK_CONSENSUS }
+
+    public fun jwk_consensus_enabled(): bool acquires Features {
+        is_enabled(JWK_CONSENSUS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::BTreeMap;
 use crate::jwks;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
@@ -11,7 +10,7 @@ use std::fmt::Debug;
 pub enum ValidatorTransaction {
     DummyTopic1(DummyValidatorTransaction),
     ObservedJWKsUpdates {
-        updates: BTreeMap<jwks::Issuer, jwks::QuorumCertifiedUpdate>,
+        updates: Vec<jwks::QuorumCertifiedUpdate>,
     },
     #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic2(DummyValidatorTransaction),
