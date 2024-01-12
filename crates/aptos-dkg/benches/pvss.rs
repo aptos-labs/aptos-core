@@ -12,6 +12,7 @@ use aptos_dkg::{
             get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking, NoAux,
         },
         traits::{transcript::Transcript, SecretSharingConfig},
+        GenericWeighting,
     },
 };
 use criterion::{
@@ -23,13 +24,17 @@ use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
+    // unweighted PVSS
     for tc in get_threshold_configs_for_benchmarking() {
         pvss_group::<pvss::scrape::Transcript>(&tc, c);
         pvss_group::<pvss::das::Transcript>(&tc, c);
     }
 
+    // weighted PVSS
     for wc in get_weighted_configs_for_benchmarking() {
         pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
+        pvss_group::<GenericWeighting<pvss::scrape::Transcript>>(&wc, c);
+        pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
     }
 }
 

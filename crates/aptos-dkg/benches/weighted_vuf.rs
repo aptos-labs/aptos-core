@@ -10,17 +10,17 @@ use aptos_dkg::{
         das, scrape,
         test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux},
         traits::{SecretSharingConfig, Transcript},
-        Player, ThresholdConfig, WeightedConfig, WeightedTranscript,
+        GenericWeighting, Player, ThresholdConfig, WeightedConfig,
     },
     weighted_vuf::{gjm21_insecure, pinkas::PinkasWUF, traits::WeightedVUF},
 };
+use core::iter::zip;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
     BenchmarkGroup, Criterion,
 };
 use rand::{rngs::ThreadRng, thread_rng};
-use std::iter::zip;
 
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
@@ -56,7 +56,7 @@ pub fn wvuf_benches<
     let mut bench_cases = vec![];
     for wc in get_weighted_configs_for_benchmarking() {
         let (pvss_pp, ssks, _spks, dks, eks, iss, _s, dsk) =
-            setup_dealing::<WeightedTranscript<T>, ThreadRng>(&wc, &mut rng);
+            setup_dealing::<GenericWeighting<T>, ThreadRng>(&wc, &mut rng);
 
         println!(
             "Best-case subset size: {}",
@@ -68,7 +68,7 @@ pub fn wvuf_benches<
         );
 
         println!("Dealing a {} PVSS transcript", T::scheme_name());
-        let trx = WeightedTranscript::<T>::deal(
+        let trx = GenericWeighting::<T>::deal(
             &wc,
             &pvss_pp,
             &ssks[0],
@@ -106,26 +106,26 @@ pub fn wvuf_benches<
     }
 
     for (wc, vuf_pp, sk, sks, pks, asks, apks, deltas) in bench_cases {
-        wvuf_augment_random_keypair::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_augment_random_keypair::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &sks, &pks, group, &mut rng,
         );
 
-        wvuf_augment_all_pubkeys::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_augment_all_pubkeys::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &pks, &deltas, group,
         );
 
-        wvuf_augment_random_pubkey::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_augment_random_pubkey::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &pks, &deltas, group, &mut rng,
         );
 
-        wvuf_create_share::<WeightedTranscript<T>, WVUF, ThreadRng, M>(&wc, &asks, group, &mut rng);
+        wvuf_create_share::<GenericWeighting<T>, WVUF, ThreadRng, M>(&wc, &asks, group, &mut rng);
 
-        wvuf_verify_share::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_verify_share::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &asks, &apks, group, &mut rng,
         );
 
         // best-case aggregation times (pick players with largest weights)
-        wvuf_aggregate_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_aggregate_shares::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc,
             &asks,
             &apks,
@@ -136,7 +136,7 @@ pub fn wvuf_benches<
         );
 
         // average/random case aggregation time
-        wvuf_aggregate_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_aggregate_shares::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc,
             &asks,
             &apks,
@@ -147,7 +147,7 @@ pub fn wvuf_benches<
         );
 
         // worst-case aggregation times (pick players with smallest weights)
-        wvuf_aggregate_shares::<WeightedTranscript<T>, WVUF, ThreadRng, M>(
+        wvuf_aggregate_shares::<GenericWeighting<T>, WVUF, ThreadRng, M>(
             &wc,
             &asks,
             &apks,
@@ -157,7 +157,7 @@ pub fn wvuf_benches<
             "worst_case".to_string(),
         );
 
-        wvuf_eval::<WeightedTranscript<T>, WVUF, M>(&wc, &sk, group);
+        wvuf_eval::<GenericWeighting<T>, WVUF, M>(&wc, &sk, group);
 
         // TODO: verify_proof (needs efficient create_proof)
 

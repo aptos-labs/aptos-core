@@ -15,7 +15,7 @@ use aptos_dkg::{
         das, scrape, test_utils,
         test_utils::NoAux,
         traits::{transcript::Transcript, Reconstructable, SecretSharingConfig},
-        Player, ThresholdConfig, WeightedConfig, WeightedTranscript,
+        GenericWeighting, Player, ThresholdConfig, WeightedConfig,
     },
     utils::random::random_scalar,
 };
@@ -56,13 +56,13 @@ fn all_weighted_pvss_bvt() {
         let seed = random_scalar(&mut rng);
 
         // SCRAPE
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<scrape::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<GenericWeighting<scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
 
         // Das (insecurely-weighted)
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<das::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<GenericWeighting<das::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
@@ -88,11 +88,8 @@ fn all_weighted_dkg_bvt() {
     let wcs = test_utils::get_weighted_configs_for_testing();
     let seed = random_scalar(&mut rng);
 
-    aggregatable_dkg::<WeightedTranscript<das::Transcript>>(
-        wcs.last().unwrap(),
-        seed.to_bytes_le(),
-    );
-    aggregatable_dkg::<WeightedTranscript<scrape::Transcript>>(
+    aggregatable_dkg::<GenericWeighting<das::Transcript>>(wcs.last().unwrap(), seed.to_bytes_le());
+    aggregatable_dkg::<GenericWeighting<scrape::Transcript>>(
         wcs.last().unwrap(),
         seed.to_bytes_le(),
     );
@@ -120,7 +117,7 @@ fn weighted_fail_due_to_blst_bug() {
         attempt += 1;
 
         let seed = random_scalar(&mut rng);
-        pvss_deal_verify_and_reconstruct::<WeightedTranscript<scrape::Transcript>>(
+        pvss_deal_verify_and_reconstruct::<GenericWeighting<scrape::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );

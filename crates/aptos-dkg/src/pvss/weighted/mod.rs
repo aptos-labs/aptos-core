@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
+pub mod generic_weighting;
 mod weighted_config;
-pub mod weighted_transcript;
 
+pub use generic_weighting::GenericWeighting;
 pub use weighted_config::WeightedConfig;
-pub use weighted_transcript::WeightedTranscript;

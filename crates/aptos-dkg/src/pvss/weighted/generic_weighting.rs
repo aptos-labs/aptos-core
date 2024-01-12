@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// A weighting wrapper around a `Transcript` type `T`. Given an implementation of an [unweighted
 /// PVSS] `Transcript` for `T`, this wrapper can be used to easily obtain a *weighted* PVSS abiding
 /// by the same `Transcript` trait.
-pub struct WeightedTranscript<T> {
+pub struct GenericWeighting<T> {
     trx: T,
 }
 
@@ -48,13 +48,13 @@ impl<SK: Reconstructable<ThresholdConfig>> Reconstructable<WeightedConfig> for S
     }
 }
 
-impl<T: Transcript> ValidCryptoMaterial for WeightedTranscript<T> {
+impl<T: Transcript> ValidCryptoMaterial for GenericWeighting<T> {
     fn to_bytes(&self) -> Vec<u8> {
         self.trx.to_bytes()
     }
 }
 
-impl<T: Transcript> TryFrom<&[u8]> for WeightedTranscript<T> {
+impl<T: Transcript> TryFrom<&[u8]> for GenericWeighting<T> {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
@@ -62,7 +62,7 @@ impl<T: Transcript> TryFrom<&[u8]> for WeightedTranscript<T> {
     }
 }
 
-impl<T: Transcript> WeightedTranscript<T> {
+impl<T: Transcript> GenericWeighting<T> {
     fn to_weighted_encryption_keys(
         sc: &WeightedConfig,
         eks: &Vec<T::EncryptPubKey>,
@@ -84,7 +84,7 @@ impl<T: Transcript> WeightedTranscript<T> {
     }
 }
 
-impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for WeightedTranscript<T> {
+impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for GenericWeighting<T> {
     type DealtPubKey = T::DealtPubKey;
     type DealtPubKeyShare = Vec<T::DealtPubKeyShare>;
     type DealtSecretKey = T::DealtSecretKey;
@@ -100,7 +100,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
     type SigningSecretKey = T::SigningSecretKey;
 
     fn scheme_name() -> String {
-        format!("weighted_{}", T::scheme_name())
+        format!("generic_weighted_{}", T::scheme_name())
     }
 
     fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
@@ -114,9 +114,9 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         rng: &mut R,
     ) -> Self {
         // TODO(Security): This EK duplication allows an adversary to decrypt share_{i_j} / share_{i_k} for any $j$th and $k$th share of a validator $i$. Prove that security holds nonetheless or remove this.
-        let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
+        let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
 
-        WeightedTranscript {
+        GenericWeighting {
             trx: T::deal(
                 sc.get_threshold_config(),
                 pp,
@@ -138,7 +138,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
         eks: &Vec<Self::EncryptPubKey>,
         aux: &Vec<A>,
     ) -> anyhow::Result<()> {
-        let duplicated_eks = WeightedTranscript::<T>::to_weighted_encryption_keys(sc, eks);
+        let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
 
         T::verify(
             &self.trx,
@@ -211,7 +211,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Weight
     where
         R: RngCore + CryptoRng,
     {
-        WeightedTranscript {
+        GenericWeighting {
             trx: T::generate(sc.get_threshold_config(), rng),
         }
     }

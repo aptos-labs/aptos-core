@@ -19,7 +19,7 @@ pub struct PinkasWUF;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RandomizedPKs {
-    pi: G1Projective,   // \hat{g}^{r}
+    pi: G1Projective,       // \hat{g}^{r}
     rks: Vec<G1Projective>, // g^{r \sk_i}, for all shares i
 }
 
@@ -114,7 +114,8 @@ impl WeightedVUF for PinkasWUF {
         if multi_pairing(
             [&delta.pi, &rks_combined].into_iter(),
             [&pks_combined, &pp.g_hat.neg()].into_iter(),
-        ) != Gt::identity() {
+        ) != Gt::identity()
+        {
             bail!("RPKs were not correctly randomized.");
         }
 
@@ -144,7 +145,8 @@ impl WeightedVUF for PinkasWUF {
         if multi_pairing(
             [&delta.pi, &pp.g.neg()].into_iter(),
             [proof, &h].into_iter(),
-        ) != Gt::identity() {
+        ) != Gt::identity()
+        {
             bail!("PinkasWVUF ProofShare failed to verify.");
         }
 
@@ -232,30 +234,41 @@ impl WeightedVUF for PinkasWUF {
         let taus = get_powers_of_tau(&tau, proof.len());
 
         // [share_i^{\tau^i}]_{i \in [0, n)}
-        let shares = proof.iter()
+        let shares = proof
+            .iter()
             .map(|(_, share)| share)
-            .zip(taus.iter()).map(|(share, tau)| share.mul(tau))
+            .zip(taus.iter())
+            .map(|(share, tau)| share.mul(tau))
             .collect::<Vec<G2Projective>>();
 
         let mut pis = Vec::with_capacity(proof.len());
         for (player, _) in proof {
             if player.id >= apks.len() {
-                bail!("Player index {} falls outside APK vector of length {}", player.id, apks.len());
+                bail!(
+                    "Player index {} falls outside APK vector of length {}",
+                    player.id,
+                    apks.len()
+                );
             }
 
-            pis.push(apks[player.id]
-                .as_ref()
-                .ok_or(anyhow!("Missing APK for player {}", player))?.0.pi);
+            pis.push(
+                apks[player.id]
+                    .as_ref()
+                    .ok_or(anyhow!("Missing APK for player {}", player))?
+                    .0
+                    .pi,
+            );
         }
 
         let h = Self::hash_to_curve(msg);
-        let sum_of_taus : Scalar = taus.iter().sum();
+        let sum_of_taus: Scalar = taus.iter().sum();
         let g_neg = pp.g.neg();
 
         if multi_pairing(
             pis.iter().chain([g_neg].iter()),
-            shares.iter().chain([h.mul(sum_of_taus)].iter())
-        ) != Gt::identity() {
+            shares.iter().chain([h.mul(sum_of_taus)].iter()),
+        ) != Gt::identity()
+        {
             bail!("Multipairing check in batched aggregate verification failed");
         }
 

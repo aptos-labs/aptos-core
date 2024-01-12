@@ -9,7 +9,7 @@ use aptos_dkg::{
         test_utils,
         test_utils::NoAux,
         traits::{Convert, SecretSharingConfig, Transcript},
-        Player, WeightedConfig, WeightedTranscript,
+        GenericWeighting, Player, WeightedConfig,
     },
     utils::random::random_scalar,
     weighted_vuf::{gjm21_insecure, pinkas::PinkasWUF, traits::WeightedVUF},
@@ -20,17 +20,15 @@ use sha3::{Digest, Sha3_256};
 
 #[test]
 fn all_wvuf_bvt() {
-    weighted_wvuf_bvt::<WeightedTranscript<pvss::das::Transcript>, PinkasWUF>();
+    weighted_wvuf_bvt::<GenericWeighting<pvss::das::Transcript>, PinkasWUF>();
     weighted_wvuf_bvt::<pvss::das::WeightedTranscript, PinkasWUF>();
 
     weighted_wvuf_bvt::<
-        WeightedTranscript<pvss::scrape::Transcript>,
+        GenericWeighting<pvss::scrape::Transcript>,
         gjm21_insecure::g2::GjmInsecureWVUF,
     >();
-    weighted_wvuf_bvt::<
-        WeightedTranscript<pvss::das::Transcript>,
-        gjm21_insecure::g1::GjmInsecureWVUF,
-    >();
+    weighted_wvuf_bvt::<GenericWeighting<pvss::das::Transcript>, gjm21_insecure::g1::GjmInsecureWVUF>(
+    );
 }
 
 fn weighted_wvuf_bvt<
