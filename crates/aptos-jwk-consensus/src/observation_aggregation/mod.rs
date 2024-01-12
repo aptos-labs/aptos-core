@@ -94,7 +94,7 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
             .ok()
             .map(|_| QuorumCertifiedUpdate {
                 authors: aggregator.contributors.clone().into_iter().collect(),
-                observed: peer_view,
+                update: peer_view,
                 multi_sig: new_multi_sig.clone(),
             });
 

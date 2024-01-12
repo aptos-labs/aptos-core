@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 
 /// Move type `0x1::jwks::UnsupportedJWK` in rust.
+/// See its doc in Move for more details.
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct UnsupportedJWK {
     pub id: Vec<u8>,

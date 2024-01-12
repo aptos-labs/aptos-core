@@ -1499,7 +1499,7 @@ impl AptosVM {
         let verified_updates: Vec<ProviderJWKs> = qc_updates
             .into_iter()
             .filter_map(|qc_update| {
-                let issuer = qc_update.observed.issuer.clone();
+                let issuer = qc_update.update.issuer.clone();
                 let on_chain = jwks_by_issuer
                     .entry(issuer.clone())
                     .or_insert_with(|| ProviderJWKs::new(issuer));

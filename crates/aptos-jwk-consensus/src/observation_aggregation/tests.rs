@@ -124,7 +124,7 @@ fn test_observation_aggregation_state() {
     });
     let QuorumCertifiedUpdate {
         authors,
-        observed,
+        update: observed,
         multi_sig,
     } = result.unwrap().unwrap();
     assert_eq!(view_0, observed);

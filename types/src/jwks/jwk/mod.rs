@@ -15,6 +15,7 @@ use std::fmt::{Debug, Formatter};
 /// When you load an on-chain config that contains some JWK(s), the JWK will be of this type.
 /// When you call a Move function from rust that takes some JWKs as input, pass in JWKs of this type.
 /// Otherwise, it is recommended to convert this to the rust enum `JWK` below for better rust experience.
+/// See its doc in Move for more details.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct JWKMoveStruct {
     pub variant: MoveAny,

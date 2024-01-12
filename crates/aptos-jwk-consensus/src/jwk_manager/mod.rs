@@ -246,7 +246,7 @@ impl<P: SigningKeyProvider> JWKManager<P> {
     pub fn process_quorum_certified_update(&mut self, update: QuorumCertifiedUpdate) -> Result<()> {
         let state = self
             .states_by_issuer
-            .entry(update.observed.issuer.clone())
+            .entry(update.update.issuer.clone())
             .or_default();
         match &state.consensus_state {
             ConsensusState::InProgress { my_proposal, .. } => {
@@ -261,7 +261,7 @@ impl<P: SigningKeyProvider> JWKManager<P> {
             },
             _ => Err(anyhow!(
                 "qc update not expected for issuer {:?} in state {}",
-                update.observed.issuer,
+                update.update.issuer,
                 state.consensus_state.name()
             )),
         }

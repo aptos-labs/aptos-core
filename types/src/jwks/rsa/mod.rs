@@ -6,6 +6,7 @@ use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
+/// See its doc in Move for more details.
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RSA_JWK {

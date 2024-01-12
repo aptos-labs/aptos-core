@@ -33,6 +33,7 @@ pub fn issuer_from_str(s: &str) -> Issuer {
 }
 
 /// Move type `0x1::jwks::OIDCProvider` in rust.
+/// See its doc in Move for more details.
 #[derive(Default, Serialize, Deserialize)]
 pub struct OIDCProvider {
     pub name: Issuer,
@@ -40,6 +41,7 @@ pub struct OIDCProvider {
 }
 
 /// Move type `0x1::jwks::SupportedOIDCProviders` in rust.
+/// See its doc in Move for more details.
 #[derive(Default, Serialize, Deserialize)]
 pub struct SupportedOIDCProviders {
     pub providers: Vec<OIDCProvider>,
@@ -57,6 +59,7 @@ impl OnChainConfig for SupportedOIDCProviders {
 }
 
 /// Move type `0x1::jwks::ProviderJWKs` in rust.
+/// See its doc in Move for more details.
 #[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct ProviderJWKs {
     pub issuer: Issuer,
@@ -100,6 +103,7 @@ impl AsMoveValue for ProviderJWKs {
     }
 }
 /// Move type `0x1::jwks::JWKs` in rust.
+/// See its doc in Move for more details.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct AllProvidersJWKs {
     pub entries: Vec<ProviderJWKs>,
@@ -116,6 +120,7 @@ impl From<AllProvidersJWKs> for HashMap<Issuer, ProviderJWKs> {
 }
 
 /// Move type `0x1::jwks::ObservedJWKs` in rust.
+/// See its doc in Move for more details.
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct ObservedJWKs {
     pub jwks: AllProvidersJWKs,
@@ -139,10 +144,11 @@ pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
 }
 
+/// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct QuorumCertifiedUpdate {
     pub authors: BTreeSet<AccountAddress>,
-    pub observed: ProviderJWKs,
+    pub update: ProviderJWKs,
     pub multi_sig: bls12381::Signature,
 }
 
@@ -157,7 +163,7 @@ pub fn verify_jwk_qc_update(
 ) -> Result<ProviderJWKs> {
     let QuorumCertifiedUpdate {
         authors,
-        observed,
+        update: observed,
         multi_sig,
     } = qc_update;
     let signer_bit_vec = BitVec::from(
@@ -179,6 +185,8 @@ pub fn verify_jwk_qc_update(
     Ok(observed)
 }
 
+/// Move event type `0x1::jwks::ObservedJWKsUpdated` in rust.
+/// See its doc in Move for more details.
 #[derive(Serialize, Deserialize)]
 pub struct ObservedJWKsUpdated {
     pub epoch: u64,

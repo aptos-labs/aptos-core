@@ -318,7 +318,7 @@ async fn test_jwk_manager_state_transition() {
     .unwrap();
     let qc_update_for_carl = QuorumCertifiedUpdate {
         authors: BTreeSet::from_iter(addrs.clone()),
-        observed: qc_jwks_for_carl,
+        update: qc_jwks_for_carl,
         multi_sig: multi_sig.clone(),
     };
     assert!(jwk_manager
@@ -390,7 +390,7 @@ async fn test_jwk_manager_state_transition() {
     .unwrap();
     let qc_update_for_alice = QuorumCertifiedUpdate {
         authors: BTreeSet::from_iter(addrs[0..3].to_vec()),
-        observed: qc_jwks_for_alice,
+        update: qc_jwks_for_alice,
         multi_sig: multi_sig.clone(),
     };
     assert!(jwk_manager
