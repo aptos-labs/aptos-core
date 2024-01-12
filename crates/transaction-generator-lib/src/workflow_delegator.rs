@@ -96,15 +96,22 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         assert_ne!(num_to_create, 0);
         let mut stage = self.stage.load_current_stage();
 
+        if stage == 0 {
+            // We can treat completed_for_first_stage as a stream of indices [0, +inf),
+            // where we want to execute only first num_for_first_stage (i.e. [0, num_for_first_stage) )
+            // So here we grab num_to_create "indices" from completed_for_first_stage counter,
+            // and then skip those that are in [num_for_first_stage, +inf) range.
+            let prev = self
+                .completed_for_first_stage
+                .fetch_add(num_to_create, Ordering::Relaxed);
+            num_to_create = cmp::min(num_to_create, self.num_for_first_stage.saturating_sub(prev));
+        }
+        // if stage is not 0, then grabing from the pool itself, inside of the generator.generate_transactions
+        // acts as coordinator, as it will generate as many transactions as number of accounts it could grab from the pool.
+
         match &self.stage {
             StageTracking::WhenDone(stage_counter) => {
                 if stage == 0 {
-                    let prev = self
-                        .completed_for_first_stage
-                        .fetch_add(num_to_create, Ordering::Relaxed);
-                    num_to_create =
-                        cmp::min(num_to_create, self.num_for_first_stage.saturating_sub(prev));
-
                     if num_to_create == 0 {
                         info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.get(0).unwrap().len());
                         let _ = stage_counter.compare_exchange(
@@ -129,16 +136,8 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                 }
             },
             StageTracking::ExternallySet(_) => {
-                if stage == 0 {
-                    let prev = self
-                        .completed_for_first_stage
-                        .fetch_add(num_to_create, Ordering::Relaxed);
-                    num_to_create =
-                        cmp::min(num_to_create, self.num_for_first_stage.saturating_sub(prev));
-
-                    if num_to_create == 0 {
-                        return Vec::new();
-                    }
+                if stage == 0 && num_to_create == 0 {
+                    return Vec::new();
                 }
             },
         }
@@ -195,6 +194,13 @@ impl WorkflowTxnGeneratorCreator {
         let stage_tracking = cur_phase.map_or_else(
             || StageTracking::WhenDone(Arc::new(AtomicUsize::new(0))),
             StageTracking::ExternallySet,
+        );
+        println!(
+            "Creating workload with stage tracking: {:?}",
+            match &stage_tracking {
+                StageTracking::ExternallySet(_) => "ExternallySet",
+                StageTracking::WhenDone(_) => "WhenDone",
+            }
         );
         match workflow_kind {
             WorkflowKind::CreateThenMint {

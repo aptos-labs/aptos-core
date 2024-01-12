@@ -390,6 +390,8 @@ impl<T> ObjectPool<T> {
         rng: &mut StdRng,
     ) {
         assert!(!addition.is_empty());
+        assert!(addition.len() <= max_size);
+
         let mut current = self.pool.write();
         if current.len() < max_size {
             if current.len() + addition.len() > max_size {
@@ -401,6 +403,7 @@ impl<T> ObjectPool<T> {
                 info!("Pool working set increased to {}", current.len())
             );
         } else {
+            // no underflow as: addition.len() <= max_size < current.len()
             let start = rng.gen_range(0, current.len() - addition.len());
             current[start..start + addition.len()].swap_with_slice(&mut addition);
 
