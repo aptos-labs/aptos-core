@@ -378,9 +378,7 @@ impl RoundManager {
             .proposal_generator
             .generate_proposal(new_round_event.round, &mut self.proposer_election, callback)
             .await?;
-        debug!("[JWK] generate_proposal: before sign");
         let signature = self.safety_rules.lock().sign_proposal(&proposal)?;
-        debug!("[JWK] generate_proposal: after sign");
         let signed_proposal =
             Block::new_proposal_from_block_data_and_signature(proposal, signature);
         observe_block(signed_proposal.timestamp_usecs(), BlockStage::SIGNED);

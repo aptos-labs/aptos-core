@@ -223,11 +223,9 @@ impl StateComputer for ExecutionProxy {
             }
 
             let input_txns = block.input_transactions().clone();
-            let validator_txns = block.validator_txns().cloned().unwrap_or_default();
-            debug!("[JWK] commit: num_vtxns={}", validator_txns.len());
             txns.extend(block.transactions_to_commit(
                 &self.validators.lock(),
-                validator_txns,
+                block.validator_txns().cloned().unwrap_or_default(),
                 input_txns,
             ));
             subscribable_txn_events.extend(block.subscribable_events());
