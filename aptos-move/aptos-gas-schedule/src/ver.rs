@@ -44,4 +44,4 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 13;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 12;
