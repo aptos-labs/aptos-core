@@ -6,6 +6,7 @@ mod dkg_manager;
 pub mod epoch_manager;
 pub mod network;
 pub mod network_interface;
+pub mod transcript_aggregation;
 pub mod types;
 
 use crate::{
@@ -50,3 +51,6 @@ pub fn start_dkg_runtime(
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
 }
+
+//TODO(zjma): make this test-only after real dkg.
+pub(crate) mod dummy_dkg;
