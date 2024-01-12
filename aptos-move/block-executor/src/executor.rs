@@ -1231,7 +1231,6 @@ where
 
         let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
             TxnLastInputOutput::new(num_txns as TxnIndex);
-        let mut found_module_rw_conflict = false;
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
@@ -1270,6 +1269,7 @@ where
                                 } as u64
                         });
 
+                    let sequential_reads = latest_view.take_sequential_reads();
                     let read_write_summary = self
                         .config
                         .onchain
@@ -1277,19 +1277,19 @@ where
                         .conflict_penalty_window()
                         .map(|_| {
                             ReadWriteSummary::new(
-                                latest_view.take_sequential_reads().get_read_summary(),
+                                sequential_reads.get_read_summary(),
                                 output.get_write_summary(),
                             )
                         });
 
-                    if !found_module_rw_conflict
+                    if block_limit_processor.use_module_publishing_block_conflict()
+                        && !block_limit_processor.has_seen_module_rw_conflict()
                         && !last_input_output.append_and_check_module_rw_conflict(
-                            latest_view.take_sequential_reads().module_reads.iter(),
+                            sequential_reads.module_reads.iter(),
                             output.module_write_set().keys(),
                         )
                     {
-                        block_limit_processor.recompute_acc_eff_block_gas_on_module_rw_conflict();
-                        found_module_rw_conflict = true;
+                        block_limit_processor.update_on_first_module_rw_conflict();
                     }
 
                     block_limit_processor.accumulate_fee_statement(

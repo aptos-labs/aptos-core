@@ -89,13 +89,11 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         }
     }
 
-    pub(crate) fn recompute_acc_eff_block_gas_on_module_rw_conflict(&mut self) {
-        if !self
+    pub(crate) fn update_on_first_module_rw_conflict(&mut self) {
+        assert!(!self.module_rw_conflict);
+        assert!(self
             .block_gas_limit_type
-            .use_module_publishing_block_conflict()
-        {
-            return;
-        }
+            .use_module_publishing_block_conflict());
 
         let conflict_multiplier = if let Some(conflict_overlap_length) =
             self.block_gas_limit_type.conflict_penalty_window()
@@ -113,6 +111,15 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                 + self.accumulated_fee_statement.io_gas_used()
                     * self.block_gas_limit_type.io_gas_effective_multiplier());
         self.module_rw_conflict = true;
+    }
+
+    pub(crate) fn has_seen_module_rw_conflict(&self) -> bool {
+        self.module_rw_conflict
+    }
+
+    pub(crate) fn use_module_publishing_block_conflict(&self) -> bool {
+        self.block_gas_limit_type
+            .use_module_publishing_block_conflict()
     }
 
     fn should_end_block(&mut self, mode: &str) -> bool {
@@ -495,7 +502,7 @@ mod test {
         assert_eq!(1, processor.compute_conflict_multiplier(8));
         assert_eq!(processor.accumulated_effective_block_gas, 30);
 
-        processor.recompute_acc_eff_block_gas_on_module_rw_conflict();
+        processor.update_on_first_module_rw_conflict();
         assert_eq!(
             processor.accumulated_effective_block_gas,
             30 * conflict_penalty_window as u64
