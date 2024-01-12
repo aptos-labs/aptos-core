@@ -29,6 +29,7 @@ pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
 pub const STORAGE_SYNCHRONIZER_UPDATE_LEDGER: &str = "update_ledger";
 pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS: &str = "commit_post_process";
+pub const STORAGE_SYNCHRONIZER_STATE_VALUE_CHUNK: &str = "state_value_chunk";
 
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
