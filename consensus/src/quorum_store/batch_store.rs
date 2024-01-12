@@ -299,16 +299,6 @@ impl BatchStore {
         ret
     }
 
-    pub fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo> {
-        let mut signed_infos = vec![];
-        for persist_request in persist_requests.into_iter() {
-            if let Some(signed_info) = self.persist_inner(persist_request) {
-                signed_infos.push(signed_info);
-            }
-        }
-        signed_infos
-    }
-
     fn persist_inner(&self, persist_request: PersistedValue) -> Option<SignedBatchInfo> {
         match self.save(persist_request.clone()) {
             Ok(needs_db) => {
@@ -382,6 +372,18 @@ impl BatchStore {
     }
 }
 
+impl BatchWriter for BatchStore {
+    fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo> {
+        let mut signed_infos = vec![];
+        for persist_request in persist_requests.into_iter() {
+            if let Some(signed_info) = self.persist_inner(persist_request) {
+                signed_infos.push(signed_info);
+            }
+        }
+        signed_infos
+    }
+}
+
 pub trait BatchReader: Send + Sync {
     /// Check if the batch corresponding to the digest exists, return the batch author if true
     fn exists(&self, digest: &HashValue) -> Option<PeerId>;
@@ -443,4 +445,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
     fn update_certified_timestamp(&self, certified_time: u64) {
         self.batch_store.update_certified_timestamp(certified_time);
     }
+}
+
+pub trait BatchWriter: Send + Sync {
+    fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo>;
 }
