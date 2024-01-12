@@ -698,24 +698,28 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {
-        let ApplicationNetworkInterfaces {
-            network_client,
-            network_service_events,
-        } = obj;
-        let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
-            "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
-        );
-        let jwk_consensus_runtime = start_jwk_consensus_runtime(
-            network_client,
-            network_service_events,
-            vtxn_pool_writer_for_jwk,
-            reconfig_events,
-            onchain_jwk_updated_events,
-        );
-        Some(jwk_consensus_runtime)
-    } else {
-        None
+    let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, identity_blob.clone()) {
+        (Some(interfaces), Some(identity_blob)) => {
+            let ApplicationNetworkInterfaces {
+                network_client,
+                network_service_events,
+            } = interfaces;
+            let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
+                "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
+            );
+            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let jwk_consensus_runtime = start_jwk_consensus_runtime(
+                my_addr,
+                identity_blob,
+                network_client,
+                network_service_events,
+                reconfig_events,
+                onchain_jwk_updated_events,
+                vtxn_pool_writer_for_jwk,
+            );
+            Some(jwk_consensus_runtime)
+        },
+        _ => None,
     };
 
     // Create the consensus runtime (this blocks on state sync first)

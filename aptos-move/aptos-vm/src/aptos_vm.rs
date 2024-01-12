@@ -39,9 +39,11 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     fee_statement::FeeStatement,
+    jwks::{verify_jwk_qc_update, Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
+    move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
-        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
+        TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder, ValidatorSet,
     },
     state_store::StateView,
     transaction::{
@@ -57,6 +59,7 @@ use aptos_types::{
         WriteSetPayload,
     },
     validator_txn::ValidatorTransaction,
+    validator_verifier::ValidatorVerifier,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -94,7 +97,7 @@ use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
     cmp::{max, min},
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
     marker::Sync,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -1437,14 +1440,104 @@ impl AptosVM {
 
     fn process_validator_transaction(
         &self,
-        _resolver: &impl AptosMoveResolver,
-        _txn: ValidatorTransaction,
-        _log_context: &AdapterLogSchema,
-    ) -> (VMStatus, VMOutput) {
-        (
-            VMStatus::Executed,
-            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-        )
+        resolver: &impl AptosMoveResolver,
+        txn: ValidatorTransaction,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        let session_id = SessionId::validator_txn(&txn);
+        match txn {
+            ValidatorTransaction::ObservedJWKsUpdates { updates } => {
+                self.process_jwk_updates(resolver, updates, log_context, session_id)
+            },
+            ValidatorTransaction::DummyTopic1(_) => Ok((
+                VMStatus::Executed,
+                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+            )),
+            ValidatorTransaction::DummyTopic2(_) => Ok((
+                VMStatus::Executed,
+                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
+            )),
+        }
+    }
+
+    fn process_jwk_updates(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        qc_updates: Vec<QuorumCertifiedUpdate>,
+        log_context: &AdapterLogSchema,
+        session_id: SessionId,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        info!("[JWK] executing qc updates, qc_updates={:?}", qc_updates);
+
+        let validator_set = load_on_chain_config_from_resolver::<ValidatorSet>(resolver)
+            .map_err(|e| {
+                VMStatus::error(
+                    StatusCode::INVALID_SIGNATURE,
+                    Some(format!(
+                        "process_jwk_updates failed with validator set loading error: {e}"
+                    )),
+                )
+            })?
+            .ok_or_else(|| {
+                VMStatus::error(
+                    StatusCode::INVALID_SIGNATURE,
+                    Some("process_jwk_updates failed with validator set not found".to_string()),
+                )
+            })?;
+        let verifier = ValidatorVerifier::from(&validator_set);
+        let observed_jwks = load_on_chain_config_from_resolver::<ObservedJWKs>(resolver)
+            .map_err(|e| {
+                VMStatus::error(
+                    StatusCode::INVALID_SIGNATURE,
+                    Some(format!(
+                        "process_jwk_updates failed with `ObservedJWKs` loading error: {e}"
+                    )),
+                )
+            })?
+            .unwrap_or_default();
+        let mut jwks_by_issuer: HashMap<Issuer, ProviderJWKs> =
+            observed_jwks.into_providers_jwks().into();
+
+        let verified_updates: Vec<ProviderJWKs> = qc_updates
+            .into_iter()
+            .filter_map(|qc_update| {
+                let issuer = qc_update.observed.issuer.clone();
+                let on_chain = jwks_by_issuer
+                    .entry(issuer.clone())
+                    .or_insert_with(|| ProviderJWKs::new(issuer));
+                verify_jwk_qc_update(&verifier, on_chain, qc_update).ok()
+            })
+            .collect();
+
+        let args = vec![
+            MoveValue::Signer(AccountAddress::ONE),
+            verified_updates.as_move_value(),
+        ];
+
+        let mut gas_meter = UnmeteredGasMeter;
+        let mut session = self.new_session(resolver, session_id);
+        session
+            .execute_function_bypass_visibility(
+                &JWKS_MODULE,
+                UPSERT_INTO_OBSERVED_JWKS,
+                vec![],
+                serialize_values(&args),
+                &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .or_else(|e| {
+                expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
+            })?;
+        info!("[JWK] execution session finished.");
+
+        let output = get_transaction_output(
+            session,
+            FeeStatement::zero(),
+            ExecutionStatus::Success,
+            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+        )?;
+        info!("[JWK] vm output obtained.");
+        Ok((VMStatus::Executed, output))
     }
 
     fn execute_user_transaction_impl(
@@ -2028,7 +2121,7 @@ impl AptosVM {
             Transaction::ValidatorTransaction(txn) => {
                 fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context);
+                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output, Some("validator_transaction".to_string()))
             },
         })
@@ -2268,6 +2361,19 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
                         .finish(Location::Undefined)
                 })?,
     )
+}
+
+pub fn load_on_chain_config_from_resolver<T: OnChainConfig>(
+    resolver: &impl AptosMoveResolver,
+) -> Result<Option<T>> {
+    let maybe_bytes = resolver.get_resource(&AccountAddress::ONE, &T::struct_tag())?;
+    match maybe_bytes {
+        None => Ok(None),
+        Some(bytes) => {
+            let item = bcs::from_bytes::<T>(bytes.as_ref())?;
+            Ok(Some(item))
+        },
+    }
 }
 
 #[test]

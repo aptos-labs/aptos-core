@@ -444,6 +444,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
         FeatureFlag::RECONFIGURE_WITH_DKG,
+        FeatureFlag::JWK_CONSENSUS,
     ]
 }
 

@@ -24,7 +24,7 @@ use aptos_consensus_types::{
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_logger::{error, sample, sample::SampleRate, warn};
+use aptos_logger::{debug, error, sample, sample::SampleRate, warn};
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
@@ -356,6 +356,11 @@ impl ProposalGenerator {
             proposer_election,
         );
 
+        debug!(
+            "generate_proposal: validator_txn_enabled={}",
+            self.validator_txn_enabled
+        );
+        debug!("generate_proposal: num_vtxns={}", validator_txns.len());
         let block = if self.validator_txn_enabled {
             BlockData::new_proposal_ext(
                 validator_txns,

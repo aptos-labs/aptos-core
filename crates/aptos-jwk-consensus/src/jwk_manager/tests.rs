@@ -1,10 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    jwk_manager::{
-        certified_update_producer::CertifiedUpdateProducer, AbortHandleWrapper, ConsensusState,
-        JWKManager, PerProviderState,
-    },
+    certified_update_producer::CertifiedUpdateProducer,
+    jwk_manager::{AbortHandleWrapper, ConsensusState, JWKManager, PerProviderState},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
 };
@@ -19,7 +17,7 @@ use aptos_types::{
     epoch_state::EpochState,
     jwks::{
         issuer_from_str, jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, Issuer,
-        ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate,
+        ProviderJWKs, QuorumCertifiedUpdate,
     },
     validator_txn::{Topic, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
@@ -27,7 +25,7 @@ use aptos_types::{
 use aptos_validator_transaction_pool::TransactionFilter;
 use futures_util::future::AbortHandle;
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap},
     sync::Arc,
     time::Duration,
 };
@@ -35,9 +33,13 @@ use std::{
 #[tokio::test]
 async fn test_jwk_manager_state_transition() {
     // Setting up an epoch of 4 validators, and simulate the JWKManager in validator 0.
-    let private_keys: Vec<PrivateKey> =
-        (0..4).map(|_| PrivateKey::generate_for_testing()).collect();
-    let public_keys: Vec<PublicKey> = private_keys.iter().map(PublicKey::from).collect();
+    let private_keys: Vec<Arc<PrivateKey>> = (0..4)
+        .map(|_| Arc::new(PrivateKey::generate_for_testing()))
+        .collect();
+    let public_keys: Vec<PublicKey> = private_keys
+        .iter()
+        .map(|sk| PublicKey::from(sk.as_ref()))
+        .collect();
     let addrs: Vec<AccountAddress> = (0..4).map(|_| AccountAddress::random()).collect();
     let voting_powers: Vec<u64> = vec![1, 1, 1, 1];
     let validator_consensus_infos: Vec<ValidatorConsensusInfo> = (0..4)
@@ -55,7 +57,7 @@ async fn test_jwk_manager_state_transition() {
     let mut jwk_manager = JWKManager::new(
         private_keys[0].clone(),
         addrs[0],
-        epoch_state,
+        Arc::new(epoch_state),
         Arc::new(certified_update_producer),
         Arc::new(vtxn_pool_write_cli),
     );
@@ -100,13 +102,11 @@ async fn test_jwk_manager_state_transition() {
         jwks: bob_jwks.clone(),
     };
 
-    let initial_on_chain_state = ObservedJWKs {
-        jwks: AllProvidersJWKs {
-            entries: vec![
-                on_chain_state_alice_v111.clone(),
-                on_chain_state_bob_v222.clone(),
-            ],
-        },
+    let initial_on_chain_state = AllProvidersJWKs {
+        entries: vec![
+            on_chain_state_alice_v111.clone(),
+            on_chain_state_bob_v222.clone(),
+        ],
     };
 
     // On start, JWKManager is always initialized with the on-chain state.
@@ -246,6 +246,7 @@ async fn test_jwk_manager_state_transition() {
             .collect();
     let expected_responses = vec![
         JWKConsensusMsg::ObservationResponse(ObservedUpdateResponse {
+            epoch: 999,
             update: expected_states
                 .get(&issuer_alice)
                 .unwrap()
@@ -253,6 +254,7 @@ async fn test_jwk_manager_state_transition() {
                 .my_proposal_cloned(),
         }),
         JWKConsensusMsg::ObservationResponse(ObservedUpdateResponse {
+            epoch: 999,
             update: expected_states
                 .get(&issuer_carl)
                 .unwrap()
@@ -317,7 +319,7 @@ async fn test_jwk_manager_state_transition() {
     let qc_update_for_carl = QuorumCertifiedUpdate {
         authors: BTreeSet::from_iter(addrs.clone()),
         observed: qc_jwks_for_carl,
-        multi_sig_bytes: multi_sig.to_bytes().to_vec(),
+        multi_sig: multi_sig.clone(),
     };
     assert!(jwk_manager
         .process_quorum_certified_update(qc_update_for_carl.clone())
@@ -331,7 +333,7 @@ async fn test_jwk_manager_state_transition() {
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
     let expected_vtxns = vec![ValidatorTransaction::ObservedJWKsUpdates {
-        updates: BTreeMap::from_iter(vec![(issuer_carl.clone(), qc_update_for_carl.clone())]),
+        updates: vec![qc_update_for_carl.clone()],
     }];
     let actual_vtxns = vtxn_pool_read_cli
         .pull(
@@ -354,6 +356,7 @@ async fn test_jwk_manager_state_transition() {
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
     let expected_responses = vec![JWKConsensusMsg::ObservationResponse(
         ObservedUpdateResponse {
+            epoch: 999,
             update: expected_states
                 .get(&issuer_carl)
                 .unwrap()
@@ -388,7 +391,7 @@ async fn test_jwk_manager_state_transition() {
     let qc_update_for_alice = QuorumCertifiedUpdate {
         authors: BTreeSet::from_iter(addrs[0..3].to_vec()),
         observed: qc_jwks_for_alice,
-        multi_sig_bytes: multi_sig.to_bytes().to_vec(),
+        multi_sig: multi_sig.clone(),
     };
     assert!(jwk_manager
         .process_quorum_certified_update(qc_update_for_alice.clone())
@@ -402,10 +405,7 @@ async fn test_jwk_manager_state_transition() {
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
     let expected_vtxns = vec![ValidatorTransaction::ObservedJWKsUpdates {
-        updates: BTreeMap::from_iter(vec![
-            (issuer_alice.clone(), qc_update_for_alice),
-            (issuer_carl.clone(), qc_update_for_carl),
-        ]),
+        updates: vec![qc_update_for_alice, qc_update_for_carl],
     }];
     let actual_vtxns = vtxn_pool_read_cli
         .pull(
@@ -423,10 +423,8 @@ async fn test_jwk_manager_state_transition() {
         version: 1,
         jwks: carl_jwks_new.clone(),
     };
-    let second_on_chain_state = ObservedJWKs {
-        jwks: AllProvidersJWKs {
-            entries: vec![on_chain_state_carl_v1.clone()],
-        },
+    let second_on_chain_state = AllProvidersJWKs {
+        entries: vec![on_chain_state_carl_v1.clone()],
     };
 
     assert!(jwk_manager
@@ -440,20 +438,20 @@ async fn test_jwk_manager_state_transition() {
 }
 
 fn new_rpc_observation_request(
-    _epoch: u64,
+    epoch: u64,
     issuer: Issuer,
     sender: AccountAddress,
     response_collector: Arc<RwLock<Vec<anyhow::Result<JWKConsensusMsg>>>>,
 ) -> IncomingRpcRequest {
     IncomingRpcRequest {
-        msg: JWKConsensusMsg::ObservationRequest(ObservedUpdateRequest { issuer }),
+        msg: JWKConsensusMsg::ObservationRequest(ObservedUpdateRequest { epoch, issuer }),
         sender,
         response_sender: Box::new(DummyRpcResponseSender::new(response_collector)),
     }
 }
 
 pub struct DummyCertifiedUpdateProducer {
-    pub invocations: Mutex<Vec<(EpochState, ProviderJWKs)>>,
+    pub invocations: Mutex<Vec<(Arc<EpochState>, ProviderJWKs)>>,
 }
 
 impl Default for DummyCertifiedUpdateProducer {
@@ -467,7 +465,7 @@ impl Default for DummyCertifiedUpdateProducer {
 impl CertifiedUpdateProducer for DummyCertifiedUpdateProducer {
     fn start_produce(
         &self,
-        epoch_state: EpochState,
+        epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
         _agg_node_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
     ) -> AbortHandle {

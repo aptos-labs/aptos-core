@@ -1,18 +1,64 @@
 // Copyright © Aptos Foundation
 
+mod dummy_provider;
+mod jwk_consensus_basic;
+mod jwk_consensus_per_issuer;
+mod jwk_consensus_provider_change_mind;
+
 use crate::smoke_test_environment::SwarmBuilder;
+use aptos::{common::types::TransactionSummary, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_types::jwks::{
     jwk::{JWKMoveStruct, JWK},
     unsupported::UnsupportedJWK,
-    AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
+    AllProvidersJWKs, OIDCProvider, PatchedJWKs, ProviderJWKs,
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
 
-async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
+pub async fn put_provider_on_chain(
+    cli: CliTestFramework,
+    account_idx: usize,
+    providers: Vec<OIDCProvider>,
+) -> TransactionSummary {
+    let implementation = providers
+        .into_iter()
+        .map(|provider| {
+            let OIDCProvider { name, config_url } = provider;
+            format!(
+                r#"
+        let issuer = b"{}";
+        let config_url = b"{}";
+        jwks::upsert_oidc_provider(&framework_signer, issuer, config_url);
+"#,
+                String::from_utf8(name).unwrap(),
+                String::from_utf8(config_url).unwrap(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+
+    let add_dummy_provider_script = format!(
+        r#"
+script {{
+    use aptos_framework::aptos_governance;
+    use aptos_framework::jwks;
+    fun main(core_resources: &signer) {{
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        {implementation}
+        aptos_governance::reconfigure(&framework_signer);
+    }}
+}}
+"#,
+    );
+    cli.run_script(account_idx, &add_dummy_provider_script)
+        .await
+        .unwrap()
+}
+
+async fn get_patched_jwks(rest_client: &Client) -> PatchedJWKs {
     let maybe_response = rest_client
         .get_account_resource_bcs::<PatchedJWKs>(AccountAddress::ONE, "0x1::jwks::PatchedJWKs")
         .await;
@@ -58,7 +104,7 @@ script {
     debug!("txn_summary={:?}", txn_summary);
 
     info!("Use resource API to check the patch result.");
-    let patched_jwks = get_latest_jwkset(&client).await;
+    let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
 
     let expected_providers_jwks = AllProvidersJWKs {
