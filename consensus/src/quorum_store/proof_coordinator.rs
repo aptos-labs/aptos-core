@@ -181,7 +181,7 @@ impl ProofCoordinator {
         let batch_author = self
             .batch_reader
             .exists(signed_batch_info.digest())
-            .ok_or(SignedBatchInfoError::WrongAuthor)?;
+            .ok_or(SignedBatchInfoError::NotFound)?;
         if batch_author != signed_batch_info.author() {
             return Err(SignedBatchInfoError::WrongAuthor);
         }
@@ -265,9 +265,9 @@ impl ProofCoordinator {
                 }
                 if !state.completed {
                     info!(
-                        "QS: received expire for batch that did not complete: {}, self_voted: {}",
-                        signed_batch_info_info.digest(),
-                        state.self_voted
+                        LogSchema::new(LogEvent::ProofOfStoreInit),
+                        digest = signed_batch_info_info.digest(),
+                        self_voted = state.self_voted,
                     );
                 }
                 Self::update_counters(&state);
@@ -307,7 +307,7 @@ impl ProofCoordinator {
                                     if batch == *existing_proof.get().batch_info() {
                                         let incremental_proof = existing_proof.get();
                                         if !incremental_proof.completed {
-                                            info!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
+                                            warn!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
                                         }
                                         Self::update_counters(incremental_proof);
                                         existing_proof.remove();
