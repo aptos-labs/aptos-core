@@ -793,10 +793,10 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
 
     config
         .consensus
-        .max_sending_block_txns_quorum_store_override = 6000;
+        .max_sending_block_txns_quorum_store_override = 10000;
     config
         .consensus
-        .max_receiving_block_txns_quorum_store_override = 7000;
+        .max_receiving_block_txns_quorum_store_override = 11000;
     config
         .consensus
         .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
