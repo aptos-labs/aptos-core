@@ -96,7 +96,8 @@ impl<P: SigningKeyProvider> JWKManager<P> {
             .into_provider_vec()
             .into_iter()
             .map(|provider| {
-                JWKObserver::spawn(
+                JWKObserver::
+                spawn(
                     self.my_addr,
                     provider.name.clone(),
                     provider.config_url.clone(),

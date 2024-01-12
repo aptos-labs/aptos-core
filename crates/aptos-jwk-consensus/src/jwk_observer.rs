@@ -49,7 +49,7 @@ pub async fn fetch_jwks(my_addr: AccountAddress, config_url: Vec<u8>) -> Result<
     }
 }
 
-/// Controls a thread that periodically fetch JWKs of a provider.
+/// A process thread that periodically fetch JWKs of a provider and push it back to JWKManager.
 pub struct JWKObserver {
     close_tx: oneshot::Sender<()>,
     join_handle: JoinHandle<()>,
@@ -119,15 +119,16 @@ impl JWKObserver {
     }
 }
 
-#[tokio::test]
-async fn test_fetch_jwks() {
-    let jwks = fetch_jwks(
-        AccountAddress::ZERO,
-        "https://www.facebook.com/.well-known/openid-configuration/"
-            .as_bytes()
-            .to_vec(),
-    )
-    .await
-    .unwrap();
-    println!("{:?}", jwks);
-}
+/// This should not be a test case. Uncomment to manually test.
+// #[tokio::test]
+// async fn test_fetch_jwks() {
+//     let jwks = fetch_jwks(
+//         AccountAddress::ZERO,
+//         "https://www.facebook.com/.well-known/openid-configuration/"
+//             .as_bytes()
+//             .to_vec(),
+//     )
+//     .await
+//     .unwrap();
+//     println!("{:?}", jwks);
+// }

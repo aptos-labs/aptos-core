@@ -1467,8 +1467,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         session_id: SessionId,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        info!("[JWK] executing qc updates, qc_updates={:?}", qc_updates);
-
         let validator_set = load_on_chain_config_from_resolver::<ValidatorSet>(resolver)
             .map_err(|e| {
                 VMStatus::error(
@@ -1528,7 +1526,6 @@ impl AptosVM {
             .or_else(|e| {
                 expect_only_successful_execution(e, UPSERT_INTO_OBSERVED_JWKS.as_str(), log_context)
             })?;
-        info!("[JWK] execution session finished.");
 
         let output = get_transaction_output(
             session,
@@ -1536,7 +1533,6 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
-        info!("[JWK] vm output obtained.");
         Ok((VMStatus::Executed, output))
     }
 
