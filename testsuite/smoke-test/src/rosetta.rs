@@ -1088,10 +1088,24 @@ async fn parse_block_transactions(
                 ));
                 assert!(transaction.operations.is_empty());
             },
+            TransactionType::BlockMetadataExt => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::BlockMetadataExt(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            },
             TransactionType::StateCheckpoint => {
                 assert!(matches!(
                     actual_txn.transaction,
                     aptos_types::transaction::Transaction::StateCheckpoint(_)
+                ));
+                assert!(transaction.operations.is_empty());
+            },
+            TransactionType::Validator => {
+                assert!(matches!(
+                    actual_txn.transaction,
+                    aptos_types::transaction::Transaction::ValidatorTransaction(_)
                 ));
                 assert!(transaction.operations.is_empty());
             },

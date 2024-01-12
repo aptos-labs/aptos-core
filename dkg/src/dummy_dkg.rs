@@ -24,7 +24,6 @@ impl DKGTrait for DummyDKG {
         _my_addr: AccountAddress,
         _target_validator_set: &ValidatorSet,
     ) -> Self::PublicParams {
-        ()
     }
 
     fn generate_transcript<R: CryptoRng>(

@@ -6,7 +6,6 @@ use crate::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    randomness::Randomness,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::hash::HashValue;
@@ -15,6 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction},
     validator_txn::ValidatorTransaction,
 };

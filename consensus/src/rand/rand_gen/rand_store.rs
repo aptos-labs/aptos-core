@@ -9,10 +9,8 @@ use crate::{
     },
 };
 use anyhow::ensure;
-use aptos_consensus_types::{
-    common::{Author, Round},
-    randomness::{RandMetadata, Randomness},
-};
+use aptos_consensus_types::common::{Author, Round};
+use aptos_types::randomness::{RandMetadata, Randomness};
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -34,7 +32,7 @@ impl<S: Share> ShareAggregator<S> {
     }
 
     pub fn add_share(&mut self, weight: u64, share: RandShare<S>) {
-        let timestamp = share.metadata().timestamp();
+        let timestamp = share.metadata().timestamp;
         if self.shares.insert(*share.author(), share).is_none() {
             observe_block(timestamp, BlockStage::RAND_ADD_SHARE);
             self.total_weight += weight;
@@ -284,7 +282,8 @@ mod tests {
         test_utils::{create_ordered_blocks, create_share, create_share_for_round},
         types::{MockShare, RandConfig},
     };
-    use aptos_consensus_types::{common::Author, randomness::RandMetadata};
+    use aptos_consensus_types::common::Author;
+    use aptos_types::randomness::RandMetadata;
     use std::{collections::HashMap, str::FromStr};
     use tokio::sync::mpsc::unbounded_channel;
 

@@ -74,7 +74,7 @@ async fn test_dkg_state_transition() {
     let rpc_node_request = new_rpc_node_request(999, addrs[3], rpc_response_collector.clone());
     let handle_result = dkg_manager.process_peer_rpc_msg(rpc_node_request).await;
     assert!(handle_result.is_ok());
-    let last_invocations = std::mem::replace(&mut *rpc_response_collector.write(), vec![]);
+    let last_invocations = std::mem::take(&mut *rpc_response_collector.write());
     assert!(last_invocations.len() == 1 && last_invocations[0].is_err());
     assert!(matches!(&dkg_manager.state, InnerState::NotStarted));
 
@@ -96,7 +96,7 @@ async fn test_dkg_state_transition() {
     let rpc_node_request = new_rpc_node_request(999, addrs[3], rpc_response_collector.clone());
     let handle_result = dkg_manager.process_peer_rpc_msg(rpc_node_request).await;
     assert!(handle_result.is_ok());
-    let last_responses = std::mem::replace(&mut *rpc_response_collector.write(), vec![])
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write())
         .into_iter()
         .map(anyhow::Result::unwrap)
         .collect::<Vec<_>>();
@@ -137,7 +137,7 @@ async fn test_dkg_state_transition() {
     let rpc_node_request = new_rpc_node_request(999, addrs[3], rpc_response_collector.clone());
     let handle_result = dkg_manager.process_peer_rpc_msg(rpc_node_request).await;
     assert!(handle_result.is_ok());
-    let last_responses = std::mem::replace(&mut *rpc_response_collector.write(), vec![])
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write())
         .into_iter()
         .map(anyhow::Result::unwrap)
         .collect::<Vec<_>>();
