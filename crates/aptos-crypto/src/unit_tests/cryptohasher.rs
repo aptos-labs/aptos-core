@@ -30,6 +30,13 @@ pub struct Baz<T> {
     b: u32,
 }
 
+#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct Duplo<A, B> {
+    a: A,
+    b: B,
+    c: u32,
+}
+
 impl CryptoHash for Bar {
     type Hasher = FooHasher;
 
@@ -105,4 +112,9 @@ fn test_cryptohasher_salt_access() {
         &prefixed_sha3(b"Foo")
     );
     assert_eq!(<Bar as CryptoHash>::Hasher::seed(), &prefixed_sha3(b"Foo"));
+
+    assert_eq!(
+        <Duplo<(), ()> as CryptoHash>::Hasher::seed(),
+        &prefixed_sha3(b"Duplo")
+    );
 }
