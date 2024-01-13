@@ -21,11 +21,8 @@ use aptos_types::{
     aggregator::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        errors::StateviewError,
-        state_key::StateKey,
-        state_storage_usage::StateStorageUsage,
-        state_value::StateValue,
-        StateView, StateViewId,
+        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateView, StateViewId,
     },
     write_set::WriteOp,
 };
