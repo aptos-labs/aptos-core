@@ -412,7 +412,7 @@ impl Block {
         Ok(())
     }
 
-    pub fn order_as_input_transactions(
+    pub fn combine_to_input_transactions(
         validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
         metadata: BlockMetadataExt,

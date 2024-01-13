@@ -164,7 +164,7 @@ impl ExecutionProxy {
                 .into()
         };
 
-        let input_txns = Block::order_as_input_transactions(validator_txns, user_txns, metadata);
+        let input_txns = Block::combine_to_input_transactions(validator_txns, user_txns, metadata);
 
         // Adds StateCheckpoint/BlockEpilogue transaction if needed.
         executed_block

@@ -124,7 +124,7 @@ impl ExecutionPipeline {
         let input_txns = input_txns.unwrap();
         tokio::task::spawn_blocking(move || {
             let txns_to_execute =
-                Block::order_as_input_transactions(validator_txns, input_txns.clone(), metadata);
+                Block::combine_to_input_transactions(validator_txns, input_txns.clone(), metadata);
             let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
                 SIG_VERIFY_POOL.install(|| {
                     let num_txns = txns_to_execute.len();
