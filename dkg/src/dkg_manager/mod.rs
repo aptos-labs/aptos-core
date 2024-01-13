@@ -140,7 +140,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                     self.process_dkg_txn_pulled_notification(dkg_txn).await
                 },
                 close_req = close_rx.select_next_some() => {
-                    self.process_close_cmd(close_req.unwrap())
+                    self.process_close_cmd(close_req.ok())
                 }
             };
 
@@ -151,7 +151,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     }
 
     /// On a CLOSE command from epoch manager, do clean-up.
-    fn process_close_cmd(&mut self, ack_tx: oneshot::Sender<()>) -> Result<()> {
+    fn process_close_cmd(&mut self, ack_tx: Option<oneshot::Sender<()>>) -> Result<()> {
         self.stopped = true;
 
         if let InnerState::InProgress { abort_handle, .. } = &self.state {
@@ -160,7 +160,10 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
 
         self.vtxn_pool_write_cli.put(None);
 
-        let _ = ack_tx.send(());
+        if let Some(tx) = ack_tx {
+            let _ = tx.send(());
+        }
+
         Ok(())
     }
 

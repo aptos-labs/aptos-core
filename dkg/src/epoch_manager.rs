@@ -106,10 +106,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             subscribed_events, ..
         } = notification;
         for event in subscribed_events {
-            let dkg_start_event = DKGStartEvent::try_from(&event).unwrap();
-            // Forward to DKGManager if it is alive.
-            if let Some(tx) = self.dkg_start_event_tx.as_ref() {
-                let _ = tx.push((), dkg_start_event);
+            if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
+                // Forward to DKGManager if it is alive.
+                if let Some(tx) = self.dkg_start_event_tx.as_ref() {
+                    let _ = tx.push((), dkg_start_event);
+                }
             }
         }
         Ok(())
@@ -240,8 +241,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     async fn shutdown_current_processor(&mut self) {
         if let Some(tx) = self.dkg_manager_close_tx.take() {
             let (ack_tx, ack_rx) = oneshot::channel();
-            tx.send(ack_tx).unwrap();
-            ack_rx.await.unwrap();
+            let _ = tx.send(ack_tx);
+            let _ = ack_rx.await;
         }
     }
 

@@ -178,7 +178,9 @@ impl RpcResponseSender for RealRpcResponseSender {
         let rpc_response = response
             .and_then(|dkg_msg| self.protocol.to_bytes(&dkg_msg).map(Bytes::from))
             .map_err(RpcError::ApplicationError);
-        let _ = self.inner.take().unwrap().send(rpc_response); // May not succeed.
+        if let Some(tx) = self.inner.take() {
+            let _ = tx.send(rpc_response); // May not succeed.
+        }
     }
 }
 
