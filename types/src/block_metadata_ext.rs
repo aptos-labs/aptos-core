@@ -5,6 +5,14 @@ use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
 
+/// The extended block metadata.
+///
+/// NOTE for `V0`: this is designed to allow a default block metadata to be represented by this type.
+/// By doing so, we can use a single type `BlockMetadataExt` across `StateComputer`,
+/// and avoid defining an extra `GenericBlockMetadata` enum for many util functions.
+///
+/// Implementation also ensures correct conversion to enum `Transaction`:
+/// `V0` goes to variant `Transaction::BlockMetadata` and the rest goes to variant `Transaction::BlockMetadataExt`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockMetadataExt {
     V0(BlockMetadata),
@@ -145,9 +153,6 @@ impl BlockMetadataExt {
     }
 }
 
-/// `StateComputer` needs to support both mode reconfiguration mode.
-/// In order to simplify `StateComputer`, we allow `BlockMetadataExt` to also act as
-/// a generic block metadata holder where the default block metadata can also live.
 impl From<BlockMetadata> for BlockMetadataExt {
     fn from(v0: BlockMetadata) -> Self {
         BlockMetadataExt::V0(v0)
