@@ -1860,6 +1860,15 @@ pub enum Transaction {
     BlockMetadataExt(BlockMetadataExt),
 }
 
+impl From<BlockMetadataExt> for Transaction {
+    fn from(metadata: BlockMetadataExt) -> Self {
+        match metadata {
+            BlockMetadataExt::V0(v0) => Transaction::BlockMetadata(v0),
+            vx => Transaction::BlockMetadataExt(vx),
+        }
+    }
+}
+
 impl Transaction {
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {

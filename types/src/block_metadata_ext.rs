@@ -7,11 +7,12 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockMetadataExt {
-    V2(BlockMetadataExtV2),
+    V0(BlockMetadata),
+    V1(BlockMetadataWithRandomness),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlockMetadataExtV2 {
+pub struct BlockMetadataWithRandomness {
     id: HashValue,
     epoch: u64,
     round: u64,
@@ -24,7 +25,7 @@ pub struct BlockMetadataExtV2 {
 }
 
 impl BlockMetadataExt {
-    pub fn new_v2(
+    pub fn new_v1(
         id: HashValue,
         epoch: u64,
         round: u64,
@@ -34,7 +35,7 @@ impl BlockMetadataExt {
         timestamp_usecs: u64,
         randomness: Option<Randomness>,
     ) -> Self {
-        Self::V2(BlockMetadataExtV2 {
+        Self::V1(BlockMetadataWithRandomness {
             id,
             epoch,
             round,
@@ -48,7 +49,8 @@ impl BlockMetadataExt {
 
     pub fn id(&self) -> HashValue {
         match self {
-            BlockMetadataExt::V2(obj) => obj.id,
+            BlockMetadataExt::V0(obj) => obj.id(),
+            BlockMetadataExt::V1(obj) => obj.id,
         }
     }
 
@@ -95,48 +97,59 @@ impl BlockMetadataExt {
 
     pub fn timestamp_usecs(&self) -> u64 {
         match self {
-            BlockMetadataExt::V2(obj) => obj.timestamp_usecs,
+            BlockMetadataExt::V0(obj) => obj.timestamp_usecs(),
+            BlockMetadataExt::V1(obj) => obj.timestamp_usecs,
         }
     }
 
     pub fn proposer(&self) -> AccountAddress {
         match self {
-            BlockMetadataExt::V2(obj) => obj.proposer,
+            BlockMetadataExt::V0(obj) => obj.proposer(),
+            BlockMetadataExt::V1(obj) => obj.proposer,
         }
     }
 
     pub fn previous_block_votes_bitvec(&self) -> &Vec<u8> {
         match self {
-            BlockMetadataExt::V2(obj) => &obj.previous_block_votes_bitvec,
+            BlockMetadataExt::V0(obj) => obj.previous_block_votes_bitvec(),
+            BlockMetadataExt::V1(obj) => &obj.previous_block_votes_bitvec,
         }
     }
 
     pub fn failed_proposer_indices(&self) -> &Vec<u32> {
         match self {
-            BlockMetadataExt::V2(obj) => &obj.failed_proposer_indices,
+            BlockMetadataExt::V0(obj) => obj.failed_proposer_indices(),
+            BlockMetadataExt::V1(obj) => &obj.failed_proposer_indices,
         }
     }
 
     pub fn epoch(&self) -> u64 {
         match self {
-            BlockMetadataExt::V2(obj) => obj.epoch,
+            BlockMetadataExt::V0(obj) => obj.epoch(),
+            BlockMetadataExt::V1(obj) => obj.epoch,
         }
     }
 
     pub fn round(&self) -> u64 {
         match self {
-            BlockMetadataExt::V2(obj) => obj.round,
+            BlockMetadataExt::V0(obj) => obj.round(),
+            BlockMetadataExt::V1(obj) => obj.round,
         }
     }
 
     pub fn randomness(&self) -> &Option<Randomness> {
         match self {
-            BlockMetadataExt::V2(obj) => &obj.randomness,
+            BlockMetadataExt::V0(_) => unreachable!(),
+            BlockMetadataExt::V1(obj) => &obj.randomness,
         }
     }
 }
 
-pub enum BlockMetadataWrapper {
-    Default(BlockMetadata),
-    Ext(BlockMetadataExt),
+/// `StateComputer` needs to support both mode reconfiguration mode.
+/// In order to simplify `StateComputer`, we allow `BlockMetadataExt` to also act as
+/// a generic block metadata holder where the default block metadata can also live.
+impl From<BlockMetadata> for BlockMetadataExt {
+    fn from(v0: BlockMetadata) -> Self {
+        BlockMetadataExt::V0(v0)
+    }
 }

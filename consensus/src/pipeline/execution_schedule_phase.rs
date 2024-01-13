@@ -81,7 +81,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         for b in &ordered_blocks {
             let fut = self
                 .execution_proxy
-                .schedule_compute(b.block(), b.parent_id())
+                .schedule_compute(b.block(), b.parent_id(), b.randomness().cloned())
                 .await;
             futs.push(fut)
         }

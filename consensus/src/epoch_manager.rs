@@ -81,8 +81,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     validator_signer::ValidatorSigner,
 };
@@ -757,6 +757,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         payload_manager: Arc<PayloadManager>,
         onchain_execution_config: &OnChainExecutionConfig,
+        features: &Features,
     ) {
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
@@ -770,6 +771,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
+            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
         );
     }
 
@@ -973,6 +975,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
+        let features = payload.get::<Features>().ok().unwrap_or_default();
 
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
@@ -988,7 +991,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
         let (network_sender, payload_client, payload_manager) = self
-            .initialize_shared_component(&epoch_state, &consensus_config, &execution_config)
+            .initialize_shared_component(
+                &epoch_state,
+                &consensus_config,
+                &execution_config,
+                &features,
+            )
             .await;
 
         if consensus_config.is_dag_enabled() {
@@ -1017,6 +1025,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: &EpochState,
         consensus_config: &OnChainConsensusConfig,
         execution_config: &OnChainExecutionConfig,
+        features: &Features,
     ) -> (NetworkSender, Arc<dyn PayloadClient>, Arc<PayloadManager>) {
         self.set_epoch_start_metrics(epoch_state);
         self.quorum_store_enabled = self.enable_quorum_store(consensus_config);
@@ -1029,7 +1038,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.validator_txn_pool_client.clone(),
             Arc::new(quorum_store_client),
         );
-        self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
+        self.init_commit_state_computer(
+            epoch_state,
+            payload_manager.clone(),
+            execution_config,
+            features,
+        );
         self.start_quorum_store(quorum_store_builder);
         (
             network_sender,
