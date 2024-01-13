@@ -1321,7 +1321,8 @@ impl TransactionsApi {
                                     message: Some(msg), ..
                                 } => {
                                     txn.info.vm_status +=
-                                        format!("\nExecution failed with status: {}", msg).as_str();
+                                        format!("\nExecution failed with message: {}", msg)
+                                            .as_str();
                                 },
                                 _ => (),
                             }

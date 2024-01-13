@@ -151,7 +151,7 @@ impl Interpreter {
             let exit_code =
                 current_frame //self
                     .execute_code(&resolver, &mut self, data_store, module_store, gas_meter)
-                    .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
+                    .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
             match exit_code {
                 ExitCode::Return => {
                     let non_ref_vals = current_frame
@@ -224,8 +224,12 @@ impl Interpreter {
                     }
                     let frame = self
                         .make_call_frame(gas_meter, loader, module_store, func, vec![])
-                        .map_err(|e| self.set_location(e))
-                        .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
+                        .map_err(|err| {
+                            self.attach_state_if_invariant_violation(
+                                self.set_location(err),
+                                &current_frame,
+                            )
+                        })?;
 
                     // Access control for the new frame.
                     self.access_control
@@ -235,7 +239,7 @@ impl Interpreter {
                     self.call_stack.push(current_frame).map_err(|frame| {
                         let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
                         let err = set_err_info!(frame, err);
-                        self.maybe_core_dump(err, &frame)
+                        self.attach_state_if_invariant_violation(err, &frame)
                     })?;
                     // Note: the caller will find the the callee's return values at the top of the shared operand stack
                     current_frame = frame;
@@ -281,8 +285,12 @@ impl Interpreter {
                     }
                     let frame = self
                         .make_call_frame(gas_meter, loader, module_store, func, ty_args)
-                        .map_err(|e| self.set_location(e))
-                        .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
+                        .map_err(|err| {
+                            self.attach_state_if_invariant_violation(
+                                self.set_location(err),
+                                &current_frame,
+                            )
+                        })?;
 
                     // Access control for the new frame.
                     self.access_control
@@ -292,7 +300,7 @@ impl Interpreter {
                     self.call_stack.push(current_frame).map_err(|frame| {
                         let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
                         let err = set_err_info!(frame, err);
-                        self.maybe_core_dump(err, &frame)
+                        self.attach_state_if_invariant_violation(err, &frame)
                     })?;
                     current_frame = frame;
                 },
@@ -767,17 +775,39 @@ impl Interpreter {
     // Debugging and logging helpers.
     //
 
-    /// Given an `VMStatus` generate a core dump if the error is an `InvariantViolation`.
-    fn maybe_core_dump(&self, mut err: VMError, current_frame: &Frame) -> VMError {
-        // a verification error cannot happen at runtime so change it into an invariant violation.
+    /// If the error is invariant violation, attaches the state of the current frame.
+    fn attach_state_if_invariant_violation(
+        &self,
+        mut err: VMError,
+        current_frame: &Frame,
+    ) -> VMError {
+        // A verification error can be returned when
+        //   1) some check fails at runtime, e.g. type layout has too many type
+        //      nodes,
+        //   2) bytecode verifier fails, e.g. on module publishing.
+        // These errors mean that the code breaks some invariant, so we need to
+        // remap the error to VERIFICATION_ERROR which is of invariant violation
+        // type.
         if err.status_type() == StatusType::Verification {
-            let new_err = PartialVMError::new(StatusCode::VERIFICATION_ERROR);
-            let new_err = match err.message() {
-                None => new_err,
-                Some(msg) => new_err.with_message(msg.to_owned()),
+            let (_major_status, sub_status, message, exec_state, location, indices, offsets) =
+                err.all_data();
+            let mut new_err = PartialVMError::new(StatusCode::VERIFICATION_ERROR);
+            if let Some(sub_status) = sub_status {
+                new_err = new_err.with_sub_status(sub_status);
             };
-            err = new_err.finish(err.location().clone())
+            if let Some(message) = message {
+                new_err = new_err.with_message(message.to_string());
+            };
+            if let Some(exec_state) = exec_state {
+                new_err = new_err.with_exec_state(exec_state);
+            };
+            err = new_err
+                .at_indices(indices)
+                .at_code_offsets(offsets)
+                .finish(location)
         }
+
+        // We do not consider speculative invariant violations.
         if err.status_type() == StatusType::InvariantViolation
             && err.major_status() != StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
         {
@@ -787,7 +817,7 @@ impl Interpreter {
                 .to_partial()
                 .append_message_with_separator(
                     '\n',
-                    format!("CORE DUMP: >>>>>>>>>>>>\n{}\n<<<<<<<<<<<<\n", state),
+                    format!("\nState: >>>>>>>>>>>>\n{}\n<<<<<<<<<<<<\n", state),
                 )
                 .finish(location);
         }
