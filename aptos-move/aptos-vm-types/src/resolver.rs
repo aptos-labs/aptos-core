@@ -7,6 +7,7 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     state_store::{
+        errors::StateviewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -168,7 +169,7 @@ pub trait TModuleView {
 pub trait StateStorageView {
     fn id(&self) -> StateViewId;
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage>;
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError>;
 }
 
 /// A fine-grained view of the state during execution.
@@ -272,8 +273,8 @@ where
         self.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        self.get_usage()
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+        self.get_usage().map_err(Into::into)
     }
 }
 

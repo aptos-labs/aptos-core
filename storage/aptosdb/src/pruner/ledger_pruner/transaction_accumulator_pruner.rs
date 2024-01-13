@@ -6,9 +6,9 @@ use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     transaction_store::TransactionStore,
 };
-use anyhow::Result;
 use aptos_logger::info;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 

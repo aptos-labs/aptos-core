@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db_debugger::common::DbDir, AptosDB};
-use anyhow::{ensure, Result};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use clap::Parser;
 use std::{fs, path::PathBuf};
 

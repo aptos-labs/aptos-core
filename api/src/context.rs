@@ -121,7 +121,7 @@ impl Context {
     }
 
     pub fn latest_state_view(&self) -> Result<DbStateView> {
-        self.db.latest_state_checkpoint_view()
+        Ok(self.db.latest_state_checkpoint_view()?)
     }
 
     pub fn latest_state_view_poem<E: InternalError>(
@@ -151,7 +151,7 @@ impl Context {
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
-        self.db.state_view_at_version(Some(version))
+        Ok(self.db.state_view_at_version(Some(version))?)
     }
 
     pub fn chain_id(&self) -> ChainId {
@@ -270,7 +270,7 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
-        self.db.get_latest_ledger_info()
+        Ok(self.db.get_latest_ledger_info()?)
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
@@ -348,9 +348,14 @@ impl Context {
             None,
             version,
         )?;
+
         let kvs = iter
             .by_ref()
             .take(MAX_REQUEST_LIMIT as usize)
+            .map(|res| match res {
+                Ok((k, v)) => Ok((k, v)),
+                Err(res) => Err(anyhow::Error::from(res)),
+            })
             .collect::<Result<_>>()?;
         if iter.next().transpose()?.is_some() {
             bail!("Too many state items under account ({:?}).", address);
@@ -396,7 +401,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e)),
+                Err(e) => Some(Err(e.into())),
             })
             .take(limit as usize + 1);
         let kvs = resource_iter
@@ -483,7 +488,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e)),
+                Err(e) => Some(Err(e.into())),
             })
             .take(limit as usize + 1);
         let kvs = module_iter
@@ -802,7 +807,7 @@ impl Context {
     }
 
     pub fn get_accumulator_root_hash(&self, version: u64) -> Result<HashValue> {
-        self.db.get_accumulator_root_hash(version)
+        Ok(self.db.get_accumulator_root_hash(version)?)
     }
 
     fn convert_into_transaction_on_chain_data(
@@ -826,15 +831,16 @@ impl Context {
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
         if let Some(start) = start {
-            self.db.get_events(
+            Ok(self.db.get_events(
                 event_key,
                 start,
                 Order::Ascending,
                 limit as u64,
                 ledger_version,
-            )
+            )?)
         } else {
-            self.db
+            Ok(self
+                .db
                 .get_events(
                     event_key,
                     u64::MAX,
@@ -845,7 +851,7 @@ impl Context {
                 .map(|mut result| {
                     result.reverse();
                     result
-                })
+                })?)
         }
     }
 

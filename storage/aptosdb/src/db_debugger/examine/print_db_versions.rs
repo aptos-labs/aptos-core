@@ -5,7 +5,6 @@ use crate::{
     db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
-        event_accumulator::EventAccumulatorSchema,
         ledger_info::LedgerInfoSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
@@ -20,9 +19,9 @@ use crate::{
     },
     AptosDB,
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, ReadOptions, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use std::path::PathBuf;
@@ -124,7 +123,9 @@ impl Cmd {
 
         println!(
             "Max Transaction version: {:?}",
-            Self::get_latest_version_for_schema::<TransactionSchema>(ledger_db.transaction_db())?,
+            Self::get_latest_version_for_schema::<TransactionSchema>(
+                ledger_db.transaction_db_raw()
+            )?,
         );
 
         println!(
@@ -148,16 +149,6 @@ impl Cmd {
                 "# of frozen nodes in TransactionAccumulator: {:?}",
                 num_frozen_nodes
             );
-        }
-
-        {
-            let mut iter = ledger_db
-                .event_db()
-                .iter::<EventAccumulatorSchema>(ReadOptions::default())?;
-            iter.seek_to_last();
-            let key = iter.next().transpose()?.map(|kv| kv.0);
-            let version = key.map(|k| k.0);
-            println!("Max EventAccumulator version: {:?}", version)
         }
 
         Ok(())

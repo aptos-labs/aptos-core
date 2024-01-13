@@ -42,3 +42,6 @@ regex = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
+
+[[bin]]
+name = "remote-gas-profiler"

@@ -21,7 +21,10 @@ use aptos_types::{
     aggregator::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        errors::StateviewError,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
         StateView, StateViewId,
     },
     write_set::WriteOp,
@@ -344,7 +347,7 @@ impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
         self.executor_view.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.executor_view.get_usage()
     }
 }

@@ -5,6 +5,7 @@
 use crate::AptosDB;
 use anyhow::Result;
 use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::AptosDbError;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
@@ -66,7 +67,7 @@ pub fn set_up(
     ledger_infos_with_sigs
         .iter()
         .map(|info| store.put_ledger_info(info, &batch))
-        .collect::<Result<Vec<_>>>()
+        .collect::<Result<Vec<_>, AptosDbError>>()
         .unwrap();
     store.ledger_db.metadata_db().write_schemas(batch).unwrap();
     store.set_latest_ledger_info(ledger_infos_with_sigs.last().unwrap().clone());

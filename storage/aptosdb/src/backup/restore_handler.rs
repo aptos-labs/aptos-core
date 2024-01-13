@@ -4,7 +4,7 @@
 
 use crate::{
     backup::restore_utils,
-    event_store::EventStore,
+    ledger_db::LedgerDb,
     ledger_store::LedgerStore,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
@@ -12,9 +12,8 @@ use crate::{
     transaction_store::TransactionStore,
     AptosDB,
 };
-use anyhow::Result;
 use aptos_crypto::HashValue;
-use aptos_storage_interface::DbReader;
+use aptos_storage_interface::{DbReader, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -32,7 +31,7 @@ pub struct RestoreHandler {
     ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
-    event_store: Arc<EventStore>,
+    ledger_db: Arc<LedgerDb>,
 }
 
 impl RestoreHandler {
@@ -41,14 +40,13 @@ impl RestoreHandler {
         ledger_store: Arc<LedgerStore>,
         transaction_store: Arc<TransactionStore>,
         state_store: Arc<StateStore>,
-        event_store: Arc<EventStore>,
     ) -> Self {
         Self {
+            ledger_db: Arc::clone(&aptosdb.ledger_db),
             aptosdb,
             ledger_store,
             transaction_store,
             state_store,
-            event_store,
         }
     }
 
@@ -105,8 +103,8 @@ impl RestoreHandler {
         restore_utils::save_transactions(
             self.ledger_store.clone(),
             self.transaction_store.clone(),
-            self.event_store.clone(),
             self.state_store.clone(),
+            self.ledger_db.clone(),
             first_version,
             txns,
             txn_infos,
@@ -128,8 +126,8 @@ impl RestoreHandler {
         restore_utils::save_transactions(
             self.ledger_store.clone(),
             self.transaction_store.clone(),
-            self.event_store.clone(),
             self.state_store.clone(),
+            self.ledger_db.clone(),
             first_version,
             txns,
             txn_infos,
@@ -148,7 +146,9 @@ impl RestoreHandler {
         &self,
         version: Version,
     ) -> Result<Option<(Version, HashValue)>> {
-        self.aptosdb.get_state_snapshot_before(version)
+        self.aptosdb
+            .get_state_snapshot_before(version)
+            .map_err(Into::into)
     }
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {

@@ -18,10 +18,10 @@ use crate::{
         truncate_state_merkle_db,
     },
 };
-use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_schemadb::{ReadOptions, DB};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::Version;
 use claims::assert_le;
 use clap::Parser;
@@ -337,7 +337,7 @@ mod test {
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.transaction_db().iter::<TransactionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_db_raw().iter::<TransactionSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 

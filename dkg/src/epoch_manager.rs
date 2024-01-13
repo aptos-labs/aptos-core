@@ -1,21 +1,23 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::{agg_node_producer::DummyAggNodeProducer, DKGManager},
-    network::{IncomingRpcRequest, NetworkReceivers},
+    dkg_manager::{agg_trx_producer::RealAggTranscriptProducer, DKGManager},
+    dummy_dkg::DummyDKG,
+    network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
 };
 use anyhow::Result;
+use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::NodeConfig;
-use aptos_crypto::bls12381;
+use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
 use aptos_logger::error;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
     dkg::{DKGStartEvent, DKGState},
@@ -28,7 +30,8 @@ use aptos_types::{
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::StreamExt;
 use futures_channel::oneshot;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
+use tokio_retry::strategy::ExponentialBackoff;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
@@ -37,7 +40,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
 
     // some DKG private params
-    sk: Option<bls12381::PrivateKey>,
+    identity_blob: Arc<IdentityBlob>,
 
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
@@ -58,21 +61,21 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
-        node_config: &NodeConfig,
+        my_addr: AccountAddress,
+        identity_blob: Arc<IdentityBlob>,
         reconfig_events: ReconfigNotificationListener<P>,
-        start_dkg_events: EventNotificationListener,
+        dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
         vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
         vtxn_pull_notification_rx: vtxn_pool::PullNotificationReceiver,
     ) -> Self {
-        let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
         Self {
-            sk: None, //TODO: load from storage
             my_addr,
+            identity_blob,
             epoch_state: None,
             reconfig_events,
-            dkg_start_events: start_dkg_events,
+            dkg_start_events,
             dkg_rpc_msg_tx: None,
             dkg_manager_close_tx: None,
             self_sender,
@@ -82,12 +85,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vtxn_pull_notification_tx_to_dkgmgr: None,
             dkg_start_event_tx: None,
         }
-    }
-
-    fn epoch_state(&self) -> &EpochState {
-        self.epoch_state
-            .as_ref()
-            .expect("EpochManager not started yet")
     }
 
     fn process_rpc_request(
@@ -151,11 +148,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get()
             .expect("failed to get ValidatorSet from payload");
 
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
-        };
-        self.epoch_state = Some(Arc::new(epoch_state.clone()));
+        });
+        self.epoch_state = Some(epoch_state.clone());
 
         let features = payload.get::<Features>().unwrap_or_default();
 
@@ -165,11 +162,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 ..
             } = payload.get::<DKGState>().unwrap_or_default();
 
-            let agg_node_producer = DummyAggNodeProducer {}; //TODO: replace with real
+            let network_sender = self.create_network_sender();
+            let rb = ReliableBroadcast::new(
+                epoch_state.verifier.get_ordered_account_addresses(),
+                Arc::new(network_sender),
+                ExponentialBackoff::from_millis(5),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(1000),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+            );
+            let agg_trx_producer = RealAggTranscriptProducer::new(rb);
 
-            let (start_dkg_event_tx, start_dkg_event_rx) =
+            let (dkg_start_event_tx, dkg_start_event_rx) =
                 aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.dkg_start_event_tx = Some(start_dkg_event_tx);
+            self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
                 (),
@@ -179,10 +185,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::new(
+            let dkg_manager = DKGManager::<DummyDKG, _>::new(
+                self.identity_blob.clone(),
                 self.my_addr,
-                self.epoch_state().clone(),
-                Arc::new(agg_node_producer),
+                epoch_state,
+                Arc::new(agg_trx_producer),
                 self.vtxn_pool_write_cli.clone(),
             );
             let (vtxn_pull_notification_tx, vtxn_pull_notification_rx) =
@@ -190,7 +197,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
-                start_dkg_event_rx,
+                dkg_start_event_rx,
                 dkg_rpc_msg_rx,
                 vtxn_pull_notification_rx,
                 dkg_manager_close_rx,
@@ -211,5 +218,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             tx.send(ack_tx).unwrap();
             ack_rx.await.unwrap();
         }
+    }
+
+    fn create_network_sender(&self) -> NetworkSender {
+        NetworkSender::new(
+            self.my_addr,
+            self.network_sender.clone(),
+            self.self_sender.clone(),
+        )
     }
 }

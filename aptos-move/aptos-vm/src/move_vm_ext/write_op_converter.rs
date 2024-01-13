@@ -349,7 +349,8 @@ mod tests {
     use aptos_types::{
         account_address::AccountAddress,
         state_store::{
-            state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+            errors::StateviewError, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
         },
     };
     use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
@@ -404,11 +405,14 @@ mod tests {
     impl TStateView for MockStateView {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
             Ok(self.data.get(state_key).cloned())
         }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
     }

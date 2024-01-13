@@ -97,7 +97,8 @@ impl DbReader for AptosDB {
         fetch_events: bool,
     ) -> Result<Option<TransactionWithProof>> {
         gauged_api("get_transaction_by_hash", || {
-            self.transaction_store
+            self.ledger_db
+                .transaction_db()
                 .get_transaction_version_by_hash(&hash, ledger_version)?
                 .map(|v| self.get_transaction_with_proof(v, ledger_version, fetch_events))
                 .transpose()
@@ -142,7 +143,7 @@ impl DbReader for AptosDB {
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
             let txns = (start_version..start_version + limit)
-                .map(|version| self.transaction_store.get_transaction(version))
+                .map(|version| self.ledger_db.transaction_db().get_transaction(version))
                 .collect::<Result<Vec<_>>>()?;
             let txn_infos = (start_version..start_version + limit)
                 .map(|version| self.ledger_store.get_transaction_info(version))
@@ -150,7 +151,7 @@ impl DbReader for AptosDB {
             let events = if fetch_events {
                 Some(
                     (start_version..start_version + limit)
-                        .map(|version| self.event_store.get_events_by_version(version))
+                        .map(|version| self.ledger_db.event_db().get_events_by_version(version))
                         .collect::<Result<Vec<_>>>()?,
                 )
             } else {
@@ -221,9 +222,9 @@ impl DbReader for AptosDB {
             let (txn_infos, txns_and_outputs) = (start_version..start_version + limit)
                 .map(|version| {
                     let txn_info = self.ledger_store.get_transaction_info(version)?;
-                    let events = self.event_store.get_events_by_version(version)?;
+                    let events = self.ledger_db.event_db().get_events_by_version(version)?;
                     let write_set = self.transaction_store.get_write_set(version)?;
-                    let txn = self.transaction_store.get_transaction(version)?;
+                    let txn = self.ledger_db.transaction_db().get_transaction(version)?;
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
@@ -275,7 +276,8 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let iter = self
-                .transaction_store
+                .ledger_db
+                .transaction_db()
                 .get_transaction_iter(start_version, limit as usize)?;
             Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<Transaction>> + '_>)
         })
@@ -307,7 +309,8 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let iter = self
-                .event_store
+                .ledger_db
+                .event_db()
                 .get_events_by_version_iter(start_version, limit as usize)?;
             Ok(Box::new(iter)
                 as Box<
@@ -483,7 +486,7 @@ impl DbReader for AptosDB {
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            ensure!(version <= self.get_latest_version()?);
+            ensure!(version <= self.get_latest_version()?, "version older than latest version");
 
             match self.event_store.get_block_metadata(version) {
                 Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
@@ -548,7 +551,8 @@ impl DbReader for AptosDB {
                 let (block_height, block_info) = item?;
                 let first_version = block_info.first_version();
                 let event = self
-                    .event_store
+                    .ledger_db
+                    .event_db()
                     .get_events_by_version(first_version)?
                     .into_iter()
                     .find(|event| {
@@ -649,7 +653,8 @@ impl DbReader for AptosDB {
 
             // TODO(grao): Consider return BlockInfo instead of NewBlockEvent.
             let new_block_event = self
-                .event_store
+                .ledger_db
+                .event_db()
                 .get_events_by_version(first_version)?
                 .into_iter()
                 .find(|event| {
@@ -729,7 +734,7 @@ impl DbReader for AptosDB {
     ) -> Result<TransactionAccumulatorSummary> {
         let num_txns = ledger_version + 1;
         let frozen_subtrees = self.ledger_store.get_frozen_subtree_hashes(num_txns)?;
-        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)
+        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?).map_err(Into::into)
     }
 
     fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
@@ -787,7 +792,7 @@ impl DbReader for AptosDB {
     fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
         gauged_api("get_table_info", || {
             self.get_table_info_option(handle)?
-                .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)).into())
+                .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)))
         })
     }
 
@@ -911,11 +916,11 @@ impl AptosDB {
         let proof = self
             .ledger_store
             .get_transaction_info_with_proof(version, ledger_version)?;
-        let transaction = self.transaction_store.get_transaction(version)?;
+        let transaction = self.ledger_db.transaction_db().get_transaction(version)?;
 
         // If events were requested, also fetch those.
         let events = if fetch_events {
-            Some(self.event_store.get_events_by_version(version)?)
+            Some(self.ledger_db.event_db().get_events_by_version(version)?)
         } else {
             None
         };

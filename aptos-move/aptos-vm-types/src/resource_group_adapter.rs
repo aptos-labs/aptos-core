@@ -277,7 +277,8 @@ mod tests {
     use super::*;
     use crate::tests::utils::{mock_tag_0, mock_tag_1, mock_tag_2};
     use aptos_types::state_store::{
-        state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+        errors::StateviewError, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        TStateView,
     };
     use claims::{assert_gt, assert_none, assert_ok_eq, assert_some, assert_some_eq};
     use std::cmp::max;
@@ -339,14 +340,17 @@ mod tests {
     impl TStateView for MockStateView {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
             Ok(self
                 .group
                 .get(state_key)
                 .map(|entry| StateValue::new_legacy(entry.blob.clone().into())))
         }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
     }
