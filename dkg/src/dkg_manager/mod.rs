@@ -5,11 +5,10 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_logger::error;
 use aptos_types::{
     dkg::{
-        DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait,
-        DKGTranscriptMetadata,
+        DKGNode, DKGPrivateParamsProvider, DKGSessionMetadata, DKGSessionState, DKGStartEvent,
+        DKGTrait, DKGTranscriptMetadata,
     },
     epoch_state::EpochState,
-    on_chain_config::ValidatorSet,
     validator_txn::ValidatorTransaction,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -44,11 +43,12 @@ impl<DKG: DKGTrait> Default for InnerState<DKG> {
 
 #[allow(dead_code)]
 pub struct DKGManager<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> {
-    private_params_provider: P,
+    private_params_provider: Arc<P>,
 
     // Some useful metadata
-    my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
+    my_addr: AccountAddress,
+    my_validator_index: usize,
 
     //
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
@@ -82,8 +82,9 @@ impl<DKG: DKGTrait> InnerState<DKG> {
 
 impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     pub fn new(
-        private_params_provider: P,
+        private_params_provider: Arc<P>,
         my_addr: AccountAddress,
+        my_validator_index: usize,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
         vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
@@ -97,6 +98,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
             agg_trx_producer,
             stopped: false,
             state: InnerState::NotStarted,
+            my_validator_index,
         }
     }
 
@@ -110,11 +112,11 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     ) {
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
+                metadata,
                 start_time_us,
-                target_validator_set,
                 ..
             } = session_state;
-            self.setup_deal_broadcast(start_time_us, &target_validator_set)
+            self.setup_deal_broadcast(start_time_us, &metadata)
                 .await
                 .expect("setup_deal_broadcast() should be infallible");
         }
@@ -184,20 +186,17 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     async fn setup_deal_broadcast(
         &mut self,
         start_time_us: u64,
-        target_validator_set: &ValidatorSet,
+        metadata: &DKGSessionMetadata,
     ) -> Result<()> {
         self.state = match &self.state {
             InnerState::NotStarted => {
-                let public_params = DKG::new_public_params(
-                    self.epoch_state.as_ref(),
-                    self.my_addr,
-                    target_validator_set,
-                );
+                let public_params = DKG::new_public_params(metadata);
                 let mut rng = thread_rng();
                 let trx = DKG::generate_transcript(
                     &mut rng,
-                    self.private_params_provider.dkg_private_params(),
                     &public_params,
+                    self.my_validator_index,
+                    self.private_params_provider.dkg_private_params(),
                 );
 
                 let dkg_node = DKGNode::new(
@@ -259,12 +258,14 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     /// On a DKG start event, execute DKG.
     async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
         let DKGStartEvent {
-            target_epoch,
+            session_metadata,
             start_time_us,
-            target_validator_set,
         } = event;
-        ensure!(self.epoch_state.epoch + 1 == target_epoch);
-        self.setup_deal_broadcast(start_time_us, &target_validator_set)
+        ensure!(
+            self.epoch_state.epoch == session_metadata.dealer_epoch,
+            "process_dkg_start_event failed with epoch mismatch"
+        );
+        self.setup_deal_broadcast(start_time_us, &session_metadata)
             .await?;
         Ok(())
     }

@@ -17,6 +17,7 @@ use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     access_path::AccessPath, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
     contract_event::ContractEvent, on_chain_config::Features, state_store::state_key::StateKey,
+    validator_txn::ValidatorTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
@@ -83,6 +84,9 @@ pub enum SessionId {
         sequence_number: u64,
         script_hash: Vec<u8>,
     },
+    ValidatorTxn {
+        script_hash: Vec<u8>,
+    },
 }
 
 impl SessionId {
@@ -136,6 +140,12 @@ impl SessionId {
 
     pub fn void() -> Self {
         Self::Void
+    }
+
+    pub fn validator_txn(txn: &ValidatorTransaction) -> Self {
+        Self::ValidatorTxn {
+            script_hash: txn.hash().to_vec(),
+        }
     }
 
     pub fn as_uuid(&self) -> HashValue {

@@ -27,6 +27,13 @@ pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     )
 });
 
+pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("reconfiguration_with_dkg").to_owned(),
+    )
+});
+
 // TZ: TODO: remove these except for the block-related names
 // Names for special functions and structs
 pub const SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("script_prologue");
@@ -35,6 +42,7 @@ pub const MODULE_PROLOGUE_NAME: &IdentStr = ident_str!("module_prologue");
 pub const USER_EPILOGUE_NAME: &IdentStr = ident_str!("epilogue");
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 pub const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
+pub const FINISH_WITH_DKG_RESULT: &IdentStr = ident_str!("finish_with_dkg_result");
 
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(

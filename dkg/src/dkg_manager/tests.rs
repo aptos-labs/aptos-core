@@ -3,7 +3,6 @@
 use crate::{
     agg_trx_producer::DummyAggTranscriptProducer,
     dkg_manager::{DKGManager, InnerState},
-    dummy_dkg::{DummyDKG, DummyDKGTranscript},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::DKGNodeRequest,
     DKGMessage,
@@ -14,11 +13,11 @@ use aptos_crypto::{
 };
 use aptos_infallible::RwLock;
 use aptos_types::{
-    dkg::{DKGNode, DKGStartEvent, DKGTrait, DKGTranscriptMetadata},
+    dkg::{
+        DKGNode, DKGSessionMetadata, DKGStartEvent, DKGTrait, DKGTranscriptMetadata, DummyDKG,
+        DummyDKGTranscript,
+    },
     epoch_state::EpochState,
-    on_chain_config::ValidatorSet,
-    validator_config::ValidatorConfig,
-    validator_info::ValidatorInfo,
     validator_txn::{Topic, ValidatorTransaction},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
@@ -44,24 +43,18 @@ async fn test_dkg_state_transition() {
     let validator_consensus_infos: Vec<ValidatorConsensusInfo> = (0..4)
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
-    let validator_configs: Vec<ValidatorConfig> = (0..4)
-        .map(|i| ValidatorConfig::new(public_keys[i].clone(), vec![], vec![], i as u64))
-        .collect();
-    let validator_infos: Vec<ValidatorInfo> = (0..4)
-        .map(|i| ValidatorInfo::new(addrs[i], voting_powers[i], validator_configs[i].clone()))
-        .collect();
-    let validator_set = ValidatorSet::new(validator_infos.clone());
 
     let epoch_state = EpochState {
         epoch: 999,
         verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
     };
-    let agg_node_producer = DummyAggTranscriptProducer {};
+    let agg_trx_producer = DummyAggTranscriptProducer {};
     let mut dkg_manager = DKGManager::new(
         private_keys[0].clone(),
         addrs[0],
+        0,
         Arc::new(epoch_state),
-        Arc::new(agg_node_producer),
+        Arc::new(agg_trx_producer),
         Arc::new(vtxn_write_client),
     );
 
@@ -82,9 +75,13 @@ async fn test_dkg_state_transition() {
     // it should record start time, compute its own node, and enter state `InProgress`.
     let handle_result = dkg_manager
         .process_dkg_start_event(DKGStartEvent {
-            target_epoch: 1000,
+            session_metadata: DKGSessionMetadata {
+                config: Default::default(),
+                dealer_epoch: 999,
+                dealer_validator_set: validator_consensus_infos.clone(),
+                target_validator_set: validator_consensus_infos.clone(),
+            },
             start_time_us: 1700000000000000,
-            target_validator_set: validator_set.clone(), // No validator set change!
         })
         .await;
     assert!(handle_result.is_ok());

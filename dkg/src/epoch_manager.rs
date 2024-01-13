@@ -3,7 +3,6 @@
 use crate::{
     agg_trx_producer::RealAggTranscriptProducer,
     dkg_manager::DKGManager,
-    dummy_dkg::DummyDKG,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
@@ -21,7 +20,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState},
+    dkg::{DKGStartEvent, DKGState, DummyDKG},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -203,24 +202,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.dkg_rpc_msg_tx = Some(dkg_rpc_msg_tx);
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
-
-            let dkg_manager = DKGManager::<DummyDKG, _>::new(
-                self.identity_blob.clone(),
-                self.my_addr,
-                epoch_state,
-                Arc::new(agg_trx_producer),
-                self.vtxn_pool_write_cli.clone(),
-            );
-            let (vtxn_pull_notification_tx, vtxn_pull_notification_rx) =
-                aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
-            tokio::spawn(dkg_manager.run(
-                in_progress_session,
-                dkg_start_event_rx,
-                dkg_rpc_msg_rx,
-                vtxn_pull_notification_rx,
-                dkg_manager_close_rx,
-            ));
+            if let Some(my_index) = epoch_state
+                .verifier
+                .address_to_validator_index()
+                .get(&self.my_addr)
+                .copied()
+            {
+                let dkg_manager = DKGManager::<DummyDKG, _>::new(
+                    self.identity_blob.clone(),
+                    self.my_addr,
+                    my_index,
+                    epoch_state,
+                    Arc::new(agg_trx_producer),
+                    self.vtxn_pool_write_cli.clone(),
+                );
+                let (vtxn_pull_notification_tx, vtxn_pull_notification_rx) =
+                    aptos_channel::new(QueueStyle::KLAST, 1, None);
+                self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
+                tokio::spawn(dkg_manager.run(
+                    in_progress_session,
+                    dkg_start_event_rx,
+                    dkg_rpc_msg_rx,
+                    vtxn_pull_notification_rx,
+                    dkg_manager_close_rx,
+                ));
+            }
         }
     }
 
