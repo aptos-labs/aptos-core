@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
 
     // Have Alice send Bob some coins.
     let txn_hash = coin_client
-        .transfer(&mut alice, bob.address(), 1_000, None)
+        .transfer(&alice, bob.address(), 1_000, None)
         .await
         .context("Failed to submit transaction to transfer coins")?;
     rest_client
@@ -111,7 +111,7 @@ async fn main() -> Result<()> {
     // Have Alice send Bob some more coins.
     // :!:>section_5
     let txn_hash = coin_client
-        .transfer(&mut alice, bob.address(), 1_000, None)
+        .transfer(&alice, bob.address(), 1_000, None)
         .await
         .context("Failed to submit transaction to transfer coins")?; // <:!:section_5
                                                                      // :!:>section_6
