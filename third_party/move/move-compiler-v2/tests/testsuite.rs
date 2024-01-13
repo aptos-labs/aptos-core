@@ -7,7 +7,7 @@ use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    function_checker, inliner,
+    function_checker, inliner, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -21,9 +21,7 @@ use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
-use move_stackless_bytecode::{
-    function_target::FunctionTarget, function_target_pipeline::FunctionTargetPipeline,
-};
+use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use std::{
     cell::RefCell,
     path::{Path, PathBuf},
@@ -334,7 +332,7 @@ impl TestConfig {
                                     &env,
                                     "initial bytecode",
                                     targets_before,
-                                    Self::register_formatters,
+                                    &pipeline::register_formatters,
                                 ),
                             );
                         }
@@ -357,7 +355,7 @@ impl TestConfig {
                                     &env,
                                     &format!("after {}:", processor.name()),
                                     targets_after,
-                                    Self::register_formatters,
+                                    &pipeline::register_formatters,
                                 ),
                             );
                         }
