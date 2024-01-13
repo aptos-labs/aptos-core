@@ -408,8 +408,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // TODO: Revisit this error whether it should be invariant violation
-                    //       or a panic/fallback.
+                    // TODO[agg_v2](fix): Revisit this error whether it should be invariant violation
+                    //                    or a panic/fallback.
                     Some(Err(PartialVMError::new(
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                     )
@@ -593,7 +593,7 @@ mod test {
         let aggregator_v1_delta_set =
             BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
-        // TODO[agg_v2]: Layout hardcoded to None. Test with layout = Some(..)
+        // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = BTreeMap::from([
             (
                 key("resource_group_both"),
@@ -685,5 +685,5 @@ mod test {
         );
     }
 
-    // TODO[agg_v2](tests) add delayed field tests
+    // TODO[agg_v2](test) add delayed field tests
 }

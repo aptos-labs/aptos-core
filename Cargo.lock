@@ -2761,6 +2761,7 @@ dependencies = [
  "claims",
  "crossbeam",
  "dashmap",
+ "derivative",
  "move-binary-format",
  "move-core-types",
  "proptest",

@@ -514,9 +514,8 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                         .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError) => {
-                    return Err(PartialVMError::new(StatusCode::VALUE_SERIALIZATION_ERROR)
-                        .with_message("Resource tag bcs serialization error".to_string()));
+                Err(TagSerializationError(e)) => {
+                    return Err(e);
                 },
             }
         }
@@ -686,7 +685,6 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                     // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                     match value_with_layout {
                         ValueWithLayout::RawFromStorage(v) => {
-                            // TODO: we should halt if patch_base_value fails!
                             let patched_value = patch_base_value(v.as_ref(), maybe_layout)?;
                             self.versioned_map
                                 .group_data()
@@ -739,14 +737,15 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        // TODO[agg_v2]: halting should be handled like ReadResult.
+                        // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
+                        // like in ReadResult for resources.
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
                         .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError) => {
+                Err(TagSerializationError(_)) => {
                     unreachable!("Reading a resource does not require tag serialization");
                 },
             }
@@ -820,7 +819,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
                                 value = exchanged_value;
                             },
                             Err(_) => {
-                                // TODO[agg_v2]: `patch_base_value` already marks as incorrect use
+                                // TODO[agg_v2](cleanup): `patch_base_value` already marks as incorrect use
                                 //               and logs an error! We need to make this uniform across
                                 //               resources and groups.
                                 *self.incorrect_use.borrow_mut() = true;
@@ -879,8 +878,6 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
             Ok(mut value) => {
                 // If we have a known layout, upgrade RawFromStorage value to Exchanged.
                 if let ValueWithLayout::RawFromStorage(v) = value {
-                    // TODO[agg_v2]: Can patching fail here, and should we do something about it directly?
-                    //               Probably yes, e.g. fallback?
                     let patched_value = patch_base_value(v.as_ref(), maybe_layout)?;
                     let maybe_layout = maybe_layout.cloned().map(Arc::new);
                     self.unsync_map.update_tagged_base_value_with_layout(
@@ -890,7 +887,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
                         maybe_layout.clone(),
                     );
 
-                    // sequential execution doesn't need to worry about concurrent change going through.
+                    // Sequential execution doesn't need to worry about concurrent change going through.
                     value = ValueWithLayout::Exchanged(Arc::new(patched_value), maybe_layout);
                 }
 
@@ -1055,7 +1052,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         );
                         self.mark_incorrect_use();
                         return Err(PartialVMError::new(
-                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
                         )
                         .with_message(format!("{}", err)));
                     },
@@ -1315,7 +1312,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
                             }
                         } else {
-                            // TODO: `get_group_size` can fail on group tag serialization. Do
+                            // TODO[agg_v2](fix): `get_group_size` can fail on group tag serialization. Do
                             //       we want to propagate this error? This is somewhat an invariant
                             //       violation so PanicError is also ok?
                             return Some(Err(code_invariant_error(format!(
@@ -1766,7 +1763,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         Ok(id.into())
     }
 
-    // TODO - update comment.
+    // TODO[agg_v2](cleanup) - update comment.
     // For each resource that satisfies the following conditions,
     //     1. Resource is in read set
     //     2. Resource is not in write set

@@ -355,8 +355,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                     })
             })
             .collect::<Result<Vec<_>, MVGroupError>>()?;
-        // TODO[agg_v2]: we should be able to propagate the error out?
-        group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)
+        group_size_as_sum(sizes.into_iter()).map_err(MVGroupError::TagSerializationError)
     }
 }
 
