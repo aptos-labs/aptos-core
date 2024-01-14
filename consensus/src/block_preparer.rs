@@ -36,14 +36,15 @@ impl BlockPreparer {
         let txns = self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
-        let txn_shuffler = self.txn_shuffler.clone();
+        let _txn_shuffler = self.txn_shuffler.clone();
         let block_id = block.id();
         let block_timestamp_usecs = block.timestamp_usecs();
         // Transaction filtering, deduplication and shuffling are CPU intensive tasks, so we run them in a blocking task.
         tokio::task::spawn_blocking(move || {
             let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
-            Ok(txn_shuffler.shuffle(deduped_txns))
+            Ok(deduped_txns)
+           // Ok(txn_shuffler.shuffle(deduped_txns))
         })
         .await
         .expect("Failed to spawn blocking task for transaction generation")
