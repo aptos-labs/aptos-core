@@ -1,5 +1,8 @@
 /// Maintains feature flags.
 spec std::features {
+    // spec module {
+    //     pragma verify = false;
+    // }
     spec Features {
         pragma bv=b"0";
     }
@@ -9,6 +12,19 @@ spec std::features {
         aborts_if false;
         ensures feature / 8 < len(features);
         ensures include == spec_contains(features, feature);
+    }
+
+    spec apply_diff(features: &mut Features, enable: vector<u64>, disable: vector<u64>) {
+        pragma verify = false;
+        aborts_if [abstract] false;
+        // ensures [abstract] forall i in disable: !spec_contains(features.features, bv2int(i));
+        // ensures [abstract] forall i in enable: !spec_contains(disable, bv2int(i))
+        //     ==> spec_contains(features.features, bv2int(i));
+        ensures [abstract] forall i in disable: !spec_contains(features.features, i);
+        ensures [abstract] forall i in enable: !vector::spec_contains(disable, i)
+            ==> spec_contains(features.features, i);
+        pragma opaque;
+        // pragma bv=b"1,2";
     }
 
     spec contains(features: &vector<u8>, feature: u64): bool {
@@ -27,6 +43,16 @@ spec std::features {
         pragma opaque;
         modifies global<Features>(@std);
         aborts_if signer::address_of(framework) != @std;
+        // pragma bv=b"1,2";
+    }
+
+    spec change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
+        pragma opaque;
+        modifies global<Features>(@std);
+        modifies global<config_buffer::ConfigBuffer<Features>>(@std);
+        pragma aborts_if_is_partial;
+        aborts_if signer::address_of(framework) != @std;
+        // pragma bv=b"1,2";
     }
 
     spec is_enabled(feature: u64): bool {

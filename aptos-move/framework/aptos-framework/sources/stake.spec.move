@@ -309,6 +309,15 @@ spec aptos_framework::stake {
         ensures stake_pool.locked_until_secs == lockup + now_seconds;
     }
 
+    spec force_update_network_and_fullnode_addresses(
+        operator: &signer,
+        pool_address: address,
+        new_network_addresses: vector<u8>,
+        new_fullnode_addresses: vector<u8>,
+    ) {
+        modifies global<ValidatorConfig>(pool_address);
+    }
+
     spec update_network_and_fullnode_addresses(
         operator: &signer,
         pool_address: address,

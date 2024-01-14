@@ -62,6 +62,12 @@ module std::config_buffer {
         move_to(account, ConfigBuffer { payload: config });
     }
 
+    spec upsert {
+        pragma opaque;
+        pragma aborts_if_is_partial;
+        modifies global<ConfigBuffer<T>>(@std);
+    }
+
     /// Take the buffered config `T` out (buffer cleared). Abort if the buffer is empty.
     /// Should only be used at the end of a reconfiguration.
     ///
@@ -70,6 +76,12 @@ module std::config_buffer {
         abort_unless_std(account);
         let ConfigBuffer<T> { payload } = move_from<ConfigBuffer<T>>(@std);
         payload
+    }
+
+    spec extract {
+        pragma opaque;
+        pragma aborts_if_is_partial;
+        modifies global<ConfigBuffer<T>>(@std);
     }
 
     fun abort_unless_std(account: &signer) {
