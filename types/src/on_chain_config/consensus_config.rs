@@ -8,19 +8,163 @@ use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub enum ConsensusAlgorithmConfig {
+    Jolteon {
+        main: ConsensusConfigV1,
+        quorum_store_enabled: bool,
+    },
+    DAG(DagConsensusConfigV1),
+}
+
+impl ConsensusAlgorithmConfig {
+    pub fn default_for_genesis() -> Self {
+        Self::Jolteon {
+            main: ConsensusConfigV1::default(),
+            quorum_store_enabled: true,
+        }
+    }
+
+    pub fn default_if_missing() -> Self {
+        Self::Jolteon {
+            main: ConsensusConfigV1::default(),
+            quorum_store_enabled: false,
+        }
+    }
+
+    pub fn quorum_store_enabled(&self) -> bool {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon {
+                quorum_store_enabled,
+                ..
+            } => *quorum_store_enabled,
+            ConsensusAlgorithmConfig::DAG(_) => false,
+        }
+    }
+
+    pub fn is_dag_enabled(&self) -> bool {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon { .. } => false,
+            ConsensusAlgorithmConfig::DAG(_) => true,
+        }
+    }
+
+    pub fn leader_reputation_exclude_round(&self) -> u64 {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.exclude_round,
+            _ => unimplemented!("method not supported"),
+        }
+    }
+
+    pub fn max_failed_authors_to_store(&self) -> usize {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon { main, .. } => main.max_failed_authors_to_store,
+            _ => unimplemented!("method not supported"),
+        }
+    }
+
+    pub fn proposer_election_type(&self) -> &ProposerElectionType {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon { main, .. } => &main.proposer_election_type,
+            _ => unimplemented!("method not supported"),
+        }
+    }
+
+    pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
+        match self {
+            ConsensusAlgorithmConfig::DAG(dag) => dag,
+            _ => unreachable!("not a dag config"),
+        }
+    }
+}
+
+const VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT: u64 = 1;
+const VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT: u64 = 2097152; //2MB
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub enum ValidatorTxnConfig {
+    /// Disabled. In Jolteon, it also means to not use `BlockType::ProposalExt`.
+    V0,
+    /// Enabled. Per-block vtxn count and their total bytes are limited.
+    V1 {
+        per_block_limit_txn_count: u64,
+        per_block_limit_total_bytes: u64,
+    },
+}
+
+impl ValidatorTxnConfig {
+    pub fn default_for_genesis() -> Self {
+        Self::V1 {
+            per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
+            per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
+        }
+    }
+
+    pub fn default_if_missing() -> Self {
+        Self::V0
+    }
+
+    pub fn default_disabled() -> Self {
+        Self::V0
+    }
+
+    pub fn default_enabled() -> Self {
+        Self::V1 {
+            per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
+            per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
+        }
+    }
+
+    pub fn enabled(&self) -> bool {
+        match self {
+            ValidatorTxnConfig::V0 => false,
+            ValidatorTxnConfig::V1 { .. } => true,
+        }
+    }
+
+    pub fn per_block_limit_txn_count(&self) -> u64 {
+        match self {
+            ValidatorTxnConfig::V0 => 0,
+            ValidatorTxnConfig::V1 {
+                per_block_limit_txn_count,
+                ..
+            } => *per_block_limit_txn_count,
+        }
+    }
+
+    pub fn per_block_limit_total_bytes(&self) -> u64 {
+        match self {
+            ValidatorTxnConfig::V0 => 0,
+            ValidatorTxnConfig::V1 {
+                per_block_limit_total_bytes,
+                ..
+            } => *per_block_limit_total_bytes,
+        }
+    }
+}
+
 /// The on-chain consensus config, in order to be able to add fields, we use enum to wrap the actual struct.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
+
+    /// Deprecated by V4.
     V3(ConsensusConfigV1Ext),
     DagV1(DagConsensusConfigV1),
+    V4 {
+        alg: ConsensusAlgorithmConfig,
+        vtxn: ValidatorTxnConfig,
+    },
 }
 
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        OnChainConsensusConfig::V3(ConsensusConfigV1Ext::default_for_genesis())
+        OnChainConsensusConfig::V4 {
+            alg: ConsensusAlgorithmConfig::default_for_genesis(),
+            vtxn: ValidatorTxnConfig::default_for_genesis(),
+        }
     }
 
     /// The number of recent rounds that don't count into reputations.
@@ -31,6 +175,7 @@ impl OnChainConsensusConfig {
             | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.exclude_round
             },
+            OnChainConsensusConfig::V4 { alg, .. } => alg.leader_reputation_exclude_round(),
             _ => unimplemented!("method not supported"),
         }
     }
@@ -49,6 +194,7 @@ impl OnChainConsensusConfig {
             | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.max_failed_authors_to_store
             },
+            OnChainConsensusConfig::V4 { alg, .. } => alg.max_failed_authors_to_store(),
             _ => unimplemented!("method not supported"),
         }
     }
@@ -61,6 +207,7 @@ impl OnChainConsensusConfig {
             | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 &config.proposer_election_type
             },
+            OnChainConsensusConfig::V4 { alg, .. } => alg.proposer_election_type(),
             _ => unimplemented!("method not supported"),
         }
     }
@@ -70,34 +217,49 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_config) => false,
             OnChainConsensusConfig::V2(_) | OnChainConsensusConfig::V3(_) => true,
             OnChainConsensusConfig::DagV1(_) => false,
+            OnChainConsensusConfig::V4 { alg, .. } => alg.quorum_store_enabled(),
         }
     }
 
     pub fn is_dag_enabled(&self) -> bool {
-        matches!(self, OnChainConsensusConfig::DagV1(_))
+        match self {
+            OnChainConsensusConfig::V1(_) => false,
+            OnChainConsensusConfig::V2(_) => false,
+            OnChainConsensusConfig::V3(_) => false,
+            OnChainConsensusConfig::DagV1(_) => true,
+            OnChainConsensusConfig::V4 { alg, .. } => alg.is_dag_enabled(),
+        }
     }
 
     pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
         match &self {
             OnChainConsensusConfig::DagV1(config) => config,
+            OnChainConsensusConfig::V4 { alg, .. } => alg.unwrap_dag_config_v1(),
             _ => unreachable!("not a dag config"),
         }
     }
 
-    pub fn validator_txn_enabled(&self) -> bool {
+    pub fn effective_validator_txn_config(&self) -> ValidatorTxnConfig {
         match self {
-            OnChainConsensusConfig::V3(obj) => obj
-                .extra_features
-                .is_enabled(ConsensusExtraFeature::ValidatorTransaction),
-            _ => false,
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
+                ValidatorTxnConfig::default_disabled()
+            },
+            OnChainConsensusConfig::V3(_) | OnChainConsensusConfig::DagV1(_) => {
+                ValidatorTxnConfig::default_enabled()
+            },
+            OnChainConsensusConfig::V4 { vtxn, .. } => vtxn.clone(),
         }
     }
 }
 
 /// This is used when on-chain config is not initialized.
+/// TODO: rename to "default_if_missing()" to be consistent with others?
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V3(ConsensusConfigV1Ext::default_if_missing())
+        OnChainConsensusConfig::V4 {
+            alg: ConsensusAlgorithmConfig::default_if_missing(),
+            vtxn: ValidatorTxnConfig::default_if_missing(),
+        }
     }
 }
 

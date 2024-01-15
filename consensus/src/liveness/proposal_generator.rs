@@ -25,7 +25,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::{error, sample, sample::SampleRate, warn};
-use aptos_types::validator_txn::ValidatorTransaction;
+use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use futures::future::BoxFuture;
 use std::{
@@ -175,7 +175,7 @@ pub struct ProposalGenerator {
     // Last round that a proposal was generated
     last_round_generated: Round,
     quorum_store_enabled: bool,
-    validator_txn_enabled: bool,
+    vtxn_config: ValidatorTxnConfig,
 }
 
 impl ProposalGenerator {
@@ -191,7 +191,7 @@ impl ProposalGenerator {
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
-        validator_txn_enabled: bool,
+        vtxn_config: ValidatorTxnConfig,
     ) -> Self {
         Self {
             author,
@@ -206,7 +206,7 @@ impl ProposalGenerator {
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
-            validator_txn_enabled,
+            vtxn_config,
         }
     }
 
@@ -356,7 +356,7 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        let block = if self.validator_txn_enabled {
+        let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(
                 validator_txns,
                 payload,

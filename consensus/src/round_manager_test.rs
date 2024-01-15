@@ -272,7 +272,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
-            onchain_consensus_config.validator_txn_enabled(),
+            onchain_consensus_config.effective_validator_txn_config(),
         );
 
         let round_state = Self::create_round_state(time_service);

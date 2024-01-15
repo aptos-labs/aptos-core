@@ -898,7 +898,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            onchain_consensus_config.validator_txn_enabled(),
+            onchain_consensus_config.effective_validator_txn_config(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -1025,8 +1025,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
+        let effective_vtxn_config = consensus_config.effective_validator_txn_config();
+        debug!("effective_vtxn_config={:?}", effective_vtxn_config);
         let mixed_payload_client = MixedPayloadClient::new(
-            consensus_config.validator_txn_enabled(),
+            effective_vtxn_config,
             self.validator_txn_pool_client.clone(),
             Arc::new(quorum_store_client),
         );
@@ -1130,7 +1132,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             state_computer,
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
-            onchain_consensus_config.validator_txn_enabled(),
+            onchain_consensus_config.effective_validator_txn_config(),
             self.bounded_executor.clone(),
         );
 

@@ -40,6 +40,7 @@ pub use self::{
     consensus_config::{
         ConsensusConfigV1, ConsensusConfigV1Ext, ConsensusExtraFeature, DagConsensusConfigV1,
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
+        ValidatorTxnConfig,
     },
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig,
