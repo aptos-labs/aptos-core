@@ -42,15 +42,23 @@ struct PoolItem {
     pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
 }
 
+/// PoolState invariants.
+/// `(seq_num=i, topic=T)` exists in `txn_queue` if and only if it exists in `seq_nums_by_topic`.
 #[derive(Default)]
 pub struct PoolState {
+    /// Incremented every time a txn is pushed in. The txn gets the old value as its sequence number.
     next_seq_num: u64,
+
+    /// Track Topic -> seq_num mapping.
+    /// We allow only 1 txn per topic and this index helps find the old txn when adding a new one for the same topic.
     seq_nums_by_topic: HashMap<Topic, u64>,
+
+    /// Txns ordered by their sequence numbers (i.e. time they entered the pool).
     txn_queue: BTreeMap<u64, PoolItem>,
 }
 
-/// Created for `txn` when you call `PoolState::put(txn)`.
-/// Once dropped, `txn` will be deleted from the pool (if it has not been).
+/// Returned for `txn` when you call `PoolState::put(txn, ...)`.
+/// If this is dropped, `txn` will be deleted from the pool (if it has not been).
 ///
 /// This allows the pool to be emptied on epoch boundaries.
 pub struct TxnGuard {
