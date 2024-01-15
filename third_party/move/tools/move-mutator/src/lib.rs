@@ -10,9 +10,11 @@ mod mutate;
 mod configuration;
 mod mutant;
 mod operator;
+mod output;
 mod report;
 
 use crate::compiler::{generate_ast, verify_mutant};
+use std::fs;
 use std::path::Path;
 
 use crate::configuration::Configuration;
@@ -56,12 +58,11 @@ pub fn run_move_mutator(
 
     let (files, ast) = generate_ast(&mutator_configuration, &config, package_path)?;
     let mutants = mutate::mutate(ast)?;
-    let output_dir = setup_output_dir(&mutator_configuration)?;
+    let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
 
     for (hash, (filename, source)) in files {
         let path = Path::new(filename.as_str());
-        let file_name = path.file_stem().unwrap().to_str().unwrap();
 
         trace!("Processing file: {:?}", path);
 
@@ -97,8 +98,8 @@ pub fn run_move_mutator(
                     }
                 }
 
-                let mutant_path = setup_mutant_path(&output_dir, file_name, i);
-                std::fs::write(&mutant_path, &mutated.mutated_source)?;
+                let mutant_path = output::setup_mutant_path(&output_dir, path, i)?;
+                fs::write(&mutant_path, &mutated.mutated_source)?;
 
                 info!(
                     "{} written to {}",
@@ -128,127 +129,4 @@ pub fn run_move_mutator(
 
     trace!("Mutator tool is done here...");
     Ok(())
-}
-
-/// Sets up the path for the mutant.
-///
-/// # Arguments
-///
-/// * `output_dir` - The directory where the mutant will be output.
-/// * `filename` - The filename of the original source file.
-/// * `index` - The index of the mutant.
-///
-/// # Returns
-///
-/// * `PathBuf` - The path to the mutant.
-#[inline]
-fn setup_mutant_path(output_dir: &Path, filename: &str, index: u64) -> PathBuf {
-    output_dir.join(format!("{}_{}.move", filename, index))
-}
-
-/// Sets up the output directory for the mutants.
-///
-/// # Arguments
-///
-/// * `mutator_configuration` - The configuration for the mutator.
-///
-/// # Returns
-///
-/// * `anyhow::Result<PathBuf>` - Returns the path to the output directory if successful, or an error if any error occurs.
-fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow::Result<PathBuf> {
-    let output_dir = mutator_configuration.project.out_mutant_dir.clone();
-    trace!("Trying to set up output directory to: {:?}", output_dir);
-
-    // Check if output directory exists and if it should be overwritten
-    if output_dir.exists() && mutator_configuration.project.no_overwrite.unwrap_or(false) {
-        return Err(anyhow::anyhow!(
-            "Output directory already exists. Use --no-overwrite=false to overwrite."
-        ));
-    }
-
-    let _ = std::fs::remove_dir_all(&output_dir);
-    std::fs::create_dir(&output_dir)?;
-
-    debug!("Output directory set to: {:?}", output_dir);
-
-    Ok(output_dir)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::path::Path;
-    use std::path::PathBuf;
-    use tempfile::tempdir;
-
-    #[test]
-    fn setup_mutant_path_creates_correct_path() {
-        let output_dir = Path::new("/path/to/output");
-        let filename = "test";
-        let index = 1;
-        let result = setup_mutant_path(output_dir, filename, index);
-        assert_eq!(result, PathBuf::from("/path/to/output/test_1.move"));
-    }
-
-    #[test]
-    fn setup_mutant_path_handles_empty_output_dir() {
-        let output_dir = Path::new("");
-        let filename = "test";
-        let index = 1;
-        let result = setup_mutant_path(output_dir, filename, index);
-        assert_eq!(result, PathBuf::from("test_1.move"));
-    }
-
-    #[test]
-    fn setup_mutant_path_handles_empty_filename() {
-        let output_dir = Path::new("/path/to/output");
-        let filename = "";
-        let index = 1;
-        let result = setup_mutant_path(output_dir, filename, index);
-        assert_eq!(result, PathBuf::from("/path/to/output/_1.move"));
-    }
-
-    #[test]
-    fn setup_output_dir_creates_directory_if_not_exists() {
-        let temp_dir = tempdir().unwrap();
-        let output_dir = temp_dir.path().join("output");
-        let options = cli::Options {
-            out_mutant_dir: output_dir.clone(),
-            no_overwrite: Some(false),
-            ..Default::default()
-        };
-        let config = Configuration::new(options, None);
-        assert!(setup_output_dir(&config).is_ok());
-        assert!(output_dir.exists());
-    }
-
-    #[test]
-    fn setup_output_dir_overwrites_directory_if_exists_and_no_overwrite_is_false() {
-        let temp_dir = tempdir().unwrap();
-        let output_dir = temp_dir.path().join("output");
-        fs::create_dir(&output_dir).unwrap();
-        let options = cli::Options {
-            out_mutant_dir: output_dir.clone(),
-            no_overwrite: Some(false),
-            ..Default::default()
-        };
-        let config = Configuration::new(options, None);
-        assert!(setup_output_dir(&config).is_ok());
-        assert!(output_dir.exists());
-    }
-
-    #[test]
-    fn setup_output_dir_errors_if_directory_exists_and_no_overwrite_is_true() {
-        let temp_dir = tempdir().unwrap();
-        let output_dir = temp_dir.path().join("output");
-        fs::create_dir(&output_dir).unwrap();
-        let options = cli::Options {
-            out_mutant_dir: output_dir.clone(),
-            no_overwrite: Some(true),
-            ..Default::default()
-        };
-        let config = Configuration::new(options, None);
-        assert!(setup_output_dir(&config).is_err());
-    }
 }
