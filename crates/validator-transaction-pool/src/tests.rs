@@ -33,6 +33,23 @@ fn txn_pull_order_should_be_fifo_except_in_topic_overwriting() {
 }
 
 #[test]
+fn delete_by_seq_num() {
+    let pool = new();
+    let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
+    let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
+    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
+    pool.lock().try_delete(guard_0.seq_num);
+    let pulled = pool.lock().pull(
+        Instant::now().add(Duration::from_secs(10)),
+        99,
+        2048,
+        TransactionFilter::default(),
+    );
+    assert_eq!(vec![txn_1], pulled);
+}
+
+#[test]
 fn txn_should_be_dropped_if_guard_is_dropped() {
     let pool = new();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
