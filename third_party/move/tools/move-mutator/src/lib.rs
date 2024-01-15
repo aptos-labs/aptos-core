@@ -37,7 +37,9 @@ pub fn run_move_mutator(
     config: BuildConfig,
     package_path: PathBuf,
 ) -> anyhow::Result<()> {
-    pretty_env_logger::init();
+    // We need to initialize logger using try_init() as it might be already initialized in some other tool
+    // (e.g. spec-test). If we use init() instead, we will get an abort.
+    let _ = pretty_env_logger::try_init();
 
     info!(
         "Executed move-mutator with the following options: {:?} \n config: {:?} \n package path: {:?}",
