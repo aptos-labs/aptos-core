@@ -5,7 +5,7 @@ use aptos_types::{
     dkg::{DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait},
     epoch_state::EpochState,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolWrapper;
 use futures_channel::oneshot;
 use futures_util::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
@@ -18,7 +18,7 @@ pub struct DKGManager<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> {
     private_params_provider: P,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+    vtxn_pool: VTxnPoolWrapper,
     agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
     agg_trx_tx: Option<aptos_channel::Sender<(), DKGNode>>,
     //TODO: inner state
@@ -31,13 +31,13 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
-        vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+        vtxn_pool: VTxnPoolWrapper,
     ) -> Self {
         Self {
             private_params_provider,
             my_addr,
             epoch_state,
-            vtxn_pool_write_cli,
+            vtxn_pool,
             agg_trx_tx: None,
             agg_trx_producer,
         }
@@ -48,7 +48,6 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         _in_progress_session: Option<DKGSessionState>,
         _dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
         _rpc_msg_rx: aptos_channel::Receiver<(), (AccountAddress, IncomingRpcRequest)>,
-        _dkg_txn_pulled_rx: vtxn_pool::PullNotificationReceiver,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         let mut close_rx = close_rx.into_stream();
@@ -56,7 +55,6 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
             tokio::select! {
                 //TODO: handle other events
                 close_req = close_rx.select_next_some() => {
-                    self.vtxn_pool_write_cli.put(None);
                     if let Ok(ack_sender) = close_req {
                         ack_sender.send(()).unwrap();
                     }

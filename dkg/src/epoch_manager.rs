@@ -25,9 +25,8 @@ use aptos_types::{
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
     },
-    validator_txn::ValidatorTransaction,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolWrapper;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
@@ -45,14 +44,12 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
     dkg_start_events: EventNotificationListener,
-    vtxn_pull_notification_rx_from_pool: vtxn_pool::PullNotificationReceiver,
 
     // Msgs to DKG manager
     dkg_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
-    vtxn_pull_notification_tx_to_dkgmgr: Option<vtxn_pool::PullNotificationSender>,
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+    vtxn_pool: VTxnPoolWrapper,
 
     // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -67,8 +64,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
-        vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
-        vtxn_pull_notification_rx: vtxn_pool::PullNotificationReceiver,
+        vtxn_pool: VTxnPoolWrapper,
     ) -> Self {
         Self {
             my_addr,
@@ -80,9 +76,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dkg_manager_close_tx: None,
             self_sender,
             network_sender,
-            vtxn_pool_write_cli: Arc::new(vtxn_pool_write_cli),
-            vtxn_pull_notification_rx_from_pool: vtxn_pull_notification_rx,
-            vtxn_pull_notification_tx_to_dkgmgr: None,
+            vtxn_pool,
             dkg_start_event_tx: None,
         }
     }
@@ -101,14 +95,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Ok(())
     }
 
-    fn process_vtxn_pull_notification(
-        &mut self,
-        _pulled_txn: Arc<ValidatorTransaction>,
-    ) -> Result<()> {
-        //TODO
-        Ok(())
-    }
-
     pub async fn start(mut self, mut network_receivers: NetworkReceivers) {
         self.await_reconfig_notification().await;
         loop {
@@ -122,9 +108,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 (peer, rpc_request) = network_receivers.rpc_rx.select_next_some() => {
                     self.process_rpc_request(peer, rpc_request)
                 },
-                msg = self.vtxn_pull_notification_rx_from_pool.select_next_some() => {
-                    self.process_vtxn_pull_notification(msg)
-                }
             };
 
             if let Err(e) = handling_result {
@@ -190,16 +173,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_trx_producer),
-                self.vtxn_pool_write_cli.clone(),
+                self.vtxn_pool.clone(),
             );
-            let (vtxn_pull_notification_tx, vtxn_pull_notification_rx) =
-                aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
                 dkg_start_event_rx,
                 dkg_rpc_msg_rx,
-                vtxn_pull_notification_rx,
                 dkg_manager_close_rx,
             ));
         }

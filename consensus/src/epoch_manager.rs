@@ -33,8 +33,7 @@ use crate::{
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
-        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient,
-        validator::ValidatorTxnPayloadClient, PayloadClient,
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -86,7 +85,7 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolWrapper;
 use fail::fail_point;
 use futures::{
     channel::{
@@ -135,7 +134,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    validator_txn_pool_client: Arc<dyn ValidatorTxnPayloadClient>,
+    vtxn_pool: VTxnPoolWrapper,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -179,7 +178,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        validator_txn_pool_client: vtxn_pool::ReadClient,
+        vtxn_pool: VTxnPoolWrapper,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -201,7 +200,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            validator_txn_pool_client: Arc::new(validator_txn_pool_client),
+            vtxn_pool,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -1027,7 +1026,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .await;
         let mixed_payload_client = MixedPayloadClient::new(
             consensus_config.validator_txn_enabled(),
-            self.validator_txn_pool_client.clone(),
+            Arc::new(self.vtxn_pool.clone()),
             Arc::new(quorum_store_client),
         );
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);

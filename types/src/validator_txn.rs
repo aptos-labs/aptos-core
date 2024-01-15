@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::jwks;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -33,11 +34,11 @@ impl ValidatorTransaction {
     }
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum Topic {
-    DKG = 0,
-    JWK_CONSENSUS = 1,
+    DKG,
+    JWK_CONSENSUS(jwks::Issuer),
     DUMMY1,
     #[cfg(any(test, feature = "fuzzing"))]
     DUMMY2,

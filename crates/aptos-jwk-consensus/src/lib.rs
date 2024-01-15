@@ -9,7 +9,7 @@ use aptos_network::application::{
     interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
 };
 use aptos_types::PeerId;
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolWrapper;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -19,7 +19,7 @@ use tokio::runtime::Runtime;
 pub fn start_jwk_consensus_runtime(
     _network_client: NetworkClient<JWKConsensusMsg>,
     _network_service_events: NetworkServiceEvents<JWKConsensusMsg>,
-    _vtxn_pool_writer: vtxn_pool::SingleTopicWriteClient,
+    _vtxn_pool: VTxnPoolWrapper,
     mut reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     mut onchain_jwk_updated_events: EventNotificationListener,
 ) -> Runtime {
