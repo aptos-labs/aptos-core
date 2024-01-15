@@ -663,7 +663,7 @@ pub(super) fn bootstrap_dag_for_test(
         state_computer,
         ordered_nodes_tx,
         false,
-        ValidatorTxnConfig::default_for_genesis(),
+        ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
     );
 
