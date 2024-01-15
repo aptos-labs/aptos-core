@@ -10,6 +10,16 @@ use std::path::{Path, PathBuf};
 /// This function recognizes if the file is inside a package and creates the directory structure
 /// according to its relative path inside the package. If the file is not inside any package,
 /// it creates the directory structure in the output directory.
+/// Example:
+/// The file to be mutated is located in "/a/b/c/sources/X/Y/file.move" (file_path).
+/// This function constructs the following output path for file.move:
+/// "output_dir/X/Y/file_index.move"
+/// It finds the package root for the file, which is "/a/b/c", then it append the relative path to the output directory.
+///
+/// If the file is not inside any package, it creates the directory structure in the output directory like:
+/// The file to be mutated is located in "/a/b/c/file.move" (file_path).
+/// This function constructs the following output path for file.move:
+/// "output_dir/file_index.move"
 ///
 /// # Arguments
 ///
@@ -37,8 +47,8 @@ pub(crate) fn setup_mutant_path(
     let root = SourcePackageLayout::try_find_root(&file_path_canonicalized);
     let root_path = if let Err(e) = root {
         debug!(
-            "Cannot find package root for {:?}. Error: {:?}. Assuming mutating single file.",
-            file_path_canonicalized, e
+            "No package root for {:?}. Assuming mutating a single file.",
+            file_path_canonicalized
         );
         file_path_canonicalized.clone()
     } else {
