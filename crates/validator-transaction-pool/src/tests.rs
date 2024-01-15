@@ -49,6 +49,7 @@ fn txn_should_be_dropped_if_guard_is_dropped() {
     );
     assert!(pulled.is_empty());
 }
+
 #[tokio::test]
 async fn per_txn_pull_notification() {
     let pool = new();
@@ -92,6 +93,7 @@ fn pull_item_limit_should_be_respected() {
     );
     assert_eq!(vec![txn_1], pulled);
 }
+
 #[test]
 fn pull_size_limit_should_be_respected() {
     let pool = new();
