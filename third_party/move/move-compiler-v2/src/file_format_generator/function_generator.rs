@@ -459,6 +459,10 @@ impl<'a> FunctionGenerator<'a> {
                 // order, perhaps we should fix this.
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
+            Operation::Release => {
+                // Move bytecode does not process release, values are released indirectly
+                // when the borrowed leaf is destroyed
+            },
             Operation::Destroy => {
                 // Currently Destroy is only translated for references. It may also make
                 // sense for other values, as we may figure later. Its known to be required

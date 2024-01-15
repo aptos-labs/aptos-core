@@ -87,7 +87,7 @@ fun m::drop_after_loop() {
  12: $t4 := copy($t7)
      # live vars: $t0, $t2, $t4
  13: goto 16
-     # live vars: $t0
+     # live vars: $t0, $t2
  14: label L3
      # live vars: $t0
  15: goto 18
@@ -232,7 +232,7 @@ fun m::drop_after_loop() {
      # moved: {$t3,$t6}
      #
  13: goto 16
-     # live vars: $t0
+     # live vars: $t0, $t2
      # graph: {L512=local($t0)[borrow(true) -> L513],L513=local($t3)[skip -> L769],L769=local($t2)[]}
      # local_to_label: {$t0=L512,$t2=L769,$t3=L513}
      # global_to_label: {}

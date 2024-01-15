@@ -171,7 +171,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  14: $t8 := !=($t9, $t11)
      # live vars: $t0, $t2, $t4, $t8
  15: if ($t8) goto 16 else goto 19
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
  16: label L5
      # live vars: $t0, $t4
  17: goto 40
@@ -199,7 +199,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  28: $t14 := ==($t15, $t17)
      # live vars: $t0, $t2, $t4, $t14
  29: if ($t14) goto 30 else goto 33
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
  30: label L8
      # live vars: $t0, $t4
  31: goto 40
@@ -211,7 +211,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  34: label L10
      # live vars: $t0, $t2, $t4
  35: goto 38
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
  36: label L3
      # live vars: $t0, $t4
  37: goto 40
@@ -295,7 +295,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  14: $t8 := !=($t9, $t11)
      # live vars: $t0, $t2, $t4, $t8
  15: if ($t8) goto 16 else goto 19
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
  16: label L5
      # live vars: $t0, $t4
  17: goto 40
@@ -323,7 +323,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  28: $t14 := ==($t15, $t17)
      # live vars: $t0, $t2, $t4, $t14
  29: if ($t14) goto 30 else goto 33
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
  30: label L8
      # live vars: $t0, $t4
  31: goto 40
@@ -335,7 +335,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  34: label L10
      # live vars: $t0, $t2, $t4
  35: goto 38
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
  36: label L3
      # live vars: $t0, $t4
  37: goto 40
@@ -499,7 +499,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # moved: {$t2,$t5,$t7,$t9,$t10,$t11,$t13,$t15,$t16,$t17,$t22,$t23,$t24}
      #
  15: if ($t8) goto 16 else goto 19
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
      # graph: {L512=local($t0)[borrow(false) -> L513],L513=local($t5)[skip -> L769],L769=local($t4)[]}
      # local_to_label: {$t0=L512,$t4=L769,$t5=L513}
      # global_to_label: {}
@@ -597,7 +597,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # moved: {$t2,$t5,$t7,$t9,$t10,$t11,$t13,$t15,$t16,$t17,$t22,$t23,$t24}
      #
  29: if ($t14) goto 30 else goto 33
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
      # graph: {L512=local($t0)[borrow(false) -> L513],L513=local($t5)[skip -> L769],L769=local($t4)[]}
      # local_to_label: {$t0=L512,$t4=L769,$t5=L513}
      # global_to_label: {}
@@ -639,7 +639,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # moved: {$t2,$t5,$t7,$t9,$t10,$t11,$t13,$t15,$t16,$t17,$t22,$t23,$t24}
      #
  35: goto 38
-     # live vars: $t0, $t4
+     # live vars: $t0, $t2, $t4
      # graph: {L512=local($t0)[borrow(false) -> L513],L513=local($t5)[skip -> L769],L769=local($t4)[]}
      # local_to_label: {$t0=L512,$t4=L769,$t5=L513}
      # global_to_label: {}

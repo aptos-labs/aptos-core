@@ -330,7 +330,7 @@ fun <SELF>_0::check() {
  63: label L12
      # live vars: $t24
  64: goto 68
-     # live vars:
+     # live vars: $t24
  65: label L13
      # live vars:
  66: $t31 := 42
@@ -922,7 +922,7 @@ fun <SELF>_0::check() {
      # moved: {$t1,$t2,$t9,$t10,$t12,$t16,$t20,$t21,$t23,$t25,$t29,$t30,$t44,$t45,$t46,$t47,$t48}
      #
  64: goto 68
-     # live vars:
+     # live vars: $t24
      # graph: {L13824=local($t26)[borrow(true) -> L13825],L13825=local($t25)[skip -> L14081],L14081=local($t24)[]}
      # local_to_label: {$t24=L14081,$t25=L13825,$t26=L13824}
      # global_to_label: {}
@@ -1293,7 +1293,7 @@ fun <SELF>_0::check() {
  36: $t17 := [104, 101, 108, 108, 111]
  37: $t16 := borrow_local($t17)
  38: $t15 := read_ref($t16)
- 39: destroy($t17)
+ 39: release($t17)
  40: $t18 := [104, 101, 108, 108, 111]
  41: $t46 := copy($t15)
  42: destroy($t15)
@@ -1326,13 +1326,13 @@ fun <SELF>_0::check() {
  69: label L12
  70: goto 76
  71: label L13
- 72: destroy($t24)
- 73: destroy($t26)
+ 72: release($t26)
+ 73: destroy($t24)
  74: $t31 := 42
  75: abort($t31)
  76: label L14
  77: $t33 := read_ref($t24)
- 78: destroy($t26)
+ 78: release($t26)
  79: $t34 := [98, 121, 101]
  80: $t49 := copy($t33)
  81: destroy($t33)

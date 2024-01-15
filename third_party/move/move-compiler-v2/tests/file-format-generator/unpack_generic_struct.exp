@@ -75,7 +75,7 @@ public fun m::destroy_none<#0>($t0: m::Option<#0>) {
   3: label L0
      # live vars: $t0
   4: goto 8
-     # live vars:
+     # live vars: $t0
   5: label L1
      # live vars:
   6: $t3 := 262144

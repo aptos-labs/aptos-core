@@ -85,8 +85,10 @@ impl<'a> ExplicitDropTransformer<'a> {
             Bytecode::Ret(..) | Bytecode::Jump(..) | Bytecode::Abort(..) | Bytecode::Branch(..) => {
             },
             _ => {
-                let released_temps = self.released_temps_at(code_offset);
-                self.drop_temps(&released_temps, bytecode.get_attr_id())
+                let (released_temps, dropped_temps) =
+                    self.released_and_dropped_temps_at(code_offset);
+                self.release_or_drop_temps(&released_temps, bytecode.get_attr_id(), true);
+                self.release_or_drop_temps(&dropped_temps, bytecode.get_attr_id(), false);
             },
         }
     }
@@ -94,6 +96,11 @@ impl<'a> ExplicitDropTransformer<'a> {
     /// Checks if the given local is of primitive type
     fn is_primitive(&self, t: TempIndex) -> bool {
         matches!(self.target.get_local_type(t), Type::Primitive(_))
+    }
+
+    /// Checks if the given local is of reference type
+    fn is_reference(&self, t: TempIndex) -> bool {
+        self.target.get_local_type(t).is_reference()
     }
 
     /// Drops unused function arguments
@@ -115,14 +122,14 @@ impl<'a> ExplicitDropTransformer<'a> {
 
     // Returns a set of locals that can be dropped at given code offset
     // Primitives are filtered out
-    fn released_temps_at(&self, code_offset: CodeOffset) -> BTreeSet<TempIndex> {
+    fn released_and_dropped_temps_at(
+        &self,
+        code_offset: CodeOffset,
+    ) -> (BTreeSet<TempIndex>, BTreeSet<TempIndex>) {
         let live_var_info = self.get_live_var_info(code_offset);
         let lifetime_info = self.get_lifetime_info(code_offset);
         let bytecode = &self.target.get_bytecode()[code_offset as usize];
-        released_temps(live_var_info, lifetime_info, bytecode)
-            .into_iter()
-            .filter(|t| !self.is_primitive(*t))
-            .collect()
+        self.released_and_dropped_temps(live_var_info, lifetime_info, bytecode)
     }
 
     fn get_live_var_info(&self, code_offset: CodeOffset) -> &'a LiveVarInfoAtCodeOffset {
@@ -136,61 +143,79 @@ impl<'a> ExplicitDropTransformer<'a> {
     }
 
     fn drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId) {
-        let drop_t = Bytecode::Call(attr_id, Vec::new(), Operation::Destroy, vec![tmp], None);
+        self.release_or_drop_temp(tmp, attr_id, false)
+    }
+
+    fn release_or_drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId, release: bool) {
+        let drop_t = Bytecode::Call(
+            attr_id,
+            Vec::new(),
+            if release {
+                Operation::Release
+            } else {
+                Operation::Destroy
+            },
+            vec![tmp],
+            None,
+        );
         self.emit_bytecode(drop_t)
     }
 
-    fn drop_temps(&mut self, temps_to_drop: &BTreeSet<TempIndex>, attr_id: AttrId) {
+    fn release_or_drop_temps(
+        &mut self,
+        temps_to_drop: &BTreeSet<TempIndex>,
+        attr_id: AttrId,
+        release: bool,
+    ) {
         for t in temps_to_drop {
-            self.drop_temp(*t, attr_id)
+            if !self.is_primitive(*t) {
+                self.release_or_drop_temp(*t, attr_id, release)
+            }
         }
     }
 
     fn emit_bytecode(&mut self, bytecode: Bytecode) {
         self.transformed.push(bytecode)
     }
-}
 
-// Returns a set of locals that can be dropped
-// these are the ones no longer alive or borrowed
-// including locals of primitives
-fn released_temps(
-    live_var_info: &LiveVarInfoAtCodeOffset,
-    life_time_info: &LifetimeInfoAtCodeOffset,
-    bytecode: &Bytecode,
-) -> BTreeSet<TempIndex> {
-    // use set to avoid duplicate dropping
-    let mut released_temps = BTreeSet::new();
-    for t in live_var_info.released_temps() {
-        if !life_time_info.after.is_borrowed(t) {
-            released_temps.insert(t);
+    /// Returns a set of locals which should be released or dropped at this program point.
+    /// See comments in the code.
+    fn released_and_dropped_temps(
+        &self,
+        live_var_info: &LiveVarInfoAtCodeOffset,
+        life_time_info: &LifetimeInfoAtCodeOffset,
+        bytecode: &Bytecode,
+    ) -> (BTreeSet<TempIndex>, BTreeSet<TempIndex>) {
+        // use set to avoid duplicate dropping
+        let mut released_temps = BTreeSet::new();
+        let mut dropped_temps = BTreeSet::new();
+        // Get the temps dropped at this program point, including those which are introduced here but never used.
+        // Exclude local values which are borrowed.
+        for t in live_var_info.released_and_unused_temps(bytecode) {
+            if !life_time_info.after.is_borrowed(t) || self.is_reference(t) {
+                // The local gets out of scope and is either not borrowed from or a reference, so drop it.
+                dropped_temps.insert(t);
+            }
         }
-    }
-    for t in life_time_info.released_temps() {
-        if !live_var_info.after.contains_key(&t) {
-            released_temps.insert(t);
+        // Get the temps which are released according to live var info.
+        for t in life_time_info.released_temps() {
+            if !live_var_info.after.contains_key(&t)
+                && !dropped_temps.contains(&t)
+                && !self.is_reference(t)
+            {
+                // The local is not longer alive but borrowed; that borrow can now be released
+                released_temps.insert(t);
+            }
         }
-    }
-    // if a temp is moved, then no need to drop
-    // this should come before the calculation
-    // of unused vars; because of, for instance,
-    // x = move(x)
-    released_temps.retain(|t| !life_time_info.is_moved(*t));
+        // if a temp is moved, then no need to drop or release
+        // this should not remove unused vars; because of, for instance,
+        // x = move(x)
+        dropped_temps.retain(|t| {
+            let is_used =
+                live_var_info.before.contains_key(t) || live_var_info.after.contains_key(t);
+            !is_used || !life_time_info.is_moved(*t)
+        });
 
-    // this is needed because unused vars are not released by live var info
-    for dst in bytecode.dests() {
-        if !live_var_info.before.contains_key(&dst)
-            && !live_var_info.after.contains_key(&dst)
-            && !life_time_info.before.is_borrowed(dst)
-            && !life_time_info.after.is_borrowed(dst)
-        {
-            // TODO: triggered in ability-checker/ability_violation.move
-            // debug_assert!(
-            //     !life_time_info.after.is_borrowed(dst),
-            //     "dead assignment borrowed later"
-            // );
-            released_temps.insert(dst);
-        }
+        (released_temps, dropped_temps)
     }
-    released_temps
 }

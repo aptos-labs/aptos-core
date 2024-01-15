@@ -550,7 +550,8 @@ impl<'a> FunctionGenerator<'a> {
                     Vector => unimplemented!("vector"),
 
                     // Specification or other operations which can be ignored here
-                    GetField(_, _, _, _)
+                    Release
+                    | GetField(_, _, _, _)
                     | GetGlobal(_, _, _)
                     | IsParent(_, _)
                     | WriteBack(_, _)

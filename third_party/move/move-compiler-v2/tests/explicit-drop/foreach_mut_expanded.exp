@@ -151,7 +151,7 @@ fun m::test_for_each_mut() {
  23: $t5 := copy($t16)
      # live vars: $t0, $t5, $t7, $t10
  24: goto 27
-     # live vars: $t0
+     # live vars: $t0, $t5, $t7, $t10
  25: label L3
      # live vars: $t0
  26: goto 29
@@ -399,7 +399,7 @@ fun m::test_for_each_mut() {
      # moved: {$t2,$t3,$t4,$t7,$t9,$t11,$t14,$t15,$t17,$t24}
      #
  24: goto 27
-     # live vars: $t0
+     # live vars: $t0, $t5, $t7, $t10
      # graph: {L1792=local($t0)[borrow(true) -> L2561],L2561=local($t11)[skip -> L2817],L2817=local($t10)[]}
      # local_to_label: {$t0=L1792,$t10=L2817,$t11=L2561}
      # global_to_label: {}
