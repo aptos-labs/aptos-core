@@ -17,7 +17,7 @@ const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
 const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 2000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
