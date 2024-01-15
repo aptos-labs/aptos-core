@@ -21,7 +21,7 @@ pub struct Options {
     #[clap(long, short, value_parser, default_value = DEFAULT_OUTPUT_DIR)]
     pub out_mutant_dir: PathBuf,
     /// Indicates if mutants should be verified and made sure mutants can compile.
-    #[clap(long, default_value = "true")]
+    #[clap(long, default_value = "false")]
     pub verify_mutants: bool,
     /// Indicates if the output files should be overwritten.
     #[clap(long, short)]
