@@ -113,6 +113,7 @@ impl PoolState {
         let mut ret = vec![];
         let mut seq_num_lower_bound = 0;
         while Instant::now() < deadline && max_items >= 1 && max_bytes >= 1 {
+            // Find the seq_num of the first txn that satisfies the quota.
             if let Some(seq_num) = self
                 .txn_queue
                 .range(seq_num_lower_bound..)
@@ -123,6 +124,9 @@ impl PoolState {
                 .map(|(seq_num, _)| *seq_num)
                 .next()
             {
+                // Now officially pop it from the queue.
+                // Update the quota usage.
+                // Send the pull notification if requested.
                 let PoolItem {
                     seq_num,
                     topic,
