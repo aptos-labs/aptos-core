@@ -117,6 +117,6 @@ fn access_path_panic() {
 
     assert_eq!(
         res.status().unwrap(),
-        ExecutionStatus::MiscellaneousError(Some(StatusCode::VERIFICATION_ERROR))
+        ExecutionStatus::MiscellaneousError(Some(StatusCode::VALUE_SERIALIZATION_ERROR))
     );
 }

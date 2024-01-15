@@ -3,7 +3,7 @@
 
 use crate::{
     data_cache::get_resource_group_from_metadata,
-    move_vm_ext::{write_op_converter::WriteOpConverter, AptosMoveResolver},
+    move_vm_ext::{resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver},
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -173,7 +173,8 @@ impl<'r, 'l> SessionExt<'r, 'l> {
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
 
         let (change_set, resource_group_change_set) =
-            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)?;
+            Self::split_and_merge_resource_groups(move_vm, self.remote, change_set)
+                .map_err(|e| e.finish(Location::Undefined))?;
 
         let table_context: NativeTableContext = extensions.remove();
         let table_change_set = table_context
@@ -217,11 +218,10 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         state_key: StateKey,
         mut source_data: BTreeMap<StructTag, Bytes>,
         resources: BTreeMap<StructTag, MoveStorageOp<BytesWithResourceLayout>>,
-    ) -> VMResult<()> {
+    ) -> PartialVMResult<()> {
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("populate v0 resource group change set error".to_string())
-                .finish(Location::Undefined)
         };
 
         let create = source_data.is_empty();
@@ -291,13 +291,12 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,
         change_set: ChangeSet,
-    ) -> VMResult<(ChangeSet, ResourceGroupChangeSet)> {
+    ) -> PartialVMResult<(ChangeSet, ResourceGroupChangeSet)> {
         // The use of this implies that we could theoretically call unwrap with no consequences,
         // but using unwrap means the code panics if someone can come up with an attack.
         let common_error = || {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("split_and_merge_resource_groups error".to_string())
-                .finish(Location::Undefined)
         };
         let mut change_set_filtered = ChangeSet::new();
 
@@ -369,9 +368,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                         // Maintain the behavior of failing the transaction on resource
                         // group member existence invariants.
                         for (struct_tag, current_op) in resources.iter() {
-                            let exists = remote
-                                .resource_exists_in_group(&state_key, struct_tag)
-                                .map_err(|_| common_error())?;
+                            let exists = remote.resource_exists_in_group(&state_key, struct_tag)?;
                             if matches!(current_op, MoveStorageOp::New(_)) == exists {
                                 // Deletion and Modification require resource to exist,
                                 // while creation requires the resource to not exist.
@@ -405,10 +402,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         for (addr, account_changeset) in change_set.into_inner() {
             let (modules, resources) = account_changeset.into_inner();
             for (struct_tag, blob_and_layout_op) in resources {
-                let state_key = StateKey::access_path(
-                    AccessPath::resource_access_path(addr, struct_tag)
-                        .unwrap_or_else(|_| AccessPath::undefined()),
-                );
+                let state_key = resource_state_key(addr, struct_tag)?;
                 let op = woc.convert_resource(
                     &state_key,
                     blob_and_layout_op,
