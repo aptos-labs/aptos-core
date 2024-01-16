@@ -14,7 +14,7 @@ use move_compiler_v2::{
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
-        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
+        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,abort_analysis::AbortAnalysisProcessor,
     },
     run_bytecode_verifier, run_file_format_gen, Options,
 };
