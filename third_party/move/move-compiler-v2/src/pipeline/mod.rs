@@ -12,6 +12,7 @@ use crate::pipeline::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_checker;
+pub mod abort_analysis;
 pub mod avail_copies_analysis;
 pub mod copy_propagation;
 pub mod dead_store_elimination;

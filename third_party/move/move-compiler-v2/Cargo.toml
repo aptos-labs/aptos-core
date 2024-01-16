@@ -22,6 +22,7 @@ move-disassembler = { path = "../tools/move-disassembler" }
 move-ir-types = { path = "../move-ir/types" }
 move-model = { path = "../move-model" }
 move-stackless-bytecode = { path = "../move-model/bytecode" }
+abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive" }
 move-symbol-pool = { path = "../move-symbol-pool" }
 
 bcs = { workspace = true }
