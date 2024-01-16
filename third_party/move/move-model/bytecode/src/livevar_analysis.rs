@@ -316,7 +316,7 @@ impl<'a> LiveVarAnalysis<'a> {
                     // that creates a root mutable reference), do not optimize it away as we need this local/global root
                     // reference for our IsParent test. An alternative (i.e., one way to get rid of this exception) is
                     // to support IsParent test against local and global directly, but that is more complicated.
-                    // 2) if the called operation is either OpaqueCallBegin or OpaqueCallEnd because they should always appear pairwise.
+                    // 2) if the called operation is either OpaqueCallBegin or OpaqueCallEnd, they should not be optimized away, because they should always appear pairwise.
                     let next_code_offset = code_offset + 1;
                     if let Bytecode::Assign(_, dest, src, _) = &code[next_code_offset] {
                         let annotation_at = &annotations[&(next_code_offset as CodeOffset)];
