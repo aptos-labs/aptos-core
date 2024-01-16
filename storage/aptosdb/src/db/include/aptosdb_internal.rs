@@ -213,7 +213,7 @@ impl AptosDB {
             .epoch_snapshot_pruner
             .get_min_readable_version();
         if version >= min_readable_epoch_snapshot_version {
-            self.ledger_store.ensure_epoch_ending(version)
+            self.ledger_db.metadata_db().ensure_epoch_ending(version)
         } else {
             bail!(
                 "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",

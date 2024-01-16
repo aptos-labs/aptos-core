@@ -60,7 +60,12 @@ impl FastSyncStorageWrapper {
             .state_sync_driver
             .bootstrapping_mode
             .is_fast_sync()
-            && (db_main.ledger_store.get_latest_version().map_or(0, |v| v) == 0)
+            && (db_main
+                .ledger_db
+                .metadata_db()
+                .get_latest_version()
+                .map_or(0, |v| v)
+                == 0)
         {
             db_dir.push(SECONDARY_DB_DIR);
             let secondary_db = AptosDB::open(
