@@ -55,6 +55,7 @@ impl Display for AbortState {
 #[derive(Clone)]
 struct AbortStateAtCodeOffset {
     before: AbortState,
+	#[allow(dead_code)]
     after: AbortState,
 }
 
