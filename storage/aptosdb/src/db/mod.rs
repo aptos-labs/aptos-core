@@ -6,8 +6,10 @@ use crate::{
     backup::{backup_handler::BackupHandler, restore_utils},
     common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
     event_store::EventStore,
-    ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb, LedgerDbSchemaBatches},
-    ledger_store::LedgerStore,
+    ledger_db::{
+        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb, LedgerDb,
+        LedgerDbSchemaBatches,
+    },
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS,
@@ -92,7 +94,6 @@ pub struct AptosDB {
     pub(crate) ledger_db: Arc<LedgerDb>,
     pub(crate) state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
-    pub(crate) ledger_store: Arc<LedgerStore>,
     pub(crate) state_store: Arc<StateStore>,
     pub(crate) transaction_store: Arc<TransactionStore>,
     ledger_pruner: LedgerPrunerManager,
@@ -186,7 +187,6 @@ impl AptosDB {
     /// Gets an instance of `BackupHandler` for data backup purpose.
     pub fn get_backup_handler(&self) -> BackupHandler {
         BackupHandler::new(
-            Arc::clone(&self.ledger_store),
             Arc::clone(&self.transaction_store),
             Arc::clone(&self.state_store),
             Arc::clone(&self.ledger_db),

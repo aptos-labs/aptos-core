@@ -5,8 +5,10 @@
 //! database restore operations, as required by restore and
 //! state sync v2.
 use crate::{
-    ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb, LedgerDbSchemaBatches},
-    ledger_store::LedgerStore,
+    ledger_db::{
+        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb, LedgerDb,
+        LedgerDbSchemaBatches,
+    },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator::TransactionAccumulatorSchema,
@@ -107,7 +109,6 @@ pub fn confirm_or_save_frozen_subtrees(
 /// Saves the given transactions to the db. If a change set is provided, a batch
 /// of db alterations will be added to the change set without writing them to the db.
 pub(crate) fn save_transactions(
-    ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
@@ -125,7 +126,6 @@ pub(crate) fn save_transactions(
 ) -> Result<()> {
     if let Some((ledger_db_batch, state_kv_batches, state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
-            Arc::clone(&ledger_store),
             transaction_store,
             state_store,
             ledger_db,
@@ -144,7 +144,6 @@ pub(crate) fn save_transactions(
         let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
         let state_kv_metadata_batch = SchemaBatch::new();
         save_transactions_impl(
-            Arc::clone(&ledger_store),
             transaction_store,
             Arc::clone(&state_store),
             Arc::clone(&ledger_db),
@@ -219,7 +218,6 @@ fn save_ledger_infos_impl(
 
 /// A helper function that saves the transactions to the given change set
 pub(crate) fn save_transactions_impl(
-    ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
@@ -242,12 +240,21 @@ pub(crate) fn save_transactions_impl(
         )?;
     }
 
-    ledger_store.put_transaction_infos(
-        first_version,
-        txn_infos,
-        &ledger_db_batch.transaction_info_db_batches,
-        &ledger_db_batch.transaction_accumulator_db_batches,
-    )?;
+    for (idx, txn_info) in txn_infos.iter().enumerate() {
+        TransactionInfoDb::put_transaction_info(
+            first_version + idx as Version,
+            txn_info,
+            &ledger_db_batch.transaction_info_db_batches,
+        )?;
+    }
+
+    ledger_db
+        .transaction_accumulator_db()
+        .put_transaction_accumulator(
+            first_version,
+            txn_infos,
+            &ledger_db_batch.transaction_accumulator_db_batches,
+        )?;
 
     ledger_db.event_db().put_events_multiple_versions(
         first_version,

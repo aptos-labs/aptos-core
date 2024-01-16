@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{db_debugger::common::DbDir, ledger_store::LedgerStore};
+use crate::db_debugger::common::DbDir;
 use aptos_crypto::hash::CryptoHash;
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::Version;
@@ -30,8 +30,8 @@ impl Cmd {
 
         println!("Checking Range proof...");
 
-        let store = LedgerStore::new(ledger_db.clone());
-        let txn_infos: Vec<_> = store
+        let txn_infos: Vec<_> = ledger_db
+            .transaction_info_db()
             .get_transaction_info_iter(self.start_version, self.num_versions)?
             .collect::<Result<_>>()?;
         ensure!(
@@ -51,11 +51,13 @@ impl Cmd {
                 "    Root hash: {:?}",
                 li.ledger_info().transaction_accumulator_hash()
             );
-            let range_proof = store.get_transaction_range_proof(
-                Some(self.start_version),
-                self.num_versions as u64,
-                li.ledger_info().version(),
-            )?;
+            let range_proof = ledger_db
+                .transaction_accumulator_db()
+                .get_transaction_range_proof(
+                    Some(self.start_version),
+                    self.num_versions as u64,
+                    li.ledger_info().version(),
+                )?;
             range_proof.verify(
                 li.ledger_info().transaction_accumulator_hash(),
                 Some(self.start_version),
