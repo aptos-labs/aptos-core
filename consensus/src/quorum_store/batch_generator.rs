@@ -408,12 +408,15 @@ impl BatchGenerator {
                         let batches = self.handle_scheduled_pull(dynamic_pull_max_txn).await;
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
-                            // TODO: time how long this takes
+
+                            let persist_start = Instant::now();
                             let mut persist_requests = vec![];
                             for batch in batches.clone().into_iter() {
                                 persist_requests.push(batch.into());
                             }
                             self.batch_writer.persist(persist_requests);
+                            counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
+
                             network_sender.broadcast_batch_msg(batches).await;
                         } else if tick_start.elapsed() > interval.period().checked_div(2).unwrap_or(Duration::ZERO) {
                             // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.
