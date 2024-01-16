@@ -6,8 +6,8 @@ use anyhow::bail;
 use move_command_line_common::{
     env::read_bool_env_var,
     testing::{
-        add_update_baseline_fix, format_diff, read_env_update_baseline, MOVE_COMPILER_V2, EXP_EXT,
-        EXP_EXT_V2,
+        add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
+        MOVE_COMPILER_V2,
     },
 };
 use move_compiler::shared::known_attributes::KnownAttribute;
