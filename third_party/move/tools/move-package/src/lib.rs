@@ -178,8 +178,8 @@ pub enum CompilerVersion {
 
 impl Default for CompilerVersion {
     fn default() -> Self {
-        static ENABLE_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("ENABLE_V2"));
-        if *ENABLE_V2 {
+        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_COMPILER_V2"));
+        if *MOVE_COMPILER_V2 {
             Self::V2
         } else {
             Self::V1
