@@ -9,7 +9,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
-name = "abstract_domain_derive"
+name = "abstract-domain-derive"
 version = "0.1.0"
 dependencies = [
  "proc-macro2 1.0.76",
@@ -11035,7 +11035,7 @@ dependencies = [
 name = "move-stackless-bytecode"
 version = "0.1.0"
 dependencies = [
- "abstract_domain_derive",
+ "abstract-domain-derive",
  "anyhow",
  "codespan",
  "codespan-reporting",

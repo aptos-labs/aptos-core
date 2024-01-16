@@ -1,5 +1,5 @@
 [package]
-name = "abstract_domain_derive"
+name = "abstract-domain-derive"
 version = "0.1.0"
 edition = "2021"
 
