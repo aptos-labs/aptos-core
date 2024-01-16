@@ -317,6 +317,30 @@ fun ability::no_key($t0: address) {
 
 
 Diagnostics:
+error: cannot copy
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:27:7
+   │
+27 │         (x, x);
+   │             ^
+
+error: no key ability
+   ┌─ tests/ability-checker/ability_violation.move:22:3
+   │
+22 │         move_to(signer, Impotent {})
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:4:3
    │
@@ -364,30 +388,6 @@ error: no key ability
    │
 18 │         exists<Impotent>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^
-
-error: no key ability
-   ┌─ tests/ability-checker/ability_violation.move:22:3
-   │
-22 │         move_to(signer, Impotent {})
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: cannot copy
-   ┌─ tests/ability-checker/ability_violation.move:27:4
-   │
-27 │         (x, x);
-   │          ^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:27:4
-   │
-27 │         (x, x);
-   │          ^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:27:7
-   │
-27 │         (x, x);
-   │             ^
 
 ============ after AbilityChecker: ================
 
