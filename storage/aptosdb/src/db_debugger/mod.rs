@@ -8,7 +8,7 @@ pub mod ledger;
 pub mod state_tree;
 pub mod truncate;
 
-use anyhow::Result;
+use aptos_storage_interface::Result;
 use clap::Parser;
 
 #[derive(Parser, Clone)]

@@ -128,14 +128,14 @@ fn test_error_if_version_pruned() {
         db.error_if_state_merkle_pruned("State", 4)
             .unwrap_err()
             .to_string(),
-        "Version 4 is not epoch ending."
+        "AptosDB Other Error: Version 4 is not epoch ending."
     );
     assert!(db.error_if_state_merkle_pruned("State", 5).is_ok());
     assert_eq!(
         db.error_if_ledger_pruned("Transaction", 9)
             .unwrap_err()
             .to_string(),
-        "Transaction at version 9 is pruned, min available version is 10."
+        "AptosDB Other Error: Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
 }

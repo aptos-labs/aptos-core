@@ -393,6 +393,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage
                 .aptos_db()
                 .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
+                .map_err(Into::into)
                 .and_then(|proof| {
                     ensure!(
                         proof.ledger_info_with_sigs.len() as u64

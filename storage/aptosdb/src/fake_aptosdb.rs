@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::AptosDbError,
     gauged_api,
     metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
@@ -15,8 +14,8 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
-    ExecutedTrees, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, AptosDbError, DbReader,
+    DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,

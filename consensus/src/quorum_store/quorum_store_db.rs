@@ -75,7 +75,8 @@ impl QuorumStoreStorage for QuorumStoreDB {
     fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
         let mut iter = self.db.iter::<BatchSchema>(ReadOptions::default())?;
         iter.seek_to_first();
-        iter.collect::<Result<HashMap<HashValue, PersistedValue>>>()
+        iter.map(|res| res.map_err(Into::into))
+            .collect::<Result<HashMap<HashValue, PersistedValue>>>()
     }
 
     fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError> {
@@ -101,7 +102,9 @@ impl QuorumStoreStorage for QuorumStoreDB {
     fn clean_and_get_batch_id(&self, current_epoch: u64) -> Result<Option<BatchId>, DbError> {
         let mut iter = self.db.iter::<BatchIdSchema>(ReadOptions::default())?;
         iter.seek_to_first();
-        let epoch_batch_id = iter.collect::<Result<HashMap<u64, BatchId>>>()?;
+        let epoch_batch_id = iter
+            .map(|res| res.map_err(Into::into))
+            .collect::<Result<HashMap<u64, BatchId>>>()?;
         let mut ret = None;
         for (epoch, batch_id) in epoch_batch_id {
             assert!(current_epoch >= epoch);

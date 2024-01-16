@@ -19,9 +19,9 @@ use crate::{
     },
     AptosDB,
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, ReadOptions, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use std::path::PathBuf;

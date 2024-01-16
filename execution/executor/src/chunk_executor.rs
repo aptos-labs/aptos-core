@@ -157,13 +157,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
     fn latest_state_view(&self, latest_state: &StateDelta) -> Result<CachedStateView> {
         let first_version = latest_state.next_version();
-        CachedStateView::new(
+        Ok(CachedStateView::new(
             StateViewId::ChunkExecution { first_version },
             self.db.reader.clone(),
             first_version,
             latest_state.current.clone(),
             Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-        )
+        )?)
     }
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {

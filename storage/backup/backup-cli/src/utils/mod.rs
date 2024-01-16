@@ -11,7 +11,6 @@ pub(crate) mod stream;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
-use anyhow::{anyhow, Result};
 use aptos_config::config::{
     RocksdbConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
     DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
@@ -29,6 +28,7 @@ use aptos_db::{
 use aptos_infallible::duration_since_epoch;
 use aptos_jellyfish_merkle::{NodeBatch, TreeWriter};
 use aptos_logger::info;
+use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
@@ -276,7 +276,7 @@ pub struct GlobalRestoreOptions {
 impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
     type Error = anyhow::Error;
 
-    fn try_from(opt: GlobalRestoreOpt) -> Result<Self> {
+    fn try_from(opt: GlobalRestoreOpt) -> anyhow::Result<Self> {
         let target_version = opt.target_version.unwrap_or(Version::max_value());
         let concurrent_downloads = opt.concurrent_downloads.get();
         let replay_concurrency_level = opt.replay_concurrency_level.get();
@@ -333,7 +333,10 @@ impl TrustedWaypointOpt {
             trusted_waypoints
                 .insert(w.version(), w)
                 .map_or(Ok(()), |w| {
-                    Err(anyhow!("Duplicated waypoints at version {}", w.version()))
+                    Err(AptosDbError::Other(format!(
+                        "Duplicated waypoints at version {}",
+                        w.version()
+                    )))
                 })?;
         }
         Ok(trusted_waypoints)
@@ -402,7 +405,7 @@ impl<T: AsRef<Path>> PathToString for T {
             .to_path_buf()
             .into_os_string()
             .into_string()
-            .map_err(|s| anyhow!("into_string failed for OsString '{:?}'", s))
+            .map_err(|s| AptosDbError::Other(format!("into_string failed for OsString '{:?}'", s)))
     }
 }
 

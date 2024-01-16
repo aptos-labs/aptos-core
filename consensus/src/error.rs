@@ -12,6 +12,12 @@ pub struct DbError {
     inner: anyhow::Error,
 }
 
+impl From<aptos_storage_interface::AptosDbError> for DbError {
+    fn from(e: aptos_storage_interface::AptosDbError) -> Self {
+        DbError { inner: e.into() }
+    }
+}
+
 #[derive(Debug, Error)]
 #[error(transparent)]
 pub struct StateSyncError {
