@@ -156,6 +156,7 @@ module aptos_framework::storage_gas {
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     const ESTORAGE_GAS_CONFIG: u64 = 0;
     const ESTORAGE_GAS: u64 = 1;

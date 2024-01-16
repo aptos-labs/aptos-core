@@ -68,7 +68,7 @@ module aptos_framework::gas_schedule {
         };
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated gas schedule.
-        reconfiguration::reconfigure();
+        reconfiguration::reconfigure(aptos_framework);
     }
 
     /// Set the gas schedule for the next epoch, typically called by on-chain governance.
@@ -98,7 +98,7 @@ module aptos_framework::gas_schedule {
         if (!std::features::reconfigure_with_dkg_enabled()) {
             // Need to trigger reconfiguration so the VM is guaranteed to load the new gas fee starting from the next
             // transaction.
-            reconfiguration::reconfigure();
+            reconfiguration::reconfigure(aptos_framework);
         }
     }
 }

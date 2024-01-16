@@ -628,7 +628,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
-    /// the next epoch starts.
+    /// the next reconfiguration ends.
     /// The last validator in the set cannot leave. This is an edge case that should never happen as long as the network
     /// is still operational.
     ///
@@ -3126,7 +3126,7 @@ pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayl
 }
 
 /// Request to have `pool_address` leave the validator set. The validator is only actually removed from the set when
-/// the next epoch starts.
+/// the next reconfiguration ends.
 /// The last validator in the set cannot leave. This is an edge case that should never happen as long as the network
 /// is still operational.
 ///

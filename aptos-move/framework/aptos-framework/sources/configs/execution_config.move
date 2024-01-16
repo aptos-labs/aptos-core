@@ -32,7 +32,7 @@ module aptos_framework::execution_config {
             move_to(account, ExecutionConfig { config });
         };
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
-        reconfiguration::reconfigure();
+        reconfiguration::reconfigure(account);
     }
 
     /// This can be called by on-chain governance to update on-chain execution configs.

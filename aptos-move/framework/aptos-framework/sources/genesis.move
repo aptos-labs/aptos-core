@@ -132,7 +132,6 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
-        reconfiguration_state::initialize(&aptos_framework_account);
         dkg::initialize(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
     }
@@ -297,7 +296,8 @@ module aptos_framework::genesis {
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
 
-        stake::update_validator_set_on_new_epoch(true);
+        stake::on_reconfig_start(aptos_framework);
+        stake::on_reconfig_end(aptos_framework);
     }
 
     /// Sets up the initial validator set for the network.
@@ -370,7 +370,7 @@ module aptos_framework::genesis {
             validator.consensus_pubkey,
             validator.proof_of_possession,
         );
-        stake::force_update_network_and_fullnode_addresses(
+        stake::update_network_and_fullnode_addresses(
             operator,
             pool_address,
             validator.network_addresses,
@@ -386,7 +386,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_framework::reconfiguration_state;
 
     #[verify_only]
     fun initialize_for_verification(

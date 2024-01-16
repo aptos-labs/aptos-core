@@ -1127,7 +1127,7 @@ module aptos_framework::vesting {
 
         // The stake pool is still in pending active stake, so unlock_rewards and vest shouldn't do anything.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, admin, stake_pool_address, false);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, admin, stake_pool_address, false);
         assert!(stake::get_validator_state(stake_pool_address) == VALIDATOR_STATUS_PENDING_ACTIVE, 1);
         unlock_rewards(contract_address);
         vest(contract_address);
@@ -1135,21 +1135,21 @@ module aptos_framework::vesting {
 
         // Wait for the validator to join the validator set. No rewards are earnt yet so unlock_rewards and vest should
         // still do nothing.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         assert!(stake::get_validator_state(stake_pool_address) == VALIDATOR_STATUS_ACTIVE, 2);
         unlock_rewards(contract_address);
         vest(contract_address);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
 
         // Stake pool earns some rewards. unlock_rewards should unlock the right amount.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let rewards = get_accumulated_rewards(contract_address);
         unlock_rewards(contract_address);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, rewards);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
 
         // Stake pool earns more rewards. vest should unlock the rewards but no vested tokens as vesting hasn't started.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         rewards = with_rewards(rewards); // Pending inactive stake still earns rewards.
         rewards = rewards + get_accumulated_rewards(contract_address);
         vest(contract_address);
@@ -1159,7 +1159,7 @@ module aptos_framework::vesting {
         // Fast forward to stake lockup expiration so rewards are fully unlocked.
         // In the mean time, rewards still earn rewards.
         // Calling distribute() should send rewards to the shareholders.
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         rewards = with_rewards(rewards);
         distribute(contract_address);
         let shareholder_1_bal = coin::balance<AptosCoin>(shareholder_1_address);
@@ -1204,7 +1204,7 @@ module aptos_framework::vesting {
         stake::assert_stake_pool(stake_pool_address, remaining_grant, 0, 0, pending_distribution);
         assert!(remaining_grant(contract_address) == remaining_grant, 0);
 
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let total_active = with_rewards(remaining_grant);
         pending_distribution = with_rewards(pending_distribution);
         distribute(contract_address);
@@ -1218,7 +1218,7 @@ module aptos_framework::vesting {
         terminate_vesting_contract(admin, contract_address);
         stake::assert_stake_pool(stake_pool_address, 0, 0, 0, total_active);
         assert!(remaining_grant(contract_address) == 0, 0);
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         let withdrawn_amount = with_rewards(total_active);
         stake::assert_stake_pool(stake_pool_address, 0, withdrawn_amount, 0, 0);
         let previous_bal = coin::balance<AptosCoin>(withdrawal_address);
@@ -1333,7 +1333,7 @@ module aptos_framework::vesting {
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, admin, stake_pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, admin, stake_pool_address, true);
 
         // Fast forward to the end of the first period. vest() should now unlock 3/48 of the tokens.
         timestamp::update_global_time_for_test_secs(vesting_start_secs(contract_address) + VESTING_PERIOD);
@@ -1364,10 +1364,10 @@ module aptos_framework::vesting {
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, admin, stake_pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, admin, stake_pool_address, true);
 
         // Stake pool earns some rewards. unlock_rewards should unlock the right amount.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let rewards = get_accumulated_rewards(contract_address);
         unlock_rewards(contract_address);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, rewards);
@@ -1400,10 +1400,10 @@ module aptos_framework::vesting {
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, stake_pool_address, true);
 
         // Stake pool earns some rewards. unlock_rewards should unlock the right amount.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let accumulated_rewards = get_accumulated_rewards(contract_address);
         let commission = accumulated_rewards / 10; // 10%.
         let staker_rewards = accumulated_rewards - commission;
@@ -1412,7 +1412,7 @@ module aptos_framework::vesting {
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
 
         // Distribution should pay commission to operator first and remaining amount to shareholders.
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         stake::assert_stake_pool(stake_pool_address, with_rewards(GRANT_AMOUNT), with_rewards(accumulated_rewards), 0, 0);
         // Operator also earns more commission from the rewards earnt on the withdrawn rewards.
         let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
@@ -1446,10 +1446,10 @@ module aptos_framework::vesting {
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let stake_pool_address = stake_pool_address(contract_address);
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, stake_pool_address, true);
 
         // Stake pool earns some rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
 
         // Operator requests commission directly with staking_contract first.
         let accumulated_rewards = get_accumulated_rewards(contract_address);
@@ -1463,7 +1463,7 @@ module aptos_framework::vesting {
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
 
         // Distribution should pay commission to operator first and remaining amount to shareholders.
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         stake::assert_stake_pool(stake_pool_address, with_rewards(GRANT_AMOUNT), with_rewards(accumulated_rewards), 0, 0);
         // Operator also earns more commission from the rewards earnt on the withdrawn rewards.
         let commission_on_staker_rewards = (with_rewards(staker_rewards) - staker_rewards) / 10;
@@ -1512,13 +1512,13 @@ module aptos_framework::vesting {
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, stake_pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, stake_pool_address, true);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
         assert!(get_accumulated_rewards(contract_address) == 0, 0);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
 
         // Stake pool earns some rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(contract_address, operator_address);
 
         // Update commission percentage to 20%. This also immediately requests commission.
@@ -1531,7 +1531,7 @@ module aptos_framework::vesting {
         let expected_commission = accumulated_rewards / 10;
 
         // Stake pool earns some more rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(contract_address, operator_address);
 
         // Request commission again.
@@ -1540,7 +1540,7 @@ module aptos_framework::vesting {
         expected_commission = with_rewards(expected_commission) + (accumulated_rewards / 5);
 
         // Unlocks the commission.
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         expected_commission = with_rewards(expected_commission);
 
         // Distribute the commission to the operator.
@@ -1577,13 +1577,13 @@ module aptos_framework::vesting {
 
         // Operator needs to join the validator set for the stake pool to earn rewards.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator1, stake_pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator1, stake_pool_address, true);
         stake::assert_stake_pool(stake_pool_address, GRANT_AMOUNT, 0, 0, 0);
         assert!(get_accumulated_rewards(contract_address) == 0, 0);
         assert!(remaining_grant(contract_address) == GRANT_AMOUNT, 0);
 
         // Stake pool earns some rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(contract_address,
             operator_address1
         );
@@ -1593,7 +1593,7 @@ module aptos_framework::vesting {
         // Request commission.
         staking_contract::request_commission(operator1, contract_address, operator_address1);
         // Unlocks the commission.
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         expected_commission = with_rewards(expected_commission);
 
         // Distribute the commission to the operator.
@@ -1607,7 +1607,7 @@ module aptos_framework::vesting {
         // switch operator to operator2. The rewards should go to operator2 not to the beneficiay of operator1.
         update_operator(admin, contract_address, operator_address2, 10);
 
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let (_, accumulated_rewards, _) = staking_contract::staking_contract_amounts(contract_address,
             operator_address2
         );
@@ -1617,7 +1617,7 @@ module aptos_framework::vesting {
         // Request commission.
         staking_contract::request_commission(operator2, contract_address, operator_address2);
         // Unlocks the commission.
-        stake::fast_forward_to_unlock(stake_pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, stake_pool_address);
         expected_commission = with_rewards(expected_commission);
 
         // Distribute the commission to the operator.
@@ -1835,7 +1835,7 @@ module aptos_framework::vesting {
         vest(contract_address);
 
         // Distribution should go to the beneficiary account.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         // No rewards as validator never joined the validator set.
         let vested_amount = fraction(GRANT_AMOUNT, 3, 48);
         distribute(contract_address);
@@ -1879,7 +1879,7 @@ module aptos_framework::vesting {
         reset_beneficiary(admin, contract_address, @11);
 
         // Distribution should go to the original account.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         // No rewards as validator never joined the validator set.
         let vested_amount = fraction(GRANT_AMOUNT, 3, 48);
         distribute(contract_address);

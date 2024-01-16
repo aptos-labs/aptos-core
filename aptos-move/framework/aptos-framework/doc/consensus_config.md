@@ -132,7 +132,7 @@ This can be called by on-chain governance to update on-chain consensus configs.
     *config_ref = config;
 
     // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated configs.
-    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>(<a href="account.md#0x1_account">account</a>);
 }
 </code></pre>
 

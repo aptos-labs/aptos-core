@@ -36,7 +36,7 @@ module aptos_framework::consensus_config {
         *config_ref = config;
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
-        reconfiguration::reconfigure();
+        reconfiguration::reconfigure(account);
     }
 
     /// This can be called by on-chain governance to update on-chain consensus configs for the next epoch.

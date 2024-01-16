@@ -992,14 +992,14 @@ module aptos_framework::aptos_governance {
 
         // 500 seconds later, lockup period of voter_1 and voter_2 is reset.
         timestamp::fast_forward_seconds(440);
-        stake::end_epoch();
+        stake::end_epoch(&aptos_framework);
         assert!(get_remaining_voting_power(proposer_addr, 0) == 100, 0);
         assert!(get_remaining_voting_power(voter_1_addr, 0) == 20, 1);
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
 
         // 501 seconds later, the proposal expires.
         timestamp::fast_forward_seconds(441);
-        stake::end_epoch();
+        stake::end_epoch(&aptos_framework);
         assert!(get_remaining_voting_power(proposer_addr, 0) == 0, 0);
         assert!(get_remaining_voting_power(voter_1_addr, 0) == 0, 1);
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 0, 2);
@@ -1098,12 +1098,12 @@ module aptos_framework::aptos_governance {
         let (_sk_1, pk_1, pop_1) = stake::generate_identity();
         let (_sk_2, pk_2, pop_2) = stake::generate_identity();
         let (_sk_3, pk_3, pop_3) = stake::generate_identity();
-        stake::initialize_test_validator(&pk_2, &pop_2, yes_voter, 20, true, false);
-        stake::initialize_test_validator(&pk_3, &pop_3, no_voter, 10, true, false);
-        stake::end_epoch();
+        stake::initialize_test_validator(aptos_framework, &pk_2, &pop_2, yes_voter, 20, true, false);
+        stake::initialize_test_validator(aptos_framework, &pk_3, &pop_3, no_voter, 10, true, false);
+        stake::end_epoch(aptos_framework);
         timestamp::fast_forward_seconds(1440);
-        stake::initialize_test_validator(&pk_1, &pop_1, proposer, 100, true, false);
-        stake::end_epoch();
+        stake::initialize_test_validator(aptos_framework, &pk_1, &pop_1, proposer, 100, true, false);
+        stake::end_epoch(aptos_framework);
     }
 
     #[test_only]

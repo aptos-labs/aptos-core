@@ -885,11 +885,11 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let new_balance = with_rewards(INITIAL_BALANCE);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
@@ -900,7 +900,7 @@ module aptos_framework::staking_contract {
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, expected_commission_1);
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
         assert_distribution(staker_address, operator_address, operator_address, expected_commission_1);
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
 
         // Both original stake and operator commissions have received rewards.
         expected_commission_1 = with_rewards(expected_commission_1);
@@ -921,7 +921,7 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == previous_principal + INITIAL_BALANCE, 0);
 
         // The newly added stake didn't receive any rewards because it was only added in the new epoch.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         new_balance = with_rewards(new_balance) + INITIAL_BALANCE;
 
         // Second round of commission request/withdrawal.
@@ -930,7 +930,7 @@ module aptos_framework::staking_contract {
         request_commission(operator, staker_address, operator_address);
         assert_distribution(staker_address, operator_address, operator_address, expected_commission_2);
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
         expected_commission_2 = with_rewards(expected_commission_2);
         distribute(staker_address, operator_address);
         operator_balance = coin::balance<AptosCoin>(operator_address);
@@ -940,7 +940,7 @@ module aptos_framework::staking_contract {
         new_balance = with_rewards(new_balance);
 
         // New rounds of rewards.
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
         new_balance = with_rewards(new_balance);
 
         // Staker withdraws all stake, which should also request commission distribution.
@@ -953,7 +953,7 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == 0, 0);
 
         // End epoch. The stake pool should get kicked out of the validator set as it has 0 remaining active stake.
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
         // Operator should still earn 10% commission on the rewards on top of the staker's withdrawn_amount.
         let commission_on_withdrawn_amount = (with_rewards(withdrawn_amount) - withdrawn_amount) / 10;
         unpaid_commission = with_rewards(unpaid_commission) + commission_on_withdrawn_amount;
@@ -982,11 +982,11 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let new_balance = with_rewards(INITIAL_BALANCE);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
@@ -1010,11 +1010,11 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let new_balance = with_rewards(INITIAL_BALANCE);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
@@ -1110,8 +1110,8 @@ module aptos_framework::staking_contract {
         // Join validator set and earn some rewards.
         let pool_address = stake_pool_address(staker_address, operator_1_address);
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator_1, pool_address, true);
-        stake::end_epoch();
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator_1, pool_address, true);
+        stake::end_epoch(aptos_framework);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
 
         // Switch operators.
@@ -1131,7 +1131,7 @@ module aptos_framework::staking_contract {
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 2);
 
         // End epoch to get more rewards.
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
         new_balance = with_rewards(new_balance);
         // Rewards on the commission being paid to operator_1 should still be charged commission that will go to
         // operator_2;
@@ -1150,7 +1150,7 @@ module aptos_framework::staking_contract {
         assert!(operator_1_balance == INITIAL_BALANCE + commission_for_operator_1, operator_1_balance);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, commission_for_operator_2);
         assert!(last_recorded_principal(staker_address, operator_2_address) == new_balance, 0);
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
 
         // Operator 2's commission is distributed.
         distribute(staker_address, operator_2_address);
@@ -1218,7 +1218,7 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator1, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator1, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Set beneficiary.
@@ -1226,7 +1226,7 @@ module aptos_framework::staking_contract {
         assert!(beneficiary_for_operator(operator1_address) == beneficiary_address, 0);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let new_balance = with_rewards(INITIAL_BALANCE);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
@@ -1237,7 +1237,7 @@ module aptos_framework::staking_contract {
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, expected_commission_1);
         assert!(last_recorded_principal(staker_address, operator1_address) == new_balance, 0);
         assert_distribution(staker_address, operator1_address, operator1_address, expected_commission_1);
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
 
         // Both original stake and operator commissions have received rewards.
         expected_commission_1 = with_rewards(expected_commission_1);
@@ -1257,7 +1257,7 @@ module aptos_framework::staking_contract {
         let old_beneficiay_balance = beneficiary_balance;
         switch_operator(staker, operator1_address, operator2_address, 10);
 
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let (_, accumulated_rewards, _) = staking_contract_amounts(staker_address, operator2_address);
 
         let expected_commission = accumulated_rewards / 10;
@@ -1265,7 +1265,7 @@ module aptos_framework::staking_contract {
         // Request commission.
         request_commission(operator2, staker_address, operator2_address);
         // Unlocks the commission.
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
         expected_commission = with_rewards(expected_commission);
 
         // Distribute the commission to the operator.
@@ -1287,11 +1287,11 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set so rewards are generated.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let new_balance = with_rewards(initial_balance);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
@@ -1306,7 +1306,7 @@ module aptos_framework::staking_contract {
         assert!(last_recorded_principal(staker_address, operator_address) == new_balance, 0);
 
         // The validator is still in the active set as its remaining stake is still above min required.
-        stake::fast_forward_to_unlock(pool_address);
+        stake::fast_forward_to_unlock(aptos_framework, pool_address);
         new_balance = with_rewards(new_balance);
         unpaid_commission = with_rewards(unpaid_commission);
         // Commission should still be charged on the rewards on top of withdrawn_stake.
@@ -1336,7 +1336,7 @@ module aptos_framework::staking_contract {
         let pool_address = stake_pool_address(staker_address, operator_address);
 
         // Epoch ended, but since validator never joined the set, no rewards were minted.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         stake::assert_stake_pool(pool_address, initial_balance, 0, 0, 0);
 
         // Staker withdraws 1/4 of the stake, which doesn't create any commission distribution as there's no rewards.
@@ -1370,11 +1370,11 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set so rewards are generated.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let new_balance = with_rewards(initial_balance);
         stake::assert_stake_pool(pool_address, new_balance, 0, 0, 0);
 
@@ -1390,7 +1390,7 @@ module aptos_framework::staking_contract {
 
         // End epoch to generate some rewards. Staker withdraws another 1/4 of the stake.
         // Commission should be charged on the rewards earned on the previous 1/4 stake withdrawal.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let commission_on_withdrawn_stake = (with_rewards(withdrawn_stake) - withdrawn_stake) / 10;
         let commission_on_new_balance = (with_rewards(new_balance) - new_balance) / 10;
         unpaid_commission = with_rewards(unpaid_commission) + commission_on_withdrawn_stake + commission_on_new_balance;
@@ -1415,17 +1415,17 @@ module aptos_framework::staking_contract {
 
         // Operator joins the validator set so rewards are generated.
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        stake::join_validator_set_for_test(aptos_framework, &pk, &pop, operator, pool_address, true);
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
         // Fast forward to generate rewards.
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let balance_1epoch = with_rewards(initial_balance);
         let unpaid_commission = (balance_1epoch - initial_balance) / 10;
         stake::assert_stake_pool(pool_address, balance_1epoch, 0, 0, 0);
 
         update_commision(staker, operator_address, 5);
-        stake::end_epoch();
+        stake::end_epoch(aptos_framework);
         let balance_2epoch = with_rewards(balance_1epoch - unpaid_commission);
         stake::assert_stake_pool(pool_address, balance_2epoch, 0, 0, with_rewards(unpaid_commission));
     }

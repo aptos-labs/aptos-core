@@ -46,7 +46,7 @@ module aptos_framework::version {
         config.major = major;
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
-        reconfiguration::reconfigure();
+        reconfiguration::reconfigure(account);
     }
 
     /// Set the major version (to a larger version) for the next epoch.

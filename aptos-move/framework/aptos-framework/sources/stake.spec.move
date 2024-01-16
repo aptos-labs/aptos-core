@@ -384,19 +384,6 @@ spec aptos_framework::stake {
         ensures post_stake_pool.delegated_voter == new_voter;
     }
 
-    spec update_validator_set_on_new_epoch {
-        pragma verify_duration_estimate = 120;
-        pragma disable_invariants_in_body;
-        // The following resource requirement cannot be discharged by the global
-        // invariants because this function is called during genesis.
-        include ResourceRequirement;
-        include staking_config::StakingRewardsConfigRequirement;
-        include aptos_framework::aptos_coin::ExistsAptosCoin;
-        // This function should never abort.
-        /// [high-level-req-4]
-        aborts_if false;
-    }
-
     spec update_performance_statistics {
         // This function is expected to be used after genesis.
         requires chain_status::is_operating();
@@ -409,54 +396,6 @@ spec aptos_framework::stake {
         ensures (option::spec_is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
             (post_validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
                 validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
-    }
-
-    spec update_stake_pool {
-        // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 120;
-        include ResourceRequirement;
-        include staking_config::StakingRewardsConfigRequirement;
-
-        include UpdateStakePoolAbortsIf;
-
-        let stake_pool = global<StakePool>(pool_address);
-        let validator_config = global<ValidatorConfig>(pool_address);
-        let cur_validator_perf = validator_perf.validators[validator_config.validator_index];
-        let num_successful_proposals = cur_validator_perf.successful_proposals;
-        let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
-        let rewards_rate = spec_get_reward_rate_1(staking_config);
-        let rewards_rate_denominator = spec_get_reward_rate_2(staking_config);
-        let rewards_amount_1 = if (stake_pool.active.value > 0) {
-            spec_rewards_amount(stake_pool.active.value, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
-        } else {
-            0
-        };
-        let rewards_amount_2 = if (stake_pool.pending_inactive.value > 0) {
-            spec_rewards_amount(stake_pool.pending_inactive.value, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
-        } else {
-            0
-        };
-        let post post_stake_pool = global<StakePool>(pool_address);
-        let post post_active_value = post_stake_pool.active.value;
-        let post post_pending_inactive_value = post_stake_pool.pending_inactive.value;
-        let fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
-        let post post_fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
-        let post post_inactive_value = post_stake_pool.inactive.value;
-        ensures post_stake_pool.pending_active.value == 0;
-        // the amount stored in the stake pool should not changed after the update
-        ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(fees_table, pool_address)) {
-            !table::spec_contains(post_fees_table, pool_address) &&
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(fees_table, pool_address).value
-        } else {
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value
-        };
-        // when current lockup cycle has expired, pending inactive should be fully unlocked and moved into inactive
-        ensures if (timestamp::spec_now_seconds() >= stake_pool.locked_until_secs) {
-            post_pending_inactive_value == 0 &&
-            post_inactive_value == stake_pool.inactive.value + stake_pool.pending_inactive.value + rewards_amount_2
-        } else {
-            post_pending_inactive_value == stake_pool.pending_inactive.value + rewards_amount_2
-        };
     }
 
     spec schema UpdateStakePoolAbortsIf {
@@ -476,33 +415,6 @@ spec aptos_framework::stake {
 
         include DistributeRewardsAbortsIf {stake: stake_pool.active};
         include DistributeRewardsAbortsIf {stake: stake_pool.pending_inactive};
-    }
-
-    spec distribute_rewards {
-        include ResourceRequirement;
-        requires rewards_rate <= MAX_REWARDS_RATE;
-        requires rewards_rate_denominator > 0;
-        requires rewards_rate <= rewards_rate_denominator;
-        requires num_successful_proposals <= num_total_proposals;
-
-        include DistributeRewardsAbortsIf;
-
-        ensures old(stake.value) > 0 ==>
-            result == spec_rewards_amount(
-                old(stake.value),
-                num_successful_proposals,
-                num_total_proposals,
-                rewards_rate,
-                rewards_rate_denominator);
-        ensures old(stake.value) > 0 ==>
-            stake.value == old(stake.value) + spec_rewards_amount(
-                old(stake.value),
-                num_successful_proposals,
-                num_total_proposals,
-                rewards_rate,
-                rewards_rate_denominator);
-        ensures old(stake.value) == 0 ==> result == 0;
-        ensures old(stake.value) == 0 ==> stake.value == old(stake.value);
     }
 
     spec schema DistributeRewardsAbortsIf {

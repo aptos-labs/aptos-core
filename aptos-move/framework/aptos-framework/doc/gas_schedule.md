@@ -232,7 +232,7 @@ This can be called by on-chain governance to update the gas schedule.
     };
 
     // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated gas schedule.
-    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+    <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>(aptos_framework);
 }
 </code></pre>
 
@@ -322,7 +322,7 @@ Apply the pending gas schedule changes, typically called in <code>block_prologue
     <b>if</b> (!std::features::reconfigure_with_dkg_enabled()) {
         // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so the VM is guaranteed <b>to</b> load the new gas fee starting from the next
         // transaction.
-        <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+        <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>(aptos_framework);
     }
 }
 </code></pre>

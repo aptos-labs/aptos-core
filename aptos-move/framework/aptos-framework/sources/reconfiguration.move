@@ -11,7 +11,6 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
-    use aptos_framework::reconfiguration_state;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
@@ -95,7 +94,7 @@ module aptos_framework::reconfiguration {
     }
 
     /// Signal validators to start using new configuration. Must be called from friend config modules.
-    public(friend) fun reconfigure() acquires Configuration {
+    public(friend) fun reconfigure(account: &signer) acquires Configuration {
         // Do not do anything if genesis has not finished.
         if (chain_status::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
             return
@@ -119,10 +118,6 @@ module aptos_framework::reconfiguration {
             return
         };
 
-        // If `RECONFIGURE_WITH_DKG` is enabled,
-        // `reconfiguration_with_dkg::start()` already marked it correctly, and this invocation becomes a no-op.
-        reconfiguration_state::try_mark_as_in_progress();
-
         // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
         // explicitly so that staking can distribute them.
         //
@@ -138,7 +133,8 @@ module aptos_framework::reconfiguration {
         };
 
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
-        stake::update_validator_set_on_new_epoch(true);
+        stake::on_reconfig_start(account);
+        stake::on_reconfig_end(account);
 
         storage_gas::on_reconfig();
 
@@ -192,11 +188,6 @@ module aptos_framework::reconfiguration {
                 events: account::new_event_handle<NewEpochEvent>(account),
             }
         );
-    }
-
-    #[test_only]
-    public fun reconfigure_for_test() acquires Configuration {
-        reconfigure();
     }
 
     // This is used together with stake::end_epoch() for testing with last_reconfiguration_time

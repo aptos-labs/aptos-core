@@ -11,8 +11,6 @@
 /// NOTE: on-chain config `0x1::state::ValidatorSet` implemented its own buffer.
 module std::config_buffer {
 
-    use std::signer;
-
     /// Config buffer operations failed with permission denied.
     const ESTD_SIGNER_NEEDED: u64 = 1;
 
@@ -20,30 +18,6 @@ module std::config_buffer {
     /// Examples of `T`: `ConsensusConfig`, `Features`.
     struct ConfigBuffer<T> has drop, key {
         payload: T,
-    }
-
-    /// This flag exists under account 0x1 if and only if any validator set change for the next epoch should be rejected.
-    struct ValidatorSetChangeLocked has copy, drop, key {}
-
-    /// Return whether validator set changes are disabled (because of ongoing DKG).
-    public fun validator_set_changes_disabled(): bool {
-        exists<ValidatorSetChangeLocked>(@std)
-    }
-
-    /// When a DKG starts, call this to disable validator set changes.
-    public fun disable_validator_set_changes(account: &signer) {
-        abort_unless_std(account);
-        if (!exists<ValidatorSetChangeLocked>(@std)) {
-            move_to(account, ValidatorSetChangeLocked {})
-        }
-    }
-
-    /// When a DKG finishes, call this to re-enable validator set changes.
-    public fun enable_validator_set_changes(account: &signer) acquires ValidatorSetChangeLocked {
-        abort_unless_std(account);
-        if (!exists<ValidatorSetChangeLocked>(@std)) {
-            move_from<ValidatorSetChangeLocked>(signer::address_of(account));
-        }
     }
 
     /// Check whether there is a pending config payload for `T`.
@@ -109,17 +83,5 @@ module std::config_buffer {
     #[expected_failure(abort_code = 0x050001)]
     fun extract_as_non_std_should_abort(malice: &signer) acquires ConfigBuffer {
         let _ = extract<DummyConfig>(malice);
-    }
-
-    #[test(malice = @0x1234)]
-    #[expected_failure(abort_code = 0x050001)]
-    fun disable_validator_set_change_as_non_std_should_abort(malice: &signer) {
-        disable_validator_set_changes(malice);
-    }
-
-    #[test(malice = @0x1234)]
-    #[expected_failure(abort_code = 0x050001)]
-    fun enable_validator_set_change_as_non_std_should_abort(malice: &signer) acquires ValidatorSetChangeLocked {
-        enable_validator_set_changes(malice);
     }
 }

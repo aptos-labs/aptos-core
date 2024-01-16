@@ -17,11 +17,7 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 
 
 -  [Resource `ConfigBuffer`](#0x1_config_buffer_ConfigBuffer)
--  [Resource `ValidatorSetChangeLocked`](#0x1_config_buffer_ValidatorSetChangeLocked)
 -  [Constants](#@Constants_0)
--  [Function `validator_set_changes_disabled`](#0x1_config_buffer_validator_set_changes_disabled)
--  [Function `disable_validator_set_changes`](#0x1_config_buffer_disable_validator_set_changes)
--  [Function `enable_validator_set_changes`](#0x1_config_buffer_enable_validator_set_changes)
 -  [Function `does_exist`](#0x1_config_buffer_does_exist)
 -  [Function `upsert`](#0x1_config_buffer_upsert)
 -  [Function `extract`](#0x1_config_buffer_extract)
@@ -63,34 +59,6 @@ Examples of <code>T</code>: <code>ConsensusConfig</code>, <code>Features</code>.
 
 </details>
 
-<a id="0x1_config_buffer_ValidatorSetChangeLocked"></a>
-
-## Resource `ValidatorSetChangeLocked`
-
-This flag exists under account 0x1 if and only if any validator set change for the next epoch should be rejected.
-
-
-<pre><code><b>struct</b> <a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a> <b>has</b> <b>copy</b>, drop, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>dummy_field: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
 <a id="@Constants_0"></a>
 
 ## Constants
@@ -105,87 +73,6 @@ Config buffer operations failed with permission denied.
 </code></pre>
 
 
-
-<a id="0x1_config_buffer_validator_set_changes_disabled"></a>
-
-## Function `validator_set_changes_disabled`
-
-Return whether validator set changes are disabled (because of ongoing DKG).
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_validator_set_changes_disabled">validator_set_changes_disabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_validator_set_changes_disabled">validator_set_changes_disabled</a>(): bool {
-    <b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(@std)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_config_buffer_disable_validator_set_changes"></a>
-
-## Function `disable_validator_set_changes`
-
-When a DKG starts, call this to disable validator set changes.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_disable_validator_set_changes">disable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_disable_validator_set_changes">disable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
-    <a href="config_buffer.md#0x1_config_buffer_abort_unless_std">abort_unless_std</a>(account);
-    <b>if</b> (!<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(@std)) {
-        <b>move_to</b>(account, <a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a> {})
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_config_buffer_enable_validator_set_changes"></a>
-
-## Function `enable_validator_set_changes`
-
-When a DKG finishes, call this to re-enable validator set changes.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_enable_validator_set_changes">enable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_enable_validator_set_changes">enable_validator_set_changes</a>(account: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a> {
-    <a href="config_buffer.md#0x1_config_buffer_abort_unless_std">abort_unless_std</a>(account);
-    <b>if</b> (!<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(@std)) {
-        <b>move_from</b>&lt;<a href="config_buffer.md#0x1_config_buffer_ValidatorSetChangeLocked">ValidatorSetChangeLocked</a>&gt;(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account));
-    }
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x1_config_buffer_does_exist"></a>
 
