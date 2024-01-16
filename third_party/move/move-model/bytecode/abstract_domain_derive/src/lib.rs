@@ -1,3 +1,9 @@
+//! Derive macro for `AbstractDomain`
+//!
+//! Currently we can only derive for structs.
+//! For tuple structs, the derived join joins each field;
+//! for structs with named fields, the derived join joins each field with #[join] attribute.
+
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{self, parse_macro_input, DeriveInput, Fields};
@@ -42,14 +48,7 @@ pub fn abstract_domain_derive(input: TokenStream) -> TokenStream {
                 })
                 .collect(),
             Fields::Unit => {
-                return quote! {
-                    impl AbstractDomain for #name {
-                        fn join(&mut self, other: &Self) -> JoinResult {
-                            JoinResult::Unchanged
-                        }
-                    }
-                }
-                .into();
+                Vec::new()
             },
         }
     } else {
