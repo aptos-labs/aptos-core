@@ -6,7 +6,7 @@
 //! - liveness analysis and lifetime analysis have been performed
 //! - Copies and moves have been made explicit in assignment instructions
 
-use move_binary_format::file_format::{Ability, AbilitySet};
+use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
     model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameterKind},
@@ -17,6 +17,8 @@ use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{AssignKind, Bytecode, Operation},
 };
+
+use super::abort_analysis::{AbortStateAnnotation, AbortStateAtCodeOffset};
 
 /// Returns the abilities of the given type.
 fn type_abilities(func_target: &FunctionTarget, ty: &Type) -> AbilitySet {
@@ -78,10 +80,28 @@ fn check_drop_for_temp_with_msg(
     check_drop(func_target, ty, loc, err_msg)
 }
 
+/// Checks if the given temporary variable has constraint drop, and add diagnostics if not,
+/// if the code abort state before the given code offset is not definitely abort
+fn cond_check_drop_for_temp_with_msg(
+    func_target: &FunctionTarget,
+    code_offset: CodeOffset,
+    t: TempIndex,
+    loc: &Loc,
+    err_msg: &str,
+) {
+    let abort_state = get_abort_state_at(func_target, code_offset);
+    if !abort_state.before.is_definitely_abort() {
+        check_drop_for_temp_with_msg(func_target, t, loc, err_msg)
+    }
+}
+
 /// `t` is the local containing the reference being written to
-fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
+fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
-        check_drop(target, ty, loc, "write_ref: cannot drop")
+        let abort_state = get_abort_state_at(target, code_offset);
+        if !abort_state.before.is_definitely_abort() {
+            check_drop(target, ty, loc, "write_ref: cannot drop")
+        }
     } else {
         panic!("ICE ability checker: write_ref has non-reference destination")
     }
@@ -176,8 +196,8 @@ impl FunctionTargetProcessor for AbilityChecker {
         }
         let target = FunctionTarget::new(fun_env, &data);
         check_fun_signature(&target);
-        for bytecode in target.get_bytecode() {
-            check_bytecode(&target, bytecode)
+        for (code_offset, bytecode) in target.get_bytecode().into_iter().enumerate() {
+            check_bytecode(&target, code_offset as CodeOffset, bytecode)
         }
         data
     }
@@ -196,7 +216,7 @@ fn check_fun_signature(target: &FunctionTarget) {
     // return type is checked in function body
 }
 
-fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
+fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &Bytecode) {
     let loc = target.get_bytecode_loc(bytecode.get_attr_id());
     match bytecode {
         Bytecode::Assign(_, dst, src, kind) => {
@@ -207,7 +227,7 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
                     check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
                     // dst is not dropped in advande in this case, since it's read by src
                     if *dst == *src {
-                        check_drop_for_temp_with_msg(target, *dst, &loc, "invalid implicit drop")
+                        cond_check_drop_for_temp_with_msg(target, code_offset, *dst, &loc, "invalid implicit drop")
                     }
                 },
                 AssignKind::Move => (),
@@ -244,12 +264,20 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
                 BorrowField(mod_id, struct_id, insts, _) => {
                     check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
                 },
-                Drop => check_drop_for_temp_with_msg(target, srcs[0], &loc, "cannot drop"),
+                Destroy => cond_check_drop_for_temp_with_msg(target, code_offset, srcs[0], &loc, "cannot drop"),
                 ReadRef => check_read_ref(target, srcs[0], &loc),
-                WriteRef => check_write_ref(target, srcs[0], &loc),
+                WriteRef => check_write_ref(target, code_offset, srcs[0], &loc),
                 _ => (),
             }
         },
         _ => (),
     }
+}
+
+fn get_abort_state<'a>(target: &'a FunctionTarget<'a>) -> &'a AbortStateAnnotation {
+    target.get_annotations().get::<AbortStateAnnotation>().expect("abort state annotation")
+}
+
+fn get_abort_state_at<'a>(target: &'a FunctionTarget<'a>, code_offset: CodeOffset) -> &'a AbortStateAtCodeOffset {
+    get_abort_state(target).get_annotation_at(code_offset).expect("abort state")
 }
