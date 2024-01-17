@@ -190,7 +190,7 @@ async fn test_certified_node_handler() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: None,
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
@@ -215,7 +215,7 @@ async fn test_dag_driver_drop() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: Some(tx),
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     driver.enter_new_round(1).await;
 

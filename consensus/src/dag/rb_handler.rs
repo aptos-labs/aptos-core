@@ -17,6 +17,7 @@ use crate::dag::{
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::ValidatorTxnConfig,
@@ -27,7 +28,7 @@ use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<PersistentDagStore>,
-    votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
+    votes_by_round_peer: Mutex<BTreeMap<Round, BTreeMap<Author, Vote>>>,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
     storage: Arc<dyn DAGStorage>,
@@ -53,7 +54,7 @@ impl NodeBroadcastHandler {
 
         Self {
             dag,
-            votes_by_round_peer,
+            votes_by_round_peer: Mutex::new(votes_by_round_peer),
             signer,
             epoch_state,
             storage,
@@ -64,16 +65,18 @@ impl NodeBroadcastHandler {
         }
     }
 
-    pub fn gc(&mut self) {
+    pub fn gc(&self) {
         let lowest_round = self.dag.read().lowest_round();
         if let Err(e) = self.gc_before_round(lowest_round) {
             error!("Error deleting votes: {}", e);
         }
     }
 
-    pub fn gc_before_round(&mut self, min_round: Round) -> anyhow::Result<()> {
-        let to_retain = self.votes_by_round_peer.split_off(&min_round);
-        let to_delete = mem::replace(&mut self.votes_by_round_peer, to_retain);
+    pub fn gc_before_round(&self, min_round: Round) -> anyhow::Result<()> {
+        let mut votes_by_round_peer_guard = self.votes_by_round_peer.lock();
+        let to_retain = votes_by_round_peer_guard.split_off(&min_round);
+        let to_delete = mem::replace(&mut *votes_by_round_peer_guard, to_retain);
+        drop(votes_by_round_peer_guard);
 
         let to_delete = to_delete
             .iter()
@@ -175,7 +178,7 @@ impl RpcHandler for NodeBroadcastHandler {
     type Request = Node;
     type Response = Vote;
 
-    async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&self, node: Self::Request) -> anyhow::Result<Self::Response> {
         ensure!(
             !self.health_backoff.stop_voting(),
             NodeBroadcastHandleError::VoteRefused
@@ -187,8 +190,8 @@ impl RpcHandler for NodeBroadcastHandler {
             .remote_peer(*node.author())
             .round(node.round()));
 
-        let votes_by_peer = self
-            .votes_by_round_peer
+        let mut votes_by_round_peer_guard = self.votes_by_round_peer.lock();
+        let votes_by_peer = votes_by_round_peer_guard
             .entry(node.metadata().round())
             .or_default();
         match votes_by_peer.get(node.metadata().author()) {
@@ -196,6 +199,7 @@ impl RpcHandler for NodeBroadcastHandler {
                 let signature = node.sign_vote(&self.signer)?;
                 let vote = Vote::new(node.metadata().clone(), signature);
 
+                // TODO: make this concurrent
                 self.storage.save_vote(&node.id(), &vote)?;
                 votes_by_peer.insert(*node.author(), vote.clone());
 

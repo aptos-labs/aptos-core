@@ -215,10 +215,10 @@ async fn test_dag_e2e() {
     let (signers, validators) = random_validator_verifier(num_nodes, None, false);
 
     let (nodes, mut ordered_node_receivers) = bootstrap_nodes(&mut playground, signers, validators);
-    for node in nodes {
-        runtime.spawn(node.start());
-    }
-
+    let tasks: Vec<_> = nodes
+        .into_iter()
+        .map(|node| runtime.spawn(node.start()))
+        .collect();
     runtime.spawn(playground.start());
 
     for _ in 1..10 {
@@ -234,6 +234,10 @@ async fn test_dag_e2e() {
             assert_eq!(a.len(), first.len(), "length should match");
             assert_eq!(a, first);
         }
+    }
+    for task in tasks {
+        task.abort();
+        let _ = task.await;
     }
     runtime.shutdown_background();
 }

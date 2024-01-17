@@ -27,6 +27,7 @@ use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -48,12 +49,12 @@ pub(crate) struct DagDriver {
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
-    rb_abort_handle: Option<(AbortHandle, u64)>,
+    rb_abort_handle: Mutex<Option<(AbortHandle, u64)>>,
     storage: Arc<dyn DAGStorage>,
     order_rule: OrderRule,
     fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
-    round_state: RoundState,
+    round_state: tokio::sync::Mutex<RoundState>,
     window_size_config: Round,
     payload_config: DagPayloadConfig,
     health_backoff: HealthBackoff,
@@ -85,19 +86,19 @@ impl DagDriver {
         let highest_strong_links_round =
             dag.read().highest_strong_links_round(&epoch_state.verifier);
 
-        let mut driver = Self {
+        let driver = Self {
             author,
             epoch_state,
             dag,
             payload_client,
             reliable_broadcast,
             time_service,
-            rb_abort_handle: None,
+            rb_abort_handle: Mutex::new(None),
             storage,
             order_rule,
             fetch_requester,
             ledger_info_provider,
-            round_state,
+            round_state: tokio::sync::Mutex::new(round_state),
             window_size_config,
             payload_config,
             health_backoff,
@@ -112,7 +113,7 @@ impl DagDriver {
                 LogSchema::new(LogEvent::NewRound).round(node.round()),
                 "Resume round"
             );
-            driver.round_state.set_current_round(node.round());
+            block_on(driver.round_state.lock()).set_current_round(node.round());
             driver.broadcast_node(node);
         } else {
             // kick start a new round
@@ -123,7 +124,7 @@ impl DagDriver {
         driver
     }
 
-    async fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+    async fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
         let (highest_strong_link_round, strong_links) = {
             {
                 let dag_reader = self.dag.read();
@@ -164,19 +165,24 @@ impl DagDriver {
         let minimum_delay = self
             .health_backoff
             .backoff_duration(highest_strong_link_round + 1);
-        self.round_state
+        let mut round_state_guard = self.round_state.lock().await;
+        round_state_guard
             .check_for_new_round(highest_strong_link_round, strong_links, minimum_delay)
             .await;
         Ok(())
     }
 
-    pub async fn enter_new_round(&mut self, new_round: Round) {
-        if self.round_state.current_round() >= new_round {
-            return;
+    pub async fn enter_new_round(&self, new_round: Round) {
+        {
+            let mut round_state = self.round_state.lock().await;
+            if round_state.current_round() >= new_round {
+                return;
+            }
+            debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
+            round_state.set_current_round(new_round);
+            counters::CURRENT_ROUND.set(new_round as i64);
         }
-        debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
-        self.round_state.set_current_round(new_round);
-        counters::CURRENT_ROUND.set(new_round as i64);
+
         let strong_links = self
             .dag
             .read()
@@ -271,7 +277,7 @@ impl DagDriver {
         self.broadcast_node(new_node);
     }
 
-    fn broadcast_node(&mut self, node: Node) {
+    fn broadcast_node(&self, node: Node) {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -304,14 +310,17 @@ impl DagDriver {
             );
             rb2.broadcast(certified_node_msg, cert_ack_set)
         });
+        let author = self.author;
         let task = async move {
-            debug!("Start reliable broadcast for round {}", round);
+            debug!("{} Start reliable broadcast for round {}", author, round);
             core_task.await;
             debug!("Finish reliable broadcast for round {}", round);
         };
         tokio::spawn(Abortable::new(task, abort_registration));
-        if let Some((prev_handle, prev_round_timestamp)) =
-            self.rb_abort_handle.replace((abort_handle, timestamp))
+        if let Some((prev_handle, prev_round_timestamp)) = self
+            .rb_abort_handle
+            .lock()
+            .replace((abort_handle, timestamp))
         {
             observe_round(prev_round_timestamp, RoundStage::Finished);
             prev_handle.abort();
@@ -324,7 +333,7 @@ impl RpcHandler for DagDriver {
     type Request = CertifiedNode;
     type Response = CertifiedAck;
 
-    async fn process(&mut self, certified_node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&self, certified_node: Self::Request) -> anyhow::Result<Self::Response> {
         let epoch = certified_node.metadata().epoch();
         debug!(LogSchema::new(LogEvent::ReceiveCertifiedNode)
             .remote_peer(*certified_node.author())
@@ -348,7 +357,7 @@ impl RpcHandler for DagDriver {
 
 impl Drop for DagDriver {
     fn drop(&mut self) {
-        if let Some((handle, _)) = &self.rb_abort_handle {
+        if let Some((handle, _)) = self.rb_abort_handle.lock().as_ref() {
             handle.abort()
         }
     }
