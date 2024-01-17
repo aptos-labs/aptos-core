@@ -43,6 +43,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
+use pipeline::abort_analysis::AbortAnalysisProcessor;
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -214,6 +215,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
+        pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }
     // The default optimization pipeline is currently always run by the compiler.
