@@ -1648,12 +1648,25 @@ impl AptosVM {
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
 
         match write_set_payload {
-            WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
-                change_set.clone(),
-                &change_set_configs,
-                resolver.is_delayed_field_optimization_capable(),
-            )
-            .map_err(|e| e.into_vm_status()),
+            WriteSetPayload::Direct(change_set) => {
+                let change = VMChangeSet::try_from_storage_change_set(
+                    change_set.clone(),
+                    &change_set_configs,
+                    // this transaction is never delayed field capable.
+                    // it is required it requires restarting execution afterwards,
+                    // which allows it to be used as last transaction in delayed_field_enabled context.
+                    false,
+                )
+                .map_err(|e| e.into_vm_status())?;
+
+                // validate_waypoint_change_set checks that this is true, so we only log here.
+                if !Self::should_restart_execution(&change) {
+                    error!(
+                        "[aptos_vm] direct write set in delayed_field_optimization_capable context finished without requiring should_restart_execution");
+                }
+
+                Ok(change)
+            },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -2006,10 +2019,9 @@ impl AptosVM {
         }
     }
 
-    pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
+    pub fn should_restart_execution(vm_change_set: &VMChangeSet) -> bool {
         let new_epoch_event_key = new_epoch_event_key();
-        vm_output
-            .change_set()
+        vm_change_set
             .events()
             .iter()
             .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
