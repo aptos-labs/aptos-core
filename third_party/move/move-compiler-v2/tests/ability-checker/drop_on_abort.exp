@@ -218,13 +218,13 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
   7: $t6 := 1
      # abort state: definitely abort
   8: abort($t6)
-     # abort state: definitely not abort
+     # abort state: maybe
   9: goto 11
-     # abort state: definitely not abort
+     # abort state: maybe
  10: label L1
-     # abort state: definitely not abort
+     # abort state: maybe
  11: label L2
-     # abort state: definitely not abort
+     # abort state: maybe
  12: $t1 := pack m::Option<#0>($t0)
      # abort state: definitely not abort
  13: return $t1
@@ -258,13 +258,13 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
   7: $t6 := 1
      # abort state: definitely abort
   8: abort($t6)
-     # abort state: definitely not abort
+     # abort state: maybe
   9: goto 11
-     # abort state: definitely not abort
+     # abort state: maybe
  10: label L1
-     # abort state: definitely not abort
+     # abort state: maybe
  11: label L2
-     # abort state: definitely not abort
+     # abort state: maybe
  12: $t1 := pack m::Option<#0>($t0)
      # abort state: definitely not abort
  13: return $t1
