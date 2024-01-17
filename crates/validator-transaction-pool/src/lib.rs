@@ -41,6 +41,8 @@ impl Default for VTxnPoolState {
     }
 }
 impl VTxnPoolState {
+    /// Append a txn to the pool.
+    /// Return a txn guard that allows you to later delete the txn from the pool.
     pub fn put(
         &self,
         topic: Topic,
@@ -111,9 +113,6 @@ pub struct TxnGuard {
 }
 
 impl PoolStateInner {
-    /// Append a txn to the pool.
-    /// Return a txn guard that allows you to later delete the txn from the pool.
-
     fn try_delete(&mut self, seq_num: u64) {
         if let Some(item) = self.txn_queue.remove(&seq_num) {
             let seq_num_another = self.seq_nums_by_topic.remove(&item.topic);
