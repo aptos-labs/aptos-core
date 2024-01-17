@@ -3,7 +3,7 @@
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 #[cfg(test)]
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use futures::future::BoxFuture;
 use std::time::Duration;
 #[cfg(test)]

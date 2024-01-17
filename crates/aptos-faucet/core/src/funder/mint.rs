@@ -14,7 +14,8 @@ use aptos_sdk::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{
-            authenticator::AuthenticationKey, Script, SignedTransaction, TransactionArgument,
+            authenticator::AuthenticationKey, deprecated::SignedTransaction, Script,
+            TransactionArgument,
         },
         LocalAccount,
     },

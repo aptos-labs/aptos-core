@@ -13,7 +13,9 @@ use aptos_consensus_types::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId};
+use aptos_types::{
+    transaction::deprecated::SignedTransaction, validator_verifier::ValidatorVerifier, PeerId,
+};
 use futures::{stream::FuturesUnordered, StreamExt};
 use rand::Rng;
 use std::{sync::Arc, time::Duration};

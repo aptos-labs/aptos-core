@@ -8,7 +8,7 @@ use aptos_types::{
         TransactionShufflerType,
         TransactionShufflerType::{DeprecatedSenderAwareV1, NoShuffling, SenderAwareV2},
     },
-    transaction::SignedTransaction,
+    transaction::deprecated::SignedTransaction,
 };
 use std::sync::Arc;
 

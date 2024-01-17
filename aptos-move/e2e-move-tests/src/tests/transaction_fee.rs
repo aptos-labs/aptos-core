@@ -9,7 +9,7 @@ use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::FeatureFlag,
-    transaction::{SignedTransaction, TransactionArgument, TransactionStatus},
+    transaction::{deprecated::SignedTransaction, TransactionArgument, TransactionStatus},
 };
 use once_cell::sync::Lazy;
 use rand::{

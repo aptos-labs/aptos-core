@@ -5,10 +5,9 @@ use super::RETRY_POLICY;
 use anyhow::{Context, Result};
 use aptos_logger::{debug, sample, sample::SampleRate, warn};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
-use aptos_sdk::{
-    move_types::account_address::AccountAddress, types::transaction::SignedTransaction,
-};
+use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter};
+use aptos_types::transaction::deprecated::SignedTransaction;
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};

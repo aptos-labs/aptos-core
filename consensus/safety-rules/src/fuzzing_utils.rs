@@ -28,7 +28,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proof::AccumulatorExtensionProof,
     proptest_types::{AccountInfoUniverse, BlockInfoGen},
-    transaction::SignedTransaction,
+    transaction::deprecated::SignedTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use proptest::prelude::*;

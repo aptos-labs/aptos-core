@@ -21,7 +21,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    transaction::{ExecutionStatus, SignedTransaction, Transaction, TransactionStatus},
+    transaction::{deprecated::SignedTransaction, ExecutionStatus, Transaction, TransactionStatus},
     validator_txn::ValidatorTransaction,
 };
 use futures_channel::oneshot;

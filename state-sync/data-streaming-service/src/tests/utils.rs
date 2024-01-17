@@ -39,9 +39,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
-        Version,
+        deprecated::{RawTransaction, SignedTransaction},
+        Script, Transaction, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };

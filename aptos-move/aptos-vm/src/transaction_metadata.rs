@@ -7,7 +7,9 @@ use aptos_gas_algebra::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+    transaction::{
+        authenticator::AuthenticationKey, deprecated::SignedTransaction, TransactionPayload,
+    },
 };
 use std::convert::TryFrom;
 

@@ -7,7 +7,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
-    account_address::AccountAddress, transaction::SignedTransaction,
+    account_address::AccountAddress, transaction::deprecated::SignedTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
 };
 use rayon::prelude::*;

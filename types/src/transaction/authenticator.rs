@@ -5,7 +5,8 @@
 use crate::{
     account_address::AccountAddress,
     transaction::{
-        webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
+        deprecated::RawTransactionWithData, webauthn::PartialAuthenticatorAssertionResponse,
+        RawTransaction,
     },
 };
 use anyhow::{bail, ensure, Error, Result};
@@ -1035,7 +1036,7 @@ impl AnyPublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transaction::{webauthn::AssertionSignature, SignedTransaction};
+    use crate::transaction::{deprecated::SignedTransaction, webauthn::AssertionSignature};
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
         secp256k1_ecdsa,
@@ -1182,7 +1183,7 @@ mod tests {
         let single_key_authenticators = mk_auth_01.to_single_key_authenticators().unwrap();
         assert_eq!(single_key_authenticators, vec![
             sender0_auth.clone(),
-            sender1_auth.clone()
+            sender1_auth.clone(),
         ]);
         let account_auth = AccountAuthenticator::multi_key(mk_auth_01);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
@@ -1196,7 +1197,7 @@ mod tests {
         let single_key_authenticators = mk_auth_02.to_single_key_authenticators().unwrap();
         assert_eq!(single_key_authenticators, vec![
             sender0_auth.clone(),
-            sender1_auth.clone()
+            sender1_auth.clone(),
         ]);
         let account_auth = AccountAuthenticator::multi_key(mk_auth_02);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
@@ -1210,7 +1211,7 @@ mod tests {
         let single_key_authenticators = mk_auth_12.to_single_key_authenticators().unwrap();
         assert_eq!(single_key_authenticators, vec![
             sender1_auth.clone(),
-            sender1_auth.clone()
+            sender1_auth.clone(),
         ]);
         let account_auth = AccountAuthenticator::multi_key(mk_auth_12);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
@@ -1497,7 +1498,7 @@ mod tests {
             sender_auth,
             second_sender0_auth,
             second_sender1_auth,
-            fee_payer_multi_key_auth
+            fee_payer_multi_key_auth,
         ]);
 
         let single_key_authenticators = txn_auth.to_single_key_authenticators().unwrap();
@@ -1506,7 +1507,7 @@ mod tests {
             second_sender0_sk_auth,
             second_sender1_sk_auth,
             fee_payer0_sk_auth,
-            fee_payer1_sk_auth
+            fee_payer1_sk_auth,
         ]);
     }
 

@@ -177,8 +177,8 @@ mod tests {
         block_metadata::BlockMetadata,
         chain_id::ChainId,
         transaction::{
-            ChangeSet, RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload,
-            WriteSetPayload,
+            deprecated::{RawTransaction, SignedTransaction},
+            ChangeSet, Script, Transaction, TransactionPayload, WriteSetPayload,
         },
         write_set::WriteSetMut,
     };

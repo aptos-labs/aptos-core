@@ -47,7 +47,9 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, RawTransaction, SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationKey,
+        deprecated::{RawTransaction, SignedTransaction},
+        TransactionPayload,
     },
 };
 use serde::de::DeserializeOwned;

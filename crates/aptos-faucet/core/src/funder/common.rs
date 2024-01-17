@@ -17,8 +17,8 @@ use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     rest_client::Client,
     types::{
-        account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction,
-        LocalAccount,
+        account_address::AccountAddress, chain_id::ChainId,
+        transaction::deprecated::SignedTransaction, LocalAccount,
     },
 };
 use clap::Parser;

@@ -14,7 +14,7 @@ use crate::{
 };
 use aptos_proptest_helpers::Index;
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
     vm_status::{AbortLocation, StatusCode},
 };
 use proptest::prelude::*;

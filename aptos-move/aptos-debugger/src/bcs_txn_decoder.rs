@@ -4,7 +4,7 @@
 use crate::aptos_debugger::AptosDebugger;
 use anyhow::Result;
 use aptos_rest_client::Client;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use aptos_vm::AptosVM;
 use clap::Parser;
 use regex::Regex;

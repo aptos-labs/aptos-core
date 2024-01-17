@@ -36,7 +36,7 @@ use aptos_rosetta::{
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
-    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+    on_chain_config::GasScheduleV2, transaction::deprecated::SignedTransaction,
 };
 use serde_json::json;
 use std::{

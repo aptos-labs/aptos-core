@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::FaucetClientError, Client, Result};
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use move_core_types::account_address::AccountAddress;
 use reqwest::{Client as ReqwestClient, Response, Url};
 use std::time::Duration;

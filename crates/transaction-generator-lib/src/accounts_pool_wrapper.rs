@@ -3,7 +3,7 @@
 
 use crate::{get_account_to_burn_from_pool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::deprecated::SignedTransaction, LocalAccount};
 use std::sync::Arc;
 
 /// Wrapper that allows inner transaction generator to have unique accounts

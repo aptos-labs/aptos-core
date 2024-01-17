@@ -15,8 +15,9 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, Module, ModuleBundle, RawTransaction,
-        Script, SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationKey,
+        deprecated::{RawTransaction, SignedTransaction},
+        EntryFunction, Module, ModuleBundle, Script, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-use aptos_types::transaction::{SignedTransaction, TransactionOutput};
+use aptos_types::transaction::{deprecated::SignedTransaction, TransactionOutput};
 
 pub type Block<Txn> = Vec<Txn>;
 pub type ExecutorResult<T> = Result<Vec<TransactionOutput>, T>;

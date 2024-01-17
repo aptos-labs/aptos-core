@@ -8,7 +8,9 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction, PeerId};
+use aptos_types::{
+    ledger_info::LedgerInfoWithSignatures, transaction::deprecated::SignedTransaction, PeerId,
+};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{

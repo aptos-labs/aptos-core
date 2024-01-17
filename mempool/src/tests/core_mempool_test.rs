@@ -13,7 +13,8 @@ use aptos_config::config::NodeConfig;
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    mempool_status::MempoolStatusCode, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    mempool_status::MempoolStatusCode, transaction::deprecated::SignedTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use itertools::Itertools;
 use maplit::btreemap;

@@ -37,7 +37,7 @@ use aptos_types::{
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
     contract_event::EventWithVersion,
     state_store::state_key::StateKey,
-    transaction::SignedTransaction,
+    transaction::deprecated::SignedTransaction,
 };
 use move_core_types::language_storage::StructTag;
 use reqwest::{

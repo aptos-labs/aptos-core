@@ -25,10 +25,7 @@ use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_sdk::{
     bcs,
     transaction_builder::TransactionFactory,
-    types::{
-        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
-    },
+    types::{account_config::aptos_test_root_address, AccountKey, LocalAccount},
 };
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};
 use aptos_temppath::TempPath;
@@ -41,6 +38,7 @@ use aptos_types::{
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
+        deprecated::SignedTransaction,
         signature_verified_transaction::into_signature_verified_block, Transaction,
         TransactionPayload, TransactionStatus,
     },

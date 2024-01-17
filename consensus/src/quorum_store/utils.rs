@@ -8,7 +8,7 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::deprecated::SignedTransaction, PeerId};
 use chrono::Utc;
 use futures::channel::{mpsc::Sender, oneshot};
 use move_core_types::account_address::AccountAddress;

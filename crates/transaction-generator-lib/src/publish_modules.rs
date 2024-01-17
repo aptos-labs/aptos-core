@@ -6,7 +6,7 @@ use crate::{
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::deprecated::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;

@@ -31,9 +31,10 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        deprecated::{RawTransaction, SignedTransaction},
+        ExecutionStatus, Script, Transaction, TransactionInfo, TransactionListWithProof,
+        TransactionOutput, TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
+        Version,
     },
     waypoint::Waypoint,
     write_set::WriteSet,

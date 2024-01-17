@@ -24,7 +24,7 @@ use crate::{
     gas_costs, transaction_status_eq,
 };
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
     vm_status::{known_locations, StatusCode},
 };
 pub use bad_transaction::*;

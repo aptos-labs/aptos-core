@@ -23,8 +23,9 @@ use aptos_types::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
             SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
         },
+        deprecated::SignedTransaction,
         webauthn::PartialAuthenticatorAssertionResponse,
-        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
+        Script, TransactionOutput, TransactionWithProof,
     },
 };
 use once_cell::sync::Lazy;

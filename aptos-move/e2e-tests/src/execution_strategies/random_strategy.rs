@@ -7,7 +7,7 @@ use crate::{
     execution_strategies::types::{Block, Executor, ExecutorResult, PartitionStrategy},
     executor::FakeExecutor,
 };
-use aptos_types::{transaction::SignedTransaction, vm_status::VMStatus};
+use aptos_types::{transaction::deprecated::SignedTransaction, vm_status::VMStatus};
 use rand::{
     rngs::{OsRng, StdRng},
     Rng, SeedableRng,

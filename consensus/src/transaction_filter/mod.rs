@@ -3,7 +3,7 @@
 
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_crypto::HashValue;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 
 pub struct TransactionFilter {
     filter: Filter,
@@ -38,7 +38,10 @@ mod test {
     use aptos_types::{
         chain_id::ChainId,
         move_utils::MemberId,
-        transaction::{EntryFunction, RawTransaction, SignedTransaction, TransactionPayload},
+        transaction::{
+            deprecated::{RawTransaction, SignedTransaction},
+            EntryFunction, TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
 

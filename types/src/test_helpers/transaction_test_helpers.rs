@@ -8,11 +8,11 @@ use crate::{
     chain_id::ChainId,
     transaction::{
         authenticator::AccountAuthenticator,
+        deprecated::{RawTransaction, RawTransactionWithData, SignedTransaction},
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Module, RawTransaction, RawTransactionWithData, Script, SignedTransaction, Transaction,
-        TransactionPayload,
+        Module, Script, Transaction, TransactionPayload,
     },
 };
 use aptos_crypto::{ed25519::*, traits::*};

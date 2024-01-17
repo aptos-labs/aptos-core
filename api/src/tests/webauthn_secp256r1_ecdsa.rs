@@ -21,8 +21,8 @@ mod tests {
             AccountAuthenticator, AnyPublicKey, AnySignature, AuthenticationKey,
             SingleKeyAuthenticator, TransactionAuthenticator,
         },
+        deprecated::{RawTransaction, SignedTransaction},
         webauthn::{AssertionSignature, PartialAuthenticatorAssertionResponse},
-        RawTransaction, SignedTransaction,
     };
     use passkey_types::{
         crypto::sha256,

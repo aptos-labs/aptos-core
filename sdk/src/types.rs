@@ -9,16 +9,16 @@ use crate::{
         traits::Uniform,
     },
     transaction_builder::TransactionBuilder,
-    types::{
-        account_address::AccountAddress,
-        transaction::{authenticator::AuthenticationKey, RawTransaction, SignedTransaction},
-    },
+    types::{account_address::AccountAddress, transaction::authenticator::AuthenticationKey},
 };
 use anyhow::Result;
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_ledger::AptosLedgerError;
-use aptos_types::event::EventKey;
 pub use aptos_types::*;
+use aptos_types::{
+    event::EventKey,
+    transaction::deprecated::{RawTransaction, SignedTransaction},
+};
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use std::{

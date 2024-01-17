@@ -28,7 +28,10 @@ use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519Signature};
 use aptos_types::{
     block_info::BlockInfo,
     chain_id::ChainId,
-    transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+    transaction::{
+        deprecated::{RawTransaction, SignedTransaction},
+        Script, TransactionPayload,
+    },
 };
 pub use mock_payload_manager::MockPayloadManager;
 pub use mock_state_computer::{

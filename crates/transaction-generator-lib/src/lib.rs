@@ -9,7 +9,7 @@ use aptos_logger::{sample, sample::SampleRate, warn};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::deprecated::SignedTransaction, LocalAccount},
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;

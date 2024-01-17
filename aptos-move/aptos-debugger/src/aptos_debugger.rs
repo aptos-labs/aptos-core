@@ -14,8 +14,9 @@ use aptos_types::{
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
     state_store::TStateView,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
-        Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
+        deprecated::SignedTransaction,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
+        TransactionOutput, TransactionPayload, Version,
     },
     vm_status::VMStatus,
 };

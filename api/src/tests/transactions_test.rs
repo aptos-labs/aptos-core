@@ -16,7 +16,8 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        EntryFunction, Script, SignedTransaction,
+        deprecated::SignedTransaction,
+        EntryFunction, Script,
     },
     utility_coin::APTOS_COIN_TYPE,
 };

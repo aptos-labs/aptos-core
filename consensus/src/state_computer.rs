@@ -30,7 +30,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::OnChainExecutionConfig,
-    transaction::{SignedTransaction, Transaction},
+    transaction::{deprecated::SignedTransaction, Transaction},
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
@@ -354,7 +354,6 @@ async fn test_commit_sync_race() {
         block_info::BlockInfo,
         ledger_info::LedgerInfo,
         on_chain_config::{TransactionDeduperType, TransactionShufflerType},
-        transaction::SignedTransaction,
     };
 
     struct RecordedCommit {

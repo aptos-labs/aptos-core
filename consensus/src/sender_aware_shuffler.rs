@@ -4,7 +4,7 @@ use crate::{
     counters::{NUM_SENDERS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
     transaction_shuffler::TransactionShuffler,
 };
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{HashMap, VecDeque};
 
@@ -229,7 +229,10 @@ mod tests {
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            deprecated::{RawTransaction, SignedTransaction},
+            Script, TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
     use rand::{rngs::OsRng, Rng};

@@ -27,8 +27,9 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        analyzed_transaction::AnalyzedTransaction, EntryFunction, RawTransaction,
-        SignedTransaction, Transaction, TransactionPayload,
+        analyzed_transaction::AnalyzedTransaction,
+        deprecated::{RawTransaction, SignedTransaction},
+        EntryFunction, Transaction, TransactionPayload,
     },
     utility_coin::APTOS_COIN_TYPE,
 };

@@ -6,7 +6,7 @@ use crate::{
     transaction_deduper::TransactionDeduper,
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
@@ -111,7 +111,10 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_types::{
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            deprecated::{RawTransaction, SignedTransaction},
+            Script, TransactionPayload,
+        },
     };
     use move_core_types::account_address::AccountAddress;
     use std::time::Instant;

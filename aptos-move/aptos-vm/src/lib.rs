@@ -128,8 +128,9 @@ use aptos_types::{
     },
     state_store::StateView,
     transaction::{
+        deprecated::SignedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
-        SignedTransaction, TransactionOutput, VMValidatorResult,
+        TransactionOutput, VMValidatorResult,
     },
     vm_status::VMStatus,
 };

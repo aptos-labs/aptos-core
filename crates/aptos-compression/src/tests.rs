@@ -10,9 +10,9 @@ use aptos_types::{
     chain_id::ChainId,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus,
+        deprecated::{RawTransaction, SignedTransaction},
+        ExecutionStatus, Script, Transaction, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
     },
     write_set::WriteSet,
 };

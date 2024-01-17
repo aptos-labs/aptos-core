@@ -25,7 +25,10 @@ use aptos_proptest_helpers::ValueGenerator;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{EntryFunction, RawTransaction, Script, SignedTransaction, TransactionArgument},
+    transaction::{
+        deprecated::{RawTransaction, SignedTransaction},
+        EntryFunction, Script, TransactionArgument,
+    },
 };
 use move_core_types::{
     identifier::Identifier,

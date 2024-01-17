@@ -5,7 +5,7 @@ use aptos_infallible::RwLock;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    types::{chain_id::ChainId, transaction::deprecated::SignedTransaction, LocalAccount},
 };
 use rand::{
     distributions::{Distribution, Standard},

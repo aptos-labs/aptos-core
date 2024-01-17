@@ -7,7 +7,9 @@ use aptos_language_e2e_tests::{
 };
 use aptos_types::{
     account_config::{DepositEvent, WithdrawEvent},
-    transaction::{ExecutionStatus, SignedTransaction, TransactionOutput, TransactionStatus},
+    transaction::{
+        deprecated::SignedTransaction, ExecutionStatus, TransactionOutput, TransactionStatus,
+    },
 };
 use std::{convert::TryFrom, time::Instant};
 

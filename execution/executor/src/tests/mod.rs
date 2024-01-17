@@ -31,9 +31,10 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_value::StateValue, StateViewId},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        deprecated::{RawTransaction, SignedTransaction},
+        signature_verified_transaction::SignatureVerifiedTransaction,
+        ExecutionStatus, Script, Transaction, TransactionListWithProof, TransactionOutput,
+        TransactionPayload, TransactionStatus, Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };

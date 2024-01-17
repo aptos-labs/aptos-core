@@ -43,7 +43,7 @@ use aptos_types::{
         ProposerElectionType::{self, RoundProposer},
         ValidatorSet,
     },
-    transaction::SignedTransaction,
+    transaction::deprecated::SignedTransaction,
     validator_info::ValidatorInfo,
     waypoint::Waypoint,
 };

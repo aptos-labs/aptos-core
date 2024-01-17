@@ -4,7 +4,7 @@
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{SignedTransaction, TransactionPayload},
+    transaction::{deprecated::SignedTransaction, TransactionPayload},
 };
 use serde::{Deserialize, Serialize};
 

@@ -16,7 +16,9 @@ use aptos_consensus_types::proof_of_store::{ProofOfStore, SignedBatchInfo};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_logger::prelude::*;
-use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
+use aptos_types::{
+    transaction::deprecated::SignedTransaction, validator_signer::ValidatorSigner, PeerId,
+};
 use dashmap::{
     mapref::entry::Entry::{Occupied, Vacant},
     DashMap,

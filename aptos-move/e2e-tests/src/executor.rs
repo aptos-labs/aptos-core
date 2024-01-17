@@ -44,11 +44,12 @@ use aptos_types::{
     },
     state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
+        deprecated::SignedTransaction,
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        BlockOutput, EntryFunction, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        BlockOutput, EntryFunction, ExecutionStatus, Transaction, TransactionOutput,
+        TransactionPayload, TransactionStatus, VMValidatorResult,
     },
     vm_status::VMStatus,
     write_set::WriteSet,

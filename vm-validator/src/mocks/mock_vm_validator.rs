@@ -7,7 +7,7 @@ use anyhow::Result;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::StateView,
-    transaction::{SignedTransaction, VMValidatorResult},
+    transaction::{deprecated::SignedTransaction, VMValidatorResult},
     vm_status::StatusCode,
 };
 use aptos_vm::VMValidator;

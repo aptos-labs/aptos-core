@@ -12,7 +12,7 @@ use crate::{
 use aptos_rest_client::aptos_api_types::U64;
 use aptos_types::{
     chain_id::ChainId,
-    transaction::{RawTransaction, SignedTransaction},
+    transaction::deprecated::{RawTransaction, SignedTransaction},
 };
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -128,7 +128,7 @@ pub struct BlockResponse {
 pub struct ConstructionCombineRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
-    /// A hex encoded, BCS encoded, [`aptos_types::transaction::RawTransaction`]
+    /// A hex encoded, BCS encoded, [`aptos_types::transaction::deprecated::RawTransaction`]
     pub unsigned_transaction: String,
     /// Set of signatures with SigningPayloads to combine
     pub signatures: Vec<Signature>,
@@ -269,10 +269,10 @@ pub struct ConstructionParseRequest {
     /// Network identifier describing the blockchain and the chain id
     pub network_identifier: NetworkIdentifier,
     /// Whether the transaction is a [`aptos_types::transaction::SignedTransaction`]
-    /// or a [`aptos_types::transaction::RawTransaction`]
+    /// or a [`aptos_types::transaction::deprecated::RawTransaction`]
     pub signed: bool,
     /// A hex encoded, BCS encoded [`aptos_types::transaction::SignedTransaction`]
-    /// or a [`aptos_types::transaction::RawTransaction`]
+    /// or a [`aptos_types::transaction::deprecated::RawTransaction`]
     pub transaction: String,
 }
 
@@ -309,7 +309,7 @@ pub struct ConstructionPayloadsRequest {
     pub network_identifier: NetworkIdentifier,
     /// The set of [`Operation`] that describes the [`InternalOperation`] to execute
     pub operations: Vec<Operation>,
-    /// Required information for building a [`aptos_types::transaction::RawTransaction`]
+    /// Required information for building a [`aptos_types::transaction::deprecated::RawTransaction`]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ConstructionMetadata>,
     /// Public keys of those who will sign the eventual [`aptos_types::transaction::SignedTransaction`]
@@ -322,7 +322,7 @@ pub struct ConstructionPayloadsRequest {
 /// [API Spec](https://www.rosetta-api.org/docs/models/ConstructionPayloadsResponse.html)
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ConstructionPayloadsResponse {
-    /// A hex encoded, BCS encoded [`aptos_types::transaction::RawTransaction`]
+    /// A hex encoded, BCS encoded [`aptos_types::transaction::deprecated::RawTransaction`]
     /// containing the [`Operation`]s
     pub unsigned_transaction: String,
     /// Payloads describing who and what to sign

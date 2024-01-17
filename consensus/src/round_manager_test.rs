@@ -66,7 +66,7 @@ use aptos_types::{
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
     },
-    transaction::SignedTransaction,
+    transaction::deprecated::SignedTransaction,
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
     validator_verifier::{generate_validator_verifier, random_validator_verifier},

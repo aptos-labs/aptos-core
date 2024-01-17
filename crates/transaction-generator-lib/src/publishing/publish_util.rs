@@ -9,7 +9,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
-        transaction::{SignedTransaction, TransactionPayload},
+        transaction::{deprecated::SignedTransaction, TransactionPayload},
         LocalAccount,
     },
 };

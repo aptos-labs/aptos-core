@@ -17,7 +17,7 @@ use aptos_language_e2e_tests::{
     },
 };
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
     vm_status::VMStatus,
 };
 

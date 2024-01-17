@@ -25,8 +25,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        deprecated::SignedTransaction, EntryFunction, Script, TransactionArgument,
+        TransactionOutput, TransactionPayload, TransactionStatus,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};

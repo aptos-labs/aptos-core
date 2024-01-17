@@ -10,7 +10,7 @@ use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::{
-    EntryFunction, ExecutionStatus, SignedTransaction, TransactionStatus,
+    deprecated::SignedTransaction, EntryFunction, ExecutionStatus, TransactionStatus,
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, value::MoveValue};
 use petgraph::{algo::toposort, graph::NodeIndex, Direction, Graph};
@@ -19,6 +19,7 @@ use proptest::{
     prelude::*,
 };
 use std::cmp::Ordering;
+
 mod module_generator;
 
 const DEFAULT_BALANCE: u64 = 1_000_000_000;

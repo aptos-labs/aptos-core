@@ -16,7 +16,8 @@ use aptos_consensus_types::proof_of_store::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
-    transaction::SignedTransaction, validator_verifier::random_validator_verifier, PeerId,
+    transaction::deprecated::SignedTransaction, validator_verifier::random_validator_verifier,
+    PeerId,
 };
 use std::sync::Arc;
 use tokio::sync::{mpsc::channel, oneshot::Receiver};

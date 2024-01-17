@@ -281,7 +281,10 @@ mod tests {
         contract_event::ContractEvent,
         event::EventKey,
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-        transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
+        transaction::{
+            deprecated::{RawTransaction, SignedTransaction},
+            Script, Transaction, TransactionPayload,
+        },
     };
     use claims::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};

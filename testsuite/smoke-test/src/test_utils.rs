@@ -5,10 +5,8 @@
 use aptos_cached_packages::aptos_stdlib;
 use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_rest_client::Client as RestClient;
-use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
-};
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_types::transaction::deprecated::SignedTransaction;
 use rand::random;
 use std::time::Duration;
 
@@ -148,7 +146,7 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 #[cfg(test)]
 pub mod swarm_utils {
     use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
-    use aptos_secure_storage::{KVStorage, Storage};
+    use aptos_secure_storage::Storage;
     use aptos_types::waypoint::Waypoint;
 
     pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {

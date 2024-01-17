@@ -8,7 +8,7 @@ use aptos_language_e2e_tests::account_universe::{
     AccountPickStyle, AccountUniverseGen,
 };
 use aptos_proptest_helpers::ValueGenerator;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use once_cell::sync::Lazy;
 use proptest::{
     collection::vec,

@@ -26,7 +26,7 @@ use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface, metadata::PeerMetadata},
     transport::ConnectionMetadata,
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::deprecated::SignedTransaction, PeerId};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use fail::fail_point;
 use itertools::Itertools;

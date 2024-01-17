@@ -23,7 +23,7 @@ use aptos_network::{
     peer_manager::{PeerManagerNotification, PeerManagerRequest},
     ProtocolId,
 };
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::deprecated::SignedTransaction, PeerId};
 use maplit::btreemap;
 use rand::{rngs::StdRng, SeedableRng};
 use std::collections::HashMap;

@@ -17,7 +17,7 @@ use aptos_consensus_types::{
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::{transaction::SignedTransaction, PeerId};
+use aptos_types::{transaction::deprecated::SignedTransaction, PeerId};
 use futures_channel::mpsc::Sender;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},

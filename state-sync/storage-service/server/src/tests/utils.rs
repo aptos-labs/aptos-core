@@ -39,9 +39,9 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus,
+        deprecated::{RawTransaction, SignedTransaction},
+        ExecutionStatus, Script, Transaction, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus,
     },
     validator_verifier::ValidatorVerifier,
     write_set::WriteSet,

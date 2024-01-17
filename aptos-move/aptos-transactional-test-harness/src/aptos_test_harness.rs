@@ -21,10 +21,9 @@ use aptos_types::{
     on_chain_config::BlockGasLimitType,
     state_store::{state_key::StateKey, table::TableHandle, TStateView},
     transaction::{
-        signature_verified_transaction::into_signature_verified_block,
+        deprecated::RawTransaction, signature_verified_transaction::into_signature_verified_block,
         EntryFunction as TransactionEntryFunction, ExecutionStatus, Module as TransactionModule,
-        RawTransaction, Script as TransactionScript, Transaction, TransactionOutput,
-        TransactionStatus,
+        Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};

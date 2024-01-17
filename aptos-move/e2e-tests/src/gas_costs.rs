@@ -9,7 +9,7 @@ use crate::{
     common_transactions::{create_account_txn, peer_to_peer_txn},
     executor::FakeExecutor,
 };
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use once_cell::sync::Lazy;
 
 /// The gas each transaction is configured to reserve. If the gas available in the account,

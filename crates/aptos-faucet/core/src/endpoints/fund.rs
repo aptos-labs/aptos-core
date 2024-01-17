@@ -17,7 +17,7 @@ use aptos_sdk::{
     crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt},
     types::{
         account_address::AccountAddress,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        transaction::{authenticator::AuthenticationKey, deprecated::SignedTransaction},
     },
 };
 use poem::{http::HeaderMap, web::RealIp};

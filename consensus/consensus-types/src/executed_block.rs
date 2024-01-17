@@ -15,7 +15,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     contract_event::ContractEvent,
-    transaction::{SignedTransaction, Transaction},
+    transaction::{deprecated::SignedTransaction, Transaction},
     validator_txn::ValidatorTransaction,
 };
 use once_cell::sync::OnceCell;

@@ -7,7 +7,8 @@ use aptos_language_e2e_tests::{
     executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
 };
 use aptos_types::{
-    account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::SignedTransaction,
+    account_address::AccountAddress, on_chain_config::FeatureFlag,
+    transaction::deprecated::SignedTransaction,
 };
 use move_core_types::{
     ident_str,

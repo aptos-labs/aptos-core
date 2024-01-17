@@ -13,7 +13,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
 use aptos_logger::prelude::*;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
 use tokio::sync::oneshot;

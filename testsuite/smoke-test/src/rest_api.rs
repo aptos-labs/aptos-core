@@ -20,7 +20,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
     on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType},
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
+    transaction::{authenticator::AuthenticationKey, deprecated::SignedTransaction, Transaction},
 };
 use move_core_types::{
     ident_str,

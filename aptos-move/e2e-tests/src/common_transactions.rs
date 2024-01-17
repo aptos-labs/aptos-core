@@ -6,7 +6,7 @@
 
 use crate::account::Account;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_types::transaction::{Script, SignedTransaction};
+use aptos_types::transaction::{deprecated::SignedTransaction, Script};
 use move_ir_compiler::Compiler;
 use once_cell::sync::Lazy;
 

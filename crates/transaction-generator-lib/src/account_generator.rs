@@ -6,7 +6,7 @@ use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::deprecated::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{sync::Arc, time::Duration};

@@ -10,12 +10,10 @@ use aptos_crypto::{
 use aptos_logger::{error, info};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
-        AccountKey, LocalAccount,
-    },
+    types::{transaction::authenticator::AuthenticationKey, AccountKey, LocalAccount},
 };
 use aptos_transaction_generator_lib::{CounterState, ReliableTransactionSubmitter, SEND_AMOUNT};
+use aptos_types::transaction::deprecated::SignedTransaction;
 use core::{
     cmp::min,
     result::Result::{Err, Ok},

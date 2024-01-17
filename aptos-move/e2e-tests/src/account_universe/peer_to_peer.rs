@@ -7,7 +7,7 @@ use crate::{
     common_transactions::peer_to_peer_txn,
 };
 use aptos_types::{
-    transaction::{ExecutionStatus, SignedTransaction, TransactionStatus},
+    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
     vm_status::StatusCode,
 };
 use move_core_types::{

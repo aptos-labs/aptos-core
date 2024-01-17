@@ -40,8 +40,9 @@ use aptos_sdk::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload, Script,
-        SignedTransaction, TransactionArgument, TransactionPayload, TransactionStatus,
+        authenticator::AuthenticationKey, deprecated::SignedTransaction, EntryFunction,
+        MultisigTransactionPayload, Script, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
 };
 use async_trait::async_trait;

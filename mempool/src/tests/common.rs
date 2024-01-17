@@ -15,7 +15,10 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     mempool_status::MempoolStatusCode,
-    transaction::{RawTransaction, Script, SignedTransaction},
+    transaction::{
+        deprecated::{RawTransaction, SignedTransaction},
+        Script,
+    },
 };
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, SeedableRng};

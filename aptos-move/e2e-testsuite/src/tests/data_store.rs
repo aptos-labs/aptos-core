@@ -6,7 +6,7 @@ use aptos_language_e2e_tests::{
     account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
 };
 use aptos_types::transaction::{
-    ExecutionStatus, Module, SignedTransaction, Transaction, TransactionStatus,
+    deprecated::SignedTransaction, ExecutionStatus, Module, Transaction, TransactionStatus,
 };
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module;

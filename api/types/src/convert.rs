@@ -28,8 +28,8 @@ use aptos_types::{
         table::TableHandle,
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
-        SignedTransaction,
+        deprecated::{RawTransaction, SignedTransaction},
+        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, Script,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,

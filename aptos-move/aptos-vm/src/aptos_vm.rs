@@ -46,9 +46,10 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         authenticator::AnySignature,
+        deprecated::SignedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        MultisigTransactionPayload, SignatureCheckedTransaction, Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
             UserTransaction,
@@ -122,6 +123,7 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 /// Remove this once the bundle is removed from the code.
 static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
+
 pub fn allow_module_bundle_for_test() {
     MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
 }
@@ -1161,7 +1163,7 @@ impl AptosVM {
                 },
                 Err(_err) => {
                     return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
-                        .finish(Location::Undefined))
+                        .finish(Location::Undefined));
                 },
             }
         }
@@ -1952,7 +1954,7 @@ impl AptosVM {
                         // Type resolution failure can be triggered by user input when providing a bad type argument, skip this case.
                         StatusCode::TYPE_RESOLUTION_FAILURE
                         if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {},
+                                == Some(move_core_types::vm_status::sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE) => {}
                         // The known Move function failure and type resolution failure could be a result of speculative execution. Use speculative logger.
                         StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION
                         | StatusCode::TYPE_RESOLUTION_FAILURE => {
@@ -1964,11 +1966,11 @@ impl AptosVM {
                                     vm_status
                                 ),
                             );
-                        },
+                        }
                         // Paranoid mode failure. We need to be alerted about this ASAP.
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                         if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE) =>
+                                == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE) =>
                             {
                                 error!(
                                 *log_context,
@@ -1976,11 +1978,11 @@ impl AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );
-                            },
+                            }
                         // Paranoid mode failure but with reference counting
                         StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                         if vm_status.sub_status()
-                            == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
+                                == Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE) =>
                             {
                                 error!(
                                 *log_context,
@@ -1988,7 +1990,7 @@ impl AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );
-                            },
+                            }
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
@@ -2001,7 +2003,7 @@ impl AptosVM {
                                 bcs::to_bytes::<SignedTransaction>(txn),
                                 vm_status,
                             );
-                        },
+                        }
                     }
                 }
 
@@ -2132,7 +2134,7 @@ impl VMValidator for AptosVM {
             .features
             .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
         {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
+            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender { .. } = transaction.authenticator_ref() {
                 return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
             }
         }

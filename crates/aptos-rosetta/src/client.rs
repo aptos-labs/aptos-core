@@ -21,7 +21,7 @@ use aptos_crypto::{
     ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, ValidCryptoMaterialStringExt,
 };
 use aptos_rest_client::aptos_api_types::mime_types::JSON;
-use aptos_types::{account_address::AccountAddress, transaction::RawTransaction};
+use aptos_types::{account_address::AccountAddress, transaction::deprecated::RawTransaction};
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashMap, convert::TryInto, fmt::Debug, str::FromStr};

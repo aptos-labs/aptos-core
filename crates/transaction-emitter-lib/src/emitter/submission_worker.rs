@@ -12,9 +12,10 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
+    types::{vm_status::StatusCode, LocalAccount},
 };
 use aptos_transaction_generator_lib::TransactionGenerator;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},

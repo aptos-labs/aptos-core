@@ -163,8 +163,8 @@ mod tests {
         test_helpers::transaction_test_helpers::get_test_raw_transaction,
         transaction::{
             authenticator::{AnyPublicKey, AuthenticationKey},
+            deprecated::RawTransaction,
             webauthn::{AssertionSignature, PartialAuthenticatorAssertionResponse},
-            RawTransaction,
         },
     };
     use anyhow::anyhow;

@@ -4,7 +4,7 @@
 
 use crate::{core_mempool::TXN_INDEX_ESTIMATED_BYTES, counters};
 use aptos_crypto::HashValue;
-use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
+use aptos_types::{account_address::AccountAddress, transaction::deprecated::SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::{
     mem::size_of,
@@ -151,7 +151,10 @@ mod test {
     use aptos_types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
+        transaction::{
+            deprecated::{RawTransaction, SignedTransaction},
+            Script, TransactionPayload,
+        },
     };
     use std::time::{Duration, SystemTime};
 

@@ -17,7 +17,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::{SignedTransaction, Transaction, Version},
+    transaction::{deprecated::SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,

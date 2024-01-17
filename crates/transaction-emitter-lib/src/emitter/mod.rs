@@ -20,9 +20,10 @@ use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Clien
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::LocalAccount,
 };
 use aptos_transaction_generator_lib::{create_txn_generator_creator, TransactionType};
+use aptos_types::transaction::deprecated::SignedTransaction;
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng};

@@ -23,7 +23,7 @@ use aptos_logger::{prelude::*, Level};
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
-    transaction::SignedTransaction,
+    transaction::deprecated::SignedTransaction,
 };
 use std::{
     cmp::max,

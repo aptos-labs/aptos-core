@@ -13,7 +13,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_view::AccountView,
     state_store::{account_with_state_view::AsAccountWithStateView, StateView},
-    transaction::{SignedTransaction, VMValidatorResult},
+    transaction::{deprecated::SignedTransaction, VMValidatorResult},
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_logging::log_schema::AdapterLogSchema;

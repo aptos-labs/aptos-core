@@ -10,7 +10,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_view::AccountView,
     state_store::account_with_state_view::AsAccountWithStateView,
-    transaction::{SignedTransaction, Transaction},
+    transaction::{deprecated::SignedTransaction, Transaction},
 };
 use async_trait::async_trait;
 use std::{

@@ -14,7 +14,7 @@ use aptos_network::{
     protocols::wire::handshake::v1::ProtocolId::MempoolDirectSend,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use proptest::{
     arbitrary::any,

@@ -32,8 +32,9 @@ use aptos_types::{
     account_config::CoinStoreResource,
     mempool_status::MempoolStatusCode,
     transaction::{
-        EntryFunction, ExecutionStatus, MultisigTransactionPayload, RawTransaction,
-        RawTransactionWithData, SignedTransaction, TransactionPayload, TransactionStatus,
+        deprecated::{RawTransaction, RawTransactionWithData, SignedTransaction},
+        EntryFunction, ExecutionStatus, MultisigTransactionPayload, TransactionPayload,
+        TransactionStatus,
     },
     vm_status::StatusCode,
 };

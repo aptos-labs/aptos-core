@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_consensus_types::block::Block;
 use aptos_executor_types::ExecutorResult;
-use aptos_types::transaction::SignedTransaction;
+use aptos_types::transaction::deprecated::SignedTransaction;
 use std::sync::Arc;
 
 pub struct BlockPreparer {

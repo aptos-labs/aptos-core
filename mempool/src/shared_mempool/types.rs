@@ -22,7 +22,8 @@ use aptos_network::{
 };
 use aptos_storage_interface::DbReader;
 use aptos_types::{
-    mempool_status::MempoolStatus, transaction::SignedTransaction, vm_status::DiscardedVMStatus,
+    mempool_status::MempoolStatus, transaction::deprecated::SignedTransaction,
+    vm_status::DiscardedVMStatus,
 };
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{

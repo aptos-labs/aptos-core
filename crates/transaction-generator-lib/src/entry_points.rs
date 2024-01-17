@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::deprecated::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
 use rand::rngs::StdRng;

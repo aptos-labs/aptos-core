@@ -12,8 +12,9 @@ use aptos_rest_client::{
 };
 use aptos_sdk::{
     crypto::{PrivateKey, SigningKey},
-    types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
+    types::transaction::authenticator::AuthenticationKey,
 };
+use aptos_types::transaction::deprecated::SignedTransaction;
 
 // TODO: debug me and re-enable the test!
 #[ignore]

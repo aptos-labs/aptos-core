@@ -21,7 +21,9 @@ use aptos_sdk::{
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
+        transaction::{
+            authenticator::AuthenticationKey, deprecated::SignedTransaction, TransactionPayload,
+        },
         LocalAccount,
     },
 };

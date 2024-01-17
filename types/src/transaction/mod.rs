@@ -8,41 +8,25 @@ use crate::{
     account_address::AccountAddress,
     aggregator::{TryFromMoveValue, TryIntoMoveValue},
     block_metadata::BlockMetadata,
-    chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
-    transaction::authenticator::{
-        AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
-        TransactionAuthenticator,
-    },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
 };
-use anyhow::{ensure, format_err, Context, Error, Result};
-use aptos_crypto::{
-    ed25519::*,
-    hash::CryptoHash,
-    multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa,
-    traits::{signing_message, SigningKey},
-    CryptoMaterialError, HashValue,
-};
+use anyhow::{Context, ensure, Error, format_err, Result};
+use aptos_crypto::{hash::CryptoHash, HashValue, secp256k1_ecdsa, traits::SigningKey};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::TryFrom,
-    fmt,
-    fmt::{Debug, Display, Formatter},
-};
+use std::{convert::TryFrom, fmt::{Debug, Display, Formatter}, fmt};
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+pub mod deprecated;
 mod block_output;
 mod change_set;
 mod module;
@@ -64,427 +48,23 @@ pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
-use once_cell::sync::OnceCell;
 pub use script::{
     ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
 use serde::de::DeserializeOwned;
-use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use std::{hash::Hash, ops::Deref, sync::atomic::AtomicU64};
+use std::collections::BTreeSet;
+use once_cell::sync::OnceCell;
+use aptos_crypto::ed25519::{Ed25519PublicKey, Ed25519Signature};
+use aptos_crypto::multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature};
+use crate::chain_id::ChainId;
+use crate::transaction::authenticator::{AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator, TransactionAuthenticator};
+use crate::transaction::deprecated::RawTransaction;
 
-pub type Version = u64; // Height - also used for MVCC in StateDB
+pub type Version = u64;
+// Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
-
-/// RawTransaction is the portion of a transaction that a client signs.
-#[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
-)]
-pub struct RawTransaction {
-    /// Sender's address.
-    sender: AccountAddress,
-
-    /// Sequence number of this transaction. This must match the sequence number
-    /// stored in the sender's account at the time the transaction executes.
-    sequence_number: u64,
-
-    /// The transaction payload, e.g., a script to execute.
-    payload: TransactionPayload,
-
-    /// Maximal total gas to spend for this transaction.
-    max_gas_amount: u64,
-
-    /// Price to be paid per gas unit.
-    gas_unit_price: u64,
-
-    /// Expiration timestamp for this transaction, represented
-    /// as seconds from the Unix Epoch. If the current blockchain timestamp
-    /// is greater than or equal to this time, then the transaction has
-    /// expired and will be discarded. This can be set to a large value far
-    /// in the future to indicate that a transaction does not expire.
-    expiration_timestamp_secs: u64,
-
-    /// Chain ID of the Aptos network this transaction is intended for.
-    chain_id: ChainId,
-}
-
-impl RawTransaction {
-    /// Create a new `RawTransaction` with a payload.
-    ///
-    /// It can be either to publish a module, to execute a script, or to issue a writeset
-    /// transaction.
-    pub fn new(
-        sender: AccountAddress,
-        sequence_number: u64,
-        payload: TransactionPayload,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload,
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` with a script.
-    ///
-    /// A script transaction contains only code to execute. No publishing is allowed in scripts.
-    pub fn new_script(
-        sender: AccountAddress,
-        sequence_number: u64,
-        script: Script,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::Script(script),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` with an entry function.
-    pub fn new_entry_function(
-        sender: AccountAddress,
-        sequence_number: u64,
-        entry_function: EntryFunction,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::EntryFunction(entry_function),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` of multisig type.
-    pub fn new_multisig(
-        sender: AccountAddress,
-        sequence_number: u64,
-        multisig: Multisig,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::Multisig(multisig),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` with a module to publish.
-    pub fn new_module(
-        sender: AccountAddress,
-        sequence_number: u64,
-        module: Module,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::ModuleBundle(ModuleBundle::from(module)),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` with a list of modules to publish.
-    ///
-    /// Multiple modules per transaction can be published.
-    pub fn new_module_bundle(
-        sender: AccountAddress,
-        sequence_number: u64,
-        modules: ModuleBundle,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::ModuleBundle(modules),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
-    /// into a `SignatureCheckedTransaction`.
-    ///
-    /// For a transaction that has just been signed, its signature is expected to be valid.
-    pub fn sign(
-        self,
-        private_key: &Ed25519PrivateKey,
-        public_key: Ed25519PublicKey,
-    ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(SignedTransaction::new(
-            self, public_key, signature,
-        )))
-    }
-
-    /// Signs the given multi-agent `RawTransaction`, which is a transaction with secondary
-    /// signers in addition to a sender. The private keys of the sender and the
-    /// secondary signers are used to sign the transaction.
-    ///
-    /// The order and length of the secondary keys provided here have to match the order and
-    /// length of the `secondary_signers`.
-    pub fn sign_multi_agent(
-        self,
-        sender_private_key: &Ed25519PrivateKey,
-        secondary_signers: Vec<AccountAddress>,
-        secondary_private_keys: Vec<&Ed25519PrivateKey>,
-    ) -> Result<SignatureCheckedTransaction> {
-        let message =
-            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
-        let sender_signature = sender_private_key.sign(&message)?;
-        let sender_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(sender_private_key),
-            sender_signature,
-        );
-
-        if secondary_private_keys.len() != secondary_signers.len() {
-            return Err(format_err!(
-                "number of secondary private keys and number of secondary signers don't match"
-            ));
-        }
-        let mut secondary_authenticators = vec![];
-        for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message)?;
-            secondary_authenticators.push(AccountAuthenticator::ed25519(
-                Ed25519PublicKey::from(priv_key),
-                signature,
-            ));
-        }
-
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multi_agent(
-                self,
-                sender_authenticator,
-                secondary_signers,
-                secondary_authenticators,
-            ),
-        ))
-    }
-
-    /// Signs the given fee-payer `RawTransaction`, which is a transaction with secondary
-    /// signers and a gas payer in addition to a sender. The private keys of the sender, the
-    /// secondary signers, and gas payer signer are used to sign the transaction.
-    ///
-    /// The order and length of the secondary keys provided here have to match the order and
-    /// length of the `secondary_signers`.
-    pub fn sign_fee_payer(
-        self,
-        sender_private_key: &Ed25519PrivateKey,
-        secondary_signers: Vec<AccountAddress>,
-        secondary_private_keys: Vec<&Ed25519PrivateKey>,
-        fee_payer_address: AccountAddress,
-        fee_payer_private_key: &Ed25519PrivateKey,
-    ) -> Result<SignatureCheckedTransaction> {
-        let message = RawTransactionWithData::new_fee_payer(
-            self.clone(),
-            secondary_signers.clone(),
-            fee_payer_address,
-        );
-        let sender_signature = sender_private_key.sign(&message)?;
-        let sender_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(sender_private_key),
-            sender_signature,
-        );
-
-        if secondary_private_keys.len() != secondary_signers.len() {
-            return Err(format_err!(
-                "number of secondary private keys and number of secondary signers don't match"
-            ));
-        }
-        let mut secondary_authenticators = vec![];
-        for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message)?;
-            secondary_authenticators.push(AccountAuthenticator::ed25519(
-                Ed25519PublicKey::from(priv_key),
-                signature,
-            ));
-        }
-
-        let fee_payer_signature = fee_payer_private_key.sign(&message)?;
-        let fee_payer_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(fee_payer_private_key),
-            fee_payer_signature,
-        );
-
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_fee_payer(
-                self,
-                sender_authenticator,
-                secondary_signers,
-                secondary_authenticators,
-                fee_payer_address,
-                fee_payer_authenticator,
-            ),
-        ))
-    }
-
-    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
-    /// into a `SignatureCheckedTransaction`.
-    ///
-    /// For a transaction that has just been signed, its signature is expected to be valid.
-    pub fn sign_secp256k1_ecdsa(
-        self,
-        private_key: &secp256k1_ecdsa::PrivateKey,
-        public_key: secp256k1_ecdsa::PublicKey,
-    ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
-        ))
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn multi_sign_for_testing(
-        self,
-        private_key: &Ed25519PrivateKey,
-        public_key: Ed25519PublicKey,
-    ) -> Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multisig(self, public_key.into(), signature.into()),
-        ))
-    }
-
-    pub fn into_payload(self) -> TransactionPayload {
-        self.payload
-    }
-
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        let (code, args) = match &self.payload {
-            TransactionPayload::Script(script) => (
-                get_transaction_name(script.code()),
-                convert_txn_args(script.args()),
-            ),
-            TransactionPayload::EntryFunction(script_fn) => (
-                format!("{}::{}", script_fn.module(), script_fn.function()),
-                script_fn.args().to_vec(),
-            ),
-            TransactionPayload::Multisig(multisig) => (
-                format!(
-                    "Executing next transaction for multisig account {}",
-                    multisig.multisig_address,
-                ),
-                vec![],
-            ),
-            TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
-        };
-        let mut f_args: String = "".to_string();
-        for arg in args {
-            f_args = format!("{}\n\t\t\t{:02X?},", f_args, arg);
-        }
-        format!(
-            "RawTransaction {{ \n\
-             \tsender: {}, \n\
-             \tsequence_number: {}, \n\
-             \tpayload: {{, \n\
-             \t\ttransaction: {}, \n\
-             \t\targs: [ {} \n\
-             \t\t]\n\
-             \t}}, \n\
-             \tmax_gas_amount: {}, \n\
-             \tgas_unit_price: {}, \n\
-             \texpiration_timestamp_secs: {:#?}, \n\
-             \tchain_id: {},
-             }}",
-            self.sender,
-            self.sequence_number,
-            code,
-            f_args,
-            self.max_gas_amount,
-            self.gas_unit_price,
-            self.expiration_timestamp_secs,
-            self.chain_id,
-        )
-    }
-
-    /// Return the sender of this transaction.
-    pub fn sender(&self) -> AccountAddress {
-        self.sender
-    }
-
-    /// Return the signing message for creating transaction signature.
-    pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
-        signing_message(self)
-    }
-}
-
-#[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
-)]
-pub enum RawTransactionWithData {
-    MultiAgent {
-        raw_txn: RawTransaction,
-        secondary_signer_addresses: Vec<AccountAddress>,
-    },
-    MultiAgentWithFeePayer {
-        raw_txn: RawTransaction,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        fee_payer_address: AccountAddress,
-    },
-}
-
-impl RawTransactionWithData {
-    pub fn new_fee_payer(
-        raw_txn: RawTransaction,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        fee_payer_address: AccountAddress,
-    ) -> Self {
-        Self::MultiAgentWithFeePayer {
-            raw_txn,
-            secondary_signer_addresses,
-            fee_payer_address,
-        }
-    }
-
-    pub fn new_multi_agent(
-        raw_txn: RawTransaction,
-        secondary_signer_addresses: Vec<AccountAddress>,
-    ) -> Self {
-        Self::MultiAgent {
-            raw_txn,
-            secondary_signer_addresses,
-        }
-    }
-}
 
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -532,305 +112,6 @@ impl WriteSetPayload {
     }
 }
 
-/// A transaction that has been signed.
-///
-/// A `SignedTransaction` is a single transaction that can be atomically executed. Clients submit
-/// these to validator nodes, and the validator and executor submits these to the VM.
-///
-/// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
-/// transaction whose signature is statically guaranteed to be verified, see
-/// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, Serialize, Deserialize)]
-pub struct SignedTransaction {
-    /// The raw transaction
-    raw_txn: RawTransaction,
-
-    /// Public key and signature to authenticate
-    authenticator: TransactionAuthenticator,
-
-    /// A cached size of the raw transaction bytes.
-    /// Prevents serializing the same transaction multiple times to determine size.
-    #[serde(skip)]
-    raw_txn_size: OnceCell<usize>,
-
-    /// A cached size of the authenticator.
-    /// Prevents serializing the same authenticator multiple times to determine size.
-    #[serde(skip)]
-    authenticator_size: OnceCell<usize>,
-}
-
-/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
-/// may not be initialized during runtime comparison.
-impl PartialEq for SignedTransaction {
-    fn eq(&self, other: &Self) -> bool {
-        self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
-    }
-}
-
-/// A transaction for which the signature has been verified. Created by
-/// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SignatureCheckedTransaction(SignedTransaction);
-
-impl SignatureCheckedTransaction {
-    /// Returns the `SignedTransaction` within.
-    pub fn into_inner(self) -> SignedTransaction {
-        self.0
-    }
-
-    /// Returns the `RawTransaction` within.
-    pub fn into_raw_transaction(self) -> RawTransaction {
-        self.0.into_raw_transaction()
-    }
-}
-
-impl Deref for SignatureCheckedTransaction {
-    type Target = SignedTransaction;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Debug for SignedTransaction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "SignedTransaction {{ \n \
-             {{ raw_txn: {:#?}, \n \
-             authenticator: {:#?}, \n \
-             }} \n \
-             }}",
-            self.raw_txn, self.authenticator
-        )
-    }
-}
-
-impl SignedTransaction {
-    pub fn new_signed_transaction(
-        raw_txn: RawTransaction,
-        authenticator: TransactionAuthenticator,
-    ) -> SignedTransaction {
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new(
-        raw_txn: RawTransaction,
-        public_key: Ed25519PublicKey,
-        signature: Ed25519Signature,
-    ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_fee_payer(
-        raw_txn: RawTransaction,
-        sender: AccountAuthenticator,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signers: Vec<AccountAuthenticator>,
-        fee_payer_address: AccountAddress,
-        fee_payer_signer: AccountAuthenticator,
-    ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::fee_payer(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-                fee_payer_address,
-                fee_payer_signer,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_multisig(
-        raw_txn: RawTransaction,
-        public_key: MultiEd25519PublicKey,
-        signature: MultiEd25519Signature,
-    ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_multi_agent(
-        raw_txn: RawTransaction,
-        sender: AccountAuthenticator,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signers: Vec<AccountAuthenticator>,
-    ) -> Self {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::multi_agent(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            ),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_secp256k1_ecdsa(
-        raw_txn: RawTransaction,
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    ) -> SignedTransaction {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::secp256k1_ecdsa(public_key),
-                AnySignature::secp256k1_ecdsa(signature),
-            )),
-        );
-        SignedTransaction {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_single_sender(
-        raw_txn: RawTransaction,
-        authenticator: AccountAuthenticator,
-    ) -> SignedTransaction {
-        SignedTransaction {
-            raw_txn,
-            authenticator: TransactionAuthenticator::single_sender(authenticator),
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn new_with_authenticator(
-        raw_txn: RawTransaction,
-        authenticator: TransactionAuthenticator,
-    ) -> Self {
-        Self {
-            raw_txn,
-            authenticator,
-            raw_txn_size: OnceCell::new(),
-            authenticator_size: OnceCell::new(),
-        }
-    }
-
-    pub fn authenticator(&self) -> TransactionAuthenticator {
-        self.authenticator.clone()
-    }
-
-    pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
-        &self.authenticator
-    }
-
-    pub fn sender(&self) -> AccountAddress {
-        self.raw_txn.sender
-    }
-
-    pub fn into_raw_transaction(self) -> RawTransaction {
-        self.raw_txn
-    }
-
-    pub fn raw_transaction_ref(&self) -> &RawTransaction {
-        &self.raw_txn
-    }
-
-    pub fn sequence_number(&self) -> u64 {
-        self.raw_txn.sequence_number
-    }
-
-    pub fn chain_id(&self) -> ChainId {
-        self.raw_txn.chain_id
-    }
-
-    pub fn payload(&self) -> &TransactionPayload {
-        &self.raw_txn.payload
-    }
-
-    pub fn max_gas_amount(&self) -> u64 {
-        self.raw_txn.max_gas_amount
-    }
-
-    pub fn gas_unit_price(&self) -> u64 {
-        self.raw_txn.gas_unit_price
-    }
-
-    pub fn expiration_timestamp_secs(&self) -> u64 {
-        self.raw_txn.expiration_timestamp_secs
-    }
-
-    pub fn raw_txn_bytes_len(&self) -> usize {
-        *self.raw_txn_size.get_or_init(|| {
-            bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
-        })
-    }
-
-    pub fn txn_bytes_len(&self) -> usize {
-        let authenticator_size = *self.authenticator_size.get_or_init(|| {
-            bcs::serialized_size(&self.authenticator)
-                .expect("Unable to serialize TransactionAuthenticator")
-        });
-        self.raw_txn_bytes_len() + authenticator_size
-    }
-
-    /// Checks that the signature of given transaction. Returns `Ok(SignatureCheckedTransaction)` if
-    /// the signature is valid.
-    pub fn check_signature(self) -> Result<SignatureCheckedTransaction> {
-        self.authenticator.verify(&self.raw_txn)?;
-        Ok(SignatureCheckedTransaction(self))
-    }
-
-    pub fn verify_signature(&self) -> Result<()> {
-        self.authenticator.verify(&self.raw_txn)?;
-        Ok(())
-    }
-
-    pub fn contains_duplicate_signers(&self) -> bool {
-        let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
-        all_signer_addresses.push(self.sender());
-        let mut s = BTreeSet::new();
-        all_signer_addresses.iter().any(|a| !s.insert(*a))
-    }
-
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        format!(
-            "SignedTransaction {{ \n \
-             raw_txn: {}, \n \
-             authenticator: {:#?}, \n \
-             }}",
-            self.raw_txn.format_for_client(get_transaction_name),
-            self.authenticator
-        )
-    }
-
-    pub fn is_multi_agent(&self) -> bool {
-        matches!(
-            self.authenticator,
-            TransactionAuthenticator::MultiAgent { .. }
-        )
-    }
-
-    /// Returns the hash when the transaction is commited onchain.
-    pub fn committed_hash(self) -> HashValue {
-        Transaction::UserTransaction(self).hash()
-    }
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionWithProof {
@@ -872,9 +153,9 @@ impl TransactionWithProof {
         sequence_number: u64,
     ) -> Result<()> {
         let signed_transaction = self
-            .transaction
-            .try_as_signed_user_txn()
-            .context("not user transaction")?;
+                .transaction
+                .try_as_signed_user_txn()
+                .context("not user transaction")?;
 
         ensure!(
             self.version == version,
@@ -906,7 +187,7 @@ impl TransactionWithProof {
         if let Some(events) = &self.events {
             let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
             let event_root_hash =
-                InMemoryEventAccumulator::from_leaves(&event_hashes[..]).root_hash();
+                    InMemoryEventAccumulator::from_leaves(&event_hashes[..]).root_hash();
             ensure!(
                 event_root_hash == self.proof.transaction_info().event_root_hash(),
                 "Event root hash ({}) not expected ({}).",
@@ -1031,18 +312,18 @@ impl TransactionStatus {
             Ok(recorded) => match recorded {
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
-                },
+                }
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => {
                 if code.status_type() == StatusType::InvariantViolation
-                    && charge_invariant_violation
+                        && charge_invariant_violation
                 {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(code)))
                 } else {
                     TransactionStatus::Discard(code)
                 }
-            },
+            }
         }
     }
 }
@@ -1078,8 +359,8 @@ impl VMValidatorResult {
                 None => true,
                 Some(status) =>
                     status.status_type() == StatusType::Unknown
-                        || status.status_type() == StatusType::Validation
-                        || status.status_type() == StatusType::InvariantViolation,
+                            || status.status_type() == StatusType::Validation
+                            || status.status_type() == StatusType::InvariantViolation,
             },
             "Unexpected discarded status: {:?}",
             vm_status
@@ -1217,10 +498,10 @@ impl TransactionOutput {
         );
 
         let event_hashes = self
-            .events()
-            .iter()
-            .map(CryptoHash::hash)
-            .collect::<Vec<_>>();
+                .events()
+                .iter()
+                .map(CryptoHash::hash)
+                .collect::<Vec<_>>();
         let event_root_hash = InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash;
         ensure!(
             event_root_hash == txn_info.event_root_hash(),
@@ -1391,7 +672,7 @@ impl TransactionInfoV0 {
 
     pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
         self.state_checkpoint_hash
-            .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
+                .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
     }
 
     pub fn event_root_hash(&self) -> HashValue {
@@ -1573,24 +854,24 @@ impl TransactionListWithProof {
 
         // Verify the transaction hashes match those of the transaction infos
         self.transactions
-            .par_iter()
-            .zip_eq(self.proof.transaction_infos.par_iter())
-            .map(|(txn, txn_info)| {
-                let txn_hash = CryptoHash::hash(txn);
-                ensure!(
+                .par_iter()
+                .zip_eq(self.proof.transaction_infos.par_iter())
+                .map(|(txn, txn_info)| {
+                    let txn_hash = CryptoHash::hash(txn);
+                    ensure!(
                     txn_hash == txn_info.transaction_hash(),
                     "The hash of transaction does not match the transaction info in proof. \
                      Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
                     txn_hash,
                     txn_info.transaction_hash(),
                 );
-                Ok(())
-            })
-            .collect::<Result<Vec<_>>>()?;
+                    Ok(())
+                })
+                .collect::<Result<Vec<_>>>()?;
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
-            .verify(ledger_info, self.first_transaction_version)?;
+                .verify(ledger_info, self.first_transaction_version)?;
 
         // Verify the events if they exist.
         if let Some(event_lists) = &self.events {
@@ -1601,10 +882,10 @@ impl TransactionListWithProof {
                 self.transactions.len(),
             );
             event_lists
-                .into_par_iter()
-                .zip_eq(self.proof.transaction_infos.par_iter())
-                .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
-                .collect::<Result<Vec<_>>>()?;
+                    .into_par_iter()
+                    .zip_eq(self.proof.transaction_infos.par_iter())
+                    .map(|(events, txn_info)| verify_events_against_root_hash(events, txn_info))
+                    .collect::<Result<Vec<_>>>()?;
         }
 
         Ok(())
@@ -1678,13 +959,13 @@ impl TransactionOutputListWithProof {
 
         // Verify the events, status, gas used and transaction hashes.
         self.transactions_and_outputs.par_iter().zip_eq(self.proof.transaction_infos.par_iter())
-        .map(|((txn, txn_output), txn_info)| {
-            // Check the events against the expected events root hash
-            verify_events_against_root_hash(&txn_output.events, txn_info)?;
+                .map(|((txn, txn_output), txn_info)| {
+                    // Check the events against the expected events root hash
+                    verify_events_against_root_hash(&txn_output.events, txn_info)?;
 
-            // Verify the write set matches for both the transaction info and output
-            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
-            ensure!(
+                    // Verify the write set matches for both the transaction info and output
+                    let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+                    ensure!(
                 txn_info.state_change_hash == write_set_hash,
                 "The write set in transaction output does not match the transaction info \
                      in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
@@ -1692,8 +973,8 @@ impl TransactionOutputListWithProof {
                 txn_info.state_change_hash,
             );
 
-            // Verify the gas matches for both the transaction info and output
-            ensure!(
+                    // Verify the gas matches for both the transaction info and output
+                    ensure!(
                 txn_output.gas_used() == txn_info.gas_used(),
                 "The gas used in transaction output does not match the transaction info \
                      in proof. Gas used in transaction output: {}. Gas used in txn_info: {}.",
@@ -1701,8 +982,8 @@ impl TransactionOutputListWithProof {
                 txn_info.gas_used(),
             );
 
-            // Verify the execution status matches for both the transaction info and output.
-            ensure!(
+                    // Verify the execution status matches for both the transaction info and output.
+                    ensure!(
                 *txn_output.status() == TransactionStatus::Keep(txn_info.status().clone()),
                 "The execution status of transaction output does not match the transaction \
                      info in proof. Status in transaction output: {:?}. Status in txn_info: {:?}.",
@@ -1710,22 +991,22 @@ impl TransactionOutputListWithProof {
                 txn_info.status(),
             );
 
-            // Verify the transaction hashes match those of the transaction infos
-            let txn_hash = txn.hash();
-            ensure!(
+                    // Verify the transaction hashes match those of the transaction infos
+                    let txn_hash = txn.hash();
+                    ensure!(
                 txn_hash == txn_info.transaction_hash(),
                 "The transaction hash does not match the hash in transaction info. \
                      Transaction hash: {:x}. Transaction hash in txn_info: {:x}.",
                 txn_hash,
                 txn_info.transaction_hash(),
             );
-            Ok(())
-        })
-        .collect::<Result<Vec<_>>>()?;
+                    Ok(())
+                })
+                .collect::<Result<Vec<_>>>()?;
 
         // Verify the transaction infos are proven by the ledger info.
         self.proof
-            .verify(ledger_info, self.first_transaction_output_version)?;
+                .verify(ledger_info, self.first_transaction_output_version)?;
 
         Ok(())
     }
@@ -1803,25 +1084,25 @@ impl AccountTransactionsWithProof {
         );
 
         self.0
-            .iter()
-            .enumerate()
-            .try_for_each(|(seq_num_offset, txn_with_proof)| {
-                let expected_seq_num = start_seq_num.saturating_add(seq_num_offset as u64);
-                let txn_version = txn_with_proof.version;
+                .iter()
+                .enumerate()
+                .try_for_each(|(seq_num_offset, txn_with_proof)| {
+                    let expected_seq_num = start_seq_num.saturating_add(seq_num_offset as u64);
+                    let txn_version = txn_with_proof.version;
 
-                ensure!(
+                    ensure!(
                     include_events == txn_with_proof.events.is_some(),
                     "unexpected events or missing events"
                 );
-                ensure!(
+                    ensure!(
                     txn_version <= ledger_version,
                     "transaction with version ({}) greater than requested ledger version ({})",
                     txn_version,
                     ledger_version,
                 );
 
-                txn_with_proof.verify_user_txn(ledger_info, txn_version, account, expected_seq_num)
-            })
+                    txn_with_proof.verify_user_txn(ledger_info, txn_version, account, expected_seq_num)
+                })
     }
 }
 
@@ -1881,7 +1162,7 @@ impl Transaction {
         match self {
             Transaction::UserTransaction(user_txn) => {
                 user_txn.format_for_client(get_transaction_name)
-            },
+            }
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
             // TODO: display proper information for client
@@ -1909,17 +1190,6 @@ impl Transaction {
     }
 }
 
-impl TryFrom<Transaction> for SignedTransaction {
-    type Error = Error;
-
-    fn try_from(txn: Transaction) -> Result<Self> {
-        match txn {
-            Transaction::UserTransaction(txn) => Ok(txn),
-            _ => Err(format_err!("Not a user transaction.")),
-        }
-    }
-}
-
 /// Trait that defines a transaction type that can be executed by the block executor. A transaction
 /// transaction will write to a key value storage as their side effect.
 pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
@@ -1929,31 +1199,56 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     /// in the future if write-set format changes to be per-resource, could be more performant).
     /// Is generic primarily to provide easy plug-in replacement for mock tests and be extensible.
     type Tag: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + DeserializeOwned
-        + Serialize;
+    + Ord
+    + Send
+    + Sync
+    + Clone
+    + Hash
+    + Eq
+    + Debug
+    + DeserializeOwned
+    + Serialize;
     /// Delayed field identifier type.
     type Identifier: PartialOrd
-        + Ord
-        + Send
-        + Sync
-        + Clone
-        + Hash
-        + Eq
-        + Debug
-        + Copy
-        + From<u64>
-        + TryIntoMoveValue
-        + TryFromMoveValue<Hint = ()>;
+    + Ord
+    + Send
+    + Sync
+    + Clone
+    + Hash
+    + Eq
+    + Debug
+    + Copy
+    + From<u64>
+    + TryIntoMoveValue
+    + TryFromMoveValue<Hint=()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
     type Event: Send + Sync + Debug + Clone + TransactionEvent;
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+}
+
+/// A transaction for which the signature has been verified. Created by
+/// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignatureCheckedTransaction(SignedTransaction);
+
+impl SignatureCheckedTransaction {
+    /// Returns the `SignedTransaction` within.
+    pub fn into_inner(self) -> SignedTransaction {
+        self.0
+    }
+
+    /// Returns the `RawTransaction` within.
+    pub fn into_raw_transaction(self) -> RawTransaction {
+        self.0.into_raw_transaction()
+    }
+}
+
+impl Deref for SignatureCheckedTransaction {
+    type Target = SignedTransaction;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }

@@ -20,7 +20,7 @@ use aptos_types::{
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_metadata::BlockMetadata,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
+        deprecated::SignedTransaction, signature_verified_transaction::SignatureVerifiedTransaction,
     },
 };
 use fail::fail_point;

@@ -40,7 +40,7 @@ use aptos_types::{
         state_value::StateValue,
         TStateView,
     },
-    transaction::{SignedTransaction, TransactionWithProof, Version},
+    transaction::{deprecated::SignedTransaction, TransactionWithProof, Version},
 };
 use aptos_utils::aptos_try;
 use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
