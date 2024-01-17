@@ -79,7 +79,6 @@ impl VTxnPoolState {
             .pull(deadline, max_items, max_bytes, filter)
     }
 }
-/// Create a new validator transaction pool.
 
 struct PoolItem {
     topic: Topic,
