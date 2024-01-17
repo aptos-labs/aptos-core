@@ -1,3 +1,8 @@
+//! Computes if a given code offset
+//! - may lead to an abort, or
+//! - leads to an abort, or
+//! - doesn't lead to an abort
+
 use abstract_domain_derive::AbstractDomain;
 use move_binary_format::file_format::CodeOffset;
 use move_model::model::FunctionEnv;
