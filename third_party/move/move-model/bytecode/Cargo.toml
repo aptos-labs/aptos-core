@@ -19,7 +19,6 @@ move-compiler = { path = "../../move-compiler" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-to-bytecode = { path = "../../move-ir-compiler/move-ir-to-bytecode" }
 move-model = { path = ".." }
-abstract-domain-derive = { path = "./abstract_domain_derive" }
 
 codespan = "0.11.1"
 codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
