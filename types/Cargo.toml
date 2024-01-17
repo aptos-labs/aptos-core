@@ -45,6 +45,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tiny-keccak = { workspace = true }
+signature = { version = "2.2.0", features = [] }
 
 [dev-dependencies]
 aptos-crypto = { workspace = true, features = ["fuzzing", "testing"] }

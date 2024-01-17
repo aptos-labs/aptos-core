@@ -21,10 +21,14 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        deprecated::{RawTransaction, SignedTransaction},
-        ChangeSet, ExecutionStatus, Module, ModuleBundle, Script, SignatureCheckedTransaction,
-        Transaction, TransactionArgument, TransactionInfo, TransactionListWithProof,
-        TransactionPayload, TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
+        deprecated::{
+            RawTransaction as DeprecatedRawTransaction,
+            SignedTransaction as DepreactedSignedTransaction,
+        },
+        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
+        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -319,7 +323,7 @@ impl RawTransactionGen {
     }
 }
 
-impl RawTransaction {
+impl DeprecatedRawTransaction {
     fn strategy_impl(
         address_strategy: impl Strategy<Value = AccountAddress>,
         payload_strategy: impl Strategy<Value = TransactionPayload>,
@@ -362,10 +366,10 @@ fn new_raw_transaction(
     max_gas_amount: u64,
     gas_unit_price: u64,
     expiration_time_secs: u64,
-) -> RawTransaction {
+) -> DeprecatedRawTransaction {
     let chain_id = ChainId::test();
     match payload {
-        TransactionPayload::ModuleBundle(module) => RawTransaction::new_module_bundle(
+        TransactionPayload::ModuleBundle(module) => DeprecatedRawTransaction::new_module_bundle(
             sender,
             sequence_number,
             module,
@@ -374,7 +378,7 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::Script(script) => RawTransaction::new_script(
+        TransactionPayload::Script(script) => DeprecatedRawTransaction::new_script(
             sender,
             sequence_number,
             script,
@@ -383,16 +387,18 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::EntryFunction(script_fn) => RawTransaction::new_entry_function(
-            sender,
-            sequence_number,
-            script_fn,
-            max_gas_amount,
-            gas_unit_price,
-            expiration_time_secs,
-            chain_id,
-        ),
-        TransactionPayload::Multisig(multisig) => RawTransaction::new_multisig(
+        TransactionPayload::EntryFunction(script_fn) => {
+            DeprecatedRawTransaction::new_entry_function(
+                sender,
+                sequence_number,
+                script_fn,
+                max_gas_amount,
+                gas_unit_price,
+                expiration_time_secs,
+                chain_id,
+            )
+        },
+        TransactionPayload::Multisig(multisig) => DeprecatedRawTransaction::new_multisig(
             sender,
             sequence_number,
             multisig,
@@ -404,12 +410,26 @@ fn new_raw_transaction(
     }
 }
 
-impl Arbitrary for RawTransaction {
+impl Arbitrary for DeprecatedRawTransaction {
     type Parameters = ();
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         Self::strategy_impl(any::<AccountAddress>(), any::<TransactionPayload>()).boxed()
+    }
+}
+
+impl Arbitrary for RawTransaction {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        DeprecatedRawTransaction::strategy_impl(
+            any::<AccountAddress>(),
+            any::<TransactionPayload>(),
+        )
+        .prop_map(|t| t.into())
+        .boxed()
     }
 }
 
@@ -437,7 +457,7 @@ impl SignatureCheckedTransaction {
                 let address = account_address::from_public_key(&keypair.public_key);
                 (
                     Just(keypair),
-                    RawTransaction::strategy_impl(Just(address), Just(payload)),
+                    DeprecatedRawTransaction::strategy_impl(Just(address), Just(payload)).into<RawTransaction>(),
                 )
             })
             .prop_flat_map(|(keypair, raw_txn)| {
@@ -494,6 +514,27 @@ impl Arbitrary for SignedTransaction {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         any::<SignatureCheckedTransaction>()
             .prop_map(|txn| txn.into_inner())
+            .boxed()
+    }
+}
+
+impl Arbitrary for DepreactedSignedTransaction {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        (ed25519::keypair_strategy(), any::<TransactionPayload>())
+            .prop_flat_map(|(keypair, payload)| {
+                let address = account_address::from_public_key(&keypair.public_key);
+                (
+                    Just(keypair),
+                    DeprecatedRawTransaction::strategy_impl(Just(address), Just(payload)),
+                )
+            })
+            .prop_flat_map(|(keypair, raw_txn)| {
+                let signature = keypair.private_key.sign(&raw_txn).unwrap();
+                Self::new(raw_txn, keypair.public_key, signature)
+            })
             .boxed()
     }
 }
@@ -823,7 +864,7 @@ impl TransactionToCommitGen {
         });
 
         TransactionToCommit::new(
-            Transaction::UserTransaction(transaction),
+            Transaction::SignedUserTransaction(transaction),
             TransactionInfo::new_placeholder(self.gas_used, None, self.status),
             sharded_state_updates,
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
@@ -903,7 +944,7 @@ fn arb_transaction_list_with_proof() -> impl Strategy<Value = TransactionListWit
             let transactions: Vec<_> = transaction_and_events
                 .clone()
                 .into_iter()
-                .map(|(transaction, _event)| Transaction::UserTransaction(transaction))
+                .map(|(transaction, _event)| Transaction::SignedUserTransaction(transaction))
                 .collect();
             let events: Vec<_> = transaction_and_events
                 .into_iter()

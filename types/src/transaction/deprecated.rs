@@ -13,10 +13,10 @@ use crate::{
 };
 use anyhow::{anyhow as format_err, Error};
 use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
+    ed25519::{Ed25519PublicKey, Ed25519Signature},
     hash::CryptoHash,
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa, signing_message, CryptoMaterialError, HashValue, SigningKey,
+    secp256k1_ecdsa, signing_message, CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{account_address::AccountAddress, transaction_argument::convert_txn_args};
@@ -26,7 +26,7 @@ use std::{collections::BTreeSet, fmt, fmt::Debug, format, matches, vec, write};
 
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub struct RawTransaction {
     /// Sender's address.
@@ -54,6 +54,20 @@ pub struct RawTransaction {
 
     /// Chain ID of the Aptos network this transaction is intended for.
     chain_id: ChainId,
+}
+
+impl From<RawTransaction> for crate::transaction::RawTransaction {
+    fn from(t: RawTransaction) -> Self {
+        Self::new(
+            t.sender,
+            t.sequence_number,
+            t.payload,
+            t.max_gas_amount,
+            t.gas_unit_price,
+            t.expiration_timestamp_secs,
+            t.chain_id,
+        )
+    }
 }
 
 impl RawTransaction {
@@ -190,149 +204,6 @@ impl RawTransaction {
         }
     }
 
-    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
-    /// into a `SignatureCheckedTransaction`.
-    ///
-    /// For a transaction that has just been signed, its signature is expected to be valid.
-    pub fn sign(
-        self,
-        private_key: &Ed25519PrivateKey,
-        public_key: Ed25519PublicKey,
-    ) -> anyhow::Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(SignedTransaction::new(
-            self, public_key, signature,
-        )))
-    }
-
-    /// Signs the given multi-agent `RawTransaction`, which is a transaction with secondary
-    /// signers in addition to a sender. The private keys of the sender and the
-    /// secondary signers are used to sign the transaction.
-    ///
-    /// The order and length of the secondary keys provided here have to match the order and
-    /// length of the `secondary_signers`.
-    pub fn sign_multi_agent(
-        self,
-        sender_private_key: &Ed25519PrivateKey,
-        secondary_signers: Vec<AccountAddress>,
-        secondary_private_keys: Vec<&Ed25519PrivateKey>,
-    ) -> anyhow::Result<SignatureCheckedTransaction> {
-        let message =
-            RawTransactionWithData::new_multi_agent(self.clone(), secondary_signers.clone());
-        let sender_signature = sender_private_key.sign(&message)?;
-        let sender_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(sender_private_key),
-            sender_signature,
-        );
-
-        if secondary_private_keys.len() != secondary_signers.len() {
-            return Err(format_err!(
-                "number of secondary private keys and number of secondary signers don't match"
-            ));
-        }
-        let mut secondary_authenticators = vec![];
-        for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message)?;
-            secondary_authenticators.push(AccountAuthenticator::ed25519(
-                Ed25519PublicKey::from(priv_key),
-                signature,
-            ));
-        }
-
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multi_agent(
-                self,
-                sender_authenticator,
-                secondary_signers,
-                secondary_authenticators,
-            ),
-        ))
-    }
-
-    /// Signs the given fee-payer `RawTransaction`, which is a transaction with secondary
-    /// signers and a gas payer in addition to a sender. The private keys of the sender, the
-    /// secondary signers, and gas payer signer are used to sign the transaction.
-    ///
-    /// The order and length of the secondary keys provided here have to match the order and
-    /// length of the `secondary_signers`.
-    pub fn sign_fee_payer(
-        self,
-        sender_private_key: &Ed25519PrivateKey,
-        secondary_signers: Vec<AccountAddress>,
-        secondary_private_keys: Vec<&Ed25519PrivateKey>,
-        fee_payer_address: AccountAddress,
-        fee_payer_private_key: &Ed25519PrivateKey,
-    ) -> anyhow::Result<SignatureCheckedTransaction> {
-        let message = RawTransactionWithData::new_fee_payer(
-            self.clone(),
-            secondary_signers.clone(),
-            fee_payer_address,
-        );
-        let sender_signature = sender_private_key.sign(&message)?;
-        let sender_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(sender_private_key),
-            sender_signature,
-        );
-
-        if secondary_private_keys.len() != secondary_signers.len() {
-            return Err(format_err!(
-                "number of secondary private keys and number of secondary signers don't match"
-            ));
-        }
-        let mut secondary_authenticators = vec![];
-        for priv_key in secondary_private_keys {
-            let signature = priv_key.sign(&message)?;
-            secondary_authenticators.push(AccountAuthenticator::ed25519(
-                Ed25519PublicKey::from(priv_key),
-                signature,
-            ));
-        }
-
-        let fee_payer_signature = fee_payer_private_key.sign(&message)?;
-        let fee_payer_authenticator = AccountAuthenticator::ed25519(
-            Ed25519PublicKey::from(fee_payer_private_key),
-            fee_payer_signature,
-        );
-
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_fee_payer(
-                self,
-                sender_authenticator,
-                secondary_signers,
-                secondary_authenticators,
-                fee_payer_address,
-                fee_payer_authenticator,
-            ),
-        ))
-    }
-
-    /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
-    /// into a `SignatureCheckedTransaction`.
-    ///
-    /// For a transaction that has just been signed, its signature is expected to be valid.
-    pub fn sign_secp256k1_ecdsa(
-        self,
-        private_key: &secp256k1_ecdsa::PrivateKey,
-        public_key: secp256k1_ecdsa::PublicKey,
-    ) -> anyhow::Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_secp256k1_ecdsa(self, public_key, signature),
-        ))
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn multi_sign_for_testing(
-        self,
-        private_key: &Ed25519PrivateKey,
-        public_key: Ed25519PublicKey,
-    ) -> anyhow::Result<SignatureCheckedTransaction> {
-        let signature = private_key.sign(&self)?;
-        Ok(SignatureCheckedTransaction(
-            SignedTransaction::new_multisig(self, public_key.into(), signature.into()),
-        ))
-    }
-
     pub fn into_payload(self) -> TransactionPayload {
         self.payload
     }
@@ -397,7 +268,7 @@ impl RawTransaction {
 }
 
 #[derive(
-    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub enum RawTransactionWithData {
     MultiAgent {
@@ -460,6 +331,12 @@ pub struct SignedTransaction {
     /// Prevents serializing the same authenticator multiple times to determine size.
     #[serde(skip)]
     authenticator_size: OnceCell<usize>,
+}
+
+impl From<SignedTransaction> for crate::transaction::SignedTransaction {
+    fn from(t: SignedTransaction) -> Self {
+        Self::new(t.raw_txn.into(), t.authenticator)
+    }
 }
 
 /// PartialEq ignores the "bytes" field as this is a OnceCell that may or
@@ -661,7 +538,7 @@ impl SignedTransaction {
     pub fn txn_bytes_len(&self) -> usize {
         let authenticator_size = *self.authenticator_size.get_or_init(|| {
             bcs::serialized_size(&self.authenticator)
-                .expect("Unable to serialize TransactionAuthenticator")
+                    .expect("Unable to serialize TransactionAuthenticator")
         });
         self.raw_txn_bytes_len() + authenticator_size
     }
@@ -670,7 +547,7 @@ impl SignedTransaction {
     /// the signature is valid.
     pub fn check_signature(self) -> anyhow::Result<SignatureCheckedTransaction> {
         self.authenticator.verify(&self.raw_txn)?;
-        Ok(SignatureCheckedTransaction(self))
+        Ok(SignatureCheckedTransaction(self.into()))
     }
 
     pub fn verify_signature(&self) -> anyhow::Result<()> {

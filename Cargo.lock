@@ -4129,6 +4129,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml 0.8.26",
+ "signature 2.2.0",
  "strum 0.24.1",
  "strum_macros 0.24.3",
  "thiserror",
