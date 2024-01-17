@@ -20,6 +20,7 @@ module aptos_framework::genesis {
     use aptos_framework::gas_schedule;
     use aptos_framework::jwks;
     use aptos_framework::reconfiguration;
+    use aptos_framework::reconfiguration_state;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
     use aptos_framework::staking_config;
@@ -386,7 +387,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_framework::reconfiguration_state;
 
     #[verify_only]
     fun initialize_for_verification(

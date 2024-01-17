@@ -3097,6 +3097,8 @@ If <code>commit</code> is false, still do the calculation but prevent any resour
     <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
     <b>let</b> validator_perf = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
 
+    // This map will store the new <a href="voting.md#0x1_voting">voting</a> power of every current validator.
+    // This is later used <b>to</b> compute new validator set.
     <b>let</b> new_stakes_by_validator = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>&lt;<b>address</b>, u64&gt;();
 
     // Process pending <a href="stake.md#0x1_stake">stake</a> and distribute transaction fees and rewards for each currently active validator.

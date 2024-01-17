@@ -1070,6 +1070,8 @@ module aptos_framework::stake {
         let config = staking_config::get();
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
 
+        // This map will store the new voting power of every current validator.
+        // This is later used to compute new validator set.
         let new_stakes_by_validator = simple_map::new<address, u64>();
 
         // Process pending stake and distribute transaction fees and rewards for each currently active validator.
