@@ -124,9 +124,9 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
-            Duration::from_millis(50), // max_poll_time
-            99,                        // max_items
-            1048576,                   // size limit: 1MB
+            Duration::from_secs(1), // max_poll_time
+            99,                     // max_items
+            1048576,                // size limit: 1MB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
@@ -166,9 +166,9 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
-            Duration::from_millis(50), // max_poll_time
-            1,                         // max_items
-            1048576,                   // size limit: 1MB
+            Duration::from_secs(1), // max_poll_time
+            1,                      // max_items
+            1048576,                // size limit: 1MB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
@@ -187,8 +187,8 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 
     let (pulled_validator_txns, Payload::DirectMempool(pulled_user_txns)) = client
         .pull_payload(
-            Duration::from_millis(50), // max_poll_time
-            99,                        // max_items
+            Duration::from_secs(1), // max_poll_time
+            99,                     // max_items
             all_validator_txns[0].size_in_bytes() as u64,
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,

@@ -4171,6 +4171,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-channels",
  "aptos-crypto",
+ "aptos-infallible",
  "aptos-types",
  "async-trait",
  "futures-util",

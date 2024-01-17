@@ -1,19 +1,14 @@
 // Copyright © Aptos Foundation
 
 use aptos_channels::aptos_channel;
-#[cfg(test)]
-use aptos_channels::message_queues::QueueStyle;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_infallible::Mutex;
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
-#[cfg(test)]
-use futures_util::StreamExt;
 use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
+    time::Instant,
 };
-#[cfg(test)]
-use tokio::time::timeout;
 
 pub enum TransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),
@@ -27,104 +22,139 @@ impl TransactionFilter {
     }
 }
 
-pub type PullNotificationSender = aptos_channel::Sender<(), Arc<ValidatorTransaction>>;
-pub type PullNotificationReceiver = aptos_channel::Receiver<(), Arc<ValidatorTransaction>>;
-
-/// Create a validator txn pool for a given list of topics.
-/// For each topic, an optional notification sender can be specified,
-/// which is used to send a notification later when a pull on the topic happens.
-///
-/// Return a read client (typically used by consensus when proposing blocks).
-/// Return the write clients (typically used by validator transaction producers like DKG).
-pub fn new(
-    topic_tx_pairs: Vec<(Topic, Option<PullNotificationSender>)>,
-) -> (ReadClient, Vec<SingleTopicWriteClient>) {
-    let topics: Vec<Topic> = topic_tx_pairs.iter().map(|(topic, _)| *topic).collect();
-    let pool_state = Arc::new(Mutex::new(PoolState::new(topic_tx_pairs)));
-    let read_client = ReadClient {
-        pool: pool_state.clone(),
-    };
-    let write_clients = topics
-        .into_iter()
-        .map(|topic| SingleTopicWriteClient {
-            pool: pool_state.clone(),
-            topic,
-        })
-        .collect();
-    (read_client, write_clients)
+impl Default for TransactionFilter {
+    fn default() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
 }
 
-struct PoolState {
-    /// sorted by priority (high to low).
-    topics: Vec<Topic>,
-
-    /// Currently only support 1 txn per topic.
-    txns: HashMap<Topic, Arc<ValidatorTransaction>>,
-
-    pull_notification_senders: HashMap<Topic, Mutex<PullNotificationSender>>,
+#[derive(Clone)]
+pub struct VTxnPoolState {
+    inner: Arc<Mutex<PoolStateInner>>,
 }
 
-impl PoolState {
-    pub fn new(topic_sender_pairs: Vec<(Topic, Option<PullNotificationSender>)>) -> Self {
-        let topics: Vec<Topic> = topic_sender_pairs.iter().map(|(topic, _)| *topic).collect();
-        let topic_set: HashSet<Topic> = HashSet::from_iter(topics.clone());
-        assert_eq!(topics.len(), topic_set.len());
-        let pull_notification_senders = topic_sender_pairs
-            .into_iter()
-            .filter_map(|(topic, maybe_sender)| {
-                maybe_sender.map(|sender| (topic, Mutex::new(sender)))
-            })
-            .collect();
+impl Default for VTxnPoolState {
+    fn default() -> Self {
         Self {
-            txns: HashMap::new(),
-            pull_notification_senders,
-            topics,
+            inner: Arc::new(Mutex::new(PoolStateInner::default())),
         }
     }
 }
+impl VTxnPoolState {
+    /// Append a txn to the pool.
+    /// Return a txn guard that allows you to later delete the txn from the pool.
+    pub fn put(
+        &self,
+        topic: Topic,
+        txn: Arc<ValidatorTransaction>,
+        pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
+    ) -> TxnGuard {
+        let mut pool = self.inner.lock();
+        let seq_num = pool.next_seq_num;
+        pool.next_seq_num += 1;
 
-impl Default for PoolState {
-    fn default() -> Self {
-        Self::new(vec![])
+        pool.txn_queue.insert(seq_num, PoolItem {
+            topic: topic.clone(),
+            txn,
+            pull_notification_tx,
+        });
+
+        if let Some(old_seq_num) = pool.seq_nums_by_topic.insert(topic.clone(), seq_num) {
+            pool.txn_queue.remove(&old_seq_num);
+        }
+
+        TxnGuard {
+            pool: self.inner.clone(),
+            seq_num,
+        }
+    }
+
+    pub fn pull(
+        &self,
+        deadline: Instant,
+        max_items: u64,
+        max_bytes: u64,
+        filter: TransactionFilter,
+    ) -> Vec<ValidatorTransaction> {
+        self.inner
+            .lock()
+            .pull(deadline, max_items, max_bytes, filter)
     }
 }
 
-pub struct ReadClient {
-    pool: Arc<Mutex<PoolState>>,
+struct PoolItem {
+    topic: Topic,
+    txn: Arc<ValidatorTransaction>,
+    pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
 }
 
-impl ReadClient {
-    pub async fn pull(
-        &self,
-        max_time: Duration,
+/// PoolState invariants.
+/// `(seq_num=i, topic=T)` exists in `txn_queue` if and only if it exists in `seq_nums_by_topic`.
+#[derive(Default)]
+pub struct PoolStateInner {
+    /// Incremented every time a txn is pushed in. The txn gets the old value as its sequence number.
+    next_seq_num: u64,
+
+    /// Track Topic -> seq_num mapping.
+    /// We allow only 1 txn per topic and this index helps find the old txn when adding a new one for the same topic.
+    seq_nums_by_topic: HashMap<Topic, u64>,
+
+    /// Txns ordered by their sequence numbers (i.e. time they entered the pool).
+    txn_queue: BTreeMap<u64, PoolItem>,
+}
+
+/// Returned for `txn` when you call `PoolState::put(txn, ...)`.
+/// If this is dropped, `txn` will be deleted from the pool (if it has not been).
+///
+/// This allows the pool to be emptied on epoch boundaries.
+pub struct TxnGuard {
+    pool: Arc<Mutex<PoolStateInner>>,
+    seq_num: u64,
+}
+
+impl PoolStateInner {
+    fn try_delete(&mut self, seq_num: u64) {
+        if let Some(item) = self.txn_queue.remove(&seq_num) {
+            let seq_num_another = self.seq_nums_by_topic.remove(&item.topic);
+            assert_eq!(Some(seq_num), seq_num_another);
+        }
+    }
+
+    pub fn pull(
+        &mut self,
+        deadline: Instant,
         mut max_items: u64,
         mut max_bytes: u64,
         filter: TransactionFilter,
     ) -> Vec<ValidatorTransaction> {
-        let pull_start_time = Instant::now();
-        let pool = self.pool.lock().unwrap();
         let mut ret = vec![];
-        let mut txn_iterator = pool
-            .topics
-            .iter()
-            .copied()
-            .filter_map(|topic| pool.txns.get(&topic).cloned().map(|txn| (topic, txn)));
-        while pull_start_time.elapsed() < max_time && max_items >= 1 && max_bytes >= 1 {
-            if let Some((topic, txn)) = txn_iterator.next() {
-                if filter.should_exclude(txn.as_ref()) {
-                    continue;
-                }
-                let txn_size = txn.size_in_bytes() as u64;
-                if txn_size > max_bytes {
-                    continue;
-                }
-                // All checks passed.
-                ret.push(txn.as_ref().clone());
-                if let Some(tx) = pool.pull_notification_senders.get(&topic) {
-                    tx.lock().unwrap().push((), txn).unwrap();
+        let mut seq_num_lower_bound = 0;
+        while Instant::now() < deadline && max_items >= 1 && max_bytes >= 1 {
+            // Find the seq_num of the first txn that satisfies the quota.
+            if let Some(seq_num) = self
+                .txn_queue
+                .range(seq_num_lower_bound..)
+                .filter(|(_, item)| {
+                    item.txn.size_in_bytes() as u64 <= max_bytes
+                        && !filter.should_exclude(&item.txn)
+                })
+                .map(|(seq_num, _)| *seq_num)
+                .next()
+            {
+                // Update the quota usage.
+                // Send the pull notification if requested.
+                let PoolItem {
+                    txn,
+                    pull_notification_tx,
+                    ..
+                } = self.txn_queue.get(&seq_num).unwrap();
+                if let Some(tx) = pull_notification_tx {
+                    let _ = tx.push((), txn.clone());
                 }
                 max_items -= 1;
-                max_bytes -= txn_size;
+                max_bytes -= txn.size_in_bytes() as u64;
+                seq_num_lower_bound = seq_num + 1;
+                ret.push(txn.as_ref().clone());
             } else {
                 break;
             }
@@ -134,131 +164,11 @@ impl ReadClient {
     }
 }
 
-pub struct SingleTopicWriteClient {
-    pool: Arc<Mutex<PoolState>>,
-    topic: Topic,
-}
-
-impl SingleTopicWriteClient {
-    pub fn put(&self, txn: Option<Arc<ValidatorTransaction>>) -> Option<Arc<ValidatorTransaction>> {
-        let mut pool = self.pool.lock().unwrap();
-        if let Some(txn) = txn {
-            pool.txns.insert(self.topic, txn)
-        } else {
-            pool.txns.remove(&self.topic)
-        }
+impl Drop for TxnGuard {
+    fn drop(&mut self) {
+        self.pool.lock().try_delete(self.seq_num);
     }
 }
 
 #[cfg(test)]
-#[tokio::test]
-async fn test_validator_txn_pool() {
-    // Create the pool with 2 topics: `dummy1` and `dummy2`. Also subscribe "pulled" notification for topic `dummy2`.
-    let (dummy2_notification_tx, mut dummy2_notification_rx) =
-        aptos_channel::new(QueueStyle::FIFO, 999, None);
-    let (read_client, mut write_clients) = new(vec![
-        (Topic::DUMMY1, None),
-        (Topic::DUMMY2, Some(dummy2_notification_tx)),
-    ]);
-    let dummy2_write_client = write_clients.pop().unwrap();
-    let dummy1_write_client = write_clients.pop().unwrap();
-
-    // Initially nothing should be available on the read client side.
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            999,
-            2048,
-            TransactionFilter::PendingTxnHashSet(HashSet::new()),
-        )
-        .await;
-    assert!(pulled.is_empty());
-
-    // Write a dummy2 txn in.
-    let dummy2_txn = ValidatorTransaction::dummy2(b"dummy2_txn".to_vec());
-    dummy2_write_client.put(Some(Arc::new(dummy2_txn.clone())));
-
-    // The dummy2 txn should be available on the read client side.
-    // Pull notification can be delivered.
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            999,
-            2048,
-            TransactionFilter::PendingTxnHashSet(HashSet::new()),
-        )
-        .await;
-    assert_eq!(vec![dummy2_txn.clone()], pulled);
-    let notification = dummy2_notification_rx.next().await;
-    assert_eq!(&dummy2_txn, notification.unwrap().as_ref());
-
-    // Write a dummy1 txn in.
-    let dummy1_txn = ValidatorTransaction::dummy1(b"dummy1_txn".to_vec());
-    dummy1_write_client.put(Some(Arc::new(dummy1_txn.clone())));
-
-    // Both txn should be available. For topic `dummy2` a pull notification can be delivered again.
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            999,
-            2048,
-            TransactionFilter::PendingTxnHashSet(HashSet::new()),
-        )
-        .await;
-    assert_eq!(vec![dummy1_txn.clone(), dummy2_txn.clone()], pulled);
-    let notification = timeout(Duration::from_secs(1), dummy2_notification_rx.next()).await;
-    assert_eq!(&dummy2_txn, notification.unwrap().unwrap().as_ref());
-
-    // In a `pull()`, limit `max_items` should be respected, and lower-priority topic should be the victim.
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            1,
-            2048,
-            TransactionFilter::PendingTxnHashSet(HashSet::new()),
-        )
-        .await;
-    assert_eq!(vec![dummy1_txn.clone()], pulled);
-
-    // In a `pull()`, limit `max_size` should be respected, and lower-priority topic should be the victim.
-    let dummy1_txn_size = dummy1_txn.size_in_bytes() as u64;
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            999,
-            dummy1_txn_size,
-            TransactionFilter::PendingTxnHashSet(HashSet::new()),
-        )
-        .await;
-    assert_eq!(vec![dummy1_txn.clone()], pulled);
-
-    // In a `pull()`,  txn filter should be respected.
-    let dummy1_txn_hash = dummy1_txn.hash();
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            999,
-            2048,
-            TransactionFilter::PendingTxnHashSet(HashSet::from([dummy1_txn_hash])),
-        )
-        .await;
-    assert_eq!(vec![dummy2_txn.clone()], pulled);
-    let notification = timeout(Duration::from_secs(1), dummy2_notification_rx.next()).await;
-    assert_eq!(&dummy2_txn, notification.unwrap().unwrap().as_ref());
-
-    // Write clients should be able to update/delete their proposals.
-    dummy1_write_client.put(None);
-    let dummy2_txn_ver_b = ValidatorTransaction::dummy1(b"dummy2_txn_ver_b".to_vec());
-    dummy2_write_client.put(Some(Arc::new(dummy2_txn_ver_b.clone())));
-    let pulled = read_client
-        .pull(
-            Duration::from_secs(3600),
-            999,
-            2048,
-            TransactionFilter::PendingTxnHashSet(HashSet::from([dummy1_txn_hash])),
-        )
-        .await;
-    assert_eq!(vec![dummy2_txn_ver_b.clone()], pulled);
-    let notification = timeout(Duration::from_secs(1), dummy2_notification_rx.next()).await;
-    assert_eq!(&dummy2_txn_ver_b, notification.unwrap().unwrap().as_ref());
-}
+mod tests;
