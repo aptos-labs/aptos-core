@@ -825,7 +825,7 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
         .consensus
         .quorum_store
         .back_pressure
-        .dynamic_max_txn_per_s = 8000;
+        .dynamic_max_txn_per_s = 15000;
 
     config.consensus.quorum_store.sender_max_batch_txns = 1000;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
