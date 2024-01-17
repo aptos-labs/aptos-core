@@ -1172,9 +1172,13 @@ fn spawn(
     future: impl Future<Output = ()> + Send + 'static,
 ) -> JoinHandle<()> {
     if let Some(runtime) = runtime {
-        runtime.spawn(future)
+        runtime.spawn(async {
+            tokio::task::unconstrained(future).await;
+        })
     } else {
-        tokio::spawn(future)
+        tokio::spawn(async {
+            tokio::task::unconstrained(future).await;
+        })
     }
 }
 

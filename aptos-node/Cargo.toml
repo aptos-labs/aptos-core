@@ -71,6 +71,7 @@ fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 maplit = { workspace = true }
+num_cpus = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

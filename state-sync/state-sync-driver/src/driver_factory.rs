@@ -131,7 +131,7 @@ impl DriverFactory {
 
         // Create a new runtime (if required)
         let driver_runtime = if create_runtime {
-            let runtime = aptos_runtimes::spawn_named_runtime("sync-driver".into(), None);
+            let runtime = aptos_runtimes::spawn_named_runtime("sync-driver".into(), Some(8));
             Some(runtime)
         } else {
             None

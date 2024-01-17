@@ -51,6 +51,10 @@ where
         .enable_all();
     if let Some(num_worker_threads) = num_worker_threads {
         builder.worker_threads(num_worker_threads);
+    } else {
+        // If no worker threads are specified, use the number of cores divided by 2
+        let num_cores = num_cpus::get() / 2;
+        builder.worker_threads(num_cores);
     }
 
     // Spawn and return the runtime

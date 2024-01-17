@@ -214,7 +214,8 @@ fn setup_data_streaming_service(
     );
 
     // Start the data streaming service
-    let streaming_service_runtime = aptos_runtimes::spawn_named_runtime("stream-serv".into(), None);
+    let streaming_service_runtime =
+        aptos_runtimes::spawn_named_runtime("stream-serv".into(), Some(8));
     streaming_service_runtime.spawn(data_streaming_service.start_service());
 
     Ok((streaming_service_client, streaming_service_runtime))
@@ -230,7 +231,8 @@ fn setup_aptos_data_client(
     let storage_service_client = StorageServiceClient::new(network_client);
 
     // Create a new runtime for the data client
-    let aptos_data_client_runtime = aptos_runtimes::spawn_named_runtime("data-client".into(), None);
+    let aptos_data_client_runtime =
+        aptos_runtimes::spawn_named_runtime("data-client".into(), Some(8));
 
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosDataClient::new(
@@ -255,7 +257,8 @@ fn setup_state_sync_storage_service(
     storage_service_listener: StorageServiceNotificationListener,
 ) -> anyhow::Result<Runtime> {
     // Create a new state sync storage service runtime
-    let storage_service_runtime = aptos_runtimes::spawn_named_runtime("stor-server".into(), None);
+    let storage_service_runtime =
+        aptos_runtimes::spawn_named_runtime("stor-server".into(), Some(8));
 
     // Spawn the state sync storage service servers on the runtime
     let storage_reader = StorageReader::new(config.storage_service, Arc::clone(&db_rw.reader));

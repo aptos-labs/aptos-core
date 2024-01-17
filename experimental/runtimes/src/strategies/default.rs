@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::thread_manager::{ThreadManager, MAX_THREAD_POOL_SIZE};
+use crate::thread_manager::ThreadManager;
 use aptos_runtimes::spawn_rayon_thread_pool;
 use rayon::ThreadPool;
-use std::cmp::min;
 
 pub struct DefaultThreadManager {
     exe_threads: ThreadPool,
@@ -15,19 +14,12 @@ pub struct DefaultThreadManager {
 
 impl DefaultThreadManager {
     pub(crate) fn new() -> DefaultThreadManager {
-        // Do not use more than 32 threads for rayon thread pools as we have seen scalability issues with more threads.
-        // This needs to be revisited once we resolve the scalability issues.
-        let exe_threads = spawn_rayon_thread_pool(
-            "exe".into(),
-            Some(min(num_cpus::get(), MAX_THREAD_POOL_SIZE)),
-        );
-        let non_exe_threads = spawn_rayon_thread_pool(
-            "non_exe".into(),
-            Some(min(num_cpus::get(), MAX_THREAD_POOL_SIZE)),
-        );
-        let io_threads = spawn_rayon_thread_pool("io".into(), Some(64));
+        let num_worker_threads = num_cpus::get() / 3;
+        let exe_threads = spawn_rayon_thread_pool("exe".into(), Some(num_worker_threads));
+        let non_exe_threads = spawn_rayon_thread_pool("non_exe".into(), Some(num_worker_threads));
+        let io_threads = spawn_rayon_thread_pool("io".into(), Some(num_worker_threads));
         let background_threads =
-            spawn_rayon_thread_pool("background".into(), Some(MAX_THREAD_POOL_SIZE));
+            spawn_rayon_thread_pool("background".into(), Some(num_worker_threads));
         Self {
             exe_threads,
             non_exe_threads,
