@@ -9,7 +9,9 @@ use aptos_logger::info;
 use aptos_sdk::bcs;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
-    on_chain_config::{DagConsensusConfigV1, OnChainConsensusConfig},
+    on_chain_config::{
+        ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
+    },
 };
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -69,7 +71,10 @@ impl NetworkLoadTest for DagOnChainEnableTest {
             assert!(matches!(current_consensus_config, OnChainConsensusConfig::V2(_)));
 
             // Change to V2
-            let new_consensus_config = OnChainConsensusConfig::DagV1(DagConsensusConfigV1::default());
+            let new_consensus_config = OnChainConsensusConfig::V3 {
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                vtxn: ValidatorTxnConfig::default_disabled(),
+            };
 
             let update_consensus_config_script = format!(
                 r#"

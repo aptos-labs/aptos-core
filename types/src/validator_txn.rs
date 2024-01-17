@@ -29,7 +29,7 @@ impl ValidatorTransaction {
     }
 
     pub fn size_in_bytes(&self) -> usize {
-        bcs::to_bytes(self).unwrap().len()
+        bcs::serialized_size(self).unwrap()
     }
 }
 
