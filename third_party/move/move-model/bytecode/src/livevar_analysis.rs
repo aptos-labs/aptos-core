@@ -293,7 +293,13 @@ impl<'a> LiveVarAnalysis<'a> {
                 Bytecode::Call(attr_id, dests, oper, srcs, aa)
                     if code_offset + 1 < code.len()
                         && dests.len() == 1
-                        && !matches!(oper, Operation::BorrowLoc | Operation::BorrowGlobal(..)) =>
+                        && !matches!(
+                            oper,
+                            Operation::BorrowLoc
+                                | Operation::BorrowGlobal(..)
+                                | Operation::OpaqueCallBegin(..)
+                                | Operation::OpaqueCallEnd(..)
+                        ) =>
                 {
                     // Catch the common case where we have:
                     //
@@ -305,10 +311,12 @@ impl<'a> LiveVarAnalysis<'a> {
                     // Copy propagation cannot catch this case because it does not have the
                     // livevar information about $t.
                     //
-                    // With one exception: if the called operation is a BorrowLocal or BorrowGlobal (i.e., an operation
+                    // With the following exceptions:
+                    // 1) if the called operation is a BorrowLocal or BorrowGlobal (i.e., an operation
                     // that creates a root mutable reference), do not optimize it away as we need this local/global root
                     // reference for our IsParent test. An alternative (i.e., one way to get rid of this exception) is
                     // to support IsParent test against local and global directly, but that is more complicated.
+                    // 2) if the called operation is either OpaqueCallBegin or OpaqueCallEnd, they should not be optimized away, because they should always appear pairwise.
                     let next_code_offset = code_offset + 1;
                     if let Bytecode::Assign(_, dest, src, _) = &code[next_code_offset] {
                         let annotation_at = &annotations[&(next_code_offset as CodeOffset)];
