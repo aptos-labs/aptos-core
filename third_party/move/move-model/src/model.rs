@@ -1080,10 +1080,15 @@ impl GlobalEnv {
         self.report_diag_with_filter(writer, |d| d.severity >= severity)
     }
 
+    // Comparison of Diagnostic values that tries to match program ordering so we
+    // can display them to the user in a more natural order.
     fn cmp_diagnostic(diag1: &Diagnostic<FileId>, diag2: &Diagnostic<FileId>) -> Ordering {
         let labels_ordering = GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels);
         if Ordering::Equal == labels_ordering {
-            let sev_ordering = diag1.severity.partial_cmp(&diag2.severity).unwrap();
+            let sev_ordering = diag1
+                .severity
+                .partial_cmp(&diag2.severity)
+                .expect("Severity provides a total ordering for valid severity enum values");
             if Ordering::Equal == sev_ordering {
                 let message_ordering = diag1.message.cmp(&diag2.message);
                 if Ordering::Equal == message_ordering {
@@ -1099,6 +1104,10 @@ impl GlobalEnv {
         }
     }
 
+    // Label comparison that tries to match program ordering.  `FileId` is already set in visitation
+    // order, so we honor that.  Within the same file, we order by labelled code ranges.  For labels
+    // marking nested regions, we want the innermost region, so we order first by end of labelled
+    // code region, then in reverse by start of region.
     fn cmp_label(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
         let file_ordering = label1.file_id.cmp(&label2.file_id);
         if Ordering::Equal == file_ordering {
@@ -1121,6 +1130,10 @@ impl GlobalEnv {
         }
     }
 
+    // Comparison for sets of labels that orders them based on program ordering, using
+    // the earliest label found.  If a `Primary` label is found then `Secondary` labels
+    // are ignored, but if all are `Secondary` then the earliest of those is used in
+    // the ordering.
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
         let primary1 = labels1
             .iter()
