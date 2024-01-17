@@ -24,7 +24,7 @@ public fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
-============ after available_copies: ================
+============ after AvailableCopiesAnalysisProcessor: ================
 
 [variant baseline]
 fun m::add($t0: u64, $t1: u64): u64 {
@@ -59,7 +59,7 @@ public fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
-============ after copy_propagation: ================
+============ after CopyPropagation: ================
 
 [variant baseline]
 fun m::add($t0: u64, $t1: u64): u64 {
@@ -85,7 +85,7 @@ public fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
-============ after dead_store_elimination: ================
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 fun m::add($t0: u64, $t1: u64): u64 {

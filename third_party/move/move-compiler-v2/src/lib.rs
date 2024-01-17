@@ -183,14 +183,23 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }
-    // ----------------------------------------------------------
-    // ----------- Default optimization pipeline ----------------
     // The default optimization pipeline is currently always run by the compiler.
-    // Any compiler errors or warnings should be reported before running this section, as we can
-    // potentially delete or change code through these optimizations.
-    // While this section of the pipeline is optional, some code that used to previously compile
-    // may no longer compile without this section because of using too many local (temp) variables.
-    //
+    add_default_optimization_pipeline(&mut pipeline);
+    // Run live var analysis again because it could be invalidated by previous pipeline steps,
+    // but it is needed by file format generator.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
+    pipeline
+}
+
+/// Add the default optimization pipeline to the given function target pipeline.
+///
+/// Any compiler errors or warnings should be reported before running this section, as we can
+/// potentially delete or change code through these optimizations.
+/// While this section of the pipeline is optional, some code that used to previously compile
+/// may no longer compile without this section because of using too many local (temp) variables.
+fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
     // Available copies analysis is needed by copy propagation.
     pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
     pipeline.add_processor(Box::new(CopyPropagation {}));
@@ -199,14 +208,6 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         with_copy_inference: false,
     }));
     pipeline.add_processor(Box::new(DeadStoreElimination {}));
-    // ------------ End default optimization pipeline ------------
-    // ----------------------------------------------------------
-    // Run live var analysis again because it could be invalidated by previous pipeline steps,
-    // but it is needed by file format generator.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: false,
-    }));
-    pipeline
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

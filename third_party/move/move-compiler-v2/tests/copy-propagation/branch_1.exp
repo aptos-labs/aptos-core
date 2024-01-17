@@ -19,7 +19,7 @@ fun m::foo($t0: bool, $t1: u64): u64 {
  10: return $t2
 }
 
-============ after available_copies: ================
+============ after AvailableCopiesAnalysisProcessor: ================
 
 [variant baseline]
 fun m::foo($t0: bool, $t1: u64): u64 {
@@ -51,7 +51,7 @@ fun m::foo($t0: bool, $t1: u64): u64 {
  10: return $t2
 }
 
-============ after copy_propagation: ================
+============ after CopyPropagation: ================
 
 [variant baseline]
 fun m::foo($t0: bool, $t1: u64): u64 {
@@ -72,7 +72,7 @@ fun m::foo($t0: bool, $t1: u64): u64 {
  10: return $t2
 }
 
-============ after dead_store_elimination: ================
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 fun m::foo($t0: bool, $t1: u64): u64 {

@@ -60,7 +60,7 @@ impl AvailCopies {
             let old_src = self.0.insert(dst, src);
             if let Some(old_src) = old_src {
                 panic!(
-                    "ICE: copy `$t{} = $t{}` already available, \
+                    "copy `$t{} = $t{}` already available, \
                         cannot have `$t{} = $t{}` available as well",
                     dst, old_src, dst, src
                 );
@@ -85,11 +85,13 @@ impl AvailCopies {
     /// Note that it is a required invariant that the copy chain is acyclic, else we panic.
     /// The natural way of constructing the copy chain for move bytecode (like in this file) ensures this.
     pub fn get_head_of_copy_chain(&self, mut tmp: TempIndex) -> TempIndex {
-        let mut visited = BTreeSet::from([tmp]);
+        let mut visit_counter = 0;
+        let limit_visits = self.0.len();
         while let Some(src) = self.0.get(&tmp) {
-            if !visited.insert(*src) {
+            visit_counter += 1;
+            if visit_counter > limit_visits {
                 // The copy chain is cyclic, which is an invariant violation.
-                panic!("ICE: copy chain is cyclic");
+                panic!("copy chain is cyclic");
             }
             tmp = *src;
         }
@@ -110,16 +112,16 @@ impl AbstractDomain for AvailCopies {
     fn join(&mut self, other: &Self) -> JoinResult {
         let mut result = JoinResult::Unchanged;
         let prev_copies = std::mem::take(&mut self.0);
-        for (dst_, src_) in &other.0 {
-            if let Some(src) = prev_copies.get(dst_) {
-                if src != src_ {
+        for (other_dst, other_src) in &other.0 {
+            if let Some(src) = prev_copies.get(other_dst) {
+                if src != other_src {
                     // We are removing the available copy (dst, src) from self.
                     result = JoinResult::Changed;
                 } else {
-                    self.0.insert(*dst_, *src_);
+                    self.0.insert(*other_dst, *other_src);
                 }
             }
-            // else: a copy of the form (dst_, _) is not already available in self, so no change to self.
+            // else: a copy (other_dst, other_src) was previously not available in self, so no change to self.
         }
         if prev_copies.len() != self.0.len() {
             // We have removed some copies from self.
@@ -236,7 +238,7 @@ impl FunctionTargetProcessor for AvailCopiesAnalysisProcessor {
     }
 
     fn name(&self) -> String {
-        "available_copies".to_string()
+        "AvailableCopiesAnalysisProcessor".to_string()
     }
 }
 

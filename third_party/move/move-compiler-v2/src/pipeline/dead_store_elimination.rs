@@ -78,12 +78,13 @@ impl FunctionTargetProcessor for DeadStoreElimination {
         // Note that the file format generator will not include unused locals in the generated code,
         // so we don't need to prune unused locals here for various fields of `data` (like `local_types`).
         data.code = new_code;
-        // Annotations may no longer be valid after this transformation, so remove them.
+        // Annotations may no longer be valid after this transformation because code offsets have changed.
+        // So remove them.
         data.annotations.clear();
         data
     }
 
     fn name(&self) -> String {
-        "dead_store_elimination".to_string()
+        "DeadStoreElimination".to_string()
     }
 }

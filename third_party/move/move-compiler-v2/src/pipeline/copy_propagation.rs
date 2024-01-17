@@ -81,6 +81,6 @@ impl FunctionTargetProcessor for CopyPropagation {
     }
 
     fn name(&self) -> String {
-        "copy_propagation".to_string()
+        "CopyPropagation".to_string()
     }
 }
