@@ -233,7 +233,8 @@ fn test_order_rule_basic() {
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),
     ));
-    let (mut order_rule, mut receiver) = create_order_rule(epoch_state, dag);
+    let (mut order_rule, mut receiver): (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) =
+        create_order_rule(epoch_state, dag);
     for node in nodes.iter().flatten().flatten() {
         order_rule.process_new_node(node.metadata());
     }

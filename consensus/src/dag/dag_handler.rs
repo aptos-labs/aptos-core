@@ -22,19 +22,18 @@ use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error, warn};
 use aptos_types::epoch_state::EpochState;
-use futures::StreamExt;
+use futures::{stream::FuturesUnordered, StreamExt};
 use std::sync::Arc;
-use tokio::select;
+use tokio::{runtime::Handle, select};
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
-    node_receiver: NodeBroadcastHandler,
-    dag_driver: DagDriver,
-    fetch_receiver: FetchRequestHandler,
+    node_receiver: Arc<NodeBroadcastHandler>,
+    dag_driver: Arc<DagDriver>,
     node_fetch_waiter: FetchWaiter<Node>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
-    state_sync_trigger: StateSyncTrigger,
     new_round_event: tokio::sync::mpsc::Receiver<Round>,
+    verified_msg_processor: Arc<VerifiedMessageProcessor>,
 }
 
 impl NetworkHandler {
@@ -48,30 +47,46 @@ impl NetworkHandler {
         state_sync_trigger: StateSyncTrigger,
         new_round_event: tokio::sync::mpsc::Receiver<Round>,
     ) -> Self {
+        let node_receiver = Arc::new(node_receiver);
+        let dag_driver = Arc::new(dag_driver);
         Self {
-            epoch_state,
-            node_receiver,
-            dag_driver,
-            fetch_receiver,
+            epoch_state: epoch_state.clone(),
+            node_receiver: node_receiver.clone(),
+            dag_driver: dag_driver.clone(),
             node_fetch_waiter,
             certified_node_fetch_waiter,
-            state_sync_trigger,
             new_round_event,
+            verified_msg_processor: Arc::new(VerifiedMessageProcessor {
+                node_receiver,
+                dag_driver,
+                fetch_receiver,
+                state_sync_trigger,
+                epoch_state,
+            }),
         }
     }
 
     pub async fn run(
-        mut self,
+        self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
         executor: BoundedExecutor,
         _buffer: Vec<DAGMessage>,
     ) -> SyncOutcome {
         // TODO: process buffer
-        let epoch_state = self.epoch_state.clone();
+        let NetworkHandler {
+            epoch_state,
+            node_receiver,
+            dag_driver,
+            mut node_fetch_waiter,
+            mut certified_node_fetch_waiter,
+            mut new_round_event,
+            verified_msg_processor,
+            ..
+        } = self;
 
         let mut verified_msg_stream = concurrent_map(
             dag_rpc_rx,
-            executor,
+            executor.clone(),
             move |rpc_request: IncomingDAGRequest| {
                 let epoch_state = epoch_state.clone();
                 async move {
@@ -91,51 +106,114 @@ impl NetworkHandler {
             },
         );
 
-        loop {
-            select! {
-                (msg, epoch, author, responder) = verified_msg_stream.select_next_some() => {
-                    monitor!("dag_on_verified_msg", match self.process_verified_message(msg, epoch, author, responder).await {
-                        Ok(sync_status) => {
-                            if matches!(sync_status, SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds) {
-                                return sync_status;
-                            }
-                        },
-                        Err(e) =>  {
-                            warn!(error = ?e, "error processing rpc");
-                        }
-                    });
-                },
-                Some(new_round) = self.new_round_event.recv() => {
+        let dag_driver_clone = dag_driver.clone();
+        let node_receiver_clone = node_receiver.clone();
+        let task1 = tokio::spawn(async move {
+            loop {
+                if let Some(new_round) = new_round_event.recv().await {
                     monitor!("dag_on_new_round_event", {
-                        self.dag_driver.enter_new_round(new_round).await;
-                        self.node_receiver.gc();
-                    });
-                }
-                Some(res) = self.node_fetch_waiter.next() => {
-                    monitor!("dag_on_node_fetch", match res {
-                        Ok(node) => if let Err(e) = self.node_receiver.process(node).await {
-                            warn!(error = ?e, "error processing node fetch notification");
-                        },
-                        Err(e) => {
-                            debug!("sender dropped channel: {}", e);
-                        },
-                    });
-                },
-                Some(res) = self.certified_node_fetch_waiter.next() => {
-                    monitor!("dag_on_cert_node_fetch", match res {
-                        Ok(certified_node) => if let Err(e) = self.dag_driver.process(certified_node).await {
-                            warn!(error = ?e, "error processing certified node fetch notification");                        },
-                        Err(e) => {
-                            debug!("sender dropped channel: {}", e);
-                        },
+                        dag_driver_clone.enter_new_round(new_round).await;
+                        node_receiver_clone.gc();
                     });
                 }
             }
+        });
+
+        let node_receiver_clone = node_receiver.clone();
+        let task2 = tokio::spawn(async move {
+            loop {
+                monitor!(
+                    "dag_on_node_fetch",
+                    match node_fetch_waiter.select_next_some().await {
+                        Ok(node) => {
+                            if let Err(e) = node_receiver_clone.process(node).await {
+                                warn!(error = ?e, "error processing node fetch notification");
+                            }
+                        },
+                        Err(e) => {
+                            debug!("sender dropped channel: {}", e);
+                        },
+                    }
+                );
+            }
+        });
+
+        let dag_driver_clone = dag_driver.clone();
+        let task3 = tokio::spawn(async move {
+            loop {
+                monitor!("dag_on_cert_node_fetch", match certified_node_fetch_waiter
+                    .select_next_some()
+                    .await
+                {
+                    Ok(certified_node) => {
+                        if let Err(e) = dag_driver_clone.process(certified_node).await {
+                            warn!(error = ?e, "error processing certified node fetch notification");
+                        }
+                    },
+                    Err(e) => {
+                        debug!("sender dropped channel: {}", e);
+                    },
+                });
+            }
+        });
+
+        let mut futures = FuturesUnordered::new();
+        // A separate executor to ensure the message verification sender (above) and receiver (below) are
+        // not blocking each other.
+        let executor = BoundedExecutor::new(8, Handle::current());
+        loop {
+            select! {
+                (msg, epoch, author, responder) = verified_msg_stream.select_next_some() => {
+                    let verified_msg_processor = verified_msg_processor.clone();
+                    let f = executor.spawn(async move {
+                        monitor!("dag_on_verified_msg", {
+                            match verified_msg_processor.process_verified_message(msg, epoch, author, responder).await {
+                                Ok(sync_status) => {
+                                    if matches!(
+                                        sync_status,
+                                        SyncOutcome::NeedsSync(_) | SyncOutcome::EpochEnds
+                                    ) {
+                                        return Some(sync_status);
+                                    }
+                                },
+                                Err(e) => {
+                                    warn!(error = ?e, "error processing rpc");
+                                },
+                            };
+                            None
+                        })
+                    }).await;
+                    futures.push(f);
+                },
+                Some(status) = futures.next() => {
+                    if let Some(status) = status.expect("must finish") {
+                        debug!("aborting handler tasks");
+                        task1.abort();
+                        task2.abort();
+                        task3.abort();
+
+                        _ = task1.await;
+                        _ = task2.await;
+                        _ = task3.await;
+                        return status;
+                    }
+                },
+            }
         }
     }
+}
 
+struct VerifiedMessageProcessor {
+    node_receiver: Arc<NodeBroadcastHandler>,
+    dag_driver: Arc<DagDriver>,
+    fetch_receiver: FetchRequestHandler,
+    state_sync_trigger: StateSyncTrigger,
+    epoch_state: Arc<EpochState>,
+}
+
+impl VerifiedMessageProcessor {
     async fn process_verified_message(
-        &mut self,
+        &self,
         dag_message_result: anyhow::Result<DAGMessage>,
         epoch: u64,
         author: Author,

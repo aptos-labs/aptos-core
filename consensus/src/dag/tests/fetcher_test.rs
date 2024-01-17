@@ -28,7 +28,7 @@ async fn test_dag_fetcher_receiver() {
         TEST_DAG_WINDOW,
     ));
 
-    let mut fetcher = FetchRequestHandler::new(dag.clone(), epoch_state);
+    let fetcher = FetchRequestHandler::new(dag.clone(), epoch_state);
 
     let mut first_round_nodes = vec![];
 

@@ -81,7 +81,7 @@ impl OrderRule {
 
     /// Find if there's anchors that can be ordered start from `start_round` until `round`,
     /// if so find next one until nothing can be ordered.
-    fn check_ordering_between(&mut self, mut start_round: Round, round: Round) {
+    fn check_ordering_between(&self, mut start_round: Round, round: Round) {
         while start_round <= round {
             if let Some(direct_anchor) =
                 self.find_first_anchor_with_enough_votes(start_round, round)
@@ -149,7 +149,7 @@ impl OrderRule {
     }
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
-    fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
+    fn finalize_order(&self, anchor: Arc<CertifiedNode>) {
         let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
 
         // Check we're in the expected instance
@@ -206,7 +206,7 @@ impl OrderRule {
             id = anchor.id(),
             lowest_unordered_anchor_round = lowest_unordered_anchor_round,
             "Reached round {} with {} nodes",
-            lowest_round_to_reach,
+            lowest_anchor_round,
             ordered_nodes.len()
         );
 
@@ -216,7 +216,7 @@ impl OrderRule {
     }
 
     /// Check if this node can trigger anchors to be ordered
-    pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
+    pub fn process_new_node(&self, node_metadata: &NodeMetadata) {
         let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
 
         let round = node_metadata.round();

@@ -63,7 +63,7 @@ impl RoundState {
 
 /// Interface to decide if we should move forward to a new round
 #[async_trait]
-pub trait ResponsiveCheck: Send {
+pub trait ResponsiveCheck: Send + Sync {
     async fn check_for_new_round(
         &mut self,
         highest_strong_links_round: Round,
