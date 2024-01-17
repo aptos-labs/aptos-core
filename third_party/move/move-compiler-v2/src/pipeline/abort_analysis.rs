@@ -39,15 +39,20 @@ impl AbortState {
         self.set_bool(false)
     }
 
+    /// Returns the top element
+    fn top() -> Self {
+        Self(Plus2::Top)
+    }
+
     /// Returns the bottom element
     fn bot() -> Self {
         Self(Plus2::Bot)
     }
 
-	/// Checks whether `self` is definitely abort
-	pub fn is_definitely_abort(&self) -> bool {
-		matches!(self.0, Plus2::Mid(true))
-	}
+    /// Checks whether `self` is definitely abort
+    pub fn is_definitely_abort(&self) -> bool {
+        matches!(self.0, Plus2::Mid(true))
+    }
 }
 
 impl Display for AbortState {
@@ -108,6 +113,19 @@ impl TransferFunctions for AbortAnalysis {
         match instr {
             Bytecode::Abort(..) => state.set_abort(),
             Bytecode::Ret(..) => state.set_not_abort(),
+            Bytecode::Call(..) => {
+                // we consider any call may abort
+                match &state.0 {
+                    // after state: definitely abort
+                    // before state: definitely abort
+                    Plus2::Mid(true) => {},
+                    // after state: may abort, definitely abort, or neither abort nor return
+                    // before state: may abort
+                    _ => {
+                        *state = AbortState::top();
+                    },
+                }
+            },
             _ => {},
         }
     }
