@@ -11,9 +11,9 @@ use move_stackless_bytecode::{
 };
 use std::{collections::BTreeMap, fmt::Display};
 
+/// top: maybe abort later or not
 /// true: definitely aborting later
 /// false: definitely not aborting later
-/// top: maybe abort later or not
 /// bot: neither aborting nor returning later
 #[derive(AbstractDomain, Clone)]
 pub struct AbortState(Plus2<bool>);
