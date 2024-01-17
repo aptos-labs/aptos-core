@@ -5,7 +5,7 @@
 //! database restore operations, as required by restore and
 //! state sync v2.
 use crate::{
-    ledger_db::{LedgerDb, LedgerDbSchemaBatches},
+    ledger_db::{ledger_metadata_db::LedgerMetadataDb, LedgerDb, LedgerDbSchemaBatches},
     ledger_store::LedgerStore,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -32,38 +32,37 @@ use std::sync::Arc;
 
 /// Saves the given ledger infos to the ledger store. If a change set is provided,
 /// a batch of db alterations will be added to the change set without writing them to the db.
-pub fn save_ledger_infos(
-    ledger_metadata_db: &DB,
-    ledger_store: Arc<LedgerStore>,
+pub(crate) fn save_ledger_infos(
+    ledger_metadata_db: &LedgerMetadataDb,
     ledger_infos: &[LedgerInfoWithSignatures],
     existing_batch: Option<&mut SchemaBatch>,
 ) -> Result<()> {
     ensure!(!ledger_infos.is_empty(), "No LedgerInfos to save.");
 
     if let Some(existing_batch) = existing_batch {
-        save_ledger_infos_impl(ledger_store, ledger_infos, existing_batch)?;
+        save_ledger_infos_impl(ledger_metadata_db, ledger_infos, existing_batch)?;
     } else {
         let mut batch = SchemaBatch::new();
-        save_ledger_infos_impl(ledger_store.clone(), ledger_infos, &mut batch)?;
+        save_ledger_infos_impl(ledger_metadata_db, ledger_infos, &mut batch)?;
         ledger_metadata_db.write_schemas(batch)?;
-        update_latest_ledger_info(ledger_store, ledger_infos)?;
+        update_latest_ledger_info(ledger_metadata_db, ledger_infos)?;
     }
 
     Ok(())
 }
 
 /// Updates the latest ledger info iff a ledger info with a higher epoch is found
-pub fn update_latest_ledger_info(
-    ledger_store: Arc<LedgerStore>,
+pub(crate) fn update_latest_ledger_info(
+    ledger_metadata_db: &LedgerMetadataDb,
     ledger_infos: &[LedgerInfoWithSignatures],
 ) -> Result<()> {
-    if let Some(li) = ledger_store.get_latest_ledger_info_option() {
+    if let Some(li) = ledger_metadata_db.get_latest_ledger_info_option() {
         if li.ledger_info().epoch() > ledger_infos.last().unwrap().ledger_info().epoch() {
             // No need to update latest ledger info.
             return Ok(());
         }
     }
-    ledger_store.set_latest_ledger_info(ledger_infos.last().unwrap().clone());
+    ledger_metadata_db.set_latest_ledger_info(ledger_infos.last().unwrap().clone());
 
     Ok(())
 }
@@ -206,13 +205,13 @@ pub fn save_transaction_outputs(
 
 /// A helper function that saves the ledger infos to the given change set
 fn save_ledger_infos_impl(
-    ledger_store: Arc<LedgerStore>,
+    ledger_metadata_db: &LedgerMetadataDb,
     ledger_infos: &[LedgerInfoWithSignatures],
     batch: &mut SchemaBatch,
 ) -> Result<()> {
     ledger_infos
         .iter()
-        .map(|li| ledger_store.put_ledger_info(li, batch))
+        .map(|li| ledger_metadata_db.put_ledger_info(li, batch))
         .collect::<Result<Vec<_>>>()?;
 
     Ok(())

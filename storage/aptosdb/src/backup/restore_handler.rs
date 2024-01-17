@@ -71,12 +71,7 @@ impl RestoreHandler {
     }
 
     pub fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
-        restore_utils::save_ledger_infos(
-            self.aptosdb.ledger_db.metadata_db(),
-            self.ledger_store.clone(),
-            ledger_infos,
-            None,
-        )
+        restore_utils::save_ledger_infos(self.aptosdb.ledger_db.metadata_db(), ledger_infos, None)
     }
 
     pub fn confirm_or_save_frozen_subtrees(
@@ -152,11 +147,8 @@ impl RestoreHandler {
     }
 
     pub fn get_in_progress_state_kv_snapshot_version(&self) -> Result<Option<Version>> {
-        let mut iter = self
-            .aptosdb
-            .ledger_db
-            .metadata_db()
-            .iter::<DbMetadataSchema>(Default::default())?;
+        let db = self.aptosdb.ledger_db.metadata_db_arc();
+        let mut iter = db.iter::<DbMetadataSchema>(Default::default())?;
         iter.seek_to_first();
         while let Some((k, _v)) = iter.next().transpose()? {
             if let DbMetadataKey::StateSnapshotRestoreProgress(version) = k {

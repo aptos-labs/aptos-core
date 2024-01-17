@@ -28,7 +28,7 @@ impl Cmd {
         let store = LedgerStore::new(Arc::clone(&ledger_db));
         println!(
             "Latest LedgerInfo: {:?}",
-            store.get_latest_ledger_info_option()
+            ledger_db.metadata_db().get_latest_ledger_info_option()
         );
 
         println!("Checking that TransactionInfo hashes matches accumulator leaf hashes...");

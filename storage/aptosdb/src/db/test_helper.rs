@@ -398,7 +398,7 @@ pub fn test_save_blocks_impl(
         }
 
         assert_eq!(
-            db.ledger_store.get_latest_ledger_info().unwrap(),
+            db.ledger_db.metadata_db().get_latest_ledger_info().unwrap(),
             *ledger_info_with_sigs
         );
         verify_committed_transactions(

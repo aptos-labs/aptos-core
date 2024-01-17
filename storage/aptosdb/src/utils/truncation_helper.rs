@@ -46,14 +46,6 @@ use std::{
     },
 };
 
-pub(crate) fn get_overall_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
-}
-
-pub(crate) fn get_ledger_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
-}
-
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
     get_progress(
         state_kv_db.metadata_db(),
@@ -257,7 +249,7 @@ fn truncate_ledger_db_single_batch(
         &batch.transaction_db_batches,
     )?;
     delete_per_epoch_data(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
@@ -359,7 +351,7 @@ fn delete_per_version_data(
         &batch.transaction_db_batches,
     )?;
     delete_per_version_data_impl::<VersionDataSchema>(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
