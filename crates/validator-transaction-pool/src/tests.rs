@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{TransactionFilter, VTxnPoolState};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::hash::CryptoHash;
