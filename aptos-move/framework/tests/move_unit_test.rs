@@ -7,7 +7,7 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
-use move_command_line_common::{env::read_env_var, testing::ENABLE_V2};
+use move_command_line_common::{env::read_bool_env_var, testing::MOVE_COMPILER_V2};
 use move_package::{CompilerConfig, CompilerVersion};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -40,8 +40,8 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     if ok != UnitTestResult::Success {
         panic!("move unit tests failed")
     }
-    if read_env_var(ENABLE_V2) == "1" {
-        // Run test against v2 when ENABLE_V2 is set
+    if read_bool_env_var(MOVE_COMPILER_V2) {
+        // Run test against v2 when MOVE_COMPILER_V2 is set
         compiler_config.compiler_version = Some(CompilerVersion::V2);
         build_config.compiler_config = compiler_config;
         ok = run_move_unit_tests(
