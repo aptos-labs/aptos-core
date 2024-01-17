@@ -124,16 +124,13 @@ impl PoolState {
                 .map(|(seq_num, _)| *seq_num)
                 .next()
             {
-                // Now officially pop it from the queue.
                 // Update the quota usage.
                 // Send the pull notification if requested.
                 let PoolItem {
-                    seq_num,
-                    topic,
                     txn,
                     pull_notification_tx,
-                } = self.txn_queue.remove(&seq_num).unwrap();
-                self.seq_nums_by_topic.remove(&topic);
+                    ..
+                } = self.txn_queue.get(&seq_num).unwrap();
                 if let Some(tx) = pull_notification_tx {
                     let _ = tx.push((), txn.clone());
                 }

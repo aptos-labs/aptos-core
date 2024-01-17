@@ -93,7 +93,7 @@ fn pull_item_limit_should_be_respected() {
     let pool = new();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
     let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
-    let _guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
+    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
     let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
     let pulled = pool.lock().pull(
         Instant::now().add(Duration::from_secs(10)),
@@ -102,6 +102,7 @@ fn pull_item_limit_should_be_respected() {
         TransactionFilter::default(),
     );
     assert_eq!(vec![txn_0], pulled);
+    drop(guard_0);
     let pulled = pool.lock().pull(
         Instant::now().add(Duration::from_secs(10)),
         1,
@@ -116,7 +117,7 @@ fn pull_size_limit_should_be_respected() {
     let pool = new();
     let txn_0 = ValidatorTransaction::dummy2(vec![0xFF; 100]);
     let txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 100]);
-    let _guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
+    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
     let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
     let pulled = pool.lock().pull(
         Instant::now().add(Duration::from_secs(10)),
@@ -125,6 +126,7 @@ fn pull_size_limit_should_be_respected() {
         TransactionFilter::default(),
     );
     assert_eq!(vec![txn_0], pulled);
+    drop(guard_0);
     let pulled = pool.lock().pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
