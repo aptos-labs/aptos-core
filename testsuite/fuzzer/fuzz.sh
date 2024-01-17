@@ -77,11 +77,21 @@ function build-oss-fuzz() {
     oss_fuzz_out=$1
     mkdir -p $oss_fuzz_out
     mkdir -p ./target
+
+    # Workaround for build failures on oss-fuzz
+    # Owner: @zi0Black
+    # Issue: Some dependencies requires to compile C/C++ code and it result in build failure on oss-fuzz using provided flags.
+    # Solution: We have fixed some lib, but not all of them. So we just disable all C/C++ code compilation using libFuzzer.
+    # Note: We will revert this when we manage to understand how to work with each dependency.
+    export CFLAGS="-O1 -fno-omit-frame-pointer -gline-tables-only -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION"
+    export CXXFLAGS_EXTRA="-stdlib=libc++"
+    export CXXFLAGS="$CFLAGS $CXXFLAGS_EXTRA"
+
     if ! build all ./target; then
         env
         error "Build failed. Exiting."
     fi
-    find ./target/*/release/ -maxdepth 1 -type f -perm +111 -exec cp {} $oss_fuzz_out \;
+    find ./target/*/release/ -maxdepth 1 -type f -perm /111 -exec cp {} $oss_fuzz_out \;
 }
 
 function run() {
