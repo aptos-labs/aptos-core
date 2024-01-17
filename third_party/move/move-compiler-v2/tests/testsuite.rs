@@ -233,6 +233,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,
