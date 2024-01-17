@@ -14,6 +14,8 @@ const VERSION_SIZE: usize = std::mem::size_of::<Version>();
 pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        BLOCK_BY_VERSION_CF_NAME,
+        BLOCK_INFO_CF_NAME,
         EPOCH_BY_VERSION_CF_NAME,
         EVENT_ACCUMULATOR_CF_NAME,
         EVENT_BY_KEY_CF_NAME,

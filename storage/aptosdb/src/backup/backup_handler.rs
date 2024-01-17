@@ -114,8 +114,9 @@ impl BackupHandler {
             last_version
         );
         let num_transactions = last_version - first_version + 1;
-        let epoch = self.ledger_store.get_epoch(last_version)?;
-        let ledger_info = self.ledger_store.get_latest_ledger_info_in_epoch(epoch)?;
+        let ledger_metadata_db = self.ledger_db.metadata_db();
+        let epoch = ledger_metadata_db.get_epoch(last_version)?;
+        let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
         let accumulator_proof = self.ledger_store.get_transaction_range_proof(
             Some(first_version),
             num_transactions,
@@ -154,7 +155,8 @@ impl BackupHandler {
     /// Gets the epoch, committed version, and synced version of the DB.
     pub fn get_db_state(&self) -> Result<Option<DbState>> {
         Ok(self
-            .ledger_store
+            .ledger_db
+            .metadata_db()
             .get_latest_ledger_info_option()
             .map(|li| DbState {
                 epoch: li.ledger_info().epoch(),
@@ -168,8 +170,9 @@ impl BackupHandler {
         &self,
         version: Version,
     ) -> Result<(TransactionInfoWithProof, LedgerInfoWithSignatures)> {
-        let epoch = self.ledger_store.get_epoch(version)?;
-        let ledger_info = self.ledger_store.get_latest_ledger_info_in_epoch(epoch)?;
+        let ledger_metadata_db = self.ledger_db.metadata_db();
+        let epoch = ledger_metadata_db.get_epoch(version)?;
+        let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
         let txn_info = self
             .ledger_store
             .get_transaction_info_with_proof(version, ledger_info.ledger_info().version())?;
@@ -183,7 +186,8 @@ impl BackupHandler {
         end_epoch: u64,
     ) -> Result<impl Iterator<Item = Result<LedgerInfoWithSignatures>> + '_> {
         Ok(self
-            .ledger_store
+            .ledger_db
+            .metadata_db()
             .get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?
             .enumerate()
             .map(move |(idx, li)| {

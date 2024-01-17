@@ -224,10 +224,8 @@ mod test {
         write_set::WriteOp,
     };
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
-    use move_core_types::{
-        value::MoveTypeLayout,
-        vm_status::{StatusCode, VMStatus},
-    };
+    use move_binary_format::errors::{PartialVMError, PartialVMResult};
+    use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
     use once_cell::sync::Lazy;
     use std::{
         collections::{BTreeMap, HashSet},
@@ -499,11 +497,11 @@ mod test {
         fn get_aggregator_v1_state_value(
             &self,
             _id: &Self::Identifier,
-        ) -> anyhow::Result<Option<StateValue>> {
-            Err(anyhow::Error::new(VMStatus::error(
-                StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                Some("Error message from BadStorage.".to_string()),
-            )))
+        ) -> PartialVMResult<Option<StateValue>> {
+            Err(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                    .with_message("Error message from BadStorage.".to_string()),
+            )
         }
     }
 

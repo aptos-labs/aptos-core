@@ -250,7 +250,7 @@ macro_rules! assert_invariant_violation {
         let check = |res: PartialVMResult<()>| {
             let err = assert_err!(res);
 
-            // TODO[agg_v2]: Uniformize errors for write op squashing.
+            // TODO[agg_v2](test): Uniformize errors for write op squashing.
             assert!(
                 err.major_status() == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
                     || err.major_status() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR

@@ -78,6 +78,8 @@ impl StateSnapshotCommitter {
                     let base_version = delta_to_commit.base_version;
                     let previous_epoch_ending_version = self
                         .state_db
+                        .ledger_db
+                        .metadata_db()
                         .get_previous_epoch_ending(version)
                         .unwrap()
                         .map(|(v, _e)| v);
