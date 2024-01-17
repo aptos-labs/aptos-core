@@ -1782,9 +1782,9 @@ fn realistic_env_max_load_test(
                 if ha_proxy {
                     4600
                 } else if long_running {
-                    7500
+                    7200
                 } else {
-                    7000
+                    6700
                 },
             ),
         }))
