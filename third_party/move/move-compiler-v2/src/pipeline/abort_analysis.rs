@@ -70,7 +70,7 @@ impl Display for AbortState {
 #[derive(Clone)]
 pub struct AbortStateAtCodeOffset {
     pub before: AbortState,
-	#[allow(dead_code)]
+    #[allow(dead_code)]
     after: AbortState,
 }
 
@@ -84,10 +84,10 @@ impl AbortStateAtCodeOffset {
 pub struct AbortStateAnnotation(BTreeMap<CodeOffset, AbortStateAtCodeOffset>);
 
 impl AbortStateAnnotation {
-	/// Get the abort state at the given code offset
-	pub fn get_annotation_at(&self, code_offset: CodeOffset) -> Option<&AbortStateAtCodeOffset> {
-		self.0.get(&code_offset)
-	}
+    /// Get the abort state at the given code offset
+    pub fn get_annotation_at(&self, code_offset: CodeOffset) -> Option<&AbortStateAtCodeOffset> {
+        self.0.get(&code_offset)
+    }
 }
 
 pub struct AbortAnalysis {}
