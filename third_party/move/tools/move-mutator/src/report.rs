@@ -1,11 +1,11 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// The `Report` struct represents a report of mutations.
 /// It contains a vector of `MutationReport` instances.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Report {
     /// The vector of `ReportEntry` instances.
     mutants: Vec<MutationReport>,
@@ -33,6 +33,15 @@ impl Report {
 
         serde_json::to_writer_pretty(file, &self)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    /// Loads the `Report` from a JSON file.
+    pub fn load_from_json_file(path: &Path) -> std::io::Result<Self> {
+        info!("Reading report from {}", path.display());
+
+        let file = std::fs::File::open(path)?;
+
+        serde_json::from_reader(file).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 
     /// Saves the `Report` as a text file.
@@ -65,6 +74,11 @@ impl Report {
         Ok(())
     }
 
+    /// Returns the vector of `MutationReport` instances.
+    pub fn get_mutants(&self) -> &Vec<MutationReport> {
+        &self.mutants
+    }
+
     /// Converts the `Report` to a JSON string.
     #[cfg(test)]
     pub fn to_json(&self) -> serde_json::Result<String> {
@@ -74,7 +88,7 @@ impl Report {
 
 /// The `Range` struct represents a range with a start and end.
 /// It is used to represent the location of a mutation inside the source file.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Range {
     /// The start of the range.
     start: usize,
@@ -94,7 +108,7 @@ impl Range {
 /// The `Mutation` struct represents a modification that was applied to a file.
 /// It contains the location of the modification, the name of the mutation operator, the old value and the new value.
 /// It is used to represent a single modification inside a `ReportEntry`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mutation {
     /// The location of the modification.
     changed_place: Range,
@@ -125,7 +139,7 @@ impl Mutation {
 
 /// The `MutationReport` struct represents an entry in a report.
 /// It contains information about a mutation that was applied to a file.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutationReport {
     /// The path to the mutated file.
     mutant_path: PathBuf,
@@ -159,6 +173,16 @@ impl MutationReport {
     pub fn add_modification(&mut self, modification: Mutation) {
         trace!("Adding modification to report: {modification:?}");
         self.mutations.push(modification);
+    }
+
+    /// Return the mutant path
+    pub fn get_mutant_path(&self) -> &PathBuf {
+        &self.mutant_path
+    }
+
+    /// Return the original file path
+    pub fn get_original_file_path(&self) -> &PathBuf {
+        &self.original_file
     }
 }
 

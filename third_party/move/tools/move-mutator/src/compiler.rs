@@ -169,7 +169,7 @@ pub fn verify_mutant(
 /// # Returns
 ///
 /// * `io::Result<()>` - Ok if the copy is successful, or an error if any error occurs.
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
+pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
     if !dst.as_ref().exists() {
         fs::create_dir_all(dst.as_ref())?;
     }
