@@ -1,0 +1,162 @@
+processed 1 task
+
+task 0 'publish'. lines 1-35:
+
+
+
+==> Compiler v2 delivered same results!
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module 42.Test {
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+
+
+public test_filter(): vector<u64> /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: vector<u64>
+L3:	loc3: &mut vector<u64>
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[2](loc2: vector<u64>)
+	2: MutBorrowLoc[2](loc2: vector<u64>)
+	3: StLoc[3](loc3: &mut vector<u64>)
+	4: LdU64(0)
+	5: StLoc[1](loc1: u64)
+B1:
+	6: Nop
+	7: CopyLoc[1](loc1: u64)
+	8: CopyLoc[3](loc3: &mut vector<u64>)
+	9: FreezeRef
+	10: VecLen(3)
+	11: Lt
+	12: BrFalse(34)
+B2:
+	13: Branch(14)
+B3:
+	14: CopyLoc[3](loc3: &mut vector<u64>)
+	15: CopyLoc[1](loc1: u64)
+	16: StLoc[0](loc0: u64)
+	17: FreezeRef
+	18: MoveLoc[0](loc0: u64)
+	19: VecImmBorrow(3)
+	20: ReadRef
+	21: LdU64(1)
+	22: Gt
+	23: BrFalse(29)
+B4:
+	24: CopyLoc[3](loc3: &mut vector<u64>)
+	25: CopyLoc[1](loc1: u64)
+	26: Call vector::swap_remove<u64>(&mut vector<u64>, u64): u64
+	27: Pop
+	28: Branch(33)
+B5:
+	29: MoveLoc[1](loc1: u64)
+	30: LdU64(1)
+	31: Add
+	32: StLoc[1](loc1: u64)
+B6:
+	33: Branch(6)
+B7:
+	34: MoveLoc[3](loc3: &mut vector<u64>)
+	35: Pop
+	36: MoveLoc[2](loc2: vector<u64>)
+	37: Ret
+}
+}
+== END Bytecode ==
+}
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v7
+module 42.Test {
+use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+
+
+
+
+public test_filter(): vector<u64> /* def_idx: 0 */ {
+L0:	loc0: vector<u64>
+L1:	loc1: vector<u64>
+L2:	loc2: &mut vector<u64>
+L3:	loc3: u64
+L4:	loc4: &mut vector<u64>
+L5:	loc5: u64
+L6:	loc6: &mut vector<u64>
+L7:	loc7: &u64
+L8:	loc8: &mut vector<u64>
+L9:	loc9: u64
+L10:	loc10: vector<u64>
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: LdU64(3)
+	3: VecPack(2, 3)
+	4: StLoc[0](loc0: vector<u64>)
+	5: CopyLoc[0](loc0: vector<u64>)
+	6: StLoc[1](loc1: vector<u64>)
+	7: MutBorrowLoc[1](loc1: vector<u64>)
+	8: StLoc[2](loc2: &mut vector<u64>)
+	9: LdU64(0)
+	10: StLoc[3](loc3: u64)
+B1:
+	11: CopyLoc[2](loc2: &mut vector<u64>)
+	12: StLoc[4](loc4: &mut vector<u64>)
+	13: MoveLoc[4](loc4: &mut vector<u64>)
+	14: FreezeRef
+	15: VecLen(2)
+	16: StLoc[5](loc5: u64)
+	17: CopyLoc[3](loc3: u64)
+	18: MoveLoc[5](loc5: u64)
+	19: Lt
+	20: BrFalse(47)
+B2:
+	21: CopyLoc[2](loc2: &mut vector<u64>)
+	22: StLoc[6](loc6: &mut vector<u64>)
+	23: MoveLoc[6](loc6: &mut vector<u64>)
+	24: FreezeRef
+	25: CopyLoc[3](loc3: u64)
+	26: VecImmBorrow(2)
+	27: StLoc[7](loc7: &u64)
+	28: MoveLoc[7](loc7: &u64)
+	29: ReadRef
+	30: LdU64(1)
+	31: Gt
+	32: BrFalse(40)
+B3:
+	33: CopyLoc[2](loc2: &mut vector<u64>)
+	34: StLoc[8](loc8: &mut vector<u64>)
+	35: MoveLoc[8](loc8: &mut vector<u64>)
+	36: CopyLoc[3](loc3: u64)
+	37: Call vector::swap_remove<u64>(&mut vector<u64>, u64): u64
+	38: Pop
+	39: Branch(46)
+B4:
+	40: LdU64(1)
+	41: StLoc[9](loc9: u64)
+	42: MoveLoc[3](loc3: u64)
+	43: MoveLoc[9](loc9: u64)
+	44: Add
+	45: StLoc[3](loc3: u64)
+B5:
+	46: Branch(50)
+B6:
+	47: MoveLoc[2](loc2: &mut vector<u64>)
+	48: Pop
+	49: Branch(51)
+B7:
+	50: Branch(11)
+B8:
+	51: CopyLoc[1](loc1: vector<u64>)
+	52: StLoc[10](loc10: vector<u64>)
+	53: MoveLoc[10](loc10: vector<u64>)
+	54: Ret
+}
+}
+== END Bytecode ==
+}

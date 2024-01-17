@@ -1,0 +1,39 @@
+// ---- Model Dump
+module 0x42::Test {
+    use std::vector;
+    public fun test_filter(): vector<u64> {
+        {
+          let v: vector<u64> = Vector<u64>(1, 2, 3);
+          {
+            let (v: &mut vector<u64>) = Tuple(Borrow(Mutable)(v));
+            {
+              let i: u64 = 0;
+              loop {
+                if spec {
+                  invariant forall k: num: Range(0, i): Not((predicate)(Index($t0, k)));
+                }
+                ;
+                Lt<u64>(i, vector::length<u64>(v)) {
+                  if {
+                    let (e: &u64) = Tuple(vector::borrow<u64>(v, i));
+                    Gt<u64>(Deref(e), 1)
+                  } {
+                    vector::swap_remove<u64>(v, i);
+                    Tuple()
+                  } else {
+                    i: u64 = Add<u64>(i, 1);
+                    Tuple()
+                  };
+                  Tuple()
+                } else {
+                  break
+                }
+              }
+            }
+          };
+          v
+        }
+    }
+    spec fun $filter<X>(v: &mut vector<#0>,predicate: |&#0|bool);
+    spec fun $test_filter(): vector<u64>;
+} // end 0x42::Test
