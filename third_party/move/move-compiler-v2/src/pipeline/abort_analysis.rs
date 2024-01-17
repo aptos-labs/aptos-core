@@ -38,6 +38,11 @@ impl AbortState {
     fn bot() -> Self {
         Self(Plus2::Bot)
     }
+
+	/// Checks whether `self` is definitely abort
+	pub fn is_definitely_abort(&self) -> bool {
+		matches!(self.0, Plus2::Mid(true))
+	}
 }
 
 impl Display for AbortState {
@@ -53,8 +58,8 @@ impl Display for AbortState {
 
 /// Before and after abort state at a program point
 #[derive(Clone)]
-struct AbortStateAtCodeOffset {
-    before: AbortState,
+pub struct AbortStateAtCodeOffset {
+    pub before: AbortState,
 	#[allow(dead_code)]
     after: AbortState,
 }
@@ -66,7 +71,14 @@ impl AbortStateAtCodeOffset {
 }
 
 #[derive(Clone)]
-struct AbortStateAnnotation(BTreeMap<CodeOffset, AbortStateAtCodeOffset>);
+pub struct AbortStateAnnotation(BTreeMap<CodeOffset, AbortStateAtCodeOffset>);
+
+impl AbortStateAnnotation {
+	/// Get the abort state at the given code offset
+	pub fn get_annotation_at(&self, code_offset: CodeOffset) -> Option<&AbortStateAtCodeOffset> {
+		self.0.get(&code_offset)
+	}
+}
 
 pub struct AbortAnalysis {}
 
