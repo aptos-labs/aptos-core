@@ -47,9 +47,7 @@ pub fn abstract_domain_derive(input: TokenStream) -> TokenStream {
                     gen_join_field(field_index)
                 })
                 .collect(),
-            Fields::Unit => {
-                Vec::new()
-            },
+            Fields::Unit => Vec::new(),
         }
     } else {
         panic!("AbstractDomain is only implemented for structs");

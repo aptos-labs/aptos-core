@@ -10,6 +10,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
+abstract-domain-derive = { path = "./abstract_domain_derive" }
 move-binary-format = { path = "../../move-binary-format" }
 move-borrow-graph = { path = "../../move-borrow-graph" }
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
@@ -18,7 +19,6 @@ move-compiler = { path = "../../move-compiler" }
 move-core-types = { path = "../../move-core/types" }
 move-ir-to-bytecode = { path = "../../move-ir-compiler/move-ir-to-bytecode" }
 move-model = { path = ".." }
-abstract-domain-derive = { path = "./abstract_domain_derive" }
 
 codespan = "0.11.1"
 codespan-reporting = { version = "0.11.1", features = ["serde", "serialization"] }
