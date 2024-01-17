@@ -11,6 +11,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_storage_interface::Result;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::{definition::NodeInProof, SparseMerkleInternalNode, SparseMerkleLeafNode},
@@ -27,14 +28,14 @@ impl TreeReader<StateKey> for DummyReader {
         &self,
         _node_key: &NodeKey,
         _tag: &str,
-    ) -> anyhow::Result<Option<crate::Node<StateKey>>> {
+    ) -> Result<Option<crate::Node<StateKey>>> {
         unimplemented!()
     }
 
     fn get_rightmost_leaf(
         &self,
         _version: Version,
-    ) -> anyhow::Result<Option<(NodeKey, LeafNode<StateKey>)>> {
+    ) -> Result<Option<(NodeKey, LeafNode<StateKey>)>> {
         unimplemented!()
     }
 }

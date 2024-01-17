@@ -1,5 +1,13 @@
 
 Diagnostics:
+error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
+   ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:12:9
+   │
+11 │         let f = &mut s.f;
+   │                 -------- previous mutable field borrow
+12 │         freeze(s);
+   │         ^^^^^^^^^ passed here
+
 error: cannot mutably borrow local `s` since other references exists
    ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:18:17
    │
@@ -16,12 +24,4 @@ error: cannot pass mutable reference in local `s`, which is still borrowed, as f
 18 │         let g = &mut s.f; // error in v2
    │                 -------- previous mutable field borrow
 19 │         freeze(s);
-   │         ^^^^^^^^^ passed here
-
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
-   ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:12:9
-   │
-11 │         let f = &mut s.f;
-   │                 -------- previous mutable field borrow
-12 │         freeze(s);
    │         ^^^^^^^^^ passed here

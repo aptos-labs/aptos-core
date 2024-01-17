@@ -13,14 +13,16 @@ use crate::{
         transaction_info_db_column_families, write_set_db_column_families,
     },
     event_store::EventStore,
-    ledger_db::{event_db::EventDb, transaction_db::TransactionDb},
+    ledger_db::{
+        event_db::EventDb, ledger_metadata_db::LedgerMetadataDb, transaction_db::TransactionDb,
+    },
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
@@ -30,6 +32,9 @@ use std::{
 mod event_db;
 #[cfg(test)]
 mod event_db_test;
+pub(crate) mod ledger_metadata_db;
+#[cfg(test)]
+mod ledger_metadata_db_test;
 mod transaction_db;
 #[cfg(test)]
 pub(crate) mod transaction_db_test;
@@ -74,7 +79,7 @@ impl LedgerDbSchemaBatches {
 
 #[derive(Debug)]
 pub struct LedgerDb {
-    ledger_metadata_db: Arc<DB>,
+    ledger_metadata_db: LedgerMetadataDb,
     event_db: EventDb,
     transaction_accumulator_db: Arc<DB>,
     transaction_db: TransactionDb,
@@ -110,7 +115,7 @@ impl LedgerDb {
         if !sharding {
             info!("Individual ledger dbs are not enabled!");
             return Ok(Self {
-                ledger_metadata_db: Arc::clone(&ledger_metadata_db),
+                ledger_metadata_db: LedgerMetadataDb::new(Arc::clone(&ledger_metadata_db)),
                 event_db: EventDb::new(
                     Arc::clone(&ledger_metadata_db),
                     EventStore::new(Arc::clone(&ledger_metadata_db)),
@@ -163,7 +168,7 @@ impl LedgerDb {
         // TODO(grao): Handle data inconsistency.
 
         Ok(Self {
-            ledger_metadata_db,
+            ledger_metadata_db: LedgerMetadataDb::new(ledger_metadata_db),
             event_db,
             transaction_accumulator_db,
             transaction_db,
@@ -236,18 +241,18 @@ impl LedgerDb {
             &DbMetadataKey::WriteSetPrunerProgress,
             &DbMetadataValue::Version(version),
         )?;
-        self.ledger_metadata_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::LedgerPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
+        self.ledger_metadata_db.write_pruner_progress(version)?;
+
+        Ok(())
     }
 
-    pub fn metadata_db(&self) -> &DB {
+    pub(crate) fn metadata_db(&self) -> &LedgerMetadataDb {
         &self.ledger_metadata_db
     }
 
+    // TODO(grao): Remove this after sharding migration.
     pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.ledger_metadata_db)
+        self.ledger_metadata_db.db_arc()
     }
 
     pub(crate) fn event_db(&self) -> &EventDb {

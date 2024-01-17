@@ -1045,7 +1045,7 @@ pub struct VerifyPackage {
 #[async_trait]
 impl CliCommand<&'static str> for VerifyPackage {
     fn command_name(&self) -> &'static str {
-        "DownloadPackage"
+        "VerifyPackage"
     }
 
     async fn execute(self) -> CliTypedResult<&'static str> {

@@ -68,7 +68,12 @@ impl RandDb {
     fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
-        Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>>>()?)
+        Ok(iter
+            .map(|e| match e {
+                Ok((k, v)) => Ok((k, v)),
+                Err(e) => Err(e.into()),
+            })
+            .collect::<Result<Vec<(S::Key, S::Value)>>>()?)
     }
 }
 

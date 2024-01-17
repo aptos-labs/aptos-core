@@ -340,7 +340,7 @@ impl DAGStorage for StorageAdapter {
 
     fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
         // TODO: use callback from notifier to cache the latest ledger info
-        self.aptos_db.get_latest_ledger_info()
+        Ok(self.aptos_db.get_latest_ledger_info()?)
     }
 }
 

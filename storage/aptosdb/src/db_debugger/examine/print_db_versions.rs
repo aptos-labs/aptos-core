@@ -5,7 +5,6 @@ use crate::{
     db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
-        ledger_info::LedgerInfoSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
         transaction_info::TransactionInfoSchema,
@@ -13,15 +12,14 @@ use crate::{
         write_set::WriteSetSchema,
     },
     utils::truncation_helper::{
-        get_current_version_in_state_merkle_db, get_ledger_commit_progress,
-        get_overall_commit_progress, get_state_kv_commit_progress,
+        get_current_version_in_state_merkle_db, get_state_kv_commit_progress,
         get_state_merkle_commit_progress,
     },
     AptosDB,
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, ReadOptions, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use clap::Parser;
 use std::path::PathBuf;
@@ -51,12 +49,12 @@ impl Cmd {
 
         println!(
             "Overall Progress: {:?}",
-            get_overall_commit_progress(ledger_db.metadata_db())?
+            ledger_db.metadata_db().get_latest_version()?
         );
 
         println!(
             "Ledger Progress: {:?}",
-            get_ledger_commit_progress(ledger_db.metadata_db())?
+            ledger_db.metadata_db().get_ledger_commit_progress()?
         );
 
         println!(
@@ -71,10 +69,7 @@ impl Cmd {
 
         println!(
             "LedgerPruner Progress: {:?}",
-            ledger_db
-                .metadata_db()
-                .get::<DbMetadataSchema>(&DbMetadataKey::LedgerPrunerProgress)?
-                .map_or(0, |v| v.expect_version())
+            ledger_db.metadata_db().get_pruner_progress()?
         );
 
         println!(
@@ -101,13 +96,10 @@ impl Cmd {
                 .map_or(0, |v| v.expect_version())
         );
 
-        {
-            let mut iter = ledger_db
-                .metadata_db()
-                .iter::<LedgerInfoSchema>(ReadOptions::default())?;
-            iter.seek_to_last();
-            println!("Current ledger info: {:?}", iter.next().transpose()?);
-        }
+        println!(
+            "Current ledger info: {:?}",
+            ledger_db.metadata_db().get_latest_ledger_info_option()
+        );
 
         println!(
             "Max JMT node version: {:?}",
@@ -130,7 +122,7 @@ impl Cmd {
 
         println!(
             "Max VersionData version: {:?}",
-            Self::get_latest_version_for_schema::<VersionDataSchema>(ledger_db.metadata_db())?,
+            Self::get_latest_version_for_schema::<VersionDataSchema>(&ledger_db.metadata_db_arc())?,
         );
 
         println!(

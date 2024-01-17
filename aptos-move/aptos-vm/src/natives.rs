@@ -34,7 +34,7 @@ use aptos_types::{
 #[cfg(feature = "testing")]
 use bytes::Bytes;
 #[cfg(feature = "testing")]
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -71,7 +71,7 @@ impl TAggregatorV1View for AptosBlankStorage {
     fn get_aggregator_v1_state_value(
         &self,
         _id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         Ok(None)
     }
 }
@@ -140,7 +140,7 @@ impl TableResolver for AptosBlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
     }
 }

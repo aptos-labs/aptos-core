@@ -19,16 +19,19 @@ use aptos_types::{
         issuer_from_str, jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, Issuer,
         ProviderJWKs, QuorumCertifiedUpdate,
     },
-    validator_txn::{Topic, ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
-use aptos_validator_transaction_pool::TransactionFilter;
+use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use futures_util::future::AbortHandle;
 use std::{
     collections::{BTreeSet, HashMap},
     sync::Arc,
     time::Duration,
 };
+use std::collections::HashSet;
+use std::time::Instant;
+use aptos_crypto::hash::CryptoHash;
 
 #[tokio::test]
 async fn test_jwk_manager_state_transition() {
@@ -51,15 +54,13 @@ async fn test_jwk_manager_state_transition() {
     };
 
     let certified_update_producer = DummyCertifiedUpdateProducer::default();
-    let (vtxn_pool_read_cli, mut vtxn_pool_write_clis) =
-        aptos_validator_transaction_pool::new(vec![(Topic::JWK_CONSENSUS, None)]);
-    let vtxn_pool_write_cli = vtxn_pool_write_clis.pop().unwrap();
+    let vtxn_pool = VTxnPoolState::default();
     let mut jwk_manager = JWKManager::new(
         private_keys[0].clone(),
         addrs[0],
         Arc::new(epoch_state),
         Arc::new(certified_update_producer),
-        Arc::new(vtxn_pool_write_cli),
+        vtxn_pool.clone(),
     );
 
     // In this example, Alice and Bob are 2 existing issuers; Carl was added in the last epoch so no JWKs of Carl is on chain.
@@ -327,6 +328,7 @@ async fn test_jwk_manager_state_transition() {
     {
         let expected_carl_state = expected_states.get_mut(&issuer_carl).unwrap();
         expected_carl_state.consensus_state = ConsensusState::Finished {
+            vtxn_guard: vtxn_pool.dummy_txn_guard(),
             my_proposal: expected_carl_state.consensus_state.my_proposal_cloned(),
             quorum_certified: qc_update_for_carl.clone(),
         };
@@ -335,14 +337,13 @@ async fn test_jwk_manager_state_transition() {
     let expected_vtxns = vec![ValidatorTransaction::ObservedJWKsUpdates {
         updates: vec![qc_update_for_carl.clone()],
     }];
-    let actual_vtxns = vtxn_pool_read_cli
+    let actual_vtxns = vtxn_pool
         .pull(
-            Duration::from_secs(3600),
+            Instant::now() + Duration::from_secs(3600),
             999,
             2048,
             TransactionFilter::empty(),
-        )
-        .await;
+        );
     assert_eq!(expected_vtxns, actual_vtxns);
 
     // For issuer Carl, in state 'Finished`, JWKConsensusManager should still reply to observation requests with its own proposal.
@@ -399,23 +400,25 @@ async fn test_jwk_manager_state_transition() {
     {
         let expected_alice_state = expected_states.get_mut(&issuer_alice).unwrap();
         expected_alice_state.consensus_state = ConsensusState::Finished {
+            vtxn_guard: vtxn_pool.dummy_txn_guard(),
             my_proposal: expected_alice_state.consensus_state.my_proposal_cloned(),
             quorum_certified: qc_update_for_alice.clone(),
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
-    let expected_vtxns = vec![ValidatorTransaction::ObservedJWKsUpdates {
-        updates: vec![qc_update_for_alice, qc_update_for_carl],
-    }];
-    let actual_vtxns = vtxn_pool_read_cli
+    let expected_vtxn_hashes = vec![
+        ValidatorTransaction::ObservedJWKsUpdates { updates: vec![qc_update_for_alice], },
+        ValidatorTransaction::ObservedJWKsUpdates { updates: vec![qc_update_for_carl], },
+    ].iter().map(CryptoHash::hash).collect::<HashSet<_>>();
+
+    let actual_vtxn_hashes = vtxn_pool
         .pull(
-            Duration::from_secs(3600),
+            Instant::now() + Duration::from_secs(3600),
             999,
             2048,
             TransactionFilter::empty(),
-        )
-        .await;
-    assert_eq!(expected_vtxns, actual_vtxns);
+        ).iter().map(CryptoHash::hash).collect::<HashSet<_>>();
+    assert_eq!(expected_vtxn_hashes, actual_vtxn_hashes);
 
     // At any time, JWKConsensusManager should fully follow on-chain update notification and re-initialize.
     let on_chain_state_carl_v1 = ProviderJWKs {

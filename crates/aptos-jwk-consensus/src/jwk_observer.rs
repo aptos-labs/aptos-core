@@ -119,16 +119,16 @@ impl JWKObserver {
     }
 }
 
-/// This should not be a test case. Uncomment to manually test.
-// #[tokio::test]
-// async fn test_fetch_jwks() {
-//     let jwks = fetch_jwks(
-//         AccountAddress::ZERO,
-//         "https://www.facebook.com/.well-known/openid-configuration/"
-//             .as_bytes()
-//             .to_vec(),
-//     )
-//     .await
-//     .unwrap();
-//     println!("{:?}", jwks);
-// }
+#[ignore]
+#[tokio::test]
+async fn test_fetch_real_jwks() {
+    let jwks = fetch_jwks(
+        AccountAddress::ZERO,
+        "https://www.facebook.com/.well-known/openid-configuration/"
+            .as_bytes()
+            .to_vec(),
+    )
+    .await
+    .unwrap();
+    println!("{:?}", jwks);
+}

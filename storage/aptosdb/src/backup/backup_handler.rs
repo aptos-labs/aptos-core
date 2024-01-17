@@ -12,8 +12,8 @@ use crate::{
     state_store::StateStore,
     transaction_store::TransactionStore,
 };
-use anyhow::{anyhow, ensure, Context, Result};
 use aptos_crypto::hash::HashValue;
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
@@ -76,18 +76,24 @@ impl BackupHandler {
             let version = start_version + idx as u64; // overflow is impossible since it's check upon txn_iter construction.
 
             let txn = txn_res?;
-            let txn_info = txn_info_iter
-                .next()
-                .ok_or_else(|| anyhow!("TransactionInfo not found when Transaction exists."))
-                .context(version)??;
-            let event_vec = event_vec_iter
-                .next()
-                .ok_or_else(|| anyhow!("Events not found when Transaction exists."))
-                .context(version)??;
-            let write_set = write_set_iter
-                .next()
-                .ok_or_else(|| anyhow!("WriteSet not found when Transaction exists."))
-                .context(version)??;
+            let txn_info = txn_info_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "TransactionInfo not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
+            let event_vec = event_vec_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "Events not found when Transaction exists., version {}",
+                    version
+                ))
+            })??;
+            let write_set = write_set_iter.next().ok_or_else(|| {
+                AptosDbError::NotFound(format!(
+                    "WriteSet not found when Transaction exists, version {}",
+                    version
+                ))
+            })??;
             BACKUP_TXN_VERSION.set(version as i64);
             Ok((txn, txn_info, event_vec, write_set))
         });
@@ -108,8 +114,9 @@ impl BackupHandler {
             last_version
         );
         let num_transactions = last_version - first_version + 1;
-        let epoch = self.ledger_store.get_epoch(last_version)?;
-        let ledger_info = self.ledger_store.get_latest_ledger_info_in_epoch(epoch)?;
+        let ledger_metadata_db = self.ledger_db.metadata_db();
+        let epoch = ledger_metadata_db.get_epoch(last_version)?;
+        let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
         let accumulator_proof = self.ledger_store.get_transaction_range_proof(
             Some(first_version),
             num_transactions,
@@ -148,7 +155,8 @@ impl BackupHandler {
     /// Gets the epoch, committed version, and synced version of the DB.
     pub fn get_db_state(&self) -> Result<Option<DbState>> {
         Ok(self
-            .ledger_store
+            .ledger_db
+            .metadata_db()
             .get_latest_ledger_info_option()
             .map(|li| DbState {
                 epoch: li.ledger_info().epoch(),
@@ -162,8 +170,9 @@ impl BackupHandler {
         &self,
         version: Version,
     ) -> Result<(TransactionInfoWithProof, LedgerInfoWithSignatures)> {
-        let epoch = self.ledger_store.get_epoch(version)?;
-        let ledger_info = self.ledger_store.get_latest_ledger_info_in_epoch(epoch)?;
+        let ledger_metadata_db = self.ledger_db.metadata_db();
+        let epoch = ledger_metadata_db.get_epoch(version)?;
+        let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
         let txn_info = self
             .ledger_store
             .get_transaction_info_with_proof(version, ledger_info.ledger_info().version())?;
@@ -177,7 +186,8 @@ impl BackupHandler {
         end_epoch: u64,
     ) -> Result<impl Iterator<Item = Result<LedgerInfoWithSignatures>> + '_> {
         Ok(self
-            .ledger_store
+            .ledger_db
+            .metadata_db()
             .get_epoch_ending_ledger_info_iter(start_epoch, end_epoch)?
             .enumerate()
             .map(move |(idx, li)| {

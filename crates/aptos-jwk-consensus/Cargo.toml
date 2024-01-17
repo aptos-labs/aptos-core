@@ -47,6 +47,6 @@ tokio-retry = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
-
+aptos-validator-transaction-pool = { workspace = true, features = ["fuzzing"] }
 [features]
 smoke-test = []

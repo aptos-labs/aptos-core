@@ -27,11 +27,11 @@ use aptos_types::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
     },
 };
-use aptos_validator_transaction_pool as vtxn_pool;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_validator_transaction_pool::VTxnPoolState;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
     // some useful metadata
@@ -55,7 +55,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     network_sender: JWKConsensusNetworkClient<NetworkClient<JWKConsensusMsg>>,
 
     // vtxn pool handle
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+    vtxn_pool: VTxnPoolState,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -66,7 +66,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         jwk_updated_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<JWKConsensusMsg>>,
         network_sender: JWKConsensusNetworkClient<NetworkClient<JWKConsensusMsg>>,
-        vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
             my_addr,
@@ -76,7 +76,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             jwk_updated_events,
             self_sender,
             network_sender,
-            vtxn_pool_write_cli: Arc::new(vtxn_pool_write_cli),
+            vtxn_pool,
             jwk_updated_event_txs: None,
             jwk_rpc_msg_tx: None,
             jwk_manager_close_tx: None,
@@ -181,7 +181,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.my_addr,
                 epoch_state.clone(),
                 Arc::new(qc_update_producer),
-                self.vtxn_pool_write_cli.clone(),
+                self.vtxn_pool.clone(),
             );
 
             let (jwk_event_tx, jwk_event_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);

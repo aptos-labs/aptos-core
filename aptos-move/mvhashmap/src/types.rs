@@ -12,6 +12,8 @@ use aptos_types::{
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use bytes::Bytes;
+use derivative::Derivative;
+use move_binary_format::errors::PartialVMError;
 use move_core_types::value::MoveTypeLayout;
 use std::sync::{atomic::AtomicU32, Arc};
 
@@ -34,7 +36,8 @@ pub(crate) enum Flag {
     Estimate,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Derivative)]
+#[derivative(PartialEq, Eq)]
 pub enum MVGroupError {
     /// The base group contents are not initialized.
     Uninitialized,
@@ -43,7 +46,7 @@ pub enum MVGroupError {
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
     /// Tag serialization is needed for group size computation.
-    TagSerializationError,
+    TagSerializationError(#[derivative(PartialEq = "ignore")] PartialVMError),
 }
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.

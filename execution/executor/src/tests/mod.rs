@@ -11,14 +11,13 @@ use crate::{
         MockVM, DISCARD_STATUS, KEEP_STATUS,
     },
 };
-use anyhow::Result;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_db::AptosDB;
 use aptos_executor_types::{
     BlockExecutorTrait, ExecutedChunk, LedgerUpdateOutput, TransactionReplayer, VerifyExecutionMode,
 };
 use aptos_storage_interface::{
-    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees,
+    async_proof_fetcher::AsyncProofFetcher, DbReaderWriter, ExecutedTrees, Result,
 };
 use aptos_types::{
     account_address::AccountAddress,

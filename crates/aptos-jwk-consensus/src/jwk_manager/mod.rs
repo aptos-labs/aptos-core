@@ -20,13 +20,14 @@ use aptos_types::{
     },
     validator_txn::ValidatorTransaction,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
 use futures_channel::oneshot;
 use futures_util::{
     future::{join_all, AbortHandle},
     FutureExt, StreamExt,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use aptos_types::validator_txn::Topic;
+use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
@@ -42,7 +43,7 @@ pub struct JWKManager<P: SigningKeyProvider> {
     certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
 
     /// When a quorum-certified JWK update is available, use this to put it into the validator transaction pool.
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+    vtxn_pool: VTxnPoolState,
 
     /// The JWK consensus states of all the issuers.
     states_by_issuer: HashMap<Issuer, PerProviderState>,
@@ -60,14 +61,14 @@ impl<P: SigningKeyProvider> JWKManager<P> {
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
-        vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
             signing_key_provider,
             my_addr,
             epoch_state,
             certified_update_producer,
-            vtxn_pool_write_cli,
+            vtxn_pool,
             states_by_issuer: HashMap::default(),
             stopped: false,
             qc_update_tx: None,
@@ -143,7 +144,6 @@ impl<P: SigningKeyProvider> JWKManager<P> {
             .map(JWKObserver::shutdown)
             .collect::<Vec<_>>();
         join_all(futures).await;
-        self.vtxn_pool_write_cli.put(None);
         if let Some(tx) = ack_tx {
             let _ = tx.send(());
         }
@@ -201,7 +201,6 @@ impl<P: SigningKeyProvider> JWKManager<P> {
                 )
             })
             .collect();
-        self.vtxn_pool_write_cli.put(None);
         info!(
             "[JWK] state reset by on chain update, update={:?}",
             on_chain_state
@@ -244,18 +243,21 @@ impl<P: SigningKeyProvider> JWKManager<P> {
 
     /// Triggered once the `certified_update_producer` produced a quorum-certified update.
     pub fn process_quorum_certified_update(&mut self, update: QuorumCertifiedUpdate) -> Result<()> {
+        let issuer = update.update.issuer.clone();
         let state = self
             .states_by_issuer
-            .entry(update.update.issuer.clone())
+            .entry(issuer.clone())
             .or_default();
         match &state.consensus_state {
             ConsensusState::InProgress { my_proposal, .. } => {
                 //TODO: counters
+                let txn = ValidatorTransaction::ObservedJWKsUpdates { updates: vec![update.clone()] };
+                let vtxn_guard = self.vtxn_pool.put(Topic::JWK_CONSENSUS(issuer), Arc::new(txn), None);
                 state.consensus_state = ConsensusState::Finished {
+                    vtxn_guard,
                     my_proposal: my_proposal.clone(),
                     quorum_certified: update.clone(),
                 };
-                self.update_vtxn_pool()?;
                 info!("[JWK] qc update obtained, update={:?}", update);
                 Ok(())
             },
@@ -265,24 +267,6 @@ impl<P: SigningKeyProvider> JWKManager<P> {
                 state.consensus_state.name()
             )),
         }
-    }
-
-    fn update_vtxn_pool(&mut self) -> Result<()> {
-        let updates: Vec<QuorumCertifiedUpdate> = self
-            .states_by_issuer
-            .iter()
-            .filter_map(
-                |(_issuer, per_provider_state)| match &per_provider_state.consensus_state {
-                    ConsensusState::Finished {
-                        quorum_certified, ..
-                    } => Some(quorum_certified.clone()),
-                    _ => None,
-                },
-            )
-            .collect();
-        let txn = ValidatorTransaction::ObservedJWKsUpdates { updates };
-        self.vtxn_pool_write_cli.put(Some(Arc::new(txn)));
-        Ok(())
     }
 }
 
@@ -321,6 +305,7 @@ pub enum ConsensusState {
         abort_handle_wrapper: AbortHandleWrapper,
     },
     Finished {
+        vtxn_guard: TxnGuard,
         my_proposal: ObservedUpdate,
         quorum_certified: QuorumCertifiedUpdate,
     },

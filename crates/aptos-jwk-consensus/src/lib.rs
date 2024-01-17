@@ -9,7 +9,7 @@ use aptos_event_notifications::{
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_types::account_address::AccountAddress;
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use types::JWKConsensusMsg;
@@ -22,7 +22,7 @@ pub fn start_jwk_consensus_runtime(
     network_service_events: NetworkServiceEvents<JWKConsensusMsg>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     jwk_updated_events: EventNotificationListener,
-    vtxn_pool_writer: vtxn_pool::SingleTopicWriteClient,
+    vtxn_pool_writer: VTxnPoolState,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("jwk".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);

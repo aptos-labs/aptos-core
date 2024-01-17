@@ -72,6 +72,9 @@ fn test_create_single_node_test_config() {
             output_batch_size: 100
         api:
             address: 0.0.0.0:8081
+        execution:
+            genesis_waypoint:
+                from_config: "0:6072b68a942aace147e0655c5704beaa255c84a7829baa4e72a500f1516584c4"
         "#,
     )
     .unwrap();

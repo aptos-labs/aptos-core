@@ -18,7 +18,13 @@ pub(crate) fn maybe_apply_genesis(
     db_rw: &DbReaderWriter,
     node_config: &NodeConfig,
 ) -> Result<Option<LedgerInfoWithSignatures>> {
-    let genesis_waypoint = node_config.base.waypoint.genesis_waypoint();
+    // We read from the storage genesis waypoint and fallback to the node config one if it is none
+    let genesis_waypoint = node_config
+        .execution
+        .genesis_waypoint
+        .as_ref()
+        .unwrap_or(&node_config.base.waypoint)
+        .genesis_waypoint();
     if let Some(genesis) = get_genesis_txn(node_config) {
         let ledger_info_opt = maybe_bootstrap::<AptosVM>(db_rw, genesis, genesis_waypoint)
             .map_err(|err| anyhow!("DB failed to bootstrap {}", err))?;

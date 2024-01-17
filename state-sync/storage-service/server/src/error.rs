@@ -39,3 +39,9 @@ impl From<anyhow::Error> for Error {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }
+
+impl From<aptos_storage_interface::AptosDbError> for Error {
+    fn from(error: aptos_storage_interface::AptosDbError) -> Self {
+        Error::StorageErrorEncountered(error.to_string())
+    }
+}
