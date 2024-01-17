@@ -1,11 +1,11 @@
 
 Diagnostics:
-warning: Function `0x42::m_nonfriend::friend_accessible` is unused: it has no current callers and is `public(friend)` but its module has no friends.
-   ┌─ tests/checking/unused/private_call_3.move:28:5
+warning: Function `0x42::m::inaccessible` is unused: it has no current callers and is private to its module.
+   ┌─ tests/checking/unused/private_call_3.move:8:5
    │
-28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-29 │ │         bar()
-30 │ │     }
+ 8 │ ╭     inline fun inaccessible(): u64 {
+ 9 │ │         bar()
+10 │ │     }
    │ ╰─────^
 
 warning: Function `0x42::m_nonfriend::inaccessible` is unused: it has no current callers and is private to its module.
@@ -16,22 +16,12 @@ warning: Function `0x42::m_nonfriend::inaccessible` is unused: it has no current
 26 │ │     }
    │ ╰─────^
 
-warning: Function `0x42::m::inaccessible` is unused: it has no current callers and is private to its module.
-   ┌─ tests/checking/unused/private_call_3.move:8:5
+warning: Function `0x42::m_nonfriend::friend_accessible` is unused: it has no current callers and is `public(friend)` but its module has no friends.
+   ┌─ tests/checking/unused/private_call_3.move:28:5
    │
- 8 │ ╭     inline fun inaccessible(): u64 {
- 9 │ │         bar()
-10 │ │     }
-   │ ╰─────^
-
-warning: Function `0x42::o_nonfriend::inaccessible` may be unused: it has callers, but none with access.
-   ┌─ tests/checking/unused/private_call_3.move:72:5
-   │
-72 │ ╭     inline fun inaccessible(): u64 {
-73 │ │         m::foo();
-74 │ │         m_nonfriend::foo();
-75 │ │     bar()
-76 │ │     }
+28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
+29 │ │         bar()
+30 │ │     }
    │ ╰─────^
 
 warning: Function `0x42::o::inaccessible` may be unused: it has callers, but none with access.
@@ -56,6 +46,16 @@ error: inline function `0x42::o::inaccessible` cannot be called from function `0
    · │
 93 │       assert!(o::inaccessible() == 42, 1);
    │               ----------------- called here
+
+warning: Function `0x42::o_nonfriend::inaccessible` may be unused: it has callers, but none with access.
+   ┌─ tests/checking/unused/private_call_3.move:72:5
+   │
+72 │ ╭     inline fun inaccessible(): u64 {
+73 │ │         m::foo();
+74 │ │         m_nonfriend::foo();
+75 │ │     bar()
+76 │ │     }
+   │ ╰─────^
 
 error: inline function `0x42::o_nonfriend::inaccessible` cannot be called from function `0x42::n::test2` because it is private to module `0x42::o_nonfriend`
    ┌─ tests/checking/unused/private_call_3.move:72:5
