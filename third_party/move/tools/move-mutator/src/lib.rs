@@ -3,7 +3,7 @@ extern crate pretty_env_logger;
 extern crate log;
 
 pub mod cli;
-mod compiler;
+pub mod compiler;
 
 mod mutate;
 
@@ -11,7 +11,7 @@ mod configuration;
 mod mutant;
 mod operator;
 mod output;
-mod report;
+pub mod report;
 
 use crate::compiler::{generate_ast, verify_mutant};
 use std::fs;
