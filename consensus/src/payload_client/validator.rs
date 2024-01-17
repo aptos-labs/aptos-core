@@ -2,7 +2,7 @@
 
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool as vtxn_pool;
-use aptos_validator_transaction_pool::VTxnPoolWrapper;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use std::{
     ops::Add,
     time::{Duration, Instant},
@@ -65,7 +65,7 @@ impl ValidatorTxnPayloadClient for DummyValidatorTxnClient {
 }
 
 #[async_trait::async_trait]
-impl ValidatorTxnPayloadClient for VTxnPoolWrapper {
+impl ValidatorTxnPayloadClient for VTxnPoolState {
     async fn pull(
         &self,
         max_time: Duration,
@@ -74,6 +74,6 @@ impl ValidatorTxnPayloadClient for VTxnPoolWrapper {
         filter: vtxn_pool::TransactionFilter,
     ) -> Vec<ValidatorTransaction> {
         let deadline = Instant::now().add(max_time);
-        self.lock().pull(deadline, max_items, max_bytes, filter)
+        self.pull(deadline, max_items, max_bytes, filter)
     }
 }

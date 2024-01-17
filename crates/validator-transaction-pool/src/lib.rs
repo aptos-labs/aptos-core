@@ -28,15 +28,60 @@ impl Default for TransactionFilter {
     }
 }
 
-pub type VTxnPoolWrapper = Arc<Mutex<PoolState>>;
-
-/// Create a new validator transaction pool.
-pub fn new() -> VTxnPoolWrapper {
-    Arc::new(Mutex::new(PoolState::default()))
+#[derive(Clone)]
+pub struct VTxnPoolState {
+    inner: Arc<Mutex<PoolStateInner>>,
 }
 
+impl Default for VTxnPoolState {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(PoolStateInner::default())),
+        }
+    }
+}
+impl VTxnPoolState {
+    pub fn put(
+        &self,
+        topic: Topic,
+        txn: Arc<ValidatorTransaction>,
+        pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
+    ) -> TxnGuard {
+        let mut pool = self.inner.lock();
+        let seq_num = pool.next_seq_num;
+        pool.next_seq_num += 1;
+
+        pool.txn_queue.insert(seq_num, PoolItem {
+            topic: topic.clone(),
+            txn,
+            pull_notification_tx,
+        });
+
+        if let Some(old_seq_num) = pool.seq_nums_by_topic.insert(topic.clone(), seq_num) {
+            pool.txn_queue.remove(&old_seq_num);
+        }
+
+        TxnGuard {
+            pool: self.inner.clone(),
+            seq_num,
+        }
+    }
+
+    pub fn pull(
+        &self,
+        deadline: Instant,
+        max_items: u64,
+        max_bytes: u64,
+        filter: TransactionFilter,
+    ) -> Vec<ValidatorTransaction> {
+        self.inner
+            .lock()
+            .pull(deadline, max_items, max_bytes, filter)
+    }
+}
+/// Create a new validator transaction pool.
+
 struct PoolItem {
-    seq_num: u64,
     topic: Topic,
     txn: Arc<ValidatorTransaction>,
     pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
@@ -45,7 +90,7 @@ struct PoolItem {
 /// PoolState invariants.
 /// `(seq_num=i, topic=T)` exists in `txn_queue` if and only if it exists in `seq_nums_by_topic`.
 #[derive(Default)]
-pub struct PoolState {
+pub struct PoolStateInner {
     /// Incremented every time a txn is pushed in. The txn gets the old value as its sequence number.
     next_seq_num: u64,
 
@@ -62,39 +107,13 @@ pub struct PoolState {
 ///
 /// This allows the pool to be emptied on epoch boundaries.
 pub struct TxnGuard {
-    pool: Arc<Mutex<PoolState>>,
+    pool: Arc<Mutex<PoolStateInner>>,
     seq_num: u64,
 }
 
-impl PoolState {
+impl PoolStateInner {
     /// Append a txn to the pool.
     /// Return a txn guard that allows you to later delete the txn from the pool.
-    pub fn put(
-        pool: Arc<Mutex<Self>>,
-        topic: Topic,
-        txn: Arc<ValidatorTransaction>,
-        pull_notification_tx: Option<aptos_channel::Sender<(), Arc<ValidatorTransaction>>>,
-    ) -> TxnGuard {
-        let mut pool_guard = pool.lock();
-        let seq_num = pool_guard.next_seq_num;
-        pool_guard.next_seq_num += 1;
-
-        pool_guard.txn_queue.insert(seq_num, PoolItem {
-            seq_num,
-            topic: topic.clone(),
-            txn,
-            pull_notification_tx,
-        });
-
-        if let Some(old_seq_num) = pool_guard.seq_nums_by_topic.insert(topic.clone(), seq_num) {
-            pool_guard.txn_queue.remove(&old_seq_num);
-        }
-
-        TxnGuard {
-            pool: pool.clone(),
-            seq_num,
-        }
-    }
 
     fn try_delete(&mut self, seq_num: u64) {
         if let Some(item) = self.txn_queue.remove(&seq_num) {

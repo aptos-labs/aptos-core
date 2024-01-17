@@ -17,7 +17,7 @@ use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
-use aptos_validator_transaction_pool::VTxnPoolWrapper;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -30,7 +30,7 @@ pub fn start_dkg_runtime(
     network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     dkg_start_events: EventNotificationListener,
-    vtxn_pool: VTxnPoolWrapper,
+    vtxn_pool: VTxnPoolState,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("dkg".into(), Some(4));
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);

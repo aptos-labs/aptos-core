@@ -26,7 +26,7 @@ use aptos_types::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
     },
 };
-use aptos_validator_transaction_pool::VTxnPoolWrapper;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
@@ -49,7 +49,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dkg_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
-    vtxn_pool: VTxnPoolWrapper,
+    vtxn_pool: VTxnPoolState,
 
     // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -64,7 +64,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
-        vtxn_pool: VTxnPoolWrapper,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
             my_addr,

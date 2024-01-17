@@ -1,4 +1,4 @@
-use crate::{new, PoolState, TransactionFilter};
+use crate::{TransactionFilter, VTxnPoolState};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::hash::CryptoHash;
 use aptos_types::validator_txn::{
@@ -16,14 +16,14 @@ use tokio::time::timeout;
 
 #[test]
 fn txn_pull_order_should_be_fifo_except_in_topic_overwriting() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
     let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
     let txn_2 = ValidatorTransaction::dummy2(b"txn2".to_vec());
-    let _guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
-    let _guard_2 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_2.clone()), None); // txn_0 is replaced.
-    let pulled = pool.lock().pull(
+    let _guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), None);
+    let _guard_2 = pool.put(DUMMY2, Arc::new(txn_2.clone()), None); // txn_0 is replaced.
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         2048,
@@ -34,13 +34,13 @@ fn txn_pull_order_should_be_fifo_except_in_topic_overwriting() {
 
 #[test]
 fn delete_by_seq_num() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
     let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
-    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
-    pool.lock().try_delete(guard_0.seq_num);
-    let pulled = pool.lock().pull(
+    let guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), None);
+    drop(guard_0);
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         2048,
@@ -51,14 +51,14 @@ fn delete_by_seq_num() {
 
 #[test]
 fn txn_should_be_dropped_if_guard_is_dropped() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
     let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
-    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
+    let guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), None);
     drop(guard_0);
     drop(guard_1);
-    let pulled = pool.lock().pull(
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         2048,
@@ -69,15 +69,15 @@ fn txn_should_be_dropped_if_guard_is_dropped() {
 
 #[tokio::test]
 async fn per_txn_pull_notification() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
     let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
     let (tx, mut rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
-    let _guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), Some(tx));
+    let _guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), Some(tx));
     let notification_received = timeout(Duration::from_millis(100), rx.select_next_some()).await;
     assert!(notification_received.is_err());
-    let pulled = pool.lock().pull(
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         2048,
@@ -90,12 +90,12 @@ async fn per_txn_pull_notification() {
 
 #[test]
 fn pull_item_limit_should_be_respected() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(b"txn0".to_vec());
     let txn_1 = ValidatorTransaction::dummy1(b"txn1".to_vec());
-    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
-    let pulled = pool.lock().pull(
+    let guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), None);
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         1,
         2048,
@@ -103,7 +103,7 @@ fn pull_item_limit_should_be_respected() {
     );
     assert_eq!(vec![txn_0], pulled);
     drop(guard_0);
-    let pulled = pool.lock().pull(
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         1,
         2048,
@@ -114,12 +114,12 @@ fn pull_item_limit_should_be_respected() {
 
 #[test]
 fn pull_size_limit_should_be_respected() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(vec![0xFF; 100]);
     let txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 100]);
-    let guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
-    let pulled = pool.lock().pull(
+    let guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), None);
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         150,
@@ -127,7 +127,7 @@ fn pull_size_limit_should_be_respected() {
     );
     assert_eq!(vec![txn_0], pulled);
     drop(guard_0);
-    let pulled = pool.lock().pull(
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         150,
@@ -138,12 +138,12 @@ fn pull_size_limit_should_be_respected() {
 
 #[test]
 fn pull_filter_should_be_respected() {
-    let pool = new();
+    let pool = VTxnPoolState::default();
     let txn_0 = ValidatorTransaction::dummy2(vec![0xFF; 100]);
     let txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 100]);
-    let _guard_0 = PoolState::put(pool.clone(), DUMMY2, Arc::new(txn_0.clone()), None);
-    let _guard_1 = PoolState::put(pool.clone(), DUMMY1, Arc::new(txn_1.clone()), None);
-    let pulled = pool.lock().pull(
+    let _guard_0 = pool.put(DUMMY2, Arc::new(txn_0.clone()), None);
+    let _guard_1 = pool.put(DUMMY1, Arc::new(txn_1.clone()), None);
+    let pulled = pool.pull(
         Instant::now().add(Duration::from_secs(10)),
         99,
         2048,

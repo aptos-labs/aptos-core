@@ -5,7 +5,7 @@ use aptos_types::{
     dkg::{DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait},
     epoch_state::EpochState,
 };
-use aptos_validator_transaction_pool::VTxnPoolWrapper;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use futures_channel::oneshot;
 use futures_util::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
@@ -18,7 +18,7 @@ pub struct DKGManager<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> {
     private_params_provider: P,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
-    vtxn_pool: VTxnPoolWrapper,
+    vtxn_pool: VTxnPoolState,
     agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
     agg_trx_tx: Option<aptos_channel::Sender<(), DKGNode>>,
     //TODO: inner state
@@ -31,7 +31,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
-        vtxn_pool: VTxnPoolWrapper,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
             private_params_provider,
