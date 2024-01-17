@@ -49,6 +49,7 @@ struct TestConfig {
     /// If None, dump annotated targets for all stages.
     /// If Some(list), dump annotated targets for pipeline stages whose index is in the list.
     /// If `dump_annotated_targets` is false, this field is ignored.
+    /// Note: the pipeline stages are numbered starting from 0.
     dump_for_only_some_stages: Option<Vec<usize>>,
 }
 
@@ -353,6 +354,7 @@ impl TestConfig {
                     |i, processor, targets_after| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
+                        // Note that `i` starts at 1.
                         if self.dump_annotated_targets
                             && (self.dump_for_only_some_stages.is_none() // dump all stages
                                 || self
