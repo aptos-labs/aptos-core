@@ -112,7 +112,10 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);
     let client = MixedPayloadClient {
-        validator_txn_config: ValidatorTxnConfig::default_enabled(),
+        validator_txn_config: ValidatorTxnConfig::V1 {
+            per_block_limit_txn_count: 99,
+            per_block_limit_total_bytes: 1048576,
+        },
         validator_txn_pool_client: Arc::new(DummyValidatorTxnClient::new(
             all_validator_txns.clone(),
         )),
