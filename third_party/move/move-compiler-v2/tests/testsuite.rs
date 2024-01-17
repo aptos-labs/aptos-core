@@ -13,7 +13,7 @@ use move_compiler_v2::{
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        uninitialized_use_checker::UninitializedUseChecker, visibility_checker::VisibilityChecker,
+        visibility_checker::VisibilityChecker,
     },
     run_file_format_gen, Options,
 };
@@ -263,16 +263,6 @@ impl TestConfig {
                 // Only dump with annotations after these pipeline stages.
                 dump_for_only_some_stages: Some(vec![0, 1, 3]),
             }
-        } else if path.contains("/uninit-use-checker/") {
-            pipeline.add_processor(Box::new(UninitializedUseChecker {}));
-            Self {
-                type_check_only: false,
-                dump_ast: false,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: true,
-                dump_for_only_some_stages: None,
-            }
         } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
@@ -406,7 +396,6 @@ impl TestConfig {
         LiveVarAnalysisProcessor::register_formatters(target);
         ReferenceSafetyProcessor::register_formatters(target);
         AvailCopiesAnalysisProcessor::register_formatters(target);
-        UninitializedUseChecker::register_formatters(target);
     }
 
     fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {

@@ -24,7 +24,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{Bytecode, Operation},
+    stackless_bytecode::{AbortAction, Bytecode, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -205,11 +205,23 @@ impl TransferFunctions for AvailCopiesAnalysis {
 
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
         use Bytecode::*;
-        instr.dests().iter().for_each(|dst| {
-            state.kill_copies_with(*dst, &self.borrowed_locals);
-        });
-        if let Assign(_, dst, src, _) = instr {
-            state.make_copy_available(*dst, *src, &self.borrowed_locals);
+        match instr {
+            Assign(_, dst, src, _) => {
+                state.kill_copies_with(*dst, &self.borrowed_locals);
+                state.make_copy_available(*dst, *src, &self.borrowed_locals);
+            },
+            Load(_, dst, _) => {
+                state.kill_copies_with(*dst, &self.borrowed_locals);
+            },
+            Call(_, dsts, _, _, on_abort) => {
+                for dst in dsts {
+                    state.kill_copies_with(*dst, &self.borrowed_locals);
+                }
+                if let Some(AbortAction(_, dst)) = on_abort {
+                    state.kill_copies_with(*dst, &self.borrowed_locals);
+                }
+            },
+            _ => (),
         }
     }
 }

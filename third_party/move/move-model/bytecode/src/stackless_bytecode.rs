@@ -484,6 +484,7 @@ impl Bytecode {
         self.is_conditional_branch() || self.is_unconditional_branch()
     }
 
+    /// Return the destinations of the instruction
     /// Return the sources of the instruction.
     /// If the instruction is a spec-only instruction, return no sources.
     pub fn sources(&self) -> Vec<TempIndex> {
@@ -523,13 +524,7 @@ impl Bytecode {
             Bytecode::Load(_, dst, _) => {
                 vec![*dst]
             },
-            Bytecode::Call(_, dsts, _, _, on_abort) => {
-                let mut result = dsts.clone();
-                if let Some(AbortAction(_, dst)) = on_abort {
-                    result.push(*dst);
-                }
-                result
-            },
+            Bytecode::Call(_, dsts, _, _, _) => dsts.clone(),
             Bytecode::Ret(_, _)
             | Bytecode::Branch(_, _, _, _)
             | Bytecode::Jump(_, _)

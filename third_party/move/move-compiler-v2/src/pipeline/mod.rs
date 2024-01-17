@@ -9,5 +9,4 @@ pub mod dead_store_elimination;
 pub mod explicit_drop;
 pub mod livevar_analysis_processor;
 pub mod reference_safety_processor;
-pub mod uninitialized_use_checker;
 pub mod visibility_checker;
