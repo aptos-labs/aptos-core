@@ -1,3 +1,4 @@
+use crate::cli;
 use crate::configuration::Configuration;
 use move_package::source_package::layout::SourcePackageLayout;
 use std::ffi::OsString;
@@ -45,7 +46,7 @@ pub(crate) fn setup_mutant_path(
 
     // Try to find package root for the file. If the file is not inside any package, assume that it is a single file
     let root = SourcePackageLayout::try_find_root(&file_path_canonicalized);
-    let root_path = if let Err(e) = root {
+    let root_path = if let Err(_) = root {
         debug!(
             "No package root for {:?}. Assuming mutating a single file.",
             file_path_canonicalized
@@ -67,12 +68,11 @@ pub(crate) fn setup_mutant_path(
     // Create the directory structure for that specified file in the output directory. Ignore errors if the directory already exists.
     if let Err(e) = fs::create_dir_all(&output_struct) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
-            let error_msg = format!(
-                "Cannot create directory structure for {:?}. Error: {:?}",
-                output_struct, e
-            );
-            error!("{error_msg}");
-            return Err(anyhow::anyhow!(error_msg));
+            return Err(anyhow::anyhow!(
+                "Cannot create directory structure for {:?} in {:?}",
+                file_path,
+                output_dir
+            ));
         }
     }
 
@@ -97,7 +97,12 @@ pub(crate) fn setup_mutant_path(
 ///
 /// * `anyhow::Result<PathBuf>` - Returns the path to the output directory if successful, or an error if any error occurs.
 pub(crate) fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow::Result<PathBuf> {
-    let output_dir = mutator_configuration.project.out_mutant_dir.clone();
+    // It's safe to unwrap here as we have default value for output directory.
+    let output_dir = mutator_configuration
+        .project
+        .out_mutant_dir
+        .clone()
+        .unwrap_or(PathBuf::from(cli::DEFAULT_OUTPUT_DIR));
     trace!("Trying to set up output directory to: {:?}", output_dir);
 
     // Check if output directory exists and if it should be overwritten
@@ -107,8 +112,8 @@ pub(crate) fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow:
         ));
     }
 
-    let _ = std::fs::remove_dir_all(&output_dir);
-    std::fs::create_dir(&output_dir)?;
+    let _ = fs::remove_dir_all(&output_dir);
+    fs::create_dir(&output_dir)?;
 
     debug!("Output directory set to: {:?}", output_dir);
 
@@ -189,7 +194,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let output_dir = temp_dir.path().join("output");
         let options = cli::Options {
-            out_mutant_dir: output_dir.clone(),
+            out_mutant_dir: Some(output_dir.clone()),
             no_overwrite: Some(false),
             ..Default::default()
         };
@@ -204,7 +209,7 @@ mod tests {
         let output_dir = temp_dir.path().join("output");
         fs::create_dir(&output_dir).unwrap();
         let options = cli::Options {
-            out_mutant_dir: output_dir.clone(),
+            out_mutant_dir: Some(output_dir.clone()),
             no_overwrite: Some(false),
             ..Default::default()
         };
@@ -219,7 +224,7 @@ mod tests {
         let output_dir = temp_dir.path().join("output");
         fs::create_dir(&output_dir).unwrap();
         let options = cli::Options {
-            out_mutant_dir: output_dir.clone(),
+            out_mutant_dir: Some(output_dir.clone()),
             no_overwrite: Some(true),
             ..Default::default()
         };

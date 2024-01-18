@@ -7,7 +7,7 @@ pub mod compiler;
 
 mod mutate;
 
-mod configuration;
+pub mod configuration;
 mod mutant;
 mod operator;
 mod output;

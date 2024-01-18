@@ -18,8 +18,8 @@ pub struct Options {
     #[clap(long, short, value_parser)]
     pub exclude_files: Option<Vec<PathBuf>>,
     /// The path where to put the output files.
-    #[clap(long, short, value_parser, default_value = DEFAULT_OUTPUT_DIR)]
-    pub out_mutant_dir: PathBuf,
+    #[clap(long, short, value_parser)]
+    pub out_mutant_dir: Option<PathBuf>,
     /// Indicates if mutants should be verified and made sure mutants can compile.
     #[clap(long, default_value = "false")]
     pub verify_mutants: bool,
@@ -43,7 +43,7 @@ impl Default for Options {
             move_sources: vec![],
             include_only_files: None,
             exclude_files: None,
-            out_mutant_dir: PathBuf::from(DEFAULT_OUTPUT_DIR),
+            out_mutant_dir: Some(PathBuf::from(DEFAULT_OUTPUT_DIR)),
             verify_mutants: true,
             no_overwrite: None,
             downsample_filter: None,
