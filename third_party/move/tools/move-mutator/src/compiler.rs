@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use crate::cli;
 use crate::configuration::Configuration;
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::{
@@ -67,6 +68,8 @@ pub fn generate_ast(
     let interface_files_dir = mutator_config
         .project
         .out_mutant_dir
+        .clone()
+        .unwrap_or(PathBuf::from(cli::DEFAULT_OUTPUT_DIR))
         .join("generated_interface_files/mutator_build");
     let flags = Flags::empty();
 

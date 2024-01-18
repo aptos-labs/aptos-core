@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::io::Write;
+use std::io::{Error, ErrorKind, Result, Write};
 use std::path::{Path, PathBuf};
 
 /// The `Report` struct represents a report of mutations.
@@ -26,26 +26,25 @@ impl Report {
     }
 
     /// Saves the `Report` as a JSON file.
-    pub fn save_to_json_file(&self, path: &Path) -> std::io::Result<()> {
+    pub fn save_to_json_file(&self, path: &Path) -> Result<()> {
         let file = std::fs::File::create(path)?;
 
         info!("Saving report to {}", path.display());
 
-        serde_json::to_writer_pretty(file, &self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        serde_json::to_writer_pretty(file, &self).map_err(|e| Error::new(ErrorKind::Other, e))
     }
 
     /// Loads the `Report` from a JSON file.
-    pub fn load_from_json_file(path: &Path) -> std::io::Result<Self> {
+    pub fn load_from_json_file(path: &Path) -> Result<Self> {
         info!("Reading report from {}", path.display());
 
         let file = std::fs::File::open(path)?;
 
-        serde_json::from_reader(file).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        serde_json::from_reader(file).map_err(|e| Error::new(ErrorKind::Other, e))
     }
 
     /// Saves the `Report` as a text file.
-    pub fn save_to_text_file(&self, path: &Path) -> std::io::Result<()> {
+    pub fn save_to_text_file(&self, path: &Path) -> Result<()> {
         let mut file = std::fs::File::create(path)?;
 
         info!("Saving report to {}", path.display());
@@ -175,13 +174,13 @@ impl MutationReport {
         self.mutations.push(modification);
     }
 
-    /// Return the mutant path
-    pub fn get_mutant_path(&self) -> &PathBuf {
+    /// Return the mutant path.
+    pub fn mutant_path(&self) -> &PathBuf {
         &self.mutant_path
     }
 
-    /// Return the original file path
-    pub fn get_original_file_path(&self) -> &PathBuf {
+    /// Return the original file path.
+    pub fn original_file_path(&self) -> &PathBuf {
         &self.original_file
     }
 }

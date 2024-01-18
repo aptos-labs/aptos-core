@@ -3,7 +3,7 @@ module TestAccount::Sum {
         let sum_r = x + y;
 
         spec {
-                // Senseless specification
+                // Senseless specification - mutator will change + operator to -*/ but spec won't notice it.
                 assert sum_r >= 0;
         };
 
