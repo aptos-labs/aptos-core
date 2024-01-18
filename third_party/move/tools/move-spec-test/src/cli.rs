@@ -27,8 +27,6 @@ pub struct Options {
 }
 
 /// This function creates a mutator CLI options from the given spec-test options.
-/// It clones the move_sources, include_only_files, exclude_files, and configuration_file from the given options.
-/// The rest of the options are set to default.
 pub fn create_mutator_options(options: &Options) -> move_mutator::cli::Options {
     move_mutator::cli::Options {
         move_sources: options.move_sources.clone(),
@@ -40,11 +38,6 @@ pub fn create_mutator_options(options: &Options) -> move_mutator::cli::Options {
 }
 
 /// This function generates a prover CLI options from the given spec-test options.
-/// It first checks if a prover configuration file is provided in the options.
-/// If it is, it creates the prover options from the configuration file.
-/// If it is not, it checks if extra prover arguments are provided in the options.
-/// If they are, it creates the prover options from the arguments.
-/// Otherwise, it creates the default prover options.
 pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover::cli::Options> {
     let prover_conf = if let Some(conf) = &options.prover_conf {
         move_prover::cli::Options::create_from_toml_file(conf.to_str().unwrap_or(""))?
@@ -55,4 +48,18 @@ pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover:
     };
 
     Ok(prover_conf)
+}
+
+/// This function checks if the mutator output path is provided in the configuration file.
+/// We don't need to check if the mutator output path is provided in the options as they were created
+/// from the spec-test options which does not allow to set it..
+pub fn check_mutator_output_path(options: &move_mutator::cli::Options) -> Option<PathBuf> {
+    if let Some(conf) = &options.configuration_file {
+        let c = move_mutator::configuration::Configuration::from_file(conf);
+        if let Ok(c) = c {
+            return c.project.out_mutant_dir;
+        }
+    };
+
+    None
 }
