@@ -457,7 +457,8 @@ impl SignatureCheckedTransaction {
                 let address = account_address::from_public_key(&keypair.public_key);
                 (
                     Just(keypair),
-                    DeprecatedRawTransaction::strategy_impl(Just(address), Just(payload)).into<RawTransaction>(),
+                    DeprecatedRawTransaction::strategy_impl(Just(address), Just(payload))
+                        .into::<RawTransaction>(),
                 )
             })
             .prop_flat_map(|(keypair, raw_txn)| {

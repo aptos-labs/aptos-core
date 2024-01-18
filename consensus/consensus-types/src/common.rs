@@ -6,9 +6,10 @@ use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
-    account_address::AccountAddress, transaction::deprecated::SignedTransaction,
-    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
+    account_address::AccountAddress, validator_verifier::ValidatorVerifier,
+    vm_status::DiscardedVMStatus,
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};

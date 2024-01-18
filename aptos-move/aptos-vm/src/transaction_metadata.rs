@@ -28,6 +28,8 @@ pub struct TransactionMetadata {
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
     pub script_size: NumBytes,
+    pub authentication_data: Option<Vec<u8>>,
+    pub nonce: Option<u64>,
 }
 
 impl TransactionMetadata {

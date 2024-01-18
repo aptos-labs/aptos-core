@@ -122,13 +122,13 @@ pub mod verifier;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
     state_store::StateView,
     transaction::{
-        deprecated::SignedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, VMValidatorResult,
     },

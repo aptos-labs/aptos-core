@@ -11,13 +11,14 @@ use anyhow::{bail, ensure, format_err};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_infallible::duration_since_epoch;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    transaction::{deprecated::SignedTransaction, Transaction, Version},
+    transaction::{Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,

@@ -29,6 +29,7 @@ use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     account_config,
     account_config::{new_block_event_key, AccountResource},
@@ -46,7 +47,6 @@ use aptos_types::{
     state_store::StateView,
     transaction::{
         authenticator::AnySignature,
-        deprecated::SignedTransaction,
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, Transaction,

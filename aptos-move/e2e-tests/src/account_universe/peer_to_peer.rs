@@ -6,8 +6,9 @@ use crate::{
     account_universe::{AUTransactionGen, AccountPair, AccountPairGen, AccountUniverse},
     common_transactions::peer_to_peer_txn,
 };
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
-    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
     vm_status::StatusCode,
 };
 use move_core_types::{

@@ -14,8 +14,9 @@ use aptos_crypto::{
 use aptos_gas_algebra::{FeePerGasUnit, Gas, GasExpression};
 use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_proptest_helpers::Index;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
-    transaction::{deprecated::SignedTransaction, Script, TransactionStatus},
+    transaction::{Script, TransactionStatus},
     vm_status::StatusCode,
 };
 use proptest::prelude::*;

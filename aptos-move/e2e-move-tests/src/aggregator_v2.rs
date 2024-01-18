@@ -6,10 +6,8 @@ use aptos_language_e2e_tests::{
     account::Account,
     executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
 };
-use aptos_types::{
-    account_address::AccountAddress, on_chain_config::FeatureFlag,
-    transaction::deprecated::SignedTransaction,
-};
+use aptos_types::transaction::SignedTransaction;
+use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
@@ -76,10 +74,13 @@ fn initialize_harness(
             vec![],
         );
     } else {
-        harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
-            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
-        ]);
+        harness.enable_features(
+            vec![FeatureFlag::AGGREGATOR_V2_API],
+            vec![
+                FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+                FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+            ],
+        );
     }
     let account = harness.new_account_at(AccountAddress::ONE);
     assert_success!(harness.publish_package_cache_building(&account, &path));
@@ -215,13 +216,11 @@ impl AggV2TestHarness {
     ) -> SignedTransaction {
         self.harness.create_entry_function(
             account.unwrap_or(&self.account),
-            str::parse(
-                if aggregator {
-                    "0x1::aggregator_v2_test::init_aggregator"
-                } else {
-                    "0x1::aggregator_v2_test::init_snapshot"
-                },
-            )
+            str::parse(if aggregator {
+                "0x1::aggregator_v2_test::init_aggregator"
+            } else {
+                "0x1::aggregator_v2_test::init_snapshot"
+            })
             .unwrap(),
             vec![element_type.get_type_tag()],
             vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
@@ -295,9 +294,11 @@ impl AggV2TestHarness {
         max_value: u128,
         a: u128,
     ) -> SignedTransaction {
-        self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::new_add", agg_loc, &[
-            max_value, a,
-        ])
+        self.create_entry_agg_func_with_args(
+            "0x1::aggregator_v2_test::new_add",
+            agg_loc,
+            &[max_value, a],
+        )
     }
 
     pub fn sub_add(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {

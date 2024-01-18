@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::TransactionSignature::V0;
 use crate::{
     Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes,
     MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
@@ -14,6 +15,7 @@ use aptos_crypto::{
     secp256k1_ecdsa, secp256r1_ecdsa,
     secp256r1_ecdsa::PUBLIC_KEY_LENGTH,
 };
+use aptos_types::transaction::authenticator::TransactionAuthenticator;
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
@@ -903,6 +905,7 @@ pub enum TransactionSignature {
     MultiAgentSignature(MultiAgentSignature),
     FeePayerSignature(FeePayerSignature),
     SingleSender(AccountSignature),
+    V0(V0Signature),
 }
 
 impl VerifyInput for TransactionSignature {
@@ -913,6 +916,7 @@ impl VerifyInput for TransactionSignature {
             TransactionSignature::MultiAgentSignature(inner) => inner.verify(),
             TransactionSignature::FeePayerSignature(inner) => inner.verify(),
             TransactionSignature::SingleSender(inner) => inner.verify(),
+            V0(inner) => inner.verify(),
         }
     }
 }
@@ -929,7 +933,57 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
             TransactionSignature::SingleSender(sig) => {
                 TransactionAuthenticator::single_sender(sig.try_into()?)
             },
+            V0(_) => bail!("V0Signature cannot be converted to DeprecatedTransactionAuthenticator"),
         })
+    }
+}
+
+impl TryFrom<TransactionSignature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(ts: TransactionSignature) -> anyhow::Result<Self> {
+        Ok(match ts {
+            V0(sig) => sig.try_into()?,
+            ts => bail!("{:?} cannot be converted to TransactionAuthenticator", ts),
+        })
+    }
+}
+
+/// The new common signature scheme for transaction v2.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct V0Signature {
+    pub senders: Vec<AccountSignature>,
+    pub fee_payer: Option<(AccountAddress, AccountSignature)>,
+}
+
+impl VerifyInput for V0Signature {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.senders
+            .iter()
+            .map(|s| s.verify())
+            .collect::<anyhow::Result<Vec<()>>>()?;
+        if let Some((_, fee_payer_sig)) = &self.fee_payer {
+            fee_payer_sig.verify()?
+        }
+        Ok(())
+    }
+}
+
+impl TryFrom<V0Signature> for TransactionAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: V0Signature) -> Result<Self, Self::Error> {
+        let V0Signature { senders, fee_payer } = value;
+
+        Ok(TransactionAuthenticator::new(
+            senders
+                .into_iter()
+                .map(|s| s.try_into())
+                .collect::<anyhow::Result<_>>()?,
+            fee_payer
+                .map(|(addr, sig)| Ok((addr, sig.try_into()?)))
+                .transpose()?,
+        ))
     }
 }
 

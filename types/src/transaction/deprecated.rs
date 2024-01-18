@@ -26,7 +26,7 @@ use std::{collections::BTreeSet, fmt, fmt::Debug, format, matches, vec, write};
 
 /// RawTransaction is the portion of a transaction that a client signs.
 #[derive(
-Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub struct RawTransaction {
     /// Sender's address.
@@ -268,7 +268,7 @@ impl RawTransaction {
 }
 
 #[derive(
-Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
+    Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub enum RawTransactionWithData {
     MultiAgent {
@@ -335,7 +335,7 @@ pub struct SignedTransaction {
 
 impl From<SignedTransaction> for crate::transaction::SignedTransaction {
     fn from(t: SignedTransaction) -> Self {
-        Self::new(t.raw_txn.into(), t.authenticator)
+        Self::V0(t)
     }
 }
 
@@ -538,7 +538,7 @@ impl SignedTransaction {
     pub fn txn_bytes_len(&self) -> usize {
         let authenticator_size = *self.authenticator_size.get_or_init(|| {
             bcs::serialized_size(&self.authenticator)
-                    .expect("Unable to serialize TransactionAuthenticator")
+                .expect("Unable to serialize TransactionAuthenticator")
         });
         self.raw_txn_bytes_len() + authenticator_size
     }

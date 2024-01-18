@@ -2,10 +2,11 @@
 
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
+use aptos_sdk::types::transaction::SignedTransaction;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::deprecated::SignedTransaction, LocalAccount},
+    types::LocalAccount,
 };
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;
@@ -52,10 +53,10 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
                 .collect::<Vec<_>>();
             requests.push(
                 account.sign_with_transaction_builder(self.txn_factory.payload(
-                    aptos_stdlib::aptos_account_batch_transfer(receivers, vec![
-                        self.send_amount;
-                        self.batch_size
-                    ]),
+                    aptos_stdlib::aptos_account_batch_transfer(
+                        receivers,
+                        vec![self.send_amount; self.batch_size],
+                    ),
                 )),
             );
         }

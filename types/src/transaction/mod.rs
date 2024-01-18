@@ -46,6 +46,7 @@ pub mod webauthn;
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
+use crate::transaction::deprecated;
 use crate::{
     chain_id::ChainId,
     contract_event::TransactionEvent,
@@ -54,22 +55,20 @@ use crate::{
     proof::accumulator::InMemoryEventAccumulator,
     transaction::authenticator::{
         AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
-        TransactionAuthenticator,
+        TransactionAuthenticator, TransactionAuthenticator,
     },
     validator_txn::ValidatorTransaction,
     write_set::TransactionWrite,
 };
-use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{
-    ed25519::{Ed25519PublicKey, Ed25519Signature},
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey, Ed25519Signature},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
-use move_core_types::transaction_argument::convert_txn_args;
 pub use move_core_types::transaction_argument::TransactionArgument;
-use move_core_types::vm_status::AbortLocation;
+use move_core_types::{transaction_argument::convert_txn_args, vm_status::AbortLocation};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -88,7 +87,8 @@ pub type AtomicVersion = AtomicU64;
     Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
 )]
 pub enum RawTransaction {
-    V0 {
+    V0(deprecated::RawTransaction),
+    V1 {
         /// Senders' address.
         senders: Vec<AccountAddress>,
 
@@ -115,9 +115,8 @@ pub enum RawTransaction {
         /// Chain ID of the Aptos network this transaction is intended for.
         chain_id: ChainId,
 
-        nonce: Option<HashValue>,
         authentication_data: Option<Vec<u8>>,
-        fee_payer: Option<AccountAddress>,
+        nonce: Option<u64>,
     },
 }
 
@@ -135,7 +134,7 @@ impl RawTransaction {
         expiration_timestamp_secs: u64,
         chain_id: ChainId,
     ) -> Self {
-        Self::V0 {
+        Self::V1 {
             senders: vec![sender],
             sequence_number,
             payload,
@@ -145,7 +144,6 @@ impl RawTransaction {
             chain_id,
             nonce: None,
             authentication_data: None,
-            fee_payer: None,
         }
     }
 
@@ -260,13 +258,16 @@ impl RawTransaction {
 
     pub fn into_payload(self) -> TransactionPayload {
         match self {
-            Self::V0 { payload, .. } => payload,
+            Self::V1 { payload, .. } => payload,
         }
     }
 
     pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
         match self {
-            Self::V0 {
+            Self::V0(deprecated_raw_txn) => {
+                deprecated_raw_txn.format_for_client(get_transaction_name)
+            },
+            Self::V1 {
                 senders,
                 sequence_number,
                 payload,
@@ -467,13 +468,8 @@ impl RawTransaction {
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         match self {
-            Self::V0 { senders, .. } => *senders.first().expect("senders cannot be empty"),
-        }
-    }
-
-    pub fn senders(&self) -> &[AccountAddress] {
-        match self {
-            Self::V0 { senders, .. } => senders,
+            Self::V0(t) => t.sender(),
+            Self::V1 { senders, .. } => *senders.first().expect("senders cannot be empty"),
         }
     }
 
@@ -493,7 +489,8 @@ impl RawTransaction {
 /// [`SignatureCheckedTransaction`].
 #[derive(Clone, Eq, Serialize, Deserialize)]
 pub enum SignedTransaction {
-    V0 {
+    V0(deprecated::SignedTransaction),
+    V1 {
         /// The raw transaction
         raw_txn: RawTransaction,
 
@@ -512,30 +509,19 @@ pub enum SignedTransaction {
     },
 }
 
-impl From<SignedTransaction> for deprecated::SignedTransaction {
-    fn from(t: SignedTransaction) -> Self {
-        match t {
-            SignedTransaction::V0 {
-                raw_txn,
-                authenticator,
-                ..
-            } => Self::new_signed_transaction(raw_txn.into(), authenticator),
-        }
-    }
-}
-
 /// PartialEq ignores the "bytes" field as this is a OnceCell that may or
 /// may not be initialized during runtime comparison.
 impl PartialEq for SignedTransaction {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (SignedTransaction::V0(s1), SignedTransaction::V0(s2)) => s1 == s2,
             (
-                SignedTransaction::V0 {
+                SignedTransaction::V1 {
                     raw_txn,
                     authenticator,
                     ..
                 },
-                SignedTransaction::V0 {
+                SignedTransaction::V1 {
                     raw_txn: other_raw_txn,
                     authenticator: other_authenticator,
                     ..
@@ -549,13 +535,14 @@ impl PartialEq for SignedTransaction {
 impl Debug for SignedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            SignedTransaction::V0 {
+            SignedTransaction::V0(s) => s.fmt(f),
+            SignedTransaction::V1 {
                 raw_txn,
                 authenticator,
                 ..
             } => write!(
                 f,
-                "SignedTransaction {{ \n \
+                "SignedTransaction V1 {{ \n \
                 {{ raw_txn: {:#?}, \n \
                 authenticator: {:#?}, \n \
                 }} \n \
@@ -568,7 +555,7 @@ impl Debug for SignedTransaction {
 
 impl SignedTransaction {
     pub fn new(raw_txn: RawTransaction, authenticator: TransactionAuthenticator) -> Self {
-        Self::V0 {
+        Self::V1 {
             raw_txn,
             authenticator,
             raw_txn_size: OnceCell::new(),
@@ -576,108 +563,33 @@ impl SignedTransaction {
         }
     }
 
-    pub fn new_ed25519(
-        raw_txn: RawTransaction,
-        public_key: Ed25519PublicKey,
-        signature: Ed25519Signature,
-    ) -> Self {
-        let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
-        Self::new(raw_txn, authenticator)
-    }
-
-    pub fn new_fee_payer(
-        raw_txn: RawTransaction,
-        sender: AccountAuthenticator,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signers: Vec<AccountAuthenticator>,
-        fee_payer_address: AccountAddress,
-        fee_payer_signer: AccountAuthenticator,
-    ) -> Self {
-        Self::new(
-            raw_txn,
-            TransactionAuthenticator::fee_payer(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-                fee_payer_address,
-                fee_payer_signer,
-            ),
-        )
-    }
-
-    pub fn new_multisig(
-        raw_txn: RawTransaction,
-        public_key: MultiEd25519PublicKey,
-        signature: MultiEd25519Signature,
-    ) -> Self {
-        let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
-        Self::new(raw_txn, authenticator)
-    }
-
-    pub fn new_multi_agent(
-        raw_txn: RawTransaction,
-        sender: AccountAuthenticator,
-        secondary_signer_addresses: Vec<AccountAddress>,
-        secondary_signers: Vec<AccountAuthenticator>,
-    ) -> Self {
-        Self::new(
-            raw_txn,
-            TransactionAuthenticator::multi_agent(
-                sender,
-                secondary_signer_addresses,
-                secondary_signers,
-            ),
-        )
-    }
-
-    pub fn new_secp256k1_ecdsa(
-        raw_txn: RawTransaction,
-        public_key: secp256k1_ecdsa::PublicKey,
-        signature: secp256k1_ecdsa::Signature,
-    ) -> Self {
-        let authenticator = TransactionAuthenticator::single_sender(
-            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::secp256k1_ecdsa(public_key),
-                AnySignature::secp256k1_ecdsa(signature),
-            )),
-        );
-        Self::new(raw_txn, authenticator)
-    }
-
-    pub fn new_single_sender(raw_txn: RawTransaction, authenticator: AccountAuthenticator) -> Self {
-        Self::new(
-            raw_txn,
-            TransactionAuthenticator::single_sender(authenticator),
-        )
-    }
-
     pub fn authenticator(&self) -> TransactionAuthenticator {
         match self {
-            SignedTransaction::V0 { authenticator, .. } => authenticator.clone(),
+            SignedTransaction::V0(t) => t.authenticator(),
+            SignedTransaction::V1 { authenticator, .. } => authenticator.clone(),
         }
     }
 
     pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
         match self {
-            SignedTransaction::V0 { authenticator, .. } => authenticator,
+            SignedTransaction::V0(t) => t.authenticator_ref(),
+            SignedTransaction::V1 { authenticator, .. } => authenticator,
         }
     }
 
     pub fn sender(&self) -> AccountAddress {
         match self {
-            SignedTransaction::V0 { raw_txn, .. } => raw_txn.sender(),
-        }
-    }
-
-    pub fn senders(&self) -> &[AccountAddress] {
-        match self.raw_transaction() {
-            RawTransaction::V0 { senders, .. } => senders.as_slice(),
+            SignedTransaction::V0(t) => t.sender(),
+            SignedTransaction::V1 { raw_txn, .. } => raw_txn.sender(),
         }
     }
 
     pub fn into_raw_transaction(self) -> RawTransaction {
         match self {
-            SignedTransaction::V0 { raw_txn, .. } => raw_txn,
+            SignedTransaction::V0 {
+                deprecated_signed_txn,
+                ..
+            } => deprecated_signed_txn,
         }
     }
 
@@ -689,7 +601,7 @@ impl SignedTransaction {
 
     pub fn sequence_number(&self) -> u64 {
         match self.raw_transaction() {
-            RawTransaction::V0 {
+            RawTransaction::V1 {
                 sequence_number, ..
             } => *sequence_number,
         }
@@ -697,31 +609,31 @@ impl SignedTransaction {
 
     pub fn chain_id(&self) -> ChainId {
         match self.raw_transaction() {
-            RawTransaction::V0 { chain_id, .. } => *chain_id,
+            RawTransaction::V1 { chain_id, .. } => *chain_id,
         }
     }
 
     pub fn payload(&self) -> &TransactionPayload {
         match self.raw_transaction() {
-            RawTransaction::V0 { payload, .. } => payload,
+            RawTransaction::V1 { payload, .. } => payload,
         }
     }
 
     pub fn max_gas_amount(&self) -> u64 {
         match self.raw_transaction() {
-            RawTransaction::V0 { max_gas_amount, .. } => *max_gas_amount,
+            RawTransaction::V1 { max_gas_amount, .. } => *max_gas_amount,
         }
     }
 
     pub fn gas_unit_price(&self) -> u64 {
         match self.raw_transaction() {
-            RawTransaction::V0 { gas_unit_price, .. } => *gas_unit_price,
+            RawTransaction::V1 { gas_unit_price, .. } => *gas_unit_price,
         }
     }
 
     pub fn expiration_timestamp_secs(&self) -> u64 {
         match self.raw_transaction() {
-            RawTransaction::V0 {
+            RawTransaction::V1 {
                 expiration_timestamp_secs,
                 ..
             } => *expiration_timestamp_secs,
@@ -1882,6 +1794,13 @@ impl Transaction {
         }
     }
 
+    pub fn try_as_signed_txn(&self) -> Option<&SignedTransaction> {
+        match self {
+            Transaction::UserTransaction(txn) => Some(txn),
+            _ => None,
+        }
+    }
+
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
             Transaction::BlockMetadata(v1) => Some(v1),
@@ -1992,5 +1911,263 @@ impl Deref for SignatureCheckedTransaction {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+/// PartialEq ignores the "bytes" field as this is a OnceCell that may or
+/// may not be initialized during runtime comparison.
+impl PartialEq for SignedTransaction {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw_txn == other.raw_txn && self.authenticator == other.authenticator
+    }
+}
+
+impl Debug for SignedTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "SignedTransaction {{ \n \
+             {{ raw_txn: {:#?}, \n \
+             authenticator: {:#?}, \n \
+             }} \n \
+             }}",
+            self.raw_txn, self.authenticator
+        )
+    }
+}
+
+impl SignedTransaction {
+    pub fn new_signed_transaction(
+        raw_txn: deprecated::RawTransaction,
+        authenticator: TransactionAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new(
+        raw_txn: deprecated::RawTransaction,
+        public_key: Ed25519PublicKey,
+        signature: Ed25519Signature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::ed25519(public_key, signature);
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_fee_payer(
+        raw_txn: deprecated::RawTransaction,
+        sender: AccountAuthenticator,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        secondary_signers: Vec<AccountAuthenticator>,
+        fee_payer_address: AccountAddress,
+        fee_payer_signer: AccountAuthenticator,
+    ) -> Self {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::fee_payer(
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+                fee_payer_address,
+                fee_payer_signer,
+            ),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_multisig(
+        raw_txn: deprecated::RawTransaction,
+        public_key: MultiEd25519PublicKey,
+        signature: MultiEd25519Signature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::multi_ed25519(public_key, signature);
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_multi_agent(
+        raw_txn: deprecated::RawTransaction,
+        sender: AccountAuthenticator,
+        secondary_signer_addresses: Vec<AccountAddress>,
+        secondary_signers: Vec<AccountAuthenticator>,
+    ) -> Self {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::multi_agent(
+                sender,
+                secondary_signer_addresses,
+                secondary_signers,
+            ),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_secp256k1_ecdsa(
+        raw_txn: deprecated::RawTransaction,
+        public_key: secp256k1_ecdsa::PublicKey,
+        signature: secp256k1_ecdsa::Signature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::single_sender(
+            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+                AnyPublicKey::secp256k1_ecdsa(public_key),
+                AnySignature::secp256k1_ecdsa(signature),
+            )),
+        );
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_single_sender(
+        raw_txn: deprecated::RawTransaction,
+        authenticator: AccountAuthenticator,
+    ) -> SignedTransaction {
+        SignedTransaction {
+            raw_txn,
+            authenticator: TransactionAuthenticator::single_sender(authenticator),
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_with_authenticator(
+        raw_txn: deprecated::RawTransaction,
+        authenticator: TransactionAuthenticator,
+    ) -> Self {
+        Self {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn authenticator(&self) -> TransactionAuthenticator {
+        self.authenticator.clone()
+    }
+
+    pub fn authenticator_ref(&self) -> &TransactionAuthenticator {
+        &self.authenticator
+    }
+
+    pub fn sender(&self) -> AccountAddress {
+        self.raw_txn.sender
+    }
+
+    pub fn into_raw_transaction(self) -> deprecated::RawTransaction {
+        self.raw_txn
+    }
+
+    pub fn raw_transaction_ref(&self) -> &deprecated::RawTransaction {
+        &self.raw_txn
+    }
+
+    pub fn sequence_number(&self) -> u64 {
+        self.raw_txn.sequence_number
+    }
+
+    pub fn chain_id(&self) -> ChainId {
+        self.raw_txn.chain_id
+    }
+
+    pub fn payload(&self) -> &TransactionPayload {
+        &self.raw_txn.payload
+    }
+
+    pub fn max_gas_amount(&self) -> u64 {
+        self.raw_txn.max_gas_amount
+    }
+
+    pub fn gas_unit_price(&self) -> u64 {
+        self.raw_txn.gas_unit_price
+    }
+
+    pub fn expiration_timestamp_secs(&self) -> u64 {
+        self.raw_txn.expiration_timestamp_secs
+    }
+
+    pub fn raw_txn_bytes_len(&self) -> usize {
+        *self.raw_txn_size.get_or_init(|| {
+            bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
+        })
+    }
+
+    pub fn txn_bytes_len(&self) -> usize {
+        let authenticator_size = *self.authenticator_size.get_or_init(|| {
+            bcs::serialized_size(&self.authenticator)
+                .expect("Unable to serialize TransactionAuthenticator")
+        });
+        self.raw_txn_bytes_len() + authenticator_size
+    }
+
+    /// Checks that the signature of given transaction. Returns `Ok(SignatureCheckedTransaction)` if
+    /// the signature is valid.
+    pub fn check_signature(self) -> anyhow::Result<SignatureCheckedTransaction> {
+        self.authenticator.verify(&self.raw_txn)?;
+        Ok(SignatureCheckedTransaction(self.into()))
+    }
+
+    pub fn verify_signature(&self) -> anyhow::Result<()> {
+        self.authenticator.verify(&self.raw_txn)?;
+        Ok(())
+    }
+
+    pub fn contains_duplicate_signers(&self) -> bool {
+        let mut all_signer_addresses = self.authenticator.secondary_signer_addresses();
+        all_signer_addresses.push(self.sender());
+        let mut s = BTreeSet::new();
+        all_signer_addresses.iter().any(|a| !s.insert(*a))
+    }
+
+    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
+        format!(
+            "DeprecatedSignedTransaction {{ \n \
+             raw_txn: {}, \n \
+             authenticator: {:#?}, \n \
+             }}",
+            self.raw_txn.format_for_client(get_transaction_name),
+            self.authenticator
+        )
+    }
+
+    pub fn is_multi_agent(&self) -> bool {
+        matches!(
+            self.authenticator,
+            TransactionAuthenticator::MultiAgent { .. }
+        )
+    }
+
+    /// Returns the hash when the transaction is commited onchain.
+    pub fn committed_hash(self) -> HashValue {
+        Transaction::UserTransaction(self).hash()
+    }
+}
+
+impl TryFrom<Transaction> for SignedTransaction {
+    type Error = Error;
+
+    fn try_from(txn: Transaction) -> anyhow::Result<Self> {
+        match txn {
+            Transaction::UserTransaction(txn) => Ok(txn),
+            _ => Err(format_err!("Not a user transaction.")),
+        }
     }
 }

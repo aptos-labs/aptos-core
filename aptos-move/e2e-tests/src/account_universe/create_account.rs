@@ -13,8 +13,9 @@ use crate::{
     gas_costs,
 };
 use aptos_proptest_helpers::Index;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
-    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
     vm_status::{AbortLocation, StatusCode},
 };
 use proptest::prelude::*;

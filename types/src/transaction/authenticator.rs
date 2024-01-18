@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::transaction::RawTransaction;
 use crate::{
     account_address::AccountAddress,
     transaction::{
@@ -71,6 +72,10 @@ pub enum TransactionAuthenticator {
     },
     SingleSender {
         sender: AccountAuthenticator,
+    },
+    V1 {
+        senders: Vec<AccountAuthenticator>,
+        fee_payer: Option<(AccountAddress, AccountAuthenticator)>,
     },
 }
 
@@ -211,6 +216,14 @@ impl TransactionAuthenticator {
                 Ok(())
             },
             Self::SingleSender { sender } => sender.verify(raw_txn),
+            Self::V1 { senders, fee_payer } => {
+                for verifier in senders {
+                    verifier.verify(raw_txn)?;
+                }
+                if let Some((_fee_payer_address, fee_payer_authenticator)) = fee_payer {
+                    fee_payer_authenticator.verify(raw_txn)
+                }
+            },
         }
     }
 
@@ -227,6 +240,7 @@ impl TransactionAuthenticator {
             } => AccountAuthenticator::multi_ed25519(public_key.clone(), signature.clone()),
             Self::MultiAgent { sender, .. } => sender.clone(),
             Self::SingleSender { sender } => sender.clone(),
+            Self::V1 { senders, .. } => senders.first().expect("senders cannot be empty"),
         }
     }
 
@@ -245,6 +259,7 @@ impl TransactionAuthenticator {
                 secondary_signer_addresses,
                 ..
             } => secondary_signer_addresses.to_vec(),
+            Self::V1 { .. } => vec![],
         }
     }
 
@@ -320,47 +335,99 @@ impl TransactionAuthenticator {
 
     pub fn to_single_key_authenticators(&self) -> Result<Vec<SingleKeyAuthenticator>> {
         let account_authenticators = self.all_signers();
-        let mut single_key_authenticators: Vec<SingleKeyAuthenticator> =
-            Vec::with_capacity(MAX_NUM_OF_SIGS);
-        for account_authenticator in account_authenticators {
-            match account_authenticator {
-                AccountAuthenticator::Ed25519 {
-                    public_key,
-                    signature,
-                } => {
-                    let authenticator = SingleKeyAuthenticator {
-                        public_key: AnyPublicKey::ed25519(public_key.clone()),
-                        signature: AnySignature::ed25519(signature.clone()),
-                    };
-                    single_key_authenticators.push(authenticator);
-                },
-                AccountAuthenticator::MultiEd25519 {
-                    public_key,
-                    signature,
-                } => {
-                    let public_keys = MultiKey::from(public_key);
-                    let signatures: Vec<AnySignature> = signature
-                        .signatures()
-                        .iter()
-                        .map(|sig| AnySignature::ed25519(sig.clone()))
-                        .collect();
-                    let signatures_bitmap = aptos_bitvec::BitVec::from(signature.bitmap().to_vec());
-                    let authenticator = MultiKeyAuthenticator {
-                        public_keys,
-                        signatures,
-                        signatures_bitmap,
-                    };
-                    single_key_authenticators.extend(authenticator.to_single_key_authenticators()?);
-                },
-                AccountAuthenticator::SingleKey { authenticator } => {
-                    single_key_authenticators.push(authenticator);
-                },
-                AccountAuthenticator::MultiKey { authenticator } => {
-                    single_key_authenticators.extend(authenticator.to_single_key_authenticators()?);
-                },
-            };
+        account_authenticators_to_single_key_authenticators(&account_authenticators)
+    }
+}
+
+fn account_authenticators_to_single_key_authenticators(
+    account_authenticators: &[AccountAuthenticator],
+) -> Result<Vec<SingleKeyAuthenticator>> {
+    let mut single_key_authenticators: Vec<SingleKeyAuthenticator> =
+        Vec::with_capacity(MAX_NUM_OF_SIGS);
+    for account_authenticator in account_authenticators {
+        match account_authenticator {
+            AccountAuthenticator::Ed25519 {
+                public_key,
+                signature,
+            } => {
+                let authenticator = SingleKeyAuthenticator {
+                    public_key: AnyPublicKey::ed25519(public_key.clone()),
+                    signature: AnySignature::ed25519(signature.clone()),
+                };
+                single_key_authenticators.push(authenticator);
+            },
+            AccountAuthenticator::MultiEd25519 {
+                public_key,
+                signature,
+            } => {
+                let public_keys = MultiKey::from(public_key.clone());
+                let signatures: Vec<AnySignature> = signature
+                    .signatures()
+                    .iter()
+                    .map(|sig| AnySignature::ed25519(sig.clone()))
+                    .collect();
+                let signatures_bitmap = aptos_bitvec::BitVec::from(signature.bitmap().to_vec());
+                let authenticator = MultiKeyAuthenticator {
+                    public_keys,
+                    signatures,
+                    signatures_bitmap,
+                };
+                single_key_authenticators.extend(authenticator.to_single_key_authenticators()?);
+            },
+            AccountAuthenticator::SingleKey { authenticator } => {
+                single_key_authenticators.push(authenticator.clone());
+            },
+            AccountAuthenticator::MultiKey { authenticator } => {
+                single_key_authenticators.extend(authenticator.to_single_key_authenticators()?);
+            },
+        };
+    }
+    Ok(single_key_authenticators)
+}
+
+impl TransactionAuthenticator {
+    pub fn new(
+        senders: Vec<AccountAuthenticator>,
+        fee_payer: Option<(AccountAddress, AccountAuthenticator)>,
+    ) -> Self {
+        Self::V0 { senders, fee_payer }
+    }
+
+    pub fn to_single_key_authenticators(&self) -> Result<Vec<SingleKeyAuthenticator>> {
+        match self {
+            Self::V0 { senders, fee_payer } => {
+                if let Some((fee_payer_address, fee_payer_authenticator)) = fee_payer {
+                    let mut authenticators = senders.clone();
+                    authenticators.push(fee_payer_authenticator.clone());
+                    account_authenticators_to_single_key_authenticators(&authenticators)
+                } else {
+                    account_authenticators_to_single_key_authenticators(senders)
+                }
+            },
         }
-        Ok(single_key_authenticators)
+    }
+
+    /// Return Ok if all AccountAuthenticator's public keys match their signatures, Err otherwise
+    pub fn verify(&self, raw_txn: &RawTransaction) -> Result<()> {
+        let num_sigs: usize = self
+            .senders()
+            .iter()
+            .map(|auth| auth.number_of_signatures())
+            .sum::<usize>();
+        if num_sigs > MAX_NUM_OF_SIGS {
+            return Err(Error::new(AuthenticationError::MaxSignaturesExceeded));
+        }
+        match self {
+            Self::V1 { senders, fee_payer } => {
+                for verifier in senders {
+                    verifier.verify(raw_txn)?;
+                }
+                if let Some((_fee_payer_address, fee_payer_authenticator)) = fee_payer {
+                    fee_payer_authenticator.verify(raw_txn)
+                }
+            },
+        }
+        Ok(())
     }
 }
 
@@ -437,6 +504,18 @@ impl fmt::Display for TransactionAuthenticator {
                     "TransactionAuthenticator[scheme: SingleSender, sender: {}]",
                     sender
                 )
+            },
+            Self::V1 { senders, fee_payer } => {
+                write!(f, "TransactionAuthenticator::V1[ senders: {:#?}]", senders)?;
+                if let Some((fee_payer_address, fee_payer_authenticator)) = fee_payer {
+                    write!(
+                        f,
+                        ", \n\t fee_payer_address: {}\n\t\
+                    fee_payer: {}\n",
+                        fee_payer_address, fee_payer_authenticator
+                    )?;
+                }
+                write!(f, "\t]")
             },
         }
     }
@@ -1183,7 +1262,7 @@ mod tests {
         let single_key_authenticators = mk_auth_01.to_single_key_authenticators().unwrap();
         assert_eq!(
             single_key_authenticators,
-            vec![sender0_auth.clone(), sender1_auth.clone(),]
+            vec![sender0_auth.clone(), sender1_auth.clone()]
         );
         let account_auth = AccountAuthenticator::multi_key(mk_auth_01);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
@@ -1197,7 +1276,7 @@ mod tests {
         let single_key_authenticators = mk_auth_02.to_single_key_authenticators().unwrap();
         assert_eq!(
             single_key_authenticators,
-            vec![sender0_auth.clone(), sender1_auth.clone(),]
+            vec![sender0_auth.clone(), sender1_auth.clone()]
         );
         let account_auth = AccountAuthenticator::multi_key(mk_auth_02);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
@@ -1211,7 +1290,7 @@ mod tests {
         let single_key_authenticators = mk_auth_12.to_single_key_authenticators().unwrap();
         assert_eq!(
             single_key_authenticators,
-            vec![sender1_auth.clone(), sender1_auth.clone(),]
+            vec![sender1_auth.clone(), sender1_auth.clone()]
         );
         let account_auth = AccountAuthenticator::multi_key(mk_auth_12);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);

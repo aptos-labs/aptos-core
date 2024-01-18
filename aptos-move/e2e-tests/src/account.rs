@@ -7,6 +7,7 @@
 use crate::gas_costs;
 use aptos_crypto::ed25519::*;
 use aptos_keygen::KeyGen;
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -15,9 +16,8 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey,
-        deprecated::{RawTransaction, SignedTransaction},
-        EntryFunction, Module, ModuleBundle, Script, TransactionPayload,
+        authenticator::AuthenticationKey, deprecated::RawTransaction, EntryFunction, Module,
+        ModuleBundle, Script, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };

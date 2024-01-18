@@ -37,12 +37,12 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
 };
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        authenticator::AuthenticationKey, deprecated::SignedTransaction, EntryFunction,
-        MultisigTransactionPayload, Script, TransactionArgument, TransactionPayload,
-        TransactionStatus,
+        authenticator::AuthenticationKey, EntryFunction, MultisigTransactionPayload, Script,
+        TransactionArgument, TransactionPayload, TransactionStatus,
     },
 };
 use async_trait::async_trait;

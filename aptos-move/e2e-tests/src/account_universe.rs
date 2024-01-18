@@ -23,8 +23,9 @@ use crate::{
     executor::FakeExecutor,
     gas_costs, transaction_status_eq,
 };
+use aptos_types::transaction::SignedTransaction;
 use aptos_types::{
-    transaction::{deprecated::SignedTransaction, ExecutionStatus, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
     vm_status::{known_locations, StatusCode},
 };
 pub use bad_transaction::*;

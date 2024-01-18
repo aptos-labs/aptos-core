@@ -7,10 +7,8 @@ use crate::{
     TransactionGeneratorCreator,
 };
 use aptos_logger::info;
-use aptos_sdk::{
-    transaction_builder::TransactionFactory,
-    types::{transaction::deprecated::SignedTransaction, LocalAccount},
-};
+use aptos_sdk::types::transaction::SignedTransaction;
+use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use std::sync::Arc;

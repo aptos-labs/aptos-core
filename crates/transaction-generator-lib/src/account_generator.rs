@@ -3,10 +3,10 @@
 use crate::{create_account_transaction, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_infallible::RwLock;
 use aptos_logger::{info, sample, sample::SampleRate};
+use aptos_sdk::types::transaction::SignedTransaction;
 use aptos_sdk::{
-    move_types::account_address::AccountAddress,
-    transaction_builder::TransactionFactory,
-    types::{transaction::deprecated::SignedTransaction, LocalAccount},
+    move_types::account_address::AccountAddress, transaction_builder::TransactionFactory,
+    types::LocalAccount,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
