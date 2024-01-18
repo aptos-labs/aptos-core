@@ -325,12 +325,6 @@ impl Pepper {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct IdCommitment(pub(crate) [u8; IDC_NUM_BYTES]);
 
-impl Default for IdCommitment {
-    fn default() -> Self {
-        Self([0u8; IDC_NUM_BYTES])
-    }
-}
-
 impl IdCommitment {
     pub fn new_from_preimage(
         aud: &str,
@@ -350,9 +344,9 @@ impl IdCommitment {
             pepper_scalar,
         ])?;
 
-        let mut idc: Self = IdCommitment::default();
-        fr.serialize_uncompressed(&mut idc.0[..])?;
-        Ok(idc)
+        let mut idc_bytes = [0u8; IDC_NUM_BYTES];
+        fr.serialize_uncompressed(&mut idc_bytes[..])?;
+        Ok(IdCommitment(idc_bytes))
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
