@@ -10,6 +10,9 @@
 //! along all possible program paths such that neither `a` nor `b` is overwritten along any of these paths.
 //! That is, `a` and `b` are always available unmodified at `P` after the copy `a := b`,
 //! making it definitely available.
+//! In the current implementation, variables that are borrowed are excluded from being a part of an
+//! available copy. We can make this analysis more precise by having more refined rules when it comes
+//! to borrowed variables.
 //!
 //! This is a forward "must" analysis.
 //! In a forward analysis, we reason about facts at a program point `P` using facts at its predecessors.
@@ -41,41 +44,29 @@ impl AvailCopies {
     }
 
     /// Make a copy `dst := src` available.
-    /// If either `dst` or `src` is in `borrowed_locals`, then the copy is not made available.
+    /// Neither `dst` nor `src` should be borrowed locals.
     /// To call this method, `dst := x` should not already be available for any `x`.
-    fn make_copy_available(
-        &mut self,
-        dst: TempIndex,
-        src: TempIndex,
-        borrowed_locals: &BTreeSet<TempIndex>,
-    ) {
+    fn make_copy_available(&mut self, dst: TempIndex, src: TempIndex) {
         if src == dst {
             // No need to make a copy available for self-assignments.
             return;
         }
-        // Note that we are conservative here for the sake of simplicity, and disallow copies
-        // when either `dst` or `src` is borrowed. We could track more copies as available by using
-        // reference analysis.
-        if !borrowed_locals.contains(&dst) && !borrowed_locals.contains(&src) {
-            let old_src = self.0.insert(dst, src);
-            if let Some(old_src) = old_src {
-                panic!(
-                    "copy `$t{} = $t{}` already available, \
-                        cannot have `$t{} = $t{}` available as well",
-                    dst, old_src, dst, src
-                );
-            }
+        let old_src = self.0.insert(dst, src);
+        if let Some(old_src) = old_src {
+            panic!(
+                "copy `$t{} = $t{}` already available, \
+                    cannot have `$t{} = $t{}` available as well",
+                dst, old_src, dst, src
+            );
         }
     }
 
     /// Kill all available copies of the form `x := y` where `x` or `y` is `tmp`.
-    /// If `tmp` is in `borrowed_locals`, then no copies are killed.
-    fn kill_copies_with(&mut self, tmp: TempIndex, borrowed_locals: &BTreeSet<TempIndex>) {
-        if !borrowed_locals.contains(&tmp) {
-            // TODO: consider optimizing the following operation by keeping a two-way map between
-            // `dst -> src` and `src -> set(dst)`. Another optimization to consider is to use im::OrdMap.
-            self.0.retain(|dst, src| *dst != tmp && *src != tmp);
-        }
+    /// Note that `tmp` should not be a borrowed local.
+    fn kill_copies_with(&mut self, tmp: TempIndex) {
+        // TODO: consider optimizing the following operation by keeping a two-way map between
+        // `dst -> src` and `src -> set(dst)`. Another optimization to consider is to use im::OrdMap.
+        self.0.retain(|dst, src| *dst != tmp && *src != tmp);
     }
 
     /// Given a set of available copies: `tmp_1 := tmp_0, tmp_2 := tmp_1,..., tmp_n := tmp_n-1`, forming
@@ -118,6 +109,7 @@ impl AbstractDomain for AvailCopies {
                     // We are removing the available copy (dst, src) from self.
                     result = JoinResult::Changed;
                 } else {
+                    // Both have (other_dst, other_src), so keep it in self.
                     self.0.insert(*other_dst, *other_src);
                 }
             }
@@ -206,10 +198,18 @@ impl TransferFunctions for AvailCopiesAnalysis {
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
         use Bytecode::*;
         instr.dests().iter().for_each(|dst| {
-            state.kill_copies_with(*dst, &self.borrowed_locals);
+            if !self.borrowed_locals.contains(dst) {
+                // We don't track copies of borrowed locals, so no need to kill them.
+                state.kill_copies_with(*dst);
+            }
         });
         if let Assign(_, dst, src, _) = instr {
-            state.make_copy_available(*dst, *src, &self.borrowed_locals);
+            if !self.borrowed_locals.contains(dst) && !self.borrowed_locals.contains(src) {
+                // Note that we are conservative here for the sake of simplicity, and disallow
+                // tracking copies when either `dst` or `src` is borrowed.
+                // We could track more copies as available by using the reference analysis.
+                state.make_copy_available(*dst, *src);
+            }
         }
     }
 }
@@ -299,21 +299,20 @@ mod tests {
     fn test_avail_copies_join() {
         let mut a = AvailCopies::new();
         let mut b = AvailCopies::new();
-        let borrowed_locals: BTreeSet<TempIndex> = BTreeSet::new();
-        a.make_copy_available(1, 2, &borrowed_locals);
-        b.make_copy_available(3, 4, &borrowed_locals);
+        a.make_copy_available(1, 2);
+        b.make_copy_available(3, 4);
         // a = (1, 2), b = (3, 4)
         assert_eq!(a.join(&b), JoinResult::Changed);
         assert_eq!(a.0.len(), 0);
-        a.make_copy_available(3, 4, &borrowed_locals);
+        a.make_copy_available(3, 4);
         // a = (3, 4), b = (3, 4)
         assert_eq!(a.join(&b), JoinResult::Unchanged);
         assert_eq!(a, b);
-        a.make_copy_available(1, 2, &borrowed_locals);
+        a.make_copy_available(1, 2);
         // a = (1, 2), (3, 4), b = (3, 4)
         assert_eq!(a.join(&b), JoinResult::Changed);
         assert_eq!(a, b);
-        b.make_copy_available(1, 2, &borrowed_locals);
+        b.make_copy_available(1, 2);
         // a = (3, 4), b = (1, 2), (3, 4)
         assert_eq!(a.join(&b), JoinResult::Unchanged);
         assert_eq!(a.0.len(), 1);
@@ -322,12 +321,11 @@ mod tests {
     #[test]
     fn test_get_head_of_copy_chain() {
         let mut copies = AvailCopies::new();
-        let borrowed_locals: BTreeSet<TempIndex> = BTreeSet::new();
-        copies.make_copy_available(1, 0, &borrowed_locals);
-        copies.make_copy_available(2, 1, &borrowed_locals);
-        copies.make_copy_available(3, 2, &borrowed_locals);
-        copies.make_copy_available(4, 3, &borrowed_locals);
-        copies.make_copy_available(44, 14, &borrowed_locals);
+        copies.make_copy_available(1, 0);
+        copies.make_copy_available(2, 1);
+        copies.make_copy_available(3, 2);
+        copies.make_copy_available(4, 3);
+        copies.make_copy_available(44, 14);
         // copies = (1, 0), (2, 1), (3, 2), (4, 3), (44, 14)
         for i in 0..=4 {
             assert_eq!(copies.get_head_of_copy_chain(i), 0);
@@ -338,12 +336,11 @@ mod tests {
     #[should_panic]
     fn test_cyclic_copy_chain() {
         let mut copies = AvailCopies::new();
-        let borrowed_locals: BTreeSet<TempIndex> = BTreeSet::new();
-        copies.make_copy_available(1, 0, &borrowed_locals);
-        copies.make_copy_available(2, 1, &borrowed_locals);
-        copies.make_copy_available(3, 2, &borrowed_locals);
-        copies.make_copy_available(4, 3, &borrowed_locals);
-        copies.make_copy_available(0, 4, &borrowed_locals);
+        copies.make_copy_available(1, 0);
+        copies.make_copy_available(2, 1);
+        copies.make_copy_available(3, 2);
+        copies.make_copy_available(4, 3);
+        copies.make_copy_available(0, 4);
         // copies = (1, 0), (2, 1), (3, 2), (4, 3), (0, 4)
         copies.get_head_of_copy_chain(4);
     }
