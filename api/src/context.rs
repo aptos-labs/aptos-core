@@ -18,7 +18,7 @@ use aptos_api_types::{
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
@@ -45,10 +45,13 @@ use aptos_types::{
 use aptos_utils::aptos_try;
 use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
+use mini_moka::sync::Cache;
 use move_core_types::{
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
+use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
@@ -66,6 +69,7 @@ pub struct Context {
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
+    view_function_stats: Arc<ViewFunctionStats>,
 }
 
 impl std::fmt::Debug for Context {
@@ -81,6 +85,11 @@ impl Context {
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
     ) -> Self {
+        let view_function_stats = if node_config.api.periodic_view_function_stats_sec.is_some() {
+            Arc::new(ViewFunctionStats::new_enabled())
+        } else {
+            Arc::new(ViewFunctionStats::new_disabled())
+        };
         Self {
             chain_id,
             db,
@@ -101,6 +110,7 @@ impl Context {
                 block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
                     .block_executor_onchain_config(),
             })),
+            view_function_stats,
         }
     }
 
@@ -1297,6 +1307,10 @@ impl Context {
             .min_inclusion_prices
             .len()
     }
+
+    pub fn view_function_stats(&self) -> &ViewFunctionStats {
+        &self.view_function_stats
+    }
 }
 
 pub struct GasScheduleCache {
@@ -1328,4 +1342,83 @@ where
     tokio::task::spawn_blocking(func)
         .await
         .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?
+}
+
+#[derive(Schema)]
+pub struct LogSchema {
+    event: LogEvent,
+}
+
+impl LogSchema {
+    pub fn new(event: LogEvent) -> Self {
+        Self { event }
+    }
+}
+
+#[derive(Serialize)]
+pub enum LogEvent {
+    ViewFunction,
+}
+
+pub struct ViewFunctionStats {
+    call_count: Option<Cache<(AccountAddress, String, String), u64>>,
+}
+
+impl ViewFunctionStats {
+    fn new_disabled() -> Self {
+        Self { call_count: None }
+    }
+
+    fn new_enabled() -> Self {
+        Self {
+            call_count: Some(Cache::new(100)),
+        }
+    }
+
+    pub fn increment(
+        &self,
+        account_address: AccountAddress,
+        module: &Identifier,
+        function: &Identifier,
+    ) {
+        if let Some(cache) = &self.call_count {
+            let key = (account_address, module.to_string(), function.to_string());
+            let count = cache.get(&key).unwrap_or(0);
+            cache.insert(key, count + 1);
+        }
+    }
+
+    pub fn log_and_clear(&self) {
+        if let Some(cache) = &self.call_count {
+            if cache.entry_count() == 0 {
+                return;
+            }
+
+            let mut sorted: Vec<_> = cache
+                .iter()
+                .map(|entry| {
+                    let (account, module, function) = entry.key();
+                    let count = *entry.value();
+                    (count, *account, module.clone(), function.clone())
+                })
+                .collect();
+            sorted.sort();
+
+            info!(
+                LogSchema::new(LogEvent::ViewFunction),
+                top_1 = sorted.get(0),
+                top_2 = sorted.get(1),
+                top_3 = sorted.get(2),
+                top_4 = sorted.get(3),
+                top_5 = sorted.get(4),
+                top_6 = sorted.get(5),
+                top_7 = sorted.get(6),
+                top_8 = sorted.get(7),
+                top_9 = sorted.get(8),
+                top_10 = sorted.get(9),
+            );
+
+            cache.invalidate_all();
+        }
+    }
 }

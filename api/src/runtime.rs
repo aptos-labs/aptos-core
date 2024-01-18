@@ -43,12 +43,13 @@ pub fn bootstrap(
     attach_poem_to_runtime(runtime.handle(), context.clone(), config, false)
         .context("Failed to attach poem to runtime")?;
 
+    let context_cloned = context.clone();
     if let Some(period_ms) = config.api.periodic_gas_estimation_ms {
         runtime.spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(period_ms));
             loop {
                 interval.tick().await;
-                let context_cloned = context.clone();
+                let context_cloned = context_cloned.clone();
                 tokio::task::spawn_blocking(move || {
                     if let Ok(latest_ledger_info) =
                         context_cloned.get_latest_ledger_info::<crate::response::BasicError>()
@@ -59,6 +60,24 @@ pub fn bootstrap(
                             TransactionsApi::log_gas_estimation(&gas_estimation);
                         }
                     }
+                })
+                .await
+                .unwrap_or(());
+            }
+        });
+    }
+
+    // TODO: combine?
+    let context_cloned = context.clone();
+    if let Some(period_sec) = config.api.periodic_view_function_stats_sec {
+        runtime.spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(period_sec));
+            loop {
+                interval.tick().await;
+                let context_cloned = context_cloned.clone();
+                tokio::task::spawn_blocking(move || {
+                    let view_function_stats = context_cloned.view_function_stats();
+                    view_function_stats.log_and_clear();
                 })
                 .await
                 .unwrap_or(());

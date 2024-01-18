@@ -146,7 +146,7 @@ fn view_request(
     .map_err(|err| {
         BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
     })?;
-    match accept_type {
+    let result = match accept_type {
         AcceptType::Bcs => {
             // The return values are already BCS encoded, but we still need to encode the outside
             // vector without re-encoding the inside values
@@ -205,5 +205,10 @@ fn view_request(
 
             BasicResponse::try_from_json((move_vals, &ledger_info, BasicResponseStatus::Ok))
         },
-    }
+    };
+    let (account_address, module) = view_function.module.into();
+    context
+        .view_function_stats()
+        .increment(account_address, &module, &view_function.function);
+    result
 }

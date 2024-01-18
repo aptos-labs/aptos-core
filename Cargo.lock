@@ -412,6 +412,7 @@ dependencies = [
  "hyper",
  "itertools 0.10.5",
  "mime",
+ "mini-moka",
  "move-core-types",
  "move-package",
  "num_cpus",
