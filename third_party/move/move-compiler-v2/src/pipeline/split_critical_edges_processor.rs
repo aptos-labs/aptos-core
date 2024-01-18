@@ -1,3 +1,7 @@
+//! This pass splits critical edges with empty blocks.
+//! A critical edge is an edge where the source node has multiple successors,
+//! and the target node has multiple predecessors.
+
 use move_model::{model::FunctionEnv, ast::TempIndex};
 use move_stackless_bytecode::{
     function_target::FunctionData,
