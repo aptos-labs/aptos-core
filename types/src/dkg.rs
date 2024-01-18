@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    move_any, move_any::AsMoveAny, on_chain_config::OnChainConfig,
-    validator_verifier::ValidatorConsensusInfo,
+use crate::{on_chain_config::OnChainConfig,
+            validator_verifier::ValidatorConsensusInfo,
 };
-use anyhow::{bail, ensure, Result};
+use anyhow::{ensure, Result};
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_any::Any as MoveAny;
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
 };
@@ -33,62 +31,6 @@ impl MoveStructType for DKGStartEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
 }
 
-/// Reflection of Move type `0x1::dkg::DKGConfig`.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct DKGConfig {
-    variant: MoveAny,
-}
-
-impl Default for DKGConfig {
-    fn default() -> Self {
-        Self {
-            variant: DKGConfigV0::default().as_move_any(),
-        }
-    }
-}
-
-impl OnChainConfig for DKGConfig {
-    const MODULE_IDENTIFIER: &'static str = "dkg";
-    const TYPE_IDENTIFIER: &'static str = "DKGConfig";
-}
-
-/// Reflection of Move type `0x1::dkg::DKGConfigV0`.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct DKGConfigV0 {
-    // When this equals to `x`, `x / u64::MAX` is the DKG transcript aggregation threshold.
-    aggregation_threshold: u64,
-}
-
-impl Default for DKGConfigV0 {
-    fn default() -> Self {
-        Self {
-            aggregation_threshold: u64::MAX / 2,
-        }
-    }
-}
-
-impl AsMoveAny for DKGConfigV0 {
-    const MOVE_TYPE_NAME: &'static str = "0x1::dkg::DKGConfigV0";
-}
-
-impl DKGConfig {
-    pub fn aggregation_threshold(&self) -> Result<u64> {
-        match self.variant.type_name.as_str() {
-            DKGConfigV0::MOVE_TYPE_NAME => {
-                let threshold = MoveAny::unpack::<DKGConfigV0>(
-                    DKGConfigV0::MOVE_TYPE_NAME,
-                    self.variant.clone(),
-                )?
-                .aggregation_threshold;
-                Ok(threshold)
-            },
-            _ => {
-                bail!("getting aggregation_threshold failed with unknown variant type")
-            },
-        }
-    }
-}
-
 /// DKG transcript and its metadata.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct DKGNode {
@@ -108,7 +50,6 @@ impl DKGNode {
 // The input of DKG.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionMetadata {
-    pub config: DKGConfig,
     pub dealer_epoch: u64,
     pub dealer_validator_set: Vec<ValidatorConsensusInfo>,
     pub target_validator_set: Vec<ValidatorConsensusInfo>,
@@ -166,6 +107,8 @@ pub trait DKGPrivateParamsProvider<DKG: DKGTrait>: Send + Sync {
     fn dkg_private_params(&self) -> &DKG::PrivateParams;
 }
 
+/// TODO: either make a separate RealDKG and make this test-only,
+/// or rename it and replace its implementation with the real one.
 pub struct DummyDKG {}
 
 impl DKGTrait for DummyDKG {

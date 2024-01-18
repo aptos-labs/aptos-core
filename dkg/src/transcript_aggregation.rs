@@ -76,7 +76,6 @@ fn test_transcript_aggregation_state() {
         .collect();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
     let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
-        config: Default::default(),
         dealer_epoch: 999,
         dealer_validator_set: validator_infos.clone(),
         target_validator_set: validator_infos.clone(),

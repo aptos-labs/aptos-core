@@ -1448,11 +1448,7 @@ impl AptosVM {
             ValidatorTransaction::DKGResult(dkg_node) => {
                 self.process_dkg_result(resolver, log_context, session_id, dkg_node)
             },
-            ValidatorTransaction::DummyTopic1(_) => Ok((
-                VMStatus::Executed,
-                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-            )),
-            ValidatorTransaction::DummyTopic2(_) => Ok((
+            _ => Ok((
                 VMStatus::Executed,
                 VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
             )),
