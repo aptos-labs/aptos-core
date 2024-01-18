@@ -540,6 +540,7 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
                 move_options.bytecode_version,
+                move_options.compiler_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
             )
