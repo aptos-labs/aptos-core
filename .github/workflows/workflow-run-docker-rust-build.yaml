@@ -3,6 +3,10 @@ name: "*run Docker rust build reusable workflow"
 on:
   workflow_call:
     inputs:
+      IMAGE_TAG:
+        required: false
+        type: string
+        description: Custom image tag for Docker build
       GIT_SHA:
         required: true
         type: string
@@ -97,3 +101,4 @@ jobs:
           BUILD_ADDL_TESTING_IMAGES: ${{ env.BUILD_ADDL_TESTING_IMAGES }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           TARGET_REGISTRY: ${{ env.TARGET_REGISTRY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}

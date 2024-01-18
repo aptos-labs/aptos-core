@@ -130,6 +130,22 @@ jobs:
   # This is a PR required job.
   rust-images:
     needs: [permission-check, determine-docker-build-metadata]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set IMAGE_TAG based on branch/environment
+      run: |
+        BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        SHORT_SHA=$(echo ${{ needs.determine-docker-build-metadata.outputs.gitSha }} | cut -c1-7)
+        
+        if [[ "$BRANCH_NAME" == "devnet" ]]; then
+          echo "IMAGE_TAG=dev-$SHORT_SHA" >> $GITHUB_ENV
+        elif [[ "$BRANCH_NAME" == "testnet" ]]; then
+          echo "IMAGE_TAG=ci-$SHORT_SHA" >> $GITHUB_ENV
+        elif [[ "$BRANCH_NAME" == "mainnet" ]]; then
+          echo "IMAGE_TAG=release-$SHORT_SHA" >> $GITHUB_ENV
+        else
+          echo "IMAGE_TAG=latest-$SHORT_SHA" >> $GITHUB_ENV
+        fi
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     secrets: inherit
     with:
@@ -138,6 +154,7 @@ jobs:
       PROFILE: release
       BUILD_ADDL_TESTING_IMAGES: true
       TARGET_REGISTRY: ${{ needs.determine-docker-build-metadata.outputs.targetRegistry }}
+      IMAGE_TAG: ${{ env.IMAGE_TAG }}
 
   rust-images-failpoints:
     needs: [permission-check, determine-docker-build-metadata]
