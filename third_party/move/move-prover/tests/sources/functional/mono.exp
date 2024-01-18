@@ -1,5 +1,16 @@
 Move prover returns: exiting with verification errors
 error: post-condition does not hold
+   ┌─ tests/sources/functional/mono.move:69:20
+   │
+69 │     spec vec_int { ensures result[0] != 1; }
+   │                    ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/mono.move:68: vec_int
+   =         x = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/mono.move:69: vec_int (spec)
+
+error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:71:21
    │
 71 │     spec vec_addr { ensures result[0] != @0x1; }
@@ -22,15 +33,15 @@ error: post-condition does not hold
    =     at tests/sources/functional/mono.move:73: vec_bool (spec)
 
 error: post-condition does not hold
-   ┌─ tests/sources/functional/mono.move:69:20
+   ┌─ tests/sources/functional/mono.move:75:27
    │
-69 │     spec vec_int { ensures result[0] != 1; }
-   │                    ^^^^^^^^^^^^^^^^^^^^^^^
+75 │     spec vec_struct_int { ensures result[0].x != 1; }
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/mono.move:68: vec_int
+   =     at tests/sources/functional/mono.move:74: vec_struct_int
    =         x = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/mono.move:69: vec_int (spec)
+   =     at tests/sources/functional/mono.move:75: vec_struct_int (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:77:28
@@ -42,17 +53,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/mono.move:77: vec_struct_addr (spec)
-
-error: post-condition does not hold
-   ┌─ tests/sources/functional/mono.move:75:27
-   │
-75 │     spec vec_struct_int { ensures result[0].x != 1; }
-   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/mono.move:74: vec_struct_int
-   =         x = <redacted>
-   =         result = <redacted>
-   =     at tests/sources/functional/mono.move:75: vec_struct_int (spec)
 
 error: post-condition does not hold
    ┌─ tests/sources/functional/mono.move:82:20

@@ -37,7 +37,7 @@ use crate::{
 };
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
 use codespan_reporting::{
-    diagnostic::{Diagnostic, Label, Severity},
+    diagnostic::{Diagnostic, Label, LabelStyle, Severity},
     term::{emit, termcolor::WriteColor, Config},
 };
 use itertools::Itertools;
@@ -1080,6 +1080,100 @@ impl GlobalEnv {
         self.report_diag_with_filter(writer, |d| d.severity >= severity)
     }
 
+    // Comparison of Diagnostic values that tries to match program ordering so we
+    // can display them to the user in a more natural order.
+    fn cmp_diagnostic(diag1: &Diagnostic<FileId>, diag2: &Diagnostic<FileId>) -> Ordering {
+        let labels_ordering = GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels);
+        if Ordering::Equal == labels_ordering {
+            let sev_ordering = diag1
+                .severity
+                .partial_cmp(&diag2.severity)
+                .expect("Severity provides a total ordering for valid severity enum values");
+            if Ordering::Equal == sev_ordering {
+                let message_ordering = diag1.message.cmp(&diag2.message);
+                if Ordering::Equal == message_ordering {
+                    diag1.code.cmp(&diag2.code)
+                } else {
+                    message_ordering
+                }
+            } else {
+                sev_ordering
+            }
+        } else {
+            labels_ordering
+        }
+    }
+
+    // Label comparison that tries to match program ordering.  `FileId` is already set in visitation
+    // order, so we honor that.  Within the same file, we order by labelled code ranges.  For labels
+    // marking nested regions, we want the innermost region, so we order first by end of labelled
+    // code region, then in reverse by start of region.
+    fn cmp_label(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
+        let file_ordering = label1.file_id.cmp(&label2.file_id);
+        if Ordering::Equal == file_ordering {
+            // First order by end of region.
+            let end1 = label1.range.end;
+            let end2 = label2.range.end;
+            let end_ordering = end1.cmp(&end2);
+            if Ordering::Equal == end_ordering {
+                let start1 = label1.range.start;
+                let start2 = label2.range.start;
+
+                // For nested regions with same end, show inner-most region first.
+                // Swap 1 and 2 in comparing starts.
+                start2.cmp(&start1)
+            } else {
+                end_ordering
+            }
+        } else {
+            file_ordering
+        }
+    }
+
+    // Comparison for sets of labels that orders them based on program ordering, using
+    // the earliest label found.  If a `Primary` label is found then `Secondary` labels
+    // are ignored, but if all are `Secondary` then the earliest of those is used in
+    // the ordering.
+    fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
+        let primary1 = labels1
+            .iter()
+            .filter(|l| l.style == LabelStyle::Primary)
+            .min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
+        let primary2 = labels2
+            .iter()
+            .filter(|l| l.style == LabelStyle::Primary)
+            .min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
+        match (primary1, primary2) {
+            (Some(prim1), Some(prim2)) => GlobalEnv::cmp_label(prim1, prim2),
+            (Some(prim1), None) => {
+                let second2 = labels2.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
+                if let Some(sec2) = second2 {
+                    GlobalEnv::cmp_label(prim1, sec2)
+                } else {
+                    Ordering::Less // Label beats none
+                }
+            },
+            (None, Some(prim2)) => {
+                let second1 = labels1.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
+                if let Some(sec1) = second1 {
+                    GlobalEnv::cmp_label(sec1, prim2)
+                } else {
+                    Ordering::Greater // None is beaten by Label
+                }
+            },
+            (None, None) => {
+                let second1 = labels1.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
+                let second2 = labels2.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
+                match (second1, second2) {
+                    (Some(sec1), Some(sec2)) => GlobalEnv::cmp_label(sec1, sec2),
+                    (Some(_), None) => Ordering::Less, // Label beats None
+                    (None, Some(_)) => Ordering::Greater, // None is beaten by Label
+                    (None, None) => Ordering::Equal,
+                }
+            },
+        }
+    }
+
     /// Writes accumulated diagnostics that pass through `filter`
     pub fn report_diag_with_filter<W: WriteColor, F: FnMut(&Diagnostic<FileId>) -> bool>(
         &self,
@@ -1087,25 +1181,19 @@ impl GlobalEnv {
         mut filter: F,
     ) {
         let mut shown = BTreeSet::new();
-        self.diags.borrow_mut().sort_by(|a, b| match a.1.cmp(&b.1) {
-            Ordering::Less => Ordering::Less,
-            Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => match a.0.severity.partial_cmp(&b.0.severity) {
-                Some(Ordering::Less) => Ordering::Less,
-                Some(Ordering::Greater) => Ordering::Greater,
-                None | Some(Ordering::Equal) => match (&a.0.code, &b.0.code) {
-                    (None, None) => Ordering::Equal,
-                    (None, Some(_)) => Ordering::Less,
-                    (Some(_), None) => Ordering::Greater,
-                    (Some(acode), Some(bcode)) => acode.cmp(bcode),
-                },
-            },
+        self.diags.borrow_mut().sort_by(|a, b| {
+            let reported_ordering = a.1.cmp(&b.1);
+            if Ordering::Equal == reported_ordering {
+                GlobalEnv::cmp_diagnostic(&a.0, &b.0)
+            } else {
+                reported_ordering
+            }
         });
         for (diag, reported) in self
             .diags
             .borrow_mut()
             .iter_mut()
-            .filter(|(d, _)| filter(d))
+            .filter(|(d, reported)| !reported && filter(d))
         {
             if !*reported {
                 // Avoid showing the same message twice. This can happen e.g. because of

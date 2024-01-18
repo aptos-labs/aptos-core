@@ -6,6 +6,12 @@ error: expected `u64` but found `bool`
 7 │         (S { f: false } : S);
   │                 ^^^^^
 
+error: expected `M::S` but found `M::R`
+   ┌─ tests/checking/typing/pack_invalid_argument.move:17:16
+   │
+17 │             s: r,
+   │                ^
+
 error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/pack_invalid_argument.move:18:16
    │
@@ -23,9 +29,3 @@ error: expected `M::S` but found `M::R`
    │
 20 │             n2: Nat{ f: r }
    │                 ^^^^^^^^^^^
-
-error: expected `M::S` but found `M::R`
-   ┌─ tests/checking/typing/pack_invalid_argument.move:17:16
-   │
-17 │             s: r,
-   │                ^

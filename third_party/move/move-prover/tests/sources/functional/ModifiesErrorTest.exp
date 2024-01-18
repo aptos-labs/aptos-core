@@ -1,18 +1,18 @@
 Move prover returns: exiting with verification errors
 error: caller does not have permission to modify `B::T` at given address
-   ┌─ tests/sources/functional/ModifiesErrorTest.move:65:17
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:38:17
    │
-65 │         let v = move_from<T>(addr1);
-   │                 ^^^^^^^^^
+38 │         let t = borrow_global_mut<T>(addr1);
+   │                 ^^^^^^^^^^^^^^^^^
    │
-   =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:74: move_from_test_incorrect (spec)
-   =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
+   =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
+   =     at tests/sources/functional/ModifiesErrorTest.move:47: mutate_at_test_incorrect (spec)
+   =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
    =         addr1 = <redacted>
    =         addr2 = <redacted>
-   =     at tests/sources/functional/ModifiesErrorTest.move:64: move_from_test_incorrect
+   =     at tests/sources/functional/ModifiesErrorTest.move:37: mutate_at_test_incorrect
    =         x0 = <redacted>
-   =     at tests/sources/functional/ModifiesErrorTest.move:65: move_from_test_incorrect
+   =     at tests/sources/functional/ModifiesErrorTest.move:38: mutate_at_test_incorrect
 
 error: caller does not have permission to modify `B::T` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:52:9
@@ -28,6 +28,21 @@ error: caller does not have permission to modify `B::T` at given address
    =     at tests/sources/functional/ModifiesErrorTest.move:51: move_to_test_incorrect
    =         x0 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:52: move_to_test_incorrect
+
+error: caller does not have permission to modify `B::T` at given address
+   ┌─ tests/sources/functional/ModifiesErrorTest.move:65:17
+   │
+65 │         let v = move_from<T>(addr1);
+   │                 ^^^^^^^^^
+   │
+   =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
+   =     at tests/sources/functional/ModifiesErrorTest.move:74: move_from_test_incorrect (spec)
+   =     at tests/sources/functional/ModifiesErrorTest.move:63: move_from_test_incorrect
+   =         addr1 = <redacted>
+   =         addr2 = <redacted>
+   =     at tests/sources/functional/ModifiesErrorTest.move:64: move_from_test_incorrect
+   =         x0 = <redacted>
+   =     at tests/sources/functional/ModifiesErrorTest.move:65: move_from_test_incorrect
 
 error: caller does not have permission to modify `A::S` at given address
    ┌─ tests/sources/functional/ModifiesErrorTest.move:79:9
@@ -61,18 +76,3 @@ error: unknown assertion failed
    =     at tests/sources/functional/ModifiesErrorTest.move:93: mutate_S_test2_incorrect
    =         x1 = <redacted>
    =     at tests/sources/functional/ModifiesErrorTest.move:95: mutate_S_test2_incorrect
-
-error: caller does not have permission to modify `B::T` at given address
-   ┌─ tests/sources/functional/ModifiesErrorTest.move:38:17
-   │
-38 │         let t = borrow_global_mut<T>(addr1);
-   │                 ^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
-   =     at tests/sources/functional/ModifiesErrorTest.move:47: mutate_at_test_incorrect (spec)
-   =     at tests/sources/functional/ModifiesErrorTest.move:36: mutate_at_test_incorrect
-   =         addr1 = <redacted>
-   =         addr2 = <redacted>
-   =     at tests/sources/functional/ModifiesErrorTest.move:37: mutate_at_test_incorrect
-   =         x0 = <redacted>
-   =     at tests/sources/functional/ModifiesErrorTest.move:38: mutate_at_test_incorrect
