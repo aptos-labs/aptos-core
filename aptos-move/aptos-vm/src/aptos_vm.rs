@@ -38,9 +38,7 @@ use aptos_types::{
     },
     block_metadata::BlockMetadata,
     chain_id::ChainId,
-    dkg::{DKGNode, DKGState, DKGTrait, DummyDKG},
     fee_statement::FeeStatement,
-    move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
@@ -58,7 +56,6 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use aptos_utils::{aptos_try, return_on_failure};
@@ -140,7 +137,7 @@ macro_rules! unwrap_or_discard {
     };
 }
 
-fn get_transaction_output(
+pub(crate) fn get_transaction_output(
     session: SessionExt,
     fee_statement: FeeStatement,
     status: ExecutionStatus,
@@ -170,7 +167,7 @@ pub struct AptosVM {
     move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
-    storage_gas_params: Result<StorageGasParameters, String>,
+    pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     features: Features,
     timed_features: TimedFeatures,
 }
@@ -1437,114 +1434,6 @@ impl AptosVM {
         }
     }
 
-    fn process_validator_transaction(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        txn: ValidatorTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        let session_id = SessionId::validator_txn(&txn);
-        match txn {
-            ValidatorTransaction::DKGResult(dkg_node) => {
-                self.process_dkg_result(resolver, log_context, session_id, dkg_node)
-            },
-            _ => Ok((
-                VMStatus::Executed,
-                VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-            )),
-        }
-    }
-
-    fn process_dkg_result(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        log_context: &AdapterLogSchema,
-        session_id: SessionId,
-        dkg_node: DKGNode,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        //TODO(zjma): replace `StatusCode::INVALID_SIGNATURE` in this function
-        let dkg_state = load_on_chain_config_from_resolver::<DKGState>(resolver)
-            .map_err(|e| {
-                VMStatus::error(
-                    StatusCode::INVALID_SIGNATURE,
-                    Some(format!(
-                        "process_dkg_result failed with dkg state loading error: {e}"
-                    )),
-                )
-            })?
-            .ok_or_else(|| {
-                VMStatus::error(
-                    StatusCode::INVALID_SIGNATURE,
-                    Some("process_dkg_result failed with missing DKGState resource".to_string()),
-                )
-            })?;
-        let DKGState { in_progress, .. } = dkg_state;
-        let in_progress_session_state = in_progress.ok_or_else(|| {
-            VMStatus::error(
-                StatusCode::INVALID_SIGNATURE,
-                Some(
-                    "process_dkg_result failed with missing in-progress session state".to_string(),
-                ),
-            )
-        })?;
-
-        // Check epoch number.
-        if dkg_node.metadata.epoch != in_progress_session_state.metadata.dealer_epoch {
-            return Err(VMStatus::error(
-                StatusCode::INVALID_SIGNATURE,
-                Some("process_dkg_result failed with invalid epoch".to_string()),
-            ));
-        }
-
-        // Deserialize transcript and verify it.
-        let pub_params = DummyDKG::new_public_params(&in_progress_session_state.metadata);
-        let transcript = DummyDKG::deserialize_transcript(dkg_node.transcript_bytes.as_slice())
-            .map_err(|e| {
-                VMStatus::error(
-                    StatusCode::INVALID_SIGNATURE,
-                    Some(format!(
-                        "process_dkg_result failed with transcript deserialization failure: {e}"
-                    )),
-                )
-            })?;
-        DummyDKG::verify_transcript(&pub_params, &transcript).map_err(|e| {
-            VMStatus::error(
-                StatusCode::INVALID_SIGNATURE,
-                Some(format!(
-                    "process_dkg_result failed with transcript verification failure: {e}"
-                )),
-            )
-        })?;
-
-        // All check passed, publish DKG result on chain.
-        let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id);
-        let args = vec![
-            MoveValue::Signer(AccountAddress::ONE),
-            dkg_node.transcript_bytes.as_move_value(),
-        ];
-        session
-            .execute_function_bypass_visibility(
-                &RECONFIGURATION_WITH_DKG_MODULE,
-                FINISH_WITH_DKG_RESULT,
-                vec![],
-                serialize_values(&args),
-                &mut gas_meter,
-            )
-            .map(|_return_vals| ())
-            .or_else(|e| {
-                expect_only_successful_execution(e, FINISH_WITH_DKG_RESULT.as_str(), log_context)
-            })?;
-
-        let output = get_transaction_output(
-            session,
-            FeeStatement::zero(),
-            ExecutionStatus::Success,
-            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
-        )?;
-        Ok((VMStatus::Executed, output))
-    }
-
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -2120,7 +2009,6 @@ impl AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
-                fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
                     self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output, Some("validator_transaction".to_string()))

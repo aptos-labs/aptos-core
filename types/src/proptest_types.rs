@@ -1221,11 +1221,9 @@ impl Arbitrary for ValidatorTransaction {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        Just(Value::Null)
-            .prop_map(|_| {
-                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction {
-                    payload: vec![0xFF; 16],
-                })
+        (any::<bool>(), any::<Vec<u8>>())
+            .prop_map(|(valid, payload)| {
+                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction { valid, payload })
             })
             .boxed()
     }

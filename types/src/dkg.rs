@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{on_chain_config::OnChainConfig,
-            validator_verifier::ValidatorConsensusInfo,
-};
+use crate::{on_chain_config::OnChainConfig, validator_verifier::ValidatorConsensusInfo};
 use anyhow::{ensure, Result};
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
