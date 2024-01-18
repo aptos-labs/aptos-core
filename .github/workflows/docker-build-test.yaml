@@ -132,17 +132,18 @@ jobs:
     needs: [permission-check, determine-docker-build-metadata]
     runs-on: ubuntu-latest
     steps:
-    - name: Set IMAGE_TAG based on branch/environment
+    - name: Set IMAGE_TAG based on PR label or branch/environment
       run: |
         BRANCH_NAME=${GITHUB_REF#refs/heads/}
         SHORT_SHA=$(echo ${{ needs.determine-docker-build-metadata.outputs.gitSha }} | cut -c1-7)
-        
-        if [[ "$BRANCH_NAME" == "devnet" ]]; then
-          echo "IMAGE_TAG=dev-$SHORT_SHA" >> $GITHUB_ENV
-        elif [[ "$BRANCH_NAME" == "testnet" ]]; then
+        PR_LABELS=$(echo "${{ join(github.event.pull_request.labels.*.name, ' ') }}")
+
+        if [[ "$PR_LABELS" =~ CICD:build(-[a-zA-Z0-9]+)?-images ]]; then
           echo "IMAGE_TAG=ci-$SHORT_SHA" >> $GITHUB_ENV
-        elif [[ "$BRANCH_NAME" == "mainnet" ]]; then
+        elif [[ "$BRANCH_NAME" == "main" || "$BRANCH_NAME" == "devnet" || "$BRANCH_NAME" == "testnet" || "$BRANCH_NAME" == "mainnet" || "$BRANCH_NAME" =~ aptos-node-v.* || "$BRANCH_NAME" =~ aptos-release-v.* || "$BRANCH_NAME" =~ aptos-indexer-grpc-.* ]]; then
           echo "IMAGE_TAG=release-$SHORT_SHA" >> $GITHUB_ENV
+        elif [[ "$BRANCH_NAME" == "performance_benchmark" || "$BRANCH_NAME" == "quorum-store" || "$BRANCH_NAME" == "preview" ]]; then
+          echo "IMAGE_TAG=dev-$SHORT_SHA" >> $GITHUB_ENV
         else
           echo "IMAGE_TAG=latest-$SHORT_SHA" >> $GITHUB_ENV
         fi
