@@ -1666,13 +1666,15 @@ Transfer to the destination address using a LinearTransferRef.
         <a href="object.md#0x1_object">object</a>.owner == ref.owner,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>),
     );
-    <a href="event.md#0x1_event_emit">event::emit</a>(
-        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
-            <a href="object.md#0x1_object">object</a>: ref.self,
-            from: <a href="object.md#0x1_object">object</a>.owner,
-            <b>to</b>,
-        },
-    );
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                <a href="object.md#0x1_object">object</a>: ref.self,
+                from: <a href="object.md#0x1_object">object</a>.owner,
+                <b>to</b>,
+            },
+        );
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
         <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {

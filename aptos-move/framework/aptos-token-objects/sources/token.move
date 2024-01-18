@@ -47,7 +47,8 @@ module aptos_token_objects::token {
         /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
-        index: u64, // DEPRECATED
+        index: u64,
+        // DEPRECATED
         /// A brief description of the token.
         description: String,
         /// Deprecated in favor of `name` inside TokenIdentifiers.
@@ -55,7 +56,8 @@ module aptos_token_objects::token {
         ///
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
-        name: String,  // DEPRECATED
+        name: String,
+        // DEPRECATED
         /// The Uniform Resource Identifier (uri) pointing to the JSON file stored in off-chain
         /// storage; the URL length will likely need a maximum any suggestions?
         uri: String,
@@ -103,6 +105,14 @@ module aptos_token_objects::token {
         new_value: String
     }
 
+    #[event]
+    struct Mutation has drop, store {
+        token_address: address,
+        mutated_field_name: String,
+        old_value: String,
+        new_value: String
+    }
+
     inline fun create_common(
         constructor_ref: &ConstructorRef,
         creator_address: address,
@@ -117,7 +127,12 @@ module aptos_token_objects::token {
     ) {
         if (option::is_some(&name_with_index_suffix)) {
             // Be conservative, as we don't know what length the index will be, and assume worst case (20 chars in MAX_U64)
-            assert!(string::length(&name_prefix) + 20 + string::length(option::borrow(&name_with_index_suffix)) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
+            assert!(
+                string::length(&name_prefix) + 20 + string::length(
+                    option::borrow(&name_with_index_suffix)
+                ) <= MAX_TOKEN_NAME_LENGTH,
+                error::out_of_range(ETOKEN_NAME_TOO_LONG)
+            );
         } else {
             assert!(string::length(&name_prefix) <= MAX_TOKEN_NAME_LENGTH, error::out_of_range(ETOKEN_NAME_TOO_LONG));
         };
@@ -216,7 +231,16 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
-        create_common(&constructor_ref, creator_address, collection_name, description, name, option::none(), royalty, uri);
+        create_common(
+            &constructor_ref,
+            creator_address,
+            collection_name,
+            description,
+            name,
+            option::none(),
+            royalty,
+            uri
+        );
         constructor_ref
     }
 
@@ -236,7 +260,16 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object(creator_address);
-        create_common(&constructor_ref, creator_address, collection_name, description, name_with_index_prefix, option::some(name_with_index_suffix), royalty, uri);
+        create_common(
+            &constructor_ref,
+            creator_address,
+            collection_name,
+            description,
+            name_with_index_prefix,
+            option::some(name_with_index_suffix),
+            royalty,
+            uri
+        );
         constructor_ref
     }
 
@@ -254,7 +287,16 @@ module aptos_token_objects::token {
         let seed = create_token_seed(&collection_name, &name);
 
         let constructor_ref = object::create_named_object(creator, seed);
-        create_common(&constructor_ref, creator_address, collection_name, description, name, option::none(), royalty, uri);
+        create_common(
+            &constructor_ref,
+            creator_address,
+            collection_name,
+            description,
+            name,
+            option::none(),
+            royalty,
+            uri
+        );
         constructor_ref
     }
 
@@ -273,7 +315,16 @@ module aptos_token_objects::token {
     ): ConstructorRef {
         let creator_address = signer::address_of(creator);
         let constructor_ref = object::create_object_from_account(creator);
-        create_common(&constructor_ref, creator_address, collection_name, description, name, option::none(), royalty, uri);
+        create_common(
+            &constructor_ref,
+            creator_address,
+            collection_name,
+            description,
+            name,
+            option::none(),
+            royalty,
+            uri
+        );
         constructor_ref
     }
 
@@ -472,6 +523,14 @@ module aptos_token_objects::token {
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
         assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let token = borrow_mut(mutator_ref);
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(Mutation {
+                token_address: mutator_ref.self,
+                mutated_field_name: string::utf8(b"description"),
+                old_value: token.description,
+                new_value: description
+            })
+        };
         event::emit_event(
             &mut token.mutation_events,
             MutationEvent {
@@ -499,6 +558,14 @@ module aptos_token_objects::token {
             old_name
         };
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(Mutation {
+                token_address: mutator_ref.self,
+                mutated_field_name: string::utf8(b"name"),
+                old_value: old_name,
+                new_value: name
+            })
+        };
         event::emit_event(
             &mut token.mutation_events,
             MutationEvent {
@@ -512,6 +579,14 @@ module aptos_token_objects::token {
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let token = borrow_mut(mutator_ref);
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(Mutation {
+                token_address: mutator_ref.self,
+                mutated_field_name: string::utf8(b"uri"),
+                old_value: token.uri,
+                new_value: uri,
+            })
+        };
         event::emit_event(
             &mut token.mutation_events,
             MutationEvent {
@@ -745,7 +820,7 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
-    #[test(creator = @0x123,fx = @std)]
+    #[test(creator = @0x123, fx = @std)]
     fun test_create_burn_and_delete(creator: &signer, fx: signer) acquires Token, TokenIdentifiers {
         use aptos_framework::account;
         use std::features;
@@ -798,7 +873,7 @@ module aptos_token_objects::token {
 
         let token_2_ref = create_numbered_token_helper(creator, collection_name, token_name);
         assert!(name(object::object_from_constructor_ref<Token>(&token_2_ref)) == std::string::utf8(b"token name2"), 1);
-        assert!(vector::length(&event::emitted_events<collection::Mint>()) == 1, 0);
+        assert!(vector::length(&event::emitted_events<collection::Mint>()) == 2, 0);
 
         let burn_ref = generate_burn_ref(&token_2_ref);
         let token_addr = object::address_from_constructor_ref(&token_2_ref);

@@ -80,6 +80,12 @@ module aptos_token_objects::collection {
         mutated_field_name: String,
     }
 
+    #[event]
+    struct Mutation has drop, store {
+        token: address,
+        mutated_field_name: String,
+    }
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// Fixed supply tracker, this is useful for ensuring that a limited number of tokens are minted.
     /// and adding events and supply tracking to a collection.
@@ -350,6 +356,16 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
+
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Mint {
+                        collection: collection_addr,
+                        index: aggregator_v2::create_snapshot(supply.total_minted),
+                        token,
+                    },
+                );
+            };
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
                     index: supply.total_minted,
@@ -361,6 +377,15 @@ module aptos_token_objects::collection {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             supply.total_minted = supply.total_minted + 1;
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Mint {
+                        collection: collection_addr,
+                        index: aggregator_v2::create_snapshot(supply.total_minted),
+                        token,
+                    },
+                );
+            };
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
@@ -405,7 +430,15 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
-            // TODO[agg_v2](cleanup): Update to Mint in the future release
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Mint {
+                        collection: collection_addr,
+                        index: aggregator_v2::create_snapshot(supply.total_minted),
+                        token,
+                    },
+                );
+            };
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
                     index: supply.total_minted,
@@ -417,7 +450,15 @@ module aptos_token_objects::collection {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             supply.total_minted = supply.total_minted + 1;
-            // TODO[agg_v2](cleanup): Update to Mint in the future release
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Mint {
+                        collection: collection_addr,
+                        index: aggregator_v2::create_snapshot(supply.total_minted),
+                        token,
+                    },
+                );
+            };
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
@@ -454,7 +495,16 @@ module aptos_token_objects::collection {
         } else if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
-            // TODO[agg_v2](cleanup): Update to Burn in the future release
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Burn {
+                        collection: collection_addr,
+                        index: *option::borrow(&index),
+                        token,
+                        previous_owner,
+                    },
+                );
+            };
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -465,7 +515,16 @@ module aptos_token_objects::collection {
         } else if (exists<UnlimitedSupply>(collection_addr)) {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
-            // TODO[agg_v2](cleanup): Update to Burn in the future release
+            if (std::features::module_event_migration_enabled()) {
+                event::emit(
+                    Burn {
+                        collection: collection_addr,
+                        index: *option::borrow(&index),
+                        token,
+                        previous_owner,
+                    },
+                );
+            };
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -489,7 +548,9 @@ module aptos_token_objects::collection {
         let metadata_object_signer = object::generate_signer_for_extending(ref);
         assert!(features::concurrent_token_v2_enabled(), error::invalid_argument(ECONCURRENT_NOT_ENABLED));
 
-        let (supply, current_supply, total_minted, burn_events, mint_events) = if (exists<FixedSupply>(metadata_object_address)) {
+        let (supply, current_supply, total_minted, burn_events, mint_events) = if (exists<FixedSupply>(
+            metadata_object_address
+        )) {
             let FixedSupply {
                 current_supply,
                 max_supply,
@@ -550,7 +611,9 @@ module aptos_token_objects::collection {
     ///
     /// Note: Calling this method from transaction that also mints/burns, prevents
     /// it from being parallelized.
-    public fun count<T: key>(collection: Object<T>): Option<u64> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    public fun count<T: key>(
+        collection: Object<T>
+    ): Option<u64> acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let collection_address = object::object_address(&collection);
         check_collection_exists(collection_address);
 
@@ -599,6 +662,9 @@ module aptos_token_objects::collection {
         assert!(string::length(&description) <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         collection.description = description;
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(Mutation { token: mutator_ref.self, mutated_field_name: string::utf8(b"description") });
+        };
         event::emit_event(
             &mut collection.mutation_events,
             MutationEvent { mutated_field_name: string::utf8(b"description") },
@@ -609,6 +675,9 @@ module aptos_token_objects::collection {
         assert!(string::length(&uri) <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
         collection.uri = uri;
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(Mutation { token: mutator_ref.self, mutated_field_name: string::utf8(b"uri") });
+        } ;
         event::emit_event(
             &mut collection.mutation_events,
             MutationEvent { mutated_field_name: string::utf8(b"uri") },
@@ -656,7 +725,10 @@ module aptos_token_objects::collection {
     }
 
     #[test(fx = @aptos_framework, creator = @0x123)]
-    fun test_create_mint_burn_for_concurrent(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    fun test_create_mint_burn_for_concurrent(
+        fx: &signer,
+        creator: &signer
+    ) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let feature = features::get_concurrent_token_v2_feature();
         features::change_feature_flags_for_testing(fx, vector[feature], vector[]);
 

@@ -156,9 +156,16 @@ module aptos_framework::object {
         self: address,
     }
 
-    #[event]
     /// Emitted whenever the object's owner field is changed.
     struct TransferEvent has drop, store {
+        object: address,
+        from: address,
+        to: address,
+    }
+
+    #[event]
+    /// Emitted whenever the object's owner field is changed.
+    struct Transfer has drop, store {
         object: address,
         from: address,
         to: address,
@@ -432,13 +439,15 @@ module aptos_framework::object {
             object.owner == ref.owner,
             error::permission_denied(ENOT_OBJECT_OWNER),
         );
-        event::emit(
-            TransferEvent {
-                object: ref.self,
-                from: object.owner,
-                to,
-            },
-        );
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                Transfer {
+                    object: ref.self,
+                    from: object.owner,
+                    to,
+                },
+            );
+        };
         event::emit_event(
             &mut object.transfer_events,
             TransferEvent {
@@ -487,7 +496,7 @@ module aptos_framework::object {
         let object_core = borrow_global_mut<ObjectCore>(object);
         if (object_core.owner != to) {
             event::emit(
-                TransferEvent {
+                Transfer {
                     object,
                     from: object_core.owner,
                     to,

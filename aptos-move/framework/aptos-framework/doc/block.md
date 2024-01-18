@@ -150,7 +150,12 @@ Store new block events as a move resource, internally using a circular buffer.
 Should be in-sync with NewBlockEvent rust struct in new_block.rs
 
 
+<<<<<<< HEAD
 <pre><code><b>struct</b> <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> <b>has</b> <b>copy</b>, drop, store
+=======
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> <b>has</b> drop, store
+>>>>>>> 8e7909a17c ([event_v2] migrate 3 files)
 </code></pre>
 
 
@@ -220,7 +225,8 @@ Should be in-sync with NewBlockEvent rust struct in new_block.rs
 Event emitted when a proposal is created.
 
 
-<pre><code><b>struct</b> <a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -401,6 +407,11 @@ Can only be called as part of the Aptos governance proposal process established 
     <b>let</b> old_epoch_interval = block_resource.epoch_interval;
     block_resource.epoch_interval = new_epoch_interval;
 
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a> { old_epoch_interval, new_epoch_interval },
+        );
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a>&gt;(
         &<b>mut</b> block_resource.update_epoch_interval_events,
         <a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a> { old_epoch_interval, new_epoch_interval },
@@ -550,6 +561,7 @@ The runtime always runs this before executing the transactions in a block.
 </code></pre>
 
 
+<<<<<<< HEAD
 
 </details>
 
@@ -582,15 +594,35 @@ The runtime always runs this before executing the transactions in a block.
 ) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
     <b>let</b> epoch_interval = <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(
         &vm,
+=======
+    // Emit both <a href="event.md#0x1_event">event</a> v1 and v2 for compatibility. Eventually only <b>module</b> events will be kept.
+    <b>let</b> new_block_event = <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
+>>>>>>> 8e7909a17c ([event_v2] migrate 3 files)
         <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>,
         epoch,
         round,
         proposer,
         failed_proposer_indices,
+<<<<<<< HEAD
         previous_block_votes_bitvec,
         <a href="timestamp.md#0x1_timestamp">timestamp</a>
     );
     <a href="randomness.md#0x1_randomness_on_new_block">randomness::on_new_block</a>(&vm, epoch, round, randomness_seed);
+=======
+        time_microseconds: <a href="timestamp.md#0x1_timestamp">timestamp</a>,
+    };
+    <b>let</b> new_block_event_v2 = <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>,
+        epoch,
+        round,
+        height: block_metadata_ref.height,
+        previous_block_votes_bitvec,
+        proposer,
+        failed_proposer_indices,
+        time_microseconds: <a href="timestamp.md#0x1_timestamp">timestamp</a>,
+    };
+    <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(&vm, &<b>mut</b> block_metadata_ref.new_block_events, new_block_event, new_block_event_v2);
+>>>>>>> 8e7909a17c ([event_v2] migrate 3 files)
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>();
@@ -635,7 +667,7 @@ Get the current block height
 Emit the event and update height and global timestamp
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>, new_block_event_v2: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
 </code></pre>
 
 
@@ -644,6 +676,8 @@ Emit the event and update height and global timestamp
 <summary>Implementation</summary>
 
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 <pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>) <b>acquires</b> <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework)) {
         <b>let</b> commit_history_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
@@ -657,11 +691,25 @@ Emit the event and update height and global timestamp
         };
         commit_history_ref.next_idx = (idx + 1) % commit_history_ref.max_capacity;
     };
+=======
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>, new_block_event_v2: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>) {
+>>>>>>> 8e7909a17c ([event_v2] migrate 3 files)
+=======
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
+    vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;,
+    new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>,
+    new_block_event_v2: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>
+) {
+>>>>>>> 0a5d0de360 (use feature_flag to switch)
     <a href="timestamp.md#0x1_timestamp_update_global_time">timestamp::update_global_time</a>(vm, new_block_event.proposer, new_block_event.time_microseconds);
     <b>assert</b>!(
         <a href="event.md#0x1_event_counter">event::counter</a>(event_handle) == new_block_event.height,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT">ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT</a>),
     );
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(new_block_event_v2);
+    };
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(event_handle, new_block_event);
 }
 </code></pre>
@@ -702,6 +750,16 @@ reconfiguration event.
             proposer: @vm_reserved,
             failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
             time_microseconds: 0,
+        },
+        <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
+            <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: genesis_id,
+            epoch: 0,
+            round: 0,
+            height: 0,
+            previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            proposer: @vm_reserved,
+            failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+            time_microseconds: 0,
         }
     );
 }
@@ -733,8 +791,26 @@ new block event for WriteSetPayload.
     <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
 
+<<<<<<< HEAD
     <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
         vm_signer,
+=======
+    <b>if</b> (std::features::module_event_migration_enabled()) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
+                <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: fake_block_hash,
+                epoch: <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>(),
+                round: <a href="block.md#0x1_block_MAX_U64">MAX_U64</a>,
+                height: block_metadata_ref.height,
+                previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+                proposer: @vm_reserved,
+                failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>(),
+                time_microseconds: <a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>(),
+            }
+        );
+    };
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(
+>>>>>>> 0a5d0de360 (use feature_flag to switch)
         &<b>mut</b> block_metadata_ref.new_block_events,
         <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
             <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: fake_block_hash,
@@ -1136,7 +1212,7 @@ The BlockResource existed under the @aptos_framework.
 ### Function `emit_new_block_event`
 
 
-<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
+<pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>, new_block_event_v2: <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>)
 </code></pre>
 
 

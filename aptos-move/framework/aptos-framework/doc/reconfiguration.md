@@ -57,7 +57,8 @@ with new configuration information. This is also called a
 "reconfiguration event"
 
 
-<pre><code><b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -394,8 +395,16 @@ Signal validators to start using new configuration. Must be called from friend c
             epoch: config_ref.epoch,
         },
     );
+<<<<<<< HEAD
 
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">reconfiguration_state::on_reconfig_finish</a>();
+=======
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
+            epoch: config_ref.epoch,
+        },
+    );
+>>>>>>> 8e7909a17c ([event_v2] migrate 3 files)
 }
 </code></pre>
 
@@ -475,6 +484,11 @@ reconfiguration event.
 
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a>&gt;(
         &<b>mut</b> config_ref.events,
+        <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
+            epoch: config_ref.epoch,
+        },
+    );
+    <a href="event.md#0x1_event_emit">event::emit</a>(
         <a href="reconfiguration.md#0x1_reconfiguration_NewEpochEvent">NewEpochEvent</a> {
             epoch: config_ref.epoch,
         },
