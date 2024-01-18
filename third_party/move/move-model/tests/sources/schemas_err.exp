@@ -46,6 +46,18 @@ error: expected `bool` but found `num` (for `x` included from schema)
 41 │         include WronglyTypedInstantiationIncluded<num>;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+error: `y` cannot be matched to an existing name in inclusion context
+   ┌─ tests/sources/schemas_err.move:52:17
+   │
+52 │         include UndeclaredVarInInclude;
+   │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+error: `requires` not allowed in struct context (included from schema)
+   ┌─ tests/sources/schemas_err.move:70:9
+   │
+70 │         include Condition;
+   │         ^^^^^^^^^^^^^^^^^^
+
 error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
    ┌─ tests/sources/schemas_err.move:80:17
    │
@@ -69,15 +81,3 @@ error: expression construct not supported for schemas
    │
 86 │         include Condition || Condition;
    │                 ^^^^^^^^^^^^^^^^^^^^^^
-
-error: `y` cannot be matched to an existing name in inclusion context
-   ┌─ tests/sources/schemas_err.move:52:17
-   │
-52 │         include UndeclaredVarInInclude;
-   │                 ^^^^^^^^^^^^^^^^^^^^^^
-
-error: `requires` not allowed in struct context (included from schema)
-   ┌─ tests/sources/schemas_err.move:70:9
-   │
-70 │         include Condition;
-   │         ^^^^^^^^^^^^^^^^^^

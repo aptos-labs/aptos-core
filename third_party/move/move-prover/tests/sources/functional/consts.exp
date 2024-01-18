@@ -1,4 +1,16 @@
 Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/consts.move:32:9
+   │
+32 │         ensures !result.b;
+   │         ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/consts.move:27: init_incorrect
+   =         result = <redacted>
+   =     at tests/sources/functional/consts.move:28: init_incorrect
+   =     at tests/sources/functional/consts.move:31: init_incorrect (spec)
+   =     at tests/sources/functional/consts.move:32: init_incorrect (spec)
+
 error: unknown assertion failed
    ┌─ tests/sources/functional/consts.move:45:13
    │
@@ -34,15 +46,3 @@ error: unknown assertion failed
    =     at tests/sources/functional/consts.move:72: array_in_fun_incorrect_bool
    =         v1 = <redacted>
    =     at tests/sources/functional/consts.move:74: array_in_fun_incorrect_bool
-
-error: post-condition does not hold
-   ┌─ tests/sources/functional/consts.move:32:9
-   │
-32 │         ensures !result.b;
-   │         ^^^^^^^^^^^^^^^^^^
-   │
-   =     at tests/sources/functional/consts.move:27: init_incorrect
-   =         result = <redacted>
-   =     at tests/sources/functional/consts.move:28: init_incorrect
-   =     at tests/sources/functional/consts.move:31: init_incorrect (spec)
-   =     at tests/sources/functional/consts.move:32: init_incorrect (spec)
