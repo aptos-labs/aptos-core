@@ -135,7 +135,7 @@ fn view_request(
         ));
     }
 
-    let return_vals = AptosVM::execute_view_function(
+    let (return_vals, gas_used) = AptosVM::execute_view_function(
         &state_view,
         view_function.module.clone(),
         view_function.function.clone(),
@@ -207,8 +207,11 @@ fn view_request(
         },
     };
     let (account_address, module) = view_function.module.into();
-    context
-        .view_function_stats()
-        .increment(account_address, &module, &view_function.function);
+    context.view_function_stats().increment(
+        account_address,
+        &module,
+        &view_function.function,
+        gas_used,
+    );
     result
 }

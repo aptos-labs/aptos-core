@@ -73,7 +73,7 @@ pub fn get_remaining_voting_power(
     proposal_id: u64,
 ) -> u64 {
     let fun = MemberId::from_str("0x1::aptos_governance::get_remaining_voting_power").unwrap();
-    let res = harness
+    let (res, _) = harness
         .execute_view_function(fun, vec![], vec![
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),

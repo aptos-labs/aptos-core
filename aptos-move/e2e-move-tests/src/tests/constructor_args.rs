@@ -86,7 +86,7 @@ fn success_generic_view(
     for (entry, args, expected) in tests {
         let res = h.execute_view_function(str::parse(entry).unwrap(), ty_args.clone(), args);
         assert!(res.is_ok(), "{}", res.err().unwrap().to_string());
-        let bcs = res.unwrap().pop().unwrap();
+        let bcs = res.unwrap().0.pop().unwrap();
         let res = bcs::from_bytes::<String>(&bcs).unwrap();
         assert_eq!(res, expected);
     }

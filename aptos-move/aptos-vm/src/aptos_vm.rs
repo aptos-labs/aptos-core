@@ -1836,7 +1836,7 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_budget: u64,
-    ) -> Result<Vec<Vec<u8>>> {
+    ) -> Result<(Vec<Vec<u8>>, u64)> {
         let resolver = state_view.as_move_resolver();
         let vm = AptosVM::new(&resolver);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -1863,7 +1863,7 @@ impl AptosVM {
             vm.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        Ok(session
+        let result = session
             .execute_function_bypass_visibility(
                 &module_id,
                 func_name.as_ident_str(),
@@ -1875,7 +1875,11 @@ impl AptosVM {
             .return_values
             .into_iter()
             .map(|(bytes, _ty)| bytes)
-            .collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let gas_used = GasQuantity::new(gas_budget)
+            .checked_sub(gas_meter.balance())
+            .expect("Balance should always be less than or equal to max gas amount");
+        Ok((result, gas_used.into()))
     }
 
     fn run_prologue_with_payload(

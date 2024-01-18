@@ -53,6 +53,7 @@ use move_core_types::{
 };
 use serde::Serialize;
 use std::{
+    cmp::Reverse,
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
     sync::{Arc, RwLock, RwLockWriteGuard},
@@ -1380,17 +1381,18 @@ impl ViewFunctionStats {
         account_address: AccountAddress,
         module: &Identifier,
         function: &Identifier,
+        gas: u64,
     ) {
         if let Some(cache) = &self.call_count {
             let key = (account_address, module.to_string(), function.to_string());
-            let count = cache.get(&key).unwrap_or(0);
-            cache.insert(key, count + 1);
+            let prev_gas = cache.get(&key).unwrap_or(0);
+            cache.insert(key, prev_gas + gas);
         }
     }
 
     pub fn log_and_clear(&self) {
         if let Some(cache) = &self.call_count {
-            if cache.entry_count() == 0 {
+            if cache.iter().next().is_none() {
                 return;
             }
 
@@ -1398,11 +1400,11 @@ impl ViewFunctionStats {
                 .iter()
                 .map(|entry| {
                     let (account, module, function) = entry.key();
-                    let count = *entry.value();
-                    (count, *account, module.clone(), function.clone())
+                    let gas_used = *entry.value();
+                    (gas_used, *account, module.clone(), function.clone())
                 })
                 .collect();
-            sorted.sort();
+            sorted.sort_by_key(|(gas_used, _, _, _)| Reverse(*gas_used));
 
             info!(
                 LogSchema::new(LogEvent::ViewFunction),
@@ -1415,7 +1417,6 @@ impl ViewFunctionStats {
                 top_7 = sorted.get(6),
                 top_8 = sorted.get(7),
                 top_9 = sorted.get(8),
-                top_10 = sorted.get(9),
             );
 
             cache.invalidate_all();

@@ -50,6 +50,7 @@ fn test_basic_fungible_token() {
             vec![],
         )
         .unwrap()
+        .0
         .pop()
         .unwrap();
     let metadata = bcs::from_bytes::<AccountAddress>(metadata.as_slice()).unwrap();

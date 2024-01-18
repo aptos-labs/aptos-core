@@ -1095,7 +1095,7 @@ impl FakeExecutor {
         func_name: Identifier,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> Result<(Vec<Vec<u8>>, u64), Error> {
         // No gas limit
         AptosVM::execute_view_function(
             self.get_state_view(),

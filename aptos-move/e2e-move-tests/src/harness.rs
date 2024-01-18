@@ -715,7 +715,7 @@ impl MoveHarness {
         fun: MemberId,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> Result<(Vec<Vec<u8>>, u64), Error> {
         self.executor
             .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
     }
