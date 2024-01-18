@@ -7,7 +7,7 @@
 
 -  [Resource `DirectTransferConfig`](#0x1_aptos_account_DirectTransferConfig)
 -  [Struct `DirectCoinTransferConfigUpdatedEvent`](#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent)
--  [Struct `AllowDirectTransfers`](#0x1_aptos_account_AllowDirectTransfers)
+-  [Struct `DirectCoinTransferConfigUpdated`](#0x1_aptos_account_DirectCoinTransferConfigUpdated)
 -  [Constants](#@Constants_0)
 -  [Function `create_account`](#0x1_aptos_account_create_account)
 -  [Function `batch_transfer`](#0x1_aptos_account_batch_transfer)
@@ -40,6 +40,7 @@
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
@@ -109,14 +110,14 @@ Event emitted when an account's direct coins transfer config is updated.
 
 </details>
 
-<a id="0x1_aptos_account_AllowDirectTransfers"></a>
+<a id="0x1_aptos_account_DirectCoinTransferConfigUpdated"></a>
 
-## Struct `AllowDirectTransfers`
+## Struct `DirectCoinTransferConfigUpdated`
 
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="aptos_account.md#0x1_aptos_account_AllowDirectTransfers">AllowDirectTransfers</a> <b>has</b> drop, store
+<b>struct</b> <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -469,8 +470,10 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
         };
 
         direct_transfer_config.allow_arbitrary_coin_transfers = allow;
-        emit(
-            <a href="aptos_account.md#0x1_aptos_account_AllowDirectTransfers">AllowDirectTransfers</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        };
         emit_event(
             &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
             <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
@@ -479,8 +482,9 @@ Set whether <code><a href="account.md#0x1_account">account</a></code> can receiv
             allow_arbitrary_coin_transfers: allow,
             update_coin_transfer_events: new_event_handle&lt;<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a>&gt;(<a href="account.md#0x1_account">account</a>),
         };
-        emit(
-            <a href="aptos_account.md#0x1_aptos_account_AllowDirectTransfers">AllowDirectTransfers</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        <b>if</b> (std::features::module_event_migration_enabled()) {
+            emit(<a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdated">DirectCoinTransferConfigUpdated</a> { <a href="account.md#0x1_account">account</a>: addr, new_allow_direct_transfers: allow });
+        };
         emit_event(
             &<b>mut</b> direct_transfer_config.update_coin_transfer_events,
             <a href="aptos_account.md#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent">DirectCoinTransferConfigUpdatedEvent</a> { new_allow_direct_transfers: allow });
