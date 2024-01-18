@@ -468,7 +468,8 @@ impl TransactionsApi {
                     u64::from(gas_params.vm.txn.min_transaction_gas_units)
                         / u64::from(gas_params.vm.txn.gas_unit_scaling_factor);
                 let max_number_of_gas_units =
-                    u64::from(gas_params.vm.txn.maximum_number_of_gas_units);
+                    u64::from(gas_params.vm.txn.maximum_number_of_gas_units)
+                        .min(context.node_config.api.max_gas_simulation);
 
                 // Retrieve account balance to determine max gas available
                 let coin_store = context

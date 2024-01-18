@@ -62,6 +62,8 @@ pub struct ApiConfig {
     ///
     /// This limits the execution length of a view function to the given gas used.
     pub max_gas_view_function: u64,
+    /// This limits the execution length of simulation to the given gas used.
+    pub max_gas_simulation: u64,
     /// Optional: Maximum number of worker threads for the API.
     ///
     /// If not set, `runtime_worker_multiplier` will multiply times the number of CPU cores on the machine
@@ -83,7 +85,8 @@ pub const DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE: usize = 10;
 pub const DEFAULT_MAX_PAGE_SIZE: u16 = 100;
 const DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE: u16 = 9999;
 const DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE: u16 = 9999;
-const DEFAULT_MAX_VIEW_GAS: u64 = 2_000_000; // We keep this value the same as the max number of gas allowed for one single transaction defined in aptos-gas.
+const DEFAULT_MAX_VIEW_GAS: u64 = 500; // The value should be smaller than the max number of gas allowed for one single transaction defined in aptos-gas.
+const DEFAULT_MAX_SIMULATION_GAS: u64 = 500; // The value should be smaller than the max number of gas allowed for one single transaction defined in aptos-gas.
 
 fn default_enabled() -> bool {
     true
@@ -115,6 +118,7 @@ impl Default for ApiConfig {
             max_account_resources_page_size: DEFAULT_MAX_ACCOUNT_RESOURCES_PAGE_SIZE,
             max_account_modules_page_size: DEFAULT_MAX_ACCOUNT_MODULES_PAGE_SIZE,
             max_gas_view_function: DEFAULT_MAX_VIEW_GAS,
+            max_gas_simulation: DEFAULT_MAX_SIMULATION_GAS,
             max_runtime_workers: None,
             runtime_worker_multiplier: 2,
             gas_estimation: GasEstimationConfig::default(),
