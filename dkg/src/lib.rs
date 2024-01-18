@@ -50,6 +50,3 @@ pub fn start_dkg_runtime(
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
 }
-
-//TODO(zjma): make this test-only after real dkg.
-pub(crate) mod dummy_dkg;

@@ -3,7 +3,10 @@
 
 use crate::{config::SecureBackend, keys::ConfigKey};
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
-use aptos_types::account_address::{AccountAddress, AccountAddress as PeerId};
+use aptos_types::{
+    account_address::{AccountAddress, AccountAddress as PeerId},
+    dkg::{DKGPrivateParamsProvider, DKGTrait, DummyDKG},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -89,4 +92,10 @@ pub struct IdentityFromStorage {
 #[serde(deny_unknown_fields)]
 pub struct IdentityFromFile {
     pub path: PathBuf,
+}
+
+impl DKGPrivateParamsProvider<DummyDKG> for IdentityBlob {
+    fn dkg_private_params(&self) -> &<DummyDKG as DKGTrait>::PrivateParams {
+        self.consensus_private_key.as_ref().unwrap()
+    }
 }
