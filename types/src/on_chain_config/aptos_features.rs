@@ -53,6 +53,8 @@ pub enum FeatureFlag {
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
+    ZK_ID_SIGNATURE = 46,
+    OPEN_ID_SIGNATURE = 47,
 }
 
 /// Representation of features on chain as a bitset.
@@ -145,5 +147,15 @@ impl Features {
 
     pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+    }
+
+    /// Whether the extra verification of TXN authenticators in the Move prologue is enabled.
+    /// (Necessary for fully-validating zkID transactions.)
+    pub fn is_zkid_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURE)
+    }
+
+    pub fn is_open_id_signature_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OPEN_ID_SIGNATURE)
     }
 }

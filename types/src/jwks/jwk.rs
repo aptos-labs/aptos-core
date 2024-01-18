@@ -33,22 +33,23 @@ impl From<JWK> for JWKMoveStruct {
     }
 }
 
-impl TryFrom<JWKMoveStruct> for JWK {
+impl TryFrom<&JWKMoveStruct> for JWK {
     type Error = anyhow::Error;
 
-    fn try_from(value: JWKMoveStruct) -> Result<Self, Self::Error> {
+    fn try_from(value: &JWKMoveStruct) -> Result<Self, Self::Error> {
         match value.variant.type_name.as_str() {
             RSA_JWK::MOVE_TYPE_NAME => {
-                let rsa_jwk = MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant).unwrap();
+                let rsa_jwk =
+                    MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
                 Ok(Self::RSA(rsa_jwk))
             },
             UnsupportedJWK::MOVE_TYPE_NAME => {
                 let unsupported_jwk =
-                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant).unwrap();
+                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
                 Ok(Self::Unsupported(unsupported_jwk))
             },
             _ => Err(anyhow!(
-                "convertion from jwk move struct to jwk failed with unknown variant"
+                "converting from jwk move struct to jwk failed with unknown variant"
             )),
         }
     }
@@ -62,20 +63,20 @@ fn convert_jwk_move_struct_to_jwk() {
     };
     assert_eq!(
         JWK::Unsupported(unsupported_jwk),
-        JWK::try_from(jwk_move_struct).unwrap()
+        JWK::try_from(&jwk_move_struct).unwrap()
     );
 
     let rsa_jwk = RSA_JWK::new_for_testing("kid1", "kty1", "alg1", "e1", "n1");
     let jwk_move_struct = JWKMoveStruct {
         variant: rsa_jwk.as_move_any(),
     };
-    assert_eq!(JWK::RSA(rsa_jwk), JWK::try_from(jwk_move_struct).unwrap());
+    assert_eq!(JWK::RSA(rsa_jwk), JWK::try_from(&jwk_move_struct).unwrap());
 
     let unknown_jwk_variant = MoveAny {
         type_name: "type1".to_string(),
         data: vec![],
     };
-    assert!(JWK::try_from(JWKMoveStruct {
+    assert!(JWK::try_from(&JWKMoveStruct {
         variant: unknown_jwk_variant
     })
     .is_err());

@@ -274,7 +274,10 @@ A provider and its <code><a href="jwks.md#0x1_jwks_JWK">JWK</a></code>s.
 <code><a href="version.md#0x1_version">version</a>: u64</code>
 </dt>
 <dd>
+ A version number is needed by JWK consensus to dedup the updates.
+ e.g, when on chain version = 5, multiple nodes can propose an update with version = 6.
  Bumped every time the JWKs for the current issuer is updated.
+ The Rust authenticator only uses the latest version.
 </dd>
 <dt>
 <code><a href="jwks.md#0x1_jwks">jwks</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="jwks.md#0x1_jwks_JWK">jwks::JWK</a>&gt;</code>

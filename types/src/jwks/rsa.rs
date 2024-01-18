@@ -2,8 +2,9 @@
 
 #[cfg(test)]
 use crate::move_any::Any as MoveAny;
-use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
-use anyhow::{anyhow, ensure};
+use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
+use anyhow::{anyhow, ensure, Result};
+use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
@@ -30,6 +31,14 @@ impl RSA_JWK {
             e: e.to_string(),
             n: n.to_string(),
         }
+    }
+
+    pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
+        let mut validation = Validation::new(Algorithm::RS256);
+        validation.validate_exp = false;
+        let key = &DecodingKey::from_rsa_components(&self.n, &self.e)?;
+        let claims = jsonwebtoken::decode::<Claims>(jwt_token, key, &validation)?;
+        Ok(claims)
     }
 }
 

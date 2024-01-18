@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
+use self::jwk::JWK;
+use anyhow::{bail, Context, Ok, Result};
 use jwk::JWKMoveStruct;
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 
 pub mod jwk;
@@ -36,6 +39,25 @@ impl ProviderJWKs {
     pub fn jwks(&self) -> &Vec<JWKMoveStruct> {
         &self.jwks
     }
+
+    pub fn get_jwk(&self, id: &str) -> Result<&JWKMoveStruct> {
+        for jwk_move in self.jwks() {
+            let jwk = JWK::try_from(jwk_move)?;
+            match jwk {
+                JWK::RSA(rsa_jwk) => {
+                    if rsa_jwk.kid.eq(id) {
+                        return Ok(jwk_move);
+                    }
+                },
+                JWK::Unsupported(unsupported_jwk) => {
+                    if unsupported_jwk.id.eq(id.as_bytes()) {
+                        return Ok(jwk_move);
+                    }
+                },
+            }
+        }
+        bail!("JWK with id {} not found", id);
+    }
 }
 
 /// Move type `0x1::jwks::JWKs` in rust.
@@ -54,4 +76,36 @@ pub struct ObservedJWKs {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
+}
+
+impl PatchedJWKs {
+    pub fn latest_version(&self, iss: &str) -> Option<&ProviderJWKs> {
+        let mut latest: Option<&ProviderJWKs> = None;
+        for provider_jwk_set in &self.jwks.entries {
+            if provider_jwk_set.issuer.eq(&issuer_from_str(iss)) {
+                match latest {
+                    Some(latest_set) => {
+                        if provider_jwk_set.version > latest_set.version {
+                            latest = Some(provider_jwk_set)
+                        }
+                    },
+                    None => latest = Some(provider_jwk_set),
+                }
+            }
+        }
+        latest
+    }
+
+    pub fn get_jwk(&self, iss: &str, kid: &str) -> Result<&JWKMoveStruct> {
+        let provider_jwk_set = self
+            .latest_version(iss)
+            .context("JWK not found for issuer")?;
+        let jwk = provider_jwk_set.get_jwk(kid)?;
+        Ok(jwk)
+    }
+}
+
+impl MoveStructType for PatchedJWKs {
+    const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("PatchedJWKs");
 }

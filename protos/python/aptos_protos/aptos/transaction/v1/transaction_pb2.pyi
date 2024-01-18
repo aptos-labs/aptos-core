@@ -1030,10 +1030,12 @@ class AnyPublicKey(_message.Message):
         TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
+        TYPE_ZKID: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
     TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
+    TYPE_ZKID: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type
@@ -1045,7 +1047,7 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = ["type", "ed25519", "secp256k1_ecdsa", "webauthn"]
+    __slots__ = ["type", "ed25519", "secp256k1_ecdsa", "webauthn", "zkid"]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
@@ -1053,24 +1055,29 @@ class AnySignature(_message.Message):
         TYPE_ED25519: _ClassVar[AnySignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
         TYPE_WEBAUTHN: _ClassVar[AnySignature.Type]
+        TYPE_ZKID: _ClassVar[AnySignature.Type]
     TYPE_UNSPECIFIED: AnySignature.Type
     TYPE_ED25519: AnySignature.Type
     TYPE_SECP256K1_ECDSA: AnySignature.Type
     TYPE_WEBAUTHN: AnySignature.Type
+    TYPE_ZKID: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
     WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
+    ZKID_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
     ed25519: Ed25519
     secp256k1_ecdsa: Secp256k1Ecdsa
     webauthn: WebAuthn
+    zkid: ZkId
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
         ed25519: _Optional[_Union[Ed25519, _Mapping]] = ...,
         secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
         webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,
+        zkid: _Optional[_Union[ZkId, _Mapping]] = ...,
     ) -> None: ...
 
 class Ed25519(_message.Message):
@@ -1086,6 +1093,12 @@ class Secp256k1Ecdsa(_message.Message):
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
 class WebAuthn(_message.Message):
+    __slots__ = ["signature"]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    signature: bytes
+    def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
+
+class ZkId(_message.Message):
     __slots__ = ["signature"]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes

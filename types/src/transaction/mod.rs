@@ -19,6 +19,7 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
+    zkid::{ZkIdPublicKey, ZkIdSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -696,6 +697,25 @@ impl SignedTransaction {
             AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
                 AnyPublicKey::secp256k1_ecdsa(public_key),
                 AnySignature::secp256k1_ecdsa(signature),
+            )),
+        );
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
+    pub fn new_zkid(
+        raw_txn: RawTransaction,
+        public_key: ZkIdPublicKey,
+        signature: ZkIdSignature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::single_sender(
+            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+                AnyPublicKey::zkid(public_key),
+                AnySignature::zkid(signature),
             )),
         );
         SignedTransaction {
