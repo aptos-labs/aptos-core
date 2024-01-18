@@ -1,5 +1,13 @@
 
 Diagnostics:
+warning: Function `0x42::explicate_drop::unused_var` is unused: it has no current callers and is private to its module.
+  ┌─ tests/explicit-drop/unused_var.move:2:2
+  │
+2 │ ╭     fun unused_var() {
+3 │ │         let _x = 42;
+4 │ │     }
+  │ ╰─────^
+
 warning: Function `0x42::explicate_drop::unused_arg` is unused: it has no current callers and is private to its module.
   ┌─ tests/explicit-drop/unused_var.move:6:2
   │
@@ -14,14 +22,6 @@ warning: Function `0x42::explicate_drop::unused_call_assign` is unused: it has n
 14 │ │         let _x = id(42);
 15 │ │     }
    │ ╰─────^
-
-warning: Function `0x42::explicate_drop::unused_var` is unused: it has no current callers and is private to its module.
-  ┌─ tests/explicit-drop/unused_var.move:2:2
-  │
-2 │ ╭     fun unused_var() {
-3 │ │         let _x = 42;
-4 │ │     }
-  │ ╰─────^
 
 ============ initial bytecode ================
 

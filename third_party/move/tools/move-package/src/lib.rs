@@ -19,11 +19,13 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use clap::*;
+use move_command_line_common::env::read_bool_env_var;
 use move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
 use move_core_types::account_address::AccountAddress;
 use move_model::model;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use source_package::layout::SourcePackageLayout;
 use std::{
@@ -176,7 +178,12 @@ pub enum CompilerVersion {
 
 impl Default for CompilerVersion {
     fn default() -> Self {
-        Self::V1
+        static MOVE_COMPILER_V2: Lazy<bool> = Lazy::new(|| read_bool_env_var("MOVE_COMPILER_V2"));
+        if *MOVE_COMPILER_V2 {
+            Self::V2
+        } else {
+            Self::V1
+        }
     }
 }
 

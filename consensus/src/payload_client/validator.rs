@@ -2,8 +2,9 @@
 
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use std::{
-    thread::sleep,
+    ops::Add,
     time::{Duration, Instant},
 };
 
@@ -18,16 +19,19 @@ pub trait ValidatorTxnPayloadClient: Send + Sync {
     ) -> Vec<ValidatorTransaction>;
 }
 
+#[cfg(test)]
 pub struct DummyValidatorTxnClient {
     txns: Vec<ValidatorTransaction>,
 }
 
+#[cfg(test)]
 impl DummyValidatorTxnClient {
     pub fn new(txns: Vec<ValidatorTransaction>) -> Self {
         Self { txns }
     }
 }
 
+#[cfg(test)]
 #[async_trait::async_trait]
 impl ValidatorTxnPayloadClient for DummyValidatorTxnClient {
     async fn pull(
@@ -45,7 +49,7 @@ impl ValidatorTxnPayloadClient for DummyValidatorTxnClient {
             && max_bytes > 0
             && nxt_txn_idx < self.txns.len()
         {
-            sleep(Duration::from_millis(1));
+            tokio::time::sleep(Duration::from_millis(1)).await;
             let txn = self.txns[nxt_txn_idx].clone();
             let txn_size = txn.size_in_bytes() as u64;
             if txn_size > max_bytes {
@@ -61,7 +65,7 @@ impl ValidatorTxnPayloadClient for DummyValidatorTxnClient {
 }
 
 #[async_trait::async_trait]
-impl ValidatorTxnPayloadClient for vtxn_pool::ReadClient {
+impl ValidatorTxnPayloadClient for VTxnPoolState {
     async fn pull(
         &self,
         max_time: Duration,
@@ -69,6 +73,7 @@ impl ValidatorTxnPayloadClient for vtxn_pool::ReadClient {
         max_bytes: u64,
         filter: vtxn_pool::TransactionFilter,
     ) -> Vec<ValidatorTransaction> {
-        vtxn_pool::ReadClient::pull(self, max_time, max_items, max_bytes, filter).await
+        let deadline = Instant::now().add(max_time);
+        self.pull(deadline, max_items, max_bytes, filter)
     }
 }

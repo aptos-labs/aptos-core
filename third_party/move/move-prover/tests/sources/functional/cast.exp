@@ -1,5 +1,21 @@
 Move prover returns: exiting with verification errors
 error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/cast.move:53:5
+   │
+51 │           (x as u8)
+   │           --------- abort happened here with execution failure
+52 │       }
+53 │ ╭     spec aborting_u8_cast_incorrect {
+54 │ │         aborts_if false;
+55 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/cast.move:50: aborting_u8_cast_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/cast.move:51: aborting_u8_cast_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
    ┌─ tests/sources/functional/cast.move:67:5
    │
 65 │           (x as u16)
@@ -46,19 +62,3 @@ error: abort not covered by any of the `aborts_if` clauses
     =         x = <redacted>
     =     at tests/sources/functional/cast.move:93: aborting_u64_cast_incorrect
     =         ABORTED
-
-error: abort not covered by any of the `aborts_if` clauses
-   ┌─ tests/sources/functional/cast.move:53:5
-   │
-51 │           (x as u8)
-   │           --------- abort happened here with execution failure
-52 │       }
-53 │ ╭     spec aborting_u8_cast_incorrect {
-54 │ │         aborts_if false;
-55 │ │     }
-   │ ╰─────^
-   │
-   =     at tests/sources/functional/cast.move:50: aborting_u8_cast_incorrect
-   =         x = <redacted>
-   =     at tests/sources/functional/cast.move:51: aborting_u8_cast_incorrect
-   =         ABORTED

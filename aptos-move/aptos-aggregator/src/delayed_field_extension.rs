@@ -21,6 +21,7 @@ fn get_delayed_field_value_from_storage(
 ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
     resolver
         .get_delayed_field_value(id)
+        // TODO[agg_v2](fix): Is this error mapping correct?
         .map_err(|_err| PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(*id)))
 }
 

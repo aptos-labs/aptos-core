@@ -1,12 +1,6 @@
 
 Diagnostics:
 error: undeclared `0x8675309::M::S`
-  ┌─ tests/checking/naming/unbound_struct_in_current.move:7:16
-  │
-7 │     fun bar(): Self::S {
-  │                ^^^^^^^
-
-error: undeclared `0x8675309::M::S`
   ┌─ tests/checking/naming/unbound_struct_in_current.move:2:16
   │
 2 │     fun foo(s: Self::S): Self::S {
@@ -17,6 +11,12 @@ error: undeclared `0x8675309::M::S`
   │
 2 │     fun foo(s: Self::S): Self::S {
   │                          ^^^^^^^
+
+error: undeclared `0x8675309::M::S`
+  ┌─ tests/checking/naming/unbound_struct_in_current.move:7:16
+  │
+7 │     fun bar(): Self::S {
+  │                ^^^^^^^
 
 error: undeclared struct `M::S`
   ┌─ tests/checking/naming/unbound_struct_in_current.move:8:9

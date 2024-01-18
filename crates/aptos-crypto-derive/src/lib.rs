@@ -374,7 +374,7 @@ pub fn hasher_dispatch(input: TokenStream) -> TokenStream {
         quote!()
     } else {
         let args = proc_macro2::TokenStream::from_iter(
-            std::iter::repeat(quote!(())).take(item.generics.params.len()),
+            std::iter::repeat(quote!((),)).take(item.generics.params.len()),
         );
         quote!(<#args>)
     };

@@ -12,6 +12,7 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::MoveTypeLayout;
 use serde::Serialize;
 use std::{cell::RefCell, collections::HashMap, fmt::Debug, hash::Hash, sync::Arc};
@@ -103,7 +104,7 @@ impl<
             .insert(tag, ValueWithLayout::Exchanged(Arc::new(value), layout));
     }
 
-    pub fn get_group_size(&self, group_key: &K) -> anyhow::Result<GroupReadResult> {
+    pub fn get_group_size(&self, group_key: &K) -> PartialVMResult<GroupReadResult> {
         Ok(match self.group_cache.borrow().get(group_key) {
             Some(group_map) => GroupReadResult::Size(group_size_as_sum(
                 group_map
