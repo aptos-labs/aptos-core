@@ -173,28 +173,19 @@ pub fn pad_and_hash_bytes_with_len(
 /// Given an array of bytes in `bytes`, if its length is less than `size`, appends zero bytes to
 /// it until its length is equal to `size`.
 fn zero_pad_bytes(bytes: &[u8], size: usize) -> anyhow::Result<Vec<u8>> {
-    let len = bytes.len();
-    if len > size {
-        bail!("Cannot pad {} byte(s) to size {}", len, size);
-    }
     if size > MAX_NUM_INPUT_BYTES {
-        bail!(
-            "Cannot pad to more than {} bytes. Inputted size is {}.",
-            MAX_NUM_INPUT_BYTES,
-            len
-        );
+        bail!("Cannot pad to more than {} bytes. Requested size is {}.", MAX_NUM_INPUT_BYTES, size);
     }
 
-    if bytes.len() < size {
-        let mut padded = Vec::with_capacity(size);
-        padded.extend_from_slice(bytes);
-        let num_zero_bytes = size - bytes.len();
-        padded.extend(std::iter::repeat(0x00).take(num_zero_bytes));
-        Ok(padded)
-    } else {
-        Ok(bytes.to_vec())
+    if bytes.len() > size {
+        bail!("Cannot pad {} byte(s) to size {}", bytes.len(), size);
     }
+
+    let mut padded = bytes.to_vec();
+    padded.resize(size, 0x00);
+    Ok(padded)
 }
+
 
 /// Converts the chunk of bytes into a scalar, assuming it is of size less than or equal to `BYTES_PACKED_PER_SCALAR`.
 pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
