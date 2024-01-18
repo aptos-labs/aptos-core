@@ -793,10 +793,10 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
 
     config
         .consensus
-        .max_sending_block_txns_quorum_store_override = 14000;
+        .max_sending_block_txns_quorum_store_override = 12000;
     config
         .consensus
-        .max_receiving_block_txns_quorum_store_override = 15000;
+        .max_receiving_block_txns_quorum_store_override = 13000;
     config
         .consensus
         .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
@@ -825,7 +825,7 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
         .consensus
         .quorum_store
         .back_pressure
-        .dynamic_max_txn_per_s = 15000;
+        .dynamic_max_txn_per_s = 8000;
 
     config.consensus.quorum_store.sender_max_batch_txns = 1000;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
@@ -1850,7 +1850,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 100_000,
+            mempool_backlog: 120_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
