@@ -130,6 +130,37 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         )))
         .fuse();
 
+        // Spawn the loop lag verifier
+        /*
+        let time_service = self.time_service.clone();
+        tokio::spawn(async move {
+            // Create a ticker that will fire every 50ms
+            let poll_loop_ticker = time_service.interval(Duration::from_millis(50));
+            futures::pin_mut!(poll_loop_ticker);
+
+            // Get the current time
+            let mut current_time = Instant::now();
+
+            loop {
+                // Wait for the next round before polling
+                poll_loop_ticker.next().await;
+
+                // Get the new current time
+                let new_current_time = Instant::now();
+
+                // Measure the difference and update the metrics
+                metrics::observe_duration(
+                    &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                    "service_loop_lag",
+                    current_time,
+                );
+
+                // Update the current time
+                current_time = new_current_time;
+            }
+        });
+         */
+
         // Start the service loop
         loop {
             ::futures::select! {

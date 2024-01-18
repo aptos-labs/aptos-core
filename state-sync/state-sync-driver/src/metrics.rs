@@ -14,6 +14,7 @@ pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
 
 /// Data notification metric labels
+pub const DRIVER_LOOP_LAG: &str = "driver_loop_lag";
 pub const NOTIFICATION_CREATE_TO_APPLY: &str = "notification_create_to_apply";
 pub const NOTIFICATION_CREATE_TO_COMMIT: &str = "notification_create_to_commit";
 pub const NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS: &str =

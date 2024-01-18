@@ -526,10 +526,13 @@ impl ProofRead for ProofReader {
 
 /// Used in both state sync and consensus to filter the txn events that should be subscribable by node components.
 pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
+    event.is_new_epoch_event()
+    /*
     matches!(
         event.type_tag().to_string().as_str(),
         "0x1::reconfiguration::NewEpochEvent"
             | "0x1::dkg::DKGStartEvent"
             | "0x1::jwks::OnChainJWKMapUpdated"
     )
+     */
 }
