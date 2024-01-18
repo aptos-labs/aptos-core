@@ -33,6 +33,7 @@ impl MoveStructType for DKGStartEvent {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct DKGNode {
     pub metadata: DKGTranscriptMetadata,
+    #[serde(with = "serde_bytes")]
     pub transcript_bytes: Vec<u8>,
 }
 

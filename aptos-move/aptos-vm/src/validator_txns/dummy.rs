@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionId},
     AptosVM,

@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     aptos_vm::{get_or_vm_startup_failure, load_on_chain_config_from_resolver},
     errors::expect_only_successful_execution,

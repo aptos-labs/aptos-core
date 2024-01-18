@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_rest_client::Client;
 use aptos_types::on_chain_config::OnChainConsensusConfig;
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
