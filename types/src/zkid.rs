@@ -49,7 +49,7 @@ pub const MAX_ZK_SIGNATURE_BYTES: usize = 1024;
 pub const MAX_ZK_ID_AUTHENTICATORS_ALLOWED: usize = 10;
 
 // How far in the future from the JWT issued at time the EPK expiry can be set.
-pub const MAX_EXPIRY_HORIZON: u64 = 1728000000; // 2000 days TODO(zkid): finalize this value
+pub const MAX_EXPIRY_HORIZON_SECS: u64 = 1728000000; // 2000 days TODO(zkid): finalize this value
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct JwkId {
@@ -75,7 +75,7 @@ pub struct OpenIdSig {
 
 impl OpenIdSig {
     /// Verifies an `OpenIdSig` by doing the following checks:
-    ///  1. Check that the ephemeral public key lifespan is under MAX_EPK_LIFESPAN_SECS
+    ///  1. Check that the ephemeral public key lifespan is under MAX_EXPIRY_HORIZON_SECS
     ///  2. Check that the iss claim in the ZkIdPublicKey matches the one in the jwt_payload
     ///  3. Check that the identity commitment in the ZkIdPublicKey matches the one constructed from the jwt_payload
     ///  4. Check that the nonce constructed from the ephemeral public key, blinder, and exp_timestamp_secs matches the one in the jwt_payload
@@ -88,9 +88,9 @@ impl OpenIdSig {
         let jwt_payload_json = base64url_to_str(&self.jwt_payload)?;
         let claims: Claims = serde_json::from_str(&jwt_payload_json)?;
 
-        // TODO(zkid): Store MAX_EXPIRY_HORIZON in a resource in zkid.move. Then, move this check
+        // TODO(zkid): Store MAX_EXPIRY_HORIZON_SECS in a resource in zkid.move. Then, move this check
         //  into the prologue for the ZK-less OpenID path.
-        let max_expiration_date = seconds_from_epoch(claims.oidc_claims.iat + MAX_EXPIRY_HORIZON);
+        let max_expiration_date = seconds_from_epoch(claims.oidc_claims.iat + MAX_EXPIRY_HORIZON_SECS);
         let expiration_date: SystemTime = seconds_from_epoch(exp_timestamp_secs);
         ensure!(
             expiration_date < max_expiration_date,
