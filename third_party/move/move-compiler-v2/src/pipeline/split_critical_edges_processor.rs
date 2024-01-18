@@ -19,7 +19,8 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
 		if fun_env.is_native() {
 			return data;
 		}
-		let mut transformer = SplitCriticalEdgesTransformation::new(fun_env, data);
+		let mut transformer = SplitCriticalEdgesTransformation::new(data);
+		transformer.transform();
 		transformer.data
     }
 
@@ -28,20 +29,18 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
     }
 }
 
-struct SplitCriticalEdgesTransformation<'a> {
-    fun_env: &'a FunctionEnv<'a>,
+struct SplitCriticalEdgesTransformation {
     data: FunctionData,
     // labels used in the original codes and in the generated codes
     labels: BTreeSet<Label>,
     srcs_count: BTreeMap<Label, usize>,
 }
 
-impl<'a> SplitCriticalEdgesTransformation<'a> {
-	pub fn new(fun_env: &'a FunctionEnv<'a>, data: FunctionData) -> Self {
+impl SplitCriticalEdgesTransformation {
+	pub fn new(data: FunctionData) -> Self {
 		let labels = Bytecode::labels(&data.code);
 		let srcs_count = count_srcs(&data.code);
 		Self {
-			fun_env,
 			data,
 			labels,
 			srcs_count,
