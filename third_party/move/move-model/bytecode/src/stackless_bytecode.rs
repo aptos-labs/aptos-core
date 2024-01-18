@@ -484,8 +484,8 @@ impl Bytecode {
         self.is_conditional_branch() || self.is_unconditional_branch()
     }
 
-    /// Return the sources of the instruction.
-    /// If the instruction is a spec-only instruction, return no sources.
+    /// Return the sources of the instruction (for non-spec-only instructions).
+    /// If the instruction is spec-only instruction, this function panics.
     pub fn sources(&self) -> Vec<TempIndex> {
         match self {
             Bytecode::Assign(_, _, src, _) => {
@@ -509,7 +509,7 @@ impl Bytecode {
             Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
             | Bytecode::Prop(_, _, _) => {
-                vec![]
+                unimplemented!("should not be called on spec-only instructions")
             },
         }
     }
