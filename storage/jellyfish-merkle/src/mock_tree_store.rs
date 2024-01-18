@@ -4,13 +4,12 @@
 
 use crate::{
     node_type::{LeafNode, Node, NodeKey},
-    NodeBatch, StaleNodeIndex, TreeReader, TreeUpdateBatch, TreeWriter,
+    NodeBatch, Result, StaleNodeIndex, TreeReader, TreeUpdateBatch, TreeWriter,
 };
-use anyhow::{bail, ensure, Result};
 use aptos_infallible::RwLock;
+use aptos_storage_interface::{db_ensure as ensure, db_other_bail, AptosDbError};
 use aptos_types::transaction::Version;
 use std::collections::{hash_map::Entry, BTreeSet, HashMap};
-
 pub struct MockTreeStore<K> {
     data: RwLock<(HashMap<NodeKey, Node<K>>, BTreeSet<StaleNodeIndex>)>,
     allow_overwrite: bool,
@@ -82,7 +81,7 @@ where
 
     pub fn put_node(&self, node_key: NodeKey, node: Node<K>) -> Result<()> {
         match self.data.write().0.entry(node_key) {
-            Entry::Occupied(o) => bail!("Key {:?} exists.", o.key()),
+            Entry::Occupied(o) => db_other_bail!("Key {:?} exists.", o.key()),
             Entry::Vacant(v) => {
                 v.insert(node);
             },

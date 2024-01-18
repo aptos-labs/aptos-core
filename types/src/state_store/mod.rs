@@ -5,6 +5,7 @@ use crate::{
     account_address::AccountAddress,
     state_store::{
         account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
+        errors::StateviewError,
         in_memory_state_view::InMemoryStateView,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
@@ -12,7 +13,6 @@ use crate::{
     },
     transaction::Version,
 };
-use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use arr_macro::arr;
@@ -21,12 +21,15 @@ use std::{collections::HashMap, ops::Deref};
 
 pub mod account_with_state_cache;
 pub mod account_with_state_view;
+pub mod errors;
 pub mod in_memory_state_view;
 pub mod state_key;
 pub mod state_key_prefix;
 pub mod state_storage_usage;
 pub mod state_value;
 pub mod table;
+
+pub type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the

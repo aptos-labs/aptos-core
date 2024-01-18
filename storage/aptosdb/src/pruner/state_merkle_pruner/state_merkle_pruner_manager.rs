@@ -14,10 +14,10 @@ use crate::{
     },
     state_merkle_db::StateMerkleDb,
 };
-use anyhow::Result;
 use aptos_config::config::StateMerklePrunerConfig;
 use aptos_jellyfish_merkle::StaleNodeIndex;
 use aptos_schemadb::schema::KeyCodec;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::{
     marker::PhantomData,

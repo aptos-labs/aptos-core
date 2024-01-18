@@ -213,7 +213,7 @@ impl AptosDB {
             .epoch_snapshot_pruner
             .get_min_readable_version();
         if version >= min_readable_epoch_snapshot_version {
-            self.ledger_store.ensure_epoch_ending(version)
+            self.ledger_db.metadata_db().ensure_epoch_ending(version)
         } else {
             bail!(
                 "{} at version {} is pruned. snapshots are available at >= {}, epoch snapshots are available at >= {}",
@@ -246,7 +246,7 @@ impl Debug for AptosDB {
 
 fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<()> {
     if num_requested > max_allowed {
-        Err(AptosDbError::TooManyRequested(num_requested, max_allowed).into())
+        Err(AptosDbError::TooManyRequested(num_requested, max_allowed))
     } else {
         Ok(())
     }

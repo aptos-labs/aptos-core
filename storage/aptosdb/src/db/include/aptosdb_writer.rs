@@ -161,7 +161,6 @@ impl DbWriter for AptosDB {
             // Save the epoch ending ledger infos
             restore_utils::save_ledger_infos(
                 self.ledger_db.metadata_db(),
-                self.ledger_store.clone(),
                 ledger_infos,
                 Some(&mut ledger_db_batch.ledger_metadata_db_batches),
             )?;
@@ -195,7 +194,7 @@ impl DbWriter for AptosDB {
                 .state_kv_pruner
                 .save_min_readable_version(version)?;
 
-            restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
+            restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
             self.state_store.reset();
 
             Ok(())
@@ -411,26 +410,11 @@ impl AptosDB {
                     if let Some(event_key) = event.event_key() {
                         if *event_key == new_block_event_key() {
                             let version = first_version + i as Version;
-                            let new_block_event =
-                                NewBlockEvent::try_from_bytes(event.event_data())?;
-                            let block_height = new_block_event.height();
-                            let id = new_block_event.hash()?;
-                            let epoch = new_block_event.epoch();
-                            let round = new_block_event.round();
-                            let proposer = new_block_event.proposer();
-                            let block_timestamp_usecs = new_block_event.proposed_time();
-                            let block_info = BlockInfo::V0(BlockInfoV0::new(
-                                id,
-                                epoch,
-                                round,
-                                proposer,
-                                block_timestamp_usecs,
+                            LedgerMetadataDb::put_block_info(
                                 version,
-                            ));
-                            ledger_metadata_batch
-                                .put::<BlockInfoSchema>(&block_height, &block_info)?;
-                            ledger_metadata_batch
-                                .put::<BlockByVersionSchema>(&version, &block_height)?;
+                                event,
+                                &ledger_metadata_batch,
+                            )?;
                         }
                     }
                 }
@@ -606,7 +590,8 @@ impl AptosDB {
                 expected_root_hash,
             );
             let current_epoch = self
-                .ledger_store
+                .ledger_db
+                .metadata_db()
                 .get_latest_ledger_info_option()
                 .map_or(0, |li| li.ledger_info().next_block_epoch());
             ensure!(
@@ -616,7 +601,9 @@ impl AptosDB {
                 current_epoch,
             );
 
-            self.ledger_store.put_ledger_info(x, &ledger_batch)?;
+            self.ledger_db
+                .metadata_db()
+                .put_ledger_info(x, &ledger_batch)?;
         }
 
         ledger_batch.put::<DbMetadataSchema>(
@@ -661,7 +648,9 @@ impl AptosDB {
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.
         if let Some(x) = ledger_info_with_sigs {
-            self.ledger_store.set_latest_ledger_info(x.clone());
+            self.ledger_db
+                .metadata_db()
+                .set_latest_ledger_info(x.clone());
 
             LEDGER_VERSION.set(x.ledger_info().version() as i64);
             NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);

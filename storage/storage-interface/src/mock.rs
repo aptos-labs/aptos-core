@@ -4,8 +4,7 @@
 
 //! This module provides mock dbreader for tests.
 
-use crate::{DbReader, DbWriter};
-use anyhow::{anyhow, Result};
+use crate::{errors::AptosDbError, DbReader, DbWriter, Result};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
@@ -51,7 +50,10 @@ impl DbReader for MockDbReaderWriter {
                     .map(StateValue::from))
             },
             StateKeyInner::Raw(raw_key) => Ok(Some(StateValue::from(raw_key.to_owned()))),
-            _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
+            _ => Err(AptosDbError::Other(format!(
+                "Not supported state key type {:?}",
+                state_key
+            ))),
         }
     }
 

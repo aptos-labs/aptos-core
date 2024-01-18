@@ -7,10 +7,9 @@ use crate::{
     metrics::LATEST_CHECKPOINT_VERSION,
     state_store::{state_snapshot_committer::StateSnapshotCommitter, StateDb},
 };
-use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_scratchpad::SmtAncestors;
-use aptos_storage_interface::state_delta::StateDelta;
+use aptos_storage_interface::{db_ensure as ensure, state_delta::StateDelta, AptosDbError, Result};
 use aptos_types::{
     state_store::{combine_sharded_state_updates, state_value::StateValue, ShardedStateUpdates},
     transaction::Version,
@@ -163,7 +162,8 @@ impl BufferedState {
             .current
             .is_family(&self.state_after_checkpoint.current));
         ensure!(
-            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
+            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version,
+            "new state base version smaller than state after checkpoint base version",
         );
         if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option

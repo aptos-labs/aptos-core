@@ -5,7 +5,6 @@ use crate::state_restore::{
     StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueBatch,
     StateValueWriter,
 };
-use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::{
@@ -14,7 +13,7 @@ use aptos_jellyfish_merkle::{
     test_helper::{init_mock_db, ValueBlob},
     JellyfishMerkleTree, NodeBatch, TestKey, TestValue, TreeReader, TreeWriter,
 };
-use aptos_storage_interface::StateSnapshotReceiver;
+use aptos_storage_interface::{Result, StateSnapshotReceiver};
 use aptos_types::{state_store::state_storage_usage::StateStorageUsage, transaction::Version};
 use proptest::{collection::btree_map, prelude::*};
 use std::{

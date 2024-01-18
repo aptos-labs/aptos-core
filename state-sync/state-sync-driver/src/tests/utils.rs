@@ -269,7 +269,7 @@ pub async fn verify_commit_notification(
     expected_events: Vec<ContractEvent>,
     expected_highest_synced_version: u64,
 ) {
-    // Verify mempool is notified and ack the notification
+    // Verify mempool is notified
     let mempool_notification = mempool_notification_listener.select_next_some().await;
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
@@ -279,7 +279,6 @@ pub async fn verify_commit_notification(
         })
         .collect();
     assert_eq!(mempool_notification.transactions, committed_transactions);
-    let _ = mempool_notification_listener.ack_commit_notification(mempool_notification);
 
     // Verify the event listener is notified about the specified events
     if let Some(event_listener) = event_listener {

@@ -1,4 +1,16 @@
 warning[W09005]: dead or unreachable code
+  ┌─ tests/move_check/control_flow/infinite_loop_with_dead_exits.move:7:13
+  │
+7 │             break
+  │             ^^^^^ Unreachable code. This statement (and any following statements) will not be executed.
+
+warning[W09005]: dead or unreachable code
+  ┌─ tests/move_check/control_flow/infinite_loop_with_dead_exits.move:8:10
+  │
+8 │         };
+  │          ^ Unreachable code. This statement (and any following statements) will not be executed.
+
+warning[W09005]: dead or unreachable code
    ┌─ tests/move_check/control_flow/infinite_loop_with_dead_exits.move:13:17
    │
 13 │             if (return) break;

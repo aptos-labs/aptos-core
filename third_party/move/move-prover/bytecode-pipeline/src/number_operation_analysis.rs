@@ -59,7 +59,7 @@ impl NumberOperationProcessor {
     /// Entry point of the analysis
     fn analyze<'a>(&self, env: &'a GlobalEnv, targets: &'a FunctionTargetsHolder) {
         self.create_initial_exp_oper_state(env);
-        let fun_env_vec = FunctionTargetPipeline::sort_targets_in_topological_order(env, targets);
+        let fun_env_vec = FunctionTargetPipeline::sort_in_reverse_topological_order(env, targets);
         for item in &fun_env_vec {
             match item {
                 Either::Left(fid) => {

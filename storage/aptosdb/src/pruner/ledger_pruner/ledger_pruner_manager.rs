@@ -9,9 +9,9 @@ use crate::{
         pruner_worker::PrunerWorker,
     },
 };
-use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::sync::{atomic::Ordering, Arc};
 

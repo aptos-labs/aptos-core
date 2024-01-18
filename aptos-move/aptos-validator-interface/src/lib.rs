@@ -16,7 +16,7 @@ use aptos_types::{
     on_chain_config::ValidatorSet,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
-        TStateView,
+        Result as StateViewResult, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
@@ -256,11 +256,12 @@ impl DebuggerStateView {
 impl TStateView for DebuggerStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         self.get_state_value_internal(state_key, self.version)
+            .map_err(Into::into)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!()
     }
 }
