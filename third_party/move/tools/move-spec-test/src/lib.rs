@@ -8,6 +8,7 @@ extern crate log;
 use crate::prover::prove;
 use anyhow::anyhow;
 use move_package::BuildConfig;
+use std::fs;
 use std::path::PathBuf;
 
 /// This function runs the specification testing, which is a combination of the
@@ -45,10 +46,12 @@ pub fn run_spec_test(
     let outdir_mutant = outdir.join("mutants");
     let outdir_original = outdir.join("base");
 
-    std::fs::create_dir_all(&outdir_mutant)?;
-    std::fs::create_dir_all(&outdir_original)?;
+    fs::create_dir_all(&outdir_mutant)?;
+    fs::create_dir_all(&outdir_original)?;
 
-    mutator_conf.out_mutant_dir = outdir_mutant.clone();
+    if cli::check_mutator_output_path(&mutator_conf).is_none() {
+        mutator_conf.out_mutant_dir = Some(outdir_mutant.clone());
+    }
 
     debug!("Running the move mutator tool");
 
@@ -65,10 +68,7 @@ pub fn run_spec_test(
     let result = prove(&config, &package_path, &prover_conf, &mut error_writer);
 
     if let Err(e) = result {
-        let msg = format!(
-            "Original code verification failed! Prover failed with error: {}",
-            e
-        );
+        let msg = format!("Original code verification failed! Prover failed with error: {e}");
         error!("{msg}");
         return Err(anyhow!(msg));
     }
@@ -79,16 +79,27 @@ pub fn run_spec_test(
 
     for elem in report.get_mutants() {
         total_mutants += 1;
+        let mutant_file = elem.mutant_path();
+        let original_file = elem.original_file_path();
+        let outdir_prove = outdir.join("prove");
 
-        let result = prover::prove_mutant(
-            &config,
-            &elem.get_mutant_path(),
-            &elem.get_original_file_path(),
-            &package_path,
-            &prover_conf,
-            &outdir.join("prove"),
-            &mut error_writer,
+        let _ = fs::remove_dir_all(&outdir_prove);
+        move_mutator::compiler::copy_dir_all(&package_path, &outdir_prove)?;
+
+        trace!(
+            "Copying mutant file {:?} to the package directory {:?}",
+            mutant_file,
+            outdir_prove.join(original_file)
         );
+
+        if let Err(res) = fs::copy(mutant_file, outdir_prove.join(original_file)) {
+            return Err(anyhow!(
+                "Can't copy mutant file to the package directory: {:?}",
+                res
+            ));
+        }
+
+        let result = prove(&config, &outdir_prove, &prover_conf, &mut error_writer);
 
         if let Err(e) = result {
             trace!("Mutant killed! Prover failed with error: {}", e);
