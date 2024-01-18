@@ -14630,7 +14630,6 @@ dependencies = [
  "diesel",
  "futures",
  "hex",
- "jsonwebtoken 8.3.0",
  "move-core-types",
  "num_cpus",
  "once_cell",

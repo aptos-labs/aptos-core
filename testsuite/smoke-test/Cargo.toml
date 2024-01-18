@@ -50,7 +50,6 @@ diesel = { workspace = true, features = [
     "serde_json",
 ] }
 hex = { workspace = true }
-jsonwebtoken = { workspace = true }
 move-core-types = { workspace = true }
 proptest = { workspace = true }
 reqwest = { workspace = true }
