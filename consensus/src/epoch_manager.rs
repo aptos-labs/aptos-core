@@ -1255,11 +1255,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 if msg_epoch == self.epoch() {
                     monitor!("process_epoch_proof", self.initiate_new_epoch(*proof).await)?;
                 } else {
-                    bail!(
+                    info!(
+                        remote_peer = peer_id,
                         "[EpochManager] Unexpected epoch proof from epoch {}, local epoch {}",
                         msg_epoch,
                         self.epoch()
                     );
+                    counters::EPOCH_PROOF_WRONG_EPOCH.inc();
                 }
             },
             ConsensusMsg::EpochRetrievalRequest(request) => {
