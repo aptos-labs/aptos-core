@@ -41,13 +41,15 @@ pub fn validate_zkid_authenticators(
             )
         })?;
 
+    if zkid_authenticators.is_empty() {
+        return Ok(());
+    }
+
     if zkid_authenticators.len() > MAX_ZK_ID_AUTHENTICATORS_ALLOWED {
         return Err(VMStatus::error(
             StatusCode::TOO_MANY_ZK_AUTHENTICATORS,
             None,
         ));
-    } else if zkid_authenticators.is_empty() {
-        return Ok(());
     }
 
     let onchain_timestamp_obj = get_current_time_onchain(resolver).map_err(|_| {
