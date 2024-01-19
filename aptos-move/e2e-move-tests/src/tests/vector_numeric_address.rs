@@ -26,6 +26,7 @@ module 0xcafe::test {
     ",
     );
     builder.add_alias("std", "0x1");
+    builder.add_alias("vm", "0x0");
     builder.add_local_dep("MoveStdlib", &move_stdlib.display().to_string());
     let dir = builder.write_to_temp().unwrap();
     assert_success!(h.publish_package(&acc, dir.path()));
