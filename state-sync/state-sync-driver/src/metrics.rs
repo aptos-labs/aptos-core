@@ -14,7 +14,6 @@ pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
 
 /// Data notification metric labels
-pub const DRIVER_LOOP_LAG: &str = "driver_loop_lag";
 pub const NOTIFICATION_CREATE_TO_APPLY: &str = "notification_create_to_apply";
 pub const NOTIFICATION_CREATE_TO_COMMIT: &str = "notification_create_to_commit";
 pub const NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS: &str =
@@ -22,6 +21,13 @@ pub const NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS: &str =
 pub const NOTIFICATION_CREATE_TO_EXECUTE: &str = "notification_create_to_execute";
 pub const NOTIFICATION_CREATE_TO_RECEIVE: &str = "notification_create_to_receive";
 pub const NOTIFICATION_CREATE_TO_UPDATE_LEDGER: &str = "notification_create_to_update_ledger";
+
+// Temporary metric labels
+pub const DRIVER_LOOP_LAG: &str = "driver_loop_lag";
+pub const APPLY_WAIT_TIME: &str = "apply_wait_time";
+pub const COMMIT_WAIT_TIME: &str = "commit_wait_time";
+pub const COMMIT_POST_PROCESS_WAIT_TIME: &str = "commit_post_process_wait_time";
+pub const UPDATE_LEDGER_WAIT_TIME: &str = "update_ledger_wait_time";
 
 /// Storage synchronizer metric labels
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";

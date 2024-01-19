@@ -477,67 +477,94 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
 ) -> JoinHandle<()> {
     // Create an executor
     let executor = async move {
+        let mut current_timestamp = Instant::now();
         while let Some(storage_data_chunk) = executor_listener.next().await {
-            // Start the execute/apply timer
-            let _timer = start_execute_apply_timer(&storage_data_chunk);
+            // Observe the scheduling lag
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_LATENCIES,
+                metrics::APPLY_WAIT_TIME,
+                current_timestamp,
+            );
 
-            // Execute/apply the storage data chunk
-            let (notification_metadata, result, executed_chunk) = match storage_data_chunk {
-                StorageDataChunk::Transactions(
-                    notification_metadata,
-                    transactions_with_proof,
-                    target_ledger_info,
-                    end_of_epoch_ledger_info,
-                ) => {
-                    // Execute the storage data chunk
-                    let result = execute_transaction_chunk(
-                        chunk_executor.clone(),
+            // Start the execute/apply timer
+            let timer = start_execute_apply_timer(&storage_data_chunk);
+
+            {
+                // Execute/apply the storage data chunk
+                let (notification_metadata, result, executed_chunk) = match storage_data_chunk {
+                    StorageDataChunk::Transactions(
+                        notification_metadata,
                         transactions_with_proof,
                         target_ledger_info,
                         end_of_epoch_ledger_info,
-                    )
-                    .await;
-                    (notification_metadata, result, true)
-                },
-                StorageDataChunk::TransactionOutputs(
-                    notification_metadata,
-                    outputs_with_proof,
-                    target_ledger_info,
-                    end_of_epoch_ledger_info,
-                ) => {
-                    // Apply the storage data chunk
-                    let result = apply_output_chunk(
-                        chunk_executor.clone(),
+                    ) => {
+                        // Execute the storage data chunk
+                        let result = execute_transaction_chunk(
+                            chunk_executor.clone(),
+                            transactions_with_proof,
+                            target_ledger_info,
+                            end_of_epoch_ledger_info,
+                        )
+                        .await;
+                        (notification_metadata, result, true)
+                    },
+                    StorageDataChunk::TransactionOutputs(
+                        notification_metadata,
                         outputs_with_proof,
                         target_ledger_info,
                         end_of_epoch_ledger_info,
-                    )
-                    .await;
-                    (notification_metadata, result, false)
-                },
-                storage_data_chunk => {
-                    unreachable!(
-                        "Invalid data chunk sent to executor! This shouldn't happen: {:?}",
-                        storage_data_chunk
-                    );
-                },
-            };
+                    ) => {
+                        // Apply the storage data chunk
+                        let result = apply_output_chunk(
+                            chunk_executor.clone(),
+                            outputs_with_proof,
+                            target_ledger_info,
+                            end_of_epoch_ledger_info,
+                        )
+                        .await;
+                        (notification_metadata, result, false)
+                    },
+                    storage_data_chunk => {
+                        unreachable!(
+                            "Invalid data chunk sent to executor! This shouldn't happen: {:?}",
+                            storage_data_chunk
+                        );
+                    },
+                };
 
-            // Notify the ledger updater of the new executed/applied chunks
-            match result {
-                Ok(()) => {
-                    // Update the metrics for the data notification ledger update latency
-                    metrics::observe_duration(
-                        &metrics::DATA_NOTIFICATION_LATENCIES,
-                        metrics::NOTIFICATION_CREATE_TO_UPDATE_LEDGER,
-                        notification_metadata.creation_time,
-                    );
+                // Notify the ledger updater of the new executed/applied chunks
+                match result {
+                    Ok(()) => {
+                        // Update the metrics for the data notification ledger update latency
+                        metrics::observe_duration(
+                            &metrics::DATA_NOTIFICATION_LATENCIES,
+                            metrics::NOTIFICATION_CREATE_TO_UPDATE_LEDGER,
+                            notification_metadata.creation_time,
+                        );
 
-                    // Notify the ledger updater
-                    if let Err(error) = ledger_updater_notifier.send(notification_metadata).await {
-                        // Send an error notification to the driver (we failed to notify the ledger updater)
-                        let error =
-                            format!("Failed to notify the ledger updater! Error: {:?}", error);
+                        // Notify the ledger updater
+                        if let Err(error) =
+                            ledger_updater_notifier.send(notification_metadata).await
+                        {
+                            // Send an error notification to the driver (we failed to notify the ledger updater)
+                            let error =
+                                format!("Failed to notify the ledger updater! Error: {:?}", error);
+                            handle_storage_synchronizer_error(
+                                notification_metadata,
+                                error,
+                                &error_notification_sender,
+                                &pending_data_chunks,
+                            )
+                            .await;
+                        }
+                    },
+                    Err(error) => {
+                        // Send an error notification to the driver (we failed to execute/apply the chunk)
+                        let error = if executed_chunk {
+                            format!("Failed to execute the data chunk! Error: {:?}", error)
+                        } else {
+                            format!("Failed to apply the data chunk! Error: {:?}", error)
+                        };
                         handle_storage_synchronizer_error(
                             notification_metadata,
                             error,
@@ -545,24 +572,12 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             &pending_data_chunks,
                         )
                         .await;
-                    }
-                },
-                Err(error) => {
-                    // Send an error notification to the driver (we failed to execute/apply the chunk)
-                    let error = if executed_chunk {
-                        format!("Failed to execute the data chunk! Error: {:?}", error)
-                    } else {
-                        format!("Failed to apply the data chunk! Error: {:?}", error)
-                    };
-                    handle_storage_synchronizer_error(
-                        notification_metadata,
-                        error,
-                        &error_notification_sender,
-                        &pending_data_chunks,
-                    )
-                    .await;
-                },
+                    },
+                }
             }
+
+            timer.stop_and_record();
+            current_timestamp = Instant::now();
         }
     };
 
@@ -599,38 +614,60 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
 ) -> JoinHandle<()> {
     // Create a ledger updater
     let ledger_updater = async move {
+        let mut current_timestamp = Instant::now();
         while let Some(notification_metadata) = ledger_updater_listener.next().await {
+            // Observe the scheduling lag
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_LATENCIES,
+                metrics::UPDATE_LEDGER_WAIT_TIME,
+                current_timestamp,
+            );
+
             // Start the update ledger timer
-            let _timer = metrics::start_timer(
+            let timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_UPDATE_LEDGER,
             );
 
-            // Update the storage ledger
-            let result = update_ledger(chunk_executor.clone()).await;
+            {
+                // Update the storage ledger
+                let result = update_ledger(chunk_executor.clone()).await;
 
-            // Notify the committer of the updated ledger
-            match result {
-                Ok(()) => {
-                    // Log the successful ledger update
-                    debug!(
-                        LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
-                            "Updated the ledger for notification ID {:?}!",
-                            notification_metadata.notification_id,
-                        ))
-                    );
+                // Notify the committer of the updated ledger
+                match result {
+                    Ok(()) => {
+                        // Log the successful ledger update
+                        debug!(
+                            LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                                "Updated the ledger for notification ID {:?}!",
+                                notification_metadata.notification_id,
+                            ))
+                        );
 
-                    // Update the metrics for the data notification commit latency
-                    metrics::observe_duration(
-                        &metrics::DATA_NOTIFICATION_LATENCIES,
-                        metrics::NOTIFICATION_CREATE_TO_COMMIT,
-                        notification_metadata.creation_time,
-                    );
+                        // Update the metrics for the data notification commit latency
+                        metrics::observe_duration(
+                            &metrics::DATA_NOTIFICATION_LATENCIES,
+                            metrics::NOTIFICATION_CREATE_TO_COMMIT,
+                            notification_metadata.creation_time,
+                        );
 
-                    // Notify the committer of the update
-                    if let Err(error) = committer_notifier.send(notification_metadata).await {
-                        // Send an error notification to the driver (we failed to notify the committer)
-                        let error = format!("Failed to notify the committer! Error: {:?}", error);
+                        // Notify the committer of the update
+                        if let Err(error) = committer_notifier.send(notification_metadata).await {
+                            // Send an error notification to the driver (we failed to notify the committer)
+                            let error =
+                                format!("Failed to notify the committer! Error: {:?}", error);
+                            handle_storage_synchronizer_error(
+                                notification_metadata,
+                                error,
+                                &error_notification_sender,
+                                &pending_data_chunks,
+                            )
+                            .await;
+                        }
+                    },
+                    Err(error) => {
+                        // Send an error notification to the driver (we failed to update the ledger)
+                        let error = format!("Failed to update the ledger! Error: {:?}", error);
                         handle_storage_synchronizer_error(
                             notification_metadata,
                             error,
@@ -638,20 +675,12 @@ fn spawn_ledger_updater<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             &pending_data_chunks,
                         )
                         .await;
-                    }
-                },
-                Err(error) => {
-                    // Send an error notification to the driver (we failed to update the ledger)
-                    let error = format!("Failed to update the ledger! Error: {:?}", error);
-                    handle_storage_synchronizer_error(
-                        notification_metadata,
-                        error,
-                        &error_notification_sender,
-                        &pending_data_chunks,
-                    )
-                    .await;
-                },
-            };
+                    },
+                };
+            }
+
+            timer.stop_and_record();
+            current_timestamp = Instant::now();
         }
     };
 
@@ -670,53 +699,75 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
+        let mut current_timestamp = Instant::now();
         while let Some(notification_metadata) = committer_listener.next().await {
+            // Observe the scheduling lag
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_LATENCIES,
+                metrics::COMMIT_WAIT_TIME,
+                current_timestamp,
+            );
+
             // Start the commit timer
-            let _timer = metrics::start_timer(
+            let timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_COMMIT_CHUNK,
             );
 
-            // Commit the executed chunk
-            let result = commit_chunk(chunk_executor.clone()).await;
+            {
+                // Commit the executed chunk
+                let result = commit_chunk(chunk_executor.clone()).await;
 
-            // Notify the commit post-processor of the committed chunk
-            match result {
-                Ok(notification) => {
-                    // Log the successful commit
-                    info!(
-                        LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
-                            "Committed a new transaction chunk! \
+                // Notify the commit post-processor of the committed chunk
+                match result {
+                    Ok(notification) => {
+                        // Log the successful commit
+                        info!(
+                            LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                                "Committed a new transaction chunk! \
                                     Transaction total: {:?}, event total: {:?}",
-                            notification.committed_transactions.len(),
-                            notification.subscribable_events.len()
-                        ))
-                    );
-
-                    // Update the metrics for the newly committed data
-                    metrics::increment_gauge(
-                        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                        metrics::StorageSynchronizerOperations::Synced.get_label(),
-                        notification.committed_transactions.len() as u64,
-                    );
-                    if notification.reconfiguration_occurred {
-                        utils::update_new_epoch_metrics();
-                    }
-
-                    // Update the metrics for the data notification commit post-process latency
-                    metrics::observe_duration(
-                        &metrics::DATA_NOTIFICATION_LATENCIES,
-                        metrics::NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS,
-                        notification_metadata.creation_time,
-                    );
-
-                    // Notify the commit post-processor of the committed chunk
-                    if let Err(error) = commit_post_processor_notifier.send(notification).await {
-                        // Send an error notification to the driver (we failed to notify the commit post-processor)
-                        let error = format!(
-                            "Failed to notify the commit post-processor! Error: {:?}",
-                            error
+                                notification.committed_transactions.len(),
+                                notification.subscribable_events.len()
+                            ))
                         );
+
+                        // Update the metrics for the newly committed data
+                        metrics::increment_gauge(
+                            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                            metrics::StorageSynchronizerOperations::Synced.get_label(),
+                            notification.committed_transactions.len() as u64,
+                        );
+                        if notification.reconfiguration_occurred {
+                            utils::update_new_epoch_metrics();
+                        }
+
+                        // Update the metrics for the data notification commit post-process latency
+                        metrics::observe_duration(
+                            &metrics::DATA_NOTIFICATION_LATENCIES,
+                            metrics::NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS,
+                            notification_metadata.creation_time,
+                        );
+
+                        // Notify the commit post-processor of the committed chunk
+                        if let Err(error) = commit_post_processor_notifier.send(notification).await
+                        {
+                            // Send an error notification to the driver (we failed to notify the commit post-processor)
+                            let error = format!(
+                                "Failed to notify the commit post-processor! Error: {:?}",
+                                error
+                            );
+                            handle_storage_synchronizer_error(
+                                notification_metadata,
+                                error,
+                                &error_notification_sender,
+                                &pending_data_chunks,
+                            )
+                            .await;
+                        }
+                    },
+                    Err(error) => {
+                        // Send an error notification to the driver (we failed to commit the chunk)
+                        let error = format!("Failed to commit executed chunk! Error: {:?}", error);
                         handle_storage_synchronizer_error(
                             notification_metadata,
                             error,
@@ -724,20 +775,12 @@ fn spawn_committer<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             &pending_data_chunks,
                         )
                         .await;
-                    }
-                },
-                Err(error) => {
-                    // Send an error notification to the driver (we failed to commit the chunk)
-                    let error = format!("Failed to commit executed chunk! Error: {:?}", error);
-                    handle_storage_synchronizer_error(
-                        notification_metadata,
-                        error,
-                        &error_notification_sender,
-                        &pending_data_chunks,
-                    )
-                    .await;
-                },
-            };
+                    },
+                };
+            }
+
+            timer.stop_and_record();
+            current_timestamp = Instant::now();
         }
     };
 
@@ -760,27 +803,40 @@ fn spawn_commit_post_processor<
 ) -> JoinHandle<()> {
     // Create a commit post-processor
     let commit_post_processor = async move {
+        let mut current_timestamp = Instant::now();
         while let Some(notification) = commit_post_processor_listener.next().await {
+            // Observe the scheduling lag
+            metrics::observe_duration(
+                &metrics::DATA_NOTIFICATION_LATENCIES,
+                metrics::COMMIT_POST_PROCESS_WAIT_TIME,
+                current_timestamp,
+            );
+
             // Start the commit post-process timer
-            let _timer = metrics::start_timer(
+            let timer = metrics::start_timer(
                 &metrics::STORAGE_SYNCHRONIZER_LATENCIES,
                 metrics::STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS,
             );
 
-            // Handle the committed transaction notification (e.g., notify mempool)
-            let committed_transactions = CommittedTransactions {
-                events: notification.subscribable_events,
-                transactions: notification.committed_transactions,
-            };
-            utils::handle_committed_transactions(
-                committed_transactions,
-                storage.clone(),
-                mempool_notification_handler.clone(),
-                event_subscription_service.clone(),
-                storage_service_notification_handler.clone(),
-            )
-            .await;
-            decrement_pending_data_chunks(pending_data_chunks.clone());
+            {
+                // Handle the committed transaction notification (e.g., notify mempool)
+                let committed_transactions = CommittedTransactions {
+                    events: notification.subscribable_events,
+                    transactions: notification.committed_transactions,
+                };
+                utils::handle_committed_transactions(
+                    committed_transactions,
+                    storage.clone(),
+                    mempool_notification_handler.clone(),
+                    event_subscription_service.clone(),
+                    storage_service_notification_handler.clone(),
+                )
+                .await;
+                decrement_pending_data_chunks(pending_data_chunks.clone());
+            }
+
+            timer.stop_and_record();
+            current_timestamp = Instant::now();
         }
     };
 
