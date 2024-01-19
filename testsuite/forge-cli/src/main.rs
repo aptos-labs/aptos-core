@@ -1799,6 +1799,14 @@ fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            optimize_state_sync_for_throughput(config);
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            optimize_state_sync_for_throughput(config);
+        }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
