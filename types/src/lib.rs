@@ -4,6 +4,8 @@
 
 #![forbid(unsafe_code)]
 
+use serde::{Serialize, Deserialize};
+
 pub mod access_path;
 pub mod account_address;
 pub mod account_config;
@@ -53,6 +55,7 @@ pub mod waypoint;
 pub mod write_set;
 
 pub use account_address::AccountAddress as PeerId;
+use move_core_types::account_address::AccountAddress;
 pub use utility_coin::*;
 
 pub mod account_view;
@@ -63,3 +66,11 @@ pub mod bytes;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
+
+/// Reflection of `0x1::types::ValidatorConsensusInfo` in rust.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ValidatorConsensusInfoMoveStruct {
+    pub addr: AccountAddress,
+    pub pk_bytes: Vec<u8>,
+    pub voting_power: u64,
+}

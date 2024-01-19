@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::on_chain_config::{OnChainConfig, ValidatorSet};
+use crate::on_chain_config::OnChainConfig;
 use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
@@ -9,6 +9,7 @@ use move_core_types::{
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use crate::ValidatorConsensusInfoMoveStruct;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {
@@ -19,9 +20,8 @@ pub struct DKGTranscriptMetadata {
 /// Reflection of Move type `0x1::dkg::DKGStartEvent`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DKGStartEvent {
-    pub target_epoch: u64,
-    pub start_time_us: u64,
-    pub target_validator_set: ValidatorSet,
+    session_metadata: DKGSessionMetadata,
+    start_time_us: u64,
 }
 
 impl MoveStructType for DKGStartEvent {
@@ -51,16 +51,20 @@ impl DKGNode {
     }
 }
 
+/// Reflection of `0x1::dkg::DKGSessionMetadata` in rust.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DKGSessionMetadata {
+    pub dealer_epoch: u64,
+    pub dealer_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
+    pub target_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
+}
+
 /// Reflection of Move type `0x1::dkg::DKGSessionState`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionState {
+    pub metadata: DKGSessionMetadata,
     pub start_time_us: u64,
-    pub dealer_epoch: u64,
-    pub dealer_validator_set: ValidatorSet,
-    pub target_epoch: u64,
-    pub target_validator_set: ValidatorSet,
-    pub result: Vec<u8>,
-    pub deadline_microseconds: u64,
+    pub transcript: Vec<u8>,
 }
 
 /// Reflection of Move type `0x1::dkg::DKGState`.

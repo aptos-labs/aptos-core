@@ -46,6 +46,9 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use aptos_crypto::HashValue;
+use aptos_types::move_utils::as_move_value::AsMoveValue;
+use aptos_types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
 
 // Code representing successful transaction, used for run_block_in_parts_and_check
 pub const SUCCESS: u64 = 0;
@@ -607,19 +610,64 @@ impl MoveHarness {
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }
 
+    pub fn change_features_for_next_epoch(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+        self.change_features_inner("change_feature_flags_for_next_epoch", enabled, disabled)
+    }
+
     /// Enables features
     pub fn enable_features(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+        self.change_features_inner("change_feature_flags", enabled, disabled)
+    }
+
+    pub fn change_features_inner(&mut self, func_variant: &str, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
         let acc = self.aptos_framework_account();
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+            .exec("features", func_variant, vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
                 bcs::to_bytes(&enabled).unwrap(),
                 bcs::to_bytes(&disabled).unwrap(),
             ]);
+    }
+
+    pub fn finish_reconfig_with_dkg_result(&mut self, dkg_result: Vec<u8>) {
+        let args = vec![
+            MoveValue::Signer(AccountAddress::ONE),
+            dkg_result.as_move_value(),
+        ];
+        let args_serialized = args.into_iter().map(|mv| mv.simple_serialize().unwrap()).collect();
+        self.executor
+            .exec("reconfiguration_with_dkg", "finish_with_dkg_result", vec![], args_serialized);
+    }
+
+    pub fn run_block_prologue_ext(
+        &mut self,
+        hash: HashValue,
+        epoch: u64,
+        round: u64,
+        proposer: AccountAddress,
+        failed_proposer_indices: Vec<u64>,
+        previous_block_votes_bitvec: Vec<u8>,
+        timestamp_us: u64,
+        randomness_seed: Option<Vec<u8>>
+    ) {
+        let args = vec![
+            MoveValue::Signer(AccountAddress::ZERO),
+            MoveValue::Address(AccountAddress::from_bytes(hash.to_vec()).unwrap()),
+            MoveValue::U64(epoch),
+            MoveValue::U64(round),
+            MoveValue::Address(proposer),
+            failed_proposer_indices.as_move_value(),
+            previous_block_votes_bitvec.as_move_value(),
+            timestamp_us.as_move_value(),
+            randomness_seed.as_move_value(),
+        ];
+        let args_serialized = args.into_iter().map(|mv| mv.simple_serialize().unwrap()).collect();
+        self.executor
+            .exec("block", "block_prologue_ext", vec![], args_serialized);
     }
 
     fn override_one_gas_param(&mut self, param: &str, param_value: u64) {
