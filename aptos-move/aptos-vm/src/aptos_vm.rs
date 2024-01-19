@@ -15,7 +15,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -58,6 +58,7 @@ use aptos_types::{
     },
     validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -1385,6 +1386,8 @@ impl AptosVM {
             ));
         }
 
+        zkid_validation::validate_zkid_authenticators(transaction, resolver, session, log_context)?;
+
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -2151,6 +2154,25 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
+
+        if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
+            if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                    if !self.features.is_open_id_signature_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            };
+        };
 
         let txn = match transaction.check_signature() {
             Ok(t) => t,
