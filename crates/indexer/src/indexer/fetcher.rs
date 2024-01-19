@@ -287,6 +287,10 @@ async fn fetch_nexts(
                         sct.info.block_height = Some(block_height_bcs);
                         sct.info.epoch = Some(epoch_bcs);
                     },
+                    Transaction::BlockEpilogueTransaction(ref mut bet) => {
+                        bet.info.block_height = Some(block_height_bcs);
+                        bet.info.epoch = Some(epoch_bcs);
+                    },
                     Transaction::ValidatorTransaction(ref mut st) => {
                         st.info.block_height = Some(block_height_bcs);
                         st.info.epoch = Some(epoch_bcs);

@@ -753,6 +753,7 @@ pub fn convert_transaction(
         Transaction::StateCheckpointTransaction(_) => {
             transaction::transaction::TransactionType::StateCheckpoint
         },
+        Transaction::BlockEpilogueTransaction(_) => panic!("BlockEpilogueTransaction not supported"),
         Transaction::PendingTransaction(_) => panic!("PendingTransaction is not supported"),
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TransactionType::Validator
@@ -806,6 +807,7 @@ pub fn convert_transaction(
                 transaction::StateCheckpointTransaction {},
             )
         },
+        Transaction::BlockEpilogueTransaction(_) => panic!("BlockEpilogueTransaction not supported"),
         Transaction::PendingTransaction(_) => panic!("PendingTransaction not supported"),
         Transaction::ValidatorTransaction(_) => {
             transaction::transaction::TxnData::Validator(transaction::ValidatorTransaction {})
