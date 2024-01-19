@@ -7,6 +7,6 @@ script {
         aptos_governance::initialize_partial_voting(&framework_signer);
         let feature = features::get_partial_governance_voting();
         features::change_feature_flags(&framework_signer, vector[feature], vector[]);
-        aptos_governance::force_reconfigure(&framework_signer);
+        aptos_governance::force_end_epoch(&framework_signer);
     }
 }

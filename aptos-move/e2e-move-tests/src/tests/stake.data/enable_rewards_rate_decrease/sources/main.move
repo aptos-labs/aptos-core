@@ -17,6 +17,6 @@ script {
         );
         let feature = features::get_periodical_reward_rate_decrease_feature();
         features::change_feature_flags(&framework_signer, vector[feature], vector[]);
-        aptos_governance::force_reconfigure(&framework_signer);
+        aptos_governance::force_end_epoch(&framework_signer);
     }
 }

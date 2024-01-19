@@ -537,13 +537,31 @@ module aptos_framework::aptos_governance {
         };
     }
 
-    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
+    /// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
+    ///
+    /// WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+    /// - If feature `RECONFIGURE_WITH_DKG` is disabled, it finishes immediately.
+    ///   - At the end of the calling transaction, we will be in a new epoch.
+    /// - If feature `RECONFIGURE_WITH_DKG` is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.
+    ///
+    /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
+    /// since such updates are applied whenever we enter an new epoch.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration::reconfigure();
+        if (features::reconfigure_with_dkg_enabled()) {
+            reconfiguration_with_dkg::try_start();
+        } else {
+            reconfiguration_with_dkg::finish(aptos_framework);
+        }
     }
 
-    public fun force_reconfigure(aptos_framework: &signer) {
+    /// Change epoch immediately.
+    /// If `RECONFIGURE_WITH_DKG` is enabled and we are in the middle of a DKG,
+    /// stop waiting for DKG and enter the new epoch without randomness.
+    ///
+    /// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
+    /// TODO: migrate these tests to be aware of async reconfiguration.
+    public fun force_end_epoch(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration_with_dkg::finish(aptos_framework);
     }
