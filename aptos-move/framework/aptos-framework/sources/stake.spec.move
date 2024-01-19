@@ -384,7 +384,7 @@ spec aptos_framework::stake {
         ensures post_stake_pool.delegated_voter == new_voter;
     }
 
-    spec on_new_epoch {
+    spec update_validator_set_on_new_epoch {
         pragma verify_duration_estimate = 120;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global

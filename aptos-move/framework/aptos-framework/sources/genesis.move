@@ -131,6 +131,7 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
+        reconfiguration_state::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -293,7 +294,7 @@ module aptos_framework::genesis {
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
 
-        stake::on_new_epoch();
+        stake::update_validator_set_on_new_epoch(true);
     }
 
     /// Sets up the initial validator set for the network.
@@ -383,6 +384,7 @@ module aptos_framework::genesis {
     #[verify_only]
     use std::features;
     use aptos_framework::jwks;
+    use aptos_framework::reconfiguration_state;
 
     #[verify_only]
     fun initialize_for_verification(

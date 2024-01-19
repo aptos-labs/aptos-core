@@ -37,6 +37,7 @@ to synchronize configuration changes for the validators.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
 <b>use</b> <a href="storage_gas.md#0x1_storage_gas">0x1::storage_gas</a>;
@@ -360,6 +361,8 @@ Signal validators to start using new configuration. Must be called from friend c
         <b>return</b>
     };
 
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">reconfiguration_state::try_mark_as_in_progress</a>();
+
     // Reconfiguration "forces the <a href="block.md#0x1_block">block</a>" <b>to</b> end, <b>as</b> mentioned above. Therefore, we must process the collected fees
     // explicitly so that staking can distribute them.
     //
@@ -375,7 +378,7 @@ Signal validators to start using new configuration. Must be called from friend c
     };
 
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards and transaction fees.
-    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
+    <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">stake::update_validator_set_on_new_epoch</a>(<b>true</b>);
     <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
 
     <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
@@ -391,6 +394,8 @@ Signal validators to start using new configuration. Must be called from friend c
             epoch: config_ref.epoch,
         },
     );
+
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_mark_as_completed">reconfiguration_state::mark_as_completed</a>();
 }
 </code></pre>
 
