@@ -23,6 +23,8 @@ pub enum CommitMessage {
     Decision(CommitDecision),
     /// Ack on either vote or decision
     Ack(()),
+    /// Nack is non-acknowledgement, we got your message, but it was bad/we were bad
+    Nack,
 }
 
 impl CommitMessage {
@@ -32,6 +34,7 @@ impl CommitMessage {
             CommitMessage::Vote(vote) => vote.verify(verifier),
             CommitMessage::Decision(decision) => decision.verify(verifier),
             CommitMessage::Ack(_) => bail!("Unexpected ack in incoming commit message"),
+            CommitMessage::Nack => bail!("Unexpected NACK in incoming commit message"),
         }
     }
 }
