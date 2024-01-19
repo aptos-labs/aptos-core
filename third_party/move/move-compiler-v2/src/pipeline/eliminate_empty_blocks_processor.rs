@@ -50,8 +50,8 @@ impl EliminateEmptyBlocksTransformation {
 	fn transform(&mut self) {
 		let subst = self.collect_blocks_to_remove();
 		let blocks_to_remove: BTreeSet<BlockId> = subst.keys().cloned().collect();
-		self.remove_blocks(&blocks_to_remove);
 		let subst = subst.into_iter().map(|(b0, b1)| (self.get_block_label(b0), self.get_block_label(b1))).collect();
+		self.remove_blocks(&blocks_to_remove);
 		self.gen_code_from_cfg(&subst);
 	}
 
