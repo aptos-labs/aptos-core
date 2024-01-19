@@ -63,12 +63,12 @@ fn traverse_function(function: parser::ast::Function) -> anyhow::Result<Vec<Muta
     trace!("Traversing function {}", function.name);
     match function.body.value {
         FunctionBody_::Defined(elem) => traverse_sequence(elem),
-        _ => Ok(vec![]),
+        FunctionBody_::Native => Ok(vec![]),
     }
 }
 
 /// Traverses a sequence and returns a list of mutants.
-/// Checks all the sequence items by calling traverse_sequence_item on them. Sequence can also contain
+/// Checks all the sequence items by calling `traverse_sequence_item` on them. Sequence can also contain
 /// return expression which needs to be also examined if it can be mutated..
 fn traverse_sequence(elem: parser::ast::Sequence) -> anyhow::Result<Vec<Mutant>> {
     trace!("Traversing sequence {:?}", elem);
@@ -175,7 +175,6 @@ fn parse_expression_and_find_mutants(exp: parser::ast::Exp) -> anyhow::Result<Ve
             mutants.extend(parse_expression_and_find_mutants(*exp)?);
             Ok(mutants)
         },
-        parser::ast::Exp_::Return(Some(exp)) => parse_expression_and_find_mutants(*exp),
         parser::ast::Exp_::Abort(exp)
         | parser::ast::Exp_::Annotate(exp, _)
         | parser::ast::Exp_::Borrow(_, exp)
@@ -183,7 +182,8 @@ fn parse_expression_and_find_mutants(exp: parser::ast::Exp) -> anyhow::Result<Ve
         | parser::ast::Exp_::Dereference(exp)
         | parser::ast::Exp_::Dot(exp, _)
         | parser::ast::Exp_::Loop(exp)
-        | parser::ast::Exp_::Lambda(_, exp) => parse_expression_and_find_mutants(*exp),
+        | parser::ast::Exp_::Lambda(_, exp)
+        | parser::ast::Exp_::Return(Some(exp)) => parse_expression_and_find_mutants(*exp),
         parser::ast::Exp_::Value(_)
         | parser::ast::Exp_::Move(_)
         | parser::ast::Exp_::Copy(_)

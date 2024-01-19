@@ -1,4 +1,4 @@
-use clap::*;
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -27,6 +27,7 @@ pub struct Options {
 }
 
 /// This function creates a mutator CLI options from the given spec-test options.
+#[must_use]
 pub fn create_mutator_options(options: &Options) -> move_mutator::cli::Options {
     move_mutator::cli::Options {
         move_sources: options.move_sources.clone(),
@@ -38,6 +39,9 @@ pub fn create_mutator_options(options: &Options) -> move_mutator::cli::Options {
 }
 
 /// This function generates a prover CLI options from the given spec-test options.
+///
+/// # Errors
+/// Errors are returned as `anyhow::Result`.
 pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover::cli::Options> {
     let prover_conf = if let Some(conf) = &options.prover_conf {
         move_prover::cli::Options::create_from_toml_file(conf.to_str().unwrap_or(""))?
@@ -52,7 +56,8 @@ pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover:
 
 /// This function checks if the mutator output path is provided in the configuration file.
 /// We don't need to check if the mutator output path is provided in the options as they were created
-/// from the spec-test options which does not allow to set it..
+/// from the spec-test options which does not allow to set it.
+#[must_use]
 pub fn check_mutator_output_path(options: &move_mutator::cli::Options) -> Option<PathBuf> {
     if let Some(conf) = &options.configuration_file {
         let c = move_mutator::configuration::Configuration::from_file(conf);

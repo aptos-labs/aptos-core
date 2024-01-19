@@ -29,12 +29,15 @@ pub(crate) fn prove<W: WriteColor>(
         },
     )?;
 
+    let mut prover_conf = prover_conf.clone();
+    prover_conf.output_path = package_path
+        .to_path_buf()
+        .join("output.bpl")
+        .to_str()
+        .unwrap_or("")
+        .to_string();
+
     let now = Instant::now();
 
-    move_prover::run_move_prover_with_model(
-        &model,
-        &mut error_writer,
-        prover_conf.clone(),
-        Some(now),
-    )
+    move_prover::run_move_prover_with_model(&model, &mut error_writer, prover_conf, Some(now))
 }

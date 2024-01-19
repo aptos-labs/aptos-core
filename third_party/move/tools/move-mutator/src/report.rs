@@ -13,6 +13,7 @@ pub struct Report {
 
 impl Report {
     /// Creates a new `Report` instance.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             mutants: Vec::new(),
@@ -74,6 +75,7 @@ impl Report {
     }
 
     /// Returns the vector of `MutationReport` instances.
+    #[must_use]
     pub fn get_mutants(&self) -> &Vec<MutationReport> {
         &self.mutants
     }
@@ -82,6 +84,12 @@ impl Report {
     #[cfg(test)]
     pub fn to_json(&self) -> serde_json::Result<String> {
         serde_json::to_string_pretty(&self)
+    }
+}
+
+impl Default for Report {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -97,7 +105,10 @@ pub struct Range {
 
 impl Range {
     /// Creates a new `Range` instance.
+    ///
+    /// # Panics
     /// The start must be smaller or equal to the end.
+    #[must_use]
     pub fn new(start: usize, end: usize) -> Self {
         assert!(start <= end);
         Self { start, end }
@@ -121,6 +132,7 @@ pub struct Mutation {
 
 impl Mutation {
     /// Creates a new `Mutation` instance.
+    #[must_use]
     pub fn new(
         changed_place: Range,
         operator_name: String,
@@ -153,6 +165,7 @@ pub struct MutationReport {
 impl MutationReport {
     /// Creates a new `MutationReport` instance.
     /// Generates diff (patch) between the original and mutated source.
+    #[must_use]
     pub fn new(
         mutant_path: &Path,
         original_file: &Path,
@@ -175,11 +188,13 @@ impl MutationReport {
     }
 
     /// Return the mutant path.
+    #[must_use]
     pub fn mutant_path(&self) -> &PathBuf {
         &self.mutant_path
     }
 
     /// Return the original file path.
+    #[must_use]
     pub fn original_file_path(&self) -> &PathBuf {
         &self.original_file
     }

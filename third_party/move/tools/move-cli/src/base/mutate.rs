@@ -22,6 +22,6 @@ impl Mutate {
 
         let options = options.unwrap_or_default();
 
-        move_mutator::run_move_mutator(options, config, path)
+        move_mutator::run_move_mutator(options, &config, &path)
     }
 }
