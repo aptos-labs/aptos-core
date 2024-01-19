@@ -1,6 +1,7 @@
 /// Maintains the execution config for the blockchain. The config is stored in a
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::execution_config {
+    use aptos_framework::config_buffer;
     use std::error;
     use std::vector;
 
@@ -9,12 +10,13 @@ module aptos_framework::execution_config {
 
     friend aptos_framework::genesis;
 
-    struct ExecutionConfig has key {
+    struct ExecutionConfig has drop, key, store {
         config: vector<u8>,
     }
 
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
+    const EAPI_DISABLED: u64 = 2;
 
     /// This can be called by on-chain governance to update on-chain execution configs.
     public fun set(account: &signer, config: vector<u8>) acquires ExecutionConfig {
@@ -29,5 +31,23 @@ module aptos_framework::execution_config {
         };
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
         reconfiguration::reconfigure();
+    }
+
+    /// This can be called by on-chain governance to update on-chain execution configs.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
+        system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        config_buffer::upsert(ExecutionConfig { config });
+    }
+
+    /// Only used in reconfiguration with DKG.
+    public(friend) fun on_new_epoch() acquires ExecutionConfig {
+        if (config_buffer::does_exist<ExecutionConfig>()) {
+            let config = config_buffer::extract<ExecutionConfig>();
+            *borrow_global_mut<ExecutionConfig>(@aptos_framework) = config;
+        }
     }
 }
