@@ -56,7 +56,10 @@ use std::{
     cmp::Reverse,
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
-    sync::{Arc, RwLock, RwLockWriteGuard},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, RwLock, RwLockWriteGuard,
+    },
     time::Instant,
 };
 
@@ -70,7 +73,8 @@ pub struct Context {
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
-    view_function_stats: Arc<ViewFunctionStats>,
+    view_function_stats: Arc<FunctionStats>,
+    simulate_txn_stats: Arc<FunctionStats>,
 }
 
 impl std::fmt::Debug for Context {
@@ -86,11 +90,18 @@ impl Context {
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
     ) -> Self {
-        let view_function_stats = if node_config.api.periodic_view_function_stats_sec.is_some() {
-            Arc::new(ViewFunctionStats::new_enabled())
-        } else {
-            Arc::new(ViewFunctionStats::new_disabled())
-        };
+        let (view_function_stats, simulate_txn_stats) =
+            if node_config.api.periodic_function_stats_sec.is_some() {
+                (
+                    Arc::new(FunctionStats::new_enabled(LogEvent::ViewFunction)),
+                    Arc::new(FunctionStats::new_enabled(LogEvent::TxnSimulation)),
+                )
+            } else {
+                (
+                    Arc::new(FunctionStats::new_disabled()),
+                    Arc::new(FunctionStats::new_disabled()),
+                )
+            };
         Self {
             chain_id,
             db,
@@ -112,6 +123,7 @@ impl Context {
                     .block_executor_onchain_config(),
             })),
             view_function_stats,
+            simulate_txn_stats,
         }
     }
 
@@ -1309,8 +1321,12 @@ impl Context {
             .len()
     }
 
-    pub fn view_function_stats(&self) -> &ViewFunctionStats {
+    pub fn view_function_stats(&self) -> &FunctionStats {
         &self.view_function_stats
+    }
+
+    pub fn simulate_txn_stats(&self) -> &FunctionStats {
+        &self.simulate_txn_stats
     }
 }
 
@@ -1356,58 +1372,71 @@ impl LogSchema {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Copy, Clone)]
 pub enum LogEvent {
     ViewFunction,
+    TxnSimulation,
 }
 
-pub struct ViewFunctionStats {
-    call_count: Option<Cache<(AccountAddress, String, String), u64>>,
+pub struct FunctionStats {
+    stats: Option<Cache<String, (Arc<AtomicU64>, Arc<AtomicU64>)>>,
+    log_event: LogEvent,
 }
 
-impl ViewFunctionStats {
+impl FunctionStats {
     fn new_disabled() -> Self {
-        Self { call_count: None }
-    }
-
-    fn new_enabled() -> Self {
         Self {
-            call_count: Some(Cache::new(100)),
+            stats: None,
+            log_event: LogEvent::ViewFunction,
         }
     }
 
-    pub fn increment(
-        &self,
-        account_address: AccountAddress,
-        module: &Identifier,
-        function: &Identifier,
-        gas: u64,
-    ) {
-        if let Some(cache) = &self.call_count {
-            let key = (account_address, module.to_string(), function.to_string());
-            let prev_gas = cache.get(&key).unwrap_or(0);
-            cache.insert(key, prev_gas + gas);
+    fn new_enabled(log_event: LogEvent) -> Self {
+        Self {
+            stats: Some(Cache::new(100)),
+            log_event,
+        }
+    }
+
+    pub fn function_to_key(module: &ModuleId, function: &Identifier) -> String {
+        format!("{}::{}", module, function)
+    }
+
+    pub fn increment(&self, key: String, gas: u64) {
+        if let Some(stats) = &self.stats {
+            let (prev_gas, prev_count) = stats.get(&key).unwrap_or_else(|| {
+                // Note, race can occur on inserting new entry, resulting in some lost data, but it should be fine
+                let new_gas = Arc::new(AtomicU64::new(0));
+                let new_count = Arc::new(AtomicU64::new(0));
+                stats.insert(key.clone(), (new_gas.clone(), new_count.clone()));
+                (new_gas, new_count)
+            });
+            prev_gas.fetch_add(gas, Ordering::Relaxed);
+            prev_count.fetch_add(1, Ordering::Relaxed);
         }
     }
 
     pub fn log_and_clear(&self) {
-        if let Some(cache) = &self.call_count {
-            if cache.iter().next().is_none() {
+        if let Some(stats) = &self.stats {
+            if stats.iter().next().is_none() {
                 return;
             }
 
-            let mut sorted: Vec<_> = cache
+            let mut sorted: Vec<_> = stats
                 .iter()
                 .map(|entry| {
-                    let (account, module, function) = entry.key();
-                    let gas_used = *entry.value();
-                    (gas_used, *account, module.clone(), function.clone())
+                    let (gas_used, count) = entry.value();
+                    (
+                        gas_used.load(Ordering::Relaxed),
+                        count.load(Ordering::Relaxed),
+                        entry.key().clone(),
+                    )
                 })
                 .collect();
-            sorted.sort_by_key(|(gas_used, _, _, _)| Reverse(*gas_used));
+            sorted.sort_by_key(|(gas_used, ..)| Reverse(*gas_used));
 
             info!(
-                LogSchema::new(LogEvent::ViewFunction),
+                LogSchema::new(self.log_event),
                 top_1 = sorted.get(0),
                 top_2 = sorted.get(1),
                 top_3 = sorted.get(2),
@@ -1419,7 +1448,7 @@ impl ViewFunctionStats {
                 top_9 = sorted.get(8),
             );
 
-            cache.invalidate_all();
+            stats.invalidate_all();
         }
     }
 }

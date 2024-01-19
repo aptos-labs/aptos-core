@@ -79,7 +79,8 @@ pub struct ApiConfig {
     pub simulation_filter: Filter,
     /// Configuration to filter view function requests.
     pub view_filter: ViewFilter,
-    pub periodic_view_function_stats_sec: Option<u64>,
+    /// Periodically log stats for view function and simulate transaction usage
+    pub periodic_function_stats_sec: Option<u64>,
 }
 
 const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -127,7 +128,7 @@ impl Default for ApiConfig {
             periodic_gas_estimation_ms: Some(30_000),
             simulation_filter: Filter::default(),
             view_filter: ViewFilter::default(),
-            periodic_view_function_stats_sec: Some(60),
+            periodic_function_stats_sec: Some(60),
         }
     }
 }

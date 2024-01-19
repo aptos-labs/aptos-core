@@ -4,7 +4,7 @@
 use crate::{
     accept_type::AcceptType,
     bcs_payload::Bcs,
-    context::api_spawn_blocking,
+    context::{api_spawn_blocking, FunctionStats},
     failpoint::fail_point_poem,
     response::{
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
@@ -206,11 +206,8 @@ fn view_request(
             BasicResponse::try_from_json((move_vals, &ledger_info, BasicResponseStatus::Ok))
         },
     };
-    let (account_address, module) = view_function.module.into();
     context.view_function_stats().increment(
-        account_address,
-        &module,
-        &view_function.function,
+        FunctionStats::function_to_key(&view_function.module, &view_function.function),
         gas_used,
     );
     result

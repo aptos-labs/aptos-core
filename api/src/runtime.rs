@@ -67,17 +67,16 @@ pub fn bootstrap(
         });
     }
 
-    // TODO: combine?
     let context_cloned = context.clone();
-    if let Some(period_sec) = config.api.periodic_view_function_stats_sec {
+    if let Some(period_sec) = config.api.periodic_function_stats_sec {
         runtime.spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(period_sec));
             loop {
                 interval.tick().await;
                 let context_cloned = context_cloned.clone();
                 tokio::task::spawn_blocking(move || {
-                    let view_function_stats = context_cloned.view_function_stats();
-                    view_function_stats.log_and_clear();
+                    context_cloned.view_function_stats().log_and_clear();
+                    context_cloned.simulate_txn_stats().log_and_clear();
                 })
                 .await
                 .unwrap_or(());
