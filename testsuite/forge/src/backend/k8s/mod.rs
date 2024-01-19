@@ -9,6 +9,7 @@ use rand::rngs::StdRng;
 use std::{convert::TryInto, num::NonZeroUsize, time::Duration};
 
 pub mod chaos;
+pub mod chaos_schema;
 mod cluster_helper;
 pub mod constants;
 mod fullnode;

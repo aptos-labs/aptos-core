@@ -317,29 +317,14 @@ fun ability::no_key($t0: address) {
 
 
 Diagnostics:
-error: cannot copy
-   ┌─ tests/ability-checker/ability_violation.move:27:4
-   │
-27 │         (x, x);
-   │          ^
-
 error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:27:4
+   ┌─ tests/ability-checker/ability_violation.move:4:3
    │
-27 │         (x, x);
-   │          ^
-
-error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:27:7
-   │
-27 │         (x, x);
-   │             ^
-
-error: no key ability
-   ┌─ tests/ability-checker/ability_violation.move:22:3
-   │
-22 │         move_to(signer, Impotent {})
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 4 │         move_from<T>(addr);
+   │         ^^^^^^^^^^^^^^^^^^
+   ·
+14 │         move_from_no_key<Impotent>(addr);
+   │         -------------------------------- in a call inlined at this callsite
 
 error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:4:3
@@ -351,21 +336,12 @@ error: no key ability
    │         -------------------------------- in a call inlined at this callsite
 
 error: cannot drop
-   ┌─ tests/ability-checker/ability_violation.move:4:3
-   │
- 4 │         move_from<T>(addr);
-   │         ^^^^^^^^^^^^^^^^^^
-   ·
-14 │         move_from_no_key<Impotent>(addr);
-   │         -------------------------------- in a call inlined at this callsite
-
-error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:15:3
    │
 15 │         move_from<S<Impotent>>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: cannot drop
+error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:15:3
    │
 15 │         move_from<S<Impotent>>(addr);
@@ -388,6 +364,30 @@ error: no key ability
    │
 18 │         exists<Impotent>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: no key ability
+   ┌─ tests/ability-checker/ability_violation.move:22:3
+   │
+22 │         move_to(signer, Impotent {})
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: cannot copy
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:27:4
+   │
+27 │         (x, x);
+   │          ^
+
+error: cannot drop
+   ┌─ tests/ability-checker/ability_violation.move:27:7
+   │
+27 │         (x, x);
+   │             ^
 
 ============ after AbilityChecker: ================
 

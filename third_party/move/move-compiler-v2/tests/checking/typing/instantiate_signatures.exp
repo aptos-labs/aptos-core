@@ -1,5 +1,29 @@
 
 Diagnostics:
+error: Invalid instantiation
+   ┌─ tests/checking/typing/instantiate_signatures.move:11:9
+   │
+11 │         f1: S<R>,
+   │         ^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:12:15
+   │
+12 │         f2: S<&u64>,
+   │               ^^^^
+
+error: Invalid instantiation
+   ┌─ tests/checking/typing/instantiate_signatures.move:14:9
+   │
+14 │         f4: S<(u64, u64)>,
+   │         ^^
+
+error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/instantiate_signatures.move:14:15
+   │
+14 │         f4: S<(u64, u64)>,
+   │               ^^^^^^^^^^
+
 error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
    ┌─ tests/checking/typing/instantiate_signatures.move:19:16
    │
@@ -23,30 +47,6 @@ error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primi
    │
 26 │         S<(u64, u64)>,
    │           ^^^^^^^^^^
-
-error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
-   ┌─ tests/checking/typing/instantiate_signatures.move:12:15
-   │
-12 │         f2: S<&u64>,
-   │               ^^^^
-
-error: invalid type instantiation `(u64, u64)`: only structs, vectors, and primitive types allowed
-   ┌─ tests/checking/typing/instantiate_signatures.move:14:15
-   │
-14 │         f4: S<(u64, u64)>,
-   │               ^^^^^^^^^^
-
-error: Invalid instantiation
-   ┌─ tests/checking/typing/instantiate_signatures.move:11:9
-   │
-11 │         f1: S<R>,
-   │         ^^
-
-error: Invalid instantiation
-   ┌─ tests/checking/typing/instantiate_signatures.move:14:9
-   │
-14 │         f4: S<(u64, u64)>,
-   │         ^^
 
 error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
    ┌─ tests/checking/typing/instantiate_signatures.move:28:9
