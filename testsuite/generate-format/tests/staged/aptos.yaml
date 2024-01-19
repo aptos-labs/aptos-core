@@ -52,6 +52,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Secp256r1EcdsaPublicKey
+    3:
+      ZkId:
+        STRUCT:
+          - public_key:
+              TYPENAME: ZkIdPublicKey
 AnySignature:
   ENUM:
     0:
@@ -69,6 +74,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
+    3:
+      ZkId:
+        STRUCT:
+          - signature:
+              TYPENAME: ZkIdSignature
 AssertionSignature:
   ENUM:
     0:
@@ -146,12 +156,40 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+EphemeralPublicKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+EphemeralSignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
+Groth16Zkp:
+  STRUCT:
+    - a:
+        SEQ: STR
+    - b:
+        SEQ:
+          SEQ: STR
+    - c:
+        SEQ: STR
 HashValue:
   STRUCT:
     - hash:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 32
+IdCommitment:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 Module:
@@ -200,12 +238,28 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+OpenIdSig:
+  STRUCT:
+    - jwt_sig: STR
+    - jwt_payload: STR
+    - uid_key: STR
+    - epk_blinder:
+        TUPLEARRAY: 
+          CONTENT: U8
+          SIZE: 31
+    - pepper:
+        TYPENAME: Pepper
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
         TYPENAME: AssertionSignature
     - authenticator_data: BYTES
     - client_data_json: BYTES
+Pepper:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 31
 RawTransaction:
   STRUCT:
     - sender:
@@ -508,3 +562,28 @@ WriteSetPayload:
 WriteSetV0:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut
+ZkIdPublicKey:
+  STRUCT:
+    - iss: STR
+    - idc:
+        TYPENAME: IdCommitment
+ZkIdSignature:
+  STRUCT:
+    - sig:
+        TYPENAME: ZkpOrOpenIdSig
+    - jwt_header: STR
+    - exp_timestamp_secs: U64
+    - ephemeral_pubkey:
+        TYPENAME: EphemeralPublicKey
+    - ephemeral_signature:
+        TYPENAME: EphemeralSignature
+ZkpOrOpenIdSig:
+  ENUM:
+    0:
+      Groth16Zkp:
+        NEWTYPE:
+          TYPENAME: Groth16Zkp
+    1:
+      OpenIdSig:
+        NEWTYPE:
+          TYPENAME: OpenIdSig

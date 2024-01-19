@@ -225,9 +225,13 @@ impl Claims {
     }
 }
 
+pub type G1 = Vec<String>;
+pub type G2 = Vec<Vec<String>>;
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct Groth16Zkp {
-    // TODO(ZkIdGroth16Zkp): proof points
+    a: G1,
+    b: G2,
+    c: G1,
 }
 
 impl TryFrom<&[u8]> for Groth16Zkp {
