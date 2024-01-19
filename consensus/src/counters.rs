@@ -892,5 +892,5 @@ pub static EPOCH_PROOF_WRONG_EPOCH: Lazy<IntCounter> = Lazy::new(|| {
         "aptos_consensus_proof_wrong_epoch",
         "Count of the number of epoch proofs received for the wrong epoch",
     )
-        .unwrap()
+    .unwrap()
 });
