@@ -4,10 +4,10 @@
 
 use anyhow::bail;
 use move_command_line_common::{
-    env::read_env_var,
+    env::read_bool_env_var,
     testing::{
-        add_update_baseline_fix, format_diff, read_env_update_baseline, ENABLE_V2, EXP_EXT,
-        EXP_EXT_V2,
+        add_update_baseline_fix, format_diff, read_env_update_baseline, EXP_EXT, EXP_EXT_V2,
+        MOVE_COMPILER_V2,
     },
 };
 use move_compiler::shared::known_attributes::KnownAttribute;
@@ -154,8 +154,8 @@ pub fn run_test(path: &Path) -> datatest_stable::Result<()> {
     let output_v1 = run_test_impl(path, false)?;
     let update_baseline = read_env_update_baseline();
     let res_v1 = check_or_update(path, output_v1.clone(), update_baseline, false);
-    if read_env_var(ENABLE_V2) == "1" {
-        // Run test against v2 when ENABLE_V2 is set
+    if read_bool_env_var(MOVE_COMPILER_V2) {
+        // Run test against v2 when MOVE_COMPILER_V2 is set
         let output_v2 = run_test_impl(path, true)?;
         if output_v1 != output_v2 {
             // TODO: compare the result between V1 and V2.

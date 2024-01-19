@@ -292,7 +292,8 @@ module std::features {
     public fun get_concurrent_assets_feature(): u64 { CONCURRENT_ASSETS }
 
     public fun concurrent_assets_enabled(): bool acquires Features {
-        is_enabled(CONCURRENT_ASSETS)
+        // concurrent assets cannot be used if aggregator v2 api is not enabled.
+        is_enabled(CONCURRENT_ASSETS) && aggregator_v2_api_enabled()
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;

@@ -21,8 +21,8 @@ use crate::{
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
     test_utils::{
-        consensus_runtime, timed_block_on, MockPayloadManager, MockStateComputer, MockStorage,
-        TreeInserter,
+        consensus_runtime, create_vec_signed_transactions, timed_block_on, MockPayloadManager,
+        MockStateComputer, MockStorage, TreeInserter,
     },
     util::time_service::{ClockTimeService, TimeService},
 };
@@ -63,7 +63,9 @@ use aptos_secure_storage::Storage;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
-    on_chain_config::{ConsensusConfigV1Ext, ConsensusExtraFeature, OnChainConsensusConfig},
+    on_chain_config::{
+        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
+    },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
@@ -272,7 +274,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
-            onchain_consensus_config.validator_txn_enabled(),
+            onchain_consensus_config.effective_validator_txn_config(),
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -2050,14 +2052,18 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
 
-    let mut onchain_config_inner = ConsensusConfigV1Ext::default_if_missing();
-    onchain_config_inner
-        .extra_features
-        .update_extra_features(vec![ConsensusExtraFeature::ValidatorTransaction], vec![]);
+    let alg_config = ConsensusAlgorithmConfig::Jolteon {
+        main: ConsensusConfigV1::default(),
+        quorum_store_enabled: true,
+    };
+    let vtxn_config = ValidatorTxnConfig::V1 {
+        per_block_limit_txn_count: 5,
+        per_block_limit_total_bytes: 400,
+    };
 
     let local_config = ConsensusConfig {
         max_receiving_block_txns_quorum_store_override: 10,
-        max_receiving_block_bytes_quorum_store_override: 256,
+        max_receiving_block_bytes_quorum_store_override: 800,
         ..Default::default()
     };
 
@@ -2066,15 +2072,29 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         runtime.handle().clone(),
         1,
         None,
-        Some(OnChainConsensusConfig::V3(onchain_config_inner)),
+        Some(OnChainConsensusConfig::V3 {
+            alg: alg_config,
+            vtxn: vtxn_config,
+        }),
         Some(local_config),
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
 
     let block_too_many_txns = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 20]); 11],
-        Payload::empty(false),
+        vec![],
+        Payload::DirectMempool(create_vec_signed_transactions(11)),
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    let block_too_many_vtxns = Block::new_proposal_ext(
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 20]); 6],
+        Payload::DirectMempool(create_vec_signed_transactions(4)),
         1,
         1,
         genesis_qc.clone(),
@@ -2084,7 +2104,18 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let block_too_large = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 30]); 10],
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 200]); 1], // total_bytes >= 200 * 1 = 200
+        Payload::DirectMempool(create_vec_signed_transactions(9)), // = total_bytes >= 69 * 9 = 621
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+    .unwrap();
+
+    let block_vtxns_too_large = Block::new_proposal_ext(
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
         Payload::empty(false),
         1,
         1,
@@ -2095,8 +2126,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let valid_block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 16]); 10], // small enough txns
-        Payload::empty(false),
+        vec![ValidatorTransaction::dummy1(vec![0xFF; 60]); 5], // total_bytes >= 60 * 5 = 300
+        Payload::DirectMempool(create_vec_signed_transactions(5)), // total_bytes >= 69 * 5 = 345
         1,
         1,
         genesis_qc.clone(),
@@ -2117,7 +2148,19 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
 
         assert!(node
             .round_manager
+            .process_proposal(block_too_many_vtxns)
+            .await
+            .is_err());
+
+        assert!(node
+            .round_manager
             .process_proposal(block_too_large)
+            .await
+            .is_err());
+
+        assert!(node
+            .round_manager
+            .process_proposal(block_vtxns_too_large)
             .await
             .is_err());
 

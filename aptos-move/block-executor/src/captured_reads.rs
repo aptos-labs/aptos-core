@@ -609,7 +609,7 @@ impl<T: Transaction> CapturedReads<T> {
                     Err(Uninitialized) => {
                         unreachable!("May not be uninitialized if captured for validation");
                     },
-                    Err(TagSerializationError) => {
+                    Err(TagSerializationError(_)) => {
                         unreachable!("Should not require tag serialization");
                     },
                 }

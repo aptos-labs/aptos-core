@@ -38,7 +38,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{OnChainConsensusConfig, ValidatorSet},
+    on_chain_config::{OnChainConsensusConfig, ValidatorSet, ValidatorTxnConfig},
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -182,7 +182,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        false,
+        ValidatorTxnConfig::default_disabled(),
     );
 
     //

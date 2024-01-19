@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{natives::any::Any, unzip_metadata_str};
+use crate::unzip_metadata_str;
 use anyhow::bail;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
@@ -9,7 +9,7 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use aptos_types::{
-    on_chain_config::OnChainConfig, transaction::ModuleBundle, vm_status::StatusCode,
+    move_any::Any, on_chain_config::OnChainConfig, transaction::ModuleBundle, vm_status::StatusCode,
 };
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};

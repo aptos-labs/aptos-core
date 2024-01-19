@@ -20,15 +20,14 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, IdentityBlob, NodeConfig, PersistableConfig};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, validator_txn::Topic};
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_types::chain_id::ChainId;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -658,32 +657,36 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
-    let (dkg_txn_pulled_tx, dkg_txn_pulled_rx) = aptos_channel::new(QueueStyle::FIFO, 1, None);
-    let (vtxn_read_client, mut txn_write_clients) = vtxn_pool::new(vec![
-        (Topic::DKG, Some(dkg_txn_pulled_tx)),
-        (Topic::JWK_CONSENSUS, None),
-    ]);
-    let vtxn_pool_writer_for_jwk = txn_write_clients.pop().unwrap();
-    let vtxn_pool_writer_for_dkg = txn_write_clients.pop().unwrap();
+    let vtxn_pool = VTxnPoolState::default();
+    let identity_blob: Option<Arc<IdentityBlob>> = node_config
+        .consensus
+        .safety_rules
+        .initial_safety_rules_config
+        .identity_blob()
+        .ok()
+        .map(Arc::new);
 
-    let dkg_runtime = if let Some(obj) = dkg_network_interfaces {
-        let ApplicationNetworkInterfaces {
-            network_client,
-            network_service_events,
-        } = obj;
-        let (reconfig_events, dkg_start_events) = dkg_subscriptions
-            .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
-        let dkg_runtime = start_dkg_runtime(
-            network_client,
-            network_service_events,
-            vtxn_pool_writer_for_dkg,
-            dkg_txn_pulled_rx,
-            reconfig_events,
-            dkg_start_events,
-        );
-        Some(dkg_runtime)
-    } else {
-        None
+    let dkg_runtime = match (dkg_network_interfaces, identity_blob.clone()) {
+        (Some(interfaces), Some(identity_blob)) => {
+            let ApplicationNetworkInterfaces {
+                network_client,
+                network_service_events,
+            } = interfaces;
+            let (reconfig_events, dkg_start_events) = dkg_subscriptions
+                .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
+            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let dkg_runtime = start_dkg_runtime(
+                my_addr,
+                identity_blob,
+                network_client,
+                network_service_events,
+                reconfig_events,
+                dkg_start_events,
+                vtxn_pool.clone(),
+            );
+            Some(dkg_runtime)
+        },
+        _ => None,
     };
 
     let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {
@@ -697,7 +700,7 @@ pub fn setup_environment_and_start_node(
         let jwk_consensus_runtime = start_jwk_consensus_runtime(
             network_client,
             network_service_events,
-            vtxn_pool_writer_for_jwk,
+            vtxn_pool.clone(),
             reconfig_events,
             onchain_jwk_updated_events,
         );
@@ -721,7 +724,7 @@ pub fn setup_environment_and_start_node(
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
-            vtxn_read_client,
+            vtxn_pool,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime

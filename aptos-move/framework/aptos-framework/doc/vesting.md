@@ -2889,7 +2889,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
-// This enforces <a id="high-level-spec-2" href="#high-level-req">high level requirement 2</a>:
+// This enforces <a id="high-level-spec-2" href="#high-level-req">high-level requirement 2</a>:
 <b>invariant</b> <b>forall</b> pool: Pool: len(pool.shareholders) &lt;= <a href="vesting.md#0x1_vesting_MAXIMUM_SHAREHOLDERS">MAXIMUM_SHAREHOLDERS</a>;
 </code></pre>
 
@@ -3009,7 +3009,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-spec-3.1" href="#high-level-req">high level requirement 3</a>:
+<pre><code>// This enforces <a id="high-level-spec-3.1" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -3209,7 +3209,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-req-6" href="#high-level-req">high level requirement 6</a>:
+<pre><code>// This enforces <a id="high-level-req-6" href="#high-level-req">high-level requirement 6</a>:
 <b>aborts_if</b> !(len(schedule) &gt; 0);
 <b>aborts_if</b> !(period_duration &gt; 0);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
@@ -3230,7 +3230,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 <pre><code><b>pragma</b> verify = <b>false</b>;
-// This enforces <a id="high-level-req-10" href="#high-level-req">high level requirement 10</a>:
+// This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
 <b>aborts_if</b> withdrawal_address == @aptos_framework || withdrawal_address == @vm_reserved;
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(withdrawal_address);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;AptosCoin&gt;&gt;(withdrawal_address);
@@ -3703,7 +3703,7 @@ This address should be deterministic for the same admin and vesting contract cre
 <b>let</b> first = concat(seed, nonce);
 <b>let</b> second = concat(first, <a href="vesting.md#0x1_vesting_VESTING_POOL_SALT">VESTING_POOL_SALT</a>);
 <b>let</b> end = concat(second, contract_creation_seed);
-// This enforces <a id="high-level-req-11" href="#high-level-req">high level requirement 11</a>:
+// This enforces <a id="high-level-req-11" href="#high-level-req">high-level requirement 11</a>:
 <b>let</b> resource_addr = <a href="account.md#0x1_account_spec_create_resource_address">account::spec_create_resource_address</a>(admin_addr, end);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_AdminStore">AdminStore</a>&gt;(admin_addr);
 <b>aborts_if</b> len(<a href="account.md#0x1_account_ZERO_AUTH_KEY">account::ZERO_AUTH_KEY</a>) != 32;
@@ -3734,7 +3734,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-req-9" href="#high-level-req">high level requirement 9</a>:
+<pre><code>// This enforces <a id="high-level-req-9" href="#high-level-req">high-level requirement 9</a>:
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(admin) != vesting_contract.admin;
 </code></pre>
 
@@ -3751,7 +3751,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
 </code></pre>
 
@@ -3887,7 +3887,7 @@ This address should be deterministic for the same admin and vesting contract cre
 
 
 
-<pre><code>// This enforces <a id="high-level-spec-3.2" href="#high-level-req">high level requirement 3</a>:
+<pre><code>// This enforces <a id="high-level-spec-3.2" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -3929,10 +3929,10 @@ This address should be deterministic for the same admin and vesting contract cre
 
 <pre><code><b>schema</b> <a href="vesting.md#0x1_vesting_ActiveVestingContractAbortsIf">ActiveVestingContractAbortsIf</a>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt; {
     contract_address: <b>address</b>;
-    // This enforces <a id="high-level-spec-5" href="#high-level-req">high level requirement 5</a>:
+    // This enforces <a id="high-level-spec-5" href="#high-level-req">high-level requirement 5</a>:
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
     <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting.md#0x1_vesting_VestingContract">VestingContract</a>&gt;(contract_address);
-    // This enforces <a id="high-level-spec-8" href="#high-level-req">high level requirement 8</a>:
+    // This enforces <a id="high-level-spec-8" href="#high-level-req">high-level requirement 8</a>:
     <b>aborts_if</b> vesting_contract.state != <a href="vesting.md#0x1_vesting_VESTING_POOL_ACTIVE">VESTING_POOL_ACTIVE</a>;
 }
 </code></pre>

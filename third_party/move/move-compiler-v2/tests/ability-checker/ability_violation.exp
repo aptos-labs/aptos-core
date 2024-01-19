@@ -317,15 +317,6 @@ fun ability::no_key($t0: address) {
 
 
 Diagnostics:
-error: no key ability
-   ┌─ tests/ability-checker/ability_violation.move:4:3
-   │
- 4 │         move_from<T>(addr);
-   │         ^^^^^^^^^^^^^^^^^^
-   ·
-14 │         move_from_no_key<Impotent>(addr);
-   │         -------------------------------- in a call inlined at this callsite
-
 error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:4:3
    │
@@ -336,12 +327,21 @@ error: cannot drop
    │         -------------------------------- in a call inlined at this callsite
 
 error: no key ability
+   ┌─ tests/ability-checker/ability_violation.move:4:3
+   │
+ 4 │         move_from<T>(addr);
+   │         ^^^^^^^^^^^^^^^^^^
+   ·
+14 │         move_from_no_key<Impotent>(addr);
+   │         -------------------------------- in a call inlined at this callsite
+
+error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:15:3
    │
 15 │         move_from<S<Impotent>>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: cannot drop
+error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:15:3
    │
 15 │         move_from<S<Impotent>>(addr);

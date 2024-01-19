@@ -128,7 +128,6 @@ spec aptos_framework::account {
             || account_address == @aptos_token
             || !(len(authentication_key) == 32)
         );
-        /// [high-level-req-2]
         ensures exists<Account>(account_address);
     }
 
@@ -140,6 +139,7 @@ spec aptos_framework::account {
         include CreateAccountAbortsIf {addr: new_address};
         aborts_if new_address == @vm_reserved || new_address == @aptos_framework || new_address == @aptos_token;
         ensures signer::address_of(result) == new_address;
+        /// [high-level-req-2]
         ensures exists<Account>(new_address);
     }
 

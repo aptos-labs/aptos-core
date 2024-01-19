@@ -40,7 +40,7 @@ use move_core_types::{
     ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::ModuleResolver,
     value::{LayoutTag, MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
@@ -64,7 +64,7 @@ pub struct MoveConverter<'a, R: ?Sized> {
     db: Arc<dyn DbReader>,
 }
 
-impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
+impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
     pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
@@ -925,7 +925,7 @@ impl<'a, R: MoveResolver + ?Sized> MoveConverter<'a, R> {
     }
 }
 
-impl<'a, R: MoveResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
+impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     fn get_module_bytecode(&self, module_id: &ModuleId) -> Result<Rc<dyn Bytecode>> {
         self.inner
             .get_module(module_id)
@@ -936,7 +936,7 @@ pub trait AsConverter<R> {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
 }
 
-impl<R: MoveResolver> AsConverter<R> for R {
+impl<R: ModuleResolver> AsConverter<R> for R {
     fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
         MoveConverter::new(self, db)
     }

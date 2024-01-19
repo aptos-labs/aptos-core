@@ -21,6 +21,7 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
+    debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
@@ -31,24 +32,6 @@ use move_vm_types::{
     views::TypeView,
 };
 use std::{cmp::min, collections::VecDeque, fmt::Write, sync::Arc};
-
-macro_rules! debug_write {
-    ($($toks: tt)*) => {
-        write!($($toks)*).map_err(|_|
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("failed to write to buffer".to_string())
-        )
-    };
-}
-
-macro_rules! debug_writeln {
-    ($($toks: tt)*) => {
-        writeln!($($toks)*).map_err(|_|
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("failed to write to buffer".to_string())
-        )
-    };
-}
 
 macro_rules! set_err_info {
     ($frame:ident, $e:expr) => {{

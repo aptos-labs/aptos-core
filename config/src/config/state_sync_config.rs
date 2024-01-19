@@ -114,10 +114,10 @@ pub struct StateSyncDriverConfig {
     pub max_num_stream_timeouts: u64,
     /// The maximum number of data chunks pending execution or commit
     pub max_pending_data_chunks: u64,
+    /// The maximum number of pending mempool commit notifications
+    pub max_pending_mempool_notifications: u64,
     /// The maximum time (ms) to wait for a data stream notification
     pub max_stream_wait_time_ms: u64,
-    /// The maximum time (ms) allowed for mempool to ack a commit notification
-    pub mempool_commit_ack_timeout_ms: u64,
     /// The version lag we'll tolerate before snapshot syncing
     pub num_versions_to_skip_snapshot_sync: u64,
 }
@@ -132,13 +132,13 @@ impl Default for StateSyncDriverConfig {
             continuous_syncing_mode: ContinuousSyncingMode::ExecuteTransactionsOrApplyOutputs,
             enable_auto_bootstrapping: false,
             fallback_to_output_syncing_secs: 180, // 3 minutes
-            progress_check_interval_ms: 50,
+            progress_check_interval_ms: 100,
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
             max_pending_data_chunks: 100,
+            max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
-            mempool_commit_ack_timeout_ms: 5000, // 5 seconds
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
         }
     }
