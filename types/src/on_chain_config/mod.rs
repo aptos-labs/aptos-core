@@ -42,8 +42,8 @@ pub use self::{
         OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType, ValidatorTxnConfig,
     },
     execution_config::{
-        BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4, OnChainExecutionConfig,
-        TransactionDeduperType, TransactionShufflerType,
+        BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
+        OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},

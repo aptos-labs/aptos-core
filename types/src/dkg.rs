@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::on_chain_config::OnChainConfig;
+use crate::{on_chain_config::OnChainConfig, ValidatorConsensusInfoMoveStruct};
 use anyhow::Result;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
@@ -9,7 +9,6 @@ use move_core_types::{
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use crate::ValidatorConsensusInfoMoveStruct;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {

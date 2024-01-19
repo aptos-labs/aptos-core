@@ -4,7 +4,7 @@
 
 #![forbid(unsafe_code)]
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub mod access_path;
 pub mod account_address;

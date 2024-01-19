@@ -4,6 +4,7 @@
 use crate::{assert_success, build_package, AptosPackageHooks};
 use anyhow::Error;
 use aptos_cached_packages::aptos_stdlib;
+use aptos_crypto::HashValue;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_gas_schedule::{
@@ -18,7 +19,7 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, CORE_CODE_ADDRESS},
     contract_event::ContractEvent,
-    move_utils::MemberId,
+    move_utils::{as_move_value::AsMoveValue, MemberId},
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
     state_store::{
         state_key::StateKey,
@@ -46,9 +47,6 @@ use std::{
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use aptos_crypto::HashValue;
-use aptos_types::move_utils::as_move_value::AsMoveValue;
-use aptos_types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
 
 // Code representing successful transaction, used for run_block_in_parts_and_check
 pub const SUCCESS: u64 = 0;
@@ -610,7 +608,11 @@ impl MoveHarness {
             .write_state_value(state_key, bcs::to_bytes(data).unwrap());
     }
 
-    pub fn change_features_for_next_epoch(&mut self, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    pub fn change_features_for_next_epoch(
+        &mut self,
+        enabled: Vec<FeatureFlag>,
+        disabled: Vec<FeatureFlag>,
+    ) {
         self.change_features_inner("change_feature_flags_for_next_epoch", enabled, disabled)
     }
 
@@ -619,18 +621,22 @@ impl MoveHarness {
         self.change_features_inner("change_feature_flags", enabled, disabled)
     }
 
-    pub fn change_features_inner(&mut self, func_variant: &str, enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
+    pub fn change_features_inner(
+        &mut self,
+        func_variant: &str,
+        enabled: Vec<FeatureFlag>,
+        disabled: Vec<FeatureFlag>,
+    ) {
         let acc = self.aptos_framework_account();
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
-        self.executor
-            .exec("features", func_variant, vec![], vec![
-                MoveValue::Signer(*acc.address())
-                    .simple_serialize()
-                    .unwrap(),
-                bcs::to_bytes(&enabled).unwrap(),
-                bcs::to_bytes(&disabled).unwrap(),
-            ]);
+        self.executor.exec("features", func_variant, vec![], vec![
+            MoveValue::Signer(*acc.address())
+                .simple_serialize()
+                .unwrap(),
+            bcs::to_bytes(&enabled).unwrap(),
+            bcs::to_bytes(&disabled).unwrap(),
+        ]);
     }
 
     pub fn finish_reconfig_with_dkg_result(&mut self, dkg_result: Vec<u8>) {
@@ -638,9 +644,16 @@ impl MoveHarness {
             MoveValue::Signer(AccountAddress::ONE),
             dkg_result.as_move_value(),
         ];
-        let args_serialized = args.into_iter().map(|mv| mv.simple_serialize().unwrap()).collect();
-        self.executor
-            .exec("reconfiguration_with_dkg", "finish_with_dkg_result", vec![], args_serialized);
+        let args_serialized = args
+            .into_iter()
+            .map(|mv| mv.simple_serialize().unwrap())
+            .collect();
+        self.executor.exec(
+            "reconfiguration_with_dkg",
+            "finish_with_dkg_result",
+            vec![],
+            args_serialized,
+        );
     }
 
     pub fn run_block_prologue_ext(
@@ -652,7 +665,7 @@ impl MoveHarness {
         failed_proposer_indices: Vec<u64>,
         previous_block_votes_bitvec: Vec<u8>,
         timestamp_us: u64,
-        randomness_seed: Option<Vec<u8>>
+        randomness_seed: Option<Vec<u8>>,
     ) {
         let args = vec![
             MoveValue::Signer(AccountAddress::ZERO),
@@ -665,7 +678,10 @@ impl MoveHarness {
             timestamp_us.as_move_value(),
             randomness_seed.as_move_value(),
         ];
-        let args_serialized = args.into_iter().map(|mv| mv.simple_serialize().unwrap()).collect();
+        let args_serialized = args
+            .into_iter()
+            .map(|mv| mv.simple_serialize().unwrap())
+            .collect();
         self.executor
             .exec("block", "block_prologue_ext", vec![], args_serialized);
     }
