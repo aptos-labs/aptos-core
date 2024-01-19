@@ -11,6 +11,7 @@ use aptos_dkg::{
 use move_core_types::{
     account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
 };
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
@@ -21,6 +22,12 @@ pub type WTrx = pvss::das::WeightedTranscript;
 pub type DkgPP = <WTrx as Transcript>::PublicParameters;
 pub type SSConfig = <WTrx as Transcript>::SecretSharingConfig;
 pub type EncPK = <WTrx as Transcript>::EncryptPubKey;
+
+pub const WEIGHT_PER_VALIDATOR_MIN: usize = 1;
+pub const WEIGHT_PER_VALIDATOR_MAX: usize = 30;
+pub const STEPS: usize = 1_000;
+pub const STAKE_GAP_THRESHOLD: f64 = 0.1;
+pub const RECONSTRUCT_THRESHOLD: f64 = 0.5;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartDKGEvent {
@@ -73,12 +80,12 @@ pub struct DKGTranscriptWrapper {
 }
 
 impl DKGTranscriptWrapper {
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn dummy() -> Self {
-        Self {
-            trx: WTrx::dummy(),
-        }
-    }
+    // #[cfg(any(test, feature = "fuzzing"))]
+    // pub fn dummy() -> Self {
+    //     Self {
+    //         trx: WTrx::dummy(),
+    //     }
+    // }
 
     pub fn verify(
         &self,
@@ -221,7 +228,43 @@ impl DKGAggNode {
     }
 }
 
-pub const HARDCODED_BEST_ROUNDING_THRESHOLD: f64 = 0.5;
+pub fn build_dkg_pvss_config(cur_epoch: u64, next_validator_set: &ValidatorSet) -> DKGPvssConfig {
+    let validator_stakes: Vec<u64> = next_validator_set
+        .active_validators
+        .iter()
+        .map(|vi| vi.consensus_voting_power())
+        .collect();
+
+    // // For mainnet-like testing
+    // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
+    // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
+
+    let dkg_rounding = DKGRounding::new(
+        validator_stakes.clone(),
+        STAKE_GAP_THRESHOLD,
+        WEIGHT_PER_VALIDATOR_MIN,
+        WEIGHT_PER_VALIDATOR_MAX,
+        STEPS,
+        RECONSTRUCT_THRESHOLD,
+    );
+
+    let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validator_set
+        .active_validators
+        .iter()
+        .map(|vi| vi.consensus_public_key().clone())
+        .collect();
+
+    let consensus_keys: Vec<EncPK> = validator_consensus_keys
+        .iter()
+        .map(|k| k.to_bytes().as_slice().try_into().unwrap())
+        .collect::<Vec<_>>();
+
+    let wconfig = dkg_rounding.wconfig.clone();
+
+    let pp = DkgPP::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
+
+    DKGPvssConfig::new(cur_epoch, wconfig.clone(), pp, consensus_keys)
+}
 
 #[derive(Clone)]
 pub struct DKGRoundingProfile {
@@ -278,6 +321,10 @@ impl DKGRounding {
 
         if profile.stake_gap > stake_gap_threshold {
             // dkg todo: add alert here
+            println!(
+                "[DKG] error: stake_gap {} is larger than threshold {}",
+                profile.stake_gap, stake_gap_threshold
+            );
         }
 
         let wconfig = WeightedConfig::new(
@@ -299,14 +346,15 @@ impl DKGRoundingProfile {
         steps: usize,
         reconstruct_threshold_in_stake_ratio: f64,
     ) -> Self {
+        assert!(0.0 < stake_gap_threshold && stake_gap_threshold < 1.0);
+        assert!(0 < weight_per_validator_min && weight_per_validator_min <= weight_per_validator_max);
+        assert!(steps > 0);
+        assert!(reconstruct_threshold_in_stake_ratio > 0.0);
+
         let validator_num = validator_stakes.len();
         let total_weight_min = weight_per_validator_min * validator_num;
         let total_weight_max = weight_per_validator_max * validator_num;
-        let mut best_profile = DKGRoundingProfile {
-            validator_weights: vec![],
-            stake_gap: 1.0,
-            reconstruct_threshold_in_weights: 0,
-        };
+        let mut maybe_best_profile: Option<DKGRoundingProfile> = None;
 
         for step in 0..steps {
             let total_weight =
@@ -320,6 +368,10 @@ impl DKGRoundingProfile {
 
             assert!(profile.stake_gap < 1.0);
 
+            if maybe_best_profile.is_none() {
+                maybe_best_profile = Some(profile.clone());
+            }
+
             // This check makes sure the randomness is live: 2/3 stakes can reconstruct the randomness.
             if reconstruct_threshold_in_stake_ratio + profile.stake_gap > 2.0 / 3.0 {
                 continue;
@@ -330,15 +382,15 @@ impl DKGRoundingProfile {
                 continue;
             }
 
-            if profile.stake_gap < best_profile.stake_gap {
-                best_profile = profile.clone();
+            if maybe_best_profile.as_ref().unwrap().stake_gap > profile.stake_gap {
+                maybe_best_profile = Some(profile.clone());
             }
 
             if profile.stake_gap <= stake_gap_threshold {
                 break;
             }
         }
-        best_profile
+        maybe_best_profile.unwrap()
     }
 }
 
@@ -348,6 +400,7 @@ pub fn compute_profile(
     weights_sum: usize,
     reconstruct_threshold_in_stake_ratio: f64,
 ) -> DKGRoundingProfile {
+    let hardcoded_best_rounding_threshold = 0.5;
     let stake_sum = validator_stakes.iter().sum::<u64>();
     let stake_per_weight = stake_sum / weights_sum as u64;
     let fractions = validator_stakes
@@ -359,7 +412,7 @@ pub fn compute_profile(
     let mut delta_down = 0.0;
     let mut delta_up = 0.0;
     for j in 0..fractions.len() {
-        if fractions[j] + HARDCODED_BEST_ROUNDING_THRESHOLD >= 1.0 {
+        if fractions[j] + hardcoded_best_rounding_threshold >= 1.0 {
             delta_up += 1.0 - fractions[j];
         } else {
             delta_down += fractions[j];
@@ -370,7 +423,7 @@ pub fn compute_profile(
     let validator_weights = validator_stakes
         .iter()
         .map(|stake| {
-            (*stake as f64 / stake_per_weight as f64 + HARDCODED_BEST_ROUNDING_THRESHOLD) as usize
+            (*stake as f64 / stake_per_weight as f64 + hardcoded_best_rounding_threshold) as usize
         })
         .collect::<Vec<usize>>();
 
@@ -389,13 +442,88 @@ pub fn compute_profile(
     }
 }
 
-pub const WEIGHT_PER_VALIDATOR_MIN: usize = 1;
-pub const WEIGHT_PER_VALIDATOR_MAX: usize = 30;
-pub const STEPS: usize = 1_000;
-pub const STAKE_GAP_THRESHOLD: f64 = 0.1;
-// dkg todo: decide threshold
-pub const RECONSTRUCT_THRESHOLD: f64 = 1.0 / 3.0;
+#[test]
+fn compute_mainnet_rounding() {
+    for stake_gap in (5..=100).step_by(1) {
+        let stake_gap = stake_gap as f64 / 1000.0;
+        let mainnet_dkg_rounding = DKGRounding::new(
+            MAINNET_STAKES.to_vec(),
+            stake_gap,
+            WEIGHT_PER_VALIDATOR_MIN,
+            WEIGHT_PER_VALIDATOR_MAX,
+            STEPS,
+            RECONSTRUCT_THRESHOLD,
+        );
+        println!("{:?}", mainnet_dkg_rounding.profile);
+    }
+}
 
+#[test]
+fn test_rounding_uniform_distribution() {
+    let num_runs = 100;
+    let mut rng = rand::thread_rng();
+    // assuming each validator has a stake between 1_000_000 and 50_000_000, following uniform distribution
+    // randomly generate 100~500 validators' stake distribution
+    for _ in 0..num_runs {
+        let validator_num = rng.gen_range(100, 250);
+        let mut validator_stakes = vec![];
+        for _ in 0..validator_num {
+            validator_stakes.push(rng.gen_range(1_000_000, 50_000_000));
+        }
+        let dkg_rounding = DKGRounding::new(
+            validator_stakes,
+            STAKE_GAP_THRESHOLD,
+            WEIGHT_PER_VALIDATOR_MIN,
+            WEIGHT_PER_VALIDATOR_MAX,
+            STEPS,
+            RECONSTRUCT_THRESHOLD,
+        );
+        // println!("{:?}", dkg_rounding.profile);
+        assert!(dkg_rounding.profile.stake_gap <= STAKE_GAP_THRESHOLD);
+        assert!(dkg_rounding.profile.stake_gap + RECONSTRUCT_THRESHOLD <= 2.0 / 3.0);
+    }
+}
+
+#[cfg(test)]
+fn generate_approximate_zipf(size: usize, a: u64, b: u64, exponent: f64) -> Vec<u64> {
+    use num_traits::Float;
+
+    let mut rng = rand::thread_rng();
+    (0..size)
+        .map(|_| {
+            let random_uniform = rng.gen_range(0.0, 1.0);
+            let approximate_value =
+                a + ((b - a + 1) as f64 * (1.0 - random_uniform).powf(exponent)) as u64;
+            // Adjust value to be within the specified range [a, b]
+            approximate_value.clamp(a, b)
+        })
+        .collect()
+}
+
+#[test]
+fn test_rounding_zipf_distribution() {
+    let num_runs = 100;
+    let mut rng = rand::thread_rng();
+    // assuming each validator has a stake between 1_000_000 and 50_000_000, following zipf distribution
+    // randomly generate 100~500 validators' stake distribution
+    for _ in 0..num_runs {
+        let validator_num = rng.gen_range(100, 250);
+        let validator_stakes = generate_approximate_zipf(validator_num, 1_000_000, 50_000_000, 5.0);
+        let dkg_rounding = DKGRounding::new(
+            validator_stakes,
+            STAKE_GAP_THRESHOLD,
+            WEIGHT_PER_VALIDATOR_MIN,
+            WEIGHT_PER_VALIDATOR_MAX,
+            STEPS,
+            RECONSTRUCT_THRESHOLD,
+        );
+        // println!("{:?}", dkg_rounding.profile);
+        assert!(dkg_rounding.profile.stake_gap <= STAKE_GAP_THRESHOLD);
+        assert!(dkg_rounding.profile.stake_gap + RECONSTRUCT_THRESHOLD <= 2.0 / 3.0);
+    }
+}
+
+#[cfg(test)]
 pub const MAINNET_STAKES: [u64; 112] = [
     210500217584363000,
     19015034427309200,
@@ -510,57 +638,3 @@ pub const MAINNET_STAKES: [u64; 112] = [
     38221788594331900,
     10516889883063100,
 ];
-
-#[test]
-fn compute_mainnet_rounding() {
-    for stake_gap in (5..=100).step_by(1) {
-        let stake_gap = stake_gap as f64 / 1000.0;
-        let mainnet_dkg_rounding = DKGRounding::new(
-            MAINNET_STAKES.to_vec(),
-            stake_gap,
-            WEIGHT_PER_VALIDATOR_MIN,
-            WEIGHT_PER_VALIDATOR_MAX,
-            STEPS,
-            RECONSTRUCT_THRESHOLD,
-        );
-        println!("{:?}", mainnet_dkg_rounding.profile);
-    }
-}
-
-pub fn build_dkg_pvss_config(cur_epoch: u64, next_validator_set: &ValidatorSet) -> DKGPvssConfig {
-    let validator_stakes: Vec<u64> = next_validator_set
-        .active_validators
-        .iter()
-        .map(|vi| vi.consensus_voting_power())
-        .collect();
-
-    // // For mainnet-like testing
-    // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
-    // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
-
-    let dkg_rounding = DKGRounding::new(
-        validator_stakes.clone(),
-        STAKE_GAP_THRESHOLD,
-        WEIGHT_PER_VALIDATOR_MIN,
-        WEIGHT_PER_VALIDATOR_MAX,
-        STEPS,
-        RECONSTRUCT_THRESHOLD,
-    );
-
-    let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validator_set
-        .active_validators
-        .iter()
-        .map(|vi| vi.consensus_public_key().clone())
-        .collect();
-
-    let consensus_keys: Vec<EncPK> = validator_consensus_keys
-        .iter()
-        .map(|k| k.to_bytes().as_slice().try_into().unwrap())
-        .collect::<Vec<_>>();
-
-    let wconfig = dkg_rounding.wconfig.clone();
-
-    let pp = DkgPP::new_from_seed_with_bls_base(SEED_PVSS_PUBLIC_PARAMS);
-
-    DKGPvssConfig::new(cur_epoch, wconfig.clone(), pp, consensus_keys)
-}
