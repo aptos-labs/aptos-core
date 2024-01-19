@@ -2,14 +2,15 @@
 remote_endpoint: ~
 name: "v1.9"
 proposals:
-  - name: step_1_update_gas
+  - name: step_1_increase_max_txn_gas
     metadata:
-      title: "Update gas schedule (for AIP-58)"
-      description: "AIP-58 - Gas Schedule Adjustments"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/286"
+      title: "Increase max txn gas temporarily for framework upgrade and update gas schedule (AIP-58)"
+      description: "Increase max txn gas temporarily for framework upgrade and update gas schedule (AIP-58)"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGas
+      - DefaultGasWithOverride:
+          - name: "txn.max_execution_gas"
+            value: 3676000000
   - name: step_2_update_block_limits
     metadata: 
       title: "AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  
@@ -42,6 +43,7 @@ proposals:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - DefaultGas
   - name: step_4_commission_change_delegation_pool
     metadata:
       title: "AIP-50: Change commission rates in delegation pools"
