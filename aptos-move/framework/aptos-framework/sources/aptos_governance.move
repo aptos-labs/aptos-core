@@ -548,11 +548,8 @@ module aptos_framework::aptos_governance {
     /// since such updates are applied whenever we enter an new epoch.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        if (features::reconfigure_with_dkg_enabled()) {
-            reconfiguration_with_dkg::try_start();
-        } else {
-            reconfiguration_with_dkg::finish(aptos_framework);
-        }
+        //TODO: once DKG is implemented, update this.
+        reconfiguration_with_dkg::finish(aptos_framework);
     }
 
     /// Change epoch immediately.
