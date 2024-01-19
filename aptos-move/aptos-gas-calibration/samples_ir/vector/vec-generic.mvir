@@ -1,0 +1,230 @@
+module 0xcafe.VecGeneric {
+    struct D has copy, drop { x: u64 }
+    struct C<T> has copy, drop { x: T, y: u64 }
+    struct E<T> has copy, drop { x: T, y: u64 }
+    struct F<T> has copy, drop { x: T, y: u64 }
+    struct G<T> has copy, drop { x: T, y: u64 }
+
+    public make(): Self.C<Self.D> {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        return C<Self.D> { x: move(d), y: 0 };
+    }
+
+    public calibrate_vec_len_generic_impl(n: u64) {
+        let i: u64;
+        let c: Self.C<Self.D>;
+        let v: vector<Self.C<Self.D>>;
+    label entry:
+        i = 0;
+        c = Self.make();
+        v = vec_pack_1<Self.C<Self.D>>(move(c));
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+        Self.vec_len(&v);
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public calibrate_vec_len_generic_inlined_impl(n: u64) {
+        let i: u64;
+        let c: Self.C<Self.D>;
+        let v: vector<Self.C<Self.D>>;
+    label entry:
+        i = 0;
+        c = Self.make();
+        v = vec_pack_1<Self.C<Self.D>>(move(c));
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+        _ = vec_len<Self.C<Self.D>>(&v);
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public vec_len(v: &vector<Self.C<Self.D>>) {
+    label entry:
+        _ = vec_len<Self.C<Self.D>>(move(v));
+        return;
+    }
+
+    public entry calibrate_vec_len_generic_1_x100() {
+    label b0:
+        Self.calibrate_vec_len_generic_impl(10);
+        return;       
+    }
+
+    public entry calibrate_vec_len_generic_1_x500() {
+    label b0:
+        Self.calibrate_vec_len_generic_impl(50);
+        return;       
+    }
+
+    public entry calibrate_vec_len_generic_1_x1000() {
+    label b0:
+        Self.calibrate_vec_len_generic_impl(100);
+        return;       
+    }
+    
+    public entry calibrate_vec_len_generic_inlined_1_x100() {
+    label b0:
+        Self.calibrate_vec_len_generic_inlined_impl(10);
+        return;       
+    }
+
+    public entry calibrate_vec_len_generic_inlined_1_x500() {
+    label b0:
+        Self.calibrate_vec_len_generic_inlined_impl(50);
+        return;       
+    }
+
+    public entry calibrate_vec_len_generic_inlined_1_x1000() {
+    label b0:
+        Self.calibrate_vec_len_generic_inlined_impl(100);
+        return;       
+    }
+
+    public make_gen<T>(v: T): Self.C<T> {
+    label b0:
+        return C<T> { x: move(v), y: 0 };
+    }
+
+    public calibrate_vec_len_generic_2_impl<T: drop>(n: u64, val: T) {
+        let i: u64;
+        let c: Self.C<T>;
+        let v: vector<Self.C<T>>;
+    label entry:
+        i = 0;
+        c = Self.make_gen<T>(move(val));
+        v = vec_pack_1<Self.C<T>>(move(c));
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+        Self.vec_len_gen<T>(&v);
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public calibrate_vec_len_generic_inlined_2_impl<T: drop>(n: u64, val: T) {
+        let i: u64;
+        let c: Self.C<T>;
+        let v: vector<Self.C<T>>;
+    label entry:
+        i = 0;
+        c = Self.make_gen<T>(move(val));
+        v = vec_pack_1<Self.C<T>>(move(c));
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+        _ = vec_len<Self.C<T>>(&v);
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public vec_len_gen<T>(v: &vector<Self.C<T>>) {
+    label entry:
+        _ = vec_len<Self.C<T>>(move(v));
+        return;
+    }
+
+    public entry calibrate_vec_len_generic_2_x100() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_2_impl<Self.D>(10, move(d));
+        return;       
+    }
+
+    public entry calibrate_vec_len_generic_2_x500() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_2_impl<Self.D>(50, move(d));
+        return;      
+    }
+
+    public entry calibrate_vec_len_generic_2_x1000() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_2_impl<Self.D>(100, move(d));
+        return;          
+    }
+    
+    public entry calibrate_vec_len_generic_inlined_2_x100() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_inlined_2_impl<Self.D>(10, move(d));
+        return;      
+    }
+
+    public entry calibrate_vec_len_generic_inlined_2_x500() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_inlined_2_impl<Self.D>(50, move(d));
+        return;          
+    }
+
+    public entry calibrate_vec_len_generic_inlined_2_x1000() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_inlined_2_impl<Self.D>(100, move(d));
+        return;        
+    }
+
+    public calibrate_vec_len_generic_inlined_exterme_impl<T: drop>(n: u64, val: T) {
+        let i: u64;
+        let v: vector<Self.C<Self.E<Self.F<Self.G<T>>>>>;
+        let g: Self.G<T>;
+        let f: Self.F<Self.G<T>>;
+        let e: Self.E<Self.F<Self.G<T>>>;
+        let c: Self.C<Self.E<Self.F<Self.G<T>>>>;
+    label entry:
+        i = 0;
+        g = G<T> { x: move(val), y: 0};
+        f = F<Self.G<T>> { x: move(g), y: 0 };
+        e = E<Self.F<Self.G<T>>> { x: move(f), y: 0 };
+        c = C<Self.E<Self.F<Self.G<T>>>> { x: move(e), y: 0 };
+        v = vec_pack_1<Self.C<Self.E<Self.F<Self.G<T>>>>>(move(c));
+    label loop_start:
+        jump_if_false (copy(i) < copy(n)) loop_end;
+        i = move(i) + 1;
+        _ = vec_len<Self.C<Self.E<Self.F<Self.G<T>>>>>(&v);
+        jump loop_start;
+    label loop_end:
+        return;
+    }
+
+    public entry calibrate_vec_len_generic_inlined_exterme_x100() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_inlined_exterme_impl<Self.D>(10, move(d));
+        return;      
+    }
+
+    public entry calibrate_vec_len_generic_inlined_exterme_x500() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_inlined_exterme_impl<Self.D>(50, move(d));
+        return;          
+    }
+
+    public entry calibrate_vec_len_generic_inlined_exterme_x1000() {
+        let d: Self.D;
+    label b0:
+        d = D { x: 0 };
+        Self.calibrate_vec_len_generic_inlined_exterme_impl<Self.D>(100, move(d));
+        return;        
+    }
+}
