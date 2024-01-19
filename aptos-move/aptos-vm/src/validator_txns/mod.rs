@@ -15,7 +15,7 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         txn: ValidatorTransaction,
         log_context: &AdapterLogSchema,
-    ) -> anyhow::Result<(VMStatus, VMOutput), VMStatus> {
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
         let session_id = SessionId::validator_txn(&txn);
         match txn {
             ValidatorTransaction::DKGResult(dkg_node) => {
