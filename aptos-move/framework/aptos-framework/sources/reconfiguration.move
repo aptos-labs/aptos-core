@@ -22,6 +22,7 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
     friend aptos_framework::version;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a

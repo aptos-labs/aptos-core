@@ -13,6 +13,7 @@ module aptos_framework::gas_schedule {
     use aptos_framework::storage_gas;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     /// The provided gas schedule bytes are empty or invalid
     const EINVALID_GAS_SCHEDULE: u64 = 1;

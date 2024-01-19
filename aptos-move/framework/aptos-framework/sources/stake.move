@@ -38,6 +38,7 @@ module aptos_framework::stake {
     friend aptos_framework::block;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
+    friend aptos_framework::reconfiguration_with_dkg;
     friend aptos_framework::transaction_fee;
 
     /// Validator Config not published.
@@ -1064,10 +1065,10 @@ module aptos_framework::stake {
     /// pending inactive validators so they no longer can vote.
     /// 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
     /// power.
-    /// 5. Return the new validator set.
+    /// 5. Return the `ValidatorConsensusInfo` of each new validator, sorted by new validator index.
     ///
     /// If `commit` is false, still do the calculation but prevent any resource update.
-    public(friend) fun update_validator_set_on_new_epoch(commit: bool): ValidatorSet acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+    public(friend) fun update_validator_set_on_new_epoch(commit: bool): vector<ValidatorConsensusInfo> acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let config = staking_config::get();
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
@@ -1196,11 +1197,50 @@ module aptos_framework::stake {
             };
         };
 
-        new_validator_set
+        validator_consensus_infos_from_validator_set(&new_validator_set)
     }
 
-    public(friend) fun cur_validator_set(): ValidatorSet acquires ValidatorSet {
-        *borrow_global<ValidatorSet>(@aptos_framework)
+    /// Return the `ValidatorConsensusInfo` of each current validator, sorted by current validator index.
+    public fun cur_validator_consensus_infos(): vector<ValidatorConsensusInfo> acquires ValidatorSet {
+        let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
+        validator_consensus_infos_from_validator_set(validator_set)
+    }
+
+    fun validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<ValidatorConsensusInfo> {
+        let validator_consensus_infos = vector[];
+
+        let num_active = vector::length(&validator_set.active_validators);
+        let num_pending_inactive = vector::length(&validator_set.pending_inactive);
+        let total = num_active + num_pending_inactive;
+
+        // Pre-fill the return value with dummy values.
+        let idx = 0;
+        while (idx < total) {
+            vector::push_back(&mut validator_consensus_infos, types::default_validator_consensus_info());
+            idx = idx + 1;
+        };
+
+        vector::for_each_ref(&validator_set.active_validators, |obj| {
+            let vi: &ValidatorInfo = obj;
+            let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
+            *vci = types::new_validator_consensus_info(
+                vi.addr,
+                vi.config.consensus_pubkey,
+                vi.voting_power
+            );
+        });
+
+        vector::for_each_ref(&validator_set.pending_inactive, |obj| {
+            let vi: &ValidatorInfo = obj;
+            let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
+            *vci = types::new_validator_consensus_info(
+                vi.addr,
+                vi.config.consensus_pubkey,
+                vi.voting_power
+            );
+        });
+
+        validator_consensus_infos
     }
 
     fun addresses_from_validator_infos(infos: &vector<ValidatorInfo>): vector<address> {
@@ -1461,6 +1501,8 @@ module aptos_framework::stake {
     use aptos_std::bls12381::proof_of_possession_from_bytes;
     use aptos_std::simple_map;
     use aptos_framework::reconfiguration_state;
+    use aptos_framework::types;
+    use aptos_framework::types::ValidatorConsensusInfo;
     #[test_only]
     use aptos_std::fixed_point64;
 

@@ -6,24 +6,19 @@ module aptos_framework::dkg {
     use aptos_framework::event::emit;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
+    use aptos_framework::types::ValidatorConsensusInfo;
     friend aptos_framework::block;
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     const EDKG_IN_PROGRESS: u64 = 1;
     const EDKG_NOT_IN_PROGRESS: u64 = 2;
 
-    /// Information about a validator that participates DKG.
-    struct ValidatorInfo has copy, drop, store {
-        addr: address,
-        pk_bytes: vector<u8>,
-        voting_power: u64,
-    }
-
     /// This can be considered as the public input of DKG.
     struct DKGSessionMetadata has copy, drop, store {
         dealer_epoch: u64,
-        dealer_validator_set: vector<ValidatorInfo>,
-        target_validator_set: vector<ValidatorInfo>,
+        dealer_validator_set: vector<ValidatorConsensusInfo>,
+        target_validator_set: vector<ValidatorConsensusInfo>,
     }
 
     #[event]
@@ -46,15 +41,6 @@ module aptos_framework::dkg {
         in_progress: Option<DKGSessionState>,
     }
 
-    /// Create a `ValidatorInfo` object.
-    public fun new_validator_info(addr: address, pk_bytes: vector<u8>, voting_power: u64): ValidatorInfo {
-        ValidatorInfo {
-            addr,
-            pk_bytes,
-            voting_power,
-        }
-    }
-
     /// Called in genesis to initialize on-chain states.
     public(friend) fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -71,8 +57,8 @@ module aptos_framework::dkg {
     /// Abort if a DKG is already in progress.
     public(friend) fun start(
         dealer_epoch: u64,
-        dealer_validator_set: vector<ValidatorInfo>,
-        target_validator_set: vector<ValidatorInfo>,
+        dealer_validator_set: vector<ValidatorConsensusInfo>,
+        target_validator_set: vector<ValidatorConsensusInfo>,
     ) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
         assert!(std::option::is_none(&dkg_state.in_progress), error::invalid_state(EDKG_IN_PROGRESS));

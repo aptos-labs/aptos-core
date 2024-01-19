@@ -6,13 +6,11 @@
 DKG on-chain states and helper functions.
 
 
--  [Struct `ValidatorInfo`](#0x1_dkg_ValidatorInfo)
 -  [Struct `DKGSessionMetadata`](#0x1_dkg_DKGSessionMetadata)
 -  [Struct `DKGStartEvent`](#0x1_dkg_DKGStartEvent)
 -  [Struct `DKGSessionState`](#0x1_dkg_DKGSessionState)
 -  [Resource `DKGState`](#0x1_dkg_DKGState)
 -  [Constants](#@Constants_0)
--  [Function `new_validator_info`](#0x1_dkg_new_validator_info)
 -  [Function `initialize`](#0x1_dkg_initialize)
 -  [Function `start`](#0x1_dkg_start)
 -  [Function `finish`](#0x1_dkg_finish)
@@ -24,49 +22,10 @@ DKG on-chain states and helper functions.
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
+<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
 </code></pre>
 
 
-
-<a id="0x1_dkg_ValidatorInfo"></a>
-
-## Struct `ValidatorInfo`
-
-Information about a validator that participates DKG.
-
-
-<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_ValidatorInfo">ValidatorInfo</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>addr: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>voting_power: u64</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
 
 <a id="0x1_dkg_DKGSessionMetadata"></a>
 
@@ -92,13 +51,13 @@ This can be considered as the public input of DKG.
 
 </dd>
 <dt>
-<code>dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="dkg.md#0x1_dkg_ValidatorInfo">dkg::ValidatorInfo</a>&gt;</code>
+<code>dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="dkg.md#0x1_dkg_ValidatorInfo">dkg::ValidatorInfo</a>&gt;</code>
+<code>target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;</code>
 </dt>
 <dd>
 
@@ -240,35 +199,6 @@ The completed and in-progress DKG sessions.
 
 
 
-<a id="0x1_dkg_new_validator_info"></a>
-
-## Function `new_validator_info`
-
-Create a <code><a href="dkg.md#0x1_dkg_ValidatorInfo">ValidatorInfo</a></code> object.
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_new_validator_info">new_validator_info</a>(addr: <b>address</b>, pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="dkg.md#0x1_dkg_ValidatorInfo">dkg::ValidatorInfo</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_new_validator_info">new_validator_info</a>(addr: <b>address</b>, pk_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, voting_power: u64): <a href="dkg.md#0x1_dkg_ValidatorInfo">ValidatorInfo</a> {
-    <a href="dkg.md#0x1_dkg_ValidatorInfo">ValidatorInfo</a> {
-        addr,
-        pk_bytes,
-        voting_power,
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_dkg_initialize"></a>
 
 ## Function `initialize`
@@ -309,7 +239,7 @@ Mark on-chain DKG state as in-progress. Notify validators to start DKG.
 Abort if a DKG is already in progress.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="dkg.md#0x1_dkg_ValidatorInfo">dkg::ValidatorInfo</a>&gt;, target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="dkg.md#0x1_dkg_ValidatorInfo">dkg::ValidatorInfo</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(dealer_epoch: u64, dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;, target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;)
 </code></pre>
 
 
@@ -320,8 +250,8 @@ Abort if a DKG is already in progress.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_start">start</a>(
     dealer_epoch: u64,
-    dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="dkg.md#0x1_dkg_ValidatorInfo">ValidatorInfo</a>&gt;,
-    target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="dkg.md#0x1_dkg_ValidatorInfo">ValidatorInfo</a>&gt;,
+    dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
+    target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
 ) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
     <b>assert</b>!(std::option::is_none(&dkg_state.in_progress), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="dkg.md#0x1_dkg_EDKG_IN_PROGRESS">EDKG_IN_PROGRESS</a>));

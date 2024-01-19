@@ -9,6 +9,7 @@ module aptos_framework::consensus_config {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     struct ConsensusConfig has drop, key, store {
         config: vector<u8>,

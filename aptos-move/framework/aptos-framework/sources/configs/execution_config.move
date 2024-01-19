@@ -7,8 +7,8 @@ module aptos_framework::execution_config {
 
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
-
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     struct ExecutionConfig has drop, key, store {
         config: vector<u8>,

@@ -44,6 +44,7 @@ to synchronize configuration changes for the validators.
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
+<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
 </code></pre>
 
 

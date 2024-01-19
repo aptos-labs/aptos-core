@@ -95,7 +95,8 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `is_current_epoch_validator`](#0x1_stake_is_current_epoch_validator)
 -  [Function `update_performance_statistics`](#0x1_stake_update_performance_statistics)
 -  [Function `update_validator_set_on_new_epoch`](#0x1_stake_update_validator_set_on_new_epoch)
--  [Function `cur_validator_set`](#0x1_stake_cur_validator_set)
+-  [Function `cur_validator_consensus_infos`](#0x1_stake_cur_validator_consensus_infos)
+-  [Function `validator_consensus_infos_from_validator_set`](#0x1_stake_validator_consensus_infos_from_validator_set)
 -  [Function `addresses_from_validator_infos`](#0x1_stake_addresses_from_validator_infos)
 -  [Function `update_stake_pool`](#0x1_stake_update_stake_pool)
 -  [Function `calculate_rewards_amount`](#0x1_stake_calculate_rewards_amount)
@@ -166,6 +167,7 @@ or if their stake drops below the min required, they would get removed at the en
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
+<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
@@ -3082,12 +3084,12 @@ The staking pool's voting power in this new epoch will be updated to the total a
 pending inactive validators so they no longer can vote.
 4. The validator's voting power in the validator set is updated to be the corresponding staking pool's voting
 power.
-5. Return the new validator set.
+5. Return the <code>ValidatorConsensusInfo</code> of each new validator, sorted by new validator index.
 
 If <code>commit</code> is false, still do the calculation but prevent any resource update.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">update_validator_set_on_new_epoch</a>(commit: bool): <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">update_validator_set_on_new_epoch</a>(commit: bool): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
 </code></pre>
 
 
@@ -3096,7 +3098,7 @@ If <code>commit</code> is false, still do the calculation but prevent any resour
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">update_validator_set_on_new_epoch</a>(commit: bool): <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>, <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">update_validator_set_on_new_epoch</a>(commit: bool): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt; <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_AptosCoinCapabilities">AptosCoinCapabilities</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>, <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>, <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>, <a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a> {
     <b>let</b> validator_set = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
     <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
     <b>let</b> validator_perf = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework);
@@ -3225,7 +3227,7 @@ If <code>commit</code> is false, still do the calculation but prevent any resour
         };
     };
 
-    new_validator_set
+    <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(&new_validator_set)
 }
 </code></pre>
 
@@ -3233,13 +3235,14 @@ If <code>commit</code> is false, still do the calculation but prevent any resour
 
 </details>
 
-<a id="0x1_stake_cur_validator_set"></a>
+<a id="0x1_stake_cur_validator_consensus_infos"></a>
 
-## Function `cur_validator_set`
+## Function `cur_validator_consensus_infos`
+
+Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted by current validator index.
 
 
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_set">cur_validator_set</a>(): <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_consensus_infos">cur_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
 </code></pre>
 
 
@@ -3248,8 +3251,66 @@ If <code>commit</code> is false, still do the calculation but prevent any resour
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_set">cur_validator_set</a>(): <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> <b>acquires</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
-    *<b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework)
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_consensus_infos">cur_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt; <b>acquires</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a> {
+    <b>let</b> validator_set = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
+    <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(validator_set)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_validator_consensus_infos_from_validator_set"></a>
+
+## Function `validator_consensus_infos_from_validator_set`
+
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(validator_set: &<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(validator_set: &<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt; {
+    <b>let</b> validator_consensus_infos = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+
+    <b>let</b> num_active = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&validator_set.active_validators);
+    <b>let</b> num_pending_inactive = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&validator_set.pending_inactive);
+    <b>let</b> total = num_active + num_pending_inactive;
+
+    // Pre-fill the <b>return</b> value <b>with</b> dummy values.
+    <b>let</b> idx = 0;
+    <b>while</b> (idx &lt; total) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validator_consensus_infos, <a href="types.md#0x1_types_default_validator_consensus_info">types::default_validator_consensus_info</a>());
+        idx = idx + 1;
+    };
+
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.active_validators, |obj| {
+        <b>let</b> vi: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = obj;
+        <b>let</b> vci = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> validator_consensus_infos, vi.config.validator_index);
+        *vci = <a href="types.md#0x1_types_new_validator_consensus_info">types::new_validator_consensus_info</a>(
+            vi.addr,
+            vi.config.consensus_pubkey,
+            vi.voting_power
+        );
+    });
+
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.pending_inactive, |obj| {
+        <b>let</b> vi: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = obj;
+        <b>let</b> vci = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> validator_consensus_infos, vi.config.validator_index);
+        *vci = <a href="types.md#0x1_types_new_validator_consensus_info">types::new_validator_consensus_info</a>(
+            vi.addr,
+            vi.config.consensus_pubkey,
+            vi.voting_power
+        );
+    });
+
+    validator_consensus_infos
 }
 </code></pre>
 
@@ -4553,7 +4614,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 ### Function `update_validator_set_on_new_epoch`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">update_validator_set_on_new_epoch</a>(commit: bool): <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">update_validator_set_on_new_epoch</a>(commit: bool): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
 </code></pre>
 
 

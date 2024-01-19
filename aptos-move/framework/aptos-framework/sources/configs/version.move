@@ -8,6 +8,7 @@ module aptos_framework::version {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     struct Version has drop, key, store {
         major: u64,
