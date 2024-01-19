@@ -1136,6 +1136,7 @@ mod tests {
         secp256r1_ecdsa::{PublicKey, Signature},
         PrivateKey, SigningKey, Uniform,
     };
+    use base64::URL_SAFE_NO_PAD;
     use hex::FromHex;
     use rand::{rngs::StdRng, SeedableRng};
 
@@ -1667,370 +1668,245 @@ mod tests {
 
     #[test]
     fn verify_zkid_open_id_single_key_auth() {
-        let pepper = Pepper::from_number(76);
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud
+        );
         let idc =
-            IdCommitment::new_from_preimage("s6BhdRkqt3", "sub", "248289761001", &pepper).unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "https://server.example.com".to_owned(),
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
             idc,
         };
-        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
-        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
-        let sender_addr = sender_auth_key.account_address();
-
-        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
-        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
-
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
-            sender_addr,
-            0,
-            &ephemeral_private_key,
-            ephemeral_private_key.public_key(),
-            None,
-            0,
-            0,
-            None,
-        )
-        .into_raw_transaction();
-
-        let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
-        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-        // This is the decoded json string the jwt_payload used below.
-        //
-        // {
-        //     "iss": "https://server.example.com",
-        //     "sub": "248289761001",
-        //     "aud": "s6BhdRkqt3",
-        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
-        //     "exp": 1311281970,
-        //     "iat": 1311280970,
-        //     "name": "Jane Doe",
-        //     "given_name": "Jane",
-        //     "family_name": "Doe",
-        //     "gender": "female",
-        //     "birthdate": "0000-10-31",
-        //     "email": "janedoe@example.com",
-        //     "picture": "http://example.com/janedoe/me.jpg"
-        // }
-        let openid_signature = OpenIdSig {
-            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
-            uid_key: "sub".to_string(),
-            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
             pepper,
-        };
-
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
-            exp_timestamp_secs: 1311281970,
-            ephemeral_pubkey: ephemeral_public_key,
-            ephemeral_signature,
-        };
-
-        let sk_auth =
-            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
-        let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_ok());
     }
 
     #[test]
     fn verify_zkid_open_id_single_key_auth_fails_with_different_pepper() {
-        let pepper = Pepper::from_number(76);
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let bad_pepper = 123;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud
+        );
         let idc =
-            IdCommitment::new_from_preimage("s6BhdRkqt3", "sub", "248289761001", &pepper).unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "https://server.example.com".to_owned(),
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
             idc,
         };
-        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
-        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
-        let sender_addr = sender_auth_key.account_address();
-
-        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
-        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
-
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
-            sender_addr,
-            0,
-            &ephemeral_private_key,
-            ephemeral_private_key.public_key(),
-            None,
-            0,
-            0,
-            None,
-        )
-        .into_raw_transaction();
-
-        let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
-        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-        // This is the decoded json string the jwt_payload used below.
-        //
-        // {
-        //     "iss": "https://server.example.com",
-        //     "sub": "248289761001",
-        //     "aud": "s6BhdRkqt3",
-        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
-        //     "exp": 1311281970,
-        //     "iat": 1311280970,
-        //     "name": "Jane Doe",
-        //     "given_name": "Jane",
-        //     "family_name": "Doe",
-        //     "gender": "female",
-        //     "birthdate": "0000-10-31",
-        //     "email": "janedoe@example.com",
-        //     "picture": "http://example.com/janedoe/me.jpg"
-        // }
-        let openid_signature = OpenIdSig {
-            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
-            uid_key: "sub".to_string(),
-            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
-            pepper: Pepper::from_number(123),
-        };
-
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
-            exp_timestamp_secs: 1311281970,
-            ephemeral_pubkey: ephemeral_public_key,
-            ephemeral_signature,
-        };
-
-        let sk_auth =
-            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
-        let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            bad_pepper, // Pepper does not match
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_err());
     }
 
     #[test]
     fn verify_zkid_open_id_single_key_auth_fails_with_expiry_past_horizon() {
-        let pepper = Pepper::from_number(76);
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud
+        );
         let idc =
-            IdCommitment::new_from_preimage("s6BhdRkqt3", "sub", "248289761001", &pepper).unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "https://server.example.com".to_owned(),
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
             idc,
         };
-        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
-        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
-        let sender_addr = sender_auth_key.account_address();
-
-        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
-        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
-
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
-            sender_addr,
-            0,
-            &ephemeral_private_key,
-            ephemeral_private_key.public_key(),
-            None,
-            0,
-            0,
-            None,
-        )
-        .into_raw_transaction();
-
-        let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
-        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-        // This is the decoded json string the jwt_payload used below.
-        //
-        // {
-        //     "iss": "https://server.example.com",
-        //     "sub": "248289761001",
-        //     "aud": "s6BhdRkqt3",
-        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
-        //     "exp": 1311281970,
-        //     "iat": 1311280970,
-        //     "name": "Jane Doe",
-        //     "given_name": "Jane",
-        //     "family_name": "Doe",
-        //     "gender": "female",
-        //     "birthdate": "0000-10-31",
-        //     "email": "janedoe@example.com",
-        //     "picture": "http://example.com/janedoe/me.jpg"
-        // }
-        let openid_signature = OpenIdSig {
-            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
-            uid_key: "sub".to_string(),
-            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
             pepper,
-        };
-
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
-            exp_timestamp_secs: 1000000000000000000, // The expiry is too large
-            ephemeral_pubkey: ephemeral_public_key,
-            ephemeral_signature,
-        };
-
-        let sk_auth =
-            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
-        let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-
+            1000000000000000000,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_err());
     }
 
     #[test]
     fn verify_zkid_open_id_single_key_auth_fails_with_different_uid_val() {
-        let pepper = Pepper::from_number(76);
-        let idc = IdCommitment::new_from_preimage(
-            "s6BhdRkqt3",
-            "sub",
-            "bad value", // Doesn't match the value in jwt_payload
-            &pepper,
-        )
-        .unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "https://server.example.com".to_owned(),
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": {},
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, "bad_uid_val", aud, exp_timestamp_secs
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
             idc,
         };
-        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
-        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
-        let sender_addr = sender_auth_key.account_address();
-
-        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
-        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
-
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
-            sender_addr,
-            0,
-            &ephemeral_private_key,
-            ephemeral_private_key.public_key(),
-            None,
-            0,
-            0,
-            None,
-        )
-        .into_raw_transaction();
-
-        let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
-        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-        // This is the decoded json string the jwt_payload used below.
-        //
-        // {
-        //     "iss": "https://server.example.com",
-        //     "sub": "248289761001",
-        //     "aud": "s6BhdRkqt3",
-        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
-        //     "exp": 1311281970,
-        //     "iat": 1311280970,
-        //     "name": "Jane Doe",
-        //     "given_name": "Jane",
-        //     "family_name": "Doe",
-        //     "gender": "female",
-        //     "birthdate": "0000-10-31",
-        //     "email": "janedoe@example.com",
-        //     "picture": "http://example.com/janedoe/me.jpg"
-        // }
-        let openid_signature = OpenIdSig {
-            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
-            uid_key: "sub".to_string(),
-            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
             pepper,
-        };
-
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
-            exp_timestamp_secs: 1311281970,
-            ephemeral_pubkey: ephemeral_public_key,
-            ephemeral_signature,
-        };
-
-        let sk_auth =
-            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
-        let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_err());
     }
 
     #[test]
     fn verify_zkid_open_id_single_key_auth_fails_with_bad_nonce() {
-        let pepper = Pepper::from_number(76);
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "bad nonce",
+            "exp": {},
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud, exp_timestamp_secs
+        );
         let idc =
-            IdCommitment::new_from_preimage("s6BhdRkqt3", "sub", "248289761001", &pepper).unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "https://server.example.com".to_owned(),
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
             idc,
         };
-        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
-        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
-        let sender_addr = sender_auth_key.account_address();
-
-        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
-        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
-
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
-            sender_addr,
-            0,
-            &ephemeral_private_key,
-            ephemeral_private_key.public_key(),
-            None,
-            0,
-            0,
-            None,
-        )
-        .into_raw_transaction();
-
-        let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
-        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-        // This is the decoded json string the jwt_payload used below.
-        //
-        // {
-        //     "iss": "https://server.example.com",
-        //     "sub": "248289761001",
-        //     "aud": "s6BhdRkqt3",
-        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
-        //     "exp": 1311281970,
-        //     "iat": 1311280970,
-        //     "name": "Jane Doe",
-        //     "given_name": "Jane",
-        //     "family_name": "Doe",
-        //     "gender": "female",
-        //     "birthdate": "0000-10-31",
-        //     "email": "janedoe@example.com",
-        //     "picture": "http://example.com/janedoe/me.jpg"
-        // }
-        let openid_signature = OpenIdSig {
-            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
-            uid_key: "sub".to_string(),
-            epk_blinder: [1u8; EPK_BLINDER_NUM_BYTES], // Should be [0u8; EPK_BLINDER_NUM_BYTES], nonce won't match
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
             pepper,
-        };
-
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
-            exp_timestamp_secs: 1311281970,
-            ephemeral_pubkey: ephemeral_public_key,
-            ephemeral_signature,
-        };
-
-        let sk_auth =
-            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
-        let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_err());
     }
@@ -2112,18 +1988,62 @@ mod tests {
 
     #[test]
     fn verify_zkid_open_id_single_key_auth_fails_with_different_iss() {
-        let pepper = Pepper::from_number(76);
-        let idc = IdCommitment::new_from_preimage(
-            "s6BhdRkqt3",
-            "sub",
-            "248289761001", // Doesn't match the value in jwt_payload
-            &pepper,
-        )
-        .unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "bad iss".to_owned(),
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": {},
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud, exp_timestamp_secs
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: "bad_iss".to_owned(),
             idc,
         };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            pepper,
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    fn zkid_test_setup(
+        zkid_pubkey: ZkIdPublicKey,
+        uid_key: &str,
+        pepper: u128,
+        exp_timestamp_secs: u64,
+        jwt_header_unencoded: &str,
+        jwt_payload_unencoded: &str,
+    ) -> SignedTransaction {
+        let sender_zkid_public_key = zkid_pubkey;
         let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
         let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
         let sender_addr = sender_auth_key.account_address();
@@ -2146,35 +2066,20 @@ mod tests {
         let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
         let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
-        // This is the decoded json string the jwt_payload used below.
-        //
-        // {
-        //     "iss": "https://server.example.com",
-        //     "sub": "248289761001",
-        //     "aud": "s6BhdRkqt3",
-        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
-        //     "exp": 1311281970,
-        //     "iat": 1311280970,
-        //     "name": "Jane Doe",
-        //     "given_name": "Jane",
-        //     "family_name": "Doe",
-        //     "gender": "female",
-        //     "birthdate": "0000-10-31",
-        //     "email": "janedoe@example.com",
-        //     "picture": "http://example.com/janedoe/me.jpg"
-        // }
+        let jwt_payload = base64::encode_config(jwt_payload_unencoded.as_bytes(), URL_SAFE_NO_PAD);
         let openid_signature = OpenIdSig {
             jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
-            uid_key: "sub".to_string(),
+            jwt_payload,
+            uid_key: uid_key.to_owned(),
             epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
-            pepper,
+            pepper: Pepper::from_number(pepper),
         };
 
+        let jwt_header = base64::encode_config(jwt_header_unencoded.as_bytes(), URL_SAFE_NO_PAD);
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
-            exp_timestamp_secs: 1311281970,
+            jwt_header,
+            exp_timestamp_secs,
             ephemeral_pubkey: ephemeral_public_key,
             ephemeral_signature,
         };
@@ -2182,9 +2087,6 @@ mod tests {
         let sk_auth =
             SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
         let account_auth = AccountAuthenticator::single_key(sk_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-
-        let verification_result = signed_txn.verify_signature();
-        assert!(verification_result.is_err());
+        SignedTransaction::new_single_sender(raw_txn, account_auth)
     }
 }
