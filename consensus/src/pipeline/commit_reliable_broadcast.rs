@@ -58,7 +58,21 @@ impl BroadcastStatus<CommitMessage> for Arc<AckState> {
     type Message = CommitMessage;
     type Response = CommitMessage;
 
-    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+        match ack {
+            CommitMessage::Vote(_) => {
+                bail!("unexected Vote reply to broadcast");
+            },
+            CommitMessage::Decision(_) => {
+                bail!("unexected Decision reply to broadcast");
+            },
+            CommitMessage::Ack(_) => {
+                // okay! continue
+            },
+            CommitMessage::Nack => {
+                bail!("unexected Nack reply to broadcast");
+            },
+        }
         let mut validators = self.validators.lock();
         if validators.remove(&peer) {
             if validators.is_empty() {
