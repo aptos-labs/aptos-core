@@ -80,7 +80,10 @@ pub struct PatchedJWKs {
 
 impl PatchedJWKs {
     pub fn get_provider_jwks(&self, iss: &str) -> Option<&ProviderJWKs> {
-        self.jwks.entries.iter().find(|&provider_jwk_set| provider_jwk_set.issuer.eq(&issuer_from_str(iss)))
+        self.jwks
+            .entries
+            .iter()
+            .find(|&provider_jwk_set| provider_jwk_set.issuer.eq(&issuer_from_str(iss)))
     }
 
     pub fn get_jwk(&self, iss: &str, kid: &str) -> Result<&JWKMoveStruct> {
