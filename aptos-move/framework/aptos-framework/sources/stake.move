@@ -2447,6 +2447,79 @@ module aptos_framework::stake {
         validator_4 = @0x4,
         validator_5 = @0x5
     )]
+    fun test_validator_consensus_infos_from_validator_set(
+        aptos_framework: &signer,
+        validator_1: &signer,
+        validator_2: &signer,
+        validator_3: &signer,
+        validator_4: &signer,
+        validator_5: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
+        let v1_addr = signer::address_of(validator_1);
+        let v2_addr = signer::address_of(validator_2);
+        let v3_addr = signer::address_of(validator_3);
+        let v4_addr = signer::address_of(validator_4);
+        let v5_addr = signer::address_of(validator_5);
+
+        initialize_for_test(aptos_framework);
+
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        let (_sk_3, pk_3, pop_3) = generate_identity();
+        let (_sk_4, pk_4, pop_4) = generate_identity();
+        let (_sk_5, pk_5, pop_5) = generate_identity();
+        let pk_1_bytes = bls12381::public_key_to_bytes(&pk_1);
+        let pk_3_bytes = bls12381::public_key_to_bytes(&pk_3);
+        let pk_5_bytes = bls12381::public_key_to_bytes(&pk_5);
+
+        initialize_test_validator(&pk_1, &pop_1, validator_1, 101, false, false);
+        initialize_test_validator(&pk_2, &pop_2, validator_2, 102, false, false);
+        initialize_test_validator(&pk_3, &pop_3, validator_3, 103, false, false);
+        initialize_test_validator(&pk_4, &pop_4, validator_4, 104, false, false);
+        initialize_test_validator(&pk_5, &pop_5, validator_5, 105, false, false);
+
+        join_validator_set(validator_3, v3_addr);
+        join_validator_set(validator_1, v1_addr);
+        join_validator_set(validator_5, v5_addr);
+        end_epoch();
+        let vci_vec_0 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@aptos_framework));
+        let vci_addrs = vector::map_ref(&vci_vec_0, |obj|{
+            let vci: &ValidatorConsensusInfo = obj;
+            types::addr_from_validator_consensus_info(vci)
+        });
+        let vci_pks = vector::map_ref(&vci_vec_0, |obj|{
+            let vci: &ValidatorConsensusInfo = obj;
+            types::pk_bytes_from_validator_consensus_info(vci)
+        });
+        let vci_voting_powers = vector::map_ref(&vci_vec_0, |obj|{
+            let vci: &ValidatorConsensusInfo = obj;
+            types::voting_power_from_validator_consensus_info(vci)
+        });
+        assert!(vector[@0x5, @aptos_framework, @0x3] == vci_addrs, 1);
+        assert!(vector[pk_5_bytes, pk_1_bytes, pk_3_bytes] == vci_pks, 2);
+        assert!(vector[105, 101, 103] == vci_voting_powers, 3);
+        leave_validator_set(validator_3, v3_addr);
+        let vci_vec_1 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@aptos_framework));
+        assert!(vci_vec_0 == vci_vec_1, 11);
+        join_validator_set(validator_2, v2_addr);
+        let vci_vec_2 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@aptos_framework));
+        assert!(vci_vec_0 == vci_vec_2, 12);
+        leave_validator_set(validator_1, v1_addr);
+        let vci_vec_3 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@aptos_framework));
+        assert!(vci_vec_0 == vci_vec_3, 13);
+        join_validator_set(validator_4, v4_addr);
+        let vci_vec_4 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@aptos_framework));
+        assert!(vci_vec_0 == vci_vec_4, 14);
+    }
+
+    #[test(
+        aptos_framework = @aptos_framework,
+        validator_1 = @aptos_framework,
+        validator_2 = @0x2,
+        validator_3 = @0x3,
+        validator_4 = @0x4,
+        validator_5 = @0x5
+    )]
     public entry fun test_staking_validator_index(
         aptos_framework: &signer,
         validator_1: &signer,
