@@ -51,6 +51,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
 <b>use</b> <a href="jwks.md#0x1_jwks">0x1::jwks</a>;
+<b>use</b> <a href="randomness.md#0x1_randomness">0x1::randomness</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
@@ -371,6 +372,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="jwks.md#0x1_jwks_initialize">jwks::initialize</a>(&aptos_framework_account);
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize">reconfiguration_state::initialize</a>(&aptos_framework_account);
     <a href="dkg.md#0x1_dkg_initialize">dkg::initialize</a>(&aptos_framework_account);
+    <a href="randomness.md#0x1_randomness_initialize">randomness::initialize</a>(&aptos_framework_account);
 }
 </code></pre>
 
