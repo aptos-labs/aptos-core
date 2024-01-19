@@ -24,6 +24,6 @@ impl SpecTest {
 
         let options = options.unwrap_or_default();
 
-        move_spec_test::run_spec_test(options, config, rerooted_path)
+        move_spec_test::run_spec_test(&options, &config, &rerooted_path)
     }
 }

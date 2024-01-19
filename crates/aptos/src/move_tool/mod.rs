@@ -574,7 +574,7 @@ impl CliCommand<&'static str> for MutatePackage {
         let path = self.move_options.get_package_path()?;
 
         let result =
-            move_mutator::run_move_mutator(mutator_options.unwrap_or_default(), config, path)
+            move_mutator::run_move_mutator(mutator_options.unwrap_or_default(), &config, &path)
                 .map_err(|err| CliError::UnexpectedError(err.to_string()));
 
         match result {
@@ -628,14 +628,17 @@ impl CliCommand<&'static str> for SpecTestPackage {
         };
 
         let path = self.move_options.get_package_path()?;
+        let path = SourcePackageLayout::try_find_root(&path.canonicalize().unwrap_or(".".into()))?;
+        std::env::set_current_dir(&path).map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 
-        let result =
-            move_spec_test::run_spec_test(spec_test_options.unwrap_or_default(), config, path)
-                .map_err(|err| CliError::UnexpectedError(err.to_string()));
-
+        let result = task::spawn_blocking(move || {
+            move_spec_test::run_spec_test(&spec_test_options.unwrap_or_default(), &config, &path)
+        })
+            .await
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
         match result {
             Ok(_) => Ok("Success"),
-            Err(e) => Err(CliError::MoveSpecTestError(format!("{:#}", e))),
+            Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
     }
 }

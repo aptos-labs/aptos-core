@@ -1,4 +1,4 @@
-use clap::*;
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
