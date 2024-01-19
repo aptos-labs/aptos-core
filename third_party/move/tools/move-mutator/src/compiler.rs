@@ -8,7 +8,9 @@ use crate::cli;
 use crate::configuration::Configuration;
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::{
-    command_line::compiler::*, diagnostics::unwrap_or_report_diagnostics, shared::Flags,
+    command_line::compiler::{Compiler, PASS_PARSER},
+    diagnostics::unwrap_or_report_diagnostics,
+    shared::Flags,
 };
 use move_package::source_package::layout::SourcePackageLayout;
 use move_package::BuildConfig;
@@ -29,13 +31,17 @@ use move_package::BuildConfig;
 /// * `config` - contains the actual build configuration.
 /// * `package_path` - the path to the Move package.
 ///
+/// # Errors
+///
+/// * If any error occurs during the generation, the string with the cause is returned.
+///
 /// # Returns
 ///
-/// * `Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error>` - tuple of FilesSourceText and Program if successful, or an error if any error occurs.
+/// * `Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error>` - tuple of `FilesSourceText` and Program if successful, or an error if any error occurs.
 pub fn generate_ast(
     mutator_config: &Configuration,
     config: &BuildConfig,
-    package_path: PathBuf,
+    package_path: &Path,
 ) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
     let mut source_files = mutator_config
         .project
@@ -107,6 +113,10 @@ pub fn generate_ast(
 /// * `mutated_source` - the mutated source code as a string.
 /// * `original_file` - the path to the original file.
 ///
+/// # Errors
+///
+/// * If any error occurs during the verification, the string with the cause is returned.
+///
 /// # Returns
 ///
 /// * `Result<(), anyhow::Error>` - Ok if the mutant is valid, or an error if any error occurs.
@@ -133,14 +143,14 @@ pub fn verify_mutant(
     // Copy the whole package to the tempdir
     // We need to copy the whole package because the Move compiler needs to find the Move.toml file and all the dependencies
     // as we don't know which files are needed for the compilation
-    copy_dir_all(&root, &tempdir.path())?;
+    copy_dir_all(&root, tempdir.path())?;
 
     // Write the mutated source to the tempdir in place of the original file
-    std::fs::write(tempdir.path().join(&relative_path), mutated_source)?;
+    std::fs::write(tempdir.path().join(relative_path), mutated_source)?;
 
     debug!(
         "Mutated source written to {:?}",
-        tempdir.path().join(&relative_path)
+        tempdir.path().join(relative_path)
     );
 
     let mut compilation_msg = vec![];
@@ -151,7 +161,7 @@ pub fn verify_mutant(
     working_config.test_mode = false;
 
     // Compile the package
-    working_config.compile_package(&tempdir.path(), &mut compilation_msg)?;
+    working_config.compile_package(tempdir.path(), &mut compilation_msg)?;
 
     info!(
         "Compilation status: {}",
@@ -168,6 +178,9 @@ pub fn verify_mutant(
 ///
 /// * `src` - the source directory.
 /// * `dst` - the destination directory.
+///
+/// # Errors
+/// * If any error occurs during the copy, the appropriate IO error is returned.
 ///
 /// # Returns
 ///

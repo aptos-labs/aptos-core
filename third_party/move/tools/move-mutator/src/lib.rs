@@ -36,8 +36,8 @@ use std::path::PathBuf;
 /// * `anyhow::Result<()>` - Returns `Ok(())` if the mutation process completes successfully, or an error if any error occurs.
 pub fn run_move_mutator(
     options: cli::Options,
-    config: BuildConfig,
-    package_path: PathBuf,
+    config: &BuildConfig,
+    package_path: &PathBuf,
 ) -> anyhow::Result<()> {
     // We need to initialize logger using try_init() as it might be already initialized in some other tool
     // (e.g. spec-test). If we use init() instead, we will get an abort.
@@ -56,7 +56,7 @@ pub fn run_move_mutator(
 
     trace!("Mutator configuration: {:?}", mutator_configuration);
 
-    let (files, ast) = generate_ast(&mutator_configuration, &config, package_path)?;
+    let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
     let mutants = mutate::mutate(ast)?;
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
@@ -86,7 +86,7 @@ pub fn run_move_mutator(
             let mutated_sources = mutant.apply(&source);
             for mutated in mutated_sources {
                 if mutator_configuration.project.verify_mutants {
-                    let res = verify_mutant(&config, &mutated.mutated_source, path);
+                    let res = verify_mutant(config, &mutated.mutated_source, path);
 
                     // In case the mutant is not a valid Move file, skip the mutant (do not save it)
                     if res.is_err() {
@@ -121,11 +121,9 @@ pub fn run_move_mutator(
         }
     }
 
-    let report_path = PathBuf::from(output_dir);
-
-    trace!("Saving reports to: {:?}", report_path);
-    report.save_to_json_file(report_path.join(Path::new("report.json")).as_path())?;
-    report.save_to_text_file(report_path.join(Path::new("report.txt")).as_path())?;
+    trace!("Saving reports to: {:?}", output_dir);
+    report.save_to_json_file(output_dir.join(Path::new("report.json")).as_path())?;
+    report.save_to_text_file(output_dir.join(Path::new("report.txt")).as_path())?;
 
     trace!("Mutator tool is done here...");
     Ok(())

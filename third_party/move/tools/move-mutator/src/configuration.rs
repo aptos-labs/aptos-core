@@ -24,6 +24,7 @@ pub struct Configuration {
 
 impl Configuration {
     /// Creates a new configuration using command line options.
+    #[must_use]
     pub fn new(project: Options, project_path: Option<PathBuf>) -> Self {
         Self {
             project,
@@ -189,7 +190,7 @@ mod tests {
             config.project.exclude_files.unwrap(),
             vec![Path::new("/path/to/exclude/file")]
         );
-        assert_eq!(config.project.out_mutant_dir, Path::new("/path/to/output"));
+        assert_eq!(config.project.out_mutant_dir, Some(PathBuf::from("/path/to/output")));
         assert_eq!(config.project.verify_mutants, true);
         assert_eq!(config.project.no_overwrite.unwrap(), false);
         assert_eq!(config.project.downsample_filter.unwrap(), "filter");

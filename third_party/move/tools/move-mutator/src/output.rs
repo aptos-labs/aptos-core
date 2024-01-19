@@ -12,15 +12,15 @@ use std::path::{Path, PathBuf};
 /// according to its relative path inside the package. If the file is not inside any package,
 /// it creates the directory structure in the output directory.
 /// Example:
-/// The file to be mutated is located in "/a/b/c/sources/X/Y/file.move" (file_path).
+/// The file to be mutated is located in "/a/b/c/sources/X/Y/file.move" (`file_path`).
 /// This function constructs the following output path for file.move:
-/// "output_dir/X/Y/file_index.move"
+/// "`output_dir/X/Y/file_index.move`"
 /// It finds the package root for the file, which is "/a/b/c", then it append the relative path to the output directory.
 ///
 /// If the file is not inside any package, it creates the directory structure in the output directory like:
-/// The file to be mutated is located in "/a/b/c/file.move" (file_path).
+/// The file to be mutated is located in "/a/b/c/file.move" (`file_path`).
 /// This function constructs the following output path for file.move:
-/// "output_dir/file_index.move"
+/// "`output_dir/file_index.move`"
 ///
 /// # Arguments
 ///
@@ -46,7 +46,7 @@ pub(crate) fn setup_mutant_path(
 
     // Try to find package root for the file. If the file is not inside any package, assume that it is a single file
     let root = SourcePackageLayout::try_find_root(&file_path_canonicalized);
-    let root_path = if let Err(_) = root {
+    let root_path = if root.is_err() {
         debug!(
             "No package root for {:?}. Assuming mutating a single file.",
             file_path_canonicalized
@@ -82,7 +82,7 @@ pub(crate) fn setup_mutant_path(
 
     // Deal with the file as OsString to avoid problems with non-UTF8 characters
     let mut filename = filename.to_os_string();
-    filename.push(OsString::from(format!("_{}.move", index)));
+    filename.push(OsString::from(format!("_{index}.move")));
 
     Ok(output_struct.join(filename))
 }
