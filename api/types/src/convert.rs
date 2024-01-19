@@ -51,6 +51,7 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
+use crate::transaction::BlockEpilogueTransaction;
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
@@ -146,8 +147,14 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
             // TODO [fix] Create separate transaction type for API
-            StateCheckpoint(_) | BlockEpilogue { .. } => {
+            StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
+                    info,
+                    timestamp: timestamp.into(),
+                })
+            },
+            BlockEpilogue(_) => {
+                Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
                     info,
                     timestamp: timestamp.into(),
                 })
