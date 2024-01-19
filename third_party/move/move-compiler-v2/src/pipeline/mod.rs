@@ -15,6 +15,7 @@ pub mod ability_checker;
 pub mod avail_copies_analysis;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
+pub mod eliminate_empty_blocks_processor;
 pub mod explicit_drop;
 pub mod livevar_analysis_processor;
 pub mod reference_safety_processor;
