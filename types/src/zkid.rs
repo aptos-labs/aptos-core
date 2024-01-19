@@ -42,7 +42,7 @@ pub const MAX_JWT_HEADER_BYTES: usize = 248;
 pub const MAX_ZK_PUBLIC_KEY_BYTES: usize = MAX_ISS_BYTES + MAX_EPK_BYTES;
 
 // TODO(ZkIdGroth16Zkp): determine max length of zkSNARK + OIDC overhead + ephemeral pubkey and signature
-pub const MAX_ZK_SIGNATURE_BYTES: usize = 1024;
+pub const MAX_ZK_SIGNATURE_BYTES: usize = 2048;
 
 // TODO(ZkIdGroth16Zkp): each zkID Groth16 proof will take ~2 ms to verify, or so. We cannot verify too many due to DoS.
 //  Figure out what this should be.
