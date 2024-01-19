@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+mod contribution;
 pub mod das;
 pub(crate) mod dealt_pub_key;
 pub(crate) mod dealt_pub_key_share;

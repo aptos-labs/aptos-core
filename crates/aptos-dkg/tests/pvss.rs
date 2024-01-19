@@ -51,6 +51,7 @@ fn all_weighted_pvss_bvt() {
     // PVSS weighted tests
     //
     let wcs = test_utils::get_weighted_configs_for_testing();
+
     for wc in wcs {
         println!("\nTesting {wc} PVSS");
         let seed = random_scalar(&mut rng);
@@ -67,8 +68,14 @@ fn all_weighted_pvss_bvt() {
             seed.to_bytes_le(),
         );
 
-        // Das (securely-weighted)
-        pvss_deal_verify_and_reconstruct::<das::WeightedTranscript>(&wc, seed.to_bytes_le());
+        // Das (ideally-weighted)
+        pvss_deal_verify_and_reconstruct::<das::WeightedTranscriptIdeal>(&wc, seed.to_bytes_le());
+
+        // Das (provably-secure-weighted)
+        pvss_deal_verify_and_reconstruct::<das::WeightedTranscriptProvable>(
+            &wc,
+            seed.to_bytes_le(),
+        );
     }
 }
 
@@ -93,6 +100,8 @@ fn all_weighted_dkg_bvt() {
         wcs.last().unwrap(),
         seed.to_bytes_le(),
     );
+    aggregatable_dkg::<das::WeightedTranscriptIdeal>(wcs.last().unwrap(), seed.to_bytes_le());
+    aggregatable_dkg::<das::WeightedTranscriptProvable>(wcs.last().unwrap(), seed.to_bytes_le());
 }
 
 #[test]

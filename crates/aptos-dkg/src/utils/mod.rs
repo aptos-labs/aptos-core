@@ -125,8 +125,21 @@ pub fn pairing_g2_g1(lhs: &G2Affine, rhs: &G1Affine) -> Gt {
     pairing(rhs, lhs)
 }
 
-pub trait HasMultiExp: Sized {
-    fn multi_exp(points: &[Self], scalars: &[Scalar]) -> Self;
+pub trait HasMultiExp: for<'a> Sized + Clone {
+    // TODO: remove this and replace with the _iter version
+    fn multi_exp(bases: &[Self], scalars: &[Scalar]) -> Self;
+
+    fn multi_exp_iter<'a, 'b, I>(bases: I, scalars: impl Iterator<Item = &'b Scalar>) -> Self
+    where
+        I: Iterator<Item = &'a Self>,
+        Self: 'a,
+    {
+        // TODO(Perf): The fact that blstrs does not work with iterators leads to unnecessary cloning here
+        Self::multi_exp(
+            bases.cloned().collect::<Vec<Self>>().as_slice(),
+            scalars.cloned().collect::<Vec<Scalar>>().as_slice(),
+        )
+    }
 }
 
 impl HasMultiExp for G2Projective {

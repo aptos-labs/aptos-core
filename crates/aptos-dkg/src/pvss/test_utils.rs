@@ -5,6 +5,8 @@ use crate::pvss::{
     ThresholdConfig, WeightedConfig,
 };
 use aptos_crypto::{SigningKey, Uniform};
+use blstrs::{G1Projective, G2Projective};
+use group::Group;
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
 use serde::Serialize;
@@ -100,7 +102,10 @@ macro_rules! vec_to_str {
     };
 }
 
-use crate::constants::{BEST_CASE_N, BEST_CASE_THRESHOLD, WORST_CASE_N, WORST_CASE_THRESHOLD};
+use crate::{
+    constants::{BEST_CASE_N, BEST_CASE_THRESHOLD, WORST_CASE_N, WORST_CASE_THRESHOLD},
+    utils::random::{random_g1_point, random_g2_point},
+};
 #[allow(unused)]
 pub(crate) use vec_to_str;
 
@@ -186,4 +191,38 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     wcs.push(WeightedConfig::new(573, weights).unwrap());
 
     wcs
+}
+
+/// TODO(rand_core_hell): Our random_g1_point and random_g2_point functions are slow.
+/// Sometimes we will want to generate somewhat random-looking points for benchmarking, so we will
+/// use this faster **insecure** function instead.
+pub fn insecure_random_g1_points<R>(n: usize, rng: &mut R) -> Vec<G1Projective>
+where
+    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+{
+    let point = random_g1_point(rng);
+    let shift = random_g1_point(rng);
+    let mut acc = point;
+    (0..n)
+        .map(|_| {
+            acc = acc.double() + shift;
+            acc
+        })
+        .collect::<Vec<G1Projective>>()
+}
+
+/// Like insecure_random_g1_points but for G_2.
+pub fn insecure_random_g2_points<R>(n: usize, rng: &mut R) -> Vec<G2Projective>
+where
+    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+{
+    let point = random_g2_point(rng);
+    let shift = random_g2_point(rng);
+    let mut acc = point;
+    (0..n)
+        .map(|_| {
+            acc = acc.double() + shift;
+            acc
+        })
+        .collect::<Vec<G2Projective>>()
 }

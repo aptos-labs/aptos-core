@@ -21,7 +21,7 @@ use sha3::{Digest, Sha3_256};
 #[test]
 fn all_wvuf_bvt() {
     weighted_wvuf_bvt::<GenericWeighting<pvss::das::Transcript>, PinkasWUF>();
-    weighted_wvuf_bvt::<pvss::das::WeightedTranscript, PinkasWUF>();
+    weighted_wvuf_bvt::<pvss::das::WeightedTranscriptIdeal, PinkasWUF>();
 
     weighted_wvuf_bvt::<
         GenericWeighting<pvss::scrape::Transcript>,

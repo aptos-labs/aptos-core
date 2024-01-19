@@ -3,14 +3,15 @@
 mod enc;
 mod input_secret;
 pub mod public_parameters;
-pub mod transcript;
-pub mod weighted_transcript;
+pub mod unweighted_protocol;
+mod weighted_protocol_ideal;
+mod weighted_protocol_provable;
 
 use crate::pvss::das;
 pub use das::{
-    public_parameters::PublicParameters, transcript::Transcript,
-    weighted_transcript::Transcript as WeightedTranscript,
+    public_parameters::PublicParameters, unweighted_protocol::Transcript,
+    weighted_protocol_ideal::Transcript as WeightedTranscriptIdeal,
+    weighted_protocol_provable::Transcript as WeightedTranscriptProvable,
 };
 
 pub const DAS_SK_IN_G1: &'static str = "das_sk_in_g1";
-pub const WEIGHTED_DAS_SK_IN_G1: &'static str = "weighted_das_sk_in_g1";

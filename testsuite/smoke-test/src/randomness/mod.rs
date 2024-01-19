@@ -1,11 +1,9 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{anyhow, bail, ensure};
-use anyhow::Result;
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{compat::Sha3_256, Uniform};
 use aptos_dkg::{
     pvss::{
-        das,
         das::PublicParameters,
         dealt_secret_key::g1::DealtSecretKey,
         encryption_dlog::g1::DecryptPrivKey,
@@ -16,6 +14,7 @@ use aptos_dkg::{
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_forge::LocalSwarm;
+use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_types::{
     dkg::{build_dkg_pvss_config, DKGTranscriptWrapper, WTrx},
@@ -29,7 +28,6 @@ use num_traits::Zero;
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
-use aptos_logger::info;
 
 mod dkg_basic;
 mod dkg_feature_flag_flips;
@@ -38,8 +36,6 @@ mod dkg_with_validator_join_leave;
 mod e2e_basic_consumption;
 mod e2e_correctness;
 mod validator_restart_during_dkg;
-
-type WT = das::weighted_transcript::Transcript;
 
 async fn get_current_version(rest_client: &Client) -> u64 {
     rest_client
@@ -112,7 +108,10 @@ fn verify_dkg_transcript(
     let verifier = ValidatorVerifier::from(&dkg_session.dealer_validator_set);
     let pvss_config =
         build_dkg_pvss_config(dkg_session.dealer_epoch, &dkg_session.target_validator_set);
-    let trxs: DKGTranscriptWrapper = bcs::from_bytes(dkg_session.result.as_slice()).map_err(|e|anyhow!("DKG transcript verification failed with transcript deserialization error: {e}"))?;
+    let trxs: DKGTranscriptWrapper =
+        bcs::from_bytes(dkg_session.result.as_slice()).map_err(|e| {
+            anyhow!("DKG transcript verification failed with transcript deserialization error: {e}")
+        })?;
     trxs.verify(&pvss_config, &verifier)?;
 
     info!("Double-verifying by reconstructing the dealt secret.");
@@ -129,7 +128,10 @@ fn verify_dkg_transcript(
         decrypt_key_map,
     );
 
-    ensure!(dealt_secret_from_shares == dealt_secret_from_inputs, "dkg transcript verification failed with final check failure");
+    ensure!(
+        dealt_secret_from_shares == dealt_secret_from_inputs,
+        "dkg transcript verification failed with final check failure"
+    );
     Ok(())
 }
 
@@ -137,7 +139,7 @@ fn dealt_secret_from_shares(
     target_validator_set: &ValidatorSet,
     decrypt_key_map: &HashMap<AccountAddress, DecryptPrivKey>,
     pvss_config: &WeightedConfig,
-    trx: &WT,
+    trx: &WTrx,
 ) -> DealtSecretKey {
     let x = ValidatorVerifier::from(target_validator_set);
     let player_share_pairs = x
@@ -158,7 +160,7 @@ fn dealt_secret_from_shares(
 
 fn dealt_secret_from_input(
     pp: &PublicParameters,
-    trx: &WT,
+    trx: &WTrx,
     dealer_validator_set: &ValidatorSet,
     decrypt_key_map: &HashMap<AccountAddress, DecryptPrivKey>,
 ) -> DealtSecretKey {
@@ -216,10 +218,17 @@ async fn verify_randomness(
     );
 
     // Derive the shared secret.
-    let dkg_session = dkg_state.last_complete.ok_or_else(||anyhow!("randomness verification failed with missing dkg result"))?;
+    let dkg_session = dkg_state
+        .last_complete
+        .ok_or_else(|| anyhow!("randomness verification failed with missing dkg result"))?;
     let pvss_config =
         build_dkg_pvss_config(dkg_session.dealer_epoch, &dkg_session.target_validator_set);
-    let trxs = bcs::from_bytes::<DKGTranscriptWrapper>(dkg_session.result.as_slice()).map_err(|e| anyhow!("randomness verification failed with on-chain dkg transcript deserialization error"))?;
+    let trxs =
+        bcs::from_bytes::<DKGTranscriptWrapper>(dkg_session.result.as_slice()).map_err(|e| {
+            anyhow!(
+                "randomness verification failed with on-chain dkg transcript deserialization error"
+            )
+        })?;
     let dealt_secret = dealt_secret_from_shares(
         &dkg_session.target_validator_set,
         &decrypt_key_map,
@@ -237,6 +246,9 @@ async fn verify_randomness(
     let output_serialized = bcs::to_bytes(&output).unwrap();
     let expected_block_randomness = Sha3_256::digest(output_serialized.as_slice()).to_vec();
 
-    ensure!(expected_block_randomness == on_chain_block_randomness.block_randomness, "randomness verification failed with final check failure");
+    ensure!(
+        expected_block_randomness == on_chain_block_randomness.block_randomness,
+        "randomness verification failed with final check failure"
+    );
     Ok(())
 }

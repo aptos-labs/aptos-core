@@ -71,7 +71,7 @@ pub fn pok_batch_verify<'a, Gr>(
     gamma: &Scalar,
 ) -> anyhow::Result<()>
 where
-    Gr: Serialize + Group + Mul<&'a Scalar, Output = Gr> + HasMultiExp,
+    Gr: Serialize + Group + Mul<&'a Scalar> + HasMultiExp,
 {
     let n = poks.len();
     let mut exps = Vec::with_capacity(2 * n + 1);

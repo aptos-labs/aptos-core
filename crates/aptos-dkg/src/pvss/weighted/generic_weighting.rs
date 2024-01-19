@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use crate::pvss::traits::transcript::MalleableTranscript;
 use crate::pvss::{
     traits::{Reconstructable, SecretSharingConfig, Transcript},
     Player, ThresholdConfig, WeightedConfig,
@@ -214,5 +215,18 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Generi
         GenericWeighting {
             trx: T::generate(sc.get_threshold_config(), rng),
         }
+    }
+}
+
+impl<T: MalleableTranscript<SecretSharingConfig = ThresholdConfig>> MalleableTranscript
+    for GenericWeighting<T>
+{
+    fn maul_signature<A: Serialize + Clone>(
+        &mut self,
+        ssk: &Self::SigningSecretKey,
+        aux: &A,
+        dealer: &Player,
+    ) {
+        <T as MalleableTranscript>::maul_signature(&mut self.trx, ssk, aux, dealer);
     }
 }

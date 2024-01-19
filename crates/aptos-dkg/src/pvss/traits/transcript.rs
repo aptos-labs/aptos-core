@@ -200,3 +200,16 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     where
         R: rand_core::RngCore + rand_core::CryptoRng;
 }
+
+/// This traits defines testing-only and benchmarking-only interfaces.
+pub trait MalleableTranscript: Transcript {
+    /// This is useful for generating many PVSS transcripts from different dealers from a single
+    /// PVSS transcript by recomputing its signature. It is used to deal quickly when benchmarking
+    /// aggregated PVSS transcript verification
+    fn maul_signature<A: Serialize + Clone>(
+        &mut self,
+        ssk: &Self::SigningSecretKey,
+        aux: &A,
+        dealer: &Player,
+    );
+}

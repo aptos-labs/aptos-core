@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 
+use crate::pvss::test_utils::{insecure_random_g1_points, insecure_random_g2_points};
+use crate::pvss::traits::transcript::MalleableTranscript;
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
     pvss,
     pvss::{
+        contribution::{batch_verify_soks, Contribution, SoK},
         das,
         das::DAS_SK_IN_G1,
         encryption_dlog, fiat_shamir, schnorr,
@@ -20,20 +23,13 @@ use crate::{
 use anyhow::bail;
 use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use blstrs::{G1Projective, G2Projective, Gt, Scalar};
+use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, AddAssign, Mul, Neg, Sub};
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
 const DAS_PVSS_FIAT_SHAMIR_DST: &[u8; 30] = b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST";
-
-type SoK = (
-    Player,
-    G2Projective,
-    bls12381::Signature,
-    schnorr::PoK<G2Projective>,
-);
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
@@ -46,7 +42,7 @@ pub struct Transcript {
     /// Also contains BLS signatures from each player $i$ on that player's contribution $c_i$, the
     /// player ID $i$ and auxiliary information `aux[i]` provided during dealing.
     /// TODO: update transcript size in tests? but the # of aggregations influences the size...
-    soks: Vec<SoK>,
+    soks: Vec<SoK<G2Projective>>,
     /// ElGamal encryption randomness $g_2^r \in G_2$
     hat_w: G2Projective,
     /// First $n$ elements are commitments to the evaluations of $p(X)$: $g_2^{p(\omega^i)}$,
@@ -56,15 +52,6 @@ pub struct Transcript {
     C: Vec<G1Projective>,
     /// Ciphertext randomness commitment $g_1^r$.
     C_0: G1Projective,
-}
-
-/// A PVSS contribution, which is signed as part of the PVSS transcript
-/// TODO(TechDebt): CryptoHasher doesn't seem to work with lifetimes. So I cannot make this struct store references, which causes unnecesary cloning in the code.
-#[derive(Serialize, Deserialize, BCSCryptoHash, CryptoHasher)]
-pub struct Contribution<A> {
-    comm: G2Projective,
-    player: Player,
-    aux: A,
 }
 
 // TODO(Optimization): For verification, can we get any speed-ups when a lot of the PKs are the same? Assuming the PVSS remains secure.
@@ -145,13 +132,7 @@ impl traits::Transcript for Transcript {
         debug_assert_eq!(C.len(), sc.n);
 
         // Sign the secret commitment, player ID and `aux`
-        let sig = ssk
-            .sign(&Contribution {
-                comm: V[sc.n],
-                player: *dealer,
-                aux: aux.clone(),
-            })
-            .expect("signing of PVSS contribution should have succeeded");
+        let sig = Transcript::sign_contribution(ssk, dealer, aux, &V[sc.n]);
 
         Transcript {
             soks: vec![(*dealer, V[sc.n], sig, pok)],
@@ -192,7 +173,14 @@ impl traits::Transcript for Transcript {
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();
-        Transcript::batch_verify_soks(&self.soks, &g_2, &self.V[sc.n], spks, aux, &extra[0])?;
+        batch_verify_soks::<G2Projective, A>(
+            self.soks.as_slice(),
+            &g_2,
+            &self.V[sc.n],
+            spks,
+            aux,
+            &extra[0],
+        )?;
 
         // Verify the committed polynomial is of the right degree
         let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
@@ -301,120 +289,54 @@ impl traits::Transcript for Transcript {
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
-        //
-        // TODO(rand_core_hell): Since our random_g1_point and random_g2_point functions are
-        // slower than we want, we do not pick everything randomly. Instead, we generate a
-        // kind-of-random-looking transcript from a few random elliptic curve points by doubling them.
-        //
-        let g2 = random_g2_point(rng);
-        let mut acc_g2 = g2;
-        let V = (0..sc.n + 1)
-            .map(|_| {
-                acc_g2 = acc_g2.double();
-                acc_g2
-            })
-            .collect::<Vec<G2Projective>>();
-
-        let mut acc_g1 = random_g1_point(rng);
-        let C = (0..sc.n)
-            .map(|_| {
-                acc_g1 = acc_g1.double();
-                acc_g1
-            })
-            .collect::<Vec<G1Projective>>();
-
-        let r1 = random_g1_point(rng);
-        let r2 = random_g2_point(rng);
         let sk = bls12381::PrivateKey::genesis();
         Transcript {
             soks: vec![(
                 sc.get_player(0),
-                r2,
-                sk.sign(&Contribution::<usize> {
-                    comm: r2,
+                random_g2_point(rng),
+                sk.sign(&Contribution::<G2Projective, usize> {
+                    comm: random_g2_point(rng),
                     player: sc.get_player(0),
                     aux: 0,
                 })
                 .unwrap(),
-                (acc_g2, random_scalar(rng)),
+                (random_g2_point(rng), random_scalar(rng)),
             )],
-            hat_w: g2,
-            V: V.iter().map(|p2| p2 + r2).collect(),
-            C: C.iter().map(|p1| p1 + r1).collect(),
+            hat_w: random_g2_point(rng),
+            V: insecure_random_g2_points(sc.n + 1, rng),
+            C: insecure_random_g1_points(sc.n, rng),
             C_0: random_g1_point(rng),
         }
     }
 }
 
+impl MalleableTranscript for Transcript {
+    fn maul_signature<A: Serialize + Clone>(
+        &mut self,
+        ssk: &Self::SigningSecretKey,
+        aux: &A,
+        player: &Player,
+    ) {
+        let comm = self.V.last().unwrap();
+        let sig = Transcript::sign_contribution(ssk, player, aux, comm);
+        self.soks[0].0 = *player;
+        self.soks[0].1 = *comm;
+        self.soks[0].2 = sig;
+    }
+}
+
 impl Transcript {
-    pub fn batch_verify_soks<A: Serialize + Clone>(
-        soks: &[SoK],
-        pk_base: &G2Projective,
-        pk: &G2Projective,
-        spks: &Vec<bls12381::PublicKey>,
-        aux: &Vec<A>,
-        tau: &Scalar,
-    ) -> anyhow::Result<()> {
-        if soks.len() != spks.len() {
-            bail!(
-                "Expected {} signing PKs, but got {}",
-                soks.len(),
-                spks.len()
-            );
-        }
-
-        if soks.len() != aux.len() {
-            bail!(
-                "Expected {} auxiliary infos, but got {}",
-                soks.len(),
-                aux.len()
-            );
-        }
-
-        // First, the PoKs
-        let mut c = G2Projective::identity();
-        for (_, c_i, _, _) in soks {
-            c.add_assign(c_i)
-        }
-
-        if c.ne(pk) {
-            bail!(
-                "The PoK does not correspond to the dealt secret. Expected {} but got {}",
-                pk,
-                c
-            );
-        }
-
-        let poks = soks
-            .iter()
-            .map(|(_, c, _, pok)| (*c, *pok))
-            .collect::<Vec<(G2Projective, schnorr::PoK<G2Projective>)>>();
-
-        // TODO(Performance): 128bit exponents
-        schnorr::pok_batch_verify(&poks, pk_base, &tau)?;
-
-        // Second, the signatures
-        let msgs = soks
-            .iter()
-            .zip(aux)
-            .map(|((player, comm, _, _), aux)| Contribution::<A> {
-                comm: *comm,
-                player: *player,
-                aux: aux.clone(),
-            })
-            .collect::<Vec<Contribution<A>>>();
-        let msgs_refs = msgs.iter().map(|c| c).collect::<Vec<&Contribution<A>>>();
-        let pks = spks
-            .iter()
-            .map(|pk| pk)
-            .collect::<Vec<&bls12381::PublicKey>>();
-        let sig = bls12381::Signature::aggregate(
-            soks.iter()
-                .map(|(_, _, sig, _)| sig.clone())
-                .collect::<Vec<bls12381::Signature>>(),
-        )?;
-
-        sig.verify_aggregate(&msgs_refs[..], &pks[..])?;
-        Ok(())
+    pub fn sign_contribution<A: Serialize + Clone>(
+        sk: &bls12381::PrivateKey,
+        player: &Player,
+        aux: &A,
+        comm: &G2Projective,
+    ) -> bls12381::Signature {
+        sk.sign(&Contribution::<G2Projective, A> {
+            comm: *comm,
+            player: *player,
+            aux: aux.clone(),
+        })
+        .expect("signing of PVSS contribution should have succeeded")
     }
 }

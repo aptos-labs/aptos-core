@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource, verify_randomness,
+    randomness::{
+        decrypt_key_map, get_current_version, get_on_chain_resource, verify_dkg_transcript,
+        verify_randomness,
     },
     smoke_test_environment::SwarmBuilder,
 };
@@ -10,7 +12,6 @@ use aptos_logger::info;
 use aptos_types::on_chain_config::DKGState;
 use digest::Digest;
 use std::{sync::Arc, time::Duration};
-use crate::randomness::{get_current_version, verify_dkg_transcript};
 
 /// Verify the correctness of DKG transcript and WVUF output (i.e., block-level randomness seed).
 ///

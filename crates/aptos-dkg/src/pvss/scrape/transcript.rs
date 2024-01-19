@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use crate::pvss::traits::transcript::MalleableTranscript;
 use crate::{
     algebra::polynomials::shamir_secret_share,
     pvss,
@@ -304,5 +305,15 @@ impl traits::Transcript for Transcript {
 
     fn get_dealers(&self) -> Vec<Player> {
         self.soks.clone()
+    }
+}
+impl MalleableTranscript for Transcript {
+    fn maul_signature<A: Serialize + Clone>(
+        &mut self,
+        _ssk: &Self::SigningSecretKey,
+        _aux: &A,
+        player: &Player,
+    ) {
+        self.soks[0] = *player;
     }
 }

@@ -18,7 +18,7 @@ use std::{
     fmt::{Debug, Formatter},
 };
 
-pub type WTrx = pvss::das::WeightedTranscript;
+pub type WTrx = pvss::das::WeightedTranscriptIdeal;
 pub type DkgPP = <WTrx as Transcript>::PublicParameters;
 pub type SSConfig = <WTrx as Transcript>::SecretSharingConfig;
 pub type EncPK = <WTrx as Transcript>::EncryptPubKey;

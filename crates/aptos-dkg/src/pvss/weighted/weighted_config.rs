@@ -99,6 +99,10 @@ impl WeightedConfig {
         self.weight[player.id]
     }
 
+    pub fn get_player_starting_index(&self, player: &Player) -> usize {
+        self.starting_index[player.id]
+    }
+
     /// In an unweighted secret sharing scheme, each player has one share. We can weigh such a scheme
     /// by splitting a player into as many "virtual" players as that player's weight, assigning one
     /// share per "virtual player."
