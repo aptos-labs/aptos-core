@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
-use anyhow::{Context, Result};
 use aptos_types::{
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
@@ -12,17 +11,28 @@ use aptos_types::{
     zkid::{ZkpOrOpenIdSig, MAX_ZK_ID_AUTHENTICATORS_ALLOWED},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
+use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 
-fn get_current_time_onchain(resolver: &impl AptosMoveResolver) -> Result<CurrentTimeMicroseconds, VMStatus> {
-    CurrentTimeMicroseconds::fetch_config(resolver).ok_or_else(VMStatus::error(StatusCode::VALUE_DESERIALIZATION_ERROR, Some("could not fetch CurrentTimeMicroseconds on-chain config".to_string())))
+
+fn get_current_time_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
+    CurrentTimeMicroseconds::fetch_config(resolver)
+    .ok_or_else(||
+        VMStatus::error(
+            StatusCode::VALUE_DESERIALIZATION_ERROR,
+            Some("could not fetch CurrentTimeMicroseconds on-chain config".to_string()))
+        )
 }
 
-fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> Result<PatchedJWKs> {
+fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
+    let error_status = VMStatus::error(
+        StatusCode::VALUE_DESERIALIZATION_ERROR,
+        Some("could not fetch PatchedJWKs".to_string()));
     let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())?
-        .context("Failed to get jwks resource")?;
-    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes)?;
+        .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .ok_or_else(|| error_status.clone())?;
+    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes).map_err(|_| error_status.clone())?;
     Ok(jwks)
 }
 
@@ -31,7 +41,7 @@ pub fn validate_zkid_authenticators(
     resolver: &impl AptosMoveResolver,
     _session: &mut SessionExt,
     _log_context: &AdapterLogSchema,
-) -> Result<(), VMStatus> {
+) -> anyhow::Result<(), VMStatus> {
     // TODO(ZkIdGroth16Zkp): The ZKP/OpenID sig verification does not charge gas. So, we could have DoS attacks.
     let zkid_authenticators =
         aptos_types::zkid::get_zkid_authenticators(transaction).map_err(|_| {
@@ -47,39 +57,30 @@ pub fn validate_zkid_authenticators(
 
     if zkid_authenticators.len() > MAX_ZK_ID_AUTHENTICATORS_ALLOWED {
         return Err(VMStatus::error(
-            StatusCode::TOO_MANY_ZK_AUTHENTICATORS,
-            None,
+            StatusCode::INVALID_SIGNATURE,
+            Some("Too many zkid authenticators".to_owned()),
         ));
     }
 
-    let onchain_timestamp_obj = get_current_time_onchain(resolver).map_err(|_| {
-        VMStatus::error(
-            StatusCode::FAILED_TO_GET_ON_CHAIN_CURRENT_TIME,
-            Some("Failed to get CurrentTimeMicroseconds".to_owned()),
-        )
-    })?;
+    let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
     for (_, zkid_sig) in &zkid_authenticators {
         zkid_sig
             .verify_expiry(&onchain_timestamp_obj)
             .map_err(|_| {
                 VMStatus::error(
-                    StatusCode::EPHEMERAL_KEYPAIR_EXPIRED,
+                    StatusCode::INVALID_SIGNATURE,
                     Some("The ephemeral keypair has expired".to_owned()),
                 )
             })?;
     }
 
-    let patched_jwks = get_jwks_onchain(resolver).map_err(|_| {
-        VMStatus::error(
-            StatusCode::FAILED_TO_GET_ON_CHAIN_JWKS,
-            Some("Failed to get jwk map".to_owned()),
-        )
-    })?;
+    let patched_jwks = get_jwks_onchain(resolver)?;
+
     for (zkid_pub_key, zkid_sig) in &zkid_authenticators {
         let jwt_header_parsed = zkid_sig.parse_jwt_header().map_err(|_| {
             VMStatus::error(
-                StatusCode::INVALID_JWT_HEADER,
+                StatusCode::INVALID_SIGNATURE,
                 Some("Failed to get JWT header".to_owned()),
             )
         })?;
@@ -87,14 +88,14 @@ pub fn validate_zkid_authenticators(
             .get_jwk(&zkid_pub_key.iss, &jwt_header_parsed.kid)
             .map_err(|_| {
                 VMStatus::error(
-                    StatusCode::FAILED_TO_FIND_JWK,
+                    StatusCode::INVALID_SIGNATURE,
                     Some("JWK not found".to_owned()),
                 )
             })?;
 
         let jwk = JWK::try_from(jwk_move_struct).map_err(|_| {
             VMStatus::error(
-                StatusCode::UNSUPPORTED_JWK,
+                StatusCode::INVALID_SIGNATURE,
                 Some("Could not parse JWK".to_owned()),
             )
         })?;
@@ -121,7 +122,7 @@ pub fn validate_zkid_authenticators(
                             .verify_jwt_signature(rsa_jwk, jwt_header)
                             .map_err(|_| {
                                 VMStatus::error(
-                                    StatusCode::JWT_VERIFICATION_FAILED,
+                                    StatusCode::INVALID_SIGNATURE,
                                     Some(
                                         "RSA Signature verification failed for OpenIdSig"
                                             .to_owned(),
@@ -131,7 +132,7 @@ pub fn validate_zkid_authenticators(
                     },
                     JWK::Unsupported(_) => {
                         return Err(VMStatus::error(
-                            StatusCode::UNSUPPORTED_JWK,
+                            StatusCode::INVALID_SIGNATURE,
                             Some("JWK is not supported".to_owned()),
                         ))
                     },

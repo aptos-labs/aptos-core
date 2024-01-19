@@ -79,26 +79,18 @@ pub struct PatchedJWKs {
 }
 
 impl PatchedJWKs {
-    pub fn latest_version(&self, iss: &str) -> Option<&ProviderJWKs> {
-        let mut latest: Option<&ProviderJWKs> = None;
+    pub fn get_provider_jwks(&self, iss: &str) -> Option<&ProviderJWKs> {
         for provider_jwk_set in &self.jwks.entries {
             if provider_jwk_set.issuer.eq(&issuer_from_str(iss)) {
-                match latest {
-                    Some(latest_set) => {
-                        if provider_jwk_set.version > latest_set.version {
-                            latest = Some(provider_jwk_set)
-                        }
-                    },
-                    None => latest = Some(provider_jwk_set),
-                }
+                return Some(provider_jwk_set)
             }
         }
-        latest
+        None
     }
 
     pub fn get_jwk(&self, iss: &str, kid: &str) -> Result<&JWKMoveStruct> {
         let provider_jwk_set = self
-            .latest_version(iss)
+            .get_provider_jwks(iss)
             .context("JWK not found for issuer")?;
         let jwk = provider_jwk_set.get_jwk(kid)?;
         Ok(jwk)

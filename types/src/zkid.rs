@@ -32,7 +32,7 @@ pub const IDC_NUM_BYTES: usize = 32;
 // TODO(ZkIdGroth16Zkp): add some static asserts here that these don't exceed the MAX poseidon input sizes
 // TODO(ZkIdGroth16Zkp): determine what our circuit will accept
 
-pub const MAX_EPK_BYTES: usize = 93; // Supports public key lengths of up to 92 bytes.
+pub const MAX_EPK_BYTES: usize = 93; // Supports public key lengths of up to 93 bytes.
 pub const MAX_ISS_BYTES: usize = 248;
 pub const MAX_AUD_VAL_BYTES: usize = 248;
 pub const MAX_UID_KEY_BYTES: usize = 248;
@@ -49,7 +49,7 @@ pub const MAX_ZK_SIGNATURE_BYTES: usize = 1024;
 pub const MAX_ZK_ID_AUTHENTICATORS_ALLOWED: usize = 10;
 
 // How far in the future from the JWT issued at time the EPK expiry can be set.
-pub const MAX_EXPIRY_HORIZON_SECS: u64 = 1728000000; // 2000 days TODO(zkid): finalize this value
+pub const MAX_EXPIRY_HORIZON_SECS: u64 = 1728000000; // 20000 days TODO(zkid): finalize this value
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct JwkId {
@@ -102,7 +102,14 @@ impl OpenIdSig {
             "'iss' claim was supposed to match \"{}\"",
             pk.iss
         );
+
+        ensure!(
+            self.uid_key.eq("sub") || self.uid_key.eq("email"),
+            "uid_key must be either 'sub' or 'email', was \"{}\"",
+            self.uid_key
+        );
         let uid_val = claims.get_uid_val(&self.uid_key)?;
+
         ensure!(
             IdCommitment::new_from_preimage(
                 &claims.oidc_claims.aud,
