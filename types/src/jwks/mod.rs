@@ -82,7 +82,7 @@ impl PatchedJWKs {
     pub fn get_provider_jwks(&self, iss: &str) -> Option<&ProviderJWKs> {
         for provider_jwk_set in &self.jwks.entries {
             if provider_jwk_set.issuer.eq(&issuer_from_str(iss)) {
-                return Some(provider_jwk_set)
+                return Some(provider_jwk_set);
             }
         }
         None

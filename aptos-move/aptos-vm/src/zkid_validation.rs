@@ -14,20 +14,22 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 
-
-fn get_current_time_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
-    CurrentTimeMicroseconds::fetch_config(resolver)
-    .ok_or_else(||
+fn get_current_time_onchain(
+    resolver: &impl AptosMoveResolver,
+) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
+    CurrentTimeMicroseconds::fetch_config(resolver).ok_or_else(|| {
         VMStatus::error(
             StatusCode::VALUE_DESERIALIZATION_ERROR,
-            Some("could not fetch CurrentTimeMicroseconds on-chain config".to_string()))
+            Some("could not fetch CurrentTimeMicroseconds on-chain config".to_string()),
         )
+    })
 }
 
 fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
     let error_status = VMStatus::error(
         StatusCode::VALUE_DESERIALIZATION_ERROR,
-        Some("could not fetch PatchedJWKs".to_string()));
+        Some("could not fetch PatchedJWKs".to_string()),
+    );
     let bytes = resolver
         .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?

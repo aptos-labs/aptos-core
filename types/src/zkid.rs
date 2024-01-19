@@ -90,7 +90,8 @@ impl OpenIdSig {
 
         // TODO(zkid): Store MAX_EXPIRY_HORIZON_SECS in a resource in zkid.move. Then, move this check
         //  into the prologue for the ZK-less OpenID path.
-        let max_expiration_date = seconds_from_epoch(claims.oidc_claims.iat + MAX_EXPIRY_HORIZON_SECS);
+        let max_expiration_date =
+            seconds_from_epoch(claims.oidc_claims.iat + MAX_EXPIRY_HORIZON_SECS);
         let expiration_date: SystemTime = seconds_from_epoch(exp_timestamp_secs);
         ensure!(
             expiration_date < max_expiration_date,

@@ -174,7 +174,11 @@ pub fn pad_and_hash_bytes_with_len(
 /// it until its length is equal to `size`.
 fn zero_pad_bytes(bytes: &[u8], size: usize) -> anyhow::Result<Vec<u8>> {
     if size > MAX_NUM_INPUT_BYTES {
-        bail!("Cannot pad to more than {} bytes. Requested size is {}.", MAX_NUM_INPUT_BYTES, size);
+        bail!(
+            "Cannot pad to more than {} bytes. Requested size is {}.",
+            MAX_NUM_INPUT_BYTES,
+            size
+        );
     }
 
     if bytes.len() > size {
@@ -185,7 +189,6 @@ fn zero_pad_bytes(bytes: &[u8], size: usize) -> anyhow::Result<Vec<u8>> {
     padded.resize(size, 0x00);
     Ok(padded)
 }
-
 
 /// Converts the chunk of bytes into a scalar, assuming it is of size less than or equal to `BYTES_PACKED_PER_SCALAR`.
 pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
