@@ -32,6 +32,15 @@ pub enum BlockContent {
     Dummy,
 }
 
+impl BlockContent {
+    pub fn to_bytecodes<'a>(&self, bytecodes: &'a [Bytecode]) -> &'a [Bytecode] {
+        match self {
+            BlockContent::Basic { lower, upper } => &bytecodes[*lower as usize..=*upper as usize],
+            BlockContent::Dummy => &bytecodes[0..0],
+        }
+    }
+}
+
 pub struct StacklessControlFlowGraph {
     entry_block_id: BlockId,
     blocks: Map<BlockId, Block>,
@@ -202,6 +211,17 @@ impl StacklessControlFlowGraph {
 impl StacklessControlFlowGraph {
     pub fn successors(&self, block_id: BlockId) -> &Vec<BlockId> {
         &self.blocks[&block_id].successors
+    }
+
+    /// Removes all blocks in `blocks`
+    /// Cannot remove entry/exit block
+    pub fn remove_blocks(&mut self, blocks_to_remove: &BTreeSet<BlockId>) {
+        debug_assert!(!blocks_to_remove.contains(&self.entry_block()));
+        debug_assert!(!blocks_to_remove.contains(&self.exit_block()));
+        self.blocks.retain(|block_id, _| !blocks_to_remove.contains(block_id));
+        for (_block_id, block) in self.blocks.iter_mut() {
+            block.successors.retain(|block_id| !blocks_to_remove.contains(block_id));
+        }
     }
 
     pub fn content(&self, block_id: BlockId) -> &BlockContent {
