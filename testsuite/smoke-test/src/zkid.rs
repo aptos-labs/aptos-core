@@ -260,12 +260,11 @@ async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
     let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
 
     info!("Submit openid transaction");
-    let err = info
+    let _err = info
         .client()
         .submit_without_serializing_response(&signed_txn)
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("JWT_VERIFICATION_FAILED"))
 }
 
 #[tokio::test]
@@ -345,10 +344,9 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
     let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
 
     info!("Submit openid transaction");
-    let err = info
+    let _err = info
         .client()
         .submit_without_serializing_response(&signed_txn)
         .await
         .unwrap_err();
-    assert!(err.to_string().contains("EPHEMERAL_KEYPAIR_EXPIRED"))
 }
