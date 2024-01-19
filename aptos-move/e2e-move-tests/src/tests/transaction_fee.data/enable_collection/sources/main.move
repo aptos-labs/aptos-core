@@ -8,6 +8,6 @@ script {
         features::change_feature_flags(&framework_signer, vector[feature], vector[]);
 
         // Make sure to trigger a reconfiguration!
-        aptos_governance::reconfigure(&framework_signer);
+        aptos_governance::force_reconfigure(&framework_signer);
     }
 }

@@ -37,8 +37,12 @@ module aptos_framework::config_buffer {
 
     /// Check whether there is a pending config payload for `T`.
     public fun does_exist<T: store>(): bool acquires PendingConfigs {
-        let config = borrow_global<PendingConfigs>(@aptos_framework);
-        simple_map::contains_key(&config.configs, &type_info::type_name<T>())
+        if (exists<PendingConfigs>(@aptos_framework)) {
+            let config = borrow_global<PendingConfigs>(@aptos_framework);
+            simple_map::contains_key(&config.configs, &type_info::type_name<T>())
+        } else {
+            false
+        }
     }
 
     /// Upsert an on-chain config to the buffer for the next epoch.

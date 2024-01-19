@@ -85,6 +85,8 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
+-  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
+-  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
@@ -472,6 +474,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>: u64 = 16;
+</code></pre>
+
+
+
+<a id="0x1_features_RECONFIGURE_WITH_DKG"></a>
+
+The on-chain randomness feature.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 45;
 </code></pre>
 
 
@@ -1835,6 +1849,52 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_reconfigure_with_dkg_feature"></a>
+
+## Function `get_reconfigure_with_dkg_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64 { <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_reconfigure_with_dkg_enabled"></a>
+
+## Function `reconfigure_with_dkg_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_change_feature_flags"></a>
 
 ## Function `change_feature_flags`
@@ -1877,7 +1937,7 @@ Function to enable and disable features. Can only be called by a signer of @std.
 
 Enable and disable features *for the next epoch*.
 
-NOTE: when it takes effects depend on feature <code>RECONFIGURE_WITH_DKG</code>.
+NOTE: when it takes effects depend on feature <code><a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a></code>.
 See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
 
 Can only be called by a signer of @std.

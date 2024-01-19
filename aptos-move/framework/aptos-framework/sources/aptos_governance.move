@@ -31,6 +31,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
+    use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
 
@@ -540,6 +541,11 @@ module aptos_framework::aptos_governance {
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration::reconfigure();
+    }
+
+    public fun force_reconfigure(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        reconfiguration_with_dkg::finish(aptos_framework);
     }
 
     /// Update feature flags and also trigger reconfiguration.

@@ -48,6 +48,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `resolve_multi_step_proposal`](#0x1_aptos_governance_resolve_multi_step_proposal)
 -  [Function `remove_approved_hash`](#0x1_aptos_governance_remove_approved_hash)
 -  [Function `reconfigure`](#0x1_aptos_governance_reconfigure)
+-  [Function `force_reconfigure`](#0x1_aptos_governance_force_reconfigure)
 -  [Function `toggle_features`](#0x1_aptos_governance_toggle_features)
 -  [Function `get_signer_testnet_only`](#0x1_aptos_governance_get_signer_testnet_only)
 -  [Function `get_voting_power`](#0x1_aptos_governance_get_voting_power)
@@ -98,6 +99,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 <b>use</b> <a href="../../aptos-stdlib/doc/math64.md#0x1_math64">0x1::math64</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
+<b>use</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg">0x1::reconfiguration_with_dkg</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/smart_table.md#0x1_smart_table">0x1::smart_table</a>;
@@ -1475,6 +1477,31 @@ Force reconfigure. To be called at the end of a proposal that alters on-chain co
 <pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_force_reconfigure"></a>
+
+## Function `force_reconfigure`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_reconfigure">force_reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_reconfigure">force_reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">reconfiguration_with_dkg::finish</a>(aptos_framework);
 }
 </code></pre>
 
