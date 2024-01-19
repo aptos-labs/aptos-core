@@ -3,13 +3,14 @@
 module aptos_framework::consensus_config {
     use std::error;
     use std::vector;
+    use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
 
-    struct ConsensusConfig has key {
+    struct ConsensusConfig has drop, key, store {
         config: vector<u8>,
     }
 
@@ -33,5 +34,21 @@ module aptos_framework::consensus_config {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
         reconfiguration::reconfigure();
+    }
+
+    /// This can be called by on-chain governance to update on-chain consensus configs for the next epoch.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    public fun set_for_next_epoch(account: &signer, config: vector<u8>) {
+        system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+        std::config_buffer::upsert<ConsensusConfig>(ConsensusConfig {config});
+    }
+
+    public(friend) fun on_new_epoch() acquires ConsensusConfig {
+        if (config_buffer::does_exist<ConsensusConfig>()) {
+            *borrow_global_mut<ConsensusConfig>(@aptos_framework) = config_buffer::extract();
+        }
     }
 }
