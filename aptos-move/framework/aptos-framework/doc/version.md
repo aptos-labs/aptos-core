@@ -11,6 +11,8 @@ Maintains the version number for the blockchain.
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_version_initialize)
 -  [Function `set_version`](#0x1_version_set_version)
+-  [Function `set_for_next_epoch`](#0x1_version_set_for_next_epoch)
+-  [Function `on_new_epoch`](#0x1_version_on_new_epoch)
 -  [Function `initialize_for_test`](#0x1_version_initialize_for_test)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
@@ -20,7 +22,8 @@ Maintains the version number for the blockchain.
     -  [Function `initialize_for_test`](#@Specification_1_initialize_for_test)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
@@ -34,7 +37,7 @@ Maintains the version number for the blockchain.
 
 
 
-<pre><code><b>struct</b> <a href="version.md#0x1_version_Version">Version</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="version.md#0x1_version_Version">Version</a> <b>has</b> drop, store, key
 </code></pre>
 
 
@@ -166,6 +169,59 @@ This can be called by on chain governance.
 
     // Need <b>to</b> trigger <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> so validator nodes can sync on the updated <a href="version.md#0x1_version">version</a>.
     <a href="reconfiguration.md#0x1_reconfiguration_reconfigure">reconfiguration::reconfigure</a>();
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_version_set_for_next_epoch"></a>
+
+## Function `set_for_next_epoch`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="version.md#0x1_version_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, major: u64) <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> {
+    <b>assert</b>!(<b>exists</b>&lt;<a href="version.md#0x1_version_SetVersionCapability">SetVersionCapability</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="version.md#0x1_version_ENOT_AUTHORIZED">ENOT_AUTHORIZED</a>));
+    <b>let</b> old_major = <b>borrow_global</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework).major;
+    <b>assert</b>!(old_major &lt; major, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="version.md#0x1_version_EINVALID_MAJOR_VERSION_NUMBER">EINVALID_MAJOR_VERSION_NUMBER</a>));
+    <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(<a href="version.md#0x1_version_Version">Version</a> {major});
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_version_on_new_epoch"></a>
+
+## Function `on_new_epoch`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>()
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="version.md#0x1_version_on_new_epoch">on_new_epoch</a>() <b>acquires</b> <a href="version.md#0x1_version_Version">Version</a> {
+    <b>if</b> (<a href="config_buffer.md#0x1_config_buffer_does_exist">config_buffer::does_exist</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;()) {
+        *<b>borrow_global_mut</b>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;(@aptos_framework) = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>&lt;<a href="version.md#0x1_version_Version">Version</a>&gt;();
+    }
 }
 </code></pre>
 

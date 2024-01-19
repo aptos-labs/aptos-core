@@ -2,13 +2,14 @@
 module aptos_framework::version {
     use std::error;
     use std::signer;
+    use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
 
-    struct Version has key {
+    struct Version has drop, key, store {
         major: u64,
     }
 
@@ -43,6 +44,19 @@ module aptos_framework::version {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
         reconfiguration::reconfigure();
+    }
+
+    public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
+        assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        let old_major = borrow_global<Version>(@aptos_framework).major;
+        assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
+        config_buffer::upsert(Version {major});
+    }
+
+    public(friend) fun on_new_epoch() acquires Version {
+        if (config_buffer::does_exist<Version>()) {
+            *borrow_global_mut<Version>(@aptos_framework) = config_buffer::extract<Version>();
+        }
     }
 
     /// Only called in tests and testnets. This allows the core resources account, which only exists in tests/testnets,
