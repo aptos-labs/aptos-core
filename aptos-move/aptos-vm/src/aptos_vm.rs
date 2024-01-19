@@ -2252,19 +2252,6 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
     )
 }
 
-pub fn load_on_chain_config_from_resolver<T: OnChainConfig>(
-    resolver: &impl AptosMoveResolver,
-) -> Result<Option<T>> {
-    let maybe_bytes = resolver.get_resource(&AccountAddress::ONE, &T::struct_tag())?;
-    match maybe_bytes {
-        None => Ok(None),
-        Some(bytes) => {
-            let item = bcs::from_bytes::<T>(bytes.as_ref())?;
-            Ok(Some(item))
-        },
-    }
-}
-
 #[test]
 fn vm_thread_safe() {
     fn assert_send<T: Send>() {}

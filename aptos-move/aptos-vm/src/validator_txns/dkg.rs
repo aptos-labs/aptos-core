@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    aptos_vm::{get_or_vm_startup_failure, load_on_chain_config_from_resolver},
+    aptos_vm::get_or_vm_startup_failure,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
     system_module_names::{FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
@@ -15,6 +15,7 @@ use aptos_types::{
     dkg::{DKGNode, DKGState, DKGTrait, DummyDKG},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
+    on_chain_config::OnChainConfig,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -67,16 +68,7 @@ impl AptosVM {
         session_id: SessionId,
         dkg_node: DKGNode,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
-        let dkg_state = load_on_chain_config_from_resolver::<DKGState>(resolver)
-            .map_err(|e| {
-                let internal_err = VMStatus::error(
-                    StatusCode::ABORTED,
-                    Some(format!(
-                        "process_dkg_result failed with dkg state loading error: {e}"
-                    )),
-                );
-                Unexpected(internal_err)
-            })?
+        let dkg_state = OnChainConfig::fetch_config(resolver)
             .ok_or_else(|| Expected(MissingResourceDKGState))?;
 
         let DKGState { in_progress, .. } = dkg_state;
