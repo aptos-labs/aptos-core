@@ -433,7 +433,23 @@ impl Client {
             .send()
             .await?;
 
-        self.json(response).await
+        self.json::<PendingTransaction>(response).await
+    }
+
+    pub async fn submit_without_serializing_response(&self, txn: &SignedTransaction) -> Result<()> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_SIGNED_TRANSACTION)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.check_response(response).await?;
+        Ok(())
     }
 
     pub async fn submit_bcs(&self, txn: &SignedTransaction) -> AptosResult<Response<()>> {

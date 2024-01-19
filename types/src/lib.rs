@@ -66,6 +66,7 @@ pub mod bytes;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
+pub mod zkid;
 
 /// Reflection of `0x1::types::ValidatorConsensusInfo` in rust.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
