@@ -24,7 +24,7 @@ pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 /// `ceil(log_2(496)) = 9` bits of a scalar. That would leave 254 - 9 = 245 bits > 30 bytes for
 /// storing data in that scalar. We do not plan on exploiting this extra free space (since our
 /// SNARK circuits would have to implement this more complicated packing).
-pub const MAX_NUM_INPUT_BYTES: usize = (MAX_NUM_INPUT_SCALARS - 1) * BYTES_PACKED_PER_SCALAR;
+pub const MAX_NUM_INPUT_BYTES: usize = MAX_NUM_INPUT_SCALARS * BYTES_PACKED_PER_SCALAR;
 
 /// Given an array of up to `MAX_NUM_INPUT_SCALARS` field elements (in the BN254 scalar field), hashes
 /// them using Poseidon-BN254 into a single field element.
@@ -247,7 +247,7 @@ mod test {
         let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES).unwrap();
         assert_eq!(
             aud_val_hash.to_string(),
-            "5356770851844488251951636664658555117557150225634247464761949692565609409749"
+            "17915006864839806432696532586295153111003299925560813222373957953553432368724"
         );
     }
 
@@ -266,36 +266,30 @@ mod test {
     fn test_pack_bytes() {
         // b"" -> vec![Fr(0)]
         let scalars = pack_bytes_to_scalars(b"").unwrap();
-        assert_eq!(scalars.len(), 1);
-        assert_eq!(scalars[0], ark_bn254::Fr::zero());
-        println!();
+        assert_eq!(scalars.len(), 0);
 
-        // 0x02 -> vec![Fr(1), Fr(2)]
-        let scalars = pack_bytes_to_scalars(vec![0x02].as_slice()).unwrap();
-        assert_eq!(scalars.len(), 2);
+        // 0x01 -> vec![Fr(0)]
+        let scalars = pack_bytes_to_scalars(vec![0x01].as_slice()).unwrap();
+        assert_eq!(scalars.len(), 1);
         assert_eq!(scalars[0], ark_bn254::Fr::one());
-        assert_eq!(scalars[1], ark_bn254::Fr::from(2));
 
         // (2^247).to_le_bytes() -> vec![Fr(31), Fr(2^247)]
         let pow_2_to_247 = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80";
         let scalars = pack_bytes_to_scalars(pow_2_to_247.as_slice()).unwrap();
-        assert_eq!(scalars.len(), 2);
-        assert_eq!(scalars[0], ark_bn254::Fr::from(31));
-        assert_eq!(scalars[1], ark_bn254::Fr::from(BigUint::from(2u8).pow(247)));
+        assert_eq!(scalars.len(), 1);
+        assert_eq!(scalars[0], ark_bn254::Fr::from(BigUint::from(2u8).pow(247)));
 
         // (2^248).to_le_bytes() -> vec![Fr(32), Fr(2^248)]
         let pow_2_to_248 = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";
         let scalars = pack_bytes_to_scalars(pow_2_to_248.as_slice()).unwrap();
-        assert_eq!(scalars.len(), 3);
-        assert_eq!(scalars[0], ark_bn254::Fr::from(32));
-        assert_eq!(scalars[1], ark_bn254::Fr::zero());
-        assert_eq!(scalars[2], ark_bn254::Fr::one());
+        assert_eq!(scalars.len(), 2);
+        assert_eq!(scalars[0], ark_bn254::Fr::zero());
+        assert_eq!(scalars[1], ark_bn254::Fr::one());
 
         // Trying to pack the max # of bytes should NOT fail
         let full_bytes = (0..MAX_NUM_INPUT_BYTES).map(|_| 0xFF).collect::<Vec<u8>>();
         let scalars = pack_bytes_to_scalars(full_bytes.as_slice()).unwrap();
         assert_eq!(scalars.len(), MAX_NUM_INPUT_SCALARS);
-        assert_eq!(scalars[0], ark_bn254::Fr::from(MAX_NUM_INPUT_BYTES as i32));
 
         let mut expected_bytes = (0..BYTES_PACKED_PER_SCALAR)
             .map(|_| 0xFF)
