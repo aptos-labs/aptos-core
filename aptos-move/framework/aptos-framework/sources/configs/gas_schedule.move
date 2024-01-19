@@ -4,6 +4,7 @@ module aptos_framework::gas_schedule {
     use std::error;
     use std::string::String;
     use std::vector;
+    use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
@@ -26,7 +27,7 @@ module aptos_framework::gas_schedule {
         entries: vector<GasEntry>
     }
 
-    struct GasScheduleV2 has key, copy, drop {
+    struct GasScheduleV2 has key, copy, drop, store {
         feature_version: u64,
         entries: vector<GasEntry>,
     }
@@ -67,10 +68,34 @@ module aptos_framework::gas_schedule {
         reconfiguration::reconfigure();
     }
 
+    /// Set the gas schedule for the next epoch, typically called by on-chain governance.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
+        config_buffer::upsert(new_gas_schedule);
+    }
+
+    /// When reconfig finish is finishing, apply the pending gas schedule changes.
+    public(friend) fun on_new_epoch() acquires GasScheduleV2 {
+        if (config_buffer::does_exist<GasScheduleV2>()) {
+            let new_gas_schedule: GasScheduleV2 = config_buffer::extract<GasScheduleV2>();
+            let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
+            *gas_schedule = new_gas_schedule;
+        }
+    }
+
     public fun set_storage_gas_config(aptos_framework: &signer, config: StorageGasConfig) {
         storage_gas::set_config(aptos_framework, config);
         // Need to trigger reconfiguration so the VM is guaranteed to load the new gas fee starting from the next
         // transaction.
         reconfiguration::reconfigure();
+    }
+
+    public fun set_storage_gas_config_for_next_epoch(aptos_framework: &signer, config: StorageGasConfig) {
+        storage_gas::set_config(aptos_framework, config);
     }
 }
