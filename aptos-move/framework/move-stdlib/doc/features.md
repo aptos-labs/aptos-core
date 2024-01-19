@@ -30,6 +30,7 @@ return true.
 
 
 -  [Resource `Features`](#0x1_features_Features)
+-  [Resource `PendingFeatures`](#0x1_features_PendingFeatures)
 -  [Constants](#@Constants_0)
 -  [Function `code_dependency_check_enabled`](#0x1_features_code_dependency_check_enabled)
 -  [Function `treat_friend_as_private`](#0x1_features_treat_friend_as_private)
@@ -85,9 +86,13 @@ return true.
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
+-  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
+-  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
+-  [Function `apply_diff`](#0x1_features_apply_diff)
+-  [Function `ensure_vm_or_framework_signer`](#0x1_features_ensure_vm_or_framework_signer)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
@@ -101,6 +106,7 @@ return true.
 
 <pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -113,6 +119,35 @@ The enabled features, represented by a bitset stored on chain.
 
 
 <pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_features_PendingFeatures"></a>
+
+## Resource `PendingFeatures`
+
+This resource holds the feature vec updates received in the current epoch.
+On epoch change, the updates take effect and this buffer is cleared.
+
+
+<pre><code><b>struct</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> <b>has</b> key
 </code></pre>
 
 
@@ -1836,6 +1871,85 @@ Function to enable and disable features. Can only be called by a signer of @std.
 
 </details>
 
+<a id="0x1_features_change_feature_flags_for_next_epoch"></a>
+
+## Function `change_feature_flags_for_next_epoch`
+
+Enable and disable features *for the next epoch*.
+
+NOTE: when it takes effects depend on feature <code>RECONFIGURE_WITH_DKG</code>.
+See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
+
+Can only be called by a signer of @std.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>, <a href="features.md#0x1_features_Features">Features</a> {
+    <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+
+    // Figure out the baseline feature vec that the diff will be applied <b>to</b>.
+    <b>let</b> new_feature_vec = <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
+        // If there is a buffered feature vec, <b>use</b> it <b>as</b> the baseline.
+        <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
+        <a href="features.md#0x1_features">features</a>
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+        // Otherwise, <b>use</b> the currently effective feature flag vec <b>as</b> the baseline, <b>if</b> it <b>exists</b>.
+        <b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>
+    } <b>else</b> {
+        // Otherwise, <b>use</b> an empty feature vec.
+        <a href="vector.md#0x1_vector">vector</a>[]
+    };
+
+    // Apply the diff and save it <b>to</b> the buffer.
+    <a href="features.md#0x1_features_apply_diff">apply_diff</a>(&<b>mut</b> new_feature_vec, enable, disable);
+    <b>move_to</b>(framework, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a>: new_feature_vec });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_on_new_epoch"></a>
+
+## Function `on_new_epoch`
+
+Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+
+While the scope is public, it can only be usd in system transactions like <code>block_prologue</code> and governance proposals,
+who have permission to set the flag that's checked in <code>extract()</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
+    <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(vm_or_framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
+        <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
+        <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_is_enabled"></a>
 
 ## Function `is_enabled`
@@ -1917,6 +2031,60 @@ Helper to check whether a feature flag is enabled.
     <b>let</b> byte_index = feature / 8;
     <b>let</b> bit_mask = 1 &lt;&lt; ((feature % 8) <b>as</b> u8);
     byte_index &lt; <a href="vector.md#0x1_vector_length">vector::length</a>(<a href="features.md#0x1_features">features</a>) && (*<a href="vector.md#0x1_vector_borrow">vector::borrow</a>(<a href="features.md#0x1_features">features</a>, byte_index) & bit_mask) != 0
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_apply_diff"></a>
+
+## Function `apply_diff`
+
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
+    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(enable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>true</b>);
+    });
+    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(disable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>false</b>);
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_ensure_vm_or_framework_signer"></a>
+
+## Function `ensure_vm_or_framework_signer`
+
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
+    <b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account);
+    <b>assert</b>!(addr == @std || addr == @vm, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
 }
 </code></pre>
 
