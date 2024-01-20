@@ -855,21 +855,18 @@ impl RoundManager {
     /// 2. Add the vote to the pending votes and check whether it finishes a QC.
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
     pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> anyhow::Result<()> {
-        fail_point!("consensus::process_vote_msg", |_| {
-            Err(anyhow::anyhow!("Injected error in process_vote_msg"))
-        });
         // Check whether this validator is a valid recipient of the vote.
-        if monitor!(
+        let x = monitor!(
             "process_vote_msg_sync",
             self.ensure_round_and_sync_up(
                 vote_msg.vote().vote_data().proposed().round(),
                 vote_msg.sync_info(),
                 vote_msg.vote().author(),
             )
-        )
-        .await
-        .context("[RoundManager] Stop processing vote")?
-        {
+            .await
+            .context("[RoundManager] Stop processing vote")?
+        );
+        if x {
             monitor!(
                 "process_vote_msg",
                 self.process_vote(vote_msg.vote())
