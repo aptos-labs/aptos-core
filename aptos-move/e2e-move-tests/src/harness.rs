@@ -26,7 +26,7 @@ use aptos_types::{
     },
     transaction::{
         EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        TransactionPayload, TransactionStatus, ViewFunctionOutput,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -715,7 +715,7 @@ impl MoveHarness {
         fun: MemberId,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<(Vec<Vec<u8>>, u64), Error> {
+    ) -> Result<ViewFunctionOutput, Error> {
         self.executor
             .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
     }

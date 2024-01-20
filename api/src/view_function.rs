@@ -135,7 +135,7 @@ fn view_request(
         ));
     }
 
-    let (return_vals, gas_used) = AptosVM::execute_view_function(
+    let output = AptosVM::execute_view_function(
         &state_view,
         view_function.module.clone(),
         view_function.function.clone(),
@@ -150,7 +150,7 @@ fn view_request(
         AcceptType::Bcs => {
             // The return values are already BCS encoded, but we still need to encode the outside
             // vector without re-encoding the inside values
-            let num_vals = return_vals.len();
+            let num_vals = output.values.len();
 
             // Push the length of the return values
             let mut length = vec![];
@@ -163,7 +163,7 @@ fn view_request(
             })?;
 
             // Combine all of the return values
-            let values = return_vals.into_iter().concat();
+            let values = output.values.into_iter().concat();
             let ret = [length, values].concat();
 
             BasicResponse::try_from_encoded((ret, &ledger_info, BasicResponseStatus::Ok))
@@ -186,7 +186,8 @@ fn view_request(
                     )
                 })?;
 
-            let move_vals = return_vals
+            let move_vals = output
+                .values
                 .into_iter()
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
@@ -208,7 +209,7 @@ fn view_request(
     };
     context.view_function_stats().increment(
         FunctionStats::function_to_key(&view_function.module, &view_function.function),
-        gas_used,
+        output.gas_used,
     );
     result
 }
