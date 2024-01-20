@@ -117,7 +117,7 @@ impl<'a> EliminateImmRefs<'a> {
                     ));
                 },
                 Drop if self.is_imm_ref(srcs[0]) => {
-                    // skip the destroy on an immutable ref
+                    // skip the drop on an immutable ref
                 },
                 _ => self.builder.emit(Call(attr_id, dests, op, srcs, aa)),
             },

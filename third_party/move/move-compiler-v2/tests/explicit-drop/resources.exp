@@ -232,7 +232,7 @@ public fun M::test_resource($t0: &signer) {
   3: $t6 := 0x42
   4: $t5 := borrow_global<M::R>($t6)
   5: $t7 := borrow_field<M::R>.f($t5)
-  6: destroy($t5)
+  6: drop($t5)
   7: $t4 := read_ref($t7)
   8: $t8 := 1
   9: $t3 := ==($t4, $t8)

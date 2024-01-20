@@ -220,11 +220,11 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
   1: $t5 := ==($t0, $t6)
   2: if ($t5) goto 3 else goto 10
   3: label L0
-  4: destroy($t1)
+  4: drop($t1)
   5: $t8 := 0x1
   6: $t7 := borrow_global<m::R>($t8)
   7: $t4 := borrow_field<m::R>.data($t7)
-  8: destroy($t7)
+  8: drop($t7)
   9: goto 12
  10: label L1
  11: $t4 := move($t1)

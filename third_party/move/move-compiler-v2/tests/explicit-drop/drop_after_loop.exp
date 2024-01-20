@@ -369,7 +369,7 @@ fun m::drop_after_loop() {
  12: $t4 := copy($t7)
  13: goto 17
  14: label L3
- 15: destroy($t2)
+ 15: drop($t2)
  16: goto 19
  17: label L4
  18: goto 6

@@ -190,9 +190,9 @@ fun m::g() {
   3: $t2 := move($t3)
   4: $t4 := m::f($t2)
   5: $t2 := move($t4)
-  6: destroy($t2)
+  6: drop($t2)
   7: $t6 := borrow_local($t0)
   8: $t5 := move($t6)
-  9: destroy($t5)
+  9: drop($t5)
  10: return ()
 }

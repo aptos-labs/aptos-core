@@ -163,7 +163,7 @@ pub enum Operation {
     // Builtins
     /// Indicates that the value is dropped.
     Drop,
-    /// Indicates that the value is not longer borrowed.
+    /// Indicates that the value is no longer borrowed.
     Release,
 
     ReadRef,
@@ -1122,7 +1122,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
                 write!(f, "uninit")?;
             },
             Drop => {
-                write!(f, "destroy")?;
+                write!(f, "drop")?;
             },
             Release => {
                 write!(f, "release")?;

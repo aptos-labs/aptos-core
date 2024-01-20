@@ -17,7 +17,7 @@ module 0x42::m {
     /// Returns 0 as a Scalar.
     public fun scalar_zero(): Scalar {
         Scalar {
-            data: x"0000000000000000000000000000000000000000000000000000000000000000"
+            data: x"00"
         }
     }
 

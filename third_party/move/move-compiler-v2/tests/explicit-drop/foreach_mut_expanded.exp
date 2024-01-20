@@ -577,7 +577,7 @@ fun m::test_for_each_mut() {
   2: $t4 := 3
   3: $t1 := vector($t2, $t3, $t4)
   4: $t0 := copy($t1)
-  5: destroy($t1)
+  5: drop($t1)
   6: $t6 := 0
   7: $t5 := copy($t6)
   8: $t9 := borrow_local($t0)
@@ -594,13 +594,13 @@ fun m::test_for_each_mut() {
  19: $t13 := move($t14)
  20: $t15 := 2
  21: write_ref($t13, $t15)
- 22: destroy($t13)
+ 22: drop($t13)
  23: $t17 := 1
  24: $t16 := +($t5, $t17)
  25: $t5 := copy($t16)
  26: goto 30
  27: label L3
- 28: destroy($t10)
+ 28: drop($t10)
  29: goto 32
  30: label L4
  31: goto 13
@@ -610,9 +610,9 @@ fun m::test_for_each_mut() {
  35: $t22 := 4
  36: $t19 := vector($t20, $t21, $t22)
  37: $t25 := copy($t0)
- 38: destroy($t0)
+ 38: drop($t0)
  39: $t26 := copy($t19)
- 40: destroy($t19)
+ 40: drop($t19)
  41: $t18 := ==($t25, $t26)
  42: if ($t18) goto 43 else goto 45
  43: label L5

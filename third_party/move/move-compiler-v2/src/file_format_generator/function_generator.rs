@@ -461,7 +461,7 @@ impl<'a> FunctionGenerator<'a> {
             },
             Operation::Release => {
                 // Move bytecode does not process release, values are released indirectly
-                // when the borrowed leaf is destroyed
+                // when the borrowed head of the borrow chain is destroyed
             },
             Operation::Drop => {
                 // Currently Destroy is only translated for references. It may also make

@@ -389,13 +389,6 @@ impl TestConfig {
         Ok(())
     }
 
-    /// Callback from the framework to register formatters for annotations.
-    fn register_formatters(target: &FunctionTarget) {
-        LiveVarAnalysisProcessor::register_formatters(target);
-        ReferenceSafetyProcessor::register_formatters(target);
-        AvailCopiesAnalysisProcessor::register_formatters(target);
-    }
-
     fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {
         let mut error_writer = Buffer::no_color();
         env.report_diag(&mut error_writer, Severity::Note);
