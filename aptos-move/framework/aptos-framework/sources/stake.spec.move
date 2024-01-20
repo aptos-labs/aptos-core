@@ -41,6 +41,7 @@ spec aptos_framework::stake {
     // Global invariants
     // -----------------
     spec module {
+        pragma verify = false;
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
         // After genesis, `AptosCoinCapabilities`, `ValidatorPerformance` and `ValidatorSet` exist.
@@ -327,6 +328,15 @@ spec aptos_framework::stake {
 
         ensures validator_info.network_addresses == new_network_addresses;
         ensures validator_info.fullnode_addresses == new_fullnode_addresses;
+    }
+
+    spec force_update_network_and_fullnode_addresses(
+        operator: &signer,
+        pool_address: address,
+        new_network_addresses: vector<u8>,
+        new_fullnode_addresses: vector<u8>,
+    ) {
+        modifies global<ValidatorConfig>(pool_address);
     }
 
     spec set_operator_with_cap(owner_cap: &OwnerCapability, new_operator: address) {

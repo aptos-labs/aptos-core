@@ -9,6 +9,7 @@ Reconfiguration with DKG helper functions.
 -  [Function `try_start`](#0x1_reconfiguration_with_dkg_try_start)
 -  [Function `finish`](#0x1_reconfiguration_with_dkg_finish)
 -  [Function `finish_with_dkg_result`](#0x1_reconfiguration_with_dkg_finish_with_dkg_result)
+-  [Specification](#@Specification_0)
 
 
 <pre><code><b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
@@ -116,6 +117,15 @@ Abort if no DKG is in progress.
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

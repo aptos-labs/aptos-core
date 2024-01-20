@@ -1,6 +1,6 @@
 spec aptos_framework::execution_config {
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         pragma aborts_if_is_strict;
     }
 

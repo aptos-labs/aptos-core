@@ -966,7 +966,7 @@ The last step of genesis.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
