@@ -12,7 +12,7 @@ use aptos_dkg::{
         traits::{SecretSharingConfig, Transcript},
         GenericWeighting, Player, ThresholdConfig, WeightedConfig,
     },
-    weighted_vuf::{gjm21_insecure, pinkas::PinkasWUF, traits::WeightedVUF},
+    weighted_vuf::{bls, gjm21_insecure, pinkas::PinkasWUF, traits::WeightedVUF},
 };
 use core::iter::zip;
 use criterion::{
@@ -21,6 +21,7 @@ use criterion::{
     BenchmarkGroup, Criterion,
 };
 use rand::{rngs::ThreadRng, thread_rng};
+use aptos_dkg::pvss::insecure_field;
 
 const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
@@ -35,6 +36,10 @@ pub fn all_groups(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("wvuf/das-gjm21-insecure-sk-in-g1");
     wvuf_benches::<das::Transcript, gjm21_insecure::g1::GjmInsecureWVUF, WallTime>(&mut group);
+    group.finish();
+
+    let mut group = c.benchmark_group("wvuf/insecure-field-bls");
+    wvuf_benches::<insecure_field::Transcript, bls::BlsWUF, WallTime>(&mut group);
     group.finish();
 }
 

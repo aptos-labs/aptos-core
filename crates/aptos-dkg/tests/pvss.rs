@@ -6,6 +6,7 @@
 
 //! PVSS scheme-independent testing
 use aptos_crypto::hash::CryptoHash;
+use aptos_dkg::pvss::insecure_field;
 use aptos_dkg::{
     constants::{
         BEST_CASE_N, BEST_CASE_THRESHOLD, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, WORST_CASE_N,
@@ -40,6 +41,9 @@ fn all_unweighted_pvss_bvt() {
 
         // SCRAPE
         pvss_deal_verify_and_reconstruct::<scrape::Transcript>(&tc, seed.to_bytes_le());
+
+        // Insecure testing-only field-element PVSS
+        pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
 }
 
@@ -64,6 +68,12 @@ fn all_weighted_pvss_bvt() {
 
         // Das (insecurely-weighted)
         pvss_deal_verify_and_reconstruct::<GenericWeighting<das::Transcript>>(
+            &wc,
+            seed.to_bytes_le(),
+        );
+
+        // Insecure testing-only field-element PVSS (weighted)
+        pvss_deal_verify_and_reconstruct::<GenericWeighting<insecure_field::Transcript>>(
             &wc,
             seed.to_bytes_le(),
         );
