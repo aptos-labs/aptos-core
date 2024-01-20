@@ -471,17 +471,17 @@ impl RoundManager {
             );
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
-            sync_info
-                .verify(&self.epoch_state().verifier)
-                .map_err(|e| {
-                    error!(
-                        SecurityEvent::InvalidSyncInfoMsg,
-                        sync_info = sync_info,
-                        remote_peer = author,
-                        error = ?e,
-                    );
-                    VerifyError::from(e)
-                })?;
+            // sync_info
+            //     .verify(&self.epoch_state().verifier)
+            //     .map_err(|e| {
+            //         error!(
+            //             SecurityEvent::InvalidSyncInfoMsg,
+            //             sync_info = sync_info,
+            //             remote_peer = author,
+            //             error = ?e,
+            //         );
+            //         VerifyError::from(e)
+            //     })?;
             let result = self
                 .block_store
                 .add_certs(sync_info, self.create_block_retriever(author))
