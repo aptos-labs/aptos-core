@@ -1,9 +1,5 @@
 // Copyright © Aptos Foundation
 
-#[cfg(test)]
-use crate::dummy_dkg::DummyDKG;
-#[cfg(test)]
-use crate::dummy_dkg::DummyDKGTranscript;
 use crate::{types::DKGNodeRequest, DKGMessage};
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
@@ -12,7 +8,13 @@ use aptos_crypto::{bls12381, Uniform};
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 #[cfg(test)]
+use aptos_types::dkg::DKGSessionMetadata;
+#[cfg(test)]
 use aptos_types::dkg::DKGTranscriptMetadata;
+#[cfg(test)]
+use aptos_types::dkg::DummyDKG;
+#[cfg(test)]
+use aptos_types::dkg::DummyDKGTranscript;
 #[cfg(test)]
 use aptos_types::validator_verifier::ValidatorConsensusInfo;
 #[cfg(test)]
@@ -72,9 +74,17 @@ fn test_transcript_aggregation_state() {
     let validator_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
-    let verifier = ValidatorVerifier::new(validator_infos);
+    let verifier = ValidatorVerifier::new(validator_infos.clone());
+    let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
+        dealer_epoch: 999,
+        dealer_validator_set: validator_infos.clone(),
+        target_validator_set: validator_infos.clone(),
+    });
     let epoch_state = Arc::new(EpochState { epoch, verifier });
-    let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new((), epoch_state));
+    let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(
+        pub_params,
+        epoch_state,
+    ));
 
     let good_transcript = DummyDKGTranscript::default();
     let good_trx_bytes = bcs::to_bytes(&good_transcript).unwrap();

@@ -118,6 +118,7 @@ pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
+pub mod validator_txns;
 pub mod verifier;
 mod zkid_validation;
 

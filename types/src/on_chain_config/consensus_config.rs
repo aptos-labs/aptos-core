@@ -85,7 +85,7 @@ impl ConsensusAlgorithmConfig {
     }
 }
 
-const VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT: u64 = 1;
+const VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT: u64 = 2;
 const VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT: u64 = 2097152; //2MB
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
