@@ -33,12 +33,14 @@ futures = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
 ordered-float = { workspace = true }
+once_cell = { workspace = true }
 # Note: we cannot rely on the workspace version of rand because it's out-of-date
 # and does not provide the necessary interfaces for weighted sampling. Similarly,
 # it's not trivial to update rand on the workspace because of several dependency
 # issues (e.g., other outdated crate versions). This is why we fix the version here.
 # Eventually we'll need to update the workspace to use the latest version of rand.
 rand = "0.8.5"
+rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

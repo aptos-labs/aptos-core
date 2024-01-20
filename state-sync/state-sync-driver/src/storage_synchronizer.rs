@@ -11,7 +11,7 @@ use crate::{
         CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
         StorageServiceNotificationHandler,
     },
-    utils,
+    utils, DRIVER_THREAD_POOL,
 };
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_data_streaming_service::data_notification::NotificationId;
@@ -46,6 +46,7 @@ use std::{
 };
 use tokio::{
     runtime::{Handle, Runtime},
+    task,
     task::JoinHandle,
 };
 
@@ -999,9 +1000,7 @@ fn spawn_state_snapshot_receiver<
     spawn(runtime, receiver)
 }
 
-/// Spawns a dedicated task that applies the given output chunk. We use
-/// `spawn_blocking` so that the heavy synchronous function doesn't
-/// block the async thread.
+/// Spawns a dedicated task that applies the given output chunk
 async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     outputs_with_proof: TransactionOutputListWithProof,
@@ -1010,15 +1009,16 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
 ) -> anyhow::Result<()> {
     // Apply the output chunk
     let num_outputs = outputs_with_proof.transactions_and_outputs.len();
-    let result = tokio::task::spawn_blocking(move || {
-        chunk_executor.enqueue_chunk_by_transaction_outputs(
+    let (send, recv) = tokio::sync::oneshot::channel();
+    DRIVER_THREAD_POOL.install(move || {
+        let result = chunk_executor.enqueue_chunk_by_transaction_outputs(
             outputs_with_proof,
             &target_ledger_info,
             end_of_epoch_ledger_info.as_ref(),
-        )
-    })
-    .await
-    .expect("Spawn_blocking(apply_output_chunk) failed!");
+        );
+        let _ = send.send(result);
+    });
+    let result = recv.await.unwrap();
 
     // Update the logs and metrics if the chunk was applied successfully
     if result.is_ok() {
@@ -1039,9 +1039,7 @@ async fn apply_output_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     result
 }
 
-/// Spawns a dedicated task that executes the given transaction chunk.
-/// We use `spawn_blocking` so that the heavy synchronous function
-/// doesn't block the async thread.
+/// Spawns a dedicated task that executes the given transaction chunk
 async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
     transactions_with_proof: TransactionListWithProof,
@@ -1050,15 +1048,16 @@ async fn execute_transaction_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
 ) -> anyhow::Result<()> {
     // Execute the transaction chunk
     let num_transactions = transactions_with_proof.transactions.len();
-    let result = tokio::task::spawn_blocking(move || {
-        chunk_executor.enqueue_chunk_by_execution(
+    let (send, recv) = tokio::sync::oneshot::channel();
+    DRIVER_THREAD_POOL.install(move || {
+        let result = chunk_executor.enqueue_chunk_by_execution(
             transactions_with_proof,
             &target_ledger_info,
             end_of_epoch_ledger_info.as_ref(),
-        )
-    })
-    .await
-    .expect("Spawn_blocking(execute_transaction_chunk) failed!");
+        );
+        let _ = send.send(result);
+    });
+    let result = recv.await.unwrap();
 
     // Update the logs and metrics if the chunk was executed successfully
     if result.is_ok() {
@@ -1093,26 +1092,28 @@ fn update_synchronizer_chunk_metrics(num_items: usize, operation_label: &str) {
     );
 }
 
-/// Spawns a dedicated task that updates the ledger in storage. We use
-/// `spawn_blocking` so that the heavy synchronous function doesn't
-/// block the async thread.
+/// Spawns a dedicated task that updates the ledger in storage
 async fn update_ledger<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
 ) -> anyhow::Result<()> {
-    tokio::task::spawn_blocking(move || chunk_executor.update_ledger())
-        .await
-        .expect("Spawn_blocking(update_ledger) failed!")
+    let (send, recv) = tokio::sync::oneshot::channel();
+    DRIVER_THREAD_POOL.install(move || {
+        let result = chunk_executor.update_ledger();
+        let _ = send.send(result);
+    });
+    recv.await.unwrap()
 }
 
-/// Spawns a dedicated task that commits a data chunk. We use
-/// `spawn_blocking` so that the heavy synchronous function doesn't
-/// block the async thread.
+/// Spawns a dedicated task that commits a data chunk
 async fn commit_chunk<ChunkExecutor: ChunkExecutorTrait + 'static>(
     chunk_executor: Arc<ChunkExecutor>,
 ) -> anyhow::Result<ChunkCommitNotification> {
-    tokio::task::spawn_blocking(move || chunk_executor.commit_chunk())
-        .await
-        .expect("Spawn_blocking(commit_chunk) failed!")
+    let (send, recv) = tokio::sync::oneshot::channel();
+    DRIVER_THREAD_POOL.install(move || {
+        let result = chunk_executor.commit_chunk();
+        let _ = send.send(result);
+    });
+    recv.await.unwrap()
 }
 
 /// Finalizes storage once all state values have been committed
@@ -1228,9 +1229,9 @@ fn spawn(
     future: impl Future<Output = ()> + Send + 'static,
 ) -> JoinHandle<()> {
     if let Some(runtime) = runtime {
-        runtime.spawn(future)
+        runtime.spawn(task::unconstrained(future))
     } else {
-        tokio::spawn(future)
+        tokio::spawn(task::unconstrained(future))
     }
 }
 

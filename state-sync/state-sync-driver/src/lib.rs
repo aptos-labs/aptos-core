@@ -4,6 +4,15 @@
 
 #![forbid(unsafe_code)]
 
+use once_cell::sync::Lazy;
+
+pub(crate) static DRIVER_THREAD_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
+    rayon::ThreadPoolBuilder::new()
+        .thread_name(|index| format!("driver_pool_{}", index))
+        .build()
+        .unwrap()
+});
+
 mod bootstrapper;
 mod continuous_syncer;
 mod driver;

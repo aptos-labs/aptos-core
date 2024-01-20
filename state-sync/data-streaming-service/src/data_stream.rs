@@ -774,10 +774,28 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 self.notification_id_generator.clone(),
             )?
         {
+            // Update the metrics for the receive latency
+            if let Some(receive_time) = response_context.receive_time {
+                metrics::observe_duration(
+                    &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                    &("receive".to_string() + data_client_request.get_label()),
+                    receive_time,
+                );
+            }
+
+            // Update the metrics for the transformation latency
+            if let Some(transformation_time) = response_context.transformation_time {
+                metrics::observe_duration(
+                    &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                    &("transform_".to_string() + data_client_request.get_label()),
+                    transformation_time,
+                );
+            }
+
             // Update the metrics for the data notification send latency
             metrics::observe_duration(
                 &metrics::DATA_NOTIFICATION_SEND_LATENCY,
-                data_client_request.get_label(),
+                &("send_notification_".to_string() + data_client_request.get_label()),
                 response_context.creation_time,
             );
 
@@ -1417,7 +1435,7 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
     );
 
     // Spawn the request
-    tokio::spawn(async move {
+    tokio::spawn(tokio::task::unconstrained(async move {
         // Time the request (the timer will stop when it's dropped)
         let _timer = start_timer(
             &metrics::DATA_REQUEST_PROCESSING_LATENCY,
@@ -1511,7 +1529,7 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
         // Send a notification via the stream update notifier
         let stream_update_notification = StreamUpdateNotification::new(data_stream_id);
         let _ = stream_update_notifier.push((), stream_update_notification);
-    })
+    }))
 }
 
 async fn get_states_values_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(

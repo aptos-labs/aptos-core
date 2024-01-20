@@ -217,6 +217,11 @@ pub struct ResponseContext {
     /// A callback for notifying the data-client source about an error with this
     /// response.
     pub response_callback: Box<dyn ResponseCallback>,
+
+    /// The time at which the response was received
+    pub receive_time: Option<Instant>,
+    /// The time at which the response was transformed into a valid message
+    pub transformation_time: Option<Instant>,
 }
 
 impl ResponseContext {
@@ -225,7 +230,17 @@ impl ResponseContext {
             creation_time: Instant::now(),
             id,
             response_callback,
+            receive_time: None,
+            transformation_time: None,
         }
+    }
+
+    pub fn set_receive_time(&mut self) {
+        self.receive_time = Some(Instant::now());
+    }
+
+    pub fn set_transformation_time(&mut self) {
+        self.transformation_time = Some(Instant::now());
     }
 }
 

@@ -390,7 +390,7 @@ impl Default for AptosDataClientConfig {
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
-            latency_monitor_loop_interval_ms: 100,
+            latency_monitor_loop_interval_ms: 50,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
             max_optimistic_fetch_lag_secs: 30, // 30 seconds
