@@ -840,18 +840,23 @@ impl RoundManager {
             Err(anyhow::anyhow!("Injected error in process_vote_msg"))
         });
         // Check whether this validator is a valid recipient of the vote.
-        if self
-            .ensure_round_and_sync_up(
+        if monitor!(
+            "process_vote_msg_sync",
+            self.ensure_round_and_sync_up(
                 vote_msg.vote().vote_data().proposed().round(),
                 vote_msg.sync_info(),
                 vote_msg.vote().author(),
             )
-            .await
-            .context("[RoundManager] Stop processing vote")?
+        )
+        .await
+        .context("[RoundManager] Stop processing vote")?
         {
-            self.process_vote(vote_msg.vote())
-                .await
-                .context("[RoundManager] Add a new vote")?;
+            monitor!(
+                "process_vote_msg",
+                self.process_vote(vote_msg.vote())
+                    .await
+                    .context("[RoundManager] Add a new vote")?
+            );
         }
         Ok(())
     }
