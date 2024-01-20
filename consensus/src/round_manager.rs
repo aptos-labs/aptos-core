@@ -76,44 +76,44 @@ pub const BACK_PRESSURE_POLLING_INTERVAL_MS: u64 = 10;
 impl UnverifiedEvent {
     pub fn verify(
         self,
-        peer_id: PeerId,
-        validator: &ValidatorVerifier,
-        quorum_store_enabled: bool,
-        self_message: bool,
-        max_num_batches: usize,
+        _peer_id: PeerId,
+        _validator: &ValidatorVerifier,
+        _quorum_store_enabled: bool,
+        _self_message: bool,
+        _max_num_batches: usize,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
-                if !self_message {
-                    p.verify(validator, quorum_store_enabled)?;
-                }
+                // if !self_message {
+                //     p.verify(validator, quorum_store_enabled)?;
+                // }
                 VerifiedEvent::ProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
-                if !self_message {
-                    v.verify(validator)?;
-                }
+                // if !self_message {
+                //     v.verify(validator)?;
+                // }
                 VerifiedEvent::VoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
-                if !self_message {
-                    b.verify(peer_id, max_num_batches)?;
-                }
+                // if !self_message {
+                //     b.verify(peer_id, max_num_batches)?;
+                // }
                 VerifiedEvent::BatchMsg(b)
             },
             UnverifiedEvent::SignedBatchInfo(sd) => {
-                if !self_message {
-                    sd.verify(peer_id, max_num_batches, validator)?;
-                }
+                // if !self_message {
+                //     sd.verify(peer_id, max_num_batches, validator)?;
+                // }
                 VerifiedEvent::SignedBatchInfo(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
-                if !self_message {
-                    p.verify(max_num_batches, validator)?;
-                }
+                // if !self_message {
+                //     p.verify(max_num_batches, validator)?;
+                // }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
