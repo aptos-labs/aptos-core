@@ -1236,13 +1236,28 @@ impl TransactionsApi {
         };
 
         let stats_key = match txn.payload() {
-            TransactionPayload::Script(_) => "Script".to_string(),
-            TransactionPayload::ModuleBundle(_) => "ModuleBundle".to_string(),
+            TransactionPayload::Script(_) => {
+                format!("Script::{}", txn.clone().committed_hash()).to_string()
+            },
+            TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
                 entry_function.module(),
                 &entry_function.function().into(),
             ),
-            TransactionPayload::Multisig(_) => "MultiSig".to_string(),
+            TransactionPayload::Multisig(multisig) => {
+                if let Some(payload) = &multisig.transaction_payload {
+                    match payload {
+                        MultisigTransactionPayload::EntryFunction(entry_function) => {
+                            FunctionStats::function_to_key(
+                                entry_function.module(),
+                                &entry_function.function().into(),
+                            )
+                        },
+                    }
+                } else {
+                    "Multisig::unknown".to_string()
+                }
+            },
         };
         self.context
             .simulate_txn_stats()
