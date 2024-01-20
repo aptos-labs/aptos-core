@@ -15,8 +15,10 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction, Version},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
@@ -410,12 +412,12 @@ impl Block {
         Ok(())
     }
 
-    pub fn transactions_to_execute_for_metadata(
+    pub fn combine_to_input_transactions(
         validator_txns: Vec<ValidatorTransaction>,
         txns: Vec<SignedTransaction>,
-        metadata: BlockMetadata,
+        metadata: BlockMetadataExt,
     ) -> Vec<Transaction> {
-        once(Transaction::BlockMetadata(metadata))
+        once(Transaction::from(metadata))
             .chain(
                 validator_txns
                     .into_iter()
@@ -423,20 +425,6 @@ impl Block {
             )
             .chain(txns.into_iter().map(Transaction::UserTransaction))
             .collect()
-    }
-
-    /// List of input transactions for each block.
-    /// Prepends BlockMetadata and validator txns, and then all user txns.
-    ///
-    /// It doesn't add StateCheckpoint/BlockEpilogue transaction - that gets added during execution.
-    pub fn transactions_to_execute(
-        &self,
-        validators: &[AccountAddress],
-        validator_txns: Vec<ValidatorTransaction>,
-        txns: Vec<SignedTransaction>,
-    ) -> Vec<Transaction> {
-        let metadata = self.new_block_metadata(validators);
-        Self::transactions_to_execute_for_metadata(validator_txns, txns, metadata)
     }
 
     fn previous_bitvec(&self) -> BitVec {
@@ -461,6 +449,28 @@ impl Block {
                     Self::failed_authors_to_indices(validators, failed_authors)
                 }),
             self.timestamp_usecs(),
+        )
+    }
+
+    pub fn new_metadata_with_randomness(
+        &self,
+        validators: &[AccountAddress],
+        randomness: Option<Randomness>,
+    ) -> BlockMetadataExt {
+        BlockMetadataExt::new_v1(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.previous_bitvec().into(),
+            // For nil block, we use 0x0 which is convention for nil address in move.
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
+            self.timestamp_usecs(),
+            randomness,
         )
     }
 

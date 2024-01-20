@@ -15,7 +15,7 @@ use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use std::sync::Arc;
 
@@ -36,8 +36,11 @@ pub trait StateComputer: Send + Sync {
         block: &Block,
         // The parent block root hash.
         parent_block_id: HashValue,
+        randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
-        self.schedule_compute(block, parent_block_id).await.await
+        self.schedule_compute(block, parent_block_id, randomness)
+            .await
+            .await
     }
 
     async fn schedule_compute(
@@ -46,6 +49,7 @@ pub trait StateComputer: Send + Sync {
         _block: &Block,
         // The parent block root hash.
         _parent_block_id: HashValue,
+        _randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         unimplemented!("This state computer does not support scheduling");
     }
@@ -72,6 +76,7 @@ pub trait StateComputer: Send + Sync {
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
+        randomness_enabled: bool,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

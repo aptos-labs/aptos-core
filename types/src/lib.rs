@@ -12,6 +12,7 @@ pub mod account_config;
 pub mod account_state;
 pub mod block_info;
 pub mod block_metadata;
+pub mod block_metadata_ext;
 pub mod chain_id;
 pub mod contract_event;
 pub mod dkg;
@@ -33,6 +34,7 @@ pub mod on_chain_config;
 pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
+pub mod randomness;
 pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;
@@ -55,8 +57,10 @@ pub mod waypoint;
 pub mod write_set;
 
 pub use account_address::AccountAddress as PeerId;
+use aptos_crypto::bls12381::bls12381_keys;
 use move_core_types::account_address::AccountAddress;
 pub use utility_coin::*;
+use crate::validator_verifier::ValidatorConsensusInfo;
 
 pub mod account_view;
 pub mod aggregate_signature;
@@ -74,4 +78,25 @@ pub struct ValidatorConsensusInfoMoveStruct {
     pub addr: AccountAddress,
     pub pk_bytes: Vec<u8>,
     pub voting_power: u64,
+}
+
+impl From<ValidatorConsensusInfo> for ValidatorConsensusInfoMoveStruct {
+    fn from(value: ValidatorConsensusInfo) -> Self {
+        let ValidatorConsensusInfo { address, public_key, voting_power } = value;
+        Self {
+            addr: address,
+            pk_bytes: public_key.to_bytes().to_vec(),
+            voting_power,
+        }
+    }
+}
+
+impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ValidatorConsensusInfoMoveStruct) -> Result<Self, Self::Error> {
+        let ValidatorConsensusInfoMoveStruct { addr, pk_bytes, voting_power } = value;
+        let public_key = bls12381_keys::PublicKey::try_from(pk_bytes.as_slice())?;
+        Ok(Self::new(addr, public_key, voting_power))
+    }
 }

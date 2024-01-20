@@ -64,9 +64,9 @@ pub enum VerifyError {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorConsensusInfo {
-    address: AccountAddress,
-    public_key: PublicKey,
-    voting_power: u64,
+    pub address: AccountAddress,
+    pub public_key: PublicKey,
+    pub voting_power: u64,
 }
 
 impl ValidatorConsensusInfo {

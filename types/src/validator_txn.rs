@@ -8,8 +8,8 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
-    DKGResult(DKGNode),
     DummyTopic1(DummyValidatorTransaction),
+    DKGResult(DKGNode),
     #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic2(DummyValidatorTransaction),
 }
@@ -43,7 +43,7 @@ impl ValidatorTransaction {
     }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum Topic {
     DKG,

@@ -37,6 +37,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
@@ -56,6 +57,10 @@ pub enum SessionId {
         script_hash: Vec<u8>,
     },
     BlockMeta {
+        // block id
+        id: HashValue,
+    },
+    BlockMetaExt {
         // block id
         id: HashValue,
     },
@@ -101,6 +106,12 @@ impl SessionId {
     pub fn block_meta(block_meta: &BlockMetadata) -> Self {
         Self::BlockMeta {
             id: block_meta.id(),
+        }
+    }
+
+    pub fn block_meta_ext(block_meta_ext: &BlockMetadataExt) -> Self {
+        Self::BlockMetaExt {
+            id: block_meta_ext.id(),
         }
     }
 

@@ -15,6 +15,12 @@ pub enum TransactionFilter {
 }
 
 impl TransactionFilter {
+    pub fn no_op() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
+}
+
+impl TransactionFilter {
     pub fn should_exclude(&self, txn: &ValidatorTransaction) -> bool {
         match self {
             TransactionFilter::PendingTxnHashSet(set) => set.contains(&txn.hash()),
@@ -82,6 +88,7 @@ impl VTxnPoolState {
     }
 }
 
+#[derive(Debug)]
 struct PoolItem {
     topic: Topic,
     txn: Arc<ValidatorTransaction>,
@@ -90,7 +97,7 @@ struct PoolItem {
 
 /// PoolState invariants.
 /// `(seq_num=i, topic=T)` exists in `txn_queue` if and only if it exists in `seq_nums_by_topic`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PoolStateInner {
     /// Incremented every time a txn is pushed in. The txn gets the old value as its sequence number.
     next_seq_num: u64,
@@ -107,6 +114,7 @@ pub struct PoolStateInner {
 /// If this is dropped, `txn` will be deleted from the pool (if it has not been).
 ///
 /// This allows the pool to be emptied on epoch boundaries.
+#[derive(Clone, Debug)]
 pub struct TxnGuard {
     pool: Arc<Mutex<PoolStateInner>>,
     seq_num: u64,
