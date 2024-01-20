@@ -97,10 +97,7 @@ impl EliminateEmptyBlocksTransformation {
 
     /// Returns label substituted if it's in `subst`; else just returns `label`
     fn subst_label(subst: &BTreeMap<Label, Label>, label: Label) -> Label {
-        match subst.get(&label) {
-            Some(new_label) => new_label.clone(),
-            None => label,
-        }
+		subst.get(&label).cloned().unwrap_or_else(|| label)
     }
 
     /// Returns the instructions of the block
