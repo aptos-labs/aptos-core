@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// ! Adds explicit destroy instructions for non-primitive types.
+// ! Adds explicit drop and release instructions for non-primitive types.
 
 use super::{
     livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
@@ -103,7 +103,8 @@ impl<'a> ExplicitDropTransformer<'a> {
         self.target.get_local_type(t).is_reference()
     }
 
-    /// Drops unused function arguments
+    /// Drops unused function arguments. We do not need to consider release operations here because they are never
+    /// borrowed from.
     fn drop_unused_args(&mut self) {
         let start_code_offset = 0;
         let live_var_info = self.get_live_var_info(start_code_offset);
@@ -115,12 +116,12 @@ impl<'a> ExplicitDropTransformer<'a> {
             {
                 // a non-native function has at least one instruction; a single return or abort at minimum
                 let attr_id = self.target.get_bytecode()[start_code_offset as usize].get_attr_id();
-                self.drop_temp(arg, attr_id)
+                self.release_or_drop_temp(arg, attr_id, false)
             }
         }
     }
 
-    // Returns a set of locals that can be dropped at given code offset
+    // Returns a set of locals that should be released or dropped at given code offset
     // Primitives are filtered out
     fn released_and_dropped_temps_at(
         &self,
@@ -142,23 +143,22 @@ impl<'a> ExplicitDropTransformer<'a> {
         self.lifetime_annot.get_info_at(code_offset)
     }
 
-    fn drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId) {
-        self.release_or_drop_temp(tmp, attr_id, false)
-    }
-
+    /// Release or drop a temporary if its type is not primitive.
     fn release_or_drop_temp(&mut self, tmp: TempIndex, attr_id: AttrId, release: bool) {
-        let drop_t = Bytecode::Call(
-            attr_id,
-            Vec::new(),
-            if release {
-                Operation::Release
-            } else {
-                Operation::Destroy
-            },
-            vec![tmp],
-            None,
-        );
-        self.emit_bytecode(drop_t)
+        if !self.is_primitive(tmp) {
+            let instr = Bytecode::Call(
+                attr_id,
+                Vec::new(),
+                if release {
+                    Operation::Release
+                } else {
+                    Operation::Drop
+                },
+                vec![tmp],
+                None,
+            );
+            self.emit_bytecode(instr)
+        }
     }
 
     fn release_or_drop_temps(
@@ -168,9 +168,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         release: bool,
     ) {
         for t in temps_to_drop {
-            if !self.is_primitive(*t) {
-                self.release_or_drop_temp(*t, attr_id, release)
-            }
+            self.release_or_drop_temp(*t, attr_id, release)
         }
     }
 
@@ -178,7 +176,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         self.transformed.push(bytecode)
     }
 
-    /// Returns a set of locals which should be released or dropped at this program point.
+    /// Returns sets of locals which should be released and dropped at this program point.
     /// See comments in the code.
     fn released_and_dropped_temps(
         &self,
@@ -186,7 +184,7 @@ impl<'a> ExplicitDropTransformer<'a> {
         life_time_info: &LifetimeInfoAtCodeOffset,
         bytecode: &Bytecode,
     ) -> (BTreeSet<TempIndex>, BTreeSet<TempIndex>) {
-        // use set to avoid duplicate dropping
+        // use sets to avoid duplicate dropping
         let mut released_temps = BTreeSet::new();
         let mut dropped_temps = BTreeSet::new();
         // Get the temps dropped at this program point, including those which are introduced here but never used.

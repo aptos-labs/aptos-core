@@ -162,7 +162,7 @@ pub enum Operation {
 
     // Builtins
     /// Indicates that the value is dropped.
-    Destroy,
+    Drop,
     /// Indicates that the value is not longer borrowed.
     Release,
 
@@ -257,7 +257,7 @@ impl Operation {
             Operation::GetField(_, _, _, _) => false,
             Operation::GetGlobal(_, _, _) => true,
             Operation::Uninit => false,
-            Operation::Destroy => false,
+            Operation::Drop => false,
             Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
@@ -1121,7 +1121,7 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             Uninit => {
                 write!(f, "uninit")?;
             },
-            Destroy => {
+            Drop => {
                 write!(f, "destroy")?;
             },
             Release => {

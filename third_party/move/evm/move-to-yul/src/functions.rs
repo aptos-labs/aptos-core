@@ -376,7 +376,7 @@ impl<'a> FunctionGenerator<'a> {
                             local(&srcs[0]),
                         )
                     },
-                    Destroy => {
+                    Drop => {
                         print_loc();
                         self.destroy(ctx, &get_local_type(srcs[0]), local(&srcs[0]))
                     },

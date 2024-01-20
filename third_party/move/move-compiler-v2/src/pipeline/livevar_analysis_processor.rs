@@ -174,11 +174,12 @@ impl LiveVarAnalysisProcessor {
         // The backwards analysis will not populate the before state of L2, which should be the same as the after
         // state of L0. However, via the loop the after state of L0 will be incrementally grow (without effecting
         // the before state of L2). The conclusion is that whatever the after state of L0 is, should be joined
-        // (union) to the before state of each branch targets. Current assumption is that there is no fixpoint
-        // needed for this post-analysis step.
+        // (union) to the before state of each branch target.
         //
-        // This propagation assumes that there are no critical edges, i.e. no targets with multiple incoming
-        // edges.
+        // Thereby we assert that there is no fixpoint needed for this post-analysis step. The argument is as follows:
+        // any live variables which we propagate from the branch source to the target have either been (a) not used
+        // by the target, then they will immediately be released (b) have been used already in which case the join
+        // does not make a difference.
         let label_to_offset = Bytecode::label_offsets(code);
         for (offs, bc) in code.iter().enumerate() {
             let offs = offs as CodeOffset;
