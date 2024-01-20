@@ -11,6 +11,8 @@ as in the Move prover's prelude.
 
 -  [Function `sha2_256`](#0x1_hash_sha2_256)
 -  [Function `sha3_256`](#0x1_hash_sha3_256)
+-  [Specification](#@Specification_0)
+    -  [Function `sha3_256`](#@Specification_0_sha3_256)
 
 
 <pre><code></code></pre>
@@ -60,6 +62,26 @@ as in the Move prover's prelude.
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+<a id="@Specification_0_sha3_256"></a>
+
+### Function `sha3_256`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="hash.md#0x1_hash_sha3_256">sha3_256</a>(data: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] len(result) == 32;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

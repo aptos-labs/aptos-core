@@ -195,12 +195,20 @@ module aptos_framework::randomness {
 
         let sample = r1 % range;
         let i = 0;
-        while (i < 256) {
+        while ({
+            spec {
+                invariant sample >= 0 && sample < max_excl - min_incl;
+            };
+            i < 256
+        }) {
             sample = safe_add_mod(sample, sample, range);
             i = i + 1;
         };
 
         let sample = safe_add_mod(sample, r0 % range, range);
+        spec {
+            assert sample >= 0 && sample < max_excl - min_incl;
+        };
 
         min_incl + sample
     }
@@ -211,15 +219,32 @@ module aptos_framework::randomness {
 
         // Initialize into [0, 1, ..., n-1].
         let i = 0;
-        while (i < n) {
+        while ({
+            spec {
+                invariant i <= n;
+                invariant len(values) == i;
+            };
+            i < n
+        }) {
             std::vector::push_back(&mut values, i);
             i = i + 1;
+        };
+        spec {
+            assert len(values) == n;
         };
 
         // Shuffle.
         let tail = n - 1;
-        while (tail > 0) {
+        while ({
+            spec {
+                invariant tail >= 0 && tail < len(values);
+            };
+            tail > 0
+        }) {
             let pop_position = u64_range(0, tail + 1);
+            spec {
+                assert pop_position < len(values);
+            };
             std::vector::swap(&mut values, pop_position, tail);
             tail = tail - 1;
         };
@@ -236,6 +261,16 @@ module aptos_framework::randomness {
 
     /// Compute `(a + b) % m`, assuming `m >= 1, 0 <= a < m, 0<= b < m`.
     inline fun safe_add_mod(a: u256, b: u256, m: u256): u256 {
+        let neg_b = m - b;
+        if (a < neg_b) {
+            a + b
+        } else {
+            a - neg_b
+        }
+    }
+
+    #[verify_only]
+    fun safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {
         let neg_b = m - b;
         if (a < neg_b) {
             a + b
