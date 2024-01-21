@@ -412,7 +412,7 @@ fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clon
     aptos_data_client: T,
     cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 ) {
-    tokio::spawn(async move {
+    tokio::spawn(tokio::task::unconstrained(async move {
         loop {
             // Refresh the cached global data summary
             refresh_global_data_summary(
@@ -425,7 +425,7 @@ fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clon
                 data_streaming_service_config.global_summary_refresh_interval_ms;
             tokio::time::sleep(Duration::from_millis(sleep_duration_ms)).await;
         }
-    });
+    }));
 }
 
 /// Refreshes the global data summary and updates the cache

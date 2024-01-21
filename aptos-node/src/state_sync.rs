@@ -215,7 +215,9 @@ fn setup_data_streaming_service(
 
     // Start the data streaming service
     let streaming_service_runtime = aptos_runtimes::spawn_named_runtime("stream-serv".into(), None);
-    streaming_service_runtime.spawn(data_streaming_service.start_service());
+    streaming_service_runtime.spawn(tokio::task::unconstrained(
+        data_streaming_service.start_service(),
+    ));
 
     Ok((streaming_service_client, streaming_service_runtime))
 }
@@ -268,7 +270,7 @@ fn setup_state_sync_storage_service(
         StorageServiceNetworkEvents::new(network_service_events),
         storage_service_listener,
     );
-    storage_service_runtime.spawn(service.start());
+    storage_service_runtime.spawn(tokio::task::unconstrained(service.start()));
 
     Ok(storage_service_runtime)
 }

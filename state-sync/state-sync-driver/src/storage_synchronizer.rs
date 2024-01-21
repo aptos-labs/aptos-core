@@ -1171,6 +1171,7 @@ fn spawn(
     runtime: Option<Handle>,
     future: impl Future<Output = ()> + Send + 'static,
 ) -> JoinHandle<()> {
+    let future = tokio::task::unconstrained(future);
     if let Some(runtime) = runtime {
         runtime.spawn(future)
     } else {

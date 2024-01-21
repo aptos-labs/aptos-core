@@ -178,10 +178,11 @@ impl DriverFactory {
         );
 
         // Spawn the driver
+        let start_driver = tokio::task::unconstrained(state_sync_driver.start_driver());
         if let Some(driver_runtime) = &driver_runtime {
-            driver_runtime.spawn(state_sync_driver.start_driver());
+            driver_runtime.spawn(start_driver);
         } else {
-            tokio::spawn(state_sync_driver.start_driver());
+            tokio::spawn(start_driver);
         }
 
         // Create the driver factory
