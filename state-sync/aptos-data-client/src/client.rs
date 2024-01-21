@@ -17,7 +17,7 @@ use crate::{
     poller::DataSummaryPoller,
     priority,
     priority::PeerPriority,
-    utils, DATA_CLIENT_THREAD_POOL,
+    utils,
 };
 use aptos_config::{
     config::{AptosDataClientConfig, BaseConfig},
@@ -737,7 +737,8 @@ impl AptosDataClient {
         }
 
         // Try to convert the storage service enum into the exact variant we're expecting.
-        // We use a rayon thread because it involves serde and compression.
+        // We use a rayon thread because it involves serde and compression.-
+        /*
         let (send, recv) = tokio::sync::oneshot::channel();
         DATA_CLIENT_THREAD_POOL.install(move || {
             let result = match T::try_from(storage_response) {
@@ -759,6 +760,21 @@ impl AptosDataClient {
             let _ = send.send(result);
         });
         recv.await.unwrap()
+         */
+        tokio::task::spawn_blocking(move || {
+            match T::try_from(storage_response) {
+                Ok(new_payload) => Ok(Response::new(context, new_payload)),
+                // If the variant doesn't match what we're expecting, report the issue
+                Err(err) => {
+                    context
+                        .response_callback
+                        .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                    Err(err.into())
+                },
+            }
+        })
+        .await
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
     }
 
     /// Sends a request to a specific peer
