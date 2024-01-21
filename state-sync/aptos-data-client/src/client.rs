@@ -646,11 +646,11 @@ impl AptosDataClient {
             // Send the request to the peer
             let aptos_data_client = self.clone();
             let request = request.clone();
-            let sent_request = tokio::spawn(tokio::task::unconstrained(async move {
+            let sent_request = tokio::spawn(async move {
                 aptos_data_client
                     .send_request_to_peer_and_decode(peer, request, request_timeout_ms)
                     .await
-            }));
+            });
             let abort_handle = sent_request.abort_handle();
 
             // Gather the tasks and abort handles
@@ -763,7 +763,13 @@ impl AptosDataClient {
          */
         tokio::task::spawn_blocking(move || {
             match T::try_from(storage_response) {
-                Ok(new_payload) => Ok(Response::new(context, new_payload)),
+                Ok(new_payload) => {
+                    // Set the transformation time on the response context
+                    context.set_transformation_time();
+
+                    // Create and return the response
+                    Ok(Response::new(context, new_payload))
+                },
                 // If the variant doesn't match what we're expecting, report the issue
                 Err(err) => {
                     context
