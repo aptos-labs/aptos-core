@@ -778,7 +778,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             if let Some(receive_time) = response_context.receive_time {
                 metrics::observe_duration(
                     &metrics::DATA_NOTIFICATION_SEND_LATENCY,
-                    &("receive".to_string() + data_client_request.get_label()),
+                    &("receive_".to_string() + data_client_request.get_label()),
                     receive_time,
                 );
             }

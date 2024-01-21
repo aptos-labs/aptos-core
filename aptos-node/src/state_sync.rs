@@ -270,7 +270,7 @@ fn setup_state_sync_storage_service(
         StorageServiceNetworkEvents::new(network_service_events),
         storage_service_listener,
     );
-    storage_service_runtime.spawn(service.start());
+    storage_service_runtime.spawn(tokio::task::unconstrained(service.start()));
 
     Ok(storage_service_runtime)
 }
