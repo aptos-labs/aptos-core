@@ -837,24 +837,24 @@ impl RoundManager {
     /// 3. Once the QC/TC successfully formed, notify the RoundState.
     pub async fn process_vote_msg(&mut self, vote_msg: VoteMsg) -> anyhow::Result<()> {
         // Check whether this validator is a valid recipient of the vote.
-        let x = monitor!(
-            "process_vote_msg_sync",
-            self.ensure_round_and_sync_up(
-                vote_msg.vote().vote_data().proposed().round(),
-                vote_msg.sync_info(),
-                vote_msg.vote().author(),
-            )
-            .await
-            .context("[RoundManager] Stop processing vote")?
-        );
-        if x {
+        // let x = monitor!(
+        //     "process_vote_msg_sync",
+        //     self.ensure_round_and_sync_up(
+        //         vote_msg.vote().vote_data().proposed().round(),
+        //         vote_msg.sync_info(),
+        //         vote_msg.vote().author(),
+        //     )
+        //     .await
+        //     .context("[RoundManager] Stop processing vote")?
+        // );
+       // if x {
             monitor!(
                 "process_vote_msg",
                 self.process_vote(vote_msg.vote())
                     .await
                     .context("[RoundManager] Add a new vote")?
             );
-        }
+        //}
         Ok(())
     }
 
