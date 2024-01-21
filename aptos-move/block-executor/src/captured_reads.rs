@@ -54,7 +54,7 @@ pub(crate) enum ReadKind {
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""), PartialEq(bound = ""))]
 pub(crate) enum DataRead<V> {
-    // Version supercedes V comparison.
+    // Version supersedes V comparison.
     Versioned(
         Version,
         // Currently, we are conservative and check the version for equality
@@ -199,7 +199,7 @@ pub enum DelayedFieldRead {
     // are all valid and produce the same outcome.
     // Only boolean outcomes of "try_add_delta" operations have been returned to the caller,
     // and so we need to respect that those return the same outcome when doing the validation.
-    // Running inner_aggregator_value is kept only for internal bookeeping - and is used to
+    // Running inner_aggregator_value is kept only for internal bookkeeping - and is used to
     // as a value against which results are computed, but is not checked for read validation.
     // Only aggregators can be in the HistoryBounded state.
     HistoryBounded {

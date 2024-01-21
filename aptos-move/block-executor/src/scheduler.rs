@@ -592,7 +592,7 @@ impl Scheduler {
     /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
     /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.
     pub fn halt(&self) -> bool {
-        // The first thread that sets done_marker to be true will be reponsible for
+        // The first thread that sets done_marker to be true will be responsible for
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function halt_transaction_execution().
         if !self.done_marker.swap(true, Ordering::SeqCst) {
