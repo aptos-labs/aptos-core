@@ -105,7 +105,7 @@ pub enum SchedulerTask {
 /// just notify the suspended execution via the dependency condition variable.
 ///
 /// 'Executing' status of an incarnation turns into 'Executed' if the execution task finishes, or
-/// if a dependency is encountered, it becomes 'Ready(incarnation + 1)' once the
+/// if a dependency is encountered, it becomes 'Ready(incarnation)' once the
 /// dependency is resolved. An 'Executed' status allows creation of validation tasks for the
 /// corresponding incarnation, and a validation failure leads to an abort. The scheduler ensures
 /// that there is exactly one abort, changing the status to 'Aborting' in the process. Once the
@@ -875,8 +875,7 @@ impl Scheduler {
         }
     }
 
-    /// When a dependency is resolved, mark the transaction as Ready with an
-    /// incremented incarnation number.
+    /// When a dependency is resolved, mark the transaction as Ready.
     /// The caller must ensure that the transaction is in the Suspended state.
     fn resume(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
