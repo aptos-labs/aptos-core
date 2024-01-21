@@ -988,21 +988,23 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
-            (9, 1.5, 3., 4.),
-            (95, 1.5, 3., 4.),
-            (950, 2., 3., 4.),
-            (2750, 2.5, 3.5, 4.5),
-            (4600, 3., 4., 5.),
+            (9, 1.5, 3., 4., 0),
+            (95, 1.5, 3., 4., 0),
+            (950, 2., 3., 4., 0),
+            (2750, 2.5, 3.5, 4.5, 0),
+            (4600, 3., 4., 5., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
-        .map(|(min_tps, max_lat_p50, max_lat_p90, max_lat_p99)| {
-            SuccessCriteria::new(min_tps)
-                .add_max_expired_tps(0)
-                .add_max_failed_submission_tps(0)
-                .add_latency_threshold(max_lat_p50, LatencyType::P50)
-                .add_latency_threshold(max_lat_p90, LatencyType::P90)
-                .add_latency_threshold(max_lat_p99, LatencyType::P99)
-        })
+        .map(
+            |(min_tps, max_lat_p50, max_lat_p90, max_lat_p99, max_expired_tps)| {
+                SuccessCriteria::new(min_tps)
+                    .add_max_expired_tps(max_expired_tps)
+                    .add_max_failed_submission_tps(0)
+                    .add_latency_threshold(max_lat_p50, LatencyType::P50)
+                    .add_latency_threshold(max_lat_p90, LatencyType::P90)
+                    .add_latency_threshold(max_lat_p99, LatencyType::P99)
+            },
+        )
         .collect(),
     })
 }
@@ -1033,7 +1035,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
                 transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
                 num_modules: 1,
                 unique_senders: true,
-                mempool_backlog: 10000,
+                mempool_backlog: 30000,
             },
             // transactions get rejected, to fix.
             // TransactionWorkload {
@@ -1045,17 +1047,24 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         ]),
         // Investigate/improve to make latency more predictable on different workloads
         criteria: [
-            (5500, 0.35, 0.3, 0.8, 0.65),
-            (4500, 0.35, 0.3, 1.0, 1.0),
-            (2000, 0.35, 0.3, 1.0, 1.0),
-            (600, 0.35, 0.3, 1.0, 1.0),
+            (5500, 100, 0.3, 0.3, 0.8, 0.65),
+            (4500, 100, 0.3, 0.4, 1.0, 2.0),
+            (2000, 300, 0.3, 0.3, 0.8, 2.0),
+            (600, 500, 0.3, 0.3, 0.8, 2.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
         .into_iter()
         .map(
-            |(min_tps, batch_to_pos, pos_to_proposal, proposal_to_ordered, ordered_to_commit)| {
+            |(
+                min_tps,
+                max_expired,
+                batch_to_pos,
+                pos_to_proposal,
+                proposal_to_ordered,
+                ordered_to_commit,
+            )| {
                 SuccessCriteria::new(min_tps)
-                    .add_max_expired_tps(200)
+                    .add_max_expired_tps(max_expired)
                     .add_max_failed_submission_tps(200)
                     .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_strict(vec![
                         (LatencyBreakdownSlice::QsBatchToPos, batch_to_pos),
@@ -1844,6 +1853,9 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             mempool_backlog: 500_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+            optimize_state_sync_for_throughput(config);
+
             // consensus and quorum store configs copied from the consensus-only suite
             optimize_for_maximum_throughput(config);
 
@@ -1888,6 +1900,9 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         forge_config = forge_config
             .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+                // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
+                optimize_state_sync_for_throughput(config);
+
                 // Experimental storage optimizations
                 config.storage.rocksdb_configs.enable_storage_sharding = true;
 
@@ -1936,6 +1951,24 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     }
 
     forge_config
+}
+
+/// Optimizes the state sync configs for throughput
+fn optimize_state_sync_for_throughput(node_config: &mut NodeConfig) {
+    let max_chunk_size = 15_000; // This allows state sync to match consensus block sizes
+    let max_chunk_bytes = 40 * 1024 * 1024; // 10x the current limit (to prevent execution fallback)
+
+    // Update the chunk sizes for the data client
+    let data_client_config = &mut node_config.state_sync.aptos_data_client;
+    data_client_config.max_transaction_chunk_size = max_chunk_size;
+    data_client_config.max_transaction_output_chunk_size = max_chunk_size;
+    // Update the chunk sizes for the storage service
+    let storage_service_config = &mut node_config.state_sync.storage_service;
+    storage_service_config.max_transaction_chunk_size = max_chunk_size;
+    storage_service_config.max_transaction_output_chunk_size = max_chunk_size;
+
+    // Update the chunk bytes for the storage service
+    storage_service_config.max_network_chunk_bytes = max_chunk_bytes;
 }
 
 fn pre_release_suite() -> ForgeConfig {
@@ -2065,7 +2098,7 @@ fn changing_working_quorum_test_helper(
                         // number of down nodes is close to the quorum limit, so
                         // make a check a bit looser, as state sync might be required
                         // to get the quorum back.
-                        30.0
+                        40.0
                     },
                     max_round_gap: 6,
                 }),

@@ -10,7 +10,6 @@ mod transaction_pruner;
 mod write_set_pruner;
 
 use crate::{
-    event_store::EventStore,
     ledger_db::LedgerDb,
     metrics::PRUNER_VERSIONS,
     pruner::{
@@ -25,9 +24,10 @@ use crate::{
     },
     transaction_store::TransactionStore,
 };
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use rayon::prelude::*;
 use std::{
@@ -128,8 +128,7 @@ impl LedgerPruner {
         let transaction_store = Arc::new(TransactionStore::new(Arc::clone(&ledger_db)));
 
         let event_store_pruner = Box::new(EventStorePruner::new(
-            Arc::new(EventStore::new(ledger_db.event_db_arc())),
-            ledger_db.event_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
@@ -144,7 +143,7 @@ impl LedgerPruner {
         )?);
         let transaction_pruner = Box::new(TransactionPruner::new(
             Arc::clone(&transaction_store),
-            ledger_db.transaction_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let write_set_pruner = Box::new(WriteSetPruner::new(

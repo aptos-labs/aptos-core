@@ -4,7 +4,7 @@
 use crate::{assert_success, harness::MoveHarness, BlockSplit};
 use aptos_language_e2e_tests::{
     account::Account,
-    executor::{ExecutorMode, FakeExecutor},
+    executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
 };
 use aptos_types::{
     account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::SignedTransaction,
@@ -21,10 +21,50 @@ pub fn initialize(
     aggregator_execution_enabled: bool,
     txns: usize,
 ) -> AggV2TestHarness {
-    // Aggregator tests should use parallel execution.
+    let (harness, account) = initialize_harness(mode, aggregator_execution_enabled, path);
+
+    let mut result = AggV2TestHarness {
+        harness,
+        comparison_harnesses: vec![],
+        account,
+        txn_accounts: vec![],
+        txn_index: 0,
+    };
+
+    result.initialize_issuer_accounts(txns);
+    result
+}
+
+pub fn initialize_enabled_disabled_comparison(
+    path: PathBuf,
+    mode: ExecutorMode,
+    txns: usize,
+) -> AggV2TestHarness {
+    let (harness_base, account_base) = initialize_harness(mode, false, path.clone());
+    let (harness_comp, _account_comp) = initialize_harness(mode, true, path);
+
+    let mut agg_harness = AggV2TestHarness {
+        harness: harness_base,
+        comparison_harnesses: vec![harness_comp],
+        account: account_base,
+        txn_accounts: vec![],
+        txn_index: 0,
+    };
+
+    agg_harness.initialize_issuer_accounts(txns);
+    agg_harness
+}
+
+fn initialize_harness(
+    mode: ExecutorMode,
+    aggregator_execution_enabled: bool,
+    path: PathBuf,
+) -> (MoveHarness, Account) {
     let executor = FakeExecutor::from_head_genesis().set_executor_mode(mode);
 
     let mut harness = MoveHarness::new_with_executor(executor);
+    // Reduce gas scaling, so that smaller differences in gas are caught in comparison testing.
+    harness.modify_gas_scaling(1000);
     if aggregator_execution_enabled {
         harness.enable_features(
             vec![
@@ -42,18 +82,7 @@ pub fn initialize(
     }
     let account = harness.new_account_at(AccountAddress::ONE);
     assert_success!(harness.publish_package_cache_building(&account, &path));
-
-    let txn_accounts: Vec<Account> = (0..txns)
-        .map(|_i| harness.new_account_with_key_pair())
-        .collect();
-
-    AggV2TestHarness {
-        harness,
-        comparison_harnesses: vec![],
-        account,
-        txn_accounts,
-        txn_index: 0,
-    }
+    (harness, account)
 }
 
 pub struct AggV2TestHarness {
@@ -140,8 +169,40 @@ impl AggV2TestHarness {
         block_split: BlockSplit,
         txn_block: Vec<(u64, SignedTransaction)>,
     ) {
-        self.harness
-            .run_block_in_parts_and_check(block_split, txn_block);
+        let result = self
+            .harness
+            .run_block_in_parts_and_check(block_split, txn_block.clone());
+
+        for (idx, h) in self.comparison_harnesses.iter_mut().enumerate() {
+            let new_result = h.run_block_in_parts_and_check(block_split, txn_block.clone());
+            assert_outputs_equal(
+                &result,
+                "baseline",
+                &new_result,
+                &format!("comparison {}", idx),
+            );
+        }
+    }
+
+    pub fn initialize_issuer_accounts(&mut self, num_accounts: usize) {
+        self.txn_accounts = (0..num_accounts)
+            .map(|_i| self.new_account_with_key_pair())
+            .collect();
+    }
+
+    pub fn new_account_with_key_pair(&mut self) -> Account {
+        let acc = Account::new();
+        let seq_num = 0;
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let balance = 1_000_000_000_000_000;
+
+        let result = self.harness.store_and_fund_account(&acc, balance, seq_num);
+
+        for h in self.comparison_harnesses.iter_mut() {
+            h.store_and_fund_account(&acc, balance, seq_num);
+        }
+
+        result
     }
 
     pub fn init(

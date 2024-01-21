@@ -35,7 +35,7 @@ use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_notifications::StorageServiceNotificationSender;
 use aptos_time_service::{TimeService, TimeServiceTrait};
-use aptos_types::waypoint::Waypoint;
+use aptos_types::{contract_event::ContractEvent, waypoint::Waypoint};
 use futures::StreamExt;
 use std::{sync::Arc, time::Instant};
 use tokio::{
@@ -299,7 +299,7 @@ impl<
             LogSchema::new(LogEntry::ConsensusNotification).message(&format!(
                 "Received a consensus commit notification! Total transactions: {:?}, events: {:?}",
                 consensus_commit_notification.transactions.len(),
-                consensus_commit_notification.reconfiguration_events.len()
+                consensus_commit_notification.subscribable_events.len()
             ))
         );
         self.update_consensus_commit_metrics(&consensus_commit_notification);
@@ -308,7 +308,7 @@ impl<
 
         // Handle the commit notification
         let committed_transactions = CommittedTransactions {
-            events: consensus_commit_notification.reconfiguration_events.clone(),
+            events: consensus_commit_notification.subscribable_events.clone(),
             transactions: consensus_commit_notification.transactions.clone(),
         };
         utils::handle_committed_transactions(
@@ -356,9 +356,10 @@ impl<
         }
 
         // Update the synced epoch
-        if !consensus_commit_notification
-            .reconfiguration_events
-            .is_empty()
+        if consensus_commit_notification
+            .subscribable_events
+            .iter()
+            .any(ContractEvent::is_new_epoch_event)
         {
             utils::update_new_epoch_metrics();
         }

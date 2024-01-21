@@ -4,17 +4,18 @@
 
 #![forbid(unsafe_code)]
 
-use anyhow::Result;
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, TStateView,
     },
 };
 use bytes::Bytes;
 use move_core_types::language_storage::ModuleId;
 use std::collections::HashMap;
+
+type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
 // `StateView` has no data given we are creating the genesis
 pub(crate) struct GenesisStateView {

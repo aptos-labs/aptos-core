@@ -15,15 +15,19 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
+use crate::network::ApplicationNetworkInterfaces;
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, IdentityBlob, NodeConfig, PersistableConfig};
+use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
+use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::{chain_id::ChainId, validator_txn::pool::ValidatorTransactionPool};
+use aptos_types::chain_id::ChainId;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
@@ -185,9 +189,11 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
+    _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
+    _jwk_consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
     _peer_monitoring_service_runtime: Runtime,
@@ -586,6 +592,8 @@ pub fn setup_environment_and_start_node(
         mut event_subscription_service,
         mempool_reconfig_subscription,
         consensus_reconfig_subscription,
+        dkg_subscriptions,
+        jwk_consensus_subscriptions,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
     // Set up the networks and gather the application network handles
@@ -593,6 +601,8 @@ pub fn setup_environment_and_start_node(
     let (
         network_runtimes,
         consensus_network_interfaces,
+        dkg_network_interfaces,
+        jwk_consensus_network_interfaces,
         mempool_network_interfaces,
         peer_monitoring_service_network_interfaces,
         storage_service_network_interfaces,
@@ -647,8 +657,57 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
+    let vtxn_pool = VTxnPoolState::default();
+    let identity_blob: Option<Arc<IdentityBlob>> = node_config
+        .consensus
+        .safety_rules
+        .initial_safety_rules_config
+        .identity_blob()
+        .ok()
+        .map(Arc::new);
 
-    let validator_txn_pool = Arc::new(ValidatorTransactionPool::new());
+    let dkg_runtime = match (dkg_network_interfaces, identity_blob.clone()) {
+        (Some(interfaces), Some(identity_blob)) => {
+            let ApplicationNetworkInterfaces {
+                network_client,
+                network_service_events,
+            } = interfaces;
+            let (reconfig_events, dkg_start_events) = dkg_subscriptions
+                .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
+            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let dkg_runtime = start_dkg_runtime(
+                my_addr,
+                identity_blob,
+                network_client,
+                network_service_events,
+                reconfig_events,
+                dkg_start_events,
+                vtxn_pool.clone(),
+            );
+            Some(dkg_runtime)
+        },
+        _ => None,
+    };
+
+    let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {
+        let ApplicationNetworkInterfaces {
+            network_client,
+            network_service_events,
+        } = obj;
+        let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
+            "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
+        );
+        let jwk_consensus_runtime = start_jwk_consensus_runtime(
+            network_client,
+            network_service_events,
+            vtxn_pool.clone(),
+            reconfig_events,
+            onchain_jwk_updated_events,
+        );
+        Some(jwk_consensus_runtime)
+    } else {
+        None
+    };
 
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
@@ -665,7 +724,7 @@ pub fn setup_environment_and_start_node(
             consensus_network_interfaces,
             consensus_notifier,
             consensus_to_mempool_sender,
-            validator_txn_pool,
+            vtxn_pool,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime
@@ -676,9 +735,11 @@ pub fn setup_environment_and_start_node(
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
+        _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
+        _jwk_consensus_runtime: jwk_consensus_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,

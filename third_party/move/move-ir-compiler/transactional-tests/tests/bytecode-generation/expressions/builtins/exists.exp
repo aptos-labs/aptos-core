@@ -7,7 +7,7 @@ struct T has key {
 	b: bool
 }
 
-f() {
+f() /* def_idx: 0 */ {
 L0:	loc0: bool
 B0:
 	0: LdU64(4)

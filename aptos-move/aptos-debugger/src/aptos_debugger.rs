@@ -8,11 +8,11 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEAT
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_resource_viewer::{AnnotatedAccountStateBlob, AptosValueAnnotator};
 use aptos_rest_client::Client;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder},
+    state_store::TStateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         Transaction, TransactionInfo, TransactionOutput, TransactionPayload, Version,
@@ -224,6 +224,24 @@ impl AptosDebugger {
         self.debugger
             .get_version_by_account_sequence(account, seq)
             .await
+    }
+
+    pub async fn get_committed_transaction_at_version(
+        &self,
+        version: Version,
+    ) -> Result<(Transaction, TransactionInfo)> {
+        let (mut txns, mut info) = self.debugger.get_committed_transactions(version, 1).await?;
+
+        let txn = txns.pop().expect("there must be exactly 1 txn in the vec");
+        let info = info
+            .pop()
+            .expect("there must be exactly 1 txn info in the vec");
+
+        Ok((txn, info))
+    }
+
+    pub fn state_view_at_version(&self, version: Version) -> DebuggerStateView {
+        DebuggerStateView::new(self.debugger.clone(), version)
     }
 
     pub fn run_session_at_version<F>(&self, version: Version, f: F) -> Result<VMChangeSet>

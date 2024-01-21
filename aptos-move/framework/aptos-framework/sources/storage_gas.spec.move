@@ -1,36 +1,4 @@
 spec aptos_framework::storage_gas {
-    /// <high-level-req>
-    /// No.: 1
-    /// Property: The module's initialization guarantees the creation of the StorageGasConfig resource with a precise
-    /// configuration, including accurate gas curves for per-item and per-byte operations.
-    /// Criticality: Medium
-    /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
-    /// the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its
-    /// existence within the module's context, and (2) the configuration of the StorageGasConfig resource includes the
-    /// precise gas curves that define the behavior of per-item and per-byte operations.
-    /// Enforcement: Formally verified via [high-level-req-1](initialize). Moreover, the native gas logic has been manually audited.
-    ///
-    /// No.: 2
-    /// Property: The gas curve approximates an exponential curve based on a minimum and maximum gas charge.
-    /// Criticality: High
-    /// Implementation: The validate_points function ensures that the provided vector of points represents a
-    /// monotonically non-decreasing curve.
-    /// Enforcement: Formally verified via [high-level-req-2](validate_points). Moreover, the configuration logic has been manually audited.
-    ///
-    /// No.: 3
-    /// Property: The initialized gas curve structure has values set according to the provided parameters.
-    /// Criticality: Low
-    /// Implementation: The new_gas_curve function initializes the GasCurve structure with values provided as parameters.
-    /// Enforcement: Formally verified via [high-level-req-3](new_gas_curve).
-    ///
-    /// No.: 4
-    /// Property: The initialized usage gas configuration structure has values set according to the provided parameters.
-    /// Criticality: Low
-    /// Implementation: The new_usage_gas_config function initializes the UsageGasConfig structure with values provided
-    /// as parameters.
-    /// Enforcement: Formally verified via [high-level-req-4](new_usage_gas_config).
-    /// </high-level-req>
-    ///
     // -----------------
     // Struct invariants
     // -----------------
@@ -41,8 +9,12 @@ spec aptos_framework::storage_gas {
     }
 
     spec GasCurve {
+        /// Invariant 1: The minimum gas charge does not exceed the maximum gas charge.
         invariant min_gas <= max_gas;
+        /// Invariant 2: The maximum gas charge is capped by MAX_U64 scaled down by the basis point denomination.
         invariant max_gas <= MAX_U64 / BASIS_POINT_DENOMINATION;
+        /// Invariant 3: The x-coordinate increases monotonically and the y-coordinate increasing strictly monotonically,
+        /// that is, the gas-curve is a monotonically increasing function.
         invariant (len(points) > 0 ==> points[0].x > 0)
             && (len(points) > 0 ==> points[len(points) - 1].x < BASIS_POINT_DENOMINATION)
             && (forall i in 0..len(points) - 1: (points[i].x < points[i + 1].x && points[i].y <= points[i + 1].y));
@@ -57,7 +29,38 @@ spec aptos_framework::storage_gas {
     // -----------------
     // Global invariants
     // -----------------
-
+    /// <high-level-req>
+    /// No.: 1
+    /// Requirement: The module's initialization guarantees the creation of the StorageGasConfig resource with a precise
+    /// configuration, including accurate gas curves for per-item and per-byte operations.
+    /// Criticality: Medium
+    /// Implementation: The initialize function is responsible for setting up the initial state of the module, ensuring
+    /// the fulfillment of the following conditions: (1) the creation of the StorageGasConfig resource, indicating its
+    /// existence witqhin the module's context, and (2) the configuration of the StorageGasConfig resource includes the
+    /// precise gas curves that define the behavior of per-item and per-byte operations.
+    /// Enforcement: Formally verified via [high-level-req-1](initialize). Moreover, the native gas logic has been manually audited.
+    ///
+    /// No.: 2
+    /// Requirement: The gas curve approximates an exponential curve based on a minimum and maximum gas charge.
+    /// Criticality: High
+    /// Implementation: The validate_points function ensures that the provided vector of points represents a
+    /// monotonically non-decreasing curve.
+    /// Enforcement: Formally verified via [high-level-req-2](validate_points). Moreover, the configuration logic has been manually audited.
+    ///
+    /// No.: 3
+    /// Requirement: The initialized gas curve structure has values set according to the provided parameters.
+    /// Criticality: Low
+    /// Implementation: The new_gas_curve function initializes the GasCurve structure with values provided as parameters.
+    /// Enforcement: Formally verified via [high-level-req-3](new_gas_curve).
+    ///
+    /// No.: 4
+    /// Requirement: The initialized usage gas configuration structure has values set according to the provided parameters.
+    /// Criticality: Low
+    /// Implementation: The new_usage_gas_config function initializes the UsageGasConfig structure with values provided
+    /// as parameters.
+    /// Enforcement: Formally verified via [high-level-req-4](new_usage_gas_config).
+    /// </high-level-req>
+    ///
     spec module {
         use aptos_framework::chain_status;
         pragma verify = true;

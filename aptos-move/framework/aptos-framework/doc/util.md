@@ -11,6 +11,7 @@ Utility functions used by the framework modules.
 -  [Specification](#@Specification_0)
     -  [Function `from_bytes`](#@Specification_0_from_bytes)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `address_from_bytes`](#@Specification_0_address_from_bytes)
 
 
@@ -92,7 +93,7 @@ owned.
 
 <table>
 <tr>
-<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
 </tr>
 
 <tr>
@@ -106,6 +107,11 @@ owned.
 </table>
 
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> opaque;
@@ -135,7 +141,7 @@ owned.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> [abstract] len(bytes) != 32;
 </code></pre>
 

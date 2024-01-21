@@ -15,7 +15,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -27,10 +27,11 @@ use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
+#[cfg(any(test, feature = "testing"))]
+use aptos_types::state_store::StateViewId;
 use aptos_types::{
     account_config,
-    account_config::new_block_event_key,
+    account_config::{new_block_event_key, AccountResource},
     block_executor::{
         config::{BlockExecutorConfig, BlockExecutorConfigFromOnchain, BlockExecutorLocalConfig},
         partitioner::PartitionedTransactions,
@@ -42,8 +43,9 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
+    state_store::StateView,
     transaction::{
-        authenticator::{AccountAuthenticator, AnySignature, TransactionAuthenticator},
+        authenticator::AnySignature,
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
@@ -56,6 +58,7 @@ use aptos_types::{
     },
     validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -72,7 +75,7 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
     CompiledModule, IndexKind,
 };
@@ -81,6 +84,7 @@ use move_core_types::{
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
+    move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
@@ -314,7 +318,7 @@ impl AptosVM {
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
     #[cfg(any(test, feature = "testing"))]
     pub fn gas_params(&self) -> Result<&AptosGasParameters, VMStatus> {
-        let log_context = AdapterLogSchema::new(aptos_state_view::StateViewId::Miscellaneous, 0);
+        let log_context = AdapterLogSchema::new(StateViewId::Miscellaneous, 0);
         get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 
@@ -480,7 +484,10 @@ impl AptosVM {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
 
-        if is_account_init_for_sponsored_transaction(txn_data, &self.features) {
+        let is_account_init_for_sponsored_transaction =
+            is_account_init_for_sponsored_transaction(txn_data, &self.features, resolver)?;
+
+        if is_account_init_for_sponsored_transaction {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
             let status = self.inject_abort_info_if_available(status);
 
@@ -1379,6 +1386,8 @@ impl AptosVM {
             ));
         }
 
+        zkid_validation::validate_zkid_authenticators(transaction, resolver, session, log_context)?;
+
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -1470,7 +1479,17 @@ impl AptosVM {
             session = self.new_session(resolver, SessionId::txn_meta(&txn_data));
         }
 
-        if is_account_init_for_sponsored_transaction(&txn_data, &self.features) {
+        let is_account_init_for_sponsored_transaction =
+            match is_account_init_for_sponsored_transaction(&txn_data, &self.features, resolver) {
+                Ok(result) => result,
+                Err(err) => {
+                    let vm_status = err.into_vm_status();
+                    let discarded_output = discarded_output(vm_status.status_code());
+                    return (vm_status, discarded_output);
+                },
+            };
+
+        if is_account_init_for_sponsored_transaction {
             if let Err(err) =
                 create_account_if_does_not_exist(&mut session, gas_meter, txn.sender())
             {
@@ -1616,7 +1635,8 @@ impl AptosVM {
                 change_set.clone(),
                 &change_set_configs,
                 resolver.is_delayed_field_optimization_capable(),
-            ),
+            )
+            .map_err(|e| e.into_vm_status()),
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -1651,7 +1671,7 @@ impl AptosVM {
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
         change_set: &VMChangeSet,
-    ) -> Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         assert!(
             change_set.aggregator_v1_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
@@ -1660,19 +1680,17 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for state_key in change_set.module_write_set().keys() {
-            executor_view
-                .get_module_state_value(state_key)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            executor_view.get_module_state_value(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
-            executor_view
-                .get_resource_state_value(state_key, None)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            executor_view.get_resource_state_value(state_key, None)?;
             if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
                 for (tag, (_, maybe_layout)) in group_write.inner_ops() {
-                    resource_group_view
-                        .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
-                        .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+                    resource_group_view.get_resource_from_group(
+                        state_key,
+                        tag,
+                        maybe_layout.as_deref(),
+                    )?;
                 }
             }
         }
@@ -1723,7 +1741,8 @@ impl AptosVM {
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
             &change_set,
-        )?;
+        )
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -1975,9 +1994,6 @@ impl AptosVM {
                             },
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
-                        // Ignore Storage Error as currently it sometimes wraps speculative errors
-                        // TODO[agg_v2](fix) propagate SPECULATIVE_EXECUTION_ABORT_ERROR correctly, and remove storage from valid errors here.
-                        StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.
@@ -2094,40 +2110,6 @@ impl VMExecutor for AptosVM {
     }
 }
 
-/// Check if account authenticator matches WebAuthn `AccountAuthenticator`
-fn matches_webauthn_authenticator(account_authenticator: &AccountAuthenticator) -> bool {
-    // exhaustive check AccountAuthenticator in case variants are added later
-    match account_authenticator {
-        AccountAuthenticator::Ed25519 { .. } | AccountAuthenticator::MultiEd25519 { .. } => {},
-        AccountAuthenticator::SingleKey { authenticator } => {
-            let signature = authenticator.signature();
-            if matches!(signature, AnySignature::WebAuthn { .. }) {
-                return true;
-            }
-        },
-        AccountAuthenticator::MultiKey { authenticator } => {
-            let signatures = authenticator.signatures();
-            for (.., signature) in signatures {
-                if matches!(signature, AnySignature::WebAuthn { .. }) {
-                    return true;
-                }
-            }
-        },
-    }
-    false
-}
-
-/// Check if account authenticators includes one or more WebAuthn AccountAuthenticator
-fn includes_webauthn_authenticator(account_authenticators: &Vec<AccountAuthenticator>) -> bool {
-    for account_authenticator in account_authenticators {
-        // immediately return if true
-        if matches_webauthn_authenticator(account_authenticator) {
-            return true;
-        }
-    }
-    false
-}
-
 // VMValidator external API
 impl VMValidator for AptosVM {
     /// Determine if a transaction is valid. Will return `None` if the transaction is accepted,
@@ -2159,42 +2141,38 @@ impl VMValidator for AptosVM {
         }
 
         if !self.features.is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
-            // exhaustive check TransactionAuthenticator in case variants are added later
-            match transaction.authenticator_ref() {
-                TransactionAuthenticator::Ed25519 { .. }
-                | TransactionAuthenticator::MultiEd25519 { .. } => {},
-                TransactionAuthenticator::MultiAgent {
-                    sender,
-                    secondary_signers,
-                    ..
-                } => {
-                    let is_webauthn = matches_webauthn_authenticator(sender)
-                        || includes_webauthn_authenticator(secondary_signers);
-                    if is_webauthn {
+            if let Ok(sk_authenticators) = transaction
+                .authenticator_ref()
+                .to_single_key_authenticators()
+            {
+                for authenticator in sk_authenticators {
+                    if let AnySignature::WebAuthn { .. } = authenticator.signature() {
                         return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
                     }
-                },
-                TransactionAuthenticator::FeePayer {
-                    sender,
-                    secondary_signers,
-                    fee_payer_signer,
-                    ..
-                } => {
-                    let is_webauthn = matches_webauthn_authenticator(sender)
-                        || includes_webauthn_authenticator(secondary_signers)
-                        || matches_webauthn_authenticator(fee_payer_signer);
-                    if is_webauthn {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                },
-                TransactionAuthenticator::SingleSender { sender } => {
-                    let is_webauthn = matches_webauthn_authenticator(sender);
-                    if is_webauthn {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                },
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
+
+        if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
+            if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                    if !self.features.is_open_id_signature_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            };
+        };
 
         let txn = match transaction.check_signature() {
             Ok(t) => t,
@@ -2284,13 +2262,30 @@ fn create_account_if_does_not_exist(
         .map(|_return_vals| ())
 }
 
+/// Signals that the transaction should trigger the flow for creating an account as part of a
+/// sponsored transaction. This occurs when:
+/// * The feature gate is enabled SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION
+/// * There is fee payer
+/// * The sequence number is 0
+/// * There is no account resource for the account
 pub(crate) fn is_account_init_for_sponsored_transaction(
     txn_data: &TransactionMetadata,
     features: &Features,
-) -> bool {
-    txn_data.fee_payer.is_some()
-        && txn_data.sequence_number == 0
-        && features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+    resolver: &impl AptosMoveResolver,
+) -> VMResult<bool> {
+    Ok(
+        features.is_enabled(FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION)
+            && txn_data.fee_payer.is_some()
+            && txn_data.sequence_number == 0
+            && resolver
+                .get_resource(&txn_data.sender(), &AccountResource::struct_tag())
+                .map(|data| data.is_none())
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("{}", e))
+                        .finish(Location::Undefined)
+                })?,
+    )
 }
 
 #[test]

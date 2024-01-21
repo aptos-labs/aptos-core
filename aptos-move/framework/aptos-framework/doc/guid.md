@@ -19,6 +19,7 @@ A module for generating globally unique identifiers
 -  [Function `eq_id`](#0x1_guid_eq_id)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `create`](#@Specification_1_create)
     -  [Function `create_id`](#@Specification_1_create_id)
     -  [Function `id`](#@Specification_1_id)
@@ -330,7 +331,7 @@ Return true if the GUID's ID is <code>id</code>
 
 <table>
 <tr>
-<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
 </tr>
 
 <tr>
@@ -369,6 +370,11 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
@@ -387,9 +393,9 @@ Return true if the GUID's ID is <code>id</code>
 
 
 <pre><code><b>aborts_if</b> creation_num_ref + 1 &gt; MAX_U64;
-// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>ensures</b> result.id.creation_num == <b>old</b>(creation_num_ref);
-// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> creation_num_ref == <b>old</b>(creation_num_ref) + 1;
 </code></pre>
 
@@ -406,7 +412,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.1" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -423,7 +429,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.2" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -440,7 +446,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.3" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -457,7 +463,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.4" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.4" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -474,7 +480,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.5" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.5" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -491,7 +497,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.6" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.6" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -508,7 +514,7 @@ Return true if the GUID's ID is <code>id</code>
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2.7" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2.7" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

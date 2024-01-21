@@ -5,12 +5,15 @@
 mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
+pub mod function_checker;
 pub mod inliner;
 mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    livevar_analysis_processor::LiveVarAnalysisProcessor,
+    ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+    explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
@@ -49,6 +52,10 @@ pub fn run_move_compiler(
     let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
+    function_checker::check_for_function_typed_parameters(&mut env);
+    function_checker::check_access_and_use(&mut env);
+    check_errors(&env, error_writer, "checking errors")?;
+
     if options.debug {
         eprintln!("After error check, GlobalEnv={}", env.dump_env());
     }
@@ -78,7 +85,12 @@ pub fn run_move_compiler(
                     .map(|f| f.to_string_lossy().as_ref().to_owned())
             })
             .unwrap_or_else(|| "dump".to_owned());
-        pipeline.run_with_dump(&env, &mut targets, &dump_base_name, options.debug)
+        pipeline.run_with_dump(
+            &env,
+            &mut targets,
+            &dump_base_name,
+            options.debug && options.dump_bytecode,
+        )
     } else {
         pipeline.run(&env, &mut targets)
     }
@@ -165,11 +177,40 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if safety_on {
         pipeline.add_processor(Box::new(VisibilityChecker()));
     }
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor()));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: true,
+    }));
+    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
-        pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+        // Ability checker is functionally not relevant so can be completely skipped if safety is off
+        pipeline.add_processor(Box::new(AbilityChecker {}));
     }
+    // The default optimization pipeline is currently always run by the compiler.
+    add_default_optimization_pipeline(&mut pipeline);
+    // Run live var analysis again because it could be invalidated by previous pipeline steps,
+    // but it is needed by file format generator.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
     pipeline
+}
+
+/// Add the default optimization pipeline to the given function target pipeline.
+///
+/// Any compiler errors or warnings should be reported before running this section, as we can
+/// potentially delete or change code through these optimizations.
+/// While this section of the pipeline is optional, some code that used to previously compile
+/// may no longer compile without this section because of using too many local (temp) variables.
+fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
+    // Available copies analysis is needed by copy propagation.
+    pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(CopyPropagation {}));
+    // Live var analysis is needed by dead store elimination.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+        with_copy_inference: false,
+    }));
+    pipeline.add_processor(Box::new(DeadStoreElimination {}));
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

@@ -364,6 +364,7 @@ impl serde::Serialize for any_public_key::Type {
             Self::Ed25519 => "TYPE_ED25519",
             Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
             Self::Secp256r1Ecdsa => "TYPE_SECP256R1_ECDSA",
+            Self::Zkid => "TYPE_ZKID",
         };
         serializer.serialize_str(variant)
     }
@@ -379,6 +380,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
             "TYPE_ED25519",
             "TYPE_SECP256K1_ECDSA",
             "TYPE_SECP256R1_ECDSA",
+            "TYPE_ZKID",
         ];
 
         struct GeneratedVisitor;
@@ -425,6 +427,7 @@ impl<'de> serde::Deserialize<'de> for any_public_key::Type {
                     "TYPE_ED25519" => Ok(any_public_key::Type::Ed25519),
                     "TYPE_SECP256K1_ECDSA" => Ok(any_public_key::Type::Secp256k1Ecdsa),
                     "TYPE_SECP256R1_ECDSA" => Ok(any_public_key::Type::Secp256r1Ecdsa),
+                    "TYPE_ZKID" => Ok(any_public_key::Type::Zkid),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -463,6 +466,9 @@ impl serde::Serialize for AnySignature {
                 any_signature::Signature::Webauthn(v) => {
                     struct_ser.serialize_field("webauthn", v)?;
                 }
+                any_signature::Signature::Zkid(v) => {
+                    struct_ser.serialize_field("zkid", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -480,6 +486,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
             "secp256k1_ecdsa",
             "secp256k1Ecdsa",
             "webauthn",
+            "zkid",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -488,6 +495,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
             Ed25519,
             Secp256k1Ecdsa,
             Webauthn,
+            Zkid,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -513,6 +521,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                             "ed25519" => Ok(GeneratedField::Ed25519),
                             "secp256k1Ecdsa" | "secp256k1_ecdsa" => Ok(GeneratedField::Secp256k1Ecdsa),
                             "webauthn" => Ok(GeneratedField::Webauthn),
+                            "zkid" => Ok(GeneratedField::Zkid),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -563,6 +572,13 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                             signature__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::Signature::Webauthn)
 ;
                         }
+                        GeneratedField::Zkid => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("zkid"));
+                            }
+                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::Signature::Zkid)
+;
+                        }
                     }
                 }
                 Ok(AnySignature {
@@ -585,6 +601,7 @@ impl serde::Serialize for any_signature::Type {
             Self::Ed25519 => "TYPE_ED25519",
             Self::Secp256k1Ecdsa => "TYPE_SECP256K1_ECDSA",
             Self::Webauthn => "TYPE_WEBAUTHN",
+            Self::Zkid => "TYPE_ZKID",
         };
         serializer.serialize_str(variant)
     }
@@ -600,6 +617,7 @@ impl<'de> serde::Deserialize<'de> for any_signature::Type {
             "TYPE_ED25519",
             "TYPE_SECP256K1_ECDSA",
             "TYPE_WEBAUTHN",
+            "TYPE_ZKID",
         ];
 
         struct GeneratedVisitor;
@@ -646,6 +664,7 @@ impl<'de> serde::Deserialize<'de> for any_signature::Type {
                     "TYPE_ED25519" => Ok(any_signature::Type::Ed25519),
                     "TYPE_SECP256K1_ECDSA" => Ok(any_signature::Type::Secp256k1Ecdsa),
                     "TYPE_WEBAUTHN" => Ok(any_signature::Type::Webauthn),
+                    "TYPE_ZKID" => Ok(any_signature::Type::Zkid),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -8705,5 +8724,98 @@ impl<'de> serde::Deserialize<'de> for WriteTableItem {
             }
         }
         deserializer.deserialize_struct("aptos.transaction.v1.WriteTableItem", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for ZkId {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.signature.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ZkId", len)?;
+        if !self.signature.is_empty() {
+            struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ZkId {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "signature",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Signature,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "signature" => Ok(GeneratedField::Signature),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = ZkId;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.ZkId")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<ZkId, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut signature__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Signature => {
+                            if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("signature"));
+                            }
+                            signature__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(ZkId {
+                    signature: signature__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.ZkId", FIELDS, GeneratedVisitor)
     }
 }

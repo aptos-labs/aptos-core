@@ -515,7 +515,7 @@ impl PerFunctionRelevance {
                             .or_insert_with(PerBytecodeRelevance::default)
                             .insts
                             .entry(rel_inst)
-                            .or_insert_with(BTreeSet::new)
+                            .or_default()
                             .extend(wellformed_inv_inst);
                     }
                 }

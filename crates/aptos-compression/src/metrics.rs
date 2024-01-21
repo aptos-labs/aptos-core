@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::client::CompressionClient;
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, HistogramVec,
+    IntCounterVec,
 };
 use once_cell::sync::Lazy;
+use std::time::Instant;
 
 /// Useful metric constants for compression and decompression
 pub const COMPRESS: &str = "compress";
@@ -12,33 +15,12 @@ pub const DECOMPRESS: &str = "decompress";
 pub const COMPRESSED_BYTES: &str = "compressed_bytes";
 pub const RAW_BYTES: &str = "raw_bytes";
 
-/// A simple enum for identifying clients of the compression crate. This
-/// allows us to provide a runtime breakdown of compression metrics for
-/// each client.
-#[derive(Clone, Debug)]
-pub enum CompressionClient {
-    Consensus,
-    Mempool,
-    StateSync,
-}
-
-impl CompressionClient {
-    /// Returns a summary label for the request
-    pub fn get_label(&self) -> &'static str {
-        match self {
-            Self::Consensus => "consensus",
-            Self::Mempool => "mempool",
-            Self::StateSync => "state_sync",
-        }
-    }
-}
-
 /// Counters for tracking the data compression ratio (i.e., total byte counts)
 pub static BYTE_COUNTS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_compression_byte_count",
         "Counters for tracking the data compression ratio",
-        &["data_type", "client"]
+        &["operation", "data_type", "client"]
     )
     .unwrap()
 });
@@ -58,35 +40,89 @@ pub static OPERATION_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_compression_operation_latency",
         "Time it takes to perform a compression/decompression operation",
-        &["operation", "client"]
+        &["operation", "client"],
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });
 
 /// Increments the compression byte count based on the given data type
-pub fn increment_compression_byte_count(
+fn increment_compression_byte_count(
+    operation: &str,
     data_type: &str,
-    client: CompressionClient,
+    client: &CompressionClient,
     byte_count: u64,
 ) {
     BYTE_COUNTS
-        .with_label_values(&[data_type, client.get_label()])
+        .with_label_values(&[operation, data_type, client.get_label()])
         .inc_by(byte_count)
 }
 
 /// Increments the compression error count based on the given operation
-pub fn increment_compression_error(operation: &str, client: CompressionClient) {
+pub fn increment_compression_error(client: &CompressionClient) {
+    increment_error_count(COMPRESS, client)
+}
+
+/// Increments the decompression error count based on the given operation
+pub fn increment_decompression_error(client: &CompressionClient) {
+    increment_error_count(DECOMPRESS, client)
+}
+
+/// Increments the error count based on the given operation
+fn increment_error_count(operation: &str, client: &CompressionClient) {
     ERROR_COUNTS
         .with_label_values(&[operation, client.get_label()])
         .inc()
 }
 
-/// Starts the timer for the compression operation using the label
-pub fn start_compression_operation_timer(
-    operation: &str,
-    client: CompressionClient,
-) -> HistogramTimer {
+/// Observes the compression operation time
+pub fn observe_compression_operation_time(client: &CompressionClient, start_time: Instant) {
+    observe_operation_time(COMPRESS, client, start_time)
+}
+
+/// Observes the decompression operation time
+pub fn observe_decompression_operation_time(client: &CompressionClient, start_time: Instant) {
+    observe_operation_time(DECOMPRESS, client, start_time)
+}
+
+/// Observes the operation time based on the given operation
+fn observe_operation_time(operation: &str, client: &CompressionClient, start_time: Instant) {
     OPERATION_LATENCY
         .with_label_values(&[operation, client.get_label()])
-        .start_timer()
+        .observe(start_time.elapsed().as_secs_f64());
+}
+
+/// Updates the compression metrics for the given data sets
+pub fn update_compression_metrics(
+    client: &CompressionClient,
+    raw_data: &Vec<u8>,
+    compressed_data: &Vec<u8>,
+) {
+    update_operation_metrics(COMPRESS, client, raw_data, compressed_data);
+}
+
+/// Updates the decompression metrics for the given data sets
+pub fn update_decompression_metrics(
+    client: &CompressionClient,
+    compressed_data: &Vec<u8>,
+    raw_data: &Vec<u8>,
+) {
+    update_operation_metrics(DECOMPRESS, client, raw_data, compressed_data);
+}
+
+/// Updates the operation metrics based on the given data
+/// (e.g., raw and compressed data sizes).
+fn update_operation_metrics(
+    operation: &str,
+    client: &CompressionClient,
+    raw_data: &Vec<u8>,
+    compressed_data: &Vec<u8>,
+) {
+    increment_compression_byte_count(operation, RAW_BYTES, client, raw_data.len() as u64);
+    increment_compression_byte_count(
+        operation,
+        COMPRESSED_BYTES,
+        client,
+        compressed_data.len() as u64,
+    );
 }

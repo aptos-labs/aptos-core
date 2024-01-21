@@ -11,7 +11,6 @@ use crate::{
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
 };
-use anyhow::bail;
 use aptos_aggregator::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
     delta_change_set::serialize,
@@ -33,13 +32,14 @@ use aptos_mvhashmap::{
     versioned_delayed_fields::TVersionedDelayedFieldView,
     MVHashMap,
 };
-use aptos_state_view::{StateViewId, TStateView};
 use aptos_types::{
     aggregator::PanicError,
     executable::{Executable, ModulePath},
     state_store::{
+        errors::StateviewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
+        StateViewId, TStateView,
     },
     transaction::BlockExecutableTransaction as Transaction,
     write_set::TransactionWrite,
@@ -50,9 +50,10 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
-    vm_status::{StatusCode, VMStatus},
+    vm_status::StatusCode,
 };
 use move_vm_types::{
     value_transformation::{
@@ -137,7 +138,7 @@ trait ResourceState<T: Transaction> {
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult;
 }
 
@@ -150,8 +151,8 @@ trait ResourceGroupState<T: Transaction> {
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult>;
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult>;
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
@@ -477,7 +478,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         &self,
         group_key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<GroupReadResult> {
+    ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
         if let Some(group_size) = self.captured_reads.borrow().group_size(group_key) {
@@ -508,11 +509,14 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError) => {
-                    bail!("Resource tag bcs serialization error");
+                Err(TagSerializationError(e)) => {
+                    return Err(e);
                 },
             }
         }
@@ -532,7 +536,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult {
         use MVDataError::*;
         use MVDataOutput::*;
@@ -660,8 +664,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult> {
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
         if let Some(DataRead::Versioned(_, v, layout)) =
@@ -691,7 +695,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                                     patched_value,
                                     maybe_layout.cloned().map(Arc::new),
                                 );
-                            // Refetch in case a concurrent change went through.
+                            // Re-fetch in case a concurrent change went through.
                             continue;
                         },
                         ValueWithLayout::Exchanged(value, layout) => {
@@ -734,10 +738,15 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
+                        // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
+                        // like in ReadResult for resources.
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError) => {
+                Err(TagSerializationError(_)) => {
                     unreachable!("Reading a resource does not require tag serialization");
                 },
             }
@@ -791,7 +800,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult {
         match self.unsync_map.fetch_data(key) {
             Some(mut value) => {
@@ -811,6 +820,9 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
                                 value = exchanged_value;
                             },
                             Err(_) => {
+                                // TODO[agg_v2](cleanup): `patch_base_value` already marks as incorrect use
+                                //               and logs an error! We need to make this uniform across
+                                //               resources and groups.
                                 *self.incorrect_use.borrow_mut() = true;
                                 error!("Unsync map couldn't patch base value");
                                 return ReadResult::HaltSpeculativeExecution(
@@ -858,8 +870,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult> {
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult> {
         match self
             .unsync_map
             .fetch_group_tagged_data(group_key, resource_tag)
@@ -876,7 +888,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
                         maybe_layout.clone(),
                     );
 
-                    // sequential execution doesn't need to worry about concurrent change going through.
+                    // Sequential execution doesn't need to worry about concurrent change going through.
                     value = ValueWithLayout::Exchanged(Arc::new(patched_value), maybe_layout);
                 }
 
@@ -998,8 +1010,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn get_raw_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        let ret = self.base_view.get_state_value(state_key);
+    fn get_raw_base_value(&self, state_key: &T::Key) -> PartialVMResult<Option<StateValue>> {
+        let ret = self.base_view.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for {:?}: {:?}",
+                state_key, e
+            ))
+        });
 
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
@@ -1013,14 +1030,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             self.mark_incorrect_use();
         }
 
-        ret
+        ret.map_err(Into::into)
     }
 
     fn patch_base_value(
         &self,
         value: &T::Value,
         layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<T::Value> {
+    ) -> PartialVMResult<T::Value> {
         let maybe_patched = match (value.as_state_value(), layout) {
             (Some(state_value), Some(layout)) => {
                 let res = self.replace_values_with_identifiers(state_value, layout);
@@ -1035,29 +1052,16 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             err
                         );
                         self.mark_incorrect_use();
-                        return Err(err);
+                        return Err(PartialVMError::new(
+                            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                        )
+                        .with_message(format!("{}", err)));
                     },
                 }
             },
             (state_value, _) => state_value,
         };
         Ok(TransactionWrite::from_state_value(maybe_patched))
-    }
-
-    fn get_base_value_with_layout(
-        &self,
-        state_key: &T::Key,
-        layout: UnknownOrLayout,
-    ) -> anyhow::Result<ValueWithLayout<T::Value>> {
-        let state_value = self.get_raw_base_value(state_key)?;
-        let value = TransactionWrite::from_state_value(state_value);
-        Ok(match layout {
-            UnknownOrLayout::Known(l) => {
-                let layout_arc = l.cloned().map(Arc::new);
-                ValueWithLayout::Exchanged(Arc::new(self.patch_base_value(&value, l)?), layout_arc)
-            },
-            UnknownOrLayout::Unknown => ValueWithLayout::RawFromStorage(Arc::new(value)),
-        })
     }
 
     /// Given a state value, performs deserialization-serialization round-trip
@@ -1304,12 +1308,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         {
                             if let Some(metadata_op) = metadata
                                 .extract_value_no_layout()
-                                .clone()
                                 .convert_read_to_modification()
                             {
                                 return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
                             }
                         } else {
+                            // TODO[agg_v2](fix): `get_group_size` can fail on group tag serialization. Do
+                            //       we want to propagate this error? This is somewhat an invariant
+                            //       violation so PanicError is also ok?
                             return Some(Err(code_invariant_error(format!(
                                 "Cannot compute metadata op size for the group read {:?}",
                                 key
@@ -1331,7 +1337,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         state_key: &T::Key,
         layout: UnknownOrLayout,
         kind: ReadKind,
-    ) -> anyhow::Result<ReadResult> {
+    ) -> PartialVMResult<ReadResult> {
         debug_assert!(
             state_key.module_path().is_none(),
             "Reading a module {:?} using ResourceView",
@@ -1357,8 +1363,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             &|value, layout| self.patch_base_value(value, layout),
         );
         if matches!(ret, ReadResult::Uninitialized) {
-            let from_storage = self.get_base_value_with_layout(state_key, layout.clone())?;
-            state.set_base_value(state_key.clone(), from_storage);
+            let from_storage =
+                TransactionWrite::from_state_value(self.get_raw_base_value(state_key)?);
+            state.set_base_value(
+                state_key.clone(),
+                ValueWithLayout::RawFromStorage(Arc::new(from_storage)),
+            );
 
             // In case of concurrent storage fetches, we cannot use our value,
             // but need to fetch it from versioned_map again.
@@ -1378,10 +1388,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             // will not log the speculative error,
             // so no actual error will be logged once the execution is halted and
             // the speculative logging is flushed.
-            ReadResult::HaltSpeculativeExecution(msg) => Err(anyhow::Error::new(VMStatus::error(
+            ReadResult::HaltSpeculativeExecution(msg) => Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                Some(msg),
-            ))),
+            )
+            .with_message(msg)),
             ReadResult::Uninitialized => {
                 unreachable!("base value must already be recorded in the MV data structure")
             },
@@ -1389,12 +1399,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> anyhow::Result<()> {
+    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> PartialVMResult<()> {
         let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
             match self.get_raw_base_value(group_key)? {
                 Some(state_value) => (
-                    bcs::from_bytes(state_value.bytes())
-                        .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
+                    bcs::from_bytes(state_value.bytes()).map_err(|e| {
+                        PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                            .with_message(format!(
+                                "Failed to deserialize the resource group at {:? }: {:?}",
+                                group_key, e
+                            ))
+                    })?,
                     TransactionWrite::from_state_value(Some(state_value)),
                 ),
                 None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
@@ -1430,7 +1445,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Known(maybe_layout),
@@ -1442,7 +1457,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -1453,7 +1468,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
             })
     }
 
-    fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
@@ -1472,7 +1487,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
 
-    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<ResourceGroupSize> {
+    fn resource_group_size(
+        &self,
+        group_key: &Self::GroupKey,
+    ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
@@ -1495,7 +1513,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let maybe_layout = maybe_layout.filter(|_| self.is_delayed_field_optimization_capable());
 
         let mut group_read = self
@@ -1531,7 +1549,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         _group_key: &Self::GroupKey,
         _resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<usize> {
+    ) -> PartialVMResult<usize> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
@@ -1539,7 +1557,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         _group_key: &Self::GroupKey,
         _resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<bool> {
+    ) -> PartialVMResult<bool> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
@@ -1562,7 +1580,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
 {
     type Key = T::Key;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         debug_assert!(
             state_key.module_path().is_some(),
             "Reading a resource {:?} using ModuleView",
@@ -1607,7 +1625,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
         self.base_view.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.base_view.get_usage()
     }
 }
@@ -1620,7 +1638,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
@@ -1746,7 +1764,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         Ok(id.into())
     }
 
-    // TODO - update comment.
+    // TODO[agg_v2](cleanup) - update comment.
     // For each resource that satisfies the following conditions,
     //     1. Resource is in read set
     //     2. Resource is not in write set
@@ -1951,11 +1969,13 @@ mod test {
         versioned_delayed_fields::TVersionedDelayedFieldView,
         MVHashMap,
     };
-    use aptos_state_view::TStateView;
     use aptos_types::{
         aggregator::DelayedFieldID,
         executable::Executable,
-        state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue},
+        state_store::{
+            errors::StateviewError, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
+        },
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
     };
@@ -2573,11 +2593,14 @@ mod test {
     impl TStateView for MockStateView {
         type Key = KeyType<u32>;
 
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
             Ok(self.data.get(state_key).cloned())
         }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
     }
@@ -2910,7 +2933,7 @@ mod test {
             &self,
             state_key: &KeyType<u32>,
             maybe_layout: Option<&MoveTypeLayout>,
-        ) -> anyhow::Result<Option<StateValue>> {
+        ) -> PartialVMResult<Option<StateValue>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value(state_key, maybe_layout);
@@ -2921,7 +2944,7 @@ mod test {
             self.assert_res_eq(seq, par)
         }
 
-        fn resource_exists(&self, state_key: &KeyType<u32>) -> anyhow::Result<bool> {
+        fn resource_exists(&self, state_key: &KeyType<u32>) -> PartialVMResult<bool> {
             let seq = self.latest_view_seq.resource_exists(state_key);
             let par = self.latest_view_par.resource_exists(state_key);
 
@@ -2931,7 +2954,7 @@ mod test {
         fn get_resource_state_value_metadata(
             &self,
             state_key: &KeyType<u32>,
-        ) -> anyhow::Result<Option<StateValueMetadata>> {
+        ) -> PartialVMResult<Option<StateValueMetadata>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value_metadata(state_key);

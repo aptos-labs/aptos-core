@@ -1,30 +1,30 @@
 spec aptos_framework::aptos_governance {
     /// <high-level-req>
     /// No.: 1
-    /// Property: The create proposal function calls create proposal v2.
+    /// Requirement: The create proposal function calls create proposal v2.
     /// Criticality: Low
     /// Implementation: The create_proposal function internally calls create_proposal_v2.
     /// Enforcement: This is manually audited to ensure create_proposal_v2 is called in create_proposal.
     ///
     /// No.: 2
-    /// Property: The proposer must have a stake equal to or greater than the required bond amount.
+    /// Requirement: The proposer must have a stake equal to or greater than the required bond amount.
     /// Criticality: High
     /// Implementation: The create_proposal_v2 function verifies that the stake balance equals or exceeds the required
     /// proposer stake amount.
-    /// Enforcement: Formally verified in [high-level-spec-2](CreateProposalAbortsIf).
+    /// Enforcement: Formally verified in [high-level-req-2](CreateProposalAbortsIf).
     ///
     /// No.: 3
-    /// Property: The Approved execution hashes resources that exist when the vote function is called.
+    /// Requirement: The Approved execution hashes resources that exist when the vote function is called.
     /// Criticality: Low
     /// Implementation: The Vote function acquires the Approved execution hashes resources.
-    /// Enforcement: Formally verified in [high-level-spec-3](VoteAbortIf).
+    /// Enforcement: Formally verified in [high-level-req-3](VoteAbortIf).
     ///
     /// No.: 4
-    /// Property: The execution script hash of a successful governance proposal is added to the approved list if the
+    /// Requirement: The execution script hash of a successful governance proposal is added to the approved list if the
     /// proposal can be resolved.
     /// Criticality: Medium
     /// Implementation: The add_approved_script_hash function asserts that proposal_state == PROPOSAL_STATE_SUCCEEDED.
-    /// Enforcement: Formally verified in [high-level-spec-4](AddApprovedScriptHash).
+    /// Enforcement: Formally verified in [high-level-req-4](AddApprovedScriptHash).
     /// </high-level-req>
     ///
     spec module {
@@ -240,7 +240,7 @@ spec aptos_framework::aptos_governance {
         let stake_balance_2 = 0;
         let governance_config = global<GovernanceConfig>(@aptos_framework);
         let required_proposer_stake = governance_config.required_proposer_stake;
-        /// [high-level-spec-2]
+        /// [high-level-req-2]
         // Comparison of the three results of get_voting_power(stake_pool) and required_proposer_stake
         aborts_if allow_validator_set_change && stake_balance_0 < required_proposer_stake;
         aborts_if !allow_validator_set_change && stake::spec_is_current_epoch_validator(stake_pool) && stake_balance_1 < required_proposer_stake;
@@ -263,7 +263,7 @@ spec aptos_framework::aptos_governance {
 
         // verify voting::create_proposal_v2
         aborts_if option::spec_is_some(maybe_supply) && governance_config.min_voting_threshold > early_resolution_vote_threshold_value;
-        aborts_if len(execution_hash) <= 0;
+        aborts_if len(execution_hash) == 0;
         aborts_if !exists<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal_id = voting_forum.next_proposal_id;
@@ -466,7 +466,7 @@ spec aptos_framework::aptos_governance {
         let post post_approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework);
 
         // Due to the complexity of the success state, the validation of 'borrow_global_mut<ApprovedExecutionHashes>(@aptos_framework);' is discussed in four cases.
-        /// [high-level-spec-3]
+        /// [high-level-req-3]
         aborts_if
             if (should_pass) {
                 proposal_state_successed_0 && !exists<ApprovedExecutionHashes>(@aptos_framework)
@@ -517,7 +517,7 @@ spec aptos_framework::aptos_governance {
             (proposal.yes_votes <= proposal.no_votes || proposal.yes_votes + proposal.no_votes < proposal.min_vote_threshold);
 
         let post post_approved_hashes = global<ApprovedExecutionHashes>(@aptos_framework);
-        /// [high-level-spec-4]
+        /// [high-level-req-4]
         ensures simple_map::spec_contains_key(post_approved_hashes.hashes, proposal_id) &&
             simple_map::spec_get(post_approved_hashes.hashes, proposal_id) == proposal.execution_hash;
     }

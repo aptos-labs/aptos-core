@@ -49,11 +49,11 @@ where
     TestAck: TryFrom<M> + Into<M>,
     TestMessage: TryFrom<M> + Into<M>,
 {
-    type Ack = TestAck;
     type Aggregated = HashSet<Author>;
     type Message = TestMessage;
+    type Response = TestAck;
 
-    fn add(&self, peer: Author, _ack: Self::Ack) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         self.received.lock().insert(peer);
         if self.received.lock().len() == self.threshold {
             Ok(Some(self.received.lock().clone()))

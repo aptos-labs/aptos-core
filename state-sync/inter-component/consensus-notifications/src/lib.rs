@@ -36,11 +36,11 @@ pub enum Error {
 /// synchronization notifications to state sync.
 #[async_trait]
 pub trait ConsensusNotificationSender: Send + Sync {
-    /// Notify state sync of newly committed transactions and reconfiguration events.
+    /// Notify state sync of newly committed transactions and subscribable events.
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
-        reconfiguration_events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> Result<(), Error>;
 
     /// Notify state sync to synchronize storage to the specified target.
@@ -93,7 +93,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
     async fn notify_new_commit(
         &self,
         transactions: Vec<Transaction>,
-        reconfiguration_events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> Result<(), Error> {
         // Only send a notification if transactions have been committed
         if transactions.is_empty() {
@@ -105,7 +105,7 @@ impl ConsensusNotificationSender for ConsensusNotifier {
         let commit_notification =
             ConsensusNotification::NotifyCommit(ConsensusCommitNotification {
                 transactions,
-                reconfiguration_events,
+                subscribable_events,
                 callback,
             });
 
@@ -225,19 +225,19 @@ pub enum ConsensusNotification {
 #[derive(Debug)]
 pub struct ConsensusCommitNotification {
     pub transactions: Vec<Transaction>,
-    pub reconfiguration_events: Vec<ContractEvent>,
+    pub subscribable_events: Vec<ContractEvent>,
     pub(crate) callback: oneshot::Sender<ConsensusNotificationResponse>,
 }
 
 impl ConsensusCommitNotification {
     pub fn new(
         transactions: Vec<Transaction>,
-        reconfiguration_events: Vec<ContractEvent>,
+        subscribable_events: Vec<ContractEvent>,
     ) -> (Self, oneshot::Receiver<ConsensusNotificationResponse>) {
         let (callback, callback_receiver) = oneshot::channel();
         let commit_notification = ConsensusCommitNotification {
             transactions,
-            reconfiguration_events,
+            subscribable_events,
             callback,
         };
 
@@ -334,10 +334,9 @@ mod tests {
 
         // Send a commit notification
         let transactions = vec![create_user_transaction()];
-        let reconfiguration_events = vec![create_contract_event()];
+        let subscribable_events = vec![create_contract_event()];
         let _ = block_on(
-            consensus_notifier
-                .notify_new_commit(transactions.clone(), reconfiguration_events.clone()),
+            consensus_notifier.notify_new_commit(transactions.clone(), subscribable_events.clone()),
         );
 
         // Verify the notification arrives at the receiver
@@ -345,10 +344,7 @@ mod tests {
             Some(consensus_notification) => match consensus_notification {
                 ConsensusNotification::NotifyCommit(commit_notification) => {
                     assert_eq!(transactions, commit_notification.transactions);
-                    assert_eq!(
-                        reconfiguration_events,
-                        commit_notification.reconfiguration_events
-                    );
+                    assert_eq!(subscribable_events, commit_notification.subscribable_events);
                 },
                 result => panic!(
                     "Expected consensus commit notification but got: {:?}",

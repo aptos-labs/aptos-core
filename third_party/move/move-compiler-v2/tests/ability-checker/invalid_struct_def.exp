@@ -1,0 +1,55 @@
+
+Diagnostics:
+error: Invalid instantiation
+  ┌─ tests/ability-checker/invalid_struct_def.move:4:15
+  │
+4 │     struct Bar { x: Foo<u8> }
+  │                  ^
+
+error: Invalid instantiation
+  ┌─ tests/ability-checker/invalid_struct_def.move:6:18
+  │
+6 │     struct Baz<T> { x: Foo<T> }
+  │                     ^
+
+error: field must have store ability because InValidHasKey is declared with key
+   ┌─ tests/ability-checker/invalid_struct_def.move:15:6
+   │
+15 │         x: HasKey
+   │            ^^^^^^
+
+error: field must have drop ability because HasDrop is declared with drop ability
+   ┌─ tests/ability-checker/invalid_struct_def.move:19:6
+   │
+19 │         x: Impotent
+   │            ^^^^^^^^
+
+error: field must have drop ability because ConditionalDropInvalid is declared with drop ability
+   ┌─ tests/ability-checker/invalid_struct_def.move:28:6
+   │
+28 │         y: Impotent,
+   │            ^^^^^^^^
+
+error: field must have drop ability because S is declared with drop ability
+   ┌─ tests/ability-checker/invalid_struct_def.move:33:6
+   │
+33 │         x: ConditionalDrop<Impotent>
+   │            ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Invalid instantiation
+   ┌─ tests/ability-checker/invalid_struct_def.move:37:3
+   │
+37 │         x: Foo<T>,
+   │         ^
+
+error: phantom type arguments cannot be used
+   ┌─ tests/ability-checker/invalid_struct_def.move:41:3
+   │
+41 │         x: T
+   │         ^
+
+error: Not a phantom position
+   ┌─ tests/ability-checker/invalid_struct_def.move:45:3
+   │
+45 │         x: S<T>
+   │         ^

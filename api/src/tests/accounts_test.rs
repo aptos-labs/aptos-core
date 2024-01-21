@@ -5,6 +5,7 @@
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, find_value};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, StateKeyWrapper};
+use aptos_cached_packages::aptos_stdlib;
 use serde_json::json;
 use std::str::FromStr;
 
@@ -150,25 +151,22 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
     context.check_golden_output(resp);
 }
 
-// figure out a working module code, no idea where the existing one comes from
-#[ignore] // TODO(issue 81): re-enable after cleaning up the compiled code in the test
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_modules_by_ledger_version() {
     let mut context = new_test_context(current_function_name!());
-    let code = "a11ceb0b0300000006010002030205050703070a0c0816100c260900000001000100000102084d794d6f64756c650269640000000000000000000000000b1e55ed00010000000231010200";
+    let payload =
+        aptos_stdlib::publish_module_source("test_module", "module 0xa550c18::test_module {}");
+
     let root_account = context.root_account().await;
-    let txn = root_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .module(hex::decode(code).unwrap()),
-    );
+    let txn =
+        root_account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn.clone()]).await;
+
     let modules = context
         .get(&account_modules(
             &context.root_account().await.address().to_hex_literal(),
         ))
         .await;
-
     assert_ne!(modules, json!([]));
 
     let modules = context

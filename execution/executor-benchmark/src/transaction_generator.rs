@@ -9,11 +9,11 @@ use crate::{
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
-use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address,
-    account_view::AccountView, chain_id::ChainId, transaction::Transaction,
+    account_view::AccountView, chain_id::ChainId,
+    state_store::account_with_state_view::AsAccountWithStateView, transaction::Transaction,
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -811,14 +811,8 @@ fn test_get_conflicting_grps_transfer_indices() {
             for (sender_idx, receiver_idx) in transfer_indices {
                 assert!(sender_idx < num_signer_accounts);
                 assert!(receiver_idx < num_signer_accounts);
-                adj_list
-                    .entry(sender_idx)
-                    .or_insert(HashSet::new())
-                    .insert(receiver_idx);
-                adj_list
-                    .entry(receiver_idx)
-                    .or_insert(HashSet::new())
-                    .insert(sender_idx);
+                adj_list.entry(sender_idx).or_default().insert(receiver_idx);
+                adj_list.entry(receiver_idx).or_default().insert(sender_idx);
             }
 
             assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);

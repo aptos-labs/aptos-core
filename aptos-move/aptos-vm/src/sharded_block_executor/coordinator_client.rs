@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::sharded_block_executor::ExecutorShardCommand;
-use aptos_state_view::StateView;
-use aptos_types::transaction::TransactionOutput;
+use aptos_types::{state_store::StateView, transaction::TransactionOutput};
 use move_core_types::vm_status::VMStatus;
 
 // Interface to communicate from the executor shards to the block executor coordinator.

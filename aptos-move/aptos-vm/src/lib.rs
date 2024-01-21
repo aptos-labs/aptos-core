@@ -119,14 +119,15 @@ pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
 pub mod verifier;
+mod zkid_validation;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};
-use aptos_state_view::StateView;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain, partitioner::PartitionedTransactions,
     },
+    state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         SignedTransaction, TransactionOutput, VMValidatorResult,

@@ -240,6 +240,7 @@ export const NetworkMessageServiceClient = makeGenericClientConstructor(
 ) as unknown as {
   new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): NetworkMessageServiceClient;
   service: typeof NetworkMessageServiceService;
+  serviceName: string;
 };
 
 function bytesFromBase64(b64: string): Uint8Array {

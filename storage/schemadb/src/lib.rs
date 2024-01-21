@@ -29,9 +29,10 @@ use crate::{
     },
     schema::{KeyCodec, Schema, SeekKeyCodec, ValueCodec},
 };
-use anyhow::{format_err, Result};
+use anyhow::format_err;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_storage_interface::Result as DbResult;
 use iterator::{ScanDirection, SchemaIterator};
 use rand::Rng;
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
@@ -71,25 +72,29 @@ impl SchemaBatch {
     }
 
     /// Adds an insert/update operation to the batch.
-    pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
+    pub fn put<S: Schema>(
+        &self,
+        key: &S::Key,
+        value: &S::Value,
+    ) -> aptos_storage_interface::Result<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         let value = <S::Value as ValueCodec<S>>::encode_value(value)?;
         self.rows
             .lock()
             .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(WriteOp::Value { key, value });
 
         Ok(())
     }
 
     /// Adds a delete operation to the batch.
-    pub fn delete<S: Schema>(&self, key: &S::Key) -> Result<()> {
+    pub fn delete<S: Schema>(&self, key: &S::Key) -> DbResult<()> {
         let key = <S::Key as KeyCodec<S>>::encode_key(key)?;
         self.rows
             .lock()
             .entry(S::COLUMN_FAMILY_NAME)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(WriteOp::Deletion { key });
 
         Ok(())
@@ -110,7 +115,7 @@ impl DB {
         name: &str,
         column_families: Vec<ColumnFamilyName>,
         db_opts: &rocksdb::Options,
-    ) -> Result<Self> {
+    ) -> DbResult<Self> {
         let db = DB::open_cf(
             db_opts,
             path,
@@ -132,7 +137,7 @@ impl DB {
         path: impl AsRef<Path>,
         name: &str,
         cfds: Vec<rocksdb::ColumnFamilyDescriptor>,
-    ) -> Result<DB> {
+    ) -> DbResult<DB> {
         let inner = rocksdb::DB::open_cf_descriptors(db_opts, path.de_unc(), cfds)?;
         Ok(Self::log_construct(name, inner))
     }
@@ -145,7 +150,7 @@ impl DB {
         path: impl AsRef<Path>,
         name: &str,
         cfs: Vec<ColumnFamilyName>,
-    ) -> Result<DB> {
+    ) -> DbResult<DB> {
         let error_if_log_file_exists = false;
         let inner =
             rocksdb::DB::open_cf_for_read_only(opts, path.de_unc(), cfs, error_if_log_file_exists)?;
@@ -159,7 +164,7 @@ impl DB {
         secondary_path: P,
         name: &str,
         cfs: Vec<ColumnFamilyName>,
-    ) -> Result<DB> {
+    ) -> DbResult<DB> {
         let inner = rocksdb::DB::open_cf_as_secondary(
             opts,
             primary_path.de_unc(),
@@ -178,7 +183,7 @@ impl DB {
     }
 
     /// Reads single record by key.
-    pub fn get<S: Schema>(&self, schema_key: &S::Key) -> Result<Option<S::Value>> {
+    pub fn get<S: Schema>(&self, schema_key: &S::Key) -> DbResult<Option<S::Value>> {
         let _timer = APTOS_SCHEMADB_GET_LATENCY_SECONDS
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .start_timer();
@@ -194,10 +199,11 @@ impl DB {
         result
             .map(|raw_value| <S::Value as ValueCodec<S>>::decode_value(&raw_value))
             .transpose()
+            .map_err(Into::into)
     }
 
     /// Writes single record.
-    pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> Result<()> {
+    pub fn put<S: Schema>(&self, key: &S::Key, value: &S::Value) -> DbResult<()> {
         // Not necessary to use a batch, but we'd like a central place to bump counters.
         let batch = SchemaBatch::new();
         batch.put::<S>(key, value)?;
@@ -208,7 +214,7 @@ impl DB {
         &self,
         opts: ReadOptions,
         direction: ScanDirection,
-    ) -> Result<SchemaIterator<S>> {
+    ) -> DbResult<SchemaIterator<S>> {
         let cf_handle = self.get_cf_handle(S::COLUMN_FAMILY_NAME)?;
         Ok(SchemaIterator::new(
             self.inner.raw_iterator_cf_opt(cf_handle, opts),
@@ -217,17 +223,17 @@ impl DB {
     }
 
     /// Returns a forward [`SchemaIterator`] on a certain schema.
-    pub fn iter<S: Schema>(&self, opts: ReadOptions) -> Result<SchemaIterator<S>> {
+    pub fn iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Forward)
     }
 
     /// Returns a backward [`SchemaIterator`] on a certain schema.
-    pub fn rev_iter<S: Schema>(&self, opts: ReadOptions) -> Result<SchemaIterator<S>> {
+    pub fn rev_iter<S: Schema>(&self, opts: ReadOptions) -> DbResult<SchemaIterator<S>> {
         self.iter_with_direction::<S>(opts, ScanDirection::Backward)
     }
 
     /// Writes a group of records wrapped in a [`SchemaBatch`].
-    pub fn write_schemas(&self, batch: SchemaBatch) -> Result<()> {
+    pub fn write_schemas(&self, batch: SchemaBatch) -> DbResult<()> {
         // Function to determine if the counter should be sampled based on a sampling percentage
         fn should_sample(sampling_percentage: usize) -> bool {
             // Generate a random number between 0 and 100
@@ -285,35 +291,40 @@ impl DB {
         Ok(())
     }
 
-    fn get_cf_handle(&self, cf_name: &str) -> Result<&rocksdb::ColumnFamily> {
-        self.inner.cf_handle(cf_name).ok_or_else(|| {
-            format_err!(
-                "DB::cf_handle not found for column family name: {}",
-                cf_name
-            )
-        })
+    fn get_cf_handle(&self, cf_name: &str) -> DbResult<&rocksdb::ColumnFamily> {
+        self.inner
+            .cf_handle(cf_name)
+            .ok_or_else(|| {
+                format_err!(
+                    "DB::cf_handle not found for column family name: {}",
+                    cf_name
+                )
+            })
+            .map_err(Into::into)
     }
 
     /// Flushes memtable data. This is only used for testing `get_approximate_sizes_cf` in unit
     /// tests.
-    pub fn flush_cf(&self, cf_name: &str) -> Result<()> {
+    pub fn flush_cf(&self, cf_name: &str) -> DbResult<()> {
         Ok(self.inner.flush_cf(self.get_cf_handle(cf_name)?)?)
     }
 
-    pub fn get_property(&self, cf_name: &str, property_name: &str) -> Result<u64> {
+    pub fn get_property(&self, cf_name: &str, property_name: &str) -> DbResult<u64> {
         self.inner
             .property_int_value_cf(self.get_cf_handle(cf_name)?, property_name)?
             .ok_or_else(|| {
-                format_err!(
-                    "Unable to get property \"{}\" of  column family \"{}\".",
-                    property_name,
-                    cf_name,
+                aptos_storage_interface::AptosDbError::Other(
+                    format!(
+                        "Unable to get property \"{}\" of  column family \"{}\".",
+                        property_name, cf_name,
+                    )
+                    .to_string(),
                 )
             })
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.
-    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    pub fn create_checkpoint<P: AsRef<Path>>(&self, path: P) -> DbResult<()> {
         rocksdb::checkpoint::Checkpoint::new(&self.inner)?.create_checkpoint(path)?;
         Ok(())
     }

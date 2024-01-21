@@ -19,6 +19,7 @@ use aptos_types::{
     },
     transaction,
     transaction::authenticator::{AccountAuthenticator, TransactionAuthenticator},
+    validator_txn::ValidatorTransaction,
     vm_status::AbortLocation,
     write_set,
 };
@@ -88,6 +89,7 @@ pub fn get_registry() -> Result<Registry> {
     // stdlib types
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
@@ -101,6 +103,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<AbortLocation>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
+    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;
@@ -116,6 +119,9 @@ pub fn get_registry() -> Result<Registry> {
 
     // output types
     tracer.trace_type::<CoinStoreResource>(&samples)?;
+
+    // aliases within StructTag
+    tracer.ignore_aliases("StructTag", &["type_params"])?;
 
     tracer.registry()
 }

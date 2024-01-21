@@ -27,7 +27,6 @@ use aptos_experimental_runtimes::thread_manager::{optimal_min_len, THREAD_MANAGE
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateViewId;
 use aptos_storage_interface::{
     async_proof_fetcher::AsyncProofFetcher, cached_state_view::CachedStateView,
     state_delta::StateDelta, DbReaderWriter, ExecutedTrees,
@@ -36,6 +35,7 @@ use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
         TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
@@ -157,13 +157,13 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
 
     fn latest_state_view(&self, latest_state: &StateDelta) -> Result<CachedStateView> {
         let first_version = latest_state.next_version();
-        CachedStateView::new(
+        Ok(CachedStateView::new(
             StateViewId::ChunkExecution { first_version },
             self.db.reader.clone(),
             first_version,
             latest_state.current.clone(),
             Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
-        )
+        )?)
     }
 
     fn commit_chunk_impl(&self) -> Result<ExecutedChunk> {

@@ -1,13 +1,13 @@
 
 Diagnostics:
-error: cannot copy mutable reference in local `s`
-   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:26:23
+error: cannot dereference local `s` which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:13:9
    │
-26 │         if (cond) x = copy s else x = other; // different error in v2 because copy of &mut
-   │                       ^^^^^^ copied here
+12 │         if (cond) f = &mut s.f else f = &mut other.f;
+   │                       -------- previous mutable field borrow
+13 │         *s;
+   │         ^^ dereferenced here
 
-
-Diagnostics:
 error: cannot dereference local `s` which is still mutable borrowed
    ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:20:9
    │
@@ -16,12 +16,4 @@ error: cannot dereference local `s` which is still mutable borrowed
    │                       │
    │                       previous mutable field borrow
 20 │         *s;
-   │         ^^ dereferenced here
-
-error: cannot dereference local `s` which is still mutable borrowed
-   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:13:9
-   │
-12 │         if (cond) f = &mut s.f else f = &mut other.f;
-   │                       -------- previous mutable field borrow
-13 │         *s;
    │         ^^ dereferenced here

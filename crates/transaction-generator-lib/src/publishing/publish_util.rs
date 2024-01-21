@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::publishing::{module_simple, raw_module_data};
-use aptos_framework::natives::code::PackageMetadata;
+use aptos_framework::{natives::code::PackageMetadata, KnownAttribute};
 use aptos_sdk::{
     bcs,
     move_types::{identifier::Identifier, language_storage::ModuleId},
@@ -13,7 +13,7 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use move_binary_format::{access::ModuleAccess, CompiledModule};
+use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
 use rand::{rngs::StdRng, Rng};
 
 // Information used to track a publisher and what allows to identify and
@@ -221,10 +221,19 @@ fn update(
             .get(module.self_handle_idx().0 as usize)
             .expect("ModuleId for self must exists");
         let original_address_idx = module_handle.address.0;
+        let original_address = new_module.address_identifiers[original_address_idx as usize];
         let _ = std::mem::replace(
             &mut new_module.address_identifiers[original_address_idx as usize],
             publisher,
         );
+
+        for constant in new_module.constant_pool.iter_mut() {
+            if constant.type_ == SignatureToken::Address
+                && original_address == AccountAddress::from_bytes(constant.data.clone()).unwrap()
+            {
+                constant.data.swap_with_slice(&mut publisher.to_vec());
+            }
+        }
 
         if suffix > 0 {
             for module_handle in &new_module.module_handles {
@@ -240,6 +249,35 @@ fn update(
                 }
             }
         }
+        if let Some(mut metadata) = aptos_framework::get_metadata_from_compiled_module(&new_module)
+        {
+            metadata
+                .struct_attributes
+                .iter_mut()
+                .for_each(|(_, attrs)| {
+                    attrs.iter_mut().for_each(|attr| {
+                        if let Some(member) = attr.get_resource_group_member() {
+                            if member.module_id().address() == &original_address {
+                                let new_full_name = format!(
+                                    "{}::{}::{}",
+                                    publisher.to_standard_string(),
+                                    member.module,
+                                    member.name
+                                );
+                                let _ = std::mem::replace(
+                                    attr,
+                                    KnownAttribute::resource_group_member(new_full_name),
+                                );
+                            }
+                        }
+                    });
+                });
+            assert!(new_module.metadata.len() == 1);
+            new_module.metadata.iter_mut().for_each(|metadata_holder| {
+                metadata_holder.value = bcs::to_bytes(&metadata).expect("Metadata must serialize");
+            })
+        }
+
         new_modules.push((original_name.clone(), new_module));
     }
     let mut metadata = metadata.clone();

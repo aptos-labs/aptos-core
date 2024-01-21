@@ -2,17 +2,26 @@
 remote_endpoint: ~
 name: "v1.9"
 proposals:
-  - name: step_1_upgrade_framework
+  - name: step_1_increase_max_txn_gas
+    metadata:
+      title: "Increase max txn gas temporarily for framework upgrade"
+      description: "Increase max txn gas temporarily for framework upgrade"
+    execution_mode: MultiStep
+    update_sequence:
+      - DefaultGasWithOverride:
+          - name: "txn.max_execution_gas"
+            value: 3676000000
+  - name: step_2_upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.9"
       description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.9"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGas
       - Framework:
           bytecode_version: 6
           git_hash: ~
-  - name: step_2_commission_change_delegation_pool
+      - DefaultGas
+  - name: step_3_commission_change_delegation_pool
     metadata:
       title: "AIP-50: Change commission rates in delegation pools"
       description: "AIP-50: This allows delegation pool owners to change operator commission rates after delegation pool creation."
@@ -22,7 +31,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - commission_change_delegation_pool
-  - name: step_3_enable_automatic_sponsored_account_creation
+  - name: step_4_enable_automatic_sponsored_account_creation
     metadata:
       title: "AIP-52: Automated Account Creation for Sponsored Transactions"
       description: "AIP-52: Automated Account Creation for Sponsored Transactions."
@@ -32,7 +41,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - sponsored_automatic_account_creation
-  - name: step_4_update_block_limits
+  - name: step_5_update_block_limits
     metadata: 
       title: "AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  
       description: "AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  

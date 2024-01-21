@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
-use aptos_state_view::{StateView, TStateView};
 use aptos_types::{
     state_store::{
-        state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
+        state_value::StateValue, StateView, TStateView,
     },
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
+
+type Result<T, E = StateviewError> = std::result::Result<T, E>;
 
 pub const TOTAL_SUPPLY_AGGR_BASE_VAL: u128 = u128::MAX >> 1;
 #[derive(Clone)]

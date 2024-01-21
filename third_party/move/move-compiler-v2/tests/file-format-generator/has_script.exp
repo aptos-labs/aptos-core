@@ -1,0 +1,74 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun <SELF>_0::whatever() {
+     var $t0: bool
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t2 := 1
+  2: $t0 := ==($t1, $t2)
+  3: if ($t0) goto 4 else goto 6
+  4: label L0
+  5: goto 9
+  6: label L1
+  7: $t3 := 1
+  8: abort($t3)
+  9: label L2
+ 10: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun <SELF>_0::whatever() {
+     var $t0: bool
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t1 := 1
+     # live vars: $t1
+  1: $t2 := 1
+     # live vars: $t1, $t2
+  2: $t0 := ==($t1, $t2)
+     # live vars: $t0
+  3: if ($t0) goto 4 else goto 6
+     # live vars:
+  4: label L0
+     # live vars:
+  5: goto 9
+     # live vars:
+  6: label L1
+     # live vars:
+  7: $t3 := 1
+     # live vars: $t3
+  8: abort($t3)
+     # live vars:
+  9: label L2
+     # live vars:
+ 10: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+script {
+
+
+main() /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: LdU64(1)
+	2: Eq
+	3: BrFalse(5)
+B1:
+	4: Branch(7)
+B2:
+	5: LdU64(1)
+	6: Abort
+B3:
+	7: Ret
+}
+}

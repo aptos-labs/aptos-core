@@ -8,7 +8,6 @@ mod storage_interface;
 pub use crate::{rest_interface::RestDebuggerInterface, storage_interface::DBDebuggerInterface};
 use anyhow::{anyhow, Result};
 use aptos_framework::natives::code::PackageMetadata;
-use aptos_state_view::TStateView;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
@@ -17,6 +16,7 @@ use aptos_types::{
     on_chain_config::ValidatorSet,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+        Result as StateViewResult, TStateView,
     },
     transaction::{Transaction, TransactionInfo, Version},
 };
@@ -256,11 +256,12 @@ impl DebuggerStateView {
 impl TStateView for DebuggerStateView {
     type Key = StateKey;
 
-    fn get_state_value(&self, state_key: &StateKey) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         self.get_state_value_internal(state_key, self.version)
+            .map_err(Into::into)
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
         unimplemented!()
     }
 }

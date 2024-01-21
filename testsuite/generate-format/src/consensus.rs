@@ -17,7 +17,9 @@ use aptos_types::{
         state_key::StateKey,
         state_value::{PersistedStateValueMetadata, StateValueMetadata},
     },
-    transaction, write_set,
+    transaction,
+    validator_txn::ValidatorTransaction,
+    write_set,
 };
 use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
@@ -90,6 +92,7 @@ pub fn get_registry() -> Result<Registry> {
     // 2. Trace the main entry point(s) + every enum separately.
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
+    tracer.trace_type::<ValidatorTransaction>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
@@ -98,6 +101,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
+    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
 
@@ -108,6 +112,9 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
+
+    // aliases within StructTag
+    tracer.ignore_aliases("StructTag", &["type_params"])?;
 
     tracer.registry()
 }

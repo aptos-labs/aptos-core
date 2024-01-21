@@ -98,7 +98,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                         .get(&tag)
                         .expect("Reading twice from storage must be consistent");
                     if let ValueWithLayout::RawFromStorage(prev_v) = prev_v {
-                        assert!(v.bytes().map(|b| b.len()) == prev_v.bytes().map(|b| b.len()));
+                        assert_eq!(v.bytes().map(|b| b.len()), prev_v.bytes().map(|b| b.len()));
                     }
                 }
             },
@@ -355,7 +355,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                     })
             })
             .collect::<Result<Vec<_>, MVGroupError>>()?;
-        group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)
+        group_size_as_sum(sizes.into_iter()).map_err(MVGroupError::TagSerializationError)
     }
 }
 
@@ -436,7 +436,7 @@ impl<
         key: &K,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Version, ValueWithLayout<V>), MVGroupError> {
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),

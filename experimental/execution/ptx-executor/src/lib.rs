@@ -27,13 +27,13 @@ use aptos_executor::{
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
-use aptos_state_view::StateView;
 use aptos_storage_interface::cached_state_view::CachedStateView;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfigFromOnchain,
         partitioner::{ExecutableTransactions, PartitionedTransactions},
     },
+    state_store::StateView,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput,

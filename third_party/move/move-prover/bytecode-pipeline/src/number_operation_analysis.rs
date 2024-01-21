@@ -59,7 +59,7 @@ impl NumberOperationProcessor {
     /// Entry point of the analysis
     fn analyze<'a>(&self, env: &'a GlobalEnv, targets: &'a FunctionTargetsHolder) {
         self.create_initial_exp_oper_state(env);
-        let fun_env_vec = FunctionTargetPipeline::sort_targets_in_topological_order(env, targets);
+        let fun_env_vec = FunctionTargetPipeline::sort_in_reverse_topological_order(env, targets);
         for item in &fun_env_vec {
             match item {
                 Either::Left(fid) => {
@@ -342,7 +342,7 @@ impl<'a> NumberOperationAnalysis<'a> {
                                     if callee_spec_fun.body.is_some() {
                                         let body_exp = callee_spec_fun.body.as_ref().unwrap();
                                         let local_map = body_exp.bound_local_vars_with_node_id();
-                                        for (i, Parameter(sym, _)) in
+                                        for (i, Parameter(sym, _, loc)) in
                                             callee_spec_fun.params.iter().enumerate()
                                         {
                                             if local_map.contains_key(sym) {
@@ -352,12 +352,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                                                 if let Some(oper) = oper_opt {
                                                     // Still need to check compatibility
                                                     if !allow_merge && oper.conflict(&para_vec[i]) {
-                                                        self.func_target.global_env().error(
-                                                            &self
-                                                                .func_target
-                                                                .get_bytecode_loc(attr_id),
-                                                            CONFLICT_ERROR_MSG,
-                                                        );
+                                                        self.func_target
+                                                            .global_env()
+                                                            .error(loc, CONFLICT_ERROR_MSG);
                                                     } else {
                                                         let merged = oper.merge(&para_vec[i]);
                                                         para_vec[i] = merged;
@@ -477,8 +474,9 @@ impl<'a> NumberOperationAnalysis<'a> {
                 },
                 _ => {},
             }
+            true // keep going
         };
-        e.visit(visitor);
+        e.visit_post_order(visitor);
     }
 
     /// Check whether operations in s conflicting

@@ -20,6 +20,7 @@ events emitted to a handle and emit events to the event store.
 -  [Function `destroy_handle`](#0x1_event_destroy_handle)
 -  [Specification](#@Specification_0)
     -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
     -  [Function `emit`](#@Specification_0_emit)
     -  [Function `write_module_event_to_store`](#@Specification_0_write_module_event_to_store)
     -  [Function `emit_event`](#@Specification_0_emit_event)
@@ -294,7 +295,7 @@ Destroy a unique handle.
 
 <table>
 <tr>
-<th>No.</th><th>Property</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
 </tr>
 
 <tr>
@@ -339,6 +340,11 @@ Destroy a unique handle.
 
 </table>
 
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
@@ -394,7 +400,7 @@ Native function use opaque.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>ensures</b> [concrete] handle_ref.counter == <b>old</b>(handle_ref.counter) + 1;
 </code></pre>
 
@@ -412,7 +418,7 @@ Native function use opaque.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high level requirement 5</a>:
+<pre><code>// This enforces <a id="high-level-req-5.1" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -430,7 +436,7 @@ Native function use opaque.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high level requirement 5</a>:
+<pre><code>// This enforces <a id="high-level-req-5.2" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 
@@ -466,7 +472,7 @@ Native function use opaque.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high level requirement 5</a>:
+<pre><code>// This enforces <a id="high-level-req-5.3" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

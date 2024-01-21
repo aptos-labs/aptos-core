@@ -100,7 +100,7 @@ fn update_rocksdb_properties(
 
     if enable_storage_sharding {
         for cf in ledger_metadata_db_column_families() {
-            set_property(cf, ledger_db.metadata_db())?;
+            set_property(cf, &ledger_db.metadata_db_arc())?;
         }
 
         for cf in write_set_db_column_families() {
@@ -112,11 +112,11 @@ fn update_rocksdb_properties(
         }
 
         for cf in transaction_db_column_families() {
-            set_property(cf, ledger_db.transaction_db())?;
+            set_property(cf, ledger_db.transaction_db_raw())?;
         }
 
         for cf in event_db_column_families() {
-            set_property(cf, ledger_db.event_db())?;
+            set_property(cf, ledger_db.event_db_raw())?;
         }
 
         for cf in transaction_accumulator_db_column_families() {
@@ -133,7 +133,7 @@ fn update_rocksdb_properties(
         }
     } else {
         for cf in ledger_db_column_families() {
-            set_property(cf, ledger_db.metadata_db())?;
+            set_property(cf, &ledger_db.metadata_db_arc())?;
         }
     }
 

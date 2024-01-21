@@ -18,13 +18,12 @@ use aptos_block_executor::{
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
 use aptos_infallible::Mutex;
-use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, StateView, StateViewId},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput,
         TransactionOutput, TransactionStatus,

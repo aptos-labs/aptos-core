@@ -11,6 +11,7 @@ xclippy = [
   "-Aclippy::result-large-err",
   "-Aclippy::mutable-key-type",
 ]
+x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 
 [build]
 rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]

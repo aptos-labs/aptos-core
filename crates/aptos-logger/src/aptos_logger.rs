@@ -57,7 +57,7 @@ struct TruncatedLogString(String);
 
 impl TruncatedLogString {
     const DEFAULT_MAX_LEN: usize = 10 * 1024;
-    const TRUNCATION_SUFFIX: &str = "(truncated)";
+    const TRUNCATION_SUFFIX: &'static str = "(truncated)";
 
     fn new(s: String) -> Self {
         let mut truncated = s;

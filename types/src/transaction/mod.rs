@@ -19,6 +19,7 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
+    zkid::{ZkIdPublicKey, ZkIdSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -51,6 +52,8 @@ mod script;
 pub mod signature_verified_transaction;
 pub mod webauthn;
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
     contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
     proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
@@ -704,6 +707,25 @@ impl SignedTransaction {
         }
     }
 
+    pub fn new_zkid(
+        raw_txn: RawTransaction,
+        public_key: ZkIdPublicKey,
+        signature: ZkIdSignature,
+    ) -> SignedTransaction {
+        let authenticator = TransactionAuthenticator::single_sender(
+            AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
+                AnyPublicKey::zkid(public_key),
+                AnySignature::zkid(signature),
+            )),
+        );
+        SignedTransaction {
+            raw_txn,
+            authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+        }
+    }
+
     pub fn new_single_sender(
         raw_txn: RawTransaction,
         authenticator: AccountAuthenticator,
@@ -1297,6 +1319,18 @@ impl TransactionInfo {
             status,
         )
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    fn dummy() -> Self {
+        Self::new(
+            HashValue::default(),
+            HashValue::default(),
+            HashValue::default(),
+            None,
+            0,
+            ExecutionStatus::Success,
+        )
+    }
 }
 
 impl Deref for TransactionInfo {
@@ -1429,6 +1463,26 @@ impl TransactionToCommit {
             write_set,
             events,
             is_reconfig,
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Self {
+            transaction: Transaction::StateCheckpoint(HashValue::zero()),
+            transaction_info: TransactionInfo::dummy(),
+            state_updates: create_empty_sharded_state_updates(),
+            write_set: Default::default(),
+            events: vec![],
+            is_reconfig: false,
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_events(events: Vec<ContractEvent>) -> Self {
+        Self {
+            events,
+            ..Self::dummy()
         }
     }
 
@@ -1867,6 +1921,11 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Transaction::StateCheckpoint(HashValue::zero())
     }
 }
 

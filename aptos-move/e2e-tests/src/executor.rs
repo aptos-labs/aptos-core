@@ -26,7 +26,6 @@ use aptos_gas_schedule::{
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
-use aptos_state_view::TStateView;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{
@@ -43,7 +42,7 @@ use aptos_types::{
         FeatureFlag, Features, OnChainConfig, TimedFeatureOverride, TimedFeaturesBuilder,
         ValidatorSet, Version,
     },
-    state_store::{state_key::StateKey, state_value::StateValue},
+    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
