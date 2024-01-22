@@ -12,7 +12,6 @@ use crate::{
     },
     golden_outputs::GoldenOutputs,
 };
-use anyhow::Error;
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -1096,7 +1095,7 @@ impl FakeExecutor {
         func_name: Identifier,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<ViewFunctionOutput, Error> {
+    ) -> ViewFunctionOutput {
         // No gas limit
         AptosVM::execute_view_function(
             self.get_state_view(),

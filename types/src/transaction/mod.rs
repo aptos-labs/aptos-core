@@ -2006,12 +2006,12 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 }
 
 pub struct ViewFunctionOutput {
-    pub values: Vec<Vec<u8>>,
+    pub values: Result<Vec<Vec<u8>>>,
     pub gas_used: u64,
 }
 
 impl ViewFunctionOutput {
-    pub fn new(values: Vec<Vec<u8>>, gas_used: u64) -> Self {
+    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
         Self { values, gas_used }
     }
 }

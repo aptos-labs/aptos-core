@@ -142,15 +142,15 @@ fn view_request(
         view_function.ty_args.clone(),
         view_function.args.clone(),
         context.node_config.api.max_gas_view_function,
-    )
-    .map_err(|err| {
+    );
+    let values = output.values.map_err(|err| {
         BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
     })?;
     let result = match accept_type {
         AcceptType::Bcs => {
             // The return values are already BCS encoded, but we still need to encode the outside
             // vector without re-encoding the inside values
-            let num_vals = output.values.len();
+            let num_vals = values.len();
 
             // Push the length of the return values
             let mut length = vec![];
@@ -163,7 +163,7 @@ fn view_request(
             })?;
 
             // Combine all of the return values
-            let values = output.values.into_iter().concat();
+            let values = values.into_iter().concat();
             let ret = [length, values].concat();
 
             BasicResponse::try_from_encoded((ret, &ledger_info, BasicResponseStatus::Ok))
@@ -186,8 +186,7 @@ fn view_request(
                     )
                 })?;
 
-            let move_vals = output
-                .values
+            let move_vals = values
                 .into_iter()
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
