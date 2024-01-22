@@ -230,7 +230,7 @@ impl ControlFlowGraphCodeGenerator {
                 let suc_block = *self.cfg.successors(block).get(0).expect("successor block");
                 debug_assert!(
                     suc_block != self.cfg.exit_block(),
-                    "path endding without return/abort"
+                    "path ending without return/abort"
                 );
                 let maybe_next_to_visit = iter_dfs_left.peek();
                 if maybe_next_to_visit.is_none() || *maybe_next_to_visit.unwrap() != suc_block {
