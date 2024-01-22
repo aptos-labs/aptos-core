@@ -169,7 +169,7 @@ fn count_srcs(codes: &[Bytecode]) -> BTreeMap<Label, usize> {
     let mut srcs_count = BTreeMap::new();
     for code in codes {
         match code {
-            Bytecode::Jump(_, label) => map_inc(&mut srcs_count, label.clone()),
+            Bytecode::Jump(_, label) => map_inc(&mut srcs_count, *label),
             Bytecode::Branch(_, l0, l1, _) => {
                 map_inc(&mut srcs_count, *l0);
                 map_inc(&mut srcs_count, *l1);
