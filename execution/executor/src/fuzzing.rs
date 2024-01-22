@@ -101,11 +101,11 @@ impl VMExecutor for FakeVM {
 pub struct FakeDb;
 
 impl DbReader for FakeDb {
-    fn get_latest_version(&self) -> Result<Version> {
+    fn get_latest_version(&self) -> aptos_storage_interface::Result<Version> {
         Ok(self.get_latest_ledger_info()?.ledger_info().version())
     }
 
-    fn get_latest_commit_metadata(&self) -> Result<(Version, u64)> {
+    fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)> {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
@@ -123,7 +123,7 @@ impl DbWriter for FakeDb {
         _in_memory_state: StateDelta,
         _block_state_updates: Option<ShardedStateUpdates>,
         _sharded_state_cache: Option<&ShardedStateCache>,
-    ) -> Result<()> {
+    ) -> aptos_storage_interface::Result<()> {
         Ok(())
     }
 }

@@ -92,14 +92,6 @@ impl AccessPath {
         AccessPath { address, path }
     }
 
-    /// An access path which has no valid target, used for representing failure of computing one.
-    pub fn undefined() -> Self {
-        AccessPath {
-            address: AccountAddress::ZERO,
-            path: vec![],
-        }
-    }
-
     pub fn resource_path_vec(tag: StructTag) -> Result<Vec<u8>> {
         let r = bcs::to_bytes(&Path::Resource(tag))?;
         Ok(r)

@@ -11,12 +11,13 @@ use crate::{
         column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
-use anyhow::{bail, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
-use aptos_storage_interface::{state_view::DbStateView, DbReader};
+use aptos_storage_interface::{
+    db_other_bail as bail, state_view::DbStateView, AptosDbError, DbReader, Result,
+};
 use aptos_types::{
     access_path::Path,
     account_address::AccountAddress,
@@ -33,7 +34,7 @@ use dashmap::{DashMap, DashSet};
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
-    resolver::MoveResolver,
+    resolver::ModuleResolver,
 };
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
@@ -114,7 +115,7 @@ impl IndexerAsyncV2 {
 
     /// Index write sets with the move annotator to parse obscure table handle and key value types
     /// After the current batch's parsed, write the mapping to the rocksdb, also update the next version to be processed
-    pub fn index_with_annotator<R: MoveResolver>(
+    pub fn index_with_annotator<R: ModuleResolver>(
         &self,
         annotator: &MoveValueAnnotator<R>,
         first_version: Version,
@@ -142,7 +143,7 @@ impl IndexerAsyncV2 {
                     error = ?&err,
                     "[DB] Failed to parse table info"
                 );
-                bail!(err);
+                bail!("{}", err);
             },
         };
         self.db.write_schemas(batch)?;
@@ -204,7 +205,7 @@ impl IndexerAsyncV2 {
     }
 
     pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        self.db.get::<TableInfoSchema>(&handle)
+        self.db.get::<TableInfoSchema>(&handle).map_err(Into::into)
     }
 
     pub fn get_table_info_with_retry(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
@@ -235,7 +236,7 @@ struct TableInfoParser<'a, R> {
     pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
 }
 
-impl<'a, R: MoveResolver> TableInfoParser<'a, R> {
+impl<'a, R: ModuleResolver> TableInfoParser<'a, R> {
     pub fn new(
         indexer_async_v2: &'a IndexerAsyncV2,
         annotator: &'a MoveValueAnnotator<R>,

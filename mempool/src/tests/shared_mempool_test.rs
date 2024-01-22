@@ -10,10 +10,11 @@ use crate::{
 use aptos_consensus_types::common::RejectedTransactionSummary;
 use aptos_mempool_notifications::MempoolNotificationSender;
 use aptos_types::{transaction::Transaction, vm_status::DiscardedVMStatus};
-use futures::{channel::oneshot, executor::block_on, sink::SinkExt};
+use futures::{channel::oneshot, sink::SinkExt};
+use tokio::time::timeout;
 
-#[test]
-fn test_consensus_events_rejected_txns() {
+#[tokio::test]
+async fn test_consensus_events_rejected_txns() {
     let smp = MockSharedMempool::new();
 
     // Add txns 1, 2, 3
@@ -42,10 +43,8 @@ fn test_consensus_events_rejected_txns() {
     let (callback, callback_rcv) = oneshot::channel();
     let req = QuorumStoreRequest::RejectNotification(transactions, callback);
     let mut consensus_sender = smp.consensus_to_mempool_sender.clone();
-    block_on(async {
-        assert!(consensus_sender.send(req).await.is_ok());
-        assert!(callback_rcv.await.is_ok());
-    });
+    assert!(consensus_sender.send(req).await.is_ok());
+    assert!(callback_rcv.await.is_ok());
 
     let pool = smp.mempool.lock();
     // TODO: make less brittle to broadcast buckets changes
@@ -54,12 +53,9 @@ fn test_consensus_events_rejected_txns() {
     assert_eq!(timeline.first().unwrap(), &kept_txn);
 }
 
-#[test]
-fn test_mempool_notify_committed_txns() {
-    // Create runtime for the mempool notifier and listener
-    let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
-    let _enter = runtime.enter();
-
+#[allow(clippy::await_holding_lock)] // This appears to be a false positive!
+#[tokio::test(flavor = "multi_thread")]
+async fn test_mempool_notify_committed_txns() {
     // Create a new mempool notifier, listener and shared mempool
     let smp = MockSharedMempool::new();
 
@@ -81,18 +77,31 @@ fn test_mempool_notify_committed_txns() {
         assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
     }
 
+    // Notify mempool of the new commit
     let committed_txns = vec![Transaction::UserTransaction(committed_txn)];
-    block_on(async {
-        assert!(smp
-            .mempool_notifier
-            .notify_new_commit(committed_txns, 1, 1000)
-            .await
-            .is_ok());
-    });
+    assert!(smp
+        .mempool_notifier
+        .notify_new_commit(committed_txns, 1)
+        .await
+        .is_ok());
 
-    let pool = smp.mempool.lock();
-    // TODO: make less brittle to broadcast buckets changes
-    let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
-    assert_eq!(timeline.len(), 1);
-    assert_eq!(timeline.first().unwrap(), &kept_txn);
+    // Wait until mempool handles the commit notification
+    let wait_for_commit = async {
+        let pool = smp.mempool.lock();
+        // TODO: make less brittle to broadcast buckets changes
+        let (timeline, _) = pool.read_timeline(&vec![0; 10].into(), 10);
+        if timeline.len() == 10 && timeline.first().unwrap() == &kept_txn {
+            return; // Mempool handled the commit notification
+        }
+        drop(pool);
+
+        // Sleep for a while
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    };
+    if let Err(elasped) = timeout(std::time::Duration::from_secs(5), wait_for_commit).await {
+        panic!(
+            "Mempool did not receive the commit notification! {:?}",
+            elasped
+        );
+    }
 }

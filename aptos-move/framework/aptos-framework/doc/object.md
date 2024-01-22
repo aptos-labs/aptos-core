@@ -464,7 +464,8 @@ Used to create derived objects from a given objects.
 Emitted whenever the object's owner field is changed.
 
 
-<pre><code><b>struct</b> <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> <b>has</b> drop, store
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -1692,6 +1693,13 @@ Transfer to the destination address using a LinearTransferRef.
         <a href="object.md#0x1_object">object</a>.owner == ref.owner,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>),
     );
+    <a href="event.md#0x1_event_emit">event::emit</a>(
+        <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+            <a href="object.md#0x1_object">object</a>: ref.self,
+            from: <a href="object.md#0x1_object">object</a>.owner,
+            <b>to</b>,
+        },
+    );
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
         &<b>mut</b> <a href="object.md#0x1_object">object</a>.transfer_events,
         <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
@@ -1819,6 +1827,13 @@ hierarchy.
 <pre><code>inline <b>fun</b> <a href="object.md#0x1_object_transfer_raw_inner">transfer_raw_inner</a>(<a href="object.md#0x1_object">object</a>: <b>address</b>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
     <b>let</b> object_core = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
     <b>if</b> (object_core.owner != <b>to</b>) {
+        <a href="event.md#0x1_event_emit">event::emit</a>(
+            <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
+                <a href="object.md#0x1_object">object</a>,
+                from: object_core.owner,
+                <b>to</b>,
+            },
+        );
         <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> object_core.transfer_events,
             <a href="object.md#0x1_object_TransferEvent">TransferEvent</a> {
@@ -2637,7 +2652,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+<pre><code>// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>aborts_if</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>);
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>).guid_creation_num == <a href="object.md#0x1_object_INIT_GUID_CREATION_NUM">INIT_GUID_CREATION_NUM</a> + 1;
@@ -2836,7 +2851,7 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 <pre><code><b>let</b> <a href="object.md#0x1_object">object</a> = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self);
-// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.owner != ref.owner;
 <b>ensures</b> <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(ref.self).owner == <b>to</b>;
 </code></pre>

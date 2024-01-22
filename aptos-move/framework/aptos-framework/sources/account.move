@@ -23,6 +23,13 @@ module aptos_framework::account {
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_validation;
 
+    #[event]
+    struct KeyRotation has drop, store {
+        account: address,
+        old_authentication_key: vector<u8>,
+        new_authentication_key: vector<u8>,
+    }
+
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
@@ -593,6 +600,11 @@ module aptos_framework::account {
         let new_auth_key = from_bcs::to_address(new_auth_key_vector);
         table::add(address_map, new_auth_key, originating_addr);
 
+        event::emit<KeyRotation>(KeyRotation {
+            account: originating_addr,
+            old_authentication_key: account_resource.authentication_key,
+            new_authentication_key: new_auth_key_vector,
+        });
         event::emit_event<KeyRotationEvent>(
             &mut account_resource.key_rotation_events,
             KeyRotationEvent {
@@ -783,7 +795,12 @@ module aptos_framework::account {
 
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
-        create_account_unchecked(new_address)
+        // Make this easier by just allowing the account to be created again in a test
+        if (!exists_at(new_address)) {
+            create_account_unchecked(new_address)
+        } else {
+            create_signer_for_test(new_address)
+        }
     }
 
     #[test]

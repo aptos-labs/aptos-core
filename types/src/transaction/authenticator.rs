@@ -7,6 +7,7 @@ use crate::{
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
+    zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use anyhow::{bail, ensure, Error, Result};
 use aptos_crypto::{
@@ -798,12 +799,12 @@ impl MultiKeyAuthenticator {
         &self.public_keys
     }
 
-    pub fn signatures(&self) -> Vec<(u8, AnySignature)> {
+    pub fn signatures(&self) -> Vec<(u8, &AnySignature)> {
         let mut values = vec![];
         for (idx, signature) in
             std::iter::zip(self.signatures_bitmap.iter_ones(), self.signatures.iter())
         {
-            values.push((idx as u8, signature.clone()));
+            values.push((idx as u8, signature));
         }
         values
     }
@@ -968,6 +969,9 @@ pub enum AnySignature {
     WebAuthn {
         signature: PartialAuthenticatorAssertionResponse,
     },
+    ZkId {
+        signature: ZkIdSignature,
+    },
 }
 
 impl AnySignature {
@@ -983,6 +987,10 @@ impl AnySignature {
         Self::WebAuthn { signature }
     }
 
+    pub fn zkid(signature: ZkIdSignature) -> Self {
+        Self::ZkId { signature }
+    }
+
     pub fn verify<T: Serialize + CryptoHash>(
         &self,
         public_key: &AnyPublicKey,
@@ -996,6 +1004,26 @@ impl AnySignature {
                 signature.verify(message, public_key)
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
+            (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key }) => {
+                match &signature.sig {
+                    ZkpOrOpenIdSig::Groth16Zkp(_) => {},
+                    ZkpOrOpenIdSig::OpenIdSig(oidc_sig) => oidc_sig.verify_jwt_claims(
+                        signature.exp_timestamp_secs,
+                        &signature.ephemeral_pubkey,
+                        public_key,
+                    )?,
+                }
+                // Verify the ephemeral signature on the TXN. The rest of the verification,
+                // i.e., [ZKPoK of] OpenID signature verification will be done in `AptosVM::run_prologue`.
+                // This is due to the dependency on the JWK, which must be fetched from the chain,
+                // since JWKs are updated automatically via consensus.
+                //
+                // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
+                // used below is the right pubkey signed by the OIDC provider.
+                signature
+                    .ephemeral_signature
+                    .verify(message, &signature.ephemeral_pubkey)
+            },
             _ => bail!("Invalid key, signature pairing"),
         }
     }
@@ -1012,6 +1040,9 @@ pub enum AnyPublicKey {
     Secp256r1Ecdsa {
         public_key: secp256r1_ecdsa::PublicKey,
     },
+    ZkId {
+        public_key: ZkIdPublicKey,
+    },
 }
 
 impl AnyPublicKey {
@@ -1027,22 +1058,87 @@ impl AnyPublicKey {
         Self::Secp256r1Ecdsa { public_key }
     }
 
+    pub fn zkid(public_key: ZkIdPublicKey) -> Self {
+        Self::ZkId { public_key }
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum EphemeralSignature {
+    Ed25519 { signature: Ed25519Signature },
+}
+
+impl EphemeralSignature {
+    pub fn ed25519(signature: Ed25519Signature) -> Self {
+        Self::Ed25519 { signature }
+    }
+
+    pub fn verify<T: Serialize + CryptoHash>(
+        &self,
+        message: &T,
+        public_key: &EphemeralPublicKey,
+    ) -> Result<()> {
+        match (self, public_key) {
+            (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
+                signature.verify(message, public_key)
+            },
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for EphemeralSignature {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<EphemeralSignature>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum EphemeralPublicKey {
+    Ed25519 { public_key: Ed25519PublicKey },
+}
+
+impl EphemeralPublicKey {
+    pub fn ed25519(public_key: Ed25519PublicKey) -> Self {
+        Self::Ed25519 { public_key }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
+    }
+}
+
+impl TryFrom<&[u8]> for EphemeralPublicKey {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
+        bcs::from_bytes::<EphemeralPublicKey>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transaction::{webauthn::AssertionSignature, SignedTransaction};
+    use crate::{
+        transaction::{webauthn::AssertionSignature, SignedTransaction},
+        zkid::{IdCommitment, OpenIdSig, Pepper, EPK_BLINDER_NUM_BYTES},
+    };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
         secp256k1_ecdsa,
         secp256r1_ecdsa::{PublicKey, Signature},
         PrivateKey, SigningKey, Uniform,
     };
+    use base64::URL_SAFE_NO_PAD;
     use hex::FromHex;
+    use rand::{rngs::StdRng, SeedableRng};
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
@@ -1568,5 +1664,429 @@ mod tests {
 
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_ok());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth() {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
+            idc,
+        };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            pepper,
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_ok());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth_fails_with_different_pepper() {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let bad_pepper = 123;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
+            idc,
+        };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            bad_pepper, // Pepper does not match
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth_fails_with_expiry_past_horizon() {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
+            idc,
+        };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            pepper,
+            1000000000000000000,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth_fails_with_different_uid_val() {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": {},
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, "bad_uid_val", aud, exp_timestamp_secs
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
+            idc,
+        };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            pepper,
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth_fails_with_bad_nonce() {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "bad nonce",
+            "exp": {},
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud, exp_timestamp_secs
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: iss.to_owned(),
+            idc,
+        };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            pepper,
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth_fails_with_bad_ephemeral_signature() {
+        let pepper = Pepper::from_number(76);
+        let idc =
+            IdCommitment::new_from_preimage("s6BhdRkqt3", "sub", "248289761001", &pepper).unwrap();
+        let sender_zkid_public_key = ZkIdPublicKey {
+            iss: "https://server.example.com".to_owned(),
+            idc,
+        };
+        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
+        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
+        let sender_addr = sender_auth_key.account_address();
+
+        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
+        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
+
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+            sender_addr,
+            0,
+            &ephemeral_private_key,
+            ephemeral_private_key.public_key(),
+            None,
+            0,
+            0,
+            None,
+        )
+        .into_raw_transaction();
+
+        let mut rng: StdRng = SeedableRng::from_seed([1; 32]);
+        let bad_ephemeral_private_key = Ed25519PrivateKey::generate(&mut rng); // Wrong private key!
+        let sender_sig = bad_ephemeral_private_key.sign(&raw_txn).unwrap();
+        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
+
+        // This is the decoded json string the jwt_payload used below.
+        //
+        // {
+        //     "iss": "https://server.example.com",
+        //     "sub": "248289761001",
+        //     "aud": "s6BhdRkqt3",
+        //     "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+        //     "exp": 1311281970,
+        //     "iat": 1311280970,
+        //     "name": "Jane Doe",
+        //     "given_name": "Jane",
+        //     "family_name": "Doe",
+        //     "gender": "female",
+        //     "birthdate": "0000-10-31",
+        //     "email": "janedoe@example.com",
+        //     "picture": "http://example.com/janedoe/me.jpg"
+        // }
+        let openid_signature = OpenIdSig {
+            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
+            jwt_payload: "ewogImlzcyI6ICJodHRwczovL3NlcnZlci5leGFtcGxlLmNvbSIsCiAic3ViIjogIjI0ODI4OTc2MTAwMSIsCiAiYXVkIjogInM2QmhkUmtxdDMiLAogIm5vbmNlIjogIjdCZ2pFMU1aZ0xLWV80TndWV29KS1VLUGdwQmNCMGVzcFJ3S1lBU0drZ3ciLAogImV4cCI6IDEzMTEyODE5NzAsCiAiaWF0IjogMTMxMTI4MDk3MCwKICJuYW1lIjogIkphbmUgRG9lIiwKICJnaXZlbl9uYW1lIjogIkphbmUiLAogImZhbWlseV9uYW1lIjogIkRvZSIsCiAiZ2VuZGVyIjogImZlbWFsZSIsCiAiYmlydGhkYXRlIjogIjAwMDAtMTAtMzEiLAogImVtYWlsIjogImphbmVkb2VAZXhhbXBsZS5jb20iLAogInBpY3R1cmUiOiAiaHR0cDovL2V4YW1wbGUuY29tL2phbmVkb2UvbWUuanBnIgp9".to_string(),
+            uid_key: "sub".to_string(),
+            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+            pepper,
+        };
+
+        let zk_sig = ZkIdSignature {
+            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
+            jwt_header: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.".to_owned(),
+            exp_timestamp_secs: 1311281970,
+            ephemeral_pubkey: ephemeral_public_key,
+            ephemeral_signature,
+        };
+
+        let sk_auth =
+            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
+        let account_auth = AccountAuthenticator::single_key(sk_auth);
+        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    #[test]
+    fn verify_zkid_open_id_single_key_auth_fails_with_different_iss() {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let pepper = 76;
+        let exp_timestamp_secs = 1311281970;
+        let jwt_header_json = r#"{
+            "alg": "RS256",
+            "typ": "JWT"
+          }"#;
+        let jwt_payload_json = format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "exp": {},
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud, exp_timestamp_secs
+        );
+        let idc =
+            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+                .unwrap();
+        let zkid_pubkey = ZkIdPublicKey {
+            iss: "bad_iss".to_owned(),
+            idc,
+        };
+        let signed_txn = zkid_test_setup(
+            zkid_pubkey,
+            uid_key,
+            pepper,
+            exp_timestamp_secs,
+            jwt_header_json,
+            &jwt_payload_json,
+        );
+        let verification_result = signed_txn.verify_signature();
+        assert!(verification_result.is_err());
+    }
+
+    fn zkid_test_setup(
+        zkid_pubkey: ZkIdPublicKey,
+        uid_key: &str,
+        pepper: u128,
+        exp_timestamp_secs: u64,
+        jwt_header_unencoded: &str,
+        jwt_payload_unencoded: &str,
+    ) -> SignedTransaction {
+        let sender_zkid_public_key = zkid_pubkey;
+        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
+        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
+        let sender_addr = sender_auth_key.account_address();
+
+        let ephemeral_private_key = Ed25519PrivateKey::generate_for_testing();
+        let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_private_key.public_key());
+
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+            sender_addr,
+            0,
+            &ephemeral_private_key,
+            ephemeral_private_key.public_key(),
+            None,
+            0,
+            0,
+            None,
+        )
+        .into_raw_transaction();
+
+        let sender_sig = ephemeral_private_key.sign(&raw_txn).unwrap();
+        let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
+
+        let jwt_payload = base64::encode_config(jwt_payload_unencoded.as_bytes(), URL_SAFE_NO_PAD);
+        let openid_signature = OpenIdSig {
+            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
+            jwt_payload,
+            uid_key: uid_key.to_owned(),
+            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+            pepper: Pepper::from_number(pepper),
+        };
+
+        let jwt_header = base64::encode_config(jwt_header_unencoded.as_bytes(), URL_SAFE_NO_PAD);
+        let zk_sig = ZkIdSignature {
+            sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
+            jwt_header,
+            exp_timestamp_secs,
+            ephemeral_pubkey: ephemeral_public_key,
+            ephemeral_signature,
+        };
+
+        let sk_auth =
+            SingleKeyAuthenticator::new(sender_any_public_key, AnySignature::zkid(zk_sig));
+        let account_auth = AccountAuthenticator::single_key(sk_auth);
+        SignedTransaction::new_single_sender(raw_txn, account_auth)
     }
 }

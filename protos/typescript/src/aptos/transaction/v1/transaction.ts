@@ -883,6 +883,7 @@ export enum AnyPublicKey_Type {
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_SECP256R1_ECDSA = 3,
+  TYPE_ZKID = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -900,6 +901,9 @@ export function anyPublicKey_TypeFromJSON(object: any): AnyPublicKey_Type {
     case 3:
     case "TYPE_SECP256R1_ECDSA":
       return AnyPublicKey_Type.TYPE_SECP256R1_ECDSA;
+    case 4:
+    case "TYPE_ZKID":
+      return AnyPublicKey_Type.TYPE_ZKID;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -917,6 +921,8 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
       return "TYPE_SECP256K1_ECDSA";
     case AnyPublicKey_Type.TYPE_SECP256R1_ECDSA:
       return "TYPE_SECP256R1_ECDSA";
+    case AnyPublicKey_Type.TYPE_ZKID:
+      return "TYPE_ZKID";
     case AnyPublicKey_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -928,6 +934,7 @@ export interface AnySignature {
   ed25519?: Ed25519 | undefined;
   secp256k1Ecdsa?: Secp256k1Ecdsa | undefined;
   webauthn?: WebAuthn | undefined;
+  zkid?: ZkId | undefined;
 }
 
 export enum AnySignature_Type {
@@ -935,6 +942,7 @@ export enum AnySignature_Type {
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_WEBAUTHN = 3,
+  TYPE_ZKID = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -952,6 +960,9 @@ export function anySignature_TypeFromJSON(object: any): AnySignature_Type {
     case 3:
     case "TYPE_WEBAUTHN":
       return AnySignature_Type.TYPE_WEBAUTHN;
+    case 4:
+    case "TYPE_ZKID":
+      return AnySignature_Type.TYPE_ZKID;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -969,6 +980,8 @@ export function anySignature_TypeToJSON(object: AnySignature_Type): string {
       return "TYPE_SECP256K1_ECDSA";
     case AnySignature_Type.TYPE_WEBAUTHN:
       return "TYPE_WEBAUTHN";
+    case AnySignature_Type.TYPE_ZKID:
+      return "TYPE_ZKID";
     case AnySignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -984,6 +997,10 @@ export interface Secp256k1Ecdsa {
 }
 
 export interface WebAuthn {
+  signature?: Uint8Array | undefined;
+}
+
+export interface ZkId {
   signature?: Uint8Array | undefined;
 }
 
@@ -7815,7 +7832,7 @@ export const AnyPublicKey = {
 };
 
 function createBaseAnySignature(): AnySignature {
-  return { type: 0, ed25519: undefined, secp256k1Ecdsa: undefined, webauthn: undefined };
+  return { type: 0, ed25519: undefined, secp256k1Ecdsa: undefined, webauthn: undefined, zkid: undefined };
 }
 
 export const AnySignature = {
@@ -7831,6 +7848,9 @@ export const AnySignature = {
     }
     if (message.webauthn !== undefined) {
       WebAuthn.encode(message.webauthn, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.zkid !== undefined) {
+      ZkId.encode(message.zkid, writer.uint32(42).fork()).ldelim();
     }
     return writer;
   },
@@ -7869,6 +7889,13 @@ export const AnySignature = {
           }
 
           message.webauthn = WebAuthn.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.zkid = ZkId.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -7917,6 +7944,7 @@ export const AnySignature = {
       ed25519: isSet(object.ed25519) ? Ed25519.fromJSON(object.ed25519) : undefined,
       secp256k1Ecdsa: isSet(object.secp256k1Ecdsa) ? Secp256k1Ecdsa.fromJSON(object.secp256k1Ecdsa) : undefined,
       webauthn: isSet(object.webauthn) ? WebAuthn.fromJSON(object.webauthn) : undefined,
+      zkid: isSet(object.zkid) ? ZkId.fromJSON(object.zkid) : undefined,
     };
   },
 
@@ -7933,6 +7961,9 @@ export const AnySignature = {
     }
     if (message.webauthn !== undefined) {
       obj.webauthn = WebAuthn.toJSON(message.webauthn);
+    }
+    if (message.zkid !== undefined) {
+      obj.zkid = ZkId.toJSON(message.zkid);
     }
     return obj;
   },
@@ -7952,6 +7983,7 @@ export const AnySignature = {
     message.webauthn = (object.webauthn !== undefined && object.webauthn !== null)
       ? WebAuthn.fromPartial(object.webauthn)
       : undefined;
+    message.zkid = (object.zkid !== undefined && object.zkid !== null) ? ZkId.fromPartial(object.zkid) : undefined;
     return message;
   },
 };
@@ -8218,6 +8250,93 @@ export const WebAuthn = {
   },
   fromPartial(object: DeepPartial<WebAuthn>): WebAuthn {
     const message = createBaseWebAuthn();
+    message.signature = object.signature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseZkId(): ZkId {
+  return { signature: new Uint8Array(0) };
+}
+
+export const ZkId = {
+  encode(message: ZkId, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(10).bytes(message.signature);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ZkId {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseZkId();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<ZkId, Uint8Array>
+  async *encodeTransform(source: AsyncIterable<ZkId | ZkId[]> | Iterable<ZkId | ZkId[]>): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ZkId.encode(p).finish()];
+        }
+      } else {
+        yield* [ZkId.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, ZkId>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<ZkId> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [ZkId.decode(p)];
+        }
+      } else {
+        yield* [ZkId.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): ZkId {
+    return { signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0) };
+  },
+
+  toJSON(message: ZkId): unknown {
+    const obj: any = {};
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ZkId>): ZkId {
+    return ZkId.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ZkId>): ZkId {
+    const message = createBaseZkId();
     message.signature = object.signature ?? new Uint8Array(0);
     return message;
   },

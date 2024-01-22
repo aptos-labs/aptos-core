@@ -96,8 +96,8 @@ impl NetworkLoadTest for ExecutionDelayTest {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        remove_execution_delay(swarm)
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+        remove_execution_delay(ctx.swarm())
     }
 }
 
@@ -164,9 +164,9 @@ impl NetworkLoadTest for NetworkUnreliabilityTest {
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
         let runtime = Runtime::new().unwrap();
-        let validators = swarm.get_validator_clients_with_names();
+        let validators = ctx.swarm().get_validator_clients_with_names();
 
         runtime.block_on(async {
             for (name, validator) in validators {
@@ -283,16 +283,21 @@ impl NetworkLoadTest for CpuChaosTest {
     fn setup(&self, ctx: &mut NetworkContext) -> anyhow::Result<LoadDestination> {
         let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
 
-        ctx.swarm()
-            .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))?;
+        ctx.runtime.block_on(
+            ctx.swarm
+                .inject_chaos(SwarmChaos::CpuStress(swarm_cpu_stress)),
+        )?;
 
         Ok(LoadDestination::FullnodesOtherwiseValidators)
     }
 
-    fn finish(&self, swarm: &mut dyn Swarm) -> anyhow::Result<()> {
-        let swarm_cpu_stress = self.create_cpu_chaos(swarm);
+    fn finish(&self, ctx: &mut NetworkContext) -> anyhow::Result<()> {
+        let swarm_cpu_stress = self.create_cpu_chaos(ctx.swarm());
 
-        swarm.remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress))
+        ctx.runtime.block_on(
+            ctx.swarm
+                .remove_chaos(SwarmChaos::CpuStress(swarm_cpu_stress)),
+        )
     }
 }
 

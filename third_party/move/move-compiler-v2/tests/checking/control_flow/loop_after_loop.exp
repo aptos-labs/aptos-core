@@ -1,0 +1,12 @@
+// ---- Model Dump
+module <SELF>_0 {
+    private fun main() {
+        loop {
+          break
+        };
+        loop {
+          Tuple()
+        }
+    }
+    spec fun $main();
+} // end <SELF>_0

@@ -33,8 +33,7 @@ use crate::{
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
-        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient,
-        validator::ValidatorTxnPayloadClient, PayloadClient,
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -86,7 +85,7 @@ use aptos_types::{
     },
     validator_signer::ValidatorSigner,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
 use futures::{
     channel::{
@@ -135,7 +134,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     commit_state_computer: Arc<dyn StateComputer>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
-    validator_txn_pool_client: Arc<dyn ValidatorTxnPayloadClient>,
+    vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
@@ -179,7 +178,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
-        validator_txn_pool_client: vtxn_pool::ReadClient,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -201,7 +200,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             commit_state_computer,
             storage,
             safety_rules_manager,
-            validator_txn_pool_client: Arc::new(validator_txn_pool_client),
+            vtxn_pool,
             reconfig_events,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
@@ -393,6 +392,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.storage
                 .aptos_db()
                 .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
+                .map_err(Into::into)
                 .and_then(|proof| {
                     ensure!(
                         proof.ledger_info_with_sigs.len() as u64
@@ -897,7 +897,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
-            onchain_consensus_config.validator_txn_enabled(),
+            onchain_consensus_config.effective_validator_txn_config(),
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -1024,9 +1024,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (payload_manager, quorum_store_client, quorum_store_builder) = self
             .init_payload_provider(epoch_state, network_sender.clone(), consensus_config)
             .await;
+        let effective_vtxn_config = consensus_config.effective_validator_txn_config();
+        debug!("effective_vtxn_config={:?}", effective_vtxn_config);
         let mixed_payload_client = MixedPayloadClient::new(
-            consensus_config.validator_txn_enabled(),
-            self.validator_txn_pool_client.clone(),
+            effective_vtxn_config,
+            Arc::new(self.vtxn_pool.clone()),
             Arc::new(quorum_store_client),
         );
         self.init_commit_state_computer(epoch_state, payload_manager.clone(), execution_config);
@@ -1129,7 +1131,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             state_computer,
             block_tx,
             onchain_consensus_config.quorum_store_enabled(),
-            onchain_consensus_config.validator_txn_enabled(),
+            onchain_consensus_config.effective_validator_txn_config(),
             self.bounded_executor.clone(),
         );
 

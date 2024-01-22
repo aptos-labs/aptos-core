@@ -24,6 +24,8 @@ bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
+derivative = { workspace = true }
+move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 serde = { workspace = true }
 

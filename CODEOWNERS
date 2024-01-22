@@ -9,7 +9,8 @@
 # Owners for the `/aptos-move` directory and its subdirectories:`aptos-gas`, `aptos-vm`, `framework` and `framework/aptos-stdlib/sources/cryptography`.
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
 /aptos-move/aptos-gas/ @vgao1996
-/aptos-move/aptos-vm/ @davidiw @wrwg @zekun000
+/aptos-move/aptos-vm/ @davidiw @wrwg @zekun000 @vgao1996 @georgemitenkov
+/aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
 /aptos-move/e2e-tests/src/account.rs @alinush
 /aptos-move/framework/ @davidiw @movekevin @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush

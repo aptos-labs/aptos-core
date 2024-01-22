@@ -801,7 +801,7 @@ impl<'env> Docgen<'env> {
 
             let href = format!("href=\"{}#high-level-req\"", module_link);
             let link = format!(
-                "<a id=\"{}\" {}>high level requirement {}</a>{}",
+                "<a id=\"{}\" {}>high-level requirement {}</a>{}",
                 req_tag, href, req_number, suffix
             );
             links.push(link);

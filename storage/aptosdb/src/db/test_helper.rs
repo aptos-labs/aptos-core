@@ -11,14 +11,13 @@ use crate::{
     schema::{jellyfish_merkle_node::JellyfishMerkleNodeSchema, state_value::StateValueSchema},
     AptosDB,
 };
-use anyhow::Result;
 use aptos_crypto::hash::CryptoHash;
 #[cfg(test)]
 use aptos_crypto::HashValue;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_schemadb::SchemaBatch;
-use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order};
+use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order, Result};
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
@@ -399,7 +398,7 @@ pub fn test_save_blocks_impl(
         }
 
         assert_eq!(
-            db.ledger_store.get_latest_ledger_info().unwrap(),
+            db.ledger_db.metadata_db().get_latest_ledger_info().unwrap(),
             *ledger_info_with_sigs
         );
         verify_committed_transactions(

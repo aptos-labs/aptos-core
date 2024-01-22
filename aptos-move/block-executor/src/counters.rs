@@ -26,6 +26,27 @@ impl Mode {
     pub const SEQUENTIAL: &'static str = "sequential";
 }
 
+fn time_buckets() -> std::vec::Vec<f64> {
+    exponential_buckets(
+        /*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30,
+    )
+    .unwrap()
+}
+
+fn gas_buckets() -> std::vec::Vec<f64> {
+    exponential_buckets(
+        /*start=*/ 1.0, /*factor=*/ 1.5, /*count=*/ 30,
+    )
+    .unwrap()
+}
+
+fn output_buckets() -> std::vec::Vec<f64> {
+    exponential_buckets(
+        /*start=*/ 1.0, /*factor=*/ 2.0, /*count=*/ 30,
+    )
+    .unwrap()
+}
+
 /// Count of times the module publishing fallback was triggered in parallel execution.
 pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -70,7 +91,7 @@ pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_parallel_execution_seconds",
         // metric description
         "The time spent in seconds in parallel execution",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -81,7 +102,7 @@ pub static RAYON_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_rayon_execution_seconds",
         // metric description
         "The time spent in seconds in rayon thread pool in parallel execution",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -92,7 +113,7 @@ pub static VM_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_execution_vm_init_seconds",
         // metric description
         "The time spent in seconds in initializing the VM in the block executor",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -103,7 +124,7 @@ pub static TASK_VALIDATE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_execution_task_validate_seconds",
         // metric description
         "The time spent in task validation in Block STM",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -114,7 +135,7 @@ pub static WORK_WITH_TASK_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_execution_work_with_task_seconds",
         // metric description
         "The time spent in work task with scope call in Block STM",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -125,7 +146,7 @@ pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_execution_task_execute_seconds",
         // metric description
         "The time spent in seconds for task execution in Block STM",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -134,7 +155,7 @@ pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_execution_dependency_wait",
         "The time spent in waiting for dependency in Block STM",
-        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+        time_buckets(),
     )
     .unwrap()
 });
@@ -143,7 +164,8 @@ pub static BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_block_gas",
         "Histogram for different block gas costs (execution, io, storage, storage fee, non-storage)",
-        &["mode", "stage"]
+        &["mode", "stage"],
+        gas_buckets(),
     )
     .unwrap()
 });
@@ -153,7 +175,8 @@ pub static EFFECTIVE_BLOCK_GAS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_execution_effective_block_gas",
         "Histogram for different effective block gas costs - used for evaluating block gas limit. \
         This can be different from actual gas consumed in a block, due to applied adjustements",
-        &["mode"]
+        &["mode"],
+        gas_buckets(),
     )
     .unwrap()
 });
@@ -162,7 +185,8 @@ pub static APPROX_BLOCK_OUTPUT_SIZE: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_approx_block_output_size",
         "Historgram for different approx block output sizes - used for evaluting block ouptut limit.",
-        &["mode"]
+        &["mode"],
+        output_buckets(),
     )
     .unwrap()
 });
@@ -171,7 +195,8 @@ pub static TXN_GAS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_execution_txn_gas",
         "Histogram for different average txn gas costs (execution, io, storage, storage fee, non-storage)",
-        &["mode", "stage"]
+        &["mode", "stage"],
+        gas_buckets(),
     )
     .unwrap()
 });

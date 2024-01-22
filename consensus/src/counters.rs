@@ -233,6 +233,14 @@ pub static LEADER_REPUTATION_ROUND_HISTORY_SIZE: Lazy<IntGauge> = Lazy::new(|| {
 });
 
 /// Counts when chain_health backoff is triggered
+pub static CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
+    register_avg_counter(
+        "aptos_consensus_withold_vote_backpressure_triggered",
+        "Counts when consensus vote_backpressure is triggered",
+    )
+});
+
+/// Counts when chain_health backoff is triggered
 pub static CHAIN_HEALTH_BACKOFF_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
         "aptos_chain_health_backoff_triggered",

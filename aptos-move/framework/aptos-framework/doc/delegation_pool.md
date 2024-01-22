@@ -1840,14 +1840,13 @@ extracted-fee = (amount - extracted-fee) * reward-rate% * (100% - operator-commi
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_add_stake_fee">get_add_stake_fee</a>(pool_address: <b>address</b>, amount: u64): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_get_add_stake_fee">get_add_stake_fee</a>(pool_address: <b>address</b>, amount: u64): u64 <b>acquires</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>, <a href="delegation_pool.md#0x1_delegation_pool_NextCommissionPercentage">NextCommissionPercentage</a> {
     <b>if</b> (<a href="stake.md#0x1_stake_is_current_epoch_validator">stake::is_current_epoch_validator</a>(pool_address)) {
         <b>let</b> (rewards_rate, rewards_rate_denominator) = <a href="staking_config.md#0x1_staking_config_get_reward_rate">staking_config::get_reward_rate</a>(&<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>());
         <b>if</b> (rewards_rate_denominator &gt; 0) {
             <a href="delegation_pool.md#0x1_delegation_pool_assert_delegation_pool_exists">assert_delegation_pool_exists</a>(pool_address);
-            <b>let</b> pool = <b>borrow_global</b>&lt;<a href="delegation_pool.md#0x1_delegation_pool_DelegationPool">DelegationPool</a>&gt;(pool_address);
 
-            rewards_rate = rewards_rate * (<a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a> - pool.operator_commission_percentage);
+            rewards_rate = rewards_rate * (<a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a> - <a href="delegation_pool.md#0x1_delegation_pool_operator_commission_percentage">operator_commission_percentage</a>(pool_address));
             rewards_rate_denominator = rewards_rate_denominator * <a href="delegation_pool.md#0x1_delegation_pool_MAX_FEE">MAX_FEE</a>;
             ((((amount <b>as</b> u128) * (rewards_rate <b>as</b> u128)) / ((rewards_rate <b>as</b> u128) + (rewards_rate_denominator <b>as</b> u128))) <b>as</b> u64)
         } <b>else</b> { 0 }

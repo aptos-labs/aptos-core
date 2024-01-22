@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state_store::{
-    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
+    state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue, Result,
     TStateView,
 };
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

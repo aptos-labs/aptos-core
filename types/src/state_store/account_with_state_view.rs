@@ -22,7 +22,9 @@ impl<'a> AccountWithStateView<'a> {
 
 impl<'a> AccountView for AccountWithStateView<'a> {
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Bytes>> {
-        self.state_view.get_state_value_bytes(state_key)
+        self.state_view
+            .get_state_value_bytes(state_key)
+            .map_err(Into::into)
     }
 
     fn get_account_address(&self) -> anyhow::Result<Option<AccountAddress>> {

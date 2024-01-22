@@ -5,7 +5,6 @@
 
 use crate::{
     common::NUM_STATE_SHARDS,
-    event_store::EventStore,
     ledger_db::{LedgerDb, LedgerDbSchemaBatches},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -28,13 +27,13 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
-use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
     ReadOptions, SchemaBatch, DB,
 };
+use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
 use claims::{assert_ge, assert_lt};
 use rayon::prelude::*;
@@ -46,14 +45,6 @@ use std::{
         Arc,
     },
 };
-
-pub(crate) fn get_overall_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
-}
-
-pub(crate) fn get_ledger_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
-}
 
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
     get_progress(
@@ -72,11 +63,10 @@ pub(crate) fn get_state_merkle_commit_progress(
 }
 
 pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {
-    let event_store = EventStore::new(ledger_db.event_db_arc());
     let transaction_store = TransactionStore::new(Arc::clone(&ledger_db));
 
     let start_version = target_version + 1;
-    truncate_ledger_db_single_batch(&ledger_db, &event_store, &transaction_store, start_version)?;
+    truncate_ledger_db_single_batch(&ledger_db, &transaction_store, start_version)?;
     Ok(())
 }
 
@@ -247,25 +237,25 @@ fn truncate_transaction_accumulator(
 
 fn truncate_ledger_db_single_batch(
     ledger_db: &LedgerDb,
-    event_store: &EventStore,
     transaction_store: &TransactionStore,
     start_version: Version,
 ) -> Result<()> {
     let batch = LedgerDbSchemaBatches::new();
 
     delete_transaction_index_data(
+        ledger_db,
         transaction_store,
         start_version,
         &batch.transaction_db_batches,
     )?;
     delete_per_epoch_data(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
     delete_per_version_data(ledger_db, start_version, &batch)?;
 
-    delete_event_data(event_store, start_version, &batch.event_db_batches)?;
+    delete_event_data(ledger_db, start_version, &batch.event_db_batches)?;
 
     truncate_transaction_accumulator(
         ledger_db.transaction_accumulator_db(),
@@ -284,11 +274,13 @@ fn truncate_ledger_db_single_batch(
 }
 
 fn delete_transaction_index_data(
+    ledger_db: &LedgerDb,
     transaction_store: &TransactionStore,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    let transactions = transaction_store
+    let transactions = ledger_db
+        .transaction_db()
         .get_transaction_iter(start_version, MAX_COMMIT_PROGRESS_DIFFERENCE as usize * 2)?
         .collect::<Result<Vec<_>>>()?;
     let num_txns = transactions.len();
@@ -299,7 +291,9 @@ fn delete_transaction_index_data(
             "Truncate transaction index data."
         );
         transaction_store.prune_transaction_by_account(&transactions, batch)?;
-        transaction_store.prune_transaction_by_hash(&transactions, batch)?;
+        ledger_db
+            .transaction_db()
+            .prune_transaction_by_hash_indices(&transactions, batch)?;
     }
 
     Ok(())
@@ -352,12 +346,12 @@ fn delete_per_version_data(
         &batch.transaction_info_db_batches,
     )?;
     delete_per_version_data_impl::<TransactionSchema>(
-        ledger_db.transaction_db(),
+        ledger_db.transaction_db_raw(),
         start_version,
         &batch.transaction_db_batches,
     )?;
     delete_per_version_data_impl::<VersionDataSchema>(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
@@ -397,18 +391,20 @@ where
 }
 
 fn delete_event_data(
-    event_store: &EventStore,
+    ledger_db: &LedgerDb,
     start_version: Version,
     batch: &SchemaBatch,
 ) -> Result<()> {
-    if let Some(latest_version) = event_store.latest_version()? {
+    if let Some(latest_version) = ledger_db.event_db().latest_version()? {
         if latest_version >= start_version {
             info!(
                 start_version = start_version,
                 latest_version = latest_version,
                 "Truncate event data."
             );
-            event_store.prune_events(start_version, latest_version + 1, batch)?;
+            ledger_db
+                .event_db()
+                .prune_events(start_version, latest_version + 1, batch)?;
         }
     }
     Ok(())

@@ -8,20 +8,18 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
-        version_data::VersionDataSchema,
     },
     state_merkle_db::StateMerkleDb,
     state_store::StateStore,
     utils::truncation_helper::{
         find_closest_node_version_at_or_before, get_current_version_in_state_merkle_db,
-        get_ledger_commit_progress, get_overall_commit_progress, get_state_kv_commit_progress,
-        truncate_state_merkle_db,
+        get_state_kv_commit_progress, truncate_state_merkle_db,
     },
 };
-use anyhow::{ensure, Result};
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
 use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_schemadb::{ReadOptions, DB};
+use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::transaction::Version;
 use claims::assert_le;
 use clap::Parser;
@@ -88,9 +86,13 @@ impl Cmd {
         let ledger_db = Arc::new(ledger_db);
         let state_merkle_db = Arc::new(state_merkle_db);
         let state_kv_db = Arc::new(state_kv_db);
-        let overall_version = get_overall_commit_progress(ledger_db.metadata_db())?
+        let overall_version = ledger_db
+            .metadata_db()
+            .get_latest_version()
             .expect("Overall commit progress must exist.");
-        let ledger_db_version = get_ledger_commit_progress(ledger_db.metadata_db())?
+        let ledger_db_version = ledger_db
+            .metadata_db()
+            .get_ledger_commit_progress()
             .expect("Current version of ledger db must exist.");
         let state_kv_db_version = get_state_kv_commit_progress(&state_kv_db)?
             .expect("Current version of state kv db must exist.");
@@ -109,11 +111,7 @@ impl Cmd {
             overall_version, ledger_db_version, state_kv_db_version, state_merkle_db_version, target_version,
         );
 
-        if ledger_db
-            .metadata_db()
-            .get::<VersionDataSchema>(&target_version)?
-            .is_none()
-        {
+        if ledger_db.metadata_db().get_usage(target_version).is_err() {
             println!(
                 "Unable to truncate to version {}, since there is no VersionData on that version.",
                 target_version
@@ -122,24 +120,17 @@ impl Cmd {
                 "Trying to fallback to the largest valid version before version {}.",
                 target_version,
             );
-            let mut iter = ledger_db
+            target_version = ledger_db
                 .metadata_db()
-                .iter::<VersionDataSchema>(ReadOptions::default())?;
-            iter.seek_for_prev(&target_version)?;
-            match iter.next().transpose()? {
-                Some((previous_valid_version, _)) => {
-                    println!("Fallback to version {previous_valid_version}.");
-                    target_version = previous_valid_version;
-                },
-                None => panic!("Unable to find a valid version."),
-            };
+                .get_usage_before_or_at(target_version)?
+                .0;
         }
 
         // TODO(grao): We are using a brute force implementation for now. We might be able to make
         // it faster, since our data is append only.
         if target_version < state_merkle_db_version {
             let state_merkle_target_version = Self::find_tree_root_at_or_before(
-                ledger_db.metadata_db(),
+                &ledger_db.metadata_db_arc(),
                 &state_merkle_db,
                 target_version,
             )?
@@ -159,10 +150,13 @@ impl Cmd {
         }
 
         println!("Starting ledger db and state kv db truncation...");
-        ledger_db.metadata_db().put::<DbMetadataSchema>(
+        let batch = SchemaBatch::new();
+        batch.put::<DbMetadataSchema>(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(target_version),
         )?;
+        ledger_db.metadata_db().write_schemas(batch)?;
+
         StateStore::sync_commit_progress(
             Arc::clone(&ledger_db),
             Arc::clone(&state_kv_db),
@@ -327,6 +321,8 @@ mod test {
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
             ).unwrap();
 
+            let ledger_metadata_db = ledger_db.metadata_db_arc();
+
             let num_frozen_nodes = num_frozen_nodes_in_accumulator(target_version + 1);
             let mut iter = ledger_db.transaction_accumulator_db().iter::<TransactionAccumulatorSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
@@ -337,11 +333,11 @@ mod test {
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.transaction_db().iter::<TransactionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_db_raw().iter::<TransactionSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.metadata_db().iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_metadata_db.iter::<VersionDataSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert!(iter.next().transpose().unwrap().unwrap().0 <= target_version);
 
@@ -349,12 +345,12 @@ mod test {
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
-            let mut iter = ledger_db.metadata_db().iter::<EpochByVersionSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_metadata_db.iter::<EpochByVersionSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             let (version, epoch) = iter.next().transpose().unwrap().unwrap();
             prop_assert!(version <= target_version);
 
-            let mut iter = ledger_db.metadata_db().iter::<LedgerInfoSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_metadata_db.iter::<LedgerInfoSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, epoch);
 

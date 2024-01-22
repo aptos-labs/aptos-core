@@ -282,7 +282,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
-// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>ensures</b> [abstract] len(result) == 32;
 </code></pre>
 
@@ -326,7 +326,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
-// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_generate_unique_address">spec_generate_unique_address</a>();
 </code></pre>
 
@@ -395,7 +395,7 @@ the generated unique address wrapped in the AUID class.
 
 
 <pre><code><b>pragma</b> opaque;
-// This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">spec_get_script_hash</a>();
 <b>ensures</b> [abstract] len(result) == 32;
@@ -423,7 +423,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+<pre><code>// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

@@ -27,12 +27,6 @@ pub static BLOCK_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     )
 });
 
-// TZ: TODO: remove these except for the block-related names
-// Names for special functions and structs
-pub const SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("script_prologue");
-pub const MULTI_AGENT_SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("multi_agent_script_prologue");
-pub const MODULE_PROLOGUE_NAME: &IdentStr = ident_str!("module_prologue");
-pub const USER_EPILOGUE_NAME: &IdentStr = ident_str!("epilogue");
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
 
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {

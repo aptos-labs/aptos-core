@@ -6,22 +6,14 @@
 
 use aptos_types::{account_address::AccountAddress, transaction::Transaction};
 use async_trait::async_trait;
-use futures::{
-    channel::{mpsc, oneshot},
-    stream::FusedStream,
-    Stream,
-};
+use futures::{channel::mpsc, stream::FusedStream, SinkExt, Stream};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 use thiserror::Error;
-use tokio::time::timeout;
-
-const MEMPOOL_NOTIFICATION_CHANNEL_SIZE: usize = 1;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
 pub enum Error {
@@ -42,7 +34,6 @@ pub trait MempoolNotificationSender: Send + Clone + Sync + 'static {
         &self,
         committed_transactions: Vec<Transaction>,
         block_timestamp_usecs: u64,
-        notification_timeout_ms: u64,
     ) -> Result<(), Error>;
 }
 
@@ -50,9 +41,11 @@ pub trait MempoolNotificationSender: Send + Clone + Sync + 'static {
 /// to allow state sync and mempool to communicate.
 ///
 /// Note: state sync should take the notifier and mempool should take the listener.
-pub fn new_mempool_notifier_listener_pair() -> (MempoolNotifier, MempoolNotificationListener) {
+pub fn new_mempool_notifier_listener_pair(
+    max_pending_mempool_notifications: u64,
+) -> (MempoolNotifier, MempoolNotificationListener) {
     let (notification_sender, notification_receiver) =
-        mpsc::channel(MEMPOOL_NOTIFICATION_CHANNEL_SIZE);
+        mpsc::channel(max_pending_mempool_notifications as usize);
 
     let mempool_notifier = MempoolNotifier::new(notification_sender);
     let mempool_listener = MempoolNotificationListener::new(notification_receiver);
@@ -80,7 +73,6 @@ impl MempoolNotificationSender for MempoolNotifier {
         &self,
         transactions: Vec<Transaction>,
         block_timestamp_usecs: u64,
-        notification_timeout_ms: u64,
     ) -> Result<(), Error> {
         // Get only user transactions from committed transactions
         let user_transactions: Vec<CommittedTransaction> = transactions
@@ -94,21 +86,19 @@ impl MempoolNotificationSender for MempoolNotifier {
             })
             .collect();
 
-        // Construct a oneshot channel to receive a mempool response
-        let (callback, callback_receiver) = oneshot::channel();
         // Mempool needs to be notified about all transactions (user and non-user transactions).
         // See https://github.com/aptos-labs/aptos-core/issues/1882 for more details.
         let commit_notification = MempoolCommitNotification {
             transactions: user_transactions,
             block_timestamp_usecs,
-            callback,
         };
 
         // Send the notification to mempool
         if let Err(error) = self
             .notification_sender
             .clone()
-            .try_send(commit_notification)
+            .send(commit_notification)
+            .await
         {
             return Err(Error::CommitNotificationError(format!(
                 "Failed to notify mempool of committed transactions! Error: {:?}",
@@ -116,20 +106,7 @@ impl MempoolNotificationSender for MempoolNotifier {
             )));
         }
 
-        // Handle any responses or a timeout
-        if let Ok(response) = timeout(
-            Duration::from_millis(notification_timeout_ms),
-            callback_receiver,
-        )
-        .await
-        {
-            match response {
-                Ok(MempoolNotificationResponse::Success) => Ok(()),
-                Err(error) => Err(Error::UnexpectedErrorEncountered(format!("{:?}", error))),
-            }
-        } else {
-            Err(Error::TimeoutWaitingForMempool)
-        }
+        Ok(())
     }
 }
 
@@ -144,17 +121,6 @@ impl MempoolNotificationListener {
         MempoolNotificationListener {
             notification_receiver,
         }
-    }
-
-    /// Respond (succesfully) to the commit notification previously sent by state sync.
-    pub fn ack_commit_notification(
-        &self,
-        mempool_commit_notification: MempoolCommitNotification,
-    ) -> Result<(), Error> {
-        mempool_commit_notification
-            .callback
-            .send(MempoolNotificationResponse::Success)
-            .map_err(|error| Error::UnexpectedErrorEncountered(format!("{:?}", error)))
     }
 }
 
@@ -177,7 +143,6 @@ impl FusedStream for MempoolNotificationListener {
 pub struct MempoolCommitNotification {
     pub transactions: Vec<CommittedTransaction>,
     pub block_timestamp_usecs: u64, // The timestamp of the committed block.
-    pub(crate) callback: oneshot::Sender<MempoolNotificationResponse>,
 }
 
 impl fmt::Display for MempoolCommitNotification {
@@ -203,14 +168,6 @@ impl fmt::Display for CommittedTransaction {
     }
 }
 
-/// A response from mempool for a notification.
-///
-/// Note: failure responses are not currently used.
-#[derive(Debug)]
-enum MempoolNotificationResponse {
-    Success,
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{CommittedTransaction, Error, MempoolNotificationSender};
@@ -226,47 +183,61 @@ mod tests {
         write_set::WriteSetMut,
     };
     use claims::{assert_matches, assert_ok};
-    use futures::{executor::block_on, FutureExt, StreamExt};
-    use tokio::runtime::Runtime;
+    use futures::{FutureExt, StreamExt};
+    use std::time::Duration;
+    use tokio::time::timeout;
 
-    #[test]
-    fn test_mempool_not_listening() {
+    #[tokio::test]
+    async fn test_mempool_not_listening() {
         // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, mut mempool_listener) = crate::new_mempool_notifier_listener_pair();
+        let (mempool_notifier, mut mempool_listener) =
+            crate::new_mempool_notifier_listener_pair(100);
 
-        // Send a notification and expect a timeout (no listener)
-        let notify_result =
-            block_on(mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0, 1000));
-        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
+        // Send a notification and expect no failures
+        let notify_result = mempool_notifier
+            .notify_new_commit(vec![create_user_transaction()], 0)
+            .await;
+        assert_ok!(notify_result);
 
-        // Drop the receiver and try again
+        // Drop the receiver and try again (this time we expect a failure)
         mempool_listener.notification_receiver.close();
-        let notify_result =
-            block_on(mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0, 1000));
+        let notify_result = mempool_notifier
+            .notify_new_commit(vec![create_user_transaction()], 0)
+            .await;
         assert_matches!(notify_result, Err(Error::CommitNotificationError(_)));
     }
 
-    #[test]
-    fn test_zero_timeout() {
-        // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair();
+    #[tokio::test]
+    async fn test_mempool_channel_blocked() {
+        // Create runtime and mempool notifier (with a max of 1 pending notifications)
+        let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair(1);
 
-        // Send a notification and expect a timeout (zero timeout)
-        let notify_result =
-            block_on(mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0, 0));
-        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
+        // Send a notification and expect no failures
+        let notify_result = mempool_notifier
+            .notify_new_commit(vec![create_user_transaction()], 0)
+            .await;
+        assert_ok!(notify_result);
+
+        // Send another notification (which should block!)
+        let result = timeout(
+            Duration::from_secs(5),
+            mempool_notifier.notify_new_commit(vec![create_user_transaction()], 0),
+        )
+        .await;
+
+        // Verify the channel is blocked
+        if let Ok(result) = result {
+            panic!(
+                "We expected the channel to be blocked, but it's not? Result: {:?}",
+                result
+            );
+        }
     }
 
-    #[test]
-    fn test_no_transaction_filtering() {
+    #[tokio::test]
+    async fn test_no_transaction_filtering() {
         // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair();
+        let (mempool_notifier, _mempool_listener) = crate::new_mempool_notifier_listener_pair(100);
 
         // Create several non-user transactions
         let mut transactions = vec![];
@@ -275,30 +246,31 @@ mod tests {
             transactions.push(create_genesis_transaction());
         }
 
-        // Send a notification and verify we get a timeout because mempool didn't respond
-        let notify_result =
-            block_on(mempool_notifier.notify_new_commit(transactions.clone(), 0, 1000));
-        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
+        // Send a notification and verify no failures
+        let notify_result = mempool_notifier
+            .notify_new_commit(transactions.clone(), 0)
+            .await;
+        assert_ok!(notify_result);
 
-        // Send another notification with a single user transaction now included.
+        // Send another notification with a single user transaction now included
         transactions.push(create_user_transaction());
-        let notify_result = block_on(mempool_notifier.notify_new_commit(transactions, 0, 1000));
-        assert_matches!(notify_result, Err(Error::TimeoutWaitingForMempool));
+        let notify_result = mempool_notifier.notify_new_commit(transactions, 0).await;
+        assert_ok!(notify_result);
     }
 
-    #[test]
-    fn test_commit_notification_arrives() {
+    #[tokio::test]
+    async fn test_commit_notification_arrives() {
         // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, mut mempool_listener) = crate::new_mempool_notifier_listener_pair();
+        let (mempool_notifier, mut mempool_listener) =
+            crate::new_mempool_notifier_listener_pair(100);
 
         // Send a notification
         let user_transaction = create_user_transaction();
         let transactions = vec![user_transaction.clone()];
         let block_timestamp_usecs = 101;
-        let _ =
-            block_on(mempool_notifier.notify_new_commit(transactions, block_timestamp_usecs, 1000));
+        let _ = mempool_notifier
+            .notify_new_commit(transactions, block_timestamp_usecs)
+            .await;
 
         // Verify the notification arrives at the receiver
         match mempool_listener.select_next_some().now_or_never() {
@@ -319,31 +291,6 @@ mod tests {
             },
             result => panic!("Expected mempool commit notification but got: {:?}", result),
         };
-    }
-
-    #[test]
-    fn test_mempool_success_response() {
-        // Create runtime and mempool notifier
-        let runtime = create_runtime();
-        let _enter = runtime.enter();
-        let (mempool_notifier, mut mempool_listener) = crate::new_mempool_notifier_listener_pair();
-
-        // Spawn a new thread to handle any messages on the receiver
-        let _handler = std::thread::spawn(move || loop {
-            if let Some(mempool_commit_notification) =
-                mempool_listener.select_next_some().now_or_never()
-            {
-                let _result = mempool_listener.ack_commit_notification(mempool_commit_notification);
-            }
-        });
-
-        // Send a notification and verify a successful response
-        let notify_result = block_on(mempool_notifier.notify_new_commit(
-            vec![create_user_transaction()],
-            101,
-            1000,
-        ));
-        assert_ok!(notify_result);
     }
 
     fn create_user_transaction() -> Transaction {
@@ -388,9 +335,5 @@ mod tests {
                 .expect("freeze cannot fail"),
             vec![],
         )))
-    }
-
-    fn create_runtime() -> Runtime {
-        aptos_runtimes::spawn_named_runtime("test".into(), None)
     }
 }

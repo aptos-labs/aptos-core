@@ -1,6 +1,24 @@
 
 Diagnostics:
 error: type argument count mismatch (expected 1 but got 0)
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:7:13
+  │
+7 │         s1: S,
+  │             ^
+
+error: type argument count mismatch (expected 1 but got 0)
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:8:13
+  │
+8 │         s2: S<>,
+  │             ^
+
+error: type argument count mismatch (expected 1 but got 2)
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:9:13
+  │
+9 │         s3: S<bool, u64>,
+  │             ^
+
+error: type argument count mismatch (expected 1 but got 0)
    ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:13:13
    │
 13 │         s1: S,
@@ -53,21 +71,3 @@ error: type argument count mismatch (expected 1 but got 0)
    │
 27 │     fun s<T>(f: T): S {
    │                     ^
-
-error: type argument count mismatch (expected 1 but got 0)
-  ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:7:13
-  │
-7 │         s1: S,
-  │             ^
-
-error: type argument count mismatch (expected 1 but got 0)
-  ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:8:13
-  │
-8 │         s2: S<>,
-  │             ^
-
-error: type argument count mismatch (expected 1 but got 2)
-  ┌─ tests/checking/typing/bad_type_argument_arity_struct.move:9:13
-  │
-9 │         s3: S<bool, u64>,
-  │             ^

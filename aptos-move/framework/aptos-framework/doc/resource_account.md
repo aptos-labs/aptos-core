@@ -506,7 +506,7 @@ the SignerCapability.
 <b>include</b> <a href="aptos_account.md#0x1_aptos_account_GuidAbortsIf">aptos_account::GuidAbortsIf</a>&lt;AptosCoin&gt;{<b>to</b>: resource_addr};
 <b>include</b> <a href="resource_account.md#0x1_resource_account_RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit">RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit</a>;
 <b>aborts_if</b> <a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(resource_addr) && coin_store_resource.frozen;
-// This enforces <a id="high-level-req-3" href="#high-level-req">high level requirement 3</a>:
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
 <b>ensures</b> <b>exists</b>&lt;aptos_framework::coin::CoinStore&lt;AptosCoin&gt;&gt;(resource_addr);
 </code></pre>
 
@@ -544,11 +544,11 @@ the SignerCapability.
 
 
 <pre><code><b>let</b> resource_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(resource);
-// This enforces <a id="high-level-req-1" href="#high-level-req">high level requirement 1</a>:
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
 <b>include</b> <a href="resource_account.md#0x1_resource_account_RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf">RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIf</a>;
-// This enforces <a id="high-level-req-2" href="#high-level-req">high level requirement 2</a>:
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>ensures</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(origin));
-// This enforces <a id="high-level-req-5" href="#high-level-req">high level requirement 5</a>:
+// This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(optional_auth_key) != 0 ==&gt;
     <b>global</b>&lt;aptos_framework::account::Account&gt;(resource_addr).authentication_key == optional_auth_key;
 </code></pre>
@@ -567,7 +567,7 @@ the SignerCapability.
     <b>let</b> container = <b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
     <b>let</b> get = len(optional_auth_key) == 0;
     <b>aborts_if</b> get && !<b>exists</b>&lt;Account&gt;(source_addr);
-    // This enforces <a id="high-level-req-4" href="#high-level-req">high level requirement 4</a>:
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
     <b>aborts_if</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr) && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(container.store, resource_addr);
     <b>aborts_if</b> get && !(<b>exists</b>&lt;Account&gt;(resource_addr) && len(<b>global</b>&lt;Account&gt;(source_addr).authentication_key) == 32);
     <b>aborts_if</b> !get && !(<b>exists</b>&lt;Account&gt;(resource_addr) && len(optional_auth_key) == 32);
@@ -615,14 +615,14 @@ the SignerCapability.
 
 
 
-<pre><code>// This enforces <a id="high-level-req-6" href="#high-level-req">high level requirement 6</a>:
+<pre><code>// This enforces <a id="high-level-req-6" href="#high-level-req">high-level requirement 6</a>:
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
 <b>let</b> resource_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(resource);
 <b>let</b> container = <b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
-// This enforces <a id="high-level-req-7" href="#high-level-req">high level requirement 7</a>:
+// This enforces <a id="high-level-req-7" href="#high-level-req">high-level requirement 7</a>:
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(container.store, resource_addr);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(resource_addr);
-// This enforces <a id="high-level-req-8" href="#high-level-req">high level requirement 8</a>:
+// This enforces <a id="high-level-req-8" href="#high-level-req">high-level requirement 8</a>:
 <b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(<b>old</b>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr)).store, resource_addr) &&
     <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(<b>old</b>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr)).store) == 1 ==&gt; !<b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr);
 <b>ensures</b> <b>exists</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr) ==&gt; !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(<b>global</b>&lt;<a href="resource_account.md#0x1_resource_account_Container">Container</a>&gt;(source_addr).store, resource_addr);
