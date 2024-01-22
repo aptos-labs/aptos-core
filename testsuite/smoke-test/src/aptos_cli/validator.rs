@@ -1193,6 +1193,13 @@ async fn test_join_and_leave_validator() {
 
     println!("dkg_3");
 
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+        .await;
+
     let withdraw_stake = 2;
     gas_used += get_gas(
         cli.withdraw_stake(validator_cli_index, withdraw_stake)
