@@ -160,6 +160,19 @@ Sample configuration file:
 }
 ```
 
+```toml
+[project]
+move_sources = ["/path/to/move/source"]
+[mutation]
+operators = ["operator1", "operator2"]
+categories = ["category1", "category2"]
+[[individual]]
+file = "/path/to/file"
+verify_mutants = true
+include_functions = ["function1", "function2"]
+exclude_functions = ["function3", "function4"]
+```
+
 ### Cross layer
 
 The layer is used to provide a common function set to other layers. None of their functions is exposed externally. Its crucial components are:

@@ -26,9 +26,12 @@ pub struct Options {
     /// Indicates if the output files should be overwritten.
     #[clap(long, short)]
     pub no_overwrite: Option<bool>,
-    /// Name of the filter to use for down sampling.
-    #[clap(long)]
+    /// Name of the filter to use for downsampling. Downsampling reduces the amount of mutants to the desired amount.
+    #[clap(long, hide = true)]
     pub downsample_filter: Option<String>,
+    /// Maximum number of mutants to be generated. If not specified, downsampling will be disabled. Currently only random filter is supported (mutants are removed randomly).
+    #[clap(long)]
+    pub downsample_num: Option<u64>,
     /// Optional configuration file. If provided, it will override the default configuration.
     #[clap(long, short, value_parser)]
     pub configuration_file: Option<PathBuf>,
@@ -47,6 +50,7 @@ impl Default for Options {
             verify_mutants: true,
             no_overwrite: None,
             downsample_filter: None,
+            downsample_num: None,
             configuration_file: None,
         }
     }

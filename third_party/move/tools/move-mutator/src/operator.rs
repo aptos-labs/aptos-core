@@ -40,7 +40,7 @@ impl MutationOperator {
     ///
     /// * `Vec<MutantInfo>` - A vector of `MutantInfo` instances representing the mutated source code.
     pub fn apply(&self, source: &str) -> Vec<MutantInfo> {
-        debug!("Applying mutation operator: {}", self);
+        debug!("Applying mutation operator: {self}");
 
         match self {
             MutationOperator::BinaryOperator(bin_op) => {
@@ -85,7 +85,7 @@ impl MutationOperator {
                 let end = unary_op.loc.end() as usize;
                 let cur_op = &source[start..end];
 
-                // For unary operator mutations, we only need to replace the operator with a space (to ensure the same file length)
+                // For unary operator mutations, we only need to replace the operator with a space (to ensure the same file length).
                 vec![" "]
                     .into_iter()
                     .map(|op| {
