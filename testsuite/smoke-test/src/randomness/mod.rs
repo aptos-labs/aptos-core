@@ -13,7 +13,7 @@ use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
 use aptos_logger::info;
-use aptos_types::dkg::{DKG, DKGSessionState, DKGState, DKGTrait};
+use aptos_types::dkg::{DefaultDKG, DKGSessionState, DKGState, DKGTrait};
 use aptos_types::on_chain_config::OnChainConfig;
 use aptos_types::validator_verifier::ValidatorConsensusInfo;
 
@@ -86,17 +86,17 @@ async fn wait_for_dkg_finish(
 /// by the validator set in epoch i-1 (stored in `new_dkg_state`).
 fn verify_dkg_transcript(
     dkg_session: &DKGSessionState,
-    decrypt_key_map: &HashMap<AccountAddress, <DKG as DKGTrait>::NewValidatorDecryptKey>,
+    decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
 ) -> Result<()> {
     info!(
         "Verifying the transcript generated in epoch {}.",
         dkg_session.metadata.dealer_epoch,
     );
-    let pub_params = DKG::new_public_params(&dkg_session.metadata);
+    let pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
     let transcript = bcs::from_bytes(dkg_session.transcript.as_slice())
         .map_err(|e|anyhow!("DKG transcript verification failed with transcript deserialization error: {e}"))?;
     println!("transcript={:?}", transcript);
-    DKG::verify_transcript(&pub_params, &transcript)?;
+    DefaultDKG::verify_transcript(&pub_params, &transcript)?;
 
     info!("Double-verifying by reconstructing the dealt secret.");
     let dealt_secret_from_shares = dealt_secret_from_shares(
@@ -121,45 +121,45 @@ fn verify_dkg_transcript(
 
 fn dealt_secret_from_shares(
     target_validator_set: Vec<ValidatorConsensusInfo>,
-    decrypt_key_map: &HashMap<AccountAddress, <DKG as DKGTrait>::NewValidatorDecryptKey>,
-    pub_params: &<DKG as DKGTrait>::PublicParams,
-    transcript: &<DKG as DKGTrait>::Transcript,
-) -> <DKG as DKGTrait>::DealtSecret {
+    decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
+    pub_params: &<DefaultDKG as DKGTrait>::PublicParams,
+    transcript: &<DefaultDKG as DKGTrait>::Transcript,
+) -> <DefaultDKG as DKGTrait>::DealtSecret {
     let player_share_pairs = target_validator_set
         .iter()
         .enumerate()
         .map(|(idx, validator_info)| {
             let dk = decrypt_key_map.get(&validator_info.address).unwrap();
             let secret_key_share =
-                DKG::decrypt_secret_share_from_transcript(pub_params, transcript, idx as u64, dk).unwrap();
+                DefaultDKG::decrypt_secret_share_from_transcript(pub_params, transcript, idx as u64, dk).unwrap();
             (idx as u64, secret_key_share)
         })
         .collect();
 
-    DKG::reconstruct_secret_from_shares(&pub_params, player_share_pairs).unwrap()
+    DefaultDKG::reconstruct_secret_from_shares(&pub_params, player_share_pairs).unwrap()
 }
 
 fn dealt_secret_from_input(
-    trx: &<DKG as DKGTrait>::Transcript,
+    trx: &<DefaultDKG as DKGTrait>::Transcript,
     dealer_validator_set: Vec<ValidatorConsensusInfo>,
-    decrypt_key_map: &HashMap<AccountAddress, <DKG as DKGTrait>::DealerPrivateKey>,
-) -> <DKG as DKGTrait>::DealtSecret {
-    let dealers = DKG::get_dealers(trx);
+    decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::DealerPrivateKey>,
+) -> <DefaultDKG as DKGTrait>::DealtSecret {
+    let dealers = DefaultDKG::get_dealers(trx);
     println!("dealers={:?}", dealers);
     let input_secrets = dealers.into_iter().map(|dealer_idx|{
         let dealer_sk = decrypt_key_map.get(&dealer_validator_set[dealer_idx as usize].address).unwrap();
-        DKG::generate_predictable_input_secret_for_testing(dealer_sk)
+        DefaultDKG::generate_predictable_input_secret_for_testing(dealer_sk)
     }).collect();
 
-    let aggregated_input_secret = DKG::aggregate_input_secret(input_secrets);
-    DKG::dealt_secret_from_input(&aggregated_input_secret)
+    let aggregated_input_secret = DefaultDKG::aggregate_input_secret(input_secrets);
+    DefaultDKG::dealt_secret_from_input(&aggregated_input_secret)
 }
 
 fn num_validators(dkg_state: &DKGSessionState) -> usize {
     dkg_state.metadata.target_validator_set.len()
 }
 
-fn decrypt_key_map(swarm: &LocalSwarm) -> HashMap<AccountAddress, <DKG as DKGTrait>::NewValidatorDecryptKey> {
+fn decrypt_key_map(swarm: &LocalSwarm) -> HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
     swarm
         .validators()
         .map(|validator| {

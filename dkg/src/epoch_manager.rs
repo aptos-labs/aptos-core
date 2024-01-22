@@ -29,7 +29,7 @@ use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_types::dkg::{DKG, DKGTrait};
+use aptos_types::dkg::{DefaultDKG, DKGTrait};
 use crate::agg_trx_producer::RealAggTranscriptProducer;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
@@ -38,7 +38,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
 
     // some DKG private params
-    dkg_dealer_sk: Arc<<DKG as DKGTrait>::DealerPrivateKey>,
+    dkg_dealer_sk: Arc<<DefaultDKG as DKGTrait>::DealerPrivateKey>,
 
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
@@ -58,7 +58,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
         my_addr: AccountAddress,
-        dkg_dealer_sk: <DKG as DKGTrait>::DealerPrivateKey,
+        dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
         reconfig_events: ReconfigNotificationListener<P>,
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -179,7 +179,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::<DKG>::new(
+            let dkg_manager = DKGManager::<DefaultDKG>::new(
                 self.dkg_dealer_sk.clone(),
                 self.my_addr,
                 my_index,

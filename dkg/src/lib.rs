@@ -20,12 +20,12 @@ use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents}
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use tokio::runtime::Runtime;
-use aptos_types::dkg::{DKG, DKGTrait};
+use aptos_types::dkg::{DefaultDKG, DKGTrait};
 pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
     my_addr: AccountAddress,
-    dkg_dealer_sk: <DKG as DKGTrait>::DealerPrivateKey,
+    dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
     network_client: NetworkClient<DKGMessage>,
     network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,

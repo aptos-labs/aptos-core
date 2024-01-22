@@ -150,4 +150,4 @@ pub trait DKGTrait: Debug {
 pub mod dummy_dkg;
 
 // TODO: replace with RealDKG.
-pub type DKG = DummyDKG;
+pub type DefaultDKG = DummyDKG;

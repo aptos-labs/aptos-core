@@ -14,7 +14,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-use aptos_types::dkg::DKG;
+use aptos_types::dkg::DefaultDKG;
 
 /// A single struct for reading / writing to a file for identity across configs
 #[derive(Deserialize, Serialize)]
@@ -42,11 +42,11 @@ impl IdentityBlob {
         Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
     }
 
-    pub fn try_into_dkg_dealer_private_key(self) -> Option<<DKG as DKGTrait>::DealerPrivateKey> {
+    pub fn try_into_dkg_dealer_private_key(self) -> Option<<DefaultDKG as DKGTrait>::DealerPrivateKey> {
         self.consensus_private_key
     }
 
-    pub fn try_into_dkg_new_validator_decrypt_key(self) -> Option<<DKG as DKGTrait>::NewValidatorDecryptKey> {
+    pub fn try_into_dkg_new_validator_decrypt_key(self) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
         self.consensus_private_key
     }
 }
