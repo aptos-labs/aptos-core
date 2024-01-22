@@ -45,7 +45,7 @@ pub fn run_spec_test(
     let mut mutator_conf = cli::create_mutator_options(options);
     let prover_conf = cli::generate_prover_options(options)?;
 
-    // Setup temporary directory structure
+    // Setup temporary directory structure.
     let outdir = tempfile::tempdir()?.into_path();
     let outdir_mutant = outdir.join("mutants");
     let outdir_original = outdir.join("base");
@@ -64,7 +64,7 @@ pub fn run_spec_test(
     let report =
         move_mutator::report::Report::load_from_json_file(&outdir_mutant.join("report.json"))?;
 
-    // Proving part
+    // Proving part.
     move_mutator::compiler::copy_dir_all(package_path, &outdir_original)?;
 
     let mut error_writer = termcolor::StandardStream::stderr(termcolor::ColorChoice::Auto);
@@ -84,8 +84,11 @@ pub fn run_spec_test(
     for elem in report.get_mutants() {
         total_mutants += 1;
         let mutant_file = elem.mutant_path();
-        // Strip prefix to get the path relative to the package directory (or take that path if it's already relative)
-        let original_file = elem.original_file_path().strip_prefix(package_path).unwrap_or(&elem.original_file_path());
+        // Strip prefix to get the path relative to the package directory (or take that path if it's already relative).
+        let original_file = elem
+            .original_file_path()
+            .strip_prefix(package_path)
+            .unwrap_or(&elem.original_file_path());
         let outdir_prove = outdir.join("prove");
 
         let _ = fs::remove_dir_all(&outdir_prove);
@@ -99,15 +102,14 @@ pub fn run_spec_test(
 
         if let Err(res) = fs::copy(mutant_file, outdir_prove.join(original_file)) {
             return Err(anyhow!(
-                "Can't copy mutant file to the package directory: {:?}",
-                res
+                "Can't copy mutant file to the package directory: {res:?}"
             ));
         }
 
         let result = prove(config, &outdir_prove, &prover_conf, &mut error_writer);
 
         if let Err(e) = result {
-            trace!("Mutant killed! Prover failed with error: {}", e);
+            trace!("Mutant killed! Prover failed with error: {e}");
             killed_mutants += 1;
         } else {
             trace!("Mutant hasn't been killed!");

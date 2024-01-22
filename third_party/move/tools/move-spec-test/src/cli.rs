@@ -56,7 +56,7 @@ pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover:
 
 /// This function checks if the mutator output path is provided in the configuration file.
 /// We don't need to check if the mutator output path is provided in the options as they were created
-/// from the spec-test options which does not allow to set it.
+/// from the spec-test options which does not allow setting it.
 #[must_use]
 pub fn check_mutator_output_path(options: &move_mutator::cli::Options) -> Option<PathBuf> {
     if let Some(conf) = &options.configuration_file {
