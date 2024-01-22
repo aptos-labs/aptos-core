@@ -289,6 +289,39 @@ impl StacklessControlFlowGraph {
     }
 }
 
+/// DFS traversal always visiting the left-most child first
+pub struct DFSLeft<'a> {
+	cfg: &'a StacklessControlFlowGraph,
+	to_visit: Vec<BlockId>,
+	visited: BTreeSet<BlockId>,
+}
+
+impl<'a> DFSLeft<'a> {
+	fn new(cfg: &'a StacklessControlFlowGraph) -> Self {
+		let to_visit = vec![cfg.entry_block()];
+		Self {
+			cfg,
+			to_visit,
+			visited: BTreeSet::new(),
+		}
+	}
+}
+
+impl<'a> Iterator for DFSLeft<'a> {
+    type Item = BlockId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let visiting = self.to_visit.pop()?;
+		debug_assert!(self.visited.insert(visiting));
+		for suc_block in self.cfg.successors(visiting).iter().rev() {
+			if !self.visited.contains(suc_block) {
+				self.to_visit.push(*suc_block);
+			}
+		}
+		Some(visiting)
+    }
+}
+
 // CFG dot graph generation
 struct DotCFGBlock<'env> {
     block_id: BlockId,
