@@ -137,52 +137,55 @@ mod tests {
         let index = 1;
         let result = setup_mutant_path(output_dir, filename, index);
         fs::remove_file(filename).unwrap();
+        fs::remove_dir_all(output_dir).unwrap();
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), PathBuf::from("mutants_output/💖_1.move"));
     }
 
     #[test]
     fn setup_mutant_path_handles_file_without_extension() {
-        let output_dir = Path::new("mutants_output");
+        let output_dir = Path::new("mutants_output_no_extension");
         let filename = Path::new("file1");
         fs::File::create(filename).unwrap();
         let index = 1;
         let result = setup_mutant_path(output_dir, filename, index);
         fs::remove_file(filename).unwrap();
+        fs::remove_dir_all(output_dir).unwrap();
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            PathBuf::from("mutants_output/file1_1.move")
+            PathBuf::from("mutants_output_no_extension/file1_1.move")
         );
     }
 
     #[test]
     fn setup_mutant_path_creates_correct_path() {
-        let output_dir = Path::new("mutants_output");
-        let filename = Path::new("test");
+        let output_dir = Path::new("mutants_output_correct");
+        let filename = Path::new("test_correct");
         fs::File::create(filename).unwrap();
         let index = 1;
         let result = setup_mutant_path(output_dir, filename, index);
         fs::remove_file(filename).unwrap();
+        fs::remove_dir_all(output_dir).unwrap();
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), PathBuf::from("mutants_output/test_1.move"));
+        assert_eq!(result.unwrap(), PathBuf::from("mutants_output_correct/test_correct_1.move"));
     }
 
     #[test]
     fn setup_mutant_path_handles_empty_output_dir() {
         let output_dir = Path::new("");
-        let filename = Path::new("test");
+        let filename = Path::new("test_empty");
         fs::File::create(filename).unwrap();
         let index = 1;
         let result = setup_mutant_path(output_dir, filename, index);
         fs::remove_file(filename).unwrap();
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), PathBuf::from("test_1.move"));
+        assert_eq!(result.unwrap(), PathBuf::from("test_empty_1.move"));
     }
 
     #[test]
     fn setup_mutant_path_handles_empty_filename() {
-        let output_dir = Path::new("mutants_output");
+        let output_dir = Path::new("mutants_output_empty_filename");
         let filename = Path::new("");
         let index = 1;
         let result = setup_mutant_path(output_dir, filename, index);
