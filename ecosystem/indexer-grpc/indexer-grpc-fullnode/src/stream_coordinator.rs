@@ -87,14 +87,16 @@ impl IndexerStreamCoordinator {
         &mut self,
         _enable_expensive_logging: bool,
     ) -> Vec<Result<EndVersion, Status>> {
+        // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
             self.fetch_transactions_from_storage().await;
 
+        // Stage 2: convert transactions to rust objects. CPU-bound load.
         let mut task_batches = vec![];
         let mut current_batch = vec![];
         let mut current_batch_size = 0;
         for (txn, size) in sorted_transactions_from_storage_with_size {
-            if current_batch_size + size > MINIMUM_TASK_LOAD_SIZE_IN_BYTES {
+            if current_batch_size > MINIMUM_TASK_LOAD_SIZE_IN_BYTES {
                 task_batches.push(current_batch);
                 current_batch = vec![];
                 current_batch_size = 0;
@@ -183,13 +185,12 @@ impl IndexerStreamCoordinator {
     }
 
     /// Fetches transactions from storage with each transaction's size.
-    /// Results are sorted by version.
+    /// Results are transactions sorted by version.
     async fn fetch_transactions_from_storage(&mut self) -> Vec<(TransactionOnChainData, usize)> {
         let fetch_start_time = std::time::Instant::now();
         let batches = self.get_batches().await;
         let mut storage_fetch_tasks = vec![];
         let ledger_version = self.highest_known_version;
-        // Stage 1: Fetch transactions from storage
         for batch in batches {
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
