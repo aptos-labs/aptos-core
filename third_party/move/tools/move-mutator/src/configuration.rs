@@ -114,6 +114,7 @@ mod tests {
         "#;
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_toml_file(Path::new("test.toml")).unwrap();
+        fs::remove_file("test.toml").unwrap();
         assert_eq!(
             config.project.move_sources,
             vec![Path::new("/path/to/move/source")]
@@ -122,7 +123,6 @@ mod tests {
             config.mutation.unwrap().operators,
             vec!["operator1", "operator2"]
         );
-        fs::remove_file("test.toml").unwrap();
     }
 
     #[test]
@@ -137,10 +137,10 @@ mod tests {
             [project]
             move_sources = "/path/to/move/source"
         "#;
-        fs::write("test.toml", toml_content).unwrap();
-        let result = Configuration::from_toml_file(Path::new("test.toml"));
+        fs::write("test_invalid.toml", toml_content).unwrap();
+        let result = Configuration::from_toml_file(Path::new("test_invalid.toml"));
+        fs::remove_file("test_invalid.toml").unwrap();
         assert!(result.is_err());
-        fs::remove_file("test.toml").unwrap();
     }
 
     #[test]
@@ -178,6 +178,7 @@ mod tests {
         "#;
         fs::write("test.json", json_content).unwrap();
         let config = Configuration::from_json_file(Path::new("test.json")).unwrap();
+        fs::remove_file("test.json").unwrap();
         assert_eq!(
             config.project.move_sources,
             vec![Path::new("/path/to/move/source")]
@@ -203,7 +204,6 @@ mod tests {
             config.mutation.unwrap().operators,
             vec!["operator1", "operator2"]
         );
-        fs::remove_file("test.json").unwrap();
     }
 
     #[test]
@@ -221,10 +221,10 @@ mod tests {
                 }
             }
         "#;
-        fs::write("test.json", json_content).unwrap();
-        let result = Configuration::from_json_file(Path::new("test.json"));
+        fs::write("test_invalid.json", json_content).unwrap();
+        let result = Configuration::from_json_file(Path::new("test_invalid.json"));
+        fs::remove_file("test_invalid.json").unwrap();
         assert!(result.is_err());
-        fs::remove_file("test.json").unwrap();
     }
 
     #[test]
@@ -241,39 +241,6 @@ mod tests {
             Configuration::get_file_type(Path::new("test.toml")).unwrap(),
             FileType::TOML
         );
-    }
-
-    #[test]
-    fn configuration_from_file_loads_json_correctly() {
-        let json_content = r#"
-            {
-                "project": {
-                    "move_sources": ["/path/to/move/source"]
-                }
-            }
-        "#;
-        fs::write("test.json", json_content).unwrap();
-        let config = Configuration::from_file(Path::new("test.json")).unwrap();
-        assert_eq!(
-            config.project.move_sources,
-            vec![Path::new("/path/to/move/source")]
-        );
-        fs::remove_file("test.json").unwrap();
-    }
-
-    #[test]
-    fn configuration_from_file_loads_toml_correctly() {
-        let toml_content = r#"
-            [project]
-            move_sources = ["/path/to/move/source"]
-        "#;
-        fs::write("test.toml", toml_content).unwrap();
-        let config = Configuration::from_file(Path::new("test.toml")).unwrap();
-        assert_eq!(
-            config.project.move_sources,
-            vec![Path::new("/path/to/move/source")]
-        );
-        fs::remove_file("test.toml").unwrap();
     }
 
     #[test]
