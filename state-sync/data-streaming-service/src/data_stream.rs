@@ -45,9 +45,6 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
-// The frequency at which to log sent data request messages
-const SENT_REQUESTS_LOG_FREQ_SECS: u64 = 1;
-
 /// A unique ID used to identify each stream.
 pub type DataStreamId = u64;
 
@@ -306,20 +303,27 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                 // Enqueue the pending response
                 self.get_sent_data_requests()?
                     .push_back(pending_client_response);
-            }
 
-            sample!(
-                SampleRate::Duration(Duration::from_secs(SENT_REQUESTS_LOG_FREQ_SECS)),
                 debug!(
                     (LogSchema::new(LogEntry::SendDataRequests)
                         .stream_id(self.data_stream_id)
                         .event(LogEvent::Success)
                         .message(&format!(
-                            "Sent {:?} data requests to the network",
-                            client_requests.len()
+                            "Sent data request to the network: {:?}",
+                            client_request
                         )))
                 )
-            );
+            }
+
+            debug!(
+                (LogSchema::new(LogEntry::SendDataRequests)
+                    .stream_id(self.data_stream_id)
+                    .event(LogEvent::Success)
+                    .message(&format!(
+                        "Sent {:?} data requests to the network",
+                        client_requests.len()
+                    )))
+            )
         }
 
         // Update the counters for the complete and pending responses
@@ -443,6 +447,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         &mut self,
         global_data_summary: GlobalDataSummary,
     ) -> Result<(), Error> {
+        // Verify the stream is still in a valid state
         if self.stream_engine.is_stream_complete()
             || self.request_failure_count >= self.streaming_service_config.max_request_retry
             || self.send_failure
@@ -450,7 +455,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             if !self.send_failure && self.stream_end_notification_id.is_none() {
                 self.send_end_of_stream_notification().await?;
             }
-            return Ok(()); // There's nothing left to do
+            return Ok(()); // There's nothing left to do (the stream is in a failed state)
         }
 
         // Process any ready data responses
@@ -468,19 +473,15 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                     Ok(client_response) => {
                         // Sanity check and process the response
                         if sanity_check_client_response_type(client_request, &client_response) {
-                            // The response is valid, send the data notification to the client
-                            let client_response_payload = client_response.payload.clone();
-                            self.send_data_notification_to_client(client_request, client_response)
-                                .await?;
-
                             // If the response wasn't enough to satisfy the original request (e.g.,
                             // it was truncated), missing data should be requested.
+                            let mut head_of_line_blocked = false;
                             match self
-                                .request_missing_data(client_request, &client_response_payload)
+                                .request_missing_data(client_request, &client_response.payload)
                             {
                                 Ok(missing_data_requested) => {
                                     if missing_data_requested {
-                                        break; // We're now head of line blocked on the missing data
+                                        head_of_line_blocked = true; // We're head of line blocked on the missing data
                                     }
                                 },
                                 Err(error) => {
@@ -500,11 +501,20 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                             if client_request.is_subscription_request() {
                                 if let Err(error) = self.check_subscription_stream_lag(
                                     &global_data_summary,
-                                    &client_response_payload,
+                                    &client_response.payload,
                                 ) {
                                     self.notify_new_data_request_error(client_request, error)?;
-                                    break; // We're now head of line blocked on the failed stream
+                                    head_of_line_blocked = true; // We're head of line blocked on the failed stream
                                 }
+                            }
+
+                            // Send the data notification to the client
+                            self.send_data_notification_to_client(client_request, client_response)
+                                .await?;
+
+                            // If we're head of line blocked, we should break early
+                            if head_of_line_blocked {
+                                break;
                             }
                         } else {
                             // The sanity check failed
@@ -783,15 +793,15 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
             self.insert_notification_response_mapping(notification_id, response_context)?;
 
             // Send the notification along the stream
-            trace!(
-                (LogSchema::new(LogEntry::StreamNotification)
-                    .stream_id(self.data_stream_id)
-                    .event(LogEvent::Success)
-                    .message(&format!(
-                        "Sent a single stream notification! Notification ID: {:?}",
-                        notification_id
-                    )))
-            );
+            debug!(LogSchema::new(LogEntry::StreamNotification)
+                .stream_id(self.data_stream_id)
+                .event(LogEvent::Success)
+                .message(&format!(
+                    "Sent a single stream notification! Notification ID: {:?}! Request: {:?}, Response: {:?}, Response size: {:?}",
+                    notification_id, data_client_request.get_label(),
+                    data_notification.data_payload.get_label(),
+                    data_notification.data_payload.get_data_chunk_size()
+                )));
             self.send_data_notification(data_notification).await?;
 
             // Reset the failure count. We've sent a notification and can move on.

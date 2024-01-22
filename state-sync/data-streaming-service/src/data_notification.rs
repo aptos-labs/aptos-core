@@ -48,6 +48,46 @@ pub enum DataPayload {
     TransactionsWithProof(TransactionListWithProof),
 }
 
+impl DataPayload {
+    pub fn get_label(&self) -> &'static str {
+        match self {
+            Self::ContinuousTransactionOutputsWithProof(_, _) => {
+                "continuous_transaction_outputs_with_proof"
+            },
+            Self::ContinuousTransactionsWithProof(_, _) => "continuous_transactions_with_proof",
+            Self::EpochEndingLedgerInfos(_) => "epoch_ending_ledger_infos",
+            Self::EndOfStream => "end_of_stream",
+            Self::StateValuesWithProof(_) => "state_values_with_proof",
+            Self::TransactionOutputsWithProof(_) => "transaction_outputs_with_proof",
+            Self::TransactionsWithProof(_) => "transactions_with_proof",
+        }
+    }
+
+    pub fn get_data_chunk_size(&self) -> usize {
+        match self {
+            Self::EpochEndingLedgerInfos(epoch_ending_ledger_infos) => {
+                epoch_ending_ledger_infos.len()
+            },
+            Self::StateValuesWithProof(state_values_with_proof) => {
+                state_values_with_proof.raw_values.len()
+            },
+            Self::TransactionOutputsWithProof(outputs_with_proof) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            Self::TransactionsWithProof(transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
+            Self::ContinuousTransactionsWithProof(_, transactions_with_proof) => {
+                transactions_with_proof.transactions.len()
+            },
+            Self::ContinuousTransactionOutputsWithProof(_, outputs_with_proof) => {
+                outputs_with_proof.transactions_and_outputs.len()
+            },
+            _ => 0,
+        }
+    }
+}
+
 /// A request that has been sent to the Aptos data client.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataClientRequest {
