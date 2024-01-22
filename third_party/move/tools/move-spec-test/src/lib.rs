@@ -32,7 +32,7 @@ use std::path::PathBuf;
 ///
 /// * `anyhow::Result<()>` - The result of the spec test.
 pub fn run_spec_test(
-    options: &cli::Options,
+    options: &cli::CLIOptions,
     config: &BuildConfig,
     package_path: &PathBuf,
 ) -> anyhow::Result<()> {

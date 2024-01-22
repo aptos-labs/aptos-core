@@ -598,7 +598,7 @@ pub struct MutatePackage {
     move_options: MovePackageDir,
     /// Options specific for the mutator tool
     #[clap(flatten)]
-    mutator_options: Option<move_mutator::cli::Options>,
+    mutator_options: Option<move_mutator::cli::CLIOptions>,
 }
 
 #[async_trait]
@@ -653,7 +653,7 @@ pub struct SpecTestPackage {
     move_options: MovePackageDir,
     /// Options specific for the spec-test tool
     #[clap(flatten)]
-    spec_test_options: Option<move_spec_test::cli::Options>,
+    spec_test_options: Option<move_spec_test::cli::CLIOptions>,
 }
 
 #[async_trait]

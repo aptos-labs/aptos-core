@@ -8,7 +8,7 @@ use std::path::PathBuf;
 pub struct Mutate {
     /// Any options passed to the move-mutator
     #[clap(flatten)]
-    pub options: Option<move_mutator::cli::Options>,
+    pub options: Option<move_mutator::cli::CLIOptions>,
 }
 
 impl Mutate {

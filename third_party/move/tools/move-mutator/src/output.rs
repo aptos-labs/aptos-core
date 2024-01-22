@@ -194,7 +194,7 @@ mod tests {
     fn setup_output_dir_creates_directory_if_not_exists() {
         let temp_dir = tempdir().unwrap();
         let output_dir = temp_dir.path().join("output");
-        let options = cli::Options {
+        let options = cli::CLIOptions {
             out_mutant_dir: Some(output_dir.clone()),
             no_overwrite: Some(false),
             ..Default::default()
@@ -209,7 +209,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let output_dir = temp_dir.path().join("output");
         fs::create_dir(&output_dir).unwrap();
-        let options = cli::Options {
+        let options = cli::CLIOptions {
             out_mutant_dir: Some(output_dir.clone()),
             no_overwrite: Some(false),
             ..Default::default()
@@ -224,7 +224,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let output_dir = temp_dir.path().join("output");
         fs::create_dir(&output_dir).unwrap();
-        let options = cli::Options {
+        let options = cli::CLIOptions {
             out_mutant_dir: Some(output_dir.clone()),
             no_overwrite: Some(true),
             ..Default::default()

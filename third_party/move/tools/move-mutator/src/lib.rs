@@ -38,7 +38,7 @@ use std::path::PathBuf;
 ///
 /// * `anyhow::Result<()>` - Returns `Ok(())` if the mutation process completes successfully, or an error if any error occurs.
 pub fn run_move_mutator(
-    options: cli::Options,
+    options: cli::CLIOptions,
     config: &BuildConfig,
     package_path: &PathBuf,
 ) -> anyhow::Result<()> {
