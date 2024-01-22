@@ -243,6 +243,12 @@ impl StacklessControlFlowGraph {
         self.blocks.keys().cloned().collect()
     }
 
+    /// DFS traversal visiting left-most child first.
+    /// Blocks unreachable from the entry is not iterated.
+    pub fn iter_dfs_left(&self) -> DFSLeft {
+        DFSLeft::new(self)
+    }
+
     pub fn entry_block(&self) -> BlockId {
         self.entry_block_id
     }
