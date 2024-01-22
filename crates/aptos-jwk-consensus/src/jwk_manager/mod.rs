@@ -26,6 +26,7 @@ use futures_util::{
     FutureExt, StreamExt,
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::collections::HashSet;
 use aptos_types::validator_txn::Topic;
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 
@@ -180,7 +181,7 @@ impl<P: SigningKeyProvider> JWKManager<P> {
                     observed: observed.clone(),
                     signature,
                 },
-                abort_handle_wrapper: AbortHandleWrapper::new(abort_handle),
+                abort_handle_wrapper: QuorumCertProcessGuard::new(abort_handle),
             };
             info!("[JWK] update observed, update={:?}", observed);
         }
@@ -189,22 +190,16 @@ impl<P: SigningKeyProvider> JWKManager<P> {
     }
 
     /// Invoked on start, or on on-chain JWK updated event.
-    /// TODO: can do per-issuer reset.
     pub fn reset_with_on_chain_state(&mut self, on_chain_state: AllProvidersJWKs) -> Result<()> {
-        self.states_by_issuer = on_chain_state
-            .entries
-            .iter()
-            .map(|provider_jwks| {
-                (
-                    provider_jwks.issuer.clone(),
-                    PerProviderState::new(provider_jwks.clone()),
-                )
-            })
-            .collect();
-        info!(
-            "[JWK] state reset by on chain update, update={:?}",
-            on_chain_state
-        );
+        debug!("[JWK] reset_with_on_chain_state: BEGIN: on_chain_state={:?}", on_chain_state);
+        let onchain_issuer_set: HashSet<Issuer> = on_chain_state.entries.iter().map(|entry|entry.issuer.clone()).collect();
+        self.states_by_issuer.retain(|issuer, _| onchain_issuer_set.contains(issuer));
+        for provider_jwks in on_chain_state.entries {
+            let x = self.states_by_issuer.get(&provider_jwks.issuer).and_then(|s|s.on_chain.as_ref());
+            if x != Some(&provider_jwks) {
+                self.states_by_issuer.insert(provider_jwks.issuer.clone(), PerProviderState::new(provider_jwks));
+            }
+        }
         Ok(())
     }
 
@@ -270,12 +265,14 @@ impl<P: SigningKeyProvider> JWKManager<P> {
     }
 }
 
+/// An instance of this resource is created when `JWKManager` starts the QC update building process for an issuer.
+/// Then `JWKManager` needs to hold it. Once this resource is dropped, the corresponding QC update process will be cancelled.
 #[derive(Clone, Debug)]
-pub struct AbortHandleWrapper {
+pub struct QuorumCertProcessGuard {
     handle: Option<AbortHandle>,
 }
 
-impl AbortHandleWrapper {
+impl QuorumCertProcessGuard {
     pub fn new(handle: AbortHandle) -> Self {
         Self {
             handle: Some(handle),
@@ -288,9 +285,9 @@ impl AbortHandleWrapper {
     }
 }
 
-impl Drop for AbortHandleWrapper {
+impl Drop for QuorumCertProcessGuard {
     fn drop(&mut self) {
-        let AbortHandleWrapper { handle } = self;
+        let QuorumCertProcessGuard { handle } = self;
         if let Some(handle) = handle {
             handle.abort();
         }
@@ -302,7 +299,7 @@ pub enum ConsensusState {
     NotStarted,
     InProgress {
         my_proposal: ObservedUpdate,
-        abort_handle_wrapper: AbortHandleWrapper,
+        abort_handle_wrapper: QuorumCertProcessGuard,
     },
     Finished {
         vtxn_guard: TxnGuard,
@@ -386,6 +383,12 @@ impl PerProviderState {
         self.on_chain
             .as_ref()
             .map_or(0, |provider_jwks| provider_jwks.version)
+    }
+
+    pub fn reset_with_onchain_state(&mut self, onchain_state: ProviderJWKs) {
+        if self.on_chain.as_ref() != Some(&onchain_state) {
+            *self = Self::new(onchain_state)
+        }
     }
 }
 

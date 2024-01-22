@@ -2,7 +2,7 @@
 
 use crate::{
     certified_update_producer::CertifiedUpdateProducer,
-    jwk_manager::{AbortHandleWrapper, ConsensusState, JWKManager, PerProviderState},
+    jwk_manager::{QuorumCertProcessGuard, ConsensusState, JWKManager, PerProviderState},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
 };
@@ -189,7 +189,7 @@ async fn test_jwk_manager_state_transition() {
                 observed,
                 signature,
             },
-            abort_handle_wrapper: AbortHandleWrapper::dummy(),
+            abort_handle_wrapper: QuorumCertProcessGuard::dummy(),
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
@@ -218,7 +218,7 @@ async fn test_jwk_manager_state_transition() {
                 observed,
                 signature,
             },
-            abort_handle_wrapper: AbortHandleWrapper::dummy(),
+            abort_handle_wrapper: QuorumCertProcessGuard::dummy(),
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
@@ -296,7 +296,7 @@ async fn test_jwk_manager_state_transition() {
                 observed,
                 signature,
             },
-            abort_handle_wrapper: AbortHandleWrapper::dummy(),
+            abort_handle_wrapper: QuorumCertProcessGuard::dummy(),
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
@@ -421,22 +421,15 @@ async fn test_jwk_manager_state_transition() {
     assert_eq!(expected_vtxn_hashes, actual_vtxn_hashes);
 
     // At any time, JWKConsensusManager should fully follow on-chain update notification and re-initialize.
-    let on_chain_state_carl_v1 = ProviderJWKs {
-        issuer: issuer_carl.clone(),
-        version: 1,
-        jwks: carl_jwks_new.clone(),
-    };
     let second_on_chain_state = AllProvidersJWKs {
-        entries: vec![on_chain_state_carl_v1.clone()],
+        entries: vec![on_chain_state_alice_v111.clone()],
     };
 
     assert!(jwk_manager
         .reset_with_on_chain_state(second_on_chain_state)
         .is_ok());
-    let expected_states = HashMap::from([(
-        issuer_carl.clone(),
-        PerProviderState::new(on_chain_state_carl_v1.clone()),
-    )]);
+    expected_states.remove(&issuer_bob);
+    expected_states.remove(&issuer_carl);
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
 }
 
