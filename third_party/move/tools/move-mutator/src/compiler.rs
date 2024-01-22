@@ -47,17 +47,17 @@ pub fn generate_ast(
         .project
         .move_sources
         .iter()
-        .map(|p| p.to_str().unwrap_or(""))
+        .map(|p| p.to_str().expect("Source path contains invalid characters"))
         .collect::<Vec<_>>();
 
-    // If -m option is specified we should only `move_sources`. However, if `move_sources` is empty
+    // If -m option is specified we should use only `move_sources`. However, if `move_sources` is empty
     // we should add a package path. This path should be always set by the calling function.
     // In case of any error we should use current directory as package root.
     if source_files.is_empty() {
         source_files.push(package_path.to_str().unwrap_or("."));
     }
 
-    debug!("Source files and folders: {:?}", source_files);
+    debug!("Source files and folders: {source_files:?}");
 
     let named_addr_map = config
         .additional_named_addresses
@@ -79,7 +79,7 @@ pub fn generate_ast(
         .join("generated_interface_files/mutator_build");
     let flags = Flags::empty();
 
-    trace!("Interface files dir: {:?}", interface_files_dir);
+    trace!("Interface files dir: {interface_files_dir:?}");
 
     let (files, res) = Compiler::from_files(
         source_files,
@@ -88,13 +88,18 @@ pub fn generate_ast(
         flags,
         &config.compiler_config.known_attributes,
     )
-    .set_interface_files_dir(interface_files_dir.to_str().unwrap_or("").to_string())
+    .set_interface_files_dir(
+        interface_files_dir
+            .to_str()
+            .expect("Output path contains invalid characters.")
+            .to_string(),
+    )
     .run::<PASS_PARSER>()?;
 
     let (_, stepped) = unwrap_or_report_diagnostics(&files, res);
     let (_, ast) = stepped.into_ast();
 
-    trace!("Sources parsed successfully, AST generated");
+    trace!("Sources parsed successfully, AST generated.");
 
     Ok((files, ast))
 }
@@ -125,27 +130,27 @@ pub fn verify_mutant(
     mutated_source: &str,
     original_file: &Path,
 ) -> Result<(), anyhow::Error> {
-    // Find the root for the package
+    // Find the root for the package.
     let root = SourcePackageLayout::try_find_root(&original_file.canonicalize()?)?;
 
-    debug!("Package path found: {:?}", root);
+    debug!("Package path found: {root:?}");
 
-    // Get the relative path to the original file
+    // Get the relative path to the original file.
     let relative_path = original_file.canonicalize()?;
     let relative_path = relative_path.strip_prefix(&root)?;
 
-    debug!("Relative path: {:?}", relative_path);
+    debug!("Relative path: {relative_path:?}");
 
     let tempdir = tempfile::tempdir()?;
 
     debug!("Temporary directory: {:?}", tempdir.path());
 
-    // Copy the whole package to the tempdir
+    // Copy the whole package to the tempdir.
     // We need to copy the whole package because the Move compiler needs to find the Move.toml file and all the dependencies
-    // as we don't know which files are needed for the compilation
+    // as we don't know which files are needed for the compilation.
     copy_dir_all(&root, tempdir.path())?;
 
-    // Write the mutated source to the tempdir in place of the original file
+    // Write the mutated source to the tempdir in place of the original file.
     std::fs::write(tempdir.path().join(relative_path), mutated_source)?;
 
     debug!(
@@ -155,12 +160,15 @@ pub fn verify_mutant(
 
     let mut compilation_msg = vec![];
 
-    // Create a working config, making sure that the test mode is disabled
-    // We want just check if the compilation is successful
+    // Create a working config, making sure that the test mode is disabled.
+    // We want just check if the compilation is successful.
     let mut working_config = config.clone();
     working_config.test_mode = false;
 
-    // Compile the package
+    // Compile the package.
+    //TODO: It might be better to use the different compiler stage to speed up the whole
+    // process. For the verification purposes it might be suffcient some earlier stage,
+    // e.g. type-checking.
     working_config.compile_package(tempdir.path(), &mut compilation_msg)?;
 
     info!(

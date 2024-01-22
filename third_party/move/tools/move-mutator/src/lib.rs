@@ -31,6 +31,9 @@ use std::path::PathBuf;
 /// * `config` - The build configuration for the Move package.
 /// * `package_path` - The path to the Move package.
 ///
+/// # Errors
+/// Any error that occurs during the mutation process will be returned as an `anyhow::Error` with a description of the error.
+///
 /// # Returns
 ///
 /// * `anyhow::Result<()>` - Returns `Ok(())` if the mutation process completes successfully, or an error if any error occurs.
@@ -48,13 +51,13 @@ pub fn run_move_mutator(
         options, config, package_path
     );
 
-    // Load configuration from file or create a new one
+    // Load configuration from file or create a new one.
     let mutator_configuration = match options.configuration_file {
         Some(path) => Configuration::from_file(path.as_path())?,
         None => Configuration::new(options, Some(package_path.clone())),
     };
 
-    trace!("Mutator configuration: {:?}", mutator_configuration);
+    trace!("Mutator configuration: {mutator_configuration:?}");
 
     let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
     let mutants = mutate::mutate(ast)?;
@@ -64,9 +67,9 @@ pub fn run_move_mutator(
     for (hash, (filename, source)) in files {
         let path = Path::new(filename.as_str());
 
-        trace!("Processing file: {:?}", path);
+        trace!("Processing file: {path:?}");
 
-        // Check if file is not excluded from mutant generation
+        // Check if file is not excluded from mutant generation.
         //TODO(asmie): refactor this when proper filtering will be introduced in the M3
         if let Some(excluded) = mutator_configuration.project.exclude_files.as_ref() {
             if excluded.contains(&path.to_path_buf()) {
@@ -74,7 +77,7 @@ pub fn run_move_mutator(
             }
         }
 
-        // Check if file is explicitly included in mutant generation (if include_only_files is set)
+        // Check if file is explicitly included in mutant generation (if include_only_files is set).
         if let Some(included) = mutator_configuration.project.include_only_files.as_ref() {
             if !included.contains(&path.to_path_buf()) {
                 continue;
@@ -88,7 +91,7 @@ pub fn run_move_mutator(
                 if mutator_configuration.project.verify_mutants {
                     let res = verify_mutant(config, &mutated.mutated_source, path);
 
-                    // In case the mutant is not a valid Move file, skip the mutant (do not save it)
+                    // In case the mutant is not a valid Move file, skip the mutant (do not save it).
                     if res.is_err() {
                         warn!(
                             "Mutant {} is not valid and will not be generated. Error: {:?}",
@@ -101,11 +104,7 @@ pub fn run_move_mutator(
                 let mutant_path = output::setup_mutant_path(&output_dir, path, i)?;
                 fs::write(&mutant_path, &mutated.mutated_source)?;
 
-                info!(
-                    "{} written to {}",
-                    mutant,
-                    mutant_path.to_str().unwrap_or("")
-                );
+                info!("{} written to {}", mutant, mutant_path.display());
 
                 let mut entry = report::MutationReport::new(
                     mutant_path.as_path(),
@@ -121,7 +120,7 @@ pub fn run_move_mutator(
         }
     }
 
-    trace!("Saving reports to: {:?}", output_dir);
+    trace!("Saving reports to: {output_dir:?}");
     report.save_to_json_file(output_dir.join(Path::new("report.json")).as_path())?;
     report.save_to_text_file(output_dir.join(Path::new("report.txt")).as_path())?;
 

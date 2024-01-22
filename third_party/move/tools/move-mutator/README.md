@@ -30,6 +30,12 @@ or
 
 The output will be generated under the `mutants_output` (or any other selected) directory.
 
+Mutator tool respects `RUST_LOG` variable, and it will print out as much information as the variable allows. To see all the logs run:
+```bash
+RUST_LOG=trace ./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
+```
+There is possibility to enable logging only for the specific modules. Please refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
+
 To check possible options run:
 ```bash
 ./target/debug/move mutate --help
