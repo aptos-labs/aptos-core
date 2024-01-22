@@ -9,7 +9,7 @@ use crate::base::reroot_path;
 pub struct SpecTest {
     /// Any options passed to the move-spec-test
     #[clap(flatten)]
-    pub options: Option<move_spec_test::cli::Options>,
+    pub options: Option<move_spec_test::cli::CLIOptions>,
 }
 
 impl SpecTest {
