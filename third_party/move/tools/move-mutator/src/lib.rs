@@ -47,8 +47,7 @@ pub fn run_move_mutator(
     let _ = pretty_env_logger::try_init();
 
     info!(
-        "Executed move-mutator with the following options: {:?} \n config: {:?} \n package path: {:?}",
-        options, config, package_path
+        "Executed move-mutator with the following options: {options:?} \n config: {config:?} \n package path: {package_path:?}"
     );
 
     // Load configuration from file or create a new one.
@@ -84,8 +83,11 @@ pub fn run_move_mutator(
             }
         }
 
-        let mut i = 0;
-        for mutant in mutants.iter().filter(|m| m.get_file_hash() == hash) {
+        for (i, mutant) in mutants
+            .iter()
+            .filter(|m| m.get_file_hash() == hash)
+            .enumerate()
+        {
             let mutated_sources = mutant.apply(&source);
             for mutated in mutated_sources {
                 if mutator_configuration.project.verify_mutants {
@@ -94,14 +96,13 @@ pub fn run_move_mutator(
                     // In case the mutant is not a valid Move file, skip the mutant (do not save it).
                     if res.is_err() {
                         warn!(
-                            "Mutant {} is not valid and will not be generated. Error: {:?}",
-                            mutant, res
+                            "Mutant {mutant} is not valid and will not be generated. Error: {res:?}"
                         );
                         continue;
                     }
                 }
 
-                let mutant_path = output::setup_mutant_path(&output_dir, path, i)?;
+                let mutant_path = output::setup_mutant_path(&output_dir, path, i as u64)?;
                 fs::write(&mutant_path, &mutated.mutated_source)?;
 
                 info!("{} written to {}", mutant, mutant_path.display());
@@ -115,7 +116,6 @@ pub fn run_move_mutator(
 
                 entry.add_modification(mutated.mutation);
                 report.add_entry(entry);
-                i += 1;
             }
         }
     }
