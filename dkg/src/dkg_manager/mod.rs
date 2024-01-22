@@ -23,7 +23,7 @@ use aptos_types::dkg::DKGSessionMetadata;
 use aptos_types::validator_txn::Topic;
 
 #[derive(Clone, Debug)]
-enum InnerState<DKG: DKGTrait> {
+enum InnerState {
     NotStarted,
     InProgress {
         start_time_us: u64,
@@ -38,7 +38,7 @@ enum InnerState<DKG: DKGTrait> {
     },
 }
 
-impl<DKG: DKGTrait> Default for InnerState<DKG> {
+impl Default for InnerState {
     fn default() -> Self {
         Self::NotStarted
     }
@@ -61,10 +61,10 @@ pub struct DKGManager<DKG: DKGTrait> {
 
     // Control states.
     stopped: bool,
-    state: InnerState<DKG>,
+    state: InnerState,
 }
 
-impl<DKG: DKGTrait> InnerState<DKG> {
+impl InnerState {
     fn variant_name(&self) -> &str {
         match self {
             InnerState::NotStarted => "NotStarted",
@@ -185,7 +185,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     ) -> Result<()> {
         if let InnerState::Finished { pull_confirmed, start_time_us, .. } = &mut self.state {
             if !*pull_confirmed {
-                let start_to_propose = aptos_infallible::duration_since_epoch() - Duration::from_micros(*star_time_us);
+                let start_to_propose = aptos_infallible::duration_since_epoch() - Duration::from_micros(*start_time_us);
                 debug!("[DKG] vtxn pulled, start_to_propose={:?}", start_to_propose);
                 // TODO(zjma): metric DKG_AGG_NODE_PROPOSED
             }

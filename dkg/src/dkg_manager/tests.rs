@@ -18,7 +18,7 @@ use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
 use std::time::Instant;
 use aptos_types::dkg::DKGSessionMetadata;
-use aptos_types::dkg::dummy_dkg::{DummyDKG, DummyDKGTranscript};
+use aptos_types::dkg::dummy_dkg::DummyDKG;
 
 #[tokio::test]
 async fn test_dkg_state_transition() {
@@ -42,7 +42,7 @@ async fn test_dkg_state_transition() {
         verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
     };
     let agg_node_producer = DummyAggTranscriptProducer {};
-    let mut dkg_manager = DKGManager::new(
+    let mut dkg_manager: DKGManager<DummyDKG> = DKGManager::new(
         private_keys[0].clone(),
         addrs[0],
         0,
