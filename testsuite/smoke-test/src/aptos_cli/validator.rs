@@ -1174,6 +1174,8 @@ async fn test_join_and_leave_validator() {
     )
     .await;
 
+    println!("dkg_1");
+
     let unlock_stake = 3;
 
     // Unlock stake.
@@ -1184,8 +1186,12 @@ async fn test_join_and_leave_validator() {
             .clone(),
     );
 
+    println!("dkg_2");
+
     // Conservatively wait until the recurring lockup is over.
     tokio::time::sleep(Duration::from_secs(10)).await;
+
+    println!("dkg_3");
 
     let withdraw_stake = 2;
     gas_used += get_gas(
@@ -1195,11 +1201,15 @@ async fn test_join_and_leave_validator() {
             .remove(0),
     );
 
+    println!("dkg_4");
+
     cli.assert_account_balance_now(
         validator_cli_index,
         (3 * DEFAULT_FUNDED_COINS) - stake_coins + withdraw_stake - gas_used,
     )
     .await;
+
+    println!("dkg_5");
 }
 
 #[tokio::test]
