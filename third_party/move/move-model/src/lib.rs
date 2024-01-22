@@ -387,16 +387,53 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     }
 
     let module_table = std::mem::take(&mut builder.module_table);
+    // To save (loc, name) info about self friend decls.
+    let mut self_friends = vec![];
+    // To save (loc, friend_module_name, current_module_name) info about out-of-address friend decls.
+    let mut out_of_address_friends = vec![];
     // Patch up information about friend module ids, as all the modules have ids by now.
     for module in env.module_data.iter_mut() {
         let mut friend_modules = BTreeSet::new();
         for friend_decl in module.friend_decls.iter_mut() {
+            if friend_decl.module_name.addr() != module.name.addr() {
+                out_of_address_friends.push((
+                    friend_decl.loc.clone(),
+                    friend_decl.module_name.clone(),
+                    module.name.clone(),
+                ));
+            }
             if let Some(friend_mod_id) = module_table.get(&friend_decl.module_name) {
                 friend_decl.module_id = Some(*friend_mod_id);
                 friend_modules.insert(*friend_mod_id);
-            } // else: unresolved friend module, which should be reported elsewhere.
+                // Save information of self-friend decls to report error later.
+                if module.id == *friend_mod_id {
+                    self_friends.push((friend_decl.loc.clone(), friend_decl.module_name.clone()));
+                }
+            } // else: unresolved friend module, which should have been reported already.
         }
         module.friend_modules = friend_modules;
+    }
+    // Report self-friend errors.
+    for (loc, module_name) in self_friends {
+        env.error(
+            &loc,
+            &format!(
+                "cannot declare module '{}' as a friend of itself",
+                module_name.display_full(env)
+            ),
+        );
+    }
+    // Report out-of-address friend errors.
+    for (loc, friend_mod_name, cur_mod_name) in out_of_address_friends {
+        env.error(
+            &loc,
+            &format!(
+                "friend modules of `{}` must have the same address, \
+                    but declared friend module '{}' has different address than current module '{}'",
+                friend_mod_name.display_full(env),
+                cur_mod_name.display_full(env),
+            ),
+        );
     }
     // Compute information derived from AST (currently callgraph)
     for module in env.module_data.iter_mut() {
