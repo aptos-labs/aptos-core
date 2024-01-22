@@ -585,7 +585,7 @@ impl Bytecode {
         code.iter()
             .filter_map(|code| {
                 if let Bytecode::Label(_, label) = code {
-                    Some(label.clone())
+                    Some(*label)
                 } else {
                     None
                 }
