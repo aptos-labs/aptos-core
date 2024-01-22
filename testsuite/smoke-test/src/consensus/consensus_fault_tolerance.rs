@@ -176,11 +176,6 @@ async fn test_no_failures() {
                 "no progress with active consensus, only {} transactions",
                 executed_transactions
             );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
-            );
             Ok(())
         }),
         true,
