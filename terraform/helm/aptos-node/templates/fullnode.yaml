@@ -76,6 +76,10 @@ spec:
         checksum/fullnode.yaml: {{ tpl ($.Files.Get "files/configs/fullnode.yaml") $ | sha256sum }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
+        profiles.grafana.com/memory.scrape: "true"
+        profiles.grafana.com/memory.port: "8080"
+        profiles.grafana.com/cpu.scrape: "true"
+        profiles.grafana.com/cpu.port: "8080"
     spec:
       terminationGracePeriodSeconds: 0
       containers:

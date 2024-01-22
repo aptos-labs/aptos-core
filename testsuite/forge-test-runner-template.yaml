@@ -9,6 +9,11 @@ metadata:
     forge-image-tag: {FORGE_IMAGE_TAG}
     forge-test-suite: {FORGE_TEST_SUITE}
     forge-username: {FORGE_USERNAME}
+  annotations:
+    profiles.grafana.com/memory.scrape: "true"
+    profiles.grafana.com/memory.port: "8080"
+    profiles.grafana.com/cpu.scrape: "true"
+    profiles.grafana.com/cpu.port: "8080"
 spec:
   restartPolicy: Never
   serviceAccountName: forge
