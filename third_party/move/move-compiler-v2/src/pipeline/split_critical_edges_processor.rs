@@ -119,7 +119,7 @@ impl SplitCriticalEdgesTransformation {
     fn split_edge(&mut self, attr_id: AttrId, label: Label) -> (Label, Vec<Bytecode>) {
         let new_label = self.gen_fresh_label();
         let codes = vec![
-            Bytecode::Label(attr_id, new_label.clone()),
+            Bytecode::Label(attr_id, new_label),
             Bytecode::Jump(attr_id, label),
         ];
         (new_label, codes)
@@ -171,8 +171,8 @@ fn count_srcs(codes: &[Bytecode]) -> BTreeMap<Label, usize> {
         match code {
             Bytecode::Jump(_, label) => map_inc(&mut srcs_count, label.clone()),
             Bytecode::Branch(_, l0, l1, _) => {
-                map_inc(&mut srcs_count, l0.clone());
-                map_inc(&mut srcs_count, l1.clone());
+                map_inc(&mut srcs_count, *l0);
+                map_inc(&mut srcs_count, *l1);
             },
             _ => {},
         }
