@@ -213,6 +213,17 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
+    /// Removes the block
+    /// Cannot remove entry/exit block
+    pub fn remove_block(&mut self, block_to_remove: BlockId) {
+        debug_assert!(block_to_remove != self.entry_block());
+        debug_assert!(block_to_remove != self.exit_block());
+        self.blocks.retain(|block_id, _| block_to_remove != *block_id);
+        for (_block_id, block) in self.blocks.iter_mut() {
+            block.successors.retain(|block_id| block_to_remove != *block_id);
+        }
+    }
+
     /// Removes all blocks in `blocks`
     /// Cannot remove entry/exit block
     pub fn remove_blocks(&mut self, blocks_to_remove: &BTreeSet<BlockId>) {
