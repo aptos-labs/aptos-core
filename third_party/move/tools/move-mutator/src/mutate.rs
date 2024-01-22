@@ -1,16 +1,15 @@
-use move_compiler::parser;
-use move_compiler::parser::ast::{Exp, FunctionBody_, SequenceItem_};
+use move_compiler::parser::ast;
+use move_compiler::parser::ast::{
+    Definition::{Address, Module, Script},
+    Exp, FunctionBody_, ModuleMember, SequenceItem_,
+};
 
 use crate::mutant::Mutant;
 use crate::operator::MutationOperator;
-use move_compiler::parser::ast::{
-    Definition::{Address, Module, Script},
-    ModuleMember,
-};
 
 /// Traverses the AST, identifies places where mutation operators can be applied
 /// and returns a list of mutants.
-pub fn mutate(ast: parser::ast::Program) -> anyhow::Result<Vec<Mutant>> {
+pub fn mutate(ast: ast::Program) -> anyhow::Result<Vec<Mutant>> {
     trace!("Starting mutation process");
     let mutants = ast
         .source_definitions
@@ -34,7 +33,7 @@ pub fn mutate(ast: parser::ast::Program) -> anyhow::Result<Vec<Mutant>> {
 
 /// Traverses a single module and returns a list of mutants.
 /// Checks all the functions and constants defined in the module.
-fn traverse_module(module: parser::ast::ModuleDefinition) -> anyhow::Result<Vec<Mutant>> {
+fn traverse_module(module: ast::ModuleDefinition) -> anyhow::Result<Vec<Mutant>> {
     trace!("Traversing module {}", module.name);
     let mutants = module
         .members
@@ -59,7 +58,7 @@ fn traverse_module(module: parser::ast::ModuleDefinition) -> anyhow::Result<Vec<
 
 /// Traverses a single function and returns a list of mutants.
 /// Checks the body of the function by traversing all the sequences.
-fn traverse_function(function: parser::ast::Function) -> anyhow::Result<Vec<Mutant>> {
+fn traverse_function(function: ast::Function) -> anyhow::Result<Vec<Mutant>> {
     trace!("Traversing function {}", function.name);
     match function.body.value {
         FunctionBody_::Defined(elem) => traverse_sequence(elem),
@@ -69,9 +68,9 @@ fn traverse_function(function: parser::ast::Function) -> anyhow::Result<Vec<Muta
 
 /// Traverses a sequence and returns a list of mutants.
 /// Checks all the sequence items by calling `traverse_sequence_item` on them. Sequence can also contain
-/// return expression which needs to be also examined if it can be mutated..
-fn traverse_sequence(elem: parser::ast::Sequence) -> anyhow::Result<Vec<Mutant>> {
-    trace!("Traversing sequence {:?}", elem);
+/// return expression which needs to be also examined if it can be mutated.
+fn traverse_sequence(elem: ast::Sequence) -> anyhow::Result<Vec<Mutant>> {
+    trace!("Traversing sequence {elem:?}");
     let (_, seq, _, exp) = elem;
     let mut mutants = seq
         .into_iter()
@@ -79,7 +78,7 @@ fn traverse_sequence(elem: parser::ast::Sequence) -> anyhow::Result<Vec<Mutant>>
         .collect::<Result<Vec<_>, _>>()?
         .concat();
 
-    // exp represents the return expression so we need to remember to parse it
+    // exp represents the return expression so we need to remember to parse it.
     if let Some(exp) = *exp {
         mutants.extend(parse_expression_and_find_mutants(exp)?);
     }
@@ -90,7 +89,7 @@ fn traverse_sequence(elem: parser::ast::Sequence) -> anyhow::Result<Vec<Mutant>>
 
 /// Traverses a single sequence item and returns a list of mutants.
 /// Checks if binds or sequence items contain expressions that can be mutated by calling appropriate function on them..
-fn traverse_sequence_item(seq_item: parser::ast::SequenceItem) -> anyhow::Result<Vec<Mutant>> {
+fn traverse_sequence_item(seq_item: ast::SequenceItem) -> anyhow::Result<Vec<Mutant>> {
     trace!("Traversing sequence item {:?}", seq_item);
     match seq_item.value {
         SequenceItem_::Bind(_, _, exp) | SequenceItem_::Seq(exp) => {
@@ -101,8 +100,8 @@ fn traverse_sequence_item(seq_item: parser::ast::SequenceItem) -> anyhow::Result
 }
 
 /// Helper function that parses a list of expressions and returns a list of mutants.
-fn parse_expressions(exp: Vec<parser::ast::Exp>) -> anyhow::Result<Vec<Mutant>> {
-    trace!("Parsing expressions {:?}", exp);
+fn parse_expressions(exp: Vec<Exp>) -> anyhow::Result<Vec<Mutant>> {
+    trace!("Parsing expressions {exp:?}");
     Ok(exp
         .into_iter()
         .map(parse_expression_and_find_mutants)
@@ -114,48 +113,48 @@ fn parse_expressions(exp: Vec<parser::ast::Exp>) -> anyhow::Result<Vec<Mutant>> 
 /// can be applied to it.
 /// In case if the expression contains another expressions, it calls itself recursively.
 /// When Move language is extended with new expressions, this function needs to be updated to support them.
-fn parse_expression_and_find_mutants(exp: parser::ast::Exp) -> anyhow::Result<Vec<Mutant>> {
-    trace!("Parsing expression {:?}", exp);
+fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
+    trace!("Parsing expression {exp:?}");
     match exp.value {
-        parser::ast::Exp_::BinopExp(left, binop, right) => {
+        ast::Exp_::BinopExp(left, binop, right) => {
             // Parse left and right side of the operator as they are expressions and may contain
-            // another things to mutate
+            // another things to mutate.
             let mut mutants = parse_expression_and_find_mutants(*left)?;
             mutants.extend(parse_expression_and_find_mutants(*right)?);
 
-            // Add the mutation operator to the list of mutants
+            // Add the mutation operator to the list of mutants.
             mutants.push(Mutant::new(MutationOperator::BinaryOperator(binop)));
 
-            trace!("Found possible mutation in BinaryExp {:?}", binop);
+            trace!("Found possible mutation in BinaryExp {binop:?}");
 
             Ok(mutants)
         },
-        parser::ast::Exp_::UnaryExp(unop, exp) => {
-            // Parse the expression as it may contain another things to mutate
+        ast::Exp_::UnaryExp(unop, exp) => {
+            // Parse the expression as it may contain another things to mutate.
             let mut mutants = parse_expression_and_find_mutants(*exp)?;
 
-            // Add the mutation operator to the list of mutants
+            // Add the mutation operator to the list of mutants.
             mutants.push(Mutant::new(MutationOperator::UnaryOperator(unop)));
 
-            trace!("Found possible mutation in UnaryExp {:?}", unop);
+            trace!("Found possible mutation in UnaryExp {unop:?}");
 
             Ok(mutants)
         },
-        parser::ast::Exp_::Assign(exp1, exp2) | parser::ast::Exp_::While(exp1, exp2) => {
+        ast::Exp_::Assign(exp1, exp2) | ast::Exp_::While(exp1, exp2) => {
             let mut mutants = parse_expression_and_find_mutants(*exp1)?;
             mutants.extend(parse_expression_and_find_mutants(*exp2)?);
             Ok(mutants)
         },
-        parser::ast::Exp_::Block(seq) => traverse_sequence(seq),
-        parser::ast::Exp_::Pack(_, _, exps) => {
+        ast::Exp_::Block(seq) => traverse_sequence(seq),
+        ast::Exp_::Pack(_, _, exps) => {
             let exps = exps.into_iter().map(|(_, exp)| exp).collect::<Vec<Exp>>();
             parse_expressions(exps)
         },
-        parser::ast::Exp_::Call(_, _, _, exps) | parser::ast::Exp_::Vector(_, _, exps) => {
+        ast::Exp_::Call(_, _, _, exps) | ast::Exp_::Vector(_, _, exps) => {
             parse_expressions(exps.value)
         },
-        parser::ast::Exp_::ExpList(exps) => parse_expressions(exps),
-        parser::ast::Exp_::IfElse(exp1, exp2, exp3) => {
+        ast::Exp_::ExpList(exps) => parse_expressions(exps),
+        ast::Exp_::IfElse(exp1, exp2, exp3) => {
             let mut mutants = parse_expression_and_find_mutants(*exp1)?;
             mutants.extend(parse_expression_and_find_mutants(*exp2)?);
             if let Some(exp3) = exp3 {
@@ -163,7 +162,7 @@ fn parse_expression_and_find_mutants(exp: parser::ast::Exp) -> anyhow::Result<Ve
             }
             Ok(mutants)
         },
-        parser::ast::Exp_::Quant(_, _, vexp, lexp, exp) => {
+        ast::Exp_::Quant(_, _, vexp, lexp, exp) => {
             let mut mutants = vec![];
             for exp in vexp {
                 let muts = parse_expressions(exp)?;
@@ -175,25 +174,25 @@ fn parse_expression_and_find_mutants(exp: parser::ast::Exp) -> anyhow::Result<Ve
             mutants.extend(parse_expression_and_find_mutants(*exp)?);
             Ok(mutants)
         },
-        parser::ast::Exp_::Abort(exp)
-        | parser::ast::Exp_::Annotate(exp, _)
-        | parser::ast::Exp_::Borrow(_, exp)
-        | parser::ast::Exp_::Cast(exp, _)
-        | parser::ast::Exp_::Dereference(exp)
-        | parser::ast::Exp_::Dot(exp, _)
-        | parser::ast::Exp_::Loop(exp)
-        | parser::ast::Exp_::Lambda(_, exp)
-        | parser::ast::Exp_::Return(Some(exp)) => parse_expression_and_find_mutants(*exp),
-        parser::ast::Exp_::Value(_)
-        | parser::ast::Exp_::Move(_)
-        | parser::ast::Exp_::Copy(_)
-        | parser::ast::Exp_::Name(_, _)
-        | parser::ast::Exp_::Unit
-        | parser::ast::Exp_::Break
-        | parser::ast::Exp_::Continue
-        | parser::ast::Exp_::Spec(_)
-        | parser::ast::Exp_::Index(_, _)
-        | parser::ast::Exp_::UnresolvedError
-        | parser::ast::Exp_::Return(None) => Ok(vec![]),
+        ast::Exp_::Abort(exp)
+        | ast::Exp_::Annotate(exp, _)
+        | ast::Exp_::Borrow(_, exp)
+        | ast::Exp_::Cast(exp, _)
+        | ast::Exp_::Dereference(exp)
+        | ast::Exp_::Dot(exp, _)
+        | ast::Exp_::Loop(exp)
+        | ast::Exp_::Lambda(_, exp)
+        | ast::Exp_::Return(Some(exp)) => parse_expression_and_find_mutants(*exp),
+        ast::Exp_::Value(_)
+        | ast::Exp_::Move(_)
+        | ast::Exp_::Copy(_)
+        | ast::Exp_::Name(_, _)
+        | ast::Exp_::Unit
+        | ast::Exp_::Break
+        | ast::Exp_::Continue
+        | ast::Exp_::Spec(_)
+        | ast::Exp_::Index(_, _)
+        | ast::Exp_::UnresolvedError
+        | ast::Exp_::Return(None) => Ok(vec![]),
     }
 }
