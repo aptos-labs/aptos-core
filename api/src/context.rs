@@ -4,6 +4,7 @@
 
 use crate::{
     accept_type::AcceptType,
+    metrics,
     response::{
         bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
         block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
@@ -90,18 +91,19 @@ impl Context {
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
     ) -> Self {
-        let (view_function_stats, simulate_txn_stats) =
-            if node_config.api.periodic_function_stats_sec.is_some() {
-                (
-                    Arc::new(FunctionStats::new_enabled(LogEvent::ViewFunction)),
-                    Arc::new(FunctionStats::new_enabled(LogEvent::TxnSimulation)),
-                )
-            } else {
-                (
-                    Arc::new(FunctionStats::new_disabled()),
-                    Arc::new(FunctionStats::new_disabled()),
-                )
-            };
+        let (view_function_stats, simulate_txn_stats) = {
+            let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
+            (
+                Arc::new(FunctionStats::new(
+                    FunctionType::ViewFuntion,
+                    log_per_call_stats,
+                )),
+                Arc::new(FunctionStats::new(
+                    FunctionType::TxnSimulation,
+                    log_per_call_stats,
+                )),
+            )
+        };
         Self {
             chain_id,
             db,
@@ -1378,23 +1380,44 @@ pub enum LogEvent {
     TxnSimulation,
 }
 
-pub struct FunctionStats {
-    stats: Option<Cache<String, (Arc<AtomicU64>, Arc<AtomicU64>)>>,
-    log_event: LogEvent,
+pub enum FunctionType {
+    ViewFuntion,
+    TxnSimulation,
 }
 
-impl FunctionStats {
-    fn new_disabled() -> Self {
-        Self {
-            stats: None,
-            log_event: LogEvent::ViewFunction,
+impl FunctionType {
+    fn log_event(&self) -> LogEvent {
+        match self {
+            FunctionType::ViewFuntion => LogEvent::ViewFunction,
+            FunctionType::TxnSimulation => LogEvent::TxnSimulation,
         }
     }
 
-    fn new_enabled(log_event: LogEvent) -> Self {
-        Self {
-            stats: Some(Cache::new(100)),
-            log_event,
+    fn operation_id(&self) -> &'static str {
+        match self {
+            FunctionType::ViewFuntion => "view_function",
+            FunctionType::TxnSimulation => "txn_simulation",
+        }
+    }
+}
+
+pub struct FunctionStats {
+    stats: Option<Cache<String, (Arc<AtomicU64>, Arc<AtomicU64>)>>,
+    log_event: LogEvent,
+    operation_id: String,
+}
+
+impl FunctionStats {
+    fn new(function_type: FunctionType, log_per_call_stats: bool) -> Self {
+        let stats = if log_per_call_stats {
+            Some(Cache::new(100))
+        } else {
+            None
+        };
+        FunctionStats {
+            stats,
+            log_event: function_type.log_event(),
+            operation_id: function_type.operation_id().to_string(),
         }
     }
 
@@ -1403,6 +1426,9 @@ impl FunctionStats {
     }
 
     pub fn increment(&self, key: String, gas: u64) {
+        metrics::GAS_USED
+            .with_label_values(&[&self.operation_id])
+            .observe(gas as f64);
         if let Some(stats) = &self.stats {
             let (prev_gas, prev_count) = stats.get(&key).unwrap_or_else(|| {
                 // Note, race can occur on inserting new entry, resulting in some lost data, but it should be fine
