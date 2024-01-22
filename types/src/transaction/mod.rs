@@ -1486,6 +1486,14 @@ impl TransactionToCommit {
         }
     }
 
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction_info(transaction_info: TransactionInfo) -> Self {
+        Self {
+            transaction_info,
+            ..Self::dummy()
+        }
+    }
+
     pub fn transaction(&self) -> &Transaction {
         &self.transaction
     }

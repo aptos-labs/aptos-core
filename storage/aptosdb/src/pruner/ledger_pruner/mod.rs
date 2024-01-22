@@ -132,13 +132,11 @@ impl LedgerPruner {
             metadata_progress,
         )?);
         let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.transaction_accumulator_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_info_pruner = Box::new(TransactionInfoPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.transaction_info_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_pruner = Box::new(TransactionPruner::new(

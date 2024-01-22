@@ -6,18 +6,13 @@
 
 use crate::{
     ledger_db::LedgerDb,
-    schema::{
-        transaction_accumulator::TransactionAccumulatorSchema,
-        transaction_by_account::TransactionByAccountSchema,
-        transaction_info::TransactionInfoSchema, write_set::WriteSetSchema,
-    },
+    schema::{transaction_by_account::TransactionByAccountSchema, write_set::WriteSetSchema},
     utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
 };
 use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
-    proof::position::Position,
     transaction::{Transaction, Version},
     write_set::WriteSet,
 };
@@ -173,78 +168,6 @@ impl TransactionStore {
             }
         }
         Ok(())
-    }
-
-    /// Prune the transaction schema store between a range of version in [begin, end)
-    pub fn prune_transaction_info_schema(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &SchemaBatch,
-    ) -> Result<()> {
-        for version in begin..end {
-            db_batch.delete::<TransactionInfoSchema>(&version)?;
-        }
-        Ok(())
-    }
-
-    /// Prune the transaction accumulator between a range of version in [begin, end).
-    ///
-    /// To avoid always pruning a full left subtree, we uses the following algorithm.
-    /// For each leaf with an odd leaf index.
-    /// 1. From the bottom upwards, find the first ancestor that's a left child of its parent.
-    /// (the position of which can be got by popping "1"s from the right of the leaf address).
-    /// Note that this node DOES NOT become non-useful.
-    /// 2. From the node found from the previous step, delete both its children non-useful, and go
-    /// to the right child to repeat the process until we reach a leaf node.
-    /// More details are in this issue https://github.com/aptos-labs/aptos-core/issues/1288.
-    pub fn prune_transaction_accumulator(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &SchemaBatch,
-    ) -> Result<()> {
-        for version_to_delete in begin..end {
-            // The even version will be pruned in the iteration of version + 1.
-            if version_to_delete % 2 == 0 {
-                continue;
-            }
-
-            let first_ancestor_that_is_a_left_child =
-                self.find_first_ancestor_that_is_a_left_child(version_to_delete);
-
-            // This assertion is true because we skip the leaf nodes with address which is a
-            // a multiple of 2.
-            assert!(!first_ancestor_that_is_a_left_child.is_leaf());
-
-            let mut current = first_ancestor_that_is_a_left_child;
-            while !current.is_leaf() {
-                db_batch.delete::<TransactionAccumulatorSchema>(&current.left_child())?;
-                db_batch.delete::<TransactionAccumulatorSchema>(&current.right_child())?;
-                current = current.right_child();
-            }
-        }
-        Ok(())
-    }
-
-    /// Finds the first ancestor that is a child of its parent.
-    fn find_first_ancestor_that_is_a_left_child(&self, version: Version) -> Position {
-        // We can get the first ancestor's position based on the two observations:
-        // - floor(level position of a node / 2) = level position of its parent.
-        // - if a node is a left child of its parent, its level position should be a multiple of 2.
-        // - level position means the position counted from 0 of a single tree level. For example,
-        //                a (level position = 0)
-        //         /                                \
-        //    b (level position = 0)      c(level position = 1)
-        //
-        // To find the first ancestor which is a left child of its parent, we can keep diving the
-        // version by 2 (to find the ancestor) until we get a number which is a multiple of 2
-        // (to make sure the ancestor is a left child of its parent). The number of time we
-        // divide the version is the level of the ancestor. The remainder is the level position
-        // of the ancestor.
-        let first_ancestor_that_is_a_left_child_level = version.trailing_ones();
-        let index_in_level = version >> first_ancestor_that_is_a_left_child_level;
-        Position::from_level_and_pos(first_ancestor_that_is_a_left_child_level, index_in_level)
     }
 
     /// Prune the transaction schema store between a range of version in [begin, end)

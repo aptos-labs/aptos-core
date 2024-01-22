@@ -16,6 +16,7 @@ use aptos_crypto::hash::CryptoHash;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ProofReader;
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
+#[cfg(test)]
 use aptos_schemadb::SchemaBatch;
 use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order, Result};
 use aptos_temppath::TempPath;
@@ -465,7 +466,8 @@ fn verify_snapshots(
         let end = (snapshot_version - start_version) as usize;
         assert!(txns_to_commit[end].is_state_checkpoint());
         let expected_root_hash = db
-            .ledger_store
+            .ledger_db
+            .transaction_info_db()
             .get_transaction_info(snapshot_version)
             .unwrap()
             .state_checkpoint_hash()
@@ -806,7 +808,11 @@ pub fn verify_committed_transactions(
     let mut cur_ver = first_version;
     let mut updates = HashMap::new();
     for txn_to_commit in txns_to_commit {
-        let txn_info = db.ledger_store.get_transaction_info(cur_ver).unwrap();
+        let txn_info = db
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info(cur_ver)
+            .unwrap();
 
         // Verify transaction hash.
         assert_eq!(
@@ -905,12 +911,21 @@ pub fn verify_committed_transactions(
     verify_account_txns(db, group_txns_by_account(txns_to_commit), ledger_info);
 }
 
-pub fn put_transaction_info(db: &AptosDB, version: Version, txn_info: &TransactionInfo) {
-    let batch = SchemaBatch::new();
-    db.ledger_store
-        .put_transaction_infos(version, &[txn_info.clone()], &batch, &batch)
+#[cfg(test)]
+pub(crate) fn put_transaction_infos(
+    db: &AptosDB,
+    version: Version,
+    txn_infos: &[TransactionInfo],
+) -> HashValue {
+    let txns_to_commit: Vec<_> = txn_infos
+        .iter()
+        .cloned()
+        .map(TransactionToCommit::dummy_with_transaction_info)
+        .collect();
+    db.commit_transaction_infos(&txns_to_commit, version)
         .unwrap();
-    db.ledger_db.transaction_db().write_schemas(batch).unwrap();
+    db.commit_transaction_accumulator(&txns_to_commit, version)
+        .unwrap()
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {
