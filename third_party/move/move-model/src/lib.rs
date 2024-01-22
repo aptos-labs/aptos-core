@@ -404,8 +404,7 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
             fun_data.called_funs = Some(
                 fun_data
                     .def
-                    .borrow()
-                    .clone()
+                    .as_ref()
                     .map(|e| e.called_funs())
                     .unwrap_or_default(),
             )

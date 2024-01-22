@@ -176,7 +176,7 @@ object "A2_M" {
                     }
                     case 9 {
                         // label L3
-                        // destroy($t18)
+                        // drop($t18)
                         // $t29 := 1
                         $t29 := 1
                         // $t1 := +($t1, $t29)
