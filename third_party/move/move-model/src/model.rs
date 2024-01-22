@@ -1146,9 +1146,9 @@ impl GlobalEnv {
     // are ignored, but if all are `Secondary` then the earliest of those is used in
     // the ordering.
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
-        let mut sorted_labels1: Vec<_> = labels1.iter().collect();
+        let mut sorted_labels1 = labels1.iter().collect_vec();
         sorted_labels1.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
-        let mut sorted_labels2: Vec<_> = labels2.iter().collect();
+        let mut sorted_labels2 = labels2.iter().collect_vec();
         sorted_labels2.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
         std::iter::zip(sorted_labels1, sorted_labels2)
             .map(|(l1, l2)| GlobalEnv::cmp_label(l1, l2))
