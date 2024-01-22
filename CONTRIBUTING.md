@@ -21,7 +21,7 @@ Refer to our Coding Guidelines for the [Move](./developer-docs-site/docs/move/bo
 
 ### Documentation
 
-Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/aptos-core/tree/main/developers-docs-site/).  It is built using [Docusaurus](https://docusaurus.io/):
+Aptos Core's developer website is also open source (the code can be found in this [repository](https://github.com/aptos-labs/developer-docs).  It is built using [Docusaurus](https://docusaurus.io/):
 
 If you know Markdown, you can already contribute!
 

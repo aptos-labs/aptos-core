@@ -1,19 +1,19 @@
 // Copyright © Aptos Foundation
 
+use self::jwk::JWK;
+use anyhow::{bail, Context};
 use crate::{
     aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig, validator_verifier::ValidatorVerifier,
 };
-use anyhow::{ensure, Result};
+use anyhow::ensure;
 use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use move_core_types::{
     account_address::AccountAddress,
-    ident_str,
-    identifier::IdentStr,
-    move_resource::MoveStructType,
     value::{MoveStruct, MoveValue},
 };
 use serde::{Deserialize, Serialize};
@@ -91,6 +91,25 @@ impl ProviderJWKs {
     pub fn jwks(&self) -> &Vec<JWKMoveStruct> {
         &self.jwks
     }
+
+    pub fn get_jwk(&self, id: &str) -> anyhow::Result<&JWKMoveStruct> {
+        for jwk_move in self.jwks() {
+            let jwk = JWK::try_from(jwk_move)?;
+            match jwk {
+                JWK::RSA(rsa_jwk) => {
+                    if rsa_jwk.kid.eq(id) {
+                        return Ok(jwk_move);
+                    }
+                },
+                JWK::Unsupported(unsupported_jwk) => {
+                    if unsupported_jwk.id.eq(id.as_bytes()) {
+                        return Ok(jwk_move);
+                    }
+                },
+            }
+        }
+        bail!("JWK with id {} not found", id);
+    }
 }
 
 impl AsMoveValue for ProviderJWKs {
@@ -144,6 +163,28 @@ pub struct PatchedJWKs {
     pub jwks: AllProvidersJWKs,
 }
 
+impl PatchedJWKs {
+    pub fn get_provider_jwks(&self, iss: &str) -> Option<&ProviderJWKs> {
+        self.jwks
+            .entries
+            .iter()
+            .find(|&provider_jwk_set| provider_jwk_set.issuer.eq(&issuer_from_str(iss)))
+    }
+
+    pub fn get_jwk(&self, iss: &str, kid: &str) -> anyhow::Result<&JWKMoveStruct> {
+        let provider_jwk_set = self
+            .get_provider_jwks(iss)
+            .context("JWK not found for issuer")?;
+        let jwk = provider_jwk_set.get_jwk(kid)?;
+        Ok(jwk)
+    }
+}
+
+impl MoveStructType for PatchedJWKs {
+    const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("PatchedJWKs");
+}
+
 /// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct QuorumCertifiedUpdate {
@@ -160,7 +201,7 @@ pub fn verify_jwk_qc_update(
     verifier: &ValidatorVerifier,
     on_chain: &ProviderJWKs,
     qc_update: QuorumCertifiedUpdate,
-) -> Result<ProviderJWKs> {
+) -> anyhow::Result<ProviderJWKs> {
     let QuorumCertifiedUpdate {
         authors,
         update: observed,

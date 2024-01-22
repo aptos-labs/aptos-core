@@ -23,7 +23,7 @@ pub struct JWKMoveStruct {
 
 impl Debug for JWKMoveStruct {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let jwk = JWK::try_from(self.clone());
+        let jwk = JWK::try_from(self);
         f.debug_struct("JWKMoveStruct")
             .field("variant", &jwk)
             .finish()
@@ -65,22 +65,23 @@ impl From<JWK> for JWKMoveStruct {
     }
 }
 
-impl TryFrom<JWKMoveStruct> for JWK {
+impl TryFrom<&JWKMoveStruct> for JWK {
     type Error = anyhow::Error;
 
-    fn try_from(value: JWKMoveStruct) -> Result<Self, Self::Error> {
+    fn try_from(value: &JWKMoveStruct) -> Result<Self, Self::Error> {
         match value.variant.type_name.as_str() {
             RSA_JWK::MOVE_TYPE_NAME => {
-                let rsa_jwk = MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant).unwrap();
+                let rsa_jwk =
+                    MoveAny::unpack(RSA_JWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
                 Ok(Self::RSA(rsa_jwk))
             },
             UnsupportedJWK::MOVE_TYPE_NAME => {
                 let unsupported_jwk =
-                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant).unwrap();
+                    MoveAny::unpack(UnsupportedJWK::MOVE_TYPE_NAME, value.variant.clone()).unwrap();
                 Ok(Self::Unsupported(unsupported_jwk))
             },
             _ => Err(anyhow!(
-                "convertion from jwk move struct to jwk failed with unknown variant"
+                "converting from jwk move struct to jwk failed with unknown variant"
             )),
         }
     }

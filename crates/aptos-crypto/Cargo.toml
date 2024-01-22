@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-std = { workspace = true }
@@ -36,6 +37,7 @@ num-bigint = { workspace = true }
 num-integer = { workspace = true }
 once_cell = { workspace = true }
 p256 = { workspace = true }
+poseidon-ark = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }

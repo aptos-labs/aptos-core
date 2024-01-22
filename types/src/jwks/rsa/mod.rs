@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
 
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
-use anyhow::{anyhow, ensure};
+use anyhow::{anyhow, ensure, Result};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
+use crate::zkid::Claims;
+use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
@@ -27,6 +29,14 @@ impl RSA_JWK {
             e: e.to_string(),
             n: n.to_string(),
         }
+    }
+
+    pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
+        let mut validation = Validation::new(Algorithm::RS256);
+        validation.validate_exp = false;
+        let key = &DecodingKey::from_rsa_components(&self.n, &self.e)?;
+        let claims = jsonwebtoken::decode::<Claims>(jwt_token, key, &validation)?;
+        Ok(claims)
     }
 }
 

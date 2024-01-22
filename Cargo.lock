@@ -1011,6 +1011,7 @@ dependencies = [
  "num-integer",
  "once_cell",
  "p256",
+ "poseidon-ark",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.7.3",
@@ -4120,8 +4121,12 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-experimental-runtimes",
+ "ark-bn254",
+ "ark-ff",
+ "ark-serialize",
  "arr_macro",
  "async-trait",
+ "base64 0.13.1",
  "bcs 0.1.4",
  "bytes",
  "chrono",
@@ -4131,10 +4136,12 @@ dependencies = [
  "derivative",
  "hex",
  "itertools 0.10.5",
+ "jsonwebtoken 8.3.0",
  "move-binary-format",
  "move-core-types",
  "move-table-extension",
  "move-vm-types",
+ "num-bigint 0.4.4",
  "num-derive",
  "num-traits",
  "once_cell",
@@ -4150,6 +4157,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
+ "serde_with",
  "serde_yaml 0.8.26",
  "strum 0.24.1",
  "strum_macros 0.24.3",
@@ -4246,6 +4254,7 @@ dependencies = [
  "aptos-utils",
  "aptos-vm-logging",
  "aptos-vm-types",
+ "base64-url",
  "bcs 0.1.4",
  "bytes",
  "claims",
@@ -4253,6 +4262,7 @@ dependencies = [
  "dashmap",
  "fail 0.5.1",
  "futures",
+ "jsonwebtoken 8.3.0",
  "move-binary-format",
  "move-bytecode-utils",
  "move-bytecode-verifier",
@@ -5118,6 +5128,15 @@ name = "base64"
 version = "0.21.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35636a1494ede3b646cc98f74f8e62c773a38a659ebc777a2cf26b9b74171df9"
+
+[[package]]
+name = "base64-url"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb9fb9fb058cc3063b5fc88d9a21eefa2735871498a04e1650da76ed511c8569"
+dependencies = [
+ "base64 0.21.5",
+]
 
 [[package]]
 name = "base64ct"
@@ -6526,12 +6545,46 @@ dependencies = [
 
 [[package]]
 name = "darling"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a01d95850c592940db9b8194bc39f4bc0e89dee5c4265e4b1807c34a9aba453c"
+dependencies = [
+ "darling_core 0.13.4",
+ "darling_macro 0.13.4",
+]
+
+[[package]]
+name = "darling"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b750cb3417fd1b327431a470f388520309479ab0bf5e323505daf0290cd3850"
 dependencies = [
- "darling_core",
- "darling_macro",
+ "darling_core 0.14.4",
+ "darling_macro 0.14.4",
+]
+
+[[package]]
+name = "darling"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
+dependencies = [
+ "darling_core 0.20.3",
+ "darling_macro 0.20.3",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "859d65a907b6852c9361e3185c862aae7fafd2887876799fa55f5f99dc40d610"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "strsim 0.10.0",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -6549,14 +6602,50 @@ dependencies = [
 ]
 
 [[package]]
+name = "darling_core"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "strsim 0.10.0",
+ "syn 2.0.47",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c972679f83bdf9c42bd905396b6c3588a843a17f0f16dfcfa3e2c5d57441835"
+dependencies = [
+ "darling_core 0.13.4",
+ "quote 1.0.35",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "darling_macro"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4aab4dbc9f7611d8b55048a3a16d2d010c2c8334e46304b40ac1cc14bf3b48e"
 dependencies = [
- "darling_core",
+ "darling_core 0.14.4",
  "quote 1.0.35",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
+dependencies = [
+ "darling_core 0.20.3",
+ "quote 1.0.35",
+ "syn 2.0.47",
 ]
 
 [[package]]
@@ -9355,6 +9444,7 @@ dependencies = [
  "k8s-openapi",
  "kube-client",
  "kube-core",
+ "kube-derive",
 ]
 
 [[package]]
@@ -9407,6 +9497,19 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "kube-derive"
+version = "0.65.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b98ff3d647085c6c025083efad0435890867f4bea042fc62d408ab3aeb1cdf66"
+dependencies = [
+ "darling 0.13.4",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "serde_json",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -12265,7 +12368,7 @@ version = "2.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "274cf13f710999977a3c1e396c2a5000d104075a7127ce6470fbdae4706be621"
 dependencies = [
- "darling",
+ "darling 0.14.4",
  "http",
  "indexmap 1.9.3",
  "mime",
@@ -12344,6 +12447,16 @@ name = "portable-atomic"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7170ef9988bc169ba16dd36a7fa041e5c4cbeb6a35b76d4c03daded371eae7c0"
+
+[[package]]
+name = "poseidon-ark"
+version = "0.0.1"
+source = "git+https://github.com/arnaucube/poseidon-ark.git?rev=6d2487aa1308d9d3860a2b724c485d73095c1c68#6d2487aa1308d9d3860a2b724c485d73095c1c68"
+dependencies = [
+ "ark-bn254",
+ "ark-ff",
+ "ark-std",
+]
 
 [[package]]
 name = "postgres-protocol"
@@ -14130,7 +14243,20 @@ dependencies = [
  "indexmap 2.1.0",
  "serde",
  "serde_json",
+ "serde_with_macros",
  "time",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93634eb5f75a2323b16de4748022ac4297f9e76b6dced2be287a099f41b5e788"
+dependencies = [
+ "darling 0.20.3",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "syn 2.0.47",
 ]
 
 [[package]]

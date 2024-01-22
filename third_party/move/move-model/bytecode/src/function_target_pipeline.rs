@@ -369,15 +369,18 @@ impl FunctionTargetPipeline {
     /// Runs the pipeline on all functions in the targets holder. Processors are run on each
     /// individual function in breadth-first fashion; i.e. a processor can expect that processors
     /// preceding it in the pipeline have been executed for all functions before it is called.
-    pub fn run_with_hook<H1, H2>(
+    /// `hook_before_pipeline` is called before the pipeline is run, and `hook_after_each_processor`
+    /// is called after each processor in the pipeline has been run on all functions.
+    /// Note that `hook_after_each_processor` is called with index starting at 1.
+    pub fn run_with_hook<Before, AfterEach>(
         &self,
         env: &GlobalEnv,
         targets: &mut FunctionTargetsHolder,
-        hook_before_pipeline: H1,
-        hook_after_each_processor: H2,
+        hook_before_pipeline: Before,
+        hook_after_each_processor: AfterEach,
     ) where
-        H1: Fn(&FunctionTargetsHolder),
-        H2: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder),
+        Before: Fn(&FunctionTargetsHolder),
+        AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder),
     {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
         info!("transforming bytecode");

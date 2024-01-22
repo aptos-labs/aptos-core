@@ -96,6 +96,11 @@ impl Annotations {
             .and_then(|(d, _)| d.value.downcast::<T>().ok())
     }
 
+    /// Clears all annotations.
+    pub fn clear(&mut self) {
+        self.map.clear()
+    }
+
     /// Mark whether the annotations all reach a fixedpoint status
     pub fn reached_fixedpoint(&self) -> bool {
         self.map.values().all(|(_, fixedpoint)| *fixedpoint)
