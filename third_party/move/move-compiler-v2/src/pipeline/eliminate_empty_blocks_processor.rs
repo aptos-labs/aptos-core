@@ -199,3 +199,76 @@ fn apply_inf<'a, T: Ord>(f: &'a BTreeMap<T, T>, x: &'a T) -> &'a T {
         None => x,
     }
 }
+
+struct ControlFlowGraphCodeGenerator {
+    cfg: StacklessControlFlowGraph,
+    code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
+}
+
+impl ControlFlowGraphCodeGenerator {
+    pub fn new(cfg: StacklessControlFlowGraph, codes: &[Bytecode]) -> Self {
+        let code_blocks = cfg
+            .iter_dfs_left()
+            .map(|block| (block, cfg.content(block).to_bytecodes(&codes).to_vec()))
+            .collect();
+        Self { cfg, code_blocks }
+    }
+
+    /// Generates code from the control flow graph
+    fn gen_codes(mut self) -> Vec<Bytecode> {
+        let mut generated = Vec::new();
+        let mut iter_dfs_left = self.cfg.iter_dfs_left().peekable();
+        while let Some(block) = iter_dfs_left.next() {
+            if block == self.cfg.entry_block() || block == self.cfg.exit_block() {
+                continue;
+            }
+            let mut code_block = self.code_blocks.remove(&block).expect("code block");
+            // if we have block 0 followed by block 1 without jump/branch
+            // and we don't visit block 1 after block 0, then we have to add an explicit jump
+            if self.falls_to_next_block(&code_block) {
+                debug_assert!(self.cfg.successors(block).len() == 1);
+                let suc_block = *self.cfg.successors(block).get(0).expect("successor block");
+                debug_assert!(
+                    suc_block != self.cfg.exit_block(),
+                    "path endding without return/abort"
+                );
+                let maybe_next_to_visit = iter_dfs_left.peek();
+                if maybe_next_to_visit.is_none() || *maybe_next_to_visit.unwrap() != suc_block {
+                    let attr_id = code_block.last().expect("last instr").get_attr_id();
+                    // assuming that any block with a non-trivial predecessor block starts with a label
+                    code_block.push(Bytecode::Jump(attr_id, self.get_block_label(suc_block)));
+                }
+            }
+            generated.append(&mut code_block);
+        }
+        generated
+    }
+
+    /// Checks whether a block falls to the next block without jump, branch, abort, or return
+    fn falls_to_next_block(&self, codes: &[Bytecode]) -> bool {
+        let last_instr = codes.last().expect("last instr");
+        !matches!(
+            last_instr,
+            Bytecode::Jump(..) | Bytecode::Branch(..) | Bytecode::Ret(..) | Bytecode::Abort(..)
+        )
+    }
+
+    /// Returns the instructions of the block
+    fn block_instrs(&self, block_id: BlockId) -> &[Bytecode] {
+        self.code_blocks.get(&block_id).expect("block instructions")
+    }
+
+    /// Returns the label of the block
+    /// Panics if the block is entry/exit, or doesn't start with a label
+    fn get_block_label(&self, block_id: BlockId) -> Label {
+        if let Bytecode::Label(_, label) = self
+            .block_instrs(block_id)
+            .get(0)
+            .expect("first instruction")
+        {
+            label.clone()
+        } else {
+            panic!("block doesn't start with a label")
+        }
+    }
+}
