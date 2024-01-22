@@ -646,11 +646,11 @@ impl AptosDataClient {
             // Send the request to the peer
             let aptos_data_client = self.clone();
             let request = request.clone();
-            let sent_request = tokio::spawn(async move {
+            let sent_request = tokio::spawn(tokio::task::unconstrained(async move {
                 aptos_data_client
                     .send_request_to_peer_and_decode(peer, request, request_timeout_ms)
                     .await
-            });
+            }));
             let abort_handle = sent_request.abort_handle();
 
             // Gather the tasks and abort handles

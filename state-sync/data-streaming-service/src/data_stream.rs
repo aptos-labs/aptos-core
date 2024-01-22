@@ -1414,7 +1414,7 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
     );
 
     // Spawn the request
-    tokio::spawn(async move {
+    tokio::spawn(tokio::task::unconstrained(async move {
         // Time the request (the timer will stop when it's dropped)
         let _timer = start_timer(
             &metrics::DATA_REQUEST_PROCESSING_LATENCY,
@@ -1508,7 +1508,7 @@ fn spawn_request_task<T: AptosDataClientInterface + Send + Clone + 'static>(
         // Send a notification via the stream update notifier
         let stream_update_notification = StreamUpdateNotification::new(data_stream_id);
         let _ = stream_update_notifier.push((), stream_update_notification);
-    })
+    }))
 }
 
 async fn get_states_values_with_proof<T: AptosDataClientInterface + Send + Clone + 'static>(
