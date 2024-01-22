@@ -36,6 +36,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
+use pipeline::{split_critical_edges_processor::SplitCriticalEdgesProcessor, eliminate_empty_blocks_processor::EliminateEmptyBlocksProcessor};
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -186,6 +187,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         with_copy_inference: true,
     }));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
@@ -193,8 +195,9 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     }
     // The default optimization pipeline is currently always run by the compiler.
     add_default_optimization_pipeline(&mut pipeline);
+    pipeline.add_processor(Box::new(EliminateEmptyBlocksProcessor {}));
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
-    // but it is needed by file format generator.
+    // and EliminateEmptyBlocksProcessor but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
         with_copy_inference: false,
     }));
