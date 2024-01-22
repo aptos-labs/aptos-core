@@ -17,6 +17,7 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
+use std::time::Duration;
 use aptos_crypto::Uniform;
 use aptos_types::dkg::DKGSessionMetadata;
 use aptos_types::validator_txn::Topic;
@@ -26,7 +27,6 @@ enum InnerState<DKG: DKGTrait> {
     NotStarted,
     InProgress {
         start_time_us: u64,
-        public_params: DKG::PublicParams,
         my_node: DKGNode,
         abort_handle: AbortHandle,
     },
@@ -183,9 +183,10 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         &mut self,
         _txn: Arc<ValidatorTransaction>,
     ) -> Result<()> {
-        if let InnerState::Finished { pull_confirmed, .. } = &mut self.state {
+        if let InnerState::Finished { pull_confirmed, start_time_us, .. } = &mut self.state {
             if !*pull_confirmed {
-                debug!("[DKG] vtxn pulled");
+                let start_to_propose = aptos_infallible::duration_since_epoch() - Duration::from_micros(*star_time_us);
+                debug!("[DKG] vtxn pulled, start_to_propose={:?}", start_to_propose);
                 // TODO(zjma): metric DKG_AGG_NODE_PROPOSED
             }
             *pull_confirmed = true;
@@ -239,7 +240,6 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 // Switch to the next stage.
                 InnerState::InProgress {
                     start_time_us,
-                    public_params,
                     my_node: dkg_node,
                     abort_handle,
                 }

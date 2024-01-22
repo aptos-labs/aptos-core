@@ -1803,7 +1803,7 @@ impl AptosVM {
             self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
 
         let block_metadata_with_randomness = match block_metadata_ext {
-            BlockMetadataExt::V0(v0) => unreachable!(),
+            BlockMetadataExt::V0(_) => unreachable!(),
             BlockMetadataExt::V1(v1) => v1,
         };
 
