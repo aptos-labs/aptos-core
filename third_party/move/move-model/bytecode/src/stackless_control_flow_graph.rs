@@ -41,6 +41,7 @@ impl BlockContent {
     }
 }
 
+#[derive(Default)]
 pub struct StacklessControlFlowGraph {
     entry_block_id: BlockId,
     blocks: Map<BlockId, Block>,
@@ -213,6 +214,10 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
+    pub fn successors_mut(&mut self, block_id: BlockId) -> &mut Vec<BlockId> {
+        &mut self.blocks.get_mut(&block_id).expect("block").successors
+    }
+
     /// Removes the block
     /// Cannot remove entry/exit block
     pub fn remove_block(&mut self, block_to_remove: BlockId) {
@@ -317,12 +322,13 @@ impl<'a> Iterator for DFSLeft<'a> {
     type Item = BlockId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let visiting = self.to_visit.pop()?;
-		debug_assert!(self.visited.insert(visiting));
+        let mut visiting = self.to_visit.pop()?;
+        while self.visited.contains(&visiting) {
+            visiting = self.to_visit.pop()?;
+        }
+        self.visited.insert(visiting);
 		for suc_block in self.cfg.successors(visiting).iter().rev() {
-			if !self.visited.contains(suc_block) {
-				self.to_visit.push(*suc_block);
-			}
+			self.to_visit.push(*suc_block);
 		}
 		Some(visiting)
     }
