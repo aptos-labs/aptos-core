@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
+use aptos_logger::debug;
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
+    AptosVM,
     errors::expect_only_successful_execution,
     move_vm_ext::{AptosMoveResolver, SessionId},
     system_module_names::{FINISH_WITH_DKG_RESULT, RECONFIGURATION_WITH_DKG_MODULE},
@@ -9,20 +11,20 @@ use crate::{
         ExecutionFailure::{Expected, Unexpected},
         ExpectedFailure::*,
     },
-    AptosVM,
 };
 use aptos_types::{
-    dkg::{DKGNode, DKGState, DKGTrait, DummyDKG},
+    dkg::{DKGNode, DKGState, DKGTrait},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
     transaction::{ExecutionStatus, TransactionStatus},
 };
+use aptos_types::dkg::dummy_dkg::{DummyDKG, DummyDKGTranscript};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use move_core_types::{
     account_address::AccountAddress,
-    value::{serialize_values, MoveValue},
+    value::{MoveValue, serialize_values},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
 use move_vm_types::gas::UnmeteredGasMeter;
@@ -48,7 +50,8 @@ impl AptosVM {
         session_id: SessionId,
         dkg_node: DKGNode,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_node) {
+        debug!("[DKG] process_dkg_result: BEGIN: dkg_node={:?}", dkg_node);
+        let ret = match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_node) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
@@ -58,7 +61,9 @@ impl AptosVM {
                 ))
             },
             Err(Unexpected(vm_status)) => Err(vm_status),
-        }
+        };
+        debug!("[DKG] process_dkg_result: END: ret={:?}", ret);
+        ret
     }
 
     fn process_dkg_result_inner(
@@ -82,7 +87,7 @@ impl AptosVM {
 
         // Deserialize transcript and verify it.
         let pub_params = DummyDKG::new_public_params(&in_progress_session_state.metadata);
-        let transcript = DummyDKG::deserialize_transcript(dkg_node.transcript_bytes.as_slice())
+        let transcript = bcs::from_bytes::<DummyDKGTranscript>(dkg_node.transcript_bytes.as_slice())
             .map_err(|_| Expected(TranscriptDeserializationFailed))?;
 
         DummyDKG::verify_transcript(&pub_params, &transcript)

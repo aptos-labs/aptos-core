@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::dkg::{DKGNode, DKGSessionMetadata, DKGTrait, DKGTranscriptMetadata, DummyDKG, DummyDKGTranscript};
+use aptos_types::dkg::{DKGNode, DKGSessionMetadata, DKGTrait, DKGTranscriptMetadata};
 use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
 use aptos_types::ValidatorConsensusInfoMoveStruct;
 use move_core_types::account_address::AccountAddress;
@@ -8,6 +8,7 @@ use std::sync::Arc;
 use aptos_crypto::bls12381::bls12381_keys;
 use aptos_crypto::Uniform;
 use aptos_reliable_broadcast::BroadcastStatus;
+use aptos_types::dkg::dummy_dkg::{DummyDKG, DummyDKGTranscript};
 use aptos_types::epoch_state::EpochState;
 use crate::transcript_aggregation::TranscriptAggregationState;
 

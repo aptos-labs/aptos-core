@@ -10,7 +10,6 @@ use std::fmt::Debug;
 pub enum ValidatorTransaction {
     DummyTopic1(DummyValidatorTransaction),
     DKGResult(DKGNode),
-    #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic2(DummyValidatorTransaction),
 }
 

@@ -3,9 +3,9 @@
 use crate::{
     agg_trx_producer::DummyAggTranscriptProducer,
     dkg_manager::{DKGManager, InnerState},
+    DKGMessage,
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::DKGNodeRequest,
-    DKGMessage,
 };
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
@@ -17,7 +17,8 @@ use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
 use std::time::Instant;
-use aptos_types::dkg::{DKGSessionMetadata, DummyDKG, DummyDKGTranscript};
+use aptos_types::dkg::DKGSessionMetadata;
+use aptos_types::dkg::dummy_dkg::{DummyDKG, DummyDKGTranscript};
 
 #[tokio::test]
 async fn test_dkg_state_transition() {
@@ -96,7 +97,7 @@ async fn test_dkg_state_transition() {
 
     // In state `InProgress`, DKGManager should accept `DKGAggNode`:
     // it should update validator txn pool, and enter state `Finished`.
-    let agg_trx = DummyDKGTranscript::default();
+    let agg_trx = <DummyDKG as DKGTrait>::Transcript::default();
     let handle_result = dkg_manager
         .process_aggregated_transcript(agg_trx.clone())
         .await;
@@ -114,7 +115,7 @@ async fn test_dkg_state_transition() {
                 epoch: 999,
                 author: addrs[0],
             },
-            transcript_bytes: DummyDKG::serialize_transcript(&agg_trx),
+            transcript_bytes: bcs::to_bytes(&agg_trx).unwrap(),
         })],
         available_vtxns
     );

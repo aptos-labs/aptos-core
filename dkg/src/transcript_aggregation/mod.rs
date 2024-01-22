@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 
 use crate::{DKGMessage, types::DKGNodeRequest};
-use anyhow::ensure;
+use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{dkg::{DKGNode, DKGTrait}, epoch_state::EpochState};
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, mem, sync::Arc};
 
 pub struct TranscriptAggregator<S: DKGTrait> {
     pub contributors: HashSet<AccountAddress>,
@@ -61,18 +61,19 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             metadata.author == sender,
             "adding dkg node failed with node author mismatch"
         );
-        let transcript = bcs::from_bytes(transcript_bytes.as_slice())?;
+        let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e|anyhow!("transcript_aggregation::add failed with trx deserialization error: {e}"))?;
         let mut trx_aggregator = self.trx_aggregator.lock();
         if trx_aggregator.contributors.contains(&metadata.author) {
             return Ok(None);
         }
 
-        S::verify_transcript(&self.dkg_pub_params, &transcript)?;
+        S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e|anyhow!("transcript_aggregation::add failed with trx verification failure: {e}"))?;
 
         // All checks passed. Aggregating.
         trx_aggregator.contributors.insert(metadata.author);
         if let Some(agg_trx) = trx_aggregator.trx.as_mut() {
-            S::aggregate_transcripts(&self.dkg_pub_params, agg_trx, &transcript);
+            let acc = mem::take(agg_trx);
+            *agg_trx = S::aggregate_transcripts(&self.dkg_pub_params, vec![acc, transcript]);
         } else {
             trx_aggregator.trx = Some(transcript);
         }

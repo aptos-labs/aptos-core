@@ -136,7 +136,7 @@ fn reconfig_with_dkg_end_to_end() {
     harness_wrapper.fast_forward_then_default_block_prologue_ext(true);
 
     let DKGState {
-        last_complete,
+        last_completed: last_complete,
         in_progress,
     } = harness_wrapper.read::<DKGState>();
     assert!(last_complete.is_none());

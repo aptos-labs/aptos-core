@@ -5,7 +5,7 @@ use crate::{config::SecureBackend, keys::ConfigKey};
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_types::{
     account_address::{AccountAddress, AccountAddress as PeerId},
-    dkg::{DKGPrivateParamsProvider, DKGTrait, DummyDKG},
+    dkg::{DKGTrait},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -14,6 +14,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use aptos_types::dkg::DKG;
 
 /// A single struct for reading / writing to a file for identity across configs
 #[derive(Deserialize, Serialize)]
@@ -39,6 +40,14 @@ impl IdentityBlob {
     pub fn to_file(&self, path: &Path) -> anyhow::Result<()> {
         let mut file = File::open(path)?;
         Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
+    }
+
+    pub fn try_into_dkg_dealer_private_key(self) -> Option<<DKG as DKGTrait>::DealerPrivateKey> {
+        self.consensus_private_key
+    }
+
+    pub fn try_into_dkg_new_validator_decrypt_key(self) -> Option<<DKG as DKGTrait>::NewValidatorDecryptKey> {
+        self.consensus_private_key
     }
 }
 
@@ -92,10 +101,4 @@ pub struct IdentityFromStorage {
 #[serde(deny_unknown_fields)]
 pub struct IdentityFromFile {
     pub path: PathBuf,
-}
-
-impl DKGPrivateParamsProvider<DummyDKG> for IdentityBlob {
-    fn dkg_private_params(&self) -> &<DummyDKG as DKGTrait>::PrivateParams {
-        self.consensus_private_key.as_ref().unwrap()
-    }
 }

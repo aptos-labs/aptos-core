@@ -198,7 +198,7 @@ module aptos_framework::block {
             previous_block_votes_bitvec,
             timestamp
         );
-        randomness::on_new_block(&vm, randomness_seed);
+        randomness::on_new_block(&vm, epoch, round, randomness_seed);
 
         if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();

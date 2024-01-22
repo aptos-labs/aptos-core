@@ -1,0 +1,9 @@
+[package]
+name = "OnChainDice"
+version = "0.0.0"
+
+[addresses]
+module_owner = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

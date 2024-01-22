@@ -56,11 +56,11 @@ pub mod vm_status;
 pub mod waypoint;
 pub mod write_set;
 
+use crate::validator_verifier::ValidatorConsensusInfo;
 pub use account_address::AccountAddress as PeerId;
 use aptos_crypto::bls12381::bls12381_keys;
 use move_core_types::account_address::AccountAddress;
 pub use utility_coin::*;
-use crate::validator_verifier::ValidatorConsensusInfo;
 
 pub mod account_view;
 pub mod aggregate_signature;
@@ -82,7 +82,11 @@ pub struct ValidatorConsensusInfoMoveStruct {
 
 impl From<ValidatorConsensusInfo> for ValidatorConsensusInfoMoveStruct {
     fn from(value: ValidatorConsensusInfo) -> Self {
-        let ValidatorConsensusInfo { address, public_key, voting_power } = value;
+        let ValidatorConsensusInfo {
+            address,
+            public_key,
+            voting_power,
+        } = value;
         Self {
             addr: address,
             pk_bytes: public_key.to_bytes().to_vec(),
@@ -95,7 +99,11 @@ impl TryFrom<ValidatorConsensusInfoMoveStruct> for ValidatorConsensusInfo {
     type Error = anyhow::Error;
 
     fn try_from(value: ValidatorConsensusInfoMoveStruct) -> Result<Self, Self::Error> {
-        let ValidatorConsensusInfoMoveStruct { addr, pk_bytes, voting_power } = value;
+        let ValidatorConsensusInfoMoveStruct {
+            addr,
+            pk_bytes,
+            voting_power,
+        } = value;
         let public_key = bls12381_keys::PublicKey::try_from(pk_bytes.as_slice())?;
         Ok(Self::new(addr, public_key, voting_power))
     }

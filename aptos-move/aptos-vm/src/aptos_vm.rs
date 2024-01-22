@@ -102,6 +102,9 @@ use std::{
         Arc,
     },
 };
+use aptos_types::block_metadata_ext::BlockMetadataWithRandomness;
+use aptos_types::move_utils::as_move_value::AsMoveValue;
+use aptos_types::randomness::Randomness;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1793,17 +1796,46 @@ impl AptosVM {
             ))
         });
 
+        debug!("[DKG] process_block_prologue_ext: BEGIN: block_metadata_ext={:?}", block_metadata_ext);
+
         let mut gas_meter = UnmeteredGasMeter;
         let mut session =
             self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
 
-        let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args());
+        let block_metadata_with_randomness = match block_metadata_ext {
+            BlockMetadataExt::V0(v0) => unreachable!(),
+            BlockMetadataExt::V1(v1) => v1,
+        };
+
+        let BlockMetadataWithRandomness {
+            id,
+            epoch,
+            round,
+            proposer,
+            previous_block_votes_bitvec,
+            failed_proposer_indices,
+            timestamp_usecs,
+            randomness,
+        } = block_metadata_with_randomness;
+
+        let args = vec![
+            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
+            MoveValue::U64(epoch),
+            MoveValue::U64(round),
+            MoveValue::Address(proposer),
+            failed_proposer_indices.into_iter().map(|i|i as u64).collect::<Vec<_>>().as_move_value(),
+            previous_block_votes_bitvec.as_move_value(),
+            MoveValue::U64(timestamp_usecs),
+            randomness.as_ref().map(Randomness::randomness_cloned).as_move_value(),
+        ];
+
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
                 BLOCK_PROLOGUE_EXT,
                 vec![],
-                args,
+                serialize_values(&args),
                 &mut gas_meter,
             )
             .map(|_return_vals| ())
@@ -1811,6 +1843,7 @@ impl AptosVM {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
+        debug!("[DKG] process_block_prologue_ext: executed");
 
         let output = get_transaction_output(
             session,
@@ -1818,6 +1851,8 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
+        debug!("[DKG] process_block_prologue_ext: END");
+
         Ok((VMStatus::Executed, output))
     }
 

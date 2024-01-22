@@ -26,7 +26,6 @@ module aptos_framework::aptos_governance {
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
-    use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
@@ -548,8 +547,11 @@ module aptos_framework::aptos_governance {
     /// since such updates are applied whenever we enter an new epoch.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        //TODO: once DKG is implemented, update this.
-        reconfiguration_with_dkg::finish(aptos_framework);
+        if (features::reconfigure_with_dkg_enabled()) {
+            reconfiguration_with_dkg::try_start();
+        } else {
+            reconfiguration_with_dkg::finish(aptos_framework);
+        }
     }
 
     /// Change epoch immediately.
@@ -566,8 +568,8 @@ module aptos_framework::aptos_governance {
     /// Update feature flags and also trigger reconfiguration.
     public fun toggle_features(aptos_framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        features::change_feature_flags(aptos_framework, enable, disable);
-        reconfiguration::reconfigure();
+        features::change_feature_flags_for_next_epoch(aptos_framework, enable, disable);
+        reconfigure(aptos_framework);
     }
 
     /// Only called in testnet where the core resources account exists and has been granted power to mint Aptos coins.

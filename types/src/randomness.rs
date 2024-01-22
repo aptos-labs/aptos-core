@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block_info::Round;
+use crate::{block_info::Round, on_chain_config::OnChainConfig};
 use aptos_crypto::HashValue;
 use serde::{Deserialize, Serialize};
 
@@ -78,6 +78,10 @@ impl Randomness {
     pub fn randomness(&self) -> &[u8] {
         &self.randomness
     }
+
+    pub fn randomness_cloned(&self) -> Vec<u8> {
+        self.randomness.clone()
+    }
 }
 
 impl Default for Randomness {
@@ -89,4 +93,16 @@ impl Default for Randomness {
             randomness,
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PerBlockRandomness {
+    pub epoch: u64,
+    pub round: u64,
+    pub seed: Vec<u8>,
+}
+
+impl OnChainConfig for PerBlockRandomness {
+    const MODULE_IDENTIFIER: &'static str = "randomness";
+    const TYPE_IDENTIFIER: &'static str = "PerBlockRandomness";
 }

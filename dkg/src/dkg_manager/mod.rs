@@ -2,10 +2,10 @@
 use crate::{agg_trx_producer::AggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::{
     dkg::{
-        DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait,
+        DKGNode, DKGSessionState, DKGStartEvent, DKGTrait,
         DKGTranscriptMetadata,
     },
     epoch_state::EpochState,
@@ -17,10 +17,10 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
+use aptos_crypto::Uniform;
 use aptos_types::dkg::DKGSessionMetadata;
 use aptos_types::validator_txn::Topic;
 
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 enum InnerState<DKG: DKGTrait> {
     NotStarted,
@@ -45,7 +45,7 @@ impl<DKG: DKGTrait> Default for InnerState<DKG> {
 }
 
 pub struct DKGManager<DKG: DKGTrait> {
-    private_params_provider: Arc<dyn DKGPrivateParamsProvider<DKG>>,
+    dealer_sk: Arc<DKG::DealerPrivateKey>,
 
     my_addr: AccountAddress,
     my_index: usize,
@@ -86,7 +86,7 @@ impl<DKG: DKGTrait> InnerState<DKG> {
 
 impl<DKG: DKGTrait> DKGManager<DKG> {
     pub fn new(
-        private_params_provider: Arc<dyn DKGPrivateParamsProvider<DKG>>,
+        dealer_sk: Arc<DKG::DealerPrivateKey>,
         my_addr: AccountAddress,
         my_index: usize,
         epoch_state: Arc<EpochState>,
@@ -95,7 +95,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     ) -> Self {
         let (pull_notification_tx, pull_notification_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
-            private_params_provider,
+            dealer_sk,
             my_addr,
             my_index,
             epoch_state,
@@ -116,6 +116,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         mut rpc_msg_rx: aptos_channel::Receiver<(), (AccountAddress, IncomingRpcRequest)>,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
+        debug!("[DKG] manager start");
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
                 start_time_us,
@@ -153,6 +154,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             if let Err(e) = handling_result {
                 error!("{}", e);
             }
+
+            debug!("[DKG] state={:?}", self.state);
         }
     }
 
@@ -182,6 +185,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     ) -> Result<()> {
         if let InnerState::Finished { pull_confirmed, .. } = &mut self.state {
             if !*pull_confirmed {
+                debug!("[DKG] vtxn pulled");
                 // TODO(zjma): metric DKG_AGG_NODE_PROPOSED
             }
             *pull_confirmed = true;
@@ -199,21 +203,29 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         start_time_us: u64,
         dkg_session_metadata: &DKGSessionMetadata,
     ) -> Result<()> {
+        debug!("[DKG] setup_deal_broadcast: BEGIN: start_time_us={}, dkg_session_metadata={:?}", start_time_us, dkg_session_metadata);
         self.state = match &self.state {
             InnerState::NotStarted => {
                 let public_params = DKG::new_public_params(dkg_session_metadata);
                 let mut rng = thread_rng();
+                let input_secret = if cfg!(feature = "smoke-test") {
+                    DKG::generate_predictable_input_secret_for_testing(self.dealer_sk.as_ref())
+                } else {
+                    DKG::InputSecret::generate(&mut rng)
+                };
+
                 let trx = DKG::generate_transcript(
                     &mut rng,
                     &public_params,
-                    self.my_index,
-                    self.private_params_provider.dkg_private_params(),
+                    &input_secret,
+                    self.my_index as u64,
+                    &self.dealer_sk,
                 );
 
                 let dkg_node = DKGNode::new(
                     self.epoch_state.epoch,
                     self.my_addr,
-                    DKG::serialize_transcript(&trx),
+                    bcs::to_bytes(&trx).map_err(|e|anyhow!("setup_deal_broadcast failed with trx serialization error: {e}"))?,
                 );
 
                 // TODO(zjma): DKG_NODE_READY metric
@@ -240,6 +252,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
     /// On a locally aggregated transcript, put it into the validator txn pool and update inner states.
     async fn process_aggregated_transcript(&mut self, agg_trx: DKG::Transcript) -> Result<()> {
+        debug!("[DKG] process_aggregated_transcript: BEGIN");
         self.state = match std::mem::take(&mut self.state) {
             InnerState::InProgress {
                 start_time_us,
@@ -252,7 +265,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                         epoch: self.epoch_state.epoch,
                         author: self.my_addr,
                     },
-                    transcript_bytes: DKG::serialize_transcript(&agg_trx),
+                    transcript_bytes: bcs::to_bytes(&agg_trx).map_err(|e|anyhow!("process_aggregated_transcript failed with trx serialization error: {e}"))?,
                 });
                 let vtxn_guard = self.vtxn_pool.put(Topic::DKG, Arc::new(txn), Some(self.pull_notification_tx.clone()));
                 InnerState::Finished {
