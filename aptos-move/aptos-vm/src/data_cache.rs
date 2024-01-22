@@ -273,8 +273,8 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
             .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: usize) -> Self::Identifier {
+        self.executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(

@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    aggregator::PanicError,
+    aggregator::{ExtractUniqueIndex, PanicError},
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -1721,31 +1721,37 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        match &self.latest_view {
-            ViewState::Sync(state) => (state.counter.fetch_add(1, Ordering::SeqCst) as u64).into(),
+    fn generate_delayed_field_id(&self, width: usize) -> Self::Identifier {
+        let index = match &self.latest_view {
+            ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
                 let mut counter = state.counter.borrow_mut();
-                let id = (*counter as u64).into();
+                let id = *counter;
                 *counter += 1;
                 id
             },
-        }
+        };
+
+        (index, width).into()
     }
 
     fn validate_and_convert_delayed_field_id(
         &self,
         id: u64,
     ) -> Result<Self::Identifier, PanicError> {
+        let result: Self::Identifier = id.into();
+
+        let unique_index = result.extract_unique_index();
+
         let start_counter = match &self.latest_view {
             ViewState::Sync(state) => state.start_counter,
             ViewState::Unsync(state) => state.start_counter,
         };
 
-        if id < start_counter as u64 {
+        if unique_index < start_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've started from {}",
-                id, start_counter
+                "Invalid delayed field id: {}, index: {}, we've started from {}",
+                id, unique_index, start_counter
             )));
         }
 
@@ -1754,14 +1760,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Unsync(state) => *state.counter.borrow(),
         };
 
-        if id > current as u64 {
+        if unique_index > current {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've only reached to {}",
-                id, current
+                "Invalid delayed field id: {}, index: {}, we've only reached to {}",
+                id, unique_index, current
             )));
         }
 
-        Ok(id.into())
+        Ok(result)
     }
 
     // TODO[agg_v2](cleanup) - update comment.
@@ -1844,8 +1850,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
         }
     }
 
-    fn generate_delayed_field_id(&self) -> T::Identifier {
-        self.latest_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: usize) -> T::Identifier {
+        self.latest_view.generate_delayed_field_id(width)
     }
 
     pub fn into_inner(self) -> HashSet<T::Identifier> {
@@ -1865,8 +1871,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         layout: &MoveTypeLayout,
         value: Value,
     ) -> TransformationResult<Value> {
-        let id = self.generate_delayed_field_id();
-        let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
+        let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
+        let id = self.generate_delayed_field_id(width);
         match &self.latest_view.latest_view {
             ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
             ViewState::Unsync(state) => {
@@ -1883,21 +1889,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
         layout: &MoveTypeLayout,
         identifier_value: Value,
     ) -> TransformationResult<Value> {
-        let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
+        let (id, width) = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
         self.delayed_field_keys.borrow_mut().insert(id);
-        match &self.latest_view.latest_view {
-            ViewState::Sync(state) => Ok(state
+        Ok(match &self.latest_view.latest_view {
+            ViewState::Sync(state) => state
                 .versioned_map
                 .delayed_fields()
                 .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
-                .expect("Committed value for ID must always exist")
-                .try_into_move_value(layout)?),
-            ViewState::Unsync(state) => Ok(state
+                .expect("Committed value for ID must always exist"),
+            ViewState::Unsync(state) => state
                 .read_delayed_field(id)
-                .expect("Delayed field value for ID must always exist in sequential execution")
-                .try_into_move_value(layout)?),
+                .expect("Delayed field value for ID must always exist in sequential execution"),
         }
+        .try_into_move_value(layout, width)?)
     }
 }
 
@@ -1926,7 +1931,7 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
         layout: &MoveTypeLayout,
         value: Value,
     ) -> TransformationResult<Value> {
-        let id = T::Identifier::try_from_move_value(layout, value, &())
+        let (id, _) = T::Identifier::try_from_move_value(layout, value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
         self.delayed_field_keys.borrow_mut().insert(id);
         id.try_into_move_value(layout)
@@ -1938,7 +1943,7 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
         layout: &MoveTypeLayout,
         identifier_value: Value,
     ) -> TransformationResult<Value> {
-        let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
+        let (id, _) = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
         self.delayed_field_keys.borrow_mut().insert(id);
         id.try_into_move_value(layout)

@@ -263,8 +263,8 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.base_executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: usize) -> Self::Identifier {
+        self.base_executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(

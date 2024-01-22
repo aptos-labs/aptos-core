@@ -2,9 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::mock_view::MockStateView;
-use aptos_aggregator::utils::{bytes_to_string, to_utf8_bytes};
 use aptos_table_natives::{TableHandle, TableResolver};
-use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
+use aptos_types::{
+    access_path::AccessPath,
+    aggregator::{
+        bytes_and_width_to_derived_string_struct, bytes_to_string, from_utf8_bytes, to_utf8_bytes,
+        DelayedFieldID,
+    },
+    state_store::state_key::StateKey,
+};
 use move_core_types::{
     account_address::AccountAddress,
     language_storage::StructTag,
@@ -15,6 +21,8 @@ use move_vm_types::values::{Struct, Value};
 use once_cell::sync::Lazy;
 use std::{clone::Clone, str::FromStr};
 
+const DERIVED_STRING_TEST_WIDTH: usize = 40;
+
 macro_rules! test_struct {
     ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr) => {
         Value::struct_(Struct::pack(vec![
@@ -23,7 +31,8 @@ macro_rules! test_struct {
             Value::u128($c),
             Value::u128($d),
             bytes_to_string(to_utf8_bytes($e)),
-            bytes_to_string(to_utf8_bytes($f)),
+            bytes_and_width_to_derived_string_struct(to_utf8_bytes($f), DERIVED_STRING_TEST_WIDTH)
+                .unwrap(),
         ]))
     };
 }
@@ -43,8 +52,11 @@ static TEST_LAYOUT: Lazy<MoveTypeLayout> = Lazy::new(|| {
             Box::new(MoveTypeLayout::U8),
         )])),
         MoveTypeLayout::Tagged(
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
             Box::new(MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
+                MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![MoveTypeLayout::Vector(
+                    Box::new(MoveTypeLayout::U8),
+                )])),
                 MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
             ]))),
         ),
@@ -91,11 +103,33 @@ fn test_resource_in_storage() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
-    assert!(actual_value.equals(&expected_value).unwrap());
-    view.assert_mapping_equal_at(0, Value::u64(200));
-    view.assert_mapping_equal_at(1, Value::u128(400));
-    view.assert_mapping_equal_at(2, bytes_to_string(to_utf8_bytes("bar")));
+    let expected_value = test_struct!(
+        100,
+        DelayedFieldID::new_with_width(0, 8).as_u64(),
+        300,
+        DelayedFieldID::new_with_width(1, 16).as_u64() as u128,
+        "foo",
+        from_utf8_bytes::<String>(
+            DelayedFieldID::new_with_width(2, DERIVED_STRING_TEST_WIDTH)
+                .as_utf8_fixed_size()
+                .unwrap()
+        )
+        .unwrap()
+    );
+    assert!(
+        actual_value.equals(&expected_value).unwrap(),
+        "actual_value: {:?}, expected_value: {:?}",
+        actual_value,
+        expected_value
+    );
+    view.assert_mapping_equal_at(0, 8, Value::u64(200));
+    view.assert_mapping_equal_at(1, 16, Value::u128(400));
+    view.assert_mapping_equal_at(
+        2,
+        DERIVED_STRING_TEST_WIDTH,
+        bytes_and_width_to_derived_string_struct(to_utf8_bytes("bar"), DERIVED_STRING_TEST_WIDTH)
+            .unwrap(),
+    );
 }
 
 #[test]
@@ -123,11 +157,33 @@ fn test_table_item_in_storage() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(100, 0, 300, 1, "foo", "00000000000000000002");
-    assert!(actual_value.equals(&expected_value).unwrap());
-    view.assert_mapping_equal_at(0, Value::u64(200));
-    view.assert_mapping_equal_at(1, Value::u128(400));
-    view.assert_mapping_equal_at(2, bytes_to_string(to_utf8_bytes("bar")));
+    let expected_value = test_struct!(
+        100,
+        DelayedFieldID::new_with_width(0, 8).as_u64(),
+        300,
+        DelayedFieldID::new_with_width(1, 16).as_u64() as u128,
+        "foo",
+        from_utf8_bytes::<String>(
+            DelayedFieldID::new_with_width(2, DERIVED_STRING_TEST_WIDTH)
+                .as_utf8_fixed_size()
+                .unwrap()
+        )
+        .unwrap()
+    );
+    assert!(
+        actual_value.equals(&expected_value).unwrap(),
+        "actual_value: {:?}, expected_value: {:?}",
+        actual_value,
+        expected_value
+    );
+    view.assert_mapping_equal_at(0, 8, Value::u64(200));
+    view.assert_mapping_equal_at(1, 16, Value::u128(400));
+    view.assert_mapping_equal_at(
+        2,
+        DERIVED_STRING_TEST_WIDTH,
+        bytes_and_width_to_derived_string_struct(to_utf8_bytes("bar"), DERIVED_STRING_TEST_WIDTH)
+            .unwrap(),
+    );
 }
 
 #[test]
@@ -139,12 +195,20 @@ fn test_resource_in_memory_cache() {
         test_struct,
         (*TEST_LAYOUT).clone(),
     );
-    view.add_mapping(0, Value::u64(200));
-    view.add_mapping(1, Value::u128(400));
-    view.add_mapping(2, bytes_to_string(to_utf8_bytes("bar")));
-    view.assert_mapping_equal_at(0, Value::u64(200));
-    view.assert_mapping_equal_at(1, Value::u128(400));
-    view.assert_mapping_equal_at(2, bytes_to_string(to_utf8_bytes("bar")));
+    view.add_mapping(0, 8, Value::u64(200));
+    view.add_mapping(1, 16, Value::u128(400));
+    view.add_mapping(
+        2,
+        DERIVED_STRING_TEST_WIDTH,
+        bytes_to_string(to_utf8_bytes("bar")),
+    );
+    view.assert_mapping_equal_at(0, 8, Value::u64(200));
+    view.assert_mapping_equal_at(1, 16, Value::u128(400));
+    view.assert_mapping_equal_at(
+        2,
+        DERIVED_STRING_TEST_WIDTH,
+        bytes_to_string(to_utf8_bytes("bar")),
+    );
 
     let (blob, _) = view
         .get_resource_bytes_with_metadata_and_layout(&TEST_ADDRESS, &TEST_RESOURCE_TAG, &[], None)
@@ -175,12 +239,20 @@ fn test_table_item_in_memory_cache() {
         test_struct,
         (*TEST_LAYOUT).clone(),
     );
-    view.add_mapping(0, Value::u64(200));
-    view.add_mapping(1, Value::u128(400));
-    view.add_mapping(2, bytes_to_string(to_utf8_bytes("bar")));
-    view.assert_mapping_equal_at(0, Value::u64(200));
-    view.assert_mapping_equal_at(1, Value::u128(400));
-    view.assert_mapping_equal_at(2, bytes_to_string(to_utf8_bytes("bar")));
+    view.add_mapping(0, 8, Value::u64(200));
+    view.add_mapping(1, 16, Value::u128(400));
+    view.add_mapping(
+        2,
+        DERIVED_STRING_TEST_WIDTH,
+        bytes_to_string(to_utf8_bytes("bar")),
+    );
+    view.assert_mapping_equal_at(0, 8, Value::u64(200));
+    view.assert_mapping_equal_at(1, 16, Value::u128(400));
+    view.assert_mapping_equal_at(
+        2,
+        DERIVED_STRING_TEST_WIDTH,
+        bytes_to_string(to_utf8_bytes("bar")),
+    );
 
     let blob = view
         .resolve_table_entry_bytes_with_layout(&TEST_TABLE_HANDLE, &TEST_TABLE_KEY, None)

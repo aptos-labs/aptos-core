@@ -6,6 +6,7 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_types::{
+    aggregator::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -293,16 +294,6 @@ pub enum ResourceGroupSize {
         num_tagged_resources: usize,
         all_tagged_resources_size: u64,
     },
-}
-
-pub fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
 }
 
 impl ResourceGroupSize {

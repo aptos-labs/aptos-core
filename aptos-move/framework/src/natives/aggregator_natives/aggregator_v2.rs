@@ -1,23 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::{
-    aggregator_natives::{
-        helpers_v2::{
-            aggregator_snapshot_field_value, aggregator_snapshot_value_field_as_id,
-            aggregator_value_field_as_id, get_aggregator_fields_u128, get_aggregator_fields_u64,
-            set_aggregator_value_field,
-        },
-        NativeAggregatorContext,
+use super::{
+    helpers_v1::get_struct_field,
+    helpers_v2::{
+        AGG_MAX_VALUE_FIELD_INDEX, AGG_SNAPSHOT_VALUE_FIELD_INDEX, AGG_VALUE_FIELD_INDEX,
+        DERIVED_STRING_VALUE_FIELD_INDEX,
     },
-    AccountAddress,
+};
+use crate::natives::aggregator_natives::{
+    helpers_v2::{
+        aggregator_snapshot_value_field_as_id, aggregator_value_field_as_id,
+        derived_string_value_field_as_id, set_aggregator_value_field,
+    },
+    NativeAggregatorContext,
 };
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_field_extension::DelayedFieldData,
     resolver::DelayedFieldResolver,
-    types::{SnapshotToStringFormula, SnapshotValue},
-    utils::{string_to_bytes, to_utf8_bytes, u128_to_u64},
+    types::SnapshotToStringFormula,
 };
 use aptos_gas_algebra::NumBytes;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -25,18 +27,16 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::aggregator::{string_to_bytes, to_utf8_bytes, u128_to_u64};
 use move_binary_format::errors::PartialVMError;
-use move_core_types::{
-    value::{MoveStructLayout, MoveTypeLayout},
-    vm_status::StatusCode,
-};
+use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
-use std::{cell::RefMut, collections::VecDeque, ops::Deref};
+use std::{cell::RefMut, collections::VecDeque};
 
 /// The generic type supplied to aggregator snapshots is not supported.
 pub const EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE: u64 = 0x03_0005;
@@ -55,18 +55,7 @@ pub const EINPUT_STRING_LENGTH_TOO_LARGE: u64 = 0x03_0008;
 /// and any calls will raise this error.
 pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 
-pub const STRING_SNAPSHOT_INPUT_MAX_LENGTH: usize = 256;
-
-/// Checks if the type argument `type_arg` is a string type.
-fn is_string_type(context: &SafeNativeContext, type_arg: &Type) -> SafeNativeResult<bool> {
-    let ty = context.deref().type_to_fully_annotated_layout(type_arg)?;
-    if let MoveTypeLayout::Struct(MoveStructLayout::WithTypes { type_, .. }) = ty {
-        return Ok(type_.name.as_str() == "String"
-            && type_.module.as_str() == "string"
-            && type_.address == AccountAddress::ONE);
-    }
-    Ok(false)
-}
+pub const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 256;
 
 /// Given the native function argument and a type, returns a tuple of its
 /// fields: (`aggregator id`, `max_value`).
@@ -76,13 +65,53 @@ pub fn get_aggregator_fields_by_type(
 ) -> SafeNativeResult<(u128, u128)> {
     match ty_arg {
         Type::U128 => {
-            let (id, max_value) = get_aggregator_fields_u128(agg)?;
+            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<u128>()?;
+            let max_value = get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u128>()?;
             Ok((id, max_value))
         },
         Type::U64 => {
-            let (id, max_value) = get_aggregator_fields_u64(agg)?;
+            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<u64>()?;
+            let max_value = get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u64>()?;
             Ok((id as u128, max_value as u128))
         },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
+    }
+}
+
+pub fn get_snapshot_field_by_type(
+    ty_arg: &Type,
+    agg_snapshot: &StructRef,
+) -> SafeNativeResult<u128> {
+    match ty_arg {
+        Type::U128 => {
+            let value = get_struct_field(agg_snapshot, AGG_SNAPSHOT_VALUE_FIELD_INDEX)?
+                .value_as::<u128>()?;
+            Ok(value)
+        },
+        Type::U64 => {
+            let value = get_struct_field(agg_snapshot, AGG_SNAPSHOT_VALUE_FIELD_INDEX)?
+                .value_as::<u64>()?;
+            Ok(value as u128)
+        },
+        _ => Err(SafeNativeError::Abort {
+            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+        }),
+    }
+}
+
+pub fn get_derived_string_field(derived_string: &StructRef) -> SafeNativeResult<Vec<u8>> {
+    Ok(string_to_bytes(
+        get_struct_field(derived_string, DERIVED_STRING_VALUE_FIELD_INDEX)?.value_as::<Struct>()?,
+    )
+    .map_err(PartialVMError::from)?)
+}
+
+pub fn aggregator_width_by_type(ty_arg: &Type) -> SafeNativeResult<usize> {
+    match ty_arg {
+        Type::U128 => Ok(16),
+        Type::U64 => Ok(8),
         _ => Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
         }),
@@ -103,85 +132,17 @@ pub fn pop_value_by_type(ty_arg: &Type, args: &mut VecDeque<Value>) -> SafeNativ
 pub fn create_value_by_type(ty_arg: &Type, value: u128) -> SafeNativeResult<Value> {
     match ty_arg {
         Type::U128 => Ok(Value::u128(value)),
-        Type::U64 => Ok(Value::u64(u128_to_u64(value)?)),
+        Type::U64 => Ok(Value::u64(
+            u128_to_u64(value).map_err(PartialVMError::from)?,
+        )),
         _ => Err(SafeNativeError::Abort {
             abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
         }),
     }
 }
 
-// To avoid checking is_string_type multiple times, check type_arg only once, and convert into this enum
-enum SnapshotType {
-    U128,
-    U64,
-    String,
-}
-
-impl SnapshotType {
-    fn from_ty_arg(context: &SafeNativeContext, ty_arg: &Type) -> SafeNativeResult<Self> {
-        match ty_arg {
-            Type::U128 => Ok(Self::U128),
-            Type::U64 => Ok(Self::U64),
-            _ => {
-                // Check if the type is a string
-                if is_string_type(context, ty_arg)? {
-                    Ok(Self::String)
-                } else {
-                    // If not a string, return an error
-                    Err(SafeNativeError::Abort {
-                        abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-                    })
-                }
-            },
-        }
-    }
-
-    pub fn pop_snapshot_field_by_type(
-        &self,
-        args: &mut VecDeque<Value>,
-    ) -> SafeNativeResult<SnapshotValue> {
-        self.parse_snapshot_value_by_type(aggregator_snapshot_field_value(&safely_pop_arg!(
-            args, StructRef
-        ))?)
-    }
-
-    pub fn pop_snapshot_value_by_type(
-        &self,
-        args: &mut VecDeque<Value>,
-    ) -> SafeNativeResult<SnapshotValue> {
-        match self {
-            SnapshotType::U128 => Ok(SnapshotValue::Integer(safely_pop_arg!(args, u128))),
-            SnapshotType::U64 => Ok(SnapshotValue::Integer(safely_pop_arg!(args, u64) as u128)),
-            SnapshotType::String => {
-                let input = string_to_bytes(safely_pop_arg!(args, Struct))?;
-                Ok(SnapshotValue::String(input))
-            },
-        }
-    }
-
-    pub fn parse_snapshot_value_by_type(&self, value: Value) -> SafeNativeResult<SnapshotValue> {
-        // Simpler to wrap to be able to reuse safely_pop_arg functions
-        self.pop_snapshot_value_by_type(&mut VecDeque::from([value]))
-    }
-
-    pub fn create_snapshot_value_by_type(&self, value: SnapshotValue) -> SafeNativeResult<Value> {
-        match (self, value) {
-            (SnapshotType::U128, SnapshotValue::Integer(v)) => Ok(Value::u128(v)),
-            (SnapshotType::U64, SnapshotValue::Integer(v)) => Ok(Value::u64(u128_to_u64(v)?)),
-            (SnapshotType::String, value) => {
-                Ok(Value::struct_(Struct::pack(vec![Value::vector_u8(
-                    match value {
-                        SnapshotValue::String(v) => v,
-                        SnapshotValue::Integer(v) => to_utf8_bytes(v),
-                    },
-                )])))
-            },
-            // Type cannot be Integer, if value is String
-            _ => Err(SafeNativeError::Abort {
-                abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-            }),
-        }
-    }
+pub fn create_string_value(value: Vec<u8>) -> Value {
+    Value::struct_(Struct::pack(vec![Value::vector_u8(value)]))
 }
 
 fn get_context_data<'t, 'b>(
@@ -219,7 +180,8 @@ fn create_aggregator_impl(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let value_field_value =
         if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-            let id = resolver.generate_delayed_field_id();
+            let width = aggregator_width_by_type(ty_arg)?;
+            let id = resolver.generate_delayed_field_id(width);
             delayed_field_data.create_new_aggregator(id);
             id.as_u64() as u128
         } else {
@@ -414,8 +376,9 @@ fn native_snapshot(
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let aggregator_id = aggregator_value_field_as_id(agg_value, resolver)?;
+        let width = aggregator_width_by_type(&ty_args[0])?;
         delayed_field_data
-            .snapshot(aggregator_id, agg_max_value, resolver)?
+            .snapshot(aggregator_id, agg_max_value, width, resolver)?
             .as_u64() as u128
     } else {
         agg_value
@@ -427,7 +390,7 @@ fn native_snapshot(
 }
 
 /***************************************************************************************************
- * native fun create_snapshot<Element>(value: Element): AggregatorSnapshot<Element>
+ * native fun create_snapshot<IntElement>(value: IntElement): AggregatorSnapshot<IntElement>
  **************************************************************************************************/
 
 fn native_create_snapshot(
@@ -441,32 +404,23 @@ fn native_create_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
-    let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
-    let input = snapshot_type.pop_snapshot_value_by_type(&mut args)?;
-
-    if let SnapshotValue::String(v) = &input {
-        context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(v.len() as u64))?;
-        if v.len() > STRING_SNAPSHOT_INPUT_MAX_LENGTH {
-            return Err(SafeNativeError::Abort {
-                abort_code: EINPUT_STRING_LENGTH_TOO_LARGE,
-            });
-        }
-    }
+    let input = pop_value_by_type(&ty_args[0], &mut args)?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let snapshot_id = delayed_field_data.create_new_snapshot(input, resolver);
-        SnapshotValue::Integer(snapshot_id.as_u64() as u128)
+        let width = aggregator_width_by_type(&ty_args[0])?;
+        let snapshot_id = delayed_field_data.create_new_snapshot(input, width, resolver);
+        snapshot_id.as_u64() as u128
     } else {
         input
     };
 
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        snapshot_type.create_snapshot_value_by_type(result_value)?
+        create_value_by_type(&ty_args[0], result_value)?
     ]))])
 }
 
 /***************************************************************************************************
- * native fun copy_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): AggregatorSnapshot<Element>
+ * native fun copy_snapshot<IntElement>(snapshot: &AggregatorSnapshot<IntElement>): AggregatorSnapshot<IntElement>
  **************************************************************************************************/
 
 fn native_copy_snapshot(
@@ -502,7 +456,7 @@ fn native_copy_snapshot(
 }
 
 /***************************************************************************************************
- * native fun read_snapshot<Element>(snapshot: &AggregatorSnapshot<Element>): Element;
+ * native fun read_snapshot<IntElement>(snapshot: &AggregatorSnapshot<IntElement>): IntElement;
  **************************************************************************************************/
 
 fn native_read_snapshot(
@@ -516,8 +470,8 @@ fn native_read_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
-    let snapshot_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
-    let snapshot_value = snapshot_type.pop_snapshot_field_by_type(&mut args)?;
+    let snapshot_value =
+        get_snapshot_field_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let aggregator_id = aggregator_snapshot_value_field_as_id(snapshot_value, resolver)?;
@@ -526,9 +480,7 @@ fn native_read_snapshot(
         snapshot_value
     };
 
-    Ok(smallvec![
-        snapshot_type.create_snapshot_value_by_type(result_value)?
-    ])
+    Ok(smallvec![create_value_by_type(&ty_args[0], result_value)?])
 }
 
 /***************************************************************************************************
@@ -536,6 +488,87 @@ fn native_read_snapshot(
  **************************************************************************************************/
 
 fn native_string_concat(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
+    Err(SafeNativeError::Abort {
+        abort_code: EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
+    })
+}
+
+/***************************************************************************************************
+ * native fun read_derived_string(snapshot: &DerivedString): String
+ **************************************************************************************************/
+
+fn native_read_derived_string(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
+    debug_assert_eq!(ty_args.len(), 0);
+    debug_assert_eq!(args.len(), 1);
+    context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
+
+    let derived_string_value = get_derived_string_field(&safely_pop_arg!(args, StructRef))?;
+
+    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+        let delayed_id = derived_string_value_field_as_id(derived_string_value, resolver)?;
+        delayed_field_data.read_derived(delayed_id, resolver)?
+    } else {
+        derived_string_value
+    };
+
+    Ok(smallvec![create_string_value(result_value)])
+}
+
+/***************************************************************************************************
+ * native fun create_derived_string(value: String): DerivedString
+ **************************************************************************************************/
+
+fn native_create_derived_string(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    abort_if_not_enabled!(context);
+
+    debug_assert_eq!(ty_args.len(), 1);
+    debug_assert_eq!(args.len(), 1);
+    context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
+
+    let input = string_to_bytes(safely_pop_arg!(args, Struct)).map_err(PartialVMError::from)?;
+
+    context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(input.len() as u64))?;
+    if input.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
+        return Err(SafeNativeError::Abort {
+            abort_code: EINPUT_STRING_LENGTH_TOO_LARGE,
+        });
+    }
+
+    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+        let snapshot_id = delayed_field_data.create_new_derived(input, resolver);
+        snapshot_id
+            .into_derived_string_struct()
+            .map_err(PartialVMError::from)?
+    } else {
+        Value::struct_(Struct::pack(vec![
+            create_string_value(input),
+            create_string_value(to_utf8_bytes("")),
+        ]))
+    };
+    Ok(smallvec![result_value])
+}
+
+/***************************************************************************************************
+ * native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): DerivedString;
+ **************************************************************************************************/
+
+fn native_derive_string_concat(
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -546,36 +579,20 @@ fn native_string_concat(
     debug_assert_eq!(args.len(), 3);
     context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
 
-    let snapshot_input_type = SnapshotType::from_ty_arg(context, &ty_args[0])?;
-
-    // Concat works only with integer snapshot types
-    // This is to avoid unnecessary recursive snapshot dependencies
-    if !matches!(snapshot_input_type, SnapshotType::U128 | SnapshotType::U64) {
-        return Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-        });
-    }
-
     // popping arguments from the end
-    let suffix = string_to_bytes(safely_pop_arg!(args, Struct))?;
+    let suffix = string_to_bytes(safely_pop_arg!(args, Struct)).map_err(PartialVMError::from)?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(suffix.len() as u64))?;
 
-    let snapshot_value = match snapshot_input_type.pop_snapshot_field_by_type(&mut args)? {
-        SnapshotValue::Integer(v) => v,
-        SnapshotValue::String(_) => {
-            return Err(SafeNativeError::Abort {
-                abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-            })
-        },
-    };
+    let snapshot_value =
+        get_snapshot_field_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
 
-    let prefix = string_to_bytes(safely_pop_arg!(args, Struct))?;
+    let prefix = string_to_bytes(safely_pop_arg!(args, Struct)).map_err(PartialVMError::from)?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(prefix.len() as u64))?;
 
     if prefix
         .len()
         .checked_add(suffix.len())
-        .map_or(false, |v| v > STRING_SNAPSHOT_INPUT_MAX_LENGTH)
+        .map_or(false, |v| v > DERIVED_STRING_INPUT_MAX_LENGTH)
     {
         return Err(SafeNativeError::Abort {
             abort_code: EINPUT_STRING_LENGTH_TOO_LARGE,
@@ -584,20 +601,20 @@ fn native_string_concat(
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let base_id = aggregator_value_field_as_id(snapshot_value, resolver)?;
-        SnapshotValue::Integer(
-            delayed_field_data
-                .string_concat(base_id, prefix, suffix, resolver)?
-                .as_u64() as u128,
-        )
+        delayed_field_data
+            .derive_string_concat(base_id, prefix, suffix, resolver)?
+            .into_derived_string_struct()
+            .map_err(PartialVMError::from)?
     } else {
-        SnapshotValue::String(
-            SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value),
-        )
+        Value::struct_(Struct::pack(vec![
+            create_string_value(
+                SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value),
+            ),
+            create_string_value(to_utf8_bytes("")),
+        ]))
     };
 
-    Ok(smallvec![Value::struct_(Struct::pack(vec![
-        SnapshotType::String.create_snapshot_value_by_type(result_value)?
-    ]))])
+    Ok(smallvec![result_value])
 }
 
 /***************************************************************************************************
@@ -624,6 +641,9 @@ pub fn make_all(
         ("copy_snapshot", native_copy_snapshot),
         ("read_snapshot", native_read_snapshot),
         ("string_concat", native_string_concat),
+        ("read_derived_string", native_read_derived_string),
+        ("create_derived_string", native_create_derived_string),
+        ("derive_string_concat", native_derive_string_concat),
     ];
     builder.make_named_natives(natives)
 }

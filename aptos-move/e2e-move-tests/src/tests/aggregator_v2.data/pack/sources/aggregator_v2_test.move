@@ -1,5 +1,5 @@
 module 0x1::aggregator_v2_test {
-    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedString};
     use aptos_std::debug;
     use aptos_std::table::{Self, Table};
     use std::vector;
@@ -35,34 +35,14 @@ module 0x1::aggregator_v2_test {
         data: vector<Option<Agg>>,
     }
 
-    public entry fun verify_copy_snapshot() {
-        let snapshot = aggregator_v2::create_snapshot(42);
-        let snapshot2 = aggregator_v2::copy_snapshot(&snapshot);
-        assert!(aggregator_v2::read_snapshot(&snapshot) == 42, 1);
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == 42, 2);
-    }
-
-    public entry fun verify_copy_string_snapshot() {
-        let snapshot = aggregator_v2::create_snapshot(std::string::utf8(b"42"));
-        let snapshot2 = aggregator_v2::copy_snapshot(&snapshot);
-        assert!(aggregator_v2::read_snapshot(&snapshot) == std::string::utf8(b"42"), 3);
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == std::string::utf8(b"42"), 4);
-    }
-
     public entry fun verify_string_concat() {
         let snapshot = aggregator_v2::create_snapshot(42);
-        let snapshot2 = aggregator_v2::string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        let val = aggregator_v2::read_snapshot(&snapshot2);
+        let snapshot2 = aggregator_v2::derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        let val = aggregator_v2::read_derived(&snapshot2);
 
         debug::print(&val);
         debug::print(&std::string::utf8(b"before42after"));
         assert!(val == std::string::utf8(b"before42after"), 5);
-    }
-
-    public entry fun verify_string_snapshot_concat() {
-        let snapshot = aggregator_v2::create_snapshot(std::string::utf8(b"42"));
-        let snapshot2 = aggregator_v2::string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 6);
     }
 
     fun init<Agg: store>(account: &signer, use_type: u32) {
@@ -83,6 +63,10 @@ module 0x1::aggregator_v2_test {
 
     public entry fun init_snapshot<Element: store>(account: &signer, use_type: u32) {
         init<AggregatorSnapshot<Element>>(account, use_type);
+    }
+
+    public entry fun init_derived_string(account: &signer, use_type: u32) {
+        init<DerivedString>(account, use_type);
     }
 
     fun insert<Agg: store>(account_addr: address, use_type: u32, i: u64, e: Agg) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
@@ -262,10 +246,10 @@ module 0x1::aggregator_v2_test {
     }
 
     public entry fun concat<Element: store>(_account: &signer, addr_i: address, use_type_i: u32, i: u64, addr_j: address, use_type_j: u32, j: u64, prefix: String, suffix: String) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let snapshot = for_element_ref<AggregatorSnapshot<Element>, AggregatorSnapshot<String>>(addr_i, use_type_i, i, |snapshot| {
-            aggregator_v2::string_concat<Element>(prefix, snapshot, suffix)
+        let snapshot = for_element_ref<AggregatorSnapshot<Element>, DerivedString>(addr_i, use_type_i, i, |snapshot| {
+            aggregator_v2::derive_string_concat<Element>(prefix, snapshot, suffix)
         });
-        insert<AggregatorSnapshot<String>>(addr_j, use_type_j, j, snapshot);
+        insert<DerivedString>(addr_j, use_type_j, j, snapshot);
     }
 
     public entry fun read_snapshot<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {

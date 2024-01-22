@@ -9,9 +9,9 @@ use crate::{
     types::{
         code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
         DelayedFieldsSpeculativeError, PanicOr, ReadPosition, SnapshotToStringFormula,
-        SnapshotValue,
     },
 };
+use aptos_types::aggregator::{bcs_size_of_byte_array, U128_MAX_DIGITS, U64_MAX_DIGITS};
 use move_binary_format::errors::PartialVMResult;
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -163,6 +163,7 @@ impl DelayedFieldData {
         &mut self,
         aggregator_id: DelayedFieldID,
         max_value: u128,
+        width: usize,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let aggregator = self.delayed_fields.get(&aggregator_id);
@@ -199,18 +200,32 @@ impl DelayedFieldData {
             },
         };
 
-        let snapshot_id = resolver.generate_delayed_field_id();
+        let snapshot_id = resolver.generate_delayed_field_id(width);
         self.delayed_fields.insert(snapshot_id, change);
         Ok(snapshot_id)
     }
 
     pub fn create_new_snapshot(
         &mut self,
-        value: SnapshotValue,
+        value: u128,
+        width: usize,
         resolver: &dyn DelayedFieldResolver,
     ) -> DelayedFieldID {
-        let change = DelayedChange::Create(value.into());
-        let snapshot_id = resolver.generate_delayed_field_id();
+        let change = DelayedChange::Create(DelayedFieldValue::Snapshot(value));
+        let snapshot_id = resolver.generate_delayed_field_id(width);
+
+        self.delayed_fields.insert(snapshot_id, change);
+        snapshot_id
+    }
+
+    pub fn create_new_derived(
+        &mut self,
+        value: Vec<u8>,
+        resolver: &dyn DelayedFieldResolver,
+    ) -> DelayedFieldID {
+        let width = (bcs_size_of_byte_array(value.len()) + 1).max(*U64_MAX_DIGITS + 2);
+        let change = DelayedChange::Create(DelayedFieldValue::Derived(value));
+        let snapshot_id = resolver.generate_delayed_field_id(width);
 
         self.delayed_fields.insert(snapshot_id, change);
         snapshot_id
@@ -220,15 +235,23 @@ impl DelayedFieldData {
         &mut self,
         snapshot_id: DelayedFieldID,
         resolver: &dyn DelayedFieldResolver,
-    ) -> PartialVMResult<SnapshotValue> {
-        Ok(SnapshotValue::try_from(self.read_value(
-            snapshot_id,
-            resolver,
-            ReadPosition::AfterCurrentTxn,
-        )?)?)
+    ) -> PartialVMResult<u128> {
+        Ok(self
+            .read_value(snapshot_id, resolver, ReadPosition::AfterCurrentTxn)?
+            .into_snapshot_value()?)
     }
 
-    pub fn string_concat(
+    pub fn read_derived(
+        &mut self,
+        snapshot_id: DelayedFieldID,
+        resolver: &dyn DelayedFieldResolver,
+    ) -> PartialVMResult<Vec<u8>> {
+        Ok(self
+            .read_value(snapshot_id, resolver, ReadPosition::AfterCurrentTxn)?
+            .into_derived_value()?)
+    }
+
+    pub fn derive_string_concat(
         &mut self,
         snapshot_id: DelayedFieldID,
         prefix: Vec<u8>,
@@ -236,6 +259,14 @@ impl DelayedFieldData {
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let snapshot = self.delayed_fields.get(&snapshot_id);
+        let max_snapshot_string_width = match snapshot_id.extract_width() {
+            8 => *U64_MAX_DIGITS,
+            16 => *U128_MAX_DIGITS,
+            x => unreachable!("unexpected width ({x}) for integer snapshot id: {snapshot_id:?}"),
+        };
+        let width =
+            bcs_size_of_byte_array(prefix.len() + suffix.len()) + max_snapshot_string_width + 2;
+        println!("Width : {width}");
         let formula = SnapshotToStringFormula::Concat { prefix, suffix };
 
         let change = match snapshot {
@@ -257,7 +288,7 @@ impl DelayedFieldData {
             },
         };
 
-        let new_id = resolver.generate_delayed_field_id();
+        let new_id = resolver.generate_delayed_field_id(width);
         self.delayed_fields.insert(new_id, change);
         Ok(new_id)
     }

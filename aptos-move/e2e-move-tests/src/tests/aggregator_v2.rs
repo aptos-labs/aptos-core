@@ -9,9 +9,6 @@ use crate::{
     tests::common,
     BlockSplit, SUCCESS,
 };
-use aptos_framework::natives::aggregator_natives::aggregator_v2::{
-    EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-};
 use aptos_language_e2e_tests::executor::ExecutorMode;
 use proptest::prelude::*;
 
@@ -42,40 +39,10 @@ mod test_cases {
     use super::*;
 
     #[test]
-    fn test_copy_snapshot() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
-        let txn = h.verify_copy_snapshot();
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(
-            EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
-            txn,
-        )]);
-    }
-
-    #[test]
-    fn test_copy_string_snapshot() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
-        let txn = h.verify_copy_string_snapshot();
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(
-            EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
-            txn,
-        )]);
-    }
-
-    #[test]
     fn test_snapshot_concat() {
         let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
         let txn = h.verify_string_concat();
         h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, txn)]);
-    }
-
-    #[test]
-    fn test_string_snapshot_concat() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
-        let txn = h.verify_string_snapshot_concat();
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(
-            EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-            txn,
-        )]);
     }
 
     #[test]

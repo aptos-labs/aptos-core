@@ -164,7 +164,7 @@ pub trait TDelayedFieldView {
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
-    fn generate_delayed_field_id(&self) -> Self::Identifier;
+    fn generate_delayed_field_id(&self, width: usize) -> Self::Identifier;
 
     /// Validate that given value (from aggregator structure) is a valid delayed field identifier,
     /// and convert it to Self::Identifier if so.
@@ -251,7 +251,7 @@ where
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, _width: usize) -> Self::Identifier {
         unimplemented!("generate_delayed_field_id not implemented")
     }
 

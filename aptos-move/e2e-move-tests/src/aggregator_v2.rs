@@ -452,42 +452,11 @@ impl AggV2TestHarness {
     }
 
     // idempotent verify functions:
-
-    pub fn verify_copy_snapshot(&mut self) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::aggregator_v2_test::verify_copy_snapshot").unwrap(),
-            vec![],
-            vec![],
-        )
-    }
-
-    pub fn verify_copy_string_snapshot(&mut self) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::aggregator_v2_test::verify_copy_string_snapshot").unwrap(),
-            vec![],
-            vec![],
-        )
-    }
-
     pub fn verify_string_concat(&mut self) -> SignedTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
             str::parse("0x1::aggregator_v2_test::verify_string_concat").unwrap(),
-            vec![],
-            vec![],
-        )
-    }
-
-    pub fn verify_string_snapshot_concat(&mut self) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::aggregator_v2_test::verify_string_snapshot_concat").unwrap(),
             vec![],
             vec![],
         )

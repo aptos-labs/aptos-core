@@ -1743,6 +1743,7 @@ impl Loader {
                 .unzip();
 
         // For aggregators / snapshots, the first field should be lifted.
+        // TODO[agg_v2](fix) for DerivedString, the whole object should be lifted, not just the first field.
         if let Some(kind) = &maybe_mapping {
             if let Some(l) = field_layouts.first_mut() {
                 *l = MoveTypeLayout::Tagged(
@@ -1792,6 +1793,8 @@ impl Loader {
                 Some(IdentifierMappingKind::Aggregator)
             } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
                 Some(IdentifierMappingKind::Snapshot)
+            } else if ident_str.eq(ident_str!("DerivedString")) {
+                Some(IdentifierMappingKind::DerivedString)
             } else {
                 None
             }

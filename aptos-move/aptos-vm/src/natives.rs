@@ -104,7 +104,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         unreachable!()
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, _width: usize) -> Self::Identifier {
         unreachable!()
     }
 

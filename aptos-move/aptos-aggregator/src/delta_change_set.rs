@@ -532,7 +532,7 @@ mod test {
             Err(code_invariant_error("Error message from BadStorage.").into())
         }
 
-        fn generate_delayed_field_id(&self) -> Self::Identifier {
+        fn generate_delayed_field_id(&self, _width: usize) -> Self::Identifier {
             unimplemented!("Irrelevant for the test")
         }
 
