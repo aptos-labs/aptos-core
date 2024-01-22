@@ -118,7 +118,8 @@ impl ControlFlowGraphCodeGenerator {
             if block == self.cfg.entry_block() || block == self.cfg.exit_block() {
                 continue;
             }
-			// can't remove, because `falls_to_next_block` may look at visited block for labels
+			// can't use `.remove` instead to avoid copying,
+			// because the following may look at visited block
             let mut code_block = self.code_blocks.get(&block).expect("code block").clone();
             // if we have block 0 followed by block 1 without jump/branch
             // and we don't visit block 1 after block 0, then we have to add an explicit jump
@@ -133,7 +134,7 @@ impl ControlFlowGraphCodeGenerator {
                 if maybe_next_to_visit.is_none() || *maybe_next_to_visit.unwrap() != suc_block {
                     let attr_id = code_block.last().expect("last instr").get_attr_id();
                     // assuming that any block with a non-trivial predecessor block starts with a label
-                    code_block.push(Bytecode::Jump(attr_id, self.get_block_label(suc_block)));
+                    code_block.push(Bytecode::Jump(attr_id, self.get_block_label(suc_block).expect("label")));
                 }
             }
             generated.append(&mut code_block);
@@ -155,17 +156,16 @@ impl ControlFlowGraphCodeGenerator {
         self.code_blocks.get(&block_id).expect("block instructions")
     }
 
-    /// Returns the label of the block
-    /// Panics if the block is entry/exit, or doesn't start with a label
-    fn get_block_label(&self, block_id: BlockId) -> Label {
+    /// Returns the label of the block or `None` if it doesn't start with a label
+    fn get_block_label(&self, block_id: BlockId) -> Option<Label> {
         if let Bytecode::Label(_, label) = self
             .block_instrs(block_id)
-            .get(0)
+			.first()
             .expect("first instruction")
         {
-            *label
+            Some(*label)
         } else {
-            panic!("block doesn't start with a label")
+			None
         }
     }
 }
@@ -181,8 +181,8 @@ impl ControlFlowGraphCodeGenerator {
         if let Some(preds) = maybe_preds {
 			for pred in preds {
                 if pred != self.cfg.entry_block() {
-					let from = self.get_block_label(block_to_remove);
-					let to = self.get_block_label(redirect_to);
+					let from = self.get_block_label(block_to_remove).expect("label");
+					let to = self.get_block_label(redirect_to).expect("label");
 					let pred_codes = self
 						.code_blocks
 						.get_mut(&pred)
