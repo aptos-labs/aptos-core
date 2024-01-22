@@ -44,6 +44,7 @@ use std::{
 
 pub mod analyzed_transaction;
 pub mod authenticator;
+pub mod block_epilogue;
 mod block_output;
 mod change_set;
 mod module;
@@ -52,6 +53,7 @@ mod script;
 pub mod signature_verified_transaction;
 pub mod webauthn;
 
+use self::block_epilogue::BlockEpiloguePayload;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
@@ -1881,6 +1883,12 @@ pub enum Transaction {
 
     /// Transaction that only proposed by a validator mainly to update on-chain configs.
     ValidatorTransaction(ValidatorTransaction),
+
+    /// Transaction to let the executor update the global state tree and record the root hash
+    /// in the TransactionInfo
+    /// The hash value inside is unique block id which can generate unique hash of state checkpoint transaction
+    /// Replaces StateCheckpoint, with optionally having more data.
+    BlockEpilogue(BlockEpiloguePayload),
 }
 
 impl Transaction {
@@ -1917,6 +1925,8 @@ impl Transaction {
             // TODO: display proper information for client
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
             // TODO: display proper information for client
+            Transaction::BlockEpilogue(_) => String::from("block_epilogue"),
+            // TODO: display proper information for client
             Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
         }
     }
@@ -1927,6 +1937,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
+            Transaction::BlockEpilogue(_) => "block_epilogue",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
     }
@@ -1934,6 +1945,16 @@ impl Transaction {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Transaction::StateCheckpoint(HashValue::zero())
+    }
+
+    pub fn is_non_reconfig_block_ending(&self) -> bool {
+        match self {
+            Transaction::BlockMetadata(_) | Transaction::BlockEpilogue(_) => true,
+            Transaction::UserTransaction(_)
+            | Transaction::GenesisTransaction(_)
+            | Transaction::StateCheckpoint(_)
+            | Transaction::ValidatorTransaction(_) => false,
+        }
     }
 }
 

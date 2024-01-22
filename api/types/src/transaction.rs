@@ -176,6 +176,7 @@ pub enum Transaction {
     GenesisTransaction(GenesisTransaction),
     BlockMetadataTransaction(BlockMetadataTransaction),
     StateCheckpointTransaction(StateCheckpointTransaction),
+    BlockEpilogueTransaction(BlockEpilogueTransaction),
     ValidatorTransaction(ValidatorTransaction),
 }
 
@@ -187,6 +188,7 @@ impl Transaction {
             Transaction::PendingTransaction(_) => 0,
             Transaction::GenesisTransaction(_) => 0,
             Transaction::StateCheckpointTransaction(txn) => txn.timestamp.0,
+            Transaction::BlockEpilogueTransaction(txn) => txn.timestamp.0,
             Transaction::ValidatorTransaction(txn) => txn.timestamp.0,
         }
     }
@@ -198,6 +200,7 @@ impl Transaction {
             Transaction::PendingTransaction(_) => None,
             Transaction::GenesisTransaction(txn) => Some(txn.info.version.into()),
             Transaction::StateCheckpointTransaction(txn) => Some(txn.info.version.into()),
+            Transaction::BlockEpilogueTransaction(txn) => Some(txn.info.version.into()),
             Transaction::ValidatorTransaction(txn) => Some(txn.info.version.into()),
         }
     }
@@ -209,6 +212,7 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => false,
             Transaction::GenesisTransaction(txn) => txn.info.success,
             Transaction::StateCheckpointTransaction(txn) => txn.info.success,
+            Transaction::BlockEpilogueTransaction(txn) => txn.info.success,
             Transaction::ValidatorTransaction(txn) => txn.info.success,
         }
     }
@@ -224,6 +228,7 @@ impl Transaction {
             Transaction::PendingTransaction(_txn) => "pending".to_owned(),
             Transaction::GenesisTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::StateCheckpointTransaction(txn) => txn.info.vm_status.clone(),
+            Transaction::BlockEpilogueTransaction(txn) => txn.info.vm_status.clone(),
             Transaction::ValidatorTransaction(txn) => txn.info.vm_status.clone(),
         }
     }
@@ -235,6 +240,7 @@ impl Transaction {
             Transaction::GenesisTransaction(_) => "genesis_transaction",
             Transaction::BlockMetadataTransaction(_) => "block_metadata_transaction",
             Transaction::StateCheckpointTransaction(_) => "state_checkpoint_transaction",
+            Transaction::BlockEpilogueTransaction(_) => "block_epilogue_transaction",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
         }
     }
@@ -248,6 +254,7 @@ impl Transaction {
             },
             Transaction::GenesisTransaction(txn) => &txn.info,
             Transaction::StateCheckpointTransaction(txn) => &txn.info,
+            Transaction::BlockEpilogueTransaction(txn) => &txn.info,
             Transaction::ValidatorTransaction(txn) => &txn.info,
         })
     }
@@ -401,6 +408,15 @@ pub struct UserTransaction {
 /// A state checkpoint transaction
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct StateCheckpointTransaction {
+    #[serde(flatten)]
+    #[oai(flatten)]
+    pub info: TransactionInfo,
+    pub timestamp: U64,
+}
+
+/// A block epilogue transaction
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockEpilogueTransaction {
     #[serde(flatten)]
     #[oai(flatten)]
     pub info: TransactionInfo,
