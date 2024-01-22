@@ -1,9 +1,11 @@
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
-    function_target::FunctionData,
+    function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
-    stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
+    stackless_control_flow_graph::{
+        generate_cfg_in_dot_format, BlockId, StacklessControlFlowGraph,
+    },
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -20,9 +22,13 @@ impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
         if fun_env.is_native() {
             return data;
         }
-		let mut transformer = EliminateEmptyBlocksTransformation::new(data);
-		transformer.transform();
-		transformer.data
+        let target = FunctionTarget::new(fun_env, &data);
+        println!("{}", generate_cfg_in_dot_format(&target));
+        let mut transformer = EliminateEmptyBlocksTransformation::new(data);
+        transformer.transform();
+        let target = FunctionTarget::new(fun_env, &transformer.data);
+        println!("{}", generate_cfg_in_dot_format(&target));
+        transformer.data
     }
 
     fn name(&self) -> String {
@@ -37,31 +43,45 @@ struct EliminateEmptyBlocksTransformation {
 }
 
 impl EliminateEmptyBlocksTransformation {
-	pub fn new(mut data: FunctionData) -> Self {
-		let original_code = std::mem::take(&mut data.code);
-		let cfg = StacklessControlFlowGraph::new_forward(&original_code);
-		Self {
-			data,
-			cfg,
-			original_code
-		}
-	}
+    pub fn new(mut data: FunctionData) -> Self {
+        let original_code = std::mem::take(&mut data.code);
+        let cfg = StacklessControlFlowGraph::new_forward(&original_code);
+        Self {
+            data,
+            cfg,
+            original_code,
+        }
+    }
 
-	fn transform(&mut self) {
-		let subst = self.collect_blocks_to_remove();
-		let blocks_to_remove: BTreeSet<BlockId> = subst.keys().cloned().collect();
-		let subst = subst.into_iter().map(|(b0, b1)| (self.get_block_label(b0), self.get_block_label(b1))).collect();
-		self.remove_blocks(&blocks_to_remove);
-		self.gen_code_from_cfg(&subst);
-	}
+    fn transform(&mut self) {
+        let subst = self.collect_blocks_to_remove();
+        self.gen_code_from_cfg(&subst);
+    }
 
-	/// Generate code from a cfg where empty blocks have been removed
-	fn gen_code_from_cfg(&mut self, subst: &BTreeMap<Label, Label>) {
+    /// Generate code from a cfg where empty blocks have been removed
+    fn gen_code_from_cfg(&mut self, subst: &BTreeMap<BlockId, BlockId>) {
+        let blocks_to_remove: BTreeSet<BlockId> = subst.keys().cloned().collect();
+		let subst_block = subst;
+        let subst_label = subst
+            .iter()
+            .map(|(b0, b1)| (self.get_block_label(*b0), self.get_block_label(*b1)))
+            .collect();
         let mut visited = BTreeSet::new();
         let mut to_visit = vec![self.cfg.entry_block()];
         while let Some(block) = to_visit.pop() {
-            for bytecode in self.cfg.content(block).to_bytecodes(&self.original_code) {
-                self.data.code.push(self.transform_bytecode(bytecode.clone(), subst));
+            let mut last_instr_of_block = None;
+            if !blocks_to_remove.contains(&block) {
+                let codes = self.cfg.content(block).to_bytecodes(&self.original_code);
+                debug_assert!(
+                    self.cfg.entry_block() == block
+                        || self.cfg.exit_block() == block
+                        || codes.len() != 0
+                );
+                for bytecode in self.cfg.content(block).to_bytecodes(&self.original_code) {
+                    let transformed = self.transform_bytecode(bytecode.clone(), &subst_label);
+                    self.data.code.push(transformed.clone());
+                    last_instr_of_block = Some(transformed);
+                }
             }
             debug_assert!(visited.insert(block));
             for suc_block in self.cfg.successors(block) {
@@ -69,35 +89,55 @@ impl EliminateEmptyBlocksTransformation {
                     to_visit.push(*suc_block);
                 }
             }
+            if let Some(instr) = last_instr_of_block {
+                if !matches!(instr, Bytecode::Jump(..) | Bytecode::Branch(..)) {
+                    if let Some(&next_to_visit) = to_visit.last() {
+                        let suc_block = Self::get_updated_suc(&subst_block, self.cfg.successors(block)[0]);
+                        if suc_block != self.cfg.exit_block() && next_to_visit != suc_block {
+                            self.data.code.push(Bytecode::Jump(
+                                instr.get_attr_id(),
+                                self.get_block_label(suc_block),
+                            ));
+                        }
+                    }
+                }
+            }
         }
-	}
+    }
 
-	/// Transforms the bytecode by substituting the labels in `subst` in branch and jumps
+    /// Transforms the bytecode by substituting the labels in `subst` in branch and jumps
     fn transform_bytecode(&self, bytecode: Bytecode, subst: &BTreeMap<Label, Label>) -> Bytecode {
         match bytecode {
             Bytecode::Branch(attr_id, l0, l1, t) => Bytecode::Branch(
                 attr_id,
-                Self::subst_label(subst, l0),
-                Self::subst_label(subst, l1),
+                Self::get_updated_label(subst, l0),
+                Self::get_updated_label(subst, l1),
                 t,
             ),
             Bytecode::Jump(attr_id, label) => {
-                Bytecode::Jump(attr_id, Self::subst_label(subst, label))
+                Bytecode::Jump(attr_id, Self::get_updated_label(subst, label))
             },
             Bytecode::Label(_, label) => {
-				if subst.contains_key(&label) {
-					panic!("label not removed")
-				} else {
-					bytecode
-				}
+                if subst.contains_key(&label) {
+                    panic!("label not removed")
+                } else {
+                    bytecode
+                }
             },
             _ => bytecode,
         }
     }
 
-    /// Returns label substituted if it's in `subst`; else just returns `label`
-    fn subst_label(subst: &BTreeMap<Label, Label>, label: Label) -> Label {
-		subst.get(&label).cloned().unwrap_or_else(|| label)
+    /// Get the updated label of `label` after block removal
+    /// so that any jump to `label` should jump to the updated label instead
+    fn get_updated_label(subst: &BTreeMap<Label, Label>, label: Label) -> Label {
+        apply_inf(subst, &label).clone()
+    }
+
+    /// If a block has successor `block`, then it has the returned block
+    /// as successor after block removal
+    fn get_updated_suc(subst: &BTreeMap<BlockId, BlockId>, block: BlockId) -> BlockId {
+        apply_inf(subst, &block).clone()
     }
 
     /// Returns the instructions of the block
@@ -144,8 +184,18 @@ impl EliminateEmptyBlocksTransformation {
         subst
     }
 
-	/// Remove given blocks in the cfg
+    /// Remove given blocks in the cfg
     fn remove_blocks(&mut self, subst: &BTreeSet<BlockId>) {
         self.cfg.remove_blocks(subst);
+    }
+}
+
+/// Let `g` be `f` extended with the identity function.
+/// Returns the result of applying `g` infinitely many times to `x`
+/// Requires: no loop in `f` (say x -> x, or x -> y, y -> x)
+fn apply_inf<'a, T: Ord>(f: &'a BTreeMap<T, T>, x: &'a T) -> &'a T {
+    match f.get(&x) {
+        Some(y) => apply_inf(f, y),
+        None => x,
     }
 }
