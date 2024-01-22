@@ -1,4 +1,4 @@
-use crate::cli::Options;
+use crate::cli::CLIOptions;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -13,7 +13,7 @@ pub enum FileType {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
     /// Main project options. It's the same as the CLI options.
-    pub project: Options,
+    pub project: CLIOptions,
     /// Path to the project.
     pub project_path: Option<PathBuf>,
     /// Configuration for the mutation operators (project-wide).
@@ -25,7 +25,7 @@ pub struct Configuration {
 impl Configuration {
     /// Creates a new configuration using command line options.
     #[must_use]
-    pub fn new(project: Options, project_path: Option<PathBuf>) -> Self {
+    pub fn new(project: CLIOptions, project_path: Option<PathBuf>) -> Self {
         Self {
             project,
             project_path,

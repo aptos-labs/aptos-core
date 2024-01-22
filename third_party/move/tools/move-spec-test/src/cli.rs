@@ -5,7 +5,7 @@ use std::path::PathBuf;
 /// Command line options for specification test tool.
 #[derive(Parser, Default, Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Options {
+pub struct CLIOptions {
     /// The paths to the Move sources.
     #[clap(long, short, value_parser)]
     pub move_sources: Vec<PathBuf>,
@@ -28,8 +28,8 @@ pub struct Options {
 
 /// This function creates a mutator CLI options from the given spec-test options.
 #[must_use]
-pub fn create_mutator_options(options: &Options) -> move_mutator::cli::Options {
-    move_mutator::cli::Options {
+pub fn create_mutator_options(options: &CLIOptions) -> move_mutator::cli::CLIOptions {
+    move_mutator::cli::CLIOptions {
         move_sources: options.move_sources.clone(),
         include_only_files: options.include_only_files.clone(),
         exclude_files: options.exclude_files.clone(),
@@ -42,7 +42,7 @@ pub fn create_mutator_options(options: &Options) -> move_mutator::cli::Options {
 ///
 /// # Errors
 /// Errors are returned as `anyhow::Result`.
-pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover::cli::Options> {
+pub fn generate_prover_options(options: &CLIOptions) -> anyhow::Result<move_prover::cli::Options> {
     let prover_conf = if let Some(conf) = &options.prover_conf {
         move_prover::cli::Options::create_from_toml_file(conf.to_str().unwrap_or(""))?
     } else if let Some(args) = &options.extra_prover_args {
@@ -58,7 +58,7 @@ pub fn generate_prover_options(options: &Options) -> anyhow::Result<move_prover:
 /// We don't need to check if the mutator output path is provided in the options as they were created
 /// from the spec-test options which does not allow setting it.
 #[must_use]
-pub fn check_mutator_output_path(options: &move_mutator::cli::Options) -> Option<PathBuf> {
+pub fn check_mutator_output_path(options: &move_mutator::cli::CLIOptions) -> Option<PathBuf> {
     if let Some(conf) = &options.configuration_file {
         let c = move_mutator::configuration::Configuration::from_file(conf);
         if let Ok(c) = c {
