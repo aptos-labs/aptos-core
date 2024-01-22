@@ -57,7 +57,7 @@ impl EliminateEmptyBlocksTransformation {
 			if self.is_empty_block(block) {
 				let suc_blocks = self.cfg_code_generator.cfg.successors(block);
 				debug_assert!(suc_blocks.len() == 1);
-				let suc_block = suc_blocks.get(0).expect("successor block");
+				let suc_block = suc_blocks.first().expect("successor block");
 				if *suc_block != block {
 					self.cfg_code_generator.remove_empty_block(block, *suc_block);
 				}
@@ -96,7 +96,7 @@ impl ControlFlowGraphCodeGenerator {
         let code_blocks = cfg
 			.blocks()
 			.into_iter()
-            .map(|block| (block, cfg.content(block).to_bytecodes(&codes).to_vec()))
+            .map(|block| (block, cfg.content(block).to_bytecodes(codes).to_vec()))
             .collect();
         let pred_map = pred_map(&cfg);
         Self {
@@ -120,7 +120,7 @@ impl ControlFlowGraphCodeGenerator {
             // and we don't visit block 1 after block 0, then we have to add an explicit jump
             if Self::falls_to_next_block(&code_block) {
                 debug_assert!(self.cfg.successors(block).len() == 1);
-                let suc_block = *self.cfg.successors(block).get(0).expect("successor block");
+                let suc_block = *self.cfg.successors(block).first().expect("successor block");
                 debug_assert!(
                     suc_block != self.cfg.exit_block(),
                     "path ending without return/abort"
@@ -159,7 +159,7 @@ impl ControlFlowGraphCodeGenerator {
             .get(0)
             .expect("first instruction")
         {
-            label.clone()
+            *label
         } else {
             panic!("block doesn't start with a label")
         }
@@ -174,8 +174,6 @@ impl ControlFlowGraphCodeGenerator {
         debug_assert!(block_to_remove != redirect_to);
 		debug_assert!(!self.cfg.successors(block_to_remove).contains(&block_to_remove));
         let maybe_preds = self.pred_map.remove(&block_to_remove);
-		if maybe_preds.is_none() {
-		}
         if let Some(preds) = maybe_preds {
 			for pred in preds {
                 if pred != self.cfg.entry_block() {
@@ -215,7 +213,7 @@ impl ControlFlowGraphCodeGenerator {
 	/// where it originally jumps/branches to `from`.
 	/// Does nothing if `codes` doesn't end with a jump/branch
 	/// Requries: `codes` not empty
-	fn redirects_block(codes: &mut Vec<Bytecode>, from: Label, to: Label) {
+	fn redirects_block(codes: &mut [Bytecode], from: Label, to: Label) {
 		let last_instr = codes
 			.last_mut()
 			.expect("last instruction");
