@@ -22,7 +22,7 @@ impl Report {
 
     /// Adds a new `MutationReport` to the report.
     pub fn add_entry(&mut self, entry: MutationReport) {
-        trace!("Adding a mutant to the report: {:?}", entry);
+        trace!("Adding a mutant to the report: {entry:?}");
         self.mutants.push(entry);
     }
 

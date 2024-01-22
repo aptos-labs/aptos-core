@@ -18,7 +18,7 @@ pub struct Configuration {
     pub project_path: Option<PathBuf>,
     /// Configuration for the mutation operators (project-wide).
     pub mutation: Option<MutationConfig>,
-    /// Configuration for the individual files. (optional)
+    /// Configuration for the individual files. (optional).
     pub individual: Option<Vec<FileConfiguration>>,
 }
 
@@ -82,7 +82,7 @@ pub struct MutationConfig {
 pub struct FileConfiguration {
     /// The path to the Move source.
     pub file: PathBuf,
-    /// Indicates if the mutants should be verified
+    /// Indicates if the mutants should be verified.
     pub verify_mutants: Option<bool>,
     /// Names of the mutation operators to use. If not provided, all operators will be used.
     pub mutation_operators: Option<MutationConfig>,
@@ -191,7 +191,10 @@ mod tests {
             config.project.exclude_files.unwrap(),
             vec![Path::new("/path/to/exclude/file")]
         );
-        assert_eq!(config.project.out_mutant_dir, Some(PathBuf::from("/path/to/output")));
+        assert_eq!(
+            config.project.out_mutant_dir,
+            Some(PathBuf::from("/path/to/output"))
+        );
         assert_eq!(config.project.verify_mutants, true);
         assert_eq!(config.project.no_overwrite.unwrap(), false);
         assert_eq!(config.project.downsample_filter.unwrap(), "filter");

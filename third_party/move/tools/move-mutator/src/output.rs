@@ -44,13 +44,10 @@ pub(crate) fn setup_mutant_path(
 
     let file_path_canonicalized = file_path.canonicalize()?;
 
-    // Try to find package root for the file. If the file is not inside any package, assume that it is a single file
+    // Try to find package root for the file. If the file is not inside any package, assume that it is a single file.
     let root = SourcePackageLayout::try_find_root(&file_path_canonicalized);
     let root_path = if root.is_err() {
-        debug!(
-            "No package root for {:?}. Assuming mutating a single file.",
-            file_path_canonicalized
-        );
+        debug!("No package root for {file_path_canonicalized:?}. Assuming mutating a single file.");
         file_path_canonicalized.clone()
     } else {
         // In case of file is inside the package it must follow the Move structure. So we can assume that
@@ -58,7 +55,7 @@ pub(crate) fn setup_mutant_path(
         root?.join("sources")
     };
 
-    // Stripping whole prefix before file to get it relative path inside the package
+    // Stripping whole prefix before file to get it relative path inside the package.
     let relative_path = file_path_canonicalized.strip_prefix(&root_path)?;
 
     // Construct the directory structure for that specified file in the output directory. If file was inside the package,
@@ -69,18 +66,16 @@ pub(crate) fn setup_mutant_path(
     if let Err(e) = fs::create_dir_all(&output_struct) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
             return Err(anyhow::anyhow!(
-                "Cannot create directory structure for {:?} in {:?}",
-                file_path,
-                output_dir
+                "Cannot create directory structure for {file_path:?} in {output_dir:?}"
             ));
         }
     }
 
     let filename = file_path
         .file_stem()
-        .ok_or(anyhow::anyhow!("Cannot get file stem of {:?}", file_path))?;
+        .ok_or(anyhow::anyhow!("Cannot get file stem of {file_path:?}"))?;
 
-    // Deal with the file as OsString to avoid problems with non-UTF8 characters
+    // Deal with the file as OsString to avoid problems with non-UTF8 characters.
     let mut filename = filename.to_os_string();
     filename.push(OsString::from(format!("_{index}.move")));
 
@@ -103,9 +98,9 @@ pub(crate) fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow:
         .out_mutant_dir
         .clone()
         .unwrap_or(PathBuf::from(cli::DEFAULT_OUTPUT_DIR));
-    trace!("Trying to set up output directory to: {:?}", output_dir);
+    trace!("Trying to set up output directory to: {output_dir:?}");
 
-    // Check if output directory exists and if it should be overwritten
+    // Check if output directory exists and if it should be overwritten.
     if output_dir.exists() && mutator_configuration.project.no_overwrite.unwrap_or(false) {
         return Err(anyhow::anyhow!(
             "Output directory already exists. Use --no-overwrite=false to overwrite."
@@ -115,7 +110,7 @@ pub(crate) fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow:
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir(&output_dir)?;
 
-    debug!("Output directory set to: {:?}", output_dir);
+    debug!("Output directory set to: {output_dir:?}");
 
     Ok(output_dir)
 }
@@ -168,7 +163,10 @@ mod tests {
         fs::remove_file(filename).unwrap();
         fs::remove_dir_all(output_dir).unwrap();
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), PathBuf::from("mutants_output_correct/test_correct_1.move"));
+        assert_eq!(
+            result.unwrap(),
+            PathBuf::from("mutants_output_correct/test_correct_1.move")
+        );
     }
 
     #[test]
