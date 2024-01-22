@@ -90,7 +90,10 @@ impl IndexerStreamCoordinator {
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
             self.fetch_transactions_from_storage().await;
-
+        let end_version = sorted_transactions_from_storage_with_size
+            .last()
+            .map(|(txn, _)| txn.version)
+            .unwrap();
         // Stage 2: convert transactions to rust objects. CPU-bound load.
         let mut task_batches = vec![];
         let mut current_batch = vec![];
@@ -114,11 +117,10 @@ impl IndexerStreamCoordinator {
         for batch in task_batches {
             let context = self.context.clone();
             let ledger_version = self.highest_known_version;
-            let transaction_sender = self.transactions_sender.clone();
             let task = tokio::spawn(async move {
                 let raw_txns = batch;
                 let convert_start_time = std::time::Instant::now();
-                let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
+                let api_txns = Self::convert_to_api_txns(context, raw_txns);
                 api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 let start_transaction = pb_txns.first().unwrap();
@@ -136,8 +138,9 @@ impl IndexerStreamCoordinator {
                     Some(pb_txns.len() as i64),
                 );
 
-                let send_start_time = std::time::Instant::now();
+                // let send_start_time = std::time::Instant::now();
 
+                let mut responses = vec![];
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
                     for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
@@ -149,39 +152,31 @@ impl IndexerStreamCoordinator {
                             )),
                             chain_id: ledger_chain_id as u32,
                         };
-                        match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
-                            Ok(_) => {},
-                            Err(_) => {
-                                // Client disconnects.
-                                return Err(Status::aborted(
-                                    "[Indexer Fullnode] Client disconnected",
-                                ));
-                            },
-                        }
+                        responses.push(item);
                     }
                 }
-
-                log_grpc_step_fullnode(
-                    IndexerGrpcStep::FullnodeSentBatch,
-                    Some(start_transaction.version as i64),
-                    Some(end_transaction.version as i64),
-                    end_txn_timestamp.as_ref(),
-                    Some(ledger_version as i64),
-                    None,
-                    Some(send_start_time.elapsed().as_secs_f64()),
-                    Some(pb_txns.len() as i64),
-                );
-                Ok(end_transaction.version)
+                responses
             });
             tasks.push(task);
         }
-        match futures::future::try_join_all(tasks).await {
-            Ok(res) => res,
+        let responses = match futures::future::try_join_all(tasks).await {
+            Ok(res) => res.into_iter().flatten().collect::<Vec<_>>(),
             Err(err) => panic!(
                 "[Indexer Fullnode] Error processing transaction batches: {:?}",
                 err
             ),
+        };
+
+        // Stage 4: send responses to stream
+        for response in responses {
+            if let Err(err) = self.transactions_sender.send(Ok(response)).await {
+                panic!(
+                    "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
+                    err
+                );
+            }
         }
+        vec![Ok(end_version)]
     }
 
     /// Fetches transactions from storage with each transaction's size.
@@ -344,7 +339,7 @@ impl IndexerStreamCoordinator {
         }
     }
 
-    async fn convert_to_api_txns(
+    fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
     ) -> Vec<APITransaction> {
