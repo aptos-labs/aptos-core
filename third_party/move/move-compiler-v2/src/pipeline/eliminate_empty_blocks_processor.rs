@@ -1,3 +1,7 @@
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
     function_target::FunctionData,
