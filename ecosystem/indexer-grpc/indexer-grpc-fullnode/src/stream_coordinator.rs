@@ -99,13 +99,13 @@ impl IndexerStreamCoordinator {
         let mut current_batch = vec![];
         let mut current_batch_size = 0;
         for (txn, size) in sorted_transactions_from_storage_with_size {
+            current_batch.push(txn);
+            current_batch_size += size;
             if current_batch_size > MINIMUM_TASK_LOAD_SIZE_IN_BYTES {
                 task_batches.push(current_batch);
                 current_batch = vec![];
                 current_batch_size = 0;
             }
-            current_batch.push(txn);
-            current_batch_size += size;
         }
         if !current_batch.is_empty() {
             task_batches.push(current_batch);
