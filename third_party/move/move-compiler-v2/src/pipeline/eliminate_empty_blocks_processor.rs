@@ -1,13 +1,13 @@
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
-    function_target::{FunctionData, FunctionTarget},
+    function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
     stackless_control_flow_graph::{
-        generate_cfg_in_dot_format, BlockId, StacklessControlFlowGraph,
+        BlockId, StacklessControlFlowGraph,
     },
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 pub struct EliminateEmptyBlocksProcessor {}
 
@@ -22,12 +22,8 @@ impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
         if fun_env.is_native() {
             return data;
         }
-        let target = FunctionTarget::new(fun_env, &data);
-        println!("{}", generate_cfg_in_dot_format(&target));
         let mut transformer = EliminateEmptyBlocksTransformation::new(data);
         transformer.transform();
-        let target = FunctionTarget::new(fun_env, &transformer.data);
-        println!("{}", generate_cfg_in_dot_format(&target));
         transformer.data
     }
 
@@ -37,116 +33,44 @@ impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
 }
 
 struct EliminateEmptyBlocksTransformation {
-    data: FunctionData,
-    cfg: StacklessControlFlowGraph,
-    original_code: Vec<Bytecode>,
+	data: FunctionData,
+    cfg_code_generator: ControlFlowGraphCodeGenerator,
 }
 
 impl EliminateEmptyBlocksTransformation {
-    pub fn new(mut data: FunctionData) -> Self {
-        let original_code = std::mem::take(&mut data.code);
-        let cfg = StacklessControlFlowGraph::new_forward(&original_code);
-        Self {
-            data,
-            cfg,
-            original_code,
-        }
+    pub fn new(data: FunctionData) -> Self {
+		let cfg = StacklessControlFlowGraph::new_forward(&data.code);
+        let cfg_code_generator = ControlFlowGraphCodeGenerator::new(cfg, &data.code);
+		Self {
+			data,
+			cfg_code_generator
+		}
     }
 
-    fn transform(&mut self) {
-        let subst = self.collect_blocks_to_remove();
-        self.gen_code_from_cfg(&subst);
-    }
+	fn transform(&mut self) {
+		self.transform_cfg();
+		self.data.code = std::mem::take(&mut self.cfg_code_generator).gen_codes();
+	}
 
-    /// Generate code from a cfg where empty blocks have been removed
-    fn gen_code_from_cfg(&mut self, subst: &BTreeMap<BlockId, BlockId>) {
-        let blocks_to_remove: BTreeSet<BlockId> = subst.keys().cloned().collect();
-		let subst_block = subst;
-        let subst_label = subst
-            .iter()
-            .map(|(b0, b1)| (self.get_block_label(*b0), self.get_block_label(*b1)))
-            .collect();
-        let mut visited = BTreeSet::new();
-        let mut to_visit = vec![self.cfg.entry_block()];
-        while let Some(block) = to_visit.pop() {
-            let mut last_instr_of_block = None;
-            if !blocks_to_remove.contains(&block) {
-                let codes = self.cfg.content(block).to_bytecodes(&self.original_code);
-                debug_assert!(
-                    self.cfg.entry_block() == block
-                        || self.cfg.exit_block() == block
-                        || codes.len() != 0
-                );
-                for bytecode in self.cfg.content(block).to_bytecodes(&self.original_code) {
-                    let transformed = self.transform_bytecode(bytecode.clone(), &subst_label);
-                    self.data.code.push(transformed.clone());
-                    last_instr_of_block = Some(transformed);
-                }
-            }
-            debug_assert!(visited.insert(block));
-            for suc_block in self.cfg.successors(block) {
-                if !visited.contains(suc_block) {
-                    to_visit.push(*suc_block);
-                }
-            }
-            if let Some(instr) = last_instr_of_block {
-                if !matches!(instr, Bytecode::Jump(..) | Bytecode::Branch(..)) {
-                    if let Some(&next_to_visit) = to_visit.last() {
-                        let suc_block = Self::get_updated_suc(&subst_block, self.cfg.successors(block)[0]);
-                        if suc_block != self.cfg.exit_block() && next_to_visit != suc_block {
-                            self.data.code.push(Bytecode::Jump(
-                                instr.get_attr_id(),
-                                self.get_block_label(suc_block),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Transforms the bytecode by substituting the labels in `subst` in branch and jumps
-    fn transform_bytecode(&self, bytecode: Bytecode, subst: &BTreeMap<Label, Label>) -> Bytecode {
-        match bytecode {
-            Bytecode::Branch(attr_id, l0, l1, t) => Bytecode::Branch(
-                attr_id,
-                Self::get_updated_label(subst, l0),
-                Self::get_updated_label(subst, l1),
-                t,
-            ),
-            Bytecode::Jump(attr_id, label) => {
-                Bytecode::Jump(attr_id, Self::get_updated_label(subst, label))
-            },
-            Bytecode::Label(_, label) => {
-                if subst.contains_key(&label) {
-                    panic!("label not removed")
-                } else {
-                    bytecode
-                }
-            },
-            _ => bytecode,
-        }
-    }
-
-    /// Get the updated label of `label` after block removal
-    /// so that any jump to `label` should jump to the updated label instead
-    fn get_updated_label(subst: &BTreeMap<Label, Label>, label: Label) -> Label {
-        apply_inf(subst, &label).clone()
-    }
-
-    /// If a block has successor `block`, then it has the returned block
-    /// as successor after block removal
-    fn get_updated_suc(subst: &BTreeMap<BlockId, BlockId>, block: BlockId) -> BlockId {
-        apply_inf(subst, &block).clone()
-    }
+	fn transform_cfg(&mut self) {
+		for block in self.cfg_code_generator.cfg.blocks() {
+			if self.is_empty_block(block) {
+				let suc_blocks = self.cfg_code_generator.cfg.successors(block);
+				debug_assert!(suc_blocks.len() == 1);
+				let suc_block = suc_blocks.get(0).expect("successor block");
+				if *suc_block != block {
+					self.cfg_code_generator.remove_empty_block(block, *suc_block);
+				}
+			}
+		}
+	}
 
     /// Returns the instructions of the block
     fn block_instrs(&self, block_id: BlockId) -> &[Bytecode] {
-        self.cfg.content(block_id).to_bytecodes(&self.original_code)
+        self.cfg_code_generator.block_instrs(block_id)
     }
 
-    /// If the given block contains only a label and a jump, returns its successor block;
-    /// else returns `None`
+    /// Checks if the given block is empty block
     fn is_empty_block(&self, block_id: BlockId) -> bool {
         let block_instrs = self.block_instrs(block_id);
         block_instrs.len() == 2
@@ -156,76 +80,45 @@ impl EliminateEmptyBlocksTransformation {
                 Bytecode::Jump(..)
             )
     }
-
-    /// Returns the label of the block
-    /// Panics if the block is entry/exit, or doesn't start with a label
-    fn get_block_label(&self, block_id: BlockId) -> Label {
-        if let Bytecode::Label(_, label) = self
-            .block_instrs(block_id)
-            .get(0)
-            .expect("first instruction")
-        {
-            label.clone()
-        } else {
-            panic!("using `get_block_label` on block not starting with a label")
-        }
-    }
-
-    /// Returns a subst map, where b0 -> b1 if a block jumpping to b0 should jump to b1 because b0 is empty
-    fn collect_blocks_to_remove(&self) -> BTreeMap<BlockId, BlockId> {
-        let mut subst = BTreeMap::new();
-        for block_id in self.cfg.blocks() {
-            if self.is_empty_block(block_id) {
-                let sucs = self.cfg.successors(block_id);
-                debug_assert!(sucs.len() == 1);
-                subst.insert(block_id, sucs[0]);
-            }
-        }
-        subst
-    }
-
-    /// Remove given blocks in the cfg
-    fn remove_blocks(&mut self, subst: &BTreeSet<BlockId>) {
-        self.cfg.remove_blocks(subst);
-    }
 }
 
-/// Let `g` be `f` extended with the identity function.
-/// Returns the result of applying `g` infinitely many times to `x`
-/// Requires: no loop in `f` (say x -> x, or x -> y, y -> x)
-fn apply_inf<'a, T: Ord>(f: &'a BTreeMap<T, T>, x: &'a T) -> &'a T {
-    match f.get(&x) {
-        Some(y) => apply_inf(f, y),
-        None => x,
-    }
-}
-
+#[derive(Default)]
 struct ControlFlowGraphCodeGenerator {
     cfg: StacklessControlFlowGraph,
     code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
+	// if `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
+    pred_map: BTreeMap<BlockId, Vec<BlockId>>,
 }
 
 impl ControlFlowGraphCodeGenerator {
+	// TODO: take `Vec<Bytecode>` instead to avoid copying
     pub fn new(cfg: StacklessControlFlowGraph, codes: &[Bytecode]) -> Self {
         let code_blocks = cfg
-            .iter_dfs_left()
+			.blocks()
+			.into_iter()
             .map(|block| (block, cfg.content(block).to_bytecodes(&codes).to_vec()))
             .collect();
-        Self { cfg, code_blocks }
+        let pred_map = pred_map(&cfg);
+        Self {
+            cfg,
+            code_blocks,
+            pred_map,
+        }
     }
 
     /// Generates code from the control flow graph
-    fn gen_codes(mut self) -> Vec<Bytecode> {
+    fn gen_codes(self) -> Vec<Bytecode> {
         let mut generated = Vec::new();
         let mut iter_dfs_left = self.cfg.iter_dfs_left().peekable();
         while let Some(block) = iter_dfs_left.next() {
             if block == self.cfg.entry_block() || block == self.cfg.exit_block() {
                 continue;
             }
-            let mut code_block = self.code_blocks.remove(&block).expect("code block");
+			// can't remove, because `falls_to_next_block` may look at visited block for labels
+            let mut code_block = self.code_blocks.get(&block).expect("code block").clone();
             // if we have block 0 followed by block 1 without jump/branch
             // and we don't visit block 1 after block 0, then we have to add an explicit jump
-            if self.falls_to_next_block(&code_block) {
+            if Self::falls_to_next_block(&code_block) {
                 debug_assert!(self.cfg.successors(block).len() == 1);
                 let suc_block = *self.cfg.successors(block).get(0).expect("successor block");
                 debug_assert!(
@@ -245,7 +138,7 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Checks whether a block falls to the next block without jump, branch, abort, or return
-    fn falls_to_next_block(&self, codes: &[Bytecode]) -> bool {
+    fn falls_to_next_block(codes: &[Bytecode]) -> bool {
         let last_instr = codes.last().expect("last instr");
         !matches!(
             last_instr,
@@ -270,5 +163,92 @@ impl ControlFlowGraphCodeGenerator {
         } else {
             panic!("block doesn't start with a label")
         }
+    }
+}
+
+impl ControlFlowGraphCodeGenerator {
+    /// Remove block from the control flow graph, and redirects any block jumpping to it
+    /// to `redirect_to` instead
+    /// Requires: `block_to_remove` doesn't have itself as a successor;
+    fn remove_empty_block(&mut self, block_to_remove: BlockId, redirect_to: BlockId) {
+        debug_assert!(block_to_remove != redirect_to);
+		debug_assert!(!self.cfg.successors(block_to_remove).contains(&block_to_remove));
+        let maybe_preds = self.pred_map.remove(&block_to_remove);
+		if maybe_preds.is_none() {
+		}
+        if let Some(preds) = maybe_preds {
+			for pred in preds {
+                if pred != self.cfg.entry_block() {
+					let from = self.get_block_label(block_to_remove);
+					let to = self.get_block_label(redirect_to);
+					let pred_codes = self
+						.code_blocks
+						.get_mut(&pred)
+						.expect("code block");
+					Self::redirects_block(pred_codes, from, to);
+                }
+				// update successors of predecessors of `block_to_remove`
+				for suc_of_pred in self.cfg.successors_mut(pred) {
+					if *suc_of_pred == block_to_remove {
+						*suc_of_pred = redirect_to;
+					}
+				}
+				// update predecessors of `redirect_to`
+				// add preds of `remove_block` to `redirect_to`
+				self.pred_map
+					.get_mut(&redirect_to)
+					.expect("predecessors")
+					.push(pred);
+            }
+        }
+		// remove `block_to_remove`
+		self.pred_map
+			.get_mut(&redirect_to)
+			.expect("predecessors")
+			.retain(|pred| *pred != block_to_remove);
+		self.code_blocks.remove(&block_to_remove);
+		self.pred_map.remove(&block_to_remove);
+		self.cfg.remove_block(block_to_remove);
+    }
+
+	/// Redirects a sequence of codes so that it jumps/branches to `to`
+	/// where it originally jumps/branches to `from`.
+	/// Does nothing if `codes` doesn't end with a jump/branch
+	/// Requries: `codes` not empty
+	fn redirects_block(codes: &mut Vec<Bytecode>, from: Label, to: Label) {
+		let last_instr = codes
+			.last_mut()
+			.expect("last instruction");
+		match last_instr {
+			Bytecode::Branch(_, l0, l1, _) => {
+				subst_label(l0, from, to);
+				subst_label(l1, from, to);
+			},
+			Bytecode::Jump(_, label) => {
+				subst_label(label, from, to);
+			},
+			_ => {},
+		}
+	}
+}
+
+/// Computes the map from a blcok to its predecessors
+fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> {
+    let mut pred_map = BTreeMap::new();
+    for block in cfg.blocks() {
+        for suc_block in cfg.successors(block) {
+            let preds: &mut Vec<BlockId> = pred_map
+                .entry(*suc_block)
+				.or_default();
+			preds.push(block);
+        }
+    }
+    pred_map
+}
+
+/// Replaces `label` with `to` if `label` equals `from`
+fn subst_label(label: &mut Label, from: Label, to: Label) {
+    if *label == from {
+        *label = to;
     }
 }
