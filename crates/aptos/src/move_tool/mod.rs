@@ -638,7 +638,7 @@ impl CliCommand<&'static str> for SpecTestPackage {
             .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
         match result {
             Ok(_) => Ok("Success"),
-            Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
+            Err(e) => Err(CliError::MoveSpecTestError(format!("{:#}", e))),
         }
     }
 }
