@@ -20,7 +20,6 @@ impl<Output: Debug> BlockOutput<Output> {
 
     /// If block limit is not set (i.e. in tests), we can safely unwrap here
     pub fn into_transaction_outputs_forced(self) -> Vec<Output> {
-        // TODO assert there is no block limit info?
         assert!(self.block_end_info.is_none());
         self.transaction_outputs
     }
@@ -30,7 +29,6 @@ impl<Output: Debug> BlockOutput<Output> {
     }
 
     pub fn get_transaction_outputs_forced(&self) -> &[Output] {
-        // TODO assert there is no block limit info?
         assert!(self.block_end_info.is_none());
         &self.transaction_outputs
     }

@@ -2060,10 +2060,11 @@ impl Transaction {
 
     pub fn is_non_reconfig_block_ending(&self) -> bool {
         match self {
-            Transaction::BlockMetadata(_) | Transaction::BlockEpilogue(_) => true,
+            Transaction::StateCheckpoint(_) | Transaction::BlockEpilogue(_) => true,
             Transaction::UserTransaction(_)
             | Transaction::GenesisTransaction(_)
-            | Transaction::StateCheckpoint(_)
+            | Transaction::BlockMetadata(_)
+            | Transaction::BlockMetadataExt(_)
             | Transaction::ValidatorTransaction(_) => false,
         }
     }
