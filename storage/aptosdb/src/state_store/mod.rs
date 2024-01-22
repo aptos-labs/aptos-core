@@ -24,7 +24,6 @@ use crate::{
         StateSnapshotProgress, StateSnapshotRestore, StateSnapshotRestoreMode, StateValueWriter,
     },
     state_store::buffered_state::BufferedState,
-    transaction_store::TransactionStore,
     utils::{
         iterators::PrefixedStateValueIterator,
         new_sharded_kv_schema_batch,
@@ -508,7 +507,9 @@ impl StateStore {
                 speculative_state,
                 Arc::new(AsyncProofFetcher::new(state_db.clone())),
             );
-            let write_sets = TransactionStore::new(Arc::clone(&state_db.ledger_db))
+            let write_sets = state_db
+                .ledger_db
+                .write_set_db()
                 .get_write_sets(snapshot_next_version, num_transactions)?;
             let txn_info_iter = state_db
                 .ledger_db

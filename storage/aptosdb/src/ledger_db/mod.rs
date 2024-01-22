@@ -16,9 +16,8 @@ use crate::{
     ledger_db::{
         event_db::EventDb, ledger_metadata_db::LedgerMetadataDb,
         transaction_accumulator_db::TransactionAccumulatorDb, transaction_db::TransactionDb,
-        transaction_info_db::TransactionInfoDb,
+        transaction_info_db::TransactionInfoDb, write_set_db::WriteSetDb,
     },
-    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
@@ -44,6 +43,9 @@ pub(crate) mod transaction_db_test;
 pub(crate) mod transaction_info_db;
 #[cfg(test)]
 mod transaction_info_db_test;
+pub(crate) mod write_set_db;
+#[cfg(test)]
+mod write_set_db_test;
 
 pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -90,7 +92,7 @@ pub struct LedgerDb {
     transaction_accumulator_db: TransactionAccumulatorDb,
     transaction_db: TransactionDb,
     transaction_info_db: TransactionInfoDb,
-    write_set_db: Arc<DB>,
+    write_set_db: WriteSetDb,
 }
 
 impl LedgerDb {
@@ -131,7 +133,7 @@ impl LedgerDb {
                 )),
                 transaction_db: TransactionDb::new(Arc::clone(&ledger_metadata_db)),
                 transaction_info_db: TransactionInfoDb::new(Arc::clone(&ledger_metadata_db)),
-                write_set_db: Arc::clone(&ledger_metadata_db),
+                write_set_db: WriteSetDb::new(Arc::clone(&ledger_metadata_db)),
             });
         }
 
@@ -167,12 +169,12 @@ impl LedgerDb {
             readonly,
         )?));
 
-        let write_set_db = Arc::new(Self::open_rocksdb(
+        let write_set_db = WriteSetDb::new(Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(WRITE_SET_DB_NAME),
             WRITE_SET_DB_NAME,
             &rocksdb_configs.ledger_db_config,
             readonly,
-        )?);
+        )?));
 
         // TODO(grao): Handle data inconsistency.
 
@@ -241,10 +243,7 @@ impl LedgerDb {
             .write_pruner_progress(version)?;
         self.transaction_db.write_pruner_progress(version)?;
         self.transaction_info_db.write_pruner_progress(version)?;
-        self.write_set_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::WriteSetPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )?;
+        self.write_set_db.write_pruner_progress(version)?;
         self.ledger_metadata_db.write_pruner_progress(version)?;
 
         Ok(())
@@ -293,12 +292,12 @@ impl LedgerDb {
         self.transaction_info_db.db()
     }
 
-    pub(crate) fn write_set_db(&self) -> &DB {
+    pub(crate) fn write_set_db(&self) -> &WriteSetDb {
         &self.write_set_db
     }
 
-    pub(crate) fn write_set_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.write_set_db)
+    pub(crate) fn write_set_db_raw(&self) -> &DB {
+        self.write_set_db.db()
     }
 
     fn open_rocksdb(

@@ -186,11 +186,7 @@ impl AptosDB {
 
     /// Gets an instance of `BackupHandler` for data backup purpose.
     pub fn get_backup_handler(&self) -> BackupHandler {
-        BackupHandler::new(
-            Arc::clone(&self.transaction_store),
-            Arc::clone(&self.state_store),
-            Arc::clone(&self.ledger_db),
-        )
+        BackupHandler::new(Arc::clone(&self.state_store), Arc::clone(&self.ledger_db))
     }
 
     /// Creates new physical DB checkpoint in directory specified by `path`.

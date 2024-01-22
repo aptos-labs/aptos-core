@@ -127,7 +127,7 @@ impl Cmd {
 
         println!(
             "Max WriteSet version: {:?}",
-            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db())?,
+            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db_raw())?,
         );
 
         {
