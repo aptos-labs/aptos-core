@@ -59,10 +59,6 @@ pub enum SessionId {
         // block id
         id: HashValue,
     },
-    BlockMetaExt {
-        // block id
-        id: HashValue,
-    },
     Genesis {
         // id to identify this specific genesis build
         id: HashValue,
@@ -86,6 +82,10 @@ pub enum SessionId {
     },
     ValidatorTxn {
         script_hash: Vec<u8>,
+    },
+    BlockMetaExt {
+        // block id
+        id: HashValue,
     },
 }
 
