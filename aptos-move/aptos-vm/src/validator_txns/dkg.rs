@@ -28,11 +28,14 @@ use move_core_types::{
 use move_vm_types::gas::UnmeteredGasMeter;
 
 enum ExpectedFailure {
-    MissingResourceDKGState = 0,
-    MissingResourceInprogressDKGSession,
-    EpochNotCurrent,
-    TranscriptDeserializationFailed,
-    TranscriptVerificationFailed,
+    // Move equivalent: `errors::invalid_argument(*)`
+    EpochNotCurrent = 0x10001,
+    TranscriptDeserializationFailed = 0x10002,
+    TranscriptVerificationFailed = 0x10003,
+
+    // Move equivalent: `errors::invalid_state(*)`
+    MissingResourceDKGState = 0x30001,
+    MissingResourceInprogressDKGSession = 0x30002,
 }
 
 enum ExecutionFailure {
