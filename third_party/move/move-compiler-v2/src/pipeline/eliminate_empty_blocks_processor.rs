@@ -2,6 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+//! Implements a compiler pass that
+//! - eliminates all empty blocks
+//! - removes all jumps to the next instruction
+//! - removes unreachable codes
+
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -111,6 +116,7 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Generates code from the control flow graph
+    /// Unreachable codes are also discarded
     fn gen_codes(self) -> Vec<Bytecode> {
         let mut generated = Vec::new();
         let mut iter_dfs_left = self.cfg.iter_dfs_left().peekable();
