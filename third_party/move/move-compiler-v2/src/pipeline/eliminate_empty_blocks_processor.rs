@@ -122,20 +122,21 @@ impl ControlFlowGraphCodeGenerator {
 			// can't use `.remove` instead to avoid copying,
 			// because the following may look at visited block
             let mut code_block = self.code_blocks.get(&block).expect("code block").clone();
-            // if we have block 0 followed by block 1 without jump/branch
-            // and we don't visit block 1 after block 0, then we have to add an explicit jump
+            let maybe_next_to_visit = iter_dfs_left.peek();
             if Self::falls_to_next_block(&code_block) {
-                debug_assert!(self.cfg.successors(block).len() == 1);
-                let suc_block = *self.cfg.successors(block).first().expect("successor block");
-                debug_assert!(
-                    suc_block != self.cfg.exit_block(),
-                    "path ending without return/abort"
-                );
-                let maybe_next_to_visit = iter_dfs_left.peek();
+                // if we have block 0 followed by block 1 without jump/branch
+                // and we don't visit block 1 after block 0, then we have to add an explicit jump
+                let suc_block = self.get_the_non_trivial_successor(block);
                 if maybe_next_to_visit.is_none() || *maybe_next_to_visit.unwrap() != suc_block {
-                    let attr_id = code_block.last().expect("last instr").get_attr_id();
-                    // assuming that any block with a non-trivial predecessor block starts with a label
-                    code_block.push(Bytecode::Jump(attr_id, self.get_block_label(suc_block).expect("label")));
+                    self.add_explicit_jump(&mut code_block, suc_block);
+                }
+            } else if matches!(code_block.last().expect("last instruction"), Bytecode::Jump(..)) {
+                // no need to jump to the next instruction
+                let suc_block = self.get_the_non_trivial_successor(block);
+                if let Some(next_to_vist) = maybe_next_to_visit {
+                    if *next_to_vist == suc_block {
+                        debug_assert!(code_block.pop().is_some());
+                    }
                 }
             }
             generated.append(&mut code_block);
@@ -151,6 +152,30 @@ impl ControlFlowGraphCodeGenerator {
             last_instr,
             Bytecode::Jump(..) | Bytecode::Branch(..) | Bytecode::Ret(..) | Bytecode::Abort(..)
         )
+    }
+
+    /// Gets the only successor of `block`; panics if this is not the case.
+    /// (May not panic in the release version due to the use of debug_assert)
+    fn get_the_successor(&self, block: BlockId) -> BlockId {
+        let successors = self.cfg.successors(block);
+        debug_assert!(successors.len() == 1);
+        *successors.first().expect("successor block")
+    }
+
+    /// Gets the only successor of `block` which is not entry/exit block; panics if this is not the case.
+    /// (May not panic in the release version due to the use of debug_assert)
+    fn get_the_non_trivial_successor(&self, block: BlockId) -> BlockId {
+        let the_suc = self.get_the_successor(block);
+        debug_assert!(the_suc != self.cfg.entry_block() && the_suc != self.cfg.exit_block());
+        the_suc
+    }
+
+    /// Adds an explicit jump to `to_block` to the end of `codes`
+    fn add_explicit_jump(&self, codes: &mut Vec<Bytecode>, to_block: BlockId) {
+        debug_assert!(to_block != self.cfg.entry_block() && to_block != self.cfg.exit_block());
+        let to_label = self.get_block_label(to_block).expect("label");
+        let attr_id = self.code_blocks.get(&to_block).expect("code block").first().expect("first instruction").get_attr_id();
+        codes.push(Bytecode::Jump(attr_id, to_label));
     }
 
     /// Returns the instructions of the block
