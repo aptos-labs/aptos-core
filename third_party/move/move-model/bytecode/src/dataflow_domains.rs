@@ -19,9 +19,11 @@ use std::{
 /// Represents the abstract outcome of a join.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JoinResult {
-    /// The left operand subsumes the right operand: L union R == L.
+    /// The left operand remains unchanged when joined with the right operand,
+    /// i.e., the L.join(R) operation leaves L unchanged.
     Unchanged,
-    /// The left operand does not subsume the right one and was changed as part of the join.
+    /// The left operand changes when joined with the right operand,
+    /// i.e., the L.join(R) operation changes L.
     Changed,
 }
 

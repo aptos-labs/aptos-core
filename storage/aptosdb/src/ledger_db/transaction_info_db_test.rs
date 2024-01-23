@@ -2,13 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use super::*;
-use crate::AptosDB;
+use crate::{db::test_helper::put_transaction_infos, AptosDB};
+use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_temppath::TempPath;
+use aptos_types::transaction::{TransactionInfo, Version};
 use proptest::{collection::vec, prelude::*};
 
 fn verify(
-    store: &LedgerStore,
+    db: &AptosDB,
     txn_infos: &[TransactionInfo],
     first_version: Version,
     ledger_version: Version,
@@ -20,8 +21,14 @@ fn verify(
         .for_each(|(idx, expected_txn_info)| {
             let version = first_version + idx as u64;
 
-            let txn_info_with_proof = store
-                .get_transaction_info_with_proof(version, ledger_version)
+            let txn_info_with_proof = db
+                .ledger_db
+                .transaction_info_db()
+                .get_transaction_info_with_proof(
+                    version,
+                    ledger_version,
+                    db.ledger_db.transaction_accumulator_db(),
+                )
                 .unwrap();
 
             assert_eq!(txn_info_with_proof.transaction_info(), expected_txn_info);
@@ -36,31 +43,6 @@ fn verify(
         })
 }
 
-fn save(store: &LedgerStore, first_version: Version, txn_infos: &[TransactionInfo]) -> HashValue {
-    let transaction_info_batch = SchemaBatch::new();
-    let transaction_accumulator_batch = SchemaBatch::new();
-    let root_hash = store
-        .put_transaction_infos(
-            first_version,
-            txn_infos,
-            &transaction_info_batch,
-            &transaction_accumulator_batch,
-        )
-        .unwrap();
-    store
-        .ledger_db
-        .transaction_info_db()
-        .write_schemas(transaction_info_batch)
-        .unwrap();
-    store
-        .ledger_db
-        .transaction_accumulator_db()
-        .write_schemas(transaction_accumulator_batch)
-        .unwrap();
-
-    root_hash
-}
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
@@ -71,20 +53,19 @@ proptest! {
     ) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
-        let store = &db.ledger_store;
 
         // insert two batches of transaction infos
-        let root_hash1 = save(store, 0, &batch1);
+        let root_hash1 = put_transaction_infos(&db, 0, &batch1);
         let ledger_version1 = batch1.len() as u64 - 1;
-        let root_hash2 = save(store, batch1.len() as u64, &batch2);
+        let root_hash2 = put_transaction_infos(&db, batch1.len() as u64, &batch2);
         let ledger_version2 = batch1.len() as u64 + batch2.len() as u64 - 1;
 
         // retrieve all leaves and verify against latest root hash
-        verify(store, &batch1, 0, ledger_version2, root_hash2);
-        verify(store, &batch2, batch1.len() as u64, ledger_version2, root_hash2);
+        verify(&db, &batch1, 0, ledger_version2, root_hash2);
+        verify(&db, &batch2, batch1.len() as u64, ledger_version2, root_hash2);
 
         // retrieve batch1 and verify against root_hash after batch1 was inserted
-        verify(store, &batch1, 0, ledger_version1, root_hash1);
+        verify(&db, &batch1, 0, ledger_version1, root_hash1);
     }
 
     #[test]
@@ -102,10 +83,9 @@ proptest! {
     ) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
-        let store = &db.ledger_store;
-        save(store, 0, &infos);
+        put_transaction_infos(&db, 0, &infos);
 
-        let iter = store
+        let iter = db.ledger_db.transaction_info_db()
             .get_transaction_info_iter(start_version, num_transaction_infos)
             .unwrap();
         prop_assert_eq!(
@@ -114,7 +94,7 @@ proptest! {
                 .skip(start_version as usize)
                 .take(num_transaction_infos)
                 .collect::<Vec<_>>(),
-            iter.collect::<Result<Vec<_>>>().unwrap()
+            iter.collect::<Result<Vec<_>, _>>().unwrap()
         );
     }
 }

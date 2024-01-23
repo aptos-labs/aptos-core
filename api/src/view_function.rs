@@ -8,7 +8,7 @@ use crate::{
     failpoint::fail_point_poem,
     response::{
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-        InternalError,
+        ForbiddenError, InternalError,
     },
     ApiTags, Context,
 };
@@ -119,6 +119,21 @@ fn view_request(
                 })?
         },
     };
+
+    // Reject the request if it's not allowed by the filter.
+    if !context.node_config.api.view_filter.allows(
+        view_function.module.address(),
+        view_function.module.name().as_str(),
+        view_function.function.as_str(),
+    ) {
+        return Err(BasicErrorWith404::forbidden_with_code_no_info(
+            format!(
+                "Function {}::{} is not allowed",
+                view_function.module, view_function.function
+            ),
+            AptosErrorCode::InvalidInput,
+        ));
+    }
 
     let return_vals = AptosVM::execute_view_function(
         &state_view,

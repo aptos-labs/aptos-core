@@ -7,7 +7,6 @@
 use crate::{
     common::NUM_STATE_SHARDS,
     ledger_db::LedgerDb,
-    ledger_store::LedgerStore,
     metrics::{OTHER_TIMERS_SECONDS, STATE_ITEMS, TOTAL_STATE_BYTES},
     pruner::{StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
@@ -436,7 +435,6 @@ impl StateStore {
         hack_for_tests: bool,
         check_max_versions_after_snapshot: bool,
     ) -> Result<(BufferedState, SmtAncestors<StateValue>)> {
-        let ledger_store = LedgerStore::new(Arc::clone(&state_db.ledger_db));
         let num_transactions = state_db
             .ledger_db
             .metadata_db()
@@ -512,8 +510,10 @@ impl StateStore {
             );
             let write_sets = TransactionStore::new(Arc::clone(&state_db.ledger_db))
                 .get_write_sets(snapshot_next_version, num_transactions)?;
-            let txn_info_iter =
-                ledger_store.get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
+            let txn_info_iter = state_db
+                .ledger_db
+                .transaction_info_db()
+                .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
             let last_checkpoint_index = txn_info_iter
                 .into_iter()
                 .collect::<Result<Vec<_>>>()?

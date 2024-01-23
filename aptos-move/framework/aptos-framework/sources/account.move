@@ -795,7 +795,12 @@ module aptos_framework::account {
 
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
-        create_account_unchecked(new_address)
+        // Make this easier by just allowing the account to be created again in a test
+        if (!exists_at(new_address)) {
+            create_account_unchecked(new_address)
+        } else {
+            create_signer_for_test(new_address)
+        }
     }
 
     #[test]

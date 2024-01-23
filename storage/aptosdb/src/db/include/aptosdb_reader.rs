@@ -146,7 +146,11 @@ impl DbReader for AptosDB {
                 .map(|version| self.ledger_db.transaction_db().get_transaction(version))
                 .collect::<Result<Vec<_>>>()?;
             let txn_infos = (start_version..start_version + limit)
-                .map(|version| self.ledger_store.get_transaction_info(version))
+                .map(|version| {
+                    self.ledger_db
+                        .transaction_info_db()
+                        .get_transaction_info(version)
+                })
                 .collect::<Result<Vec<_>>>()?;
             let events = if fetch_events {
                 Some(
@@ -158,11 +162,9 @@ impl DbReader for AptosDB {
                 None
             };
             let proof = TransactionInfoListWithProof::new(
-                self.ledger_store.get_transaction_range_proof(
-                    Some(start_version),
-                    limit,
-                    ledger_version,
-                )?,
+                self.ledger_db
+                    .transaction_accumulator_db()
+                    .get_transaction_range_proof(Some(start_version), limit, ledger_version)?,
                 txn_infos,
             );
 
@@ -221,7 +223,10 @@ impl DbReader for AptosDB {
 
             let (txn_infos, txns_and_outputs) = (start_version..start_version + limit)
                 .map(|version| {
-                    let txn_info = self.ledger_store.get_transaction_info(version)?;
+                    let txn_info = self
+                        .ledger_db
+                        .transaction_info_db()
+                        .get_transaction_info(version)?;
                     let events = self.ledger_db.event_db().get_events_by_version(version)?;
                     let write_set = self.transaction_store.get_write_set(version)?;
                     let txn = self.ledger_db.transaction_db().get_transaction(version)?;
@@ -237,11 +242,9 @@ impl DbReader for AptosDB {
                 .into_iter()
                 .unzip();
             let proof = TransactionInfoListWithProof::new(
-                self.ledger_store.get_transaction_range_proof(
-                    Some(start_version),
-                    limit,
-                    ledger_version,
-                )?,
+                self.ledger_db
+                    .transaction_accumulator_db()
+                    .get_transaction_range_proof(Some(start_version), limit, ledger_version)?,
                 txn_infos,
             );
 
@@ -293,7 +296,8 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let iter = self
-                .ledger_store
+                .ledger_db
+                .transaction_info_db()
                 .get_transaction_info_iter(start_version, limit as usize)?;
             Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<TransactionInfo>> + '_>)
         })
@@ -344,11 +348,9 @@ impl DbReader for AptosDB {
         gauged_api("get_transaction_accumulator_range_proof", || {
             self.error_if_ledger_pruned("Transaction", first_version)?;
 
-            self.ledger_store.get_transaction_range_proof(
-                Some(first_version),
-                limit,
-                ledger_version,
-            )
+            self.ledger_db
+                .transaction_accumulator_db()
+                .get_transaction_range_proof(Some(first_version), limit, ledger_version)
         })
     }
 
@@ -469,7 +471,10 @@ impl DbReader for AptosDB {
                 .current_version
                 .map_or(0, |v| v + 1);
 
-            let frozen_subtrees = self.ledger_store.get_frozen_subtree_hashes(num_txns)?;
+            let frozen_subtrees = self
+                .ledger_db
+                .transaction_accumulator_db()
+                .get_frozen_subtree_hashes(num_txns)?;
             let transaction_accumulator =
                 Arc::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?);
             let executed_trees = ExecutedTrees::new(
@@ -489,7 +494,10 @@ impl DbReader for AptosDB {
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
             self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            ensure!(version <= self.get_latest_version()?, "version older than latest version");
+            ensure!(
+                version <= self.get_latest_version()?,
+                "version older than latest version"
+            );
 
             match self.event_store.get_block_metadata(version) {
                 Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
@@ -709,7 +717,9 @@ impl DbReader for AptosDB {
     fn get_accumulator_root_hash(&self, version: Version) -> Result<HashValue> {
         gauged_api("get_accumulator_root_hash", || {
             self.error_if_ledger_pruned("Transaction accumulator", version)?;
-            self.ledger_store.get_root_hash(version)
+            self.ledger_db
+                .transaction_accumulator_db()
+                .get_root_hash(version)
         })
     }
 
@@ -723,7 +733,8 @@ impl DbReader for AptosDB {
                 "Transaction accumulator",
                 client_known_version.unwrap_or(0),
             )?;
-            self.ledger_store
+            self.ledger_db
+                .transaction_accumulator_db()
                 .get_consistency_proof(client_known_version, ledger_version)
         })
     }
@@ -733,8 +744,12 @@ impl DbReader for AptosDB {
         ledger_version: Version,
     ) -> Result<TransactionAccumulatorSummary> {
         let num_txns = ledger_version + 1;
-        let frozen_subtrees = self.ledger_store.get_frozen_subtree_hashes(num_txns)?;
-        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?).map_err(Into::into)
+        let frozen_subtrees = self
+            .ledger_db
+            .transaction_accumulator_db()
+            .get_frozen_subtree_hashes(num_txns)?;
+        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)
+            .map_err(Into::into)
     }
 
     fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
@@ -916,8 +931,13 @@ impl AptosDB {
         self.error_if_ledger_pruned("Transaction", version)?;
 
         let proof = self
-            .ledger_store
-            .get_transaction_info_with_proof(version, ledger_version)?;
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info_with_proof(
+                version,
+                ledger_version,
+                self.ledger_db.transaction_accumulator_db(),
+            )?;
         let transaction = self.ledger_db.transaction_db().get_transaction(version)?;
 
         // If events were requested, also fetch those.

@@ -103,6 +103,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<AbortLocation>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
+    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;
