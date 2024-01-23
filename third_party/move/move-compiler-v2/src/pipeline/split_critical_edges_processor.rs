@@ -2,7 +2,7 @@
 //! A critical edge is an edge where the source node has multiple successors,
 //! and the target node has multiple predecessors.
 
-use move_model::{model::FunctionEnv, ast::TempIndex};
+use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
@@ -20,12 +20,12 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-		if fun_env.is_native() {
-			return data;
-		}
-		let mut transformer = SplitCriticalEdgesTransformation::new(data);
-		transformer.transform();
-		transformer.data
+        if fun_env.is_native() {
+            return data;
+        }
+        let mut transformer = SplitCriticalEdgesTransformation::new(data);
+        transformer.transform();
+        transformer.data
     }
 
     fn name(&self) -> String {
@@ -41,34 +41,34 @@ struct SplitCriticalEdgesTransformation {
 }
 
 impl SplitCriticalEdgesTransformation {
-	pub fn new(data: FunctionData) -> Self {
-		let labels = Bytecode::labels(&data.code);
-		let srcs_count = count_srcs(&data.code);
-		Self {
-			data,
-			labels,
-			srcs_count,
-		}
-	}
-
-	/// Runs the transformation, which breaks critical edges with empty blocks.
-    fn transform(&mut self) {
-        let bytecodes = std::mem::take(&mut self.data.code);
-		for bytecode in bytecodes {
-			self.transform_bytecode(bytecode)
-		}
+    pub fn new(data: FunctionData) -> Self {
+        let labels = Bytecode::labels(&data.code);
+        let srcs_count = count_srcs(&data.code);
+        Self {
+            data,
+            labels,
+            srcs_count,
+        }
     }
 
-	/// Transforms a bytecode
+    /// Runs the transformation, which breaks critical edges with empty blocks.
+    fn transform(&mut self) {
+        let bytecodes = std::mem::take(&mut self.data.code);
+        for bytecode in bytecodes {
+            self.transform_bytecode(bytecode)
+        }
+    }
+
+    /// Transforms a bytecode
     fn transform_bytecode(&mut self, bytecode: Bytecode) {
         match bytecode {
             Bytecode::Branch(attr_id, l0, l1, t) => self.transform_branch(attr_id, l0, l1, t),
-			// Edge of a `Jump` can never be critical since the source node only have one out edge
+            // Edge of a `Jump` can never be critical since the source node only have one out edge
             _ => self.emit(bytecode),
         }
     }
 
-	/// Transforms a branch instruction by splitting the critical out edges
+    /// Transforms a branch instruction by splitting the critical out edges
     pub fn transform_branch(&mut self, attr_id: AttrId, l0: Label, l1: Label, t: TempIndex) {
         match (
             self.split_critical_edge(attr_id, l0),
@@ -76,17 +76,17 @@ impl SplitCriticalEdgesTransformation {
         ) {
             (None, None) => self.emit(Bytecode::Branch(attr_id, l0, l1, t)),
             (None, Some((l1_new, codes))) => {
-				self.emit(Bytecode::Branch(attr_id, l0, l1_new, t));
-				self.emit_codes(codes)
+                self.emit(Bytecode::Branch(attr_id, l0, l1_new, t));
+                self.emit_codes(codes)
             },
             (Some((l0_new, codes)), None) => {
-				self.emit(Bytecode::Branch(attr_id, l0_new, l1, t));
-				self.emit_codes(codes)
-			},
-            (Some((l0_new, codes0)), Some((l1_new,codes1))) => {
+                self.emit(Bytecode::Branch(attr_id, l0_new, l1, t));
+                self.emit_codes(codes)
+            },
+            (Some((l0_new, codes0)), Some((l1_new, codes1))) => {
                 self.emit(Bytecode::Branch(attr_id, l0_new, l1_new, t));
-				self.emit_codes(codes0);
-				self.emit_codes(codes1);
+                self.emit_codes(codes0);
+                self.emit_codes(codes1);
             },
         }
     }
@@ -142,11 +142,11 @@ impl SplitCriticalEdgesTransformation {
         self.data.code.push(bytecode)
     }
 
-	fn emit_codes(&mut self, codes: Vec<Bytecode>) {
-		for code in codes {
-			self.emit(code)
-		}
-	}
+    fn emit_codes(&mut self, codes: Vec<Bytecode>) {
+        for code in codes {
+            self.emit(code)
+        }
+    }
 }
 
 /// If key present in `map`, add 1 to its value; else insert 1
