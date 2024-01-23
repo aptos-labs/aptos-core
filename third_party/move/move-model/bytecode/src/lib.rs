@@ -34,7 +34,7 @@ pub fn print_targets_for_test(
     header: &str,
     targets: &FunctionTargetsHolder,
 ) -> String {
-    print_targets_with_annotations_for_test(env, header, targets, |target| {
+    print_targets_with_annotations_for_test(env, header, targets, &|target| {
         target.register_annotation_formatters_for_test()
     })
 }
@@ -44,7 +44,7 @@ pub fn print_targets_with_annotations_for_test(
     env: &GlobalEnv,
     header: &str,
     targets: &FunctionTargetsHolder,
-    register_annotations: impl Fn(&FunctionTarget),
+    register_annotations: &impl Fn(&FunctionTarget),
 ) -> String {
     let mut text = String::new();
     writeln!(&mut text, "============ {} ================", header).unwrap();

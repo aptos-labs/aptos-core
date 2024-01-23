@@ -161,7 +161,11 @@ pub enum Operation {
     BorrowGlobal(ModuleId, StructId, Vec<Type>),
 
     // Builtins
-    Destroy,
+    /// Indicates that the value is dropped.
+    Drop,
+    /// Indicates that the value is no longer borrowed.
+    Release,
+
     ReadRef,
     WriteRef,
     FreezeRef,
@@ -253,7 +257,8 @@ impl Operation {
             Operation::GetField(_, _, _, _) => false,
             Operation::GetGlobal(_, _, _) => true,
             Operation::Uninit => false,
-            Operation::Destroy => false,
+            Operation::Drop => false,
+            Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
             Operation::FreezeRef => false,
@@ -1116,8 +1121,11 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             Uninit => {
                 write!(f, "uninit")?;
             },
-            Destroy => {
-                write!(f, "destroy")?;
+            Drop => {
+                write!(f, "drop")?;
+            },
+            Release => {
+                write!(f, "release")?;
             },
             ReadRef => {
                 write!(f, "read_ref")?;

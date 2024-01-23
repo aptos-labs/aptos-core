@@ -371,7 +371,7 @@ impl<'a> LiveVarAnalysis<'a> {
                 new_bytecodes.push(Bytecode::Call(
                     self.new_attr_id(),
                     vec![],
-                    Operation::Destroy,
+                    Operation::Drop,
                     vec![idx],
                     None,
                 ));

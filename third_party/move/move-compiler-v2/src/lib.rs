@@ -90,6 +90,7 @@ pub fn run_move_compiler(
             &mut targets,
             &dump_base_name,
             options.debug && options.dump_bytecode,
+            &pipeline::register_formatters,
         )
     } else {
         pipeline.run(&env, &mut targets)
