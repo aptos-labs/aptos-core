@@ -12,9 +12,7 @@ use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
-    stackless_control_flow_graph::{
-        BlockId, StacklessControlFlowGraph,
-    },
+    stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
 };
 use std::collections::BTreeMap;
 
@@ -42,37 +40,38 @@ impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
 }
 
 struct EliminateEmptyBlocksTransformation {
-	data: FunctionData,
+    data: FunctionData,
     cfg_code_generator: ControlFlowGraphCodeGenerator,
 }
 
 impl EliminateEmptyBlocksTransformation {
     pub fn new(data: FunctionData) -> Self {
-		let cfg = StacklessControlFlowGraph::new_forward(&data.code);
+        let cfg = StacklessControlFlowGraph::new_forward(&data.code);
         let cfg_code_generator = ControlFlowGraphCodeGenerator::new(cfg, &data.code);
-		Self {
-			data,
-			cfg_code_generator
-		}
+        Self {
+            data,
+            cfg_code_generator,
+        }
     }
 
-	fn transform(&mut self) {
-		self.transform_cfg();
-		self.data.code = std::mem::take(&mut self.cfg_code_generator).gen_codes();
-	}
+    fn transform(&mut self) {
+        self.transform_cfg();
+        self.data.code = std::mem::take(&mut self.cfg_code_generator).gen_codes();
+    }
 
-	fn transform_cfg(&mut self) {
-		for block in self.cfg_code_generator.cfg.blocks() {
-			if self.is_empty_block(block) {
-				let suc_blocks = self.cfg_code_generator.cfg.successors(block);
-				debug_assert!(suc_blocks.len() == 1);
-				let suc_block = suc_blocks.first().expect("successor block");
-				if *suc_block != block {
-					self.cfg_code_generator.remove_empty_block(block, *suc_block);
-				}
-			}
-		}
-	}
+    fn transform_cfg(&mut self) {
+        for block in self.cfg_code_generator.cfg.blocks() {
+            if self.is_empty_block(block) {
+                let suc_blocks = self.cfg_code_generator.cfg.successors(block);
+                debug_assert!(suc_blocks.len() == 1);
+                let suc_block = suc_blocks.first().expect("successor block");
+                if *suc_block != block {
+                    self.cfg_code_generator
+                        .remove_empty_block(block, *suc_block);
+                }
+            }
+        }
+    }
 
     /// Returns the instructions of the block
     fn block_instrs(&self, block_id: BlockId) -> &[Bytecode] {
@@ -95,16 +94,16 @@ impl EliminateEmptyBlocksTransformation {
 struct ControlFlowGraphCodeGenerator {
     cfg: StacklessControlFlowGraph,
     code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
-	// if `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
+    // if `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
     pred_map: BTreeMap<BlockId, Vec<BlockId>>,
 }
 
 impl ControlFlowGraphCodeGenerator {
-	// TODO: take `Vec<Bytecode>` instead to avoid copying
+    // TODO: take `Vec<Bytecode>` instead to avoid copying
     pub fn new(cfg: StacklessControlFlowGraph, codes: &[Bytecode]) -> Self {
         let code_blocks = cfg
-			.blocks()
-			.into_iter()
+            .blocks()
+            .into_iter()
             .map(|block| (block, cfg.content(block).to_bytecodes(codes).to_vec()))
             .collect();
         let pred_map = pred_map(&cfg);
@@ -117,16 +116,16 @@ impl ControlFlowGraphCodeGenerator {
 
     /// Generates code from the control flow graph
     /// Unreachable codes are also discarded
-    fn gen_codes(self) -> Vec<Bytecode> {
+    pub fn gen_codes(self) -> Vec<Bytecode> {
         let mut generated = Vec::new();
         let mut iter_dfs_left = self.cfg.iter_dfs_left().peekable();
         while let Some(block) = iter_dfs_left.next() {
-            if block == self.cfg.entry_block() || block == self.cfg.exit_block() {
+            if self.is_trivial_block(block) {
                 continue;
             }
             // TODO:
-			// can't use `.remove` instead to avoid copying,
-			// because the following may look at visited block
+            // can't use `.remove` instead to avoid copying,
+            // because the following may look at visited block
             let mut code_block = self.code_blocks.get(&block).expect("code block").clone();
             let maybe_next_to_visit = iter_dfs_left.peek();
             if Self::falls_to_next_block(&code_block) {
@@ -136,7 +135,10 @@ impl ControlFlowGraphCodeGenerator {
                 if maybe_next_to_visit.is_none() || *maybe_next_to_visit.unwrap() != suc_block {
                     self.add_explicit_jump(&mut code_block, suc_block);
                 }
-            } else if matches!(code_block.last().expect("last instruction"), Bytecode::Jump(..)) {
+            } else if matches!(
+                code_block.last().expect("last instruction"),
+                Bytecode::Jump(..)
+            ) {
                 // no need to jump to the next instruction
                 let suc_block = self.get_the_non_trivial_successor(block);
                 if let Some(next_to_vist) = maybe_next_to_visit {
