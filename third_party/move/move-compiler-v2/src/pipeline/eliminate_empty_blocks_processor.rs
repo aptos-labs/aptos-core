@@ -204,7 +204,7 @@ impl ControlFlowGraphCodeGenerator {
 }
 
 impl ControlFlowGraphCodeGenerator {
-    /// Remove block from the control flow graph, and redirects any block jumpping to it
+    /// Removes block from the control flow graph, and redirects any block jumpping to it
     /// to `redirect_to` instead
     /// Requires: `block_to_remove` doesn't have itself as a successor;
     fn remove_empty_block(&mut self, block_to_remove: BlockId, redirect_to: BlockId) {
