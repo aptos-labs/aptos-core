@@ -87,13 +87,27 @@ impl IndexerStreamCoordinator {
         &mut self,
         _enable_expensive_logging: bool,
     ) -> Vec<Result<EndVersion, Status>> {
+        let fetching_start_time = std::time::Instant::now();
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
             self.fetch_transactions_from_storage().await;
+        let first_version = sorted_transactions_from_storage_with_size
+            .first()
+            .map(|(txn, _)| txn.version)
+            .unwrap() as i64;
         let end_version = sorted_transactions_from_storage_with_size
             .last()
             .map(|(txn, _)| txn.version)
-            .unwrap();
+            .unwrap() as i64;
+        let num_transactions = sorted_transactions_from_storage_with_size.len();
+        let highest_known_version = self.highest_known_version as i64;
+        log_grpc_step_fullnode(IndexerGrpcStep::FullnodeFetchedBatch, 
+            Some(first_version), 
+            Some(end_version), None, 
+            Some(highest_known_version), None,
+            Some(fetching_start_time.elapsed().as_secs_f64()), 
+            Some(num_transactions as i64)
+        );
         // Stage 2: convert transactions to rust objects. CPU-bound load.
         let mut task_batches = vec![];
         let mut current_batch = vec![];
@@ -159,24 +173,37 @@ impl IndexerStreamCoordinator {
             });
             tasks.push(task);
         }
-        let responses = match futures::future::try_join_all(tasks).await {
+        let _responses = match futures::future::try_join_all(tasks).await {
             Ok(res) => res.into_iter().flatten().collect::<Vec<_>>(),
             Err(err) => panic!(
                 "[Indexer Fullnode] Error processing transaction batches: {:?}",
                 err
             ),
         };
-
-        // Stage 4: send responses to stream
-        for response in responses {
-            if let Err(err) = self.transactions_sender.send(Ok(response)).await {
-                panic!(
-                    "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
-                    err
-                );
-            }
-        }
-        vec![Ok(end_version)]
+        log_grpc_step_fullnode(IndexerGrpcStep::FullnodeDecodedBatch, 
+            Some(first_version), 
+            Some(end_version), None, 
+            Some(highest_known_version), None,
+            Some(fetching_start_time.elapsed().as_secs_f64()), 
+            Some(num_transactions as i64)
+        );
+        // // Stage 4: send responses to stream
+        // for response in responses {
+        //     if let Err(err) = self.transactions_sender.send(Ok(response)).await {
+        //         panic!(
+        //             "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
+        //             err
+        //         );
+        //     }
+        // }
+        log_grpc_step_fullnode(IndexerGrpcStep::FullnodeProcessedBatch, 
+            Some(first_version), 
+            Some(end_version), None, 
+            Some(highest_known_version), None,
+            Some(fetching_start_time.elapsed().as_secs_f64()), 
+            Some(num_transactions as i64)
+        );
+        vec![Ok(end_version as u64)]
     }
 
     /// Fetches transactions from storage with each transaction's size.
