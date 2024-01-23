@@ -174,13 +174,13 @@ impl ControlFlowGraphCodeGenerator {
     /// (May not panic in the release version due to the use of debug_assert)
     fn get_the_non_trivial_successor(&self, block: BlockId) -> BlockId {
         let the_suc = self.get_the_successor(block);
-        debug_assert!(the_suc != self.cfg.entry_block() && the_suc != self.cfg.exit_block());
+        debug_assert!(!self.is_trivial_block(the_suc));
         the_suc
     }
 
     /// Adds an explicit jump to `to_block` to the end of `codes`
     fn add_explicit_jump(&self, codes: &mut Vec<Bytecode>, to_block: BlockId) {
-        debug_assert!(to_block != self.cfg.entry_block() && to_block != self.cfg.exit_block());
+        debug_assert!(!self.is_trivial_block(to_block));
         let to_label = self.get_block_label(to_block).expect("label");
         let attr_id = self
             .code_blocks
@@ -208,6 +208,11 @@ impl ControlFlowGraphCodeGenerator {
         } else {
             None
         }
+    }
+
+    /// Checks if the block is entry or exit block
+    fn is_trivial_block(&self, block: BlockId) -> bool {
+        block == self.cfg.entry_block() || block == self.cfg.exit_block()
     }
 }
 
