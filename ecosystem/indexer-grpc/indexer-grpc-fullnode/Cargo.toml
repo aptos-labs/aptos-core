@@ -24,6 +24,7 @@ hex = { workspace = true }
 hyper = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
