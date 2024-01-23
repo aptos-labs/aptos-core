@@ -12,6 +12,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
+    block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{
         state_key::StateKey,
@@ -25,7 +26,6 @@ use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
-use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 /// Return a relative path to start tracking changes in commits.
 pub fn output_file() -> Option<&'static str> {
