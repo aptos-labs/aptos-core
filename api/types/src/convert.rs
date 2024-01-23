@@ -4,7 +4,7 @@
 
 use crate::{
     transaction::{
-        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
         MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
@@ -55,7 +55,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use crate::transaction::BlockEpilogueTransaction;
 
 const OBJECT_MODULE: &IdentStr = ident_str!("object");
 const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
@@ -208,12 +207,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     timestamp: timestamp.into(),
                 })
             },
-            BlockEpilogue(_) => {
-                Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
-                    info,
-                    timestamp: timestamp.into(),
-                })
-            },
+            BlockEpilogue(_) => Transaction::BlockEpilogueTransaction(BlockEpilogueTransaction {
+                info,
+                timestamp: timestamp.into(),
+            }),
             ValidatorTransaction(_txn) => (info, events, timestamp).into(),
         })
     }
