@@ -182,7 +182,13 @@ impl ControlFlowGraphCodeGenerator {
     fn add_explicit_jump(&self, codes: &mut Vec<Bytecode>, to_block: BlockId) {
         debug_assert!(to_block != self.cfg.entry_block() && to_block != self.cfg.exit_block());
         let to_label = self.get_block_label(to_block).expect("label");
-        let attr_id = self.code_blocks.get(&to_block).expect("code block").first().expect("first instruction").get_attr_id();
+        let attr_id = self
+            .code_blocks
+            .get(&to_block)
+            .expect("code block")
+            .first()
+            .expect("first instruction")
+            .get_attr_id();
         codes.push(Bytecode::Jump(attr_id, to_label));
     }
 
