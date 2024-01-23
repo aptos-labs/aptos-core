@@ -195,12 +195,12 @@ impl ControlFlowGraphCodeGenerator {
     fn get_block_label(&self, block_id: BlockId) -> Option<Label> {
         if let Bytecode::Label(_, label) = self
             .block_instrs(block_id)
-			.first()
+            .first()
             .expect("first instruction")
         {
             Some(*label)
         } else {
-			None
+            None
         }
     }
 }
