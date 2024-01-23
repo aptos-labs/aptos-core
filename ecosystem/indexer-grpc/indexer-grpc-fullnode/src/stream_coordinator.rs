@@ -126,7 +126,11 @@ impl IndexerStreamCoordinator {
         // Flatten the batches into a single batch.
         let mut responses = vec![];
         let processed_pb_transactions = pb_transactions.into_iter().flatten().collect::<Vec<_>>();
-        for chunk in processed_pb_transactions.chunks(output_batch_size as usize) {
+        let sorted_processed_pb_transactions = processed_pb_transactions
+            .iter()
+            .sorted_by(|a, b| a.version.cmp(&b.version))
+            .collect::<Vec<_>>();
+        for chunk in sorted_processed_pb_transactions.chunks(output_batch_size as usize) {
             for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
                 let item = TransactionsFromNodeResponse {
                     response: Some(transactions_from_node_response::Response::Data(
