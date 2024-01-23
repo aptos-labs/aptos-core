@@ -4,6 +4,7 @@
 
 //! Implements a compiler pass that
 //! - eliminates all empty blocks
+//! - removes edges where the source has only one successors and the target has only one predecessors
 //! - removes all jumps to the next instruction
 //! - removes unreachable codes
 
@@ -220,24 +221,24 @@ impl_deref!(RemoveEmptyBlock, ControlFlowGraphCodeGenerator);
 impl_deref_mut!(RemoveEmptyBlock);
 
 impl RemoveEmptyBlock {
+    /// Wrapper
     pub fn new(generator: ControlFlowGraphCodeGenerator) -> Self {
         Self(generator)
     }
 
-    fn transform(&mut self) {
+    /// Removes all empty blocks from the CFG except for empty loops (Label; jump Label)
+    pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             if self.is_empty_block(block) {
-                let suc_blocks = self.cfg.successors(block);
-                debug_assert!(suc_blocks.len() == 1);
-                let suc_block = suc_blocks.first().expect("successor block");
-                if *suc_block != block {
-                    self.remove_empty_block(block, *suc_block);
+                let suc_block = self.get_the_non_trivial_successor(block);
+                if suc_block != block {
+                    self.remove_empty_block(block, suc_block);
                 }
             }
         }
     }
 
-    /// Checks if the given block is empty block
+    /// Checks if the given block is empty; i.e., only a label and a jump
     fn is_empty_block(&self, block_id: BlockId) -> bool {
         let block_instrs = self.block_instrs(block_id);
         block_instrs.len() == 2
@@ -316,6 +317,7 @@ impl RemoveRedundantJump {
         Self(cfg_generator)
     }
 
+    /// Removes edges where the source has only one successors and the target has only one predecessors
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             // the later condition says that `block` is unreachable or has been removed
@@ -368,7 +370,7 @@ impl RemoveRedundantJump {
         }
         from_codes.append(&mut to_codes);
         self.cfg.successors_mut(from).clear();
-        // for all successors of `to`, update their preds of `to` to `from`
+        // for all successors of `to`, update their preds by substituting `to` to `from`
         for suc_of_to in self.cfg.successors(to).clone() {
             // successors of `from` becomes successors of `to`
             self.cfg.successors_mut(from).push(suc_of_to);
@@ -378,6 +380,8 @@ impl RemoveRedundantJump {
                 }
             }
         }
+        self.cfg.remove_block(to);
+        self.pred_map.remove(&to);
         true
     }
 }
