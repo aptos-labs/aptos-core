@@ -223,9 +223,12 @@ impl StacklessControlFlowGraph {
     pub fn remove_block(&mut self, block_to_remove: BlockId) {
         debug_assert!(block_to_remove != self.entry_block());
         debug_assert!(block_to_remove != self.exit_block());
-        self.blocks.retain(|block_id, _| block_to_remove != *block_id);
+        self.blocks
+            .retain(|block_id, _| block_to_remove != *block_id);
         for (_block_id, block) in self.blocks.iter_mut() {
-            block.successors.retain(|block_id| block_to_remove != *block_id);
+            block
+                .successors
+                .retain(|block_id| block_to_remove != *block_id);
         }
     }
 
@@ -234,9 +237,12 @@ impl StacklessControlFlowGraph {
     pub fn remove_blocks(&mut self, blocks_to_remove: &BTreeSet<BlockId>) {
         debug_assert!(!blocks_to_remove.contains(&self.entry_block()));
         debug_assert!(!blocks_to_remove.contains(&self.exit_block()));
-        self.blocks.retain(|block_id, _| !blocks_to_remove.contains(block_id));
+        self.blocks
+            .retain(|block_id, _| !blocks_to_remove.contains(block_id));
         for (_block_id, block) in self.blocks.iter_mut() {
-            block.successors.retain(|block_id| !blocks_to_remove.contains(block_id));
+            block
+                .successors
+                .retain(|block_id| !blocks_to_remove.contains(block_id));
         }
     }
 
@@ -302,20 +308,20 @@ impl StacklessControlFlowGraph {
 
 /// DFS traversal always visiting the left-most child first
 pub struct DFSLeft<'a> {
-	cfg: &'a StacklessControlFlowGraph,
-	to_visit: Vec<BlockId>,
-	visited: BTreeSet<BlockId>,
+    cfg: &'a StacklessControlFlowGraph,
+    to_visit: Vec<BlockId>,
+    visited: BTreeSet<BlockId>,
 }
 
 impl<'a> DFSLeft<'a> {
-	fn new(cfg: &'a StacklessControlFlowGraph) -> Self {
-		let to_visit = vec![cfg.entry_block()];
-		Self {
-			cfg,
-			to_visit,
-			visited: BTreeSet::new(),
-		}
-	}
+    fn new(cfg: &'a StacklessControlFlowGraph) -> Self {
+        let to_visit = vec![cfg.entry_block()];
+        Self {
+            cfg,
+            to_visit,
+            visited: BTreeSet::new(),
+        }
+    }
 }
 
 impl<'a> Iterator for DFSLeft<'a> {
@@ -327,10 +333,10 @@ impl<'a> Iterator for DFSLeft<'a> {
             visiting = self.to_visit.pop()?;
         }
         self.visited.insert(visiting);
-		for suc_block in self.cfg.successors(visiting).iter().rev() {
-			self.to_visit.push(*suc_block);
-		}
-		Some(visiting)
+        for suc_block in self.cfg.successors(visiting).iter().rev() {
+            self.to_visit.push(*suc_block);
+        }
+        Some(visiting)
     }
 }
 
