@@ -12,7 +12,7 @@ use crate::{
     AptosVM,
 };
 use aptos_types::{
-    dkg::{DKGNode, DKGState, DKGTrait, DummyDKG},
+    dkg::{DKGNode, DKGState, DKGTrait, DefaultDKG},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
@@ -81,11 +81,13 @@ impl AptosVM {
         }
 
         // Deserialize transcript and verify it.
-        let pub_params = DummyDKG::new_public_params(&in_progress_session_state.metadata);
-        let transcript = DummyDKG::deserialize_transcript(dkg_node.transcript_bytes.as_slice())
-            .map_err(|_| Expected(TranscriptDeserializationFailed))?;
+        let pub_params = DefaultDKG::new_public_params(&in_progress_session_state.metadata);
+        let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
+            dkg_node.transcript_bytes.as_slice(),
+        )
+        .map_err(|_| Expected(TranscriptDeserializationFailed))?;
 
-        DummyDKG::verify_transcript(&pub_params, &transcript)
+        DefaultDKG::verify_transcript(&pub_params, &transcript)
             .map_err(|_| Expected(TranscriptVerificationFailed))?;
 
         // All check passed, invoke VM to publish DKG result on chain.

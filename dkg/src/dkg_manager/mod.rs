@@ -2,7 +2,7 @@
 use crate::{dkg_manager::agg_trx_producer::AggTranscriptProducer, network::IncomingRpcRequest};
 use aptos_channels::aptos_channel;
 use aptos_types::{
-    dkg::{DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait},
+    dkg::{DKGNode, DKGSessionState, DKGStartEvent, DKGTrait},
     epoch_state::EpochState,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -15,7 +15,7 @@ pub mod agg_trx_producer;
 
 #[allow(dead_code)]
 pub struct DKGManager<DKG: DKGTrait> {
-    private_params_provider: Arc<dyn DKGPrivateParamsProvider<DKG>>,
+    dealer_sk: Arc<DKG::DealerPrivateKey>,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
     vtxn_pool: VTxnPoolState,
@@ -27,14 +27,14 @@ pub struct DKGManager<DKG: DKGTrait> {
 #[allow(clippy::never_loop)]
 impl<DKG: DKGTrait> DKGManager<DKG> {
     pub fn new(
-        private_params_provider: Arc<dyn DKGPrivateParamsProvider<DKG>>,
+        dealer_sk: Arc<DKG::DealerPrivateKey>,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
-            private_params_provider,
+            dealer_sk,
             my_addr,
             epoch_state,
             vtxn_pool,
