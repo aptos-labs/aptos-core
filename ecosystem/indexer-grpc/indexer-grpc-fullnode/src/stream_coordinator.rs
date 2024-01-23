@@ -155,14 +155,14 @@ impl IndexerStreamCoordinator {
         );
         let sending_start_time = std::time::Instant::now();
         // Stage 4: send responses to stream
-        // for response in responses {
-        //     if let Err(err) = self.transactions_sender.send(Ok(response)).await {
-        //         panic!(
-        //             "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
-        //             err
-        //         );
-        //     }
-        // }
+        for response in responses {
+            if let Err(err) = self.transactions_sender.send(Ok(response)).await {
+                panic!(
+                    "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
+                    err
+                );
+            }
+        }
         log_grpc_step_fullnode(
             IndexerGrpcStep::FullnodeSentBatch,
             Some(start_version),
