@@ -12,7 +12,7 @@ cargo build -p move-cli
 
 Check if the tool is working properly by running its tests:
 ```bash
-cargo test -p move-mutator -- --test-threads=1
+cargo test -p move-mutator
 ```
 
 ## Usage
