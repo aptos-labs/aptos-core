@@ -6,17 +6,26 @@ import * as os from 'os';
 import * as vscode from 'vscode';
 import * as Path from 'path';
 
+class InlayHintsConfig {
+    enable: boolean;
+    constructor(enable: boolean) {
+        this.enable = enable;
+    }
+}
+
 /**
  * User-defined configuration values, such as those specified in VS Code settings.
  *
  * This provides a more strongly typed interface to the configuration values specified in this
  * extension's `package.json`, under the key `"contributes.configuration.properties"`.
  */
-export class Configuration {
+
+
+class Configuration {
     private readonly configuration: vscode.WorkspaceConfiguration;
 
     constructor() {
-        this.configuration = vscode.workspace.getConfiguration('move-analyzer');
+        this.configuration = vscode.workspace.getConfiguration('aptos-move-analyzer');
     }
 
     /** A string representation of the configured values, for logging purposes. */
@@ -24,12 +33,12 @@ export class Configuration {
         return JSON.stringify(this.configuration);
     }
 
-    /** The path to the move-analyzer executable. */
+    /** The path to the aptos-move-analyzer executable. */
     get serverPath(): string {
-        const defaultName = 'move-analyzer';
+        const defaultName = 'aptos-move-analyzer';
         let serverPath = this.configuration.get<string>('server.path', defaultName);
         if (serverPath.length === 0) {
-            // The default value of the `server.path` setting is 'move-analyzer'.
+            // The default value of the `server.path` setting is 'aptos-move-analyzer'.
             // A user may have over-written this default with an empty string value, ''.
             // An empty string cannot be an executable name, so instead use the default.
             return defaultName;
@@ -48,7 +57,14 @@ export class Configuration {
         if (process.platform === 'win32' && !serverPath.endsWith('.exe')) {
             serverPath = serverPath + '.exe';
         }
-
         return Path.resolve(serverPath);
     }
+
+    inlay_hints_config(): InlayHintsConfig {
+        const enable = this.configuration.get<boolean>('inlay.hints.enable');
+
+        return new InlayHintsConfig(enable === true);
+    }
 }
+
+export { InlayHintsConfig, Configuration };

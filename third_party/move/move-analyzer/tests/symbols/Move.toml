@@ -3,7 +3,8 @@ name = "Symbols"
 version = "0.0.1"
 
 [dependencies]
-MoveStdlib = { local = "../../../move-stdlib/", addr_subst = { "std" = "0x1" } }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework/", rev = "83641d3f083762f31700060e5e95fbb1cbc28bf0" }
+
 
 [addresses]
 Symbols = "0xCAFE"

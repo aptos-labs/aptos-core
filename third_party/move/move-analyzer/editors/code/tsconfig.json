@@ -4,7 +4,8 @@
         "target": "es2020",
         "outDir": "out",
         "lib": [
-            "es2020"
+            "es2020",
+            "ES2021.String"
         ],
         "sourceMap": true,
         "rootDir": ".",
