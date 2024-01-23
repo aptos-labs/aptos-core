@@ -14,7 +14,7 @@ Ok(
                                 hash: OnceCell(Uninit),
                             }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10b00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
                             StateKey {
-                                inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
+                                inner: TableItem { handle: 0d9eb42bc7cb65194c3d337c8afed5386683d4c87a1ca7f13956b17482377ea8, key: 122fa0e0af562b411ddeb954cf5fe7616149250385c596648e5ae4fd37def87e },
                                 hash: OnceCell(Uninit),
                             }: Modification(fce0f505000000000100000000000000, metadata:StateValueMetadata { inner: None }),
                         },
