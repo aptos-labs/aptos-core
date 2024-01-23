@@ -164,22 +164,22 @@ impl LiveVarAnalysisProcessor {
                 }
             });
 
-        // Now propagate to all branches in the code the after set of the branch instruction. Consider code as follows:
+        // Now propagate to all branches in the code the `after` set of the branch instruction. Consider code as follows:
         // ```
         // L0: if c goto L1 else L2
+        // <x alive>
         // L1: ..
         //     goto L0
         // L2: ..
         // ```
-        // The backwards analysis will not populate the before state of L2, which should be the same as the after
-        // state of L0. However, via the loop the after state of L0 will be incrementally grow (without effecting
-        // the before state of L2). The conclusion is that whatever the after state of L0 is, should be joined
-        // (union) to the before state of each branch target.
+        // The backwards analysis will not populate the before state of `L1` and `L2` with `x` being alive unless it
+        // is used in the branch. However, from the forward program flow it follows that `x` is alive before
+        // `L1` and `L2` regardless of its usage. More specifically, it may have to be _dropped_ if it goes out
+        // of scope after the branch.
         //
-        // Thereby we assert that there is no fixpoint needed for this post-analysis step. The argument is as follows:
-        // any live variables which we propagate from the branch source to the target have either been (a) not used
-        // by the target, then they will immediately be released (b) have been used already in which case the join
-        // does not make a difference.
+        // This problem of values which "are lost on the edge" of the control graph can be dealt with by
+        // introducing extra edges. However, assuming that there are no critical edges, a simpler
+        // solution is the join `pre(L1) := pre(L1) join after(L0)`, and similar for `L2`.
         let label_to_offset = Bytecode::label_offsets(code);
         for (offs, bc) in code.iter().enumerate() {
             let offs = offs as CodeOffset;
@@ -201,8 +201,6 @@ impl LiveVarAnalysisProcessor {
                     e.insert(v.clone());
                 },
                 Entry::Occupied(mut e) => {
-                    // Assuming no fixpoint needed since the incoming livevar info should be independent of
-                    // this information.
                     e.get_mut().join(v);
                 },
             }

@@ -230,35 +230,35 @@ fun ability::no_key($t0: address) {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t1}
+     # moved: {}
      #
   2: $t3 := move_from<ability::S<ability::Impotent>>($t0)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1}
+     # moved: {}
      #
   3: $t4 := borrow_global<ability::Impotent>($t0)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1}
+     # moved: {}
      #
   4: $t5 := borrow_global<ability::Impotent>($t0)
      # live vars: $t0
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1}
+     # moved: {}
      #
   5: $t6 := exists<ability::Impotent>($t0)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1}
+     # moved: {$t0}
      #
   6: return ()
 }

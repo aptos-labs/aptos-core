@@ -205,7 +205,7 @@ impl<'a> ExplicitDropTransformer<'a> {
                 released_temps.insert(t);
             }
         }
-        // if a temp is moved, then no need to drop or release
+        // if a temp is moved, then no need to drop
         // this should not remove unused vars; because of, for instance,
         // x = move(x)
         dropped_temps.retain(|t| {

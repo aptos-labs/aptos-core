@@ -1092,7 +1092,6 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, &label, false, alive).into_iter(),
             )
         }
-        state.moved.insert(src);
         state.moved.remove(&dest);
     }
 
@@ -1166,7 +1165,6 @@ impl<'env> LifeTimeAnalysis<'env> {
                 )
             }
         }
-        state.moved.insert(src);
         state.moved.remove(&dest);
     }
 
@@ -1192,7 +1190,6 @@ impl<'env> LifeTimeAnalysis<'env> {
                 self.borrow_info(state, label, false, alive).into_iter(),
             )
         }
-        state.moved.insert(src);
         // The destination variable is not overridden, only what it is pointing to, so
         // no removal from moved
     }

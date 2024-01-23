@@ -154,14 +154,14 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # graph: {L512=local($t2)[]}
      # local_to_label: {$t2=L512}
      # global_to_label: {}
-     # moved: {$t0,$t5,$t6,$t8}
+     # moved: {$t5,$t6,$t8}
      #
   8: $t1 := copy($t2)
      # live vars: $t1
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t5,$t6,$t8}
+     # moved: {$t5,$t6,$t8}
      #
   9: return $t1
 }

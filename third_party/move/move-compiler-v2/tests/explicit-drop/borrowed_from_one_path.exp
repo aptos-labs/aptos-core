@@ -198,7 +198,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t3,$t4,$t6,$t9,$t10}
+     # moved: {$t0,$t1,$t3,$t4,$t6,$t10}
      #
  15: return $t2
 }
@@ -233,5 +233,6 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
  14: $t10 := 0
  15: $t9 := vector::borrow<u64>($t3, $t10)
  16: $t2 := read_ref($t9)
- 17: return $t2
+ 17: drop($t9)
+ 18: return $t2
 }
