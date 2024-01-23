@@ -84,10 +84,6 @@ pub enum SessionId {
         // block id
         id: HashValue,
     },
-    BlockMetaExt {
-        // block id
-        id: HashValue,
-    },
 }
 
 impl SessionId {
@@ -141,12 +137,6 @@ impl SessionId {
 
     pub fn void() -> Self {
         Self::Void
-    }
-
-    pub fn validator_txn(txn: &ValidatorTransaction) -> Self {
-        Self::ValidatorTxn {
-            script_hash: txn.hash().to_vec(),
-        }
     }
 
     pub fn as_uuid(&self) -> HashValue {
