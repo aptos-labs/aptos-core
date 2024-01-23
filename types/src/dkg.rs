@@ -40,12 +40,12 @@ pub struct DKGConfig {
 
 /// DKG transcript and its metadata.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct DKGNode {
+pub struct DKGTranscript {
     pub metadata: DKGTranscriptMetadata,
     pub transcript_bytes: Vec<u8>,
 }
 
-impl DKGNode {
+impl DKGTranscript {
     pub fn new(epoch: u64, author: AccountAddress, transcript_bytes: Vec<u8>) -> Self {
         Self {
             metadata: DKGTranscriptMetadata { epoch, author },

@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
-use crate::{agg_trx_producer::AggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
+use crate::{agg_trx_producer::TAggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_logger::error;
 use aptos_types::{
     dkg::{
-        DKGNode, DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait,
+        DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
         DKGTranscriptMetadata,
     },
     epoch_state::EpochState,
@@ -26,12 +26,12 @@ enum InnerState<DKG: DKGTrait> {
     InProgress {
         start_time_us: u64,
         public_params: DKG::PublicParams,
-        my_node: DKGNode,
+        my_transcript: DKGTranscript,
         abort_handle: AbortHandle,
     },
     Finished {
         start_time_us: u64,
-        my_node: DKGNode,
+        my_transcript: DKGTranscript,
         pull_confirmed: bool,
     },
 }
@@ -52,7 +52,7 @@ pub struct DKGManager<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> {
 
     //
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
-    agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
+    agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
     agg_trx_tx: Option<aptos_channel::Sender<(), DKG::Transcript>>,
 
     // Control states.
@@ -70,12 +70,17 @@ impl<DKG: DKGTrait> InnerState<DKG> {
     }
 
     #[cfg(test)]
-    pub fn my_node_cloned(&self) -> DKGNode {
+    pub fn my_node_cloned(&self) -> DKGTranscript {
         match self {
             InnerState::NotStarted => panic!("my_node unavailable"),
-            InnerState::InProgress { my_node, .. } | InnerState::Finished { my_node, .. } => {
-                my_node.clone()
-            },
+            InnerState::InProgress {
+                my_transcript: my_node,
+                ..
+            }
+            | InnerState::Finished {
+                my_transcript: my_node,
+                ..
+            } => my_node.clone(),
         }
     }
 }
@@ -85,7 +90,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         private_params_provider: P,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
+        agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
         vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
     ) -> Self {
         Self {
@@ -103,8 +108,11 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     pub async fn run(
         mut self,
         in_progress_session: Option<DKGSessionState>,
-        mut dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
-        mut rpc_msg_rx: aptos_channel::Receiver<(), (AccountAddress, IncomingRpcRequest)>,
+        dkg_start_event_rx: oneshot::Receiver<DKGStartEvent>,
+        mut rpc_msg_rx: aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingRpcRequest),
+        >,
         mut dkg_txn_pulled_rx: vtxn_pool::PullNotificationReceiver,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
@@ -122,11 +130,12 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
 
+        let mut dkg_start_event_rx = dkg_start_event_rx.into_stream();
         let mut close_rx = close_rx.into_stream();
         while !self.stopped {
             let handling_result = tokio::select! {
                 dkg_start_event = dkg_start_event_rx.select_next_some() => {
-                    self.process_dkg_start_event(dkg_start_event).await
+                    self.process_dkg_start_event(dkg_start_event.ok()).await
                 },
                 (_sender, msg) = rpc_msg_rx.select_next_some() => {
                     self.process_peer_rpc_msg(msg).await
@@ -203,7 +212,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                     &public_params,
                 );
 
-                let dkg_node = DKGNode::new(
+                let dkg_transcript = DKGTranscript::new(
                     self.epoch_state.epoch,
                     self.my_addr,
                     DKG::serialize_transcript(&trx),
@@ -221,7 +230,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                 InnerState::InProgress {
                     start_time_us,
                     public_params,
-                    my_node: dkg_node,
+                    my_transcript: dkg_transcript,
                     abort_handle,
                 }
             },
@@ -236,11 +245,11 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         self.state = match std::mem::take(&mut self.state) {
             InnerState::InProgress {
                 start_time_us,
-                my_node,
+                my_transcript: my_node,
                 ..
             } => {
                 // TODO(zjma): metric DKG_AGG_NODE_READY
-                let txn = ValidatorTransaction::DKGResult(DKGNode {
+                let txn = ValidatorTransaction::DKGResult(DKGTranscript {
                     metadata: DKGTranscriptMetadata {
                         epoch: self.epoch_state.epoch,
                         author: self.my_addr,
@@ -250,7 +259,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                 self.vtxn_pool_write_cli.put(Some(Arc::new(txn)));
                 InnerState::Finished {
                     start_time_us,
-                    my_node,
+                    my_transcript: my_node,
                     pull_confirmed: false,
                 }
             },
@@ -260,15 +269,17 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     }
 
     /// On a DKG start event, execute DKG.
-    async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
-        let DKGStartEvent {
-            target_epoch,
-            start_time_us,
-            target_validator_set,
-        } = event;
-        ensure!(self.epoch_state.epoch + 1 == target_epoch);
-        self.setup_deal_broadcast(start_time_us, &target_validator_set)
-            .await?;
+    async fn process_dkg_start_event(&mut self, maybe_event: Option<DKGStartEvent>) -> Result<()> {
+        if let Some(event) = maybe_event {
+            let DKGStartEvent {
+                target_epoch,
+                start_time_us,
+                target_validator_set,
+            } = event;
+            ensure!(self.epoch_state.epoch + 1 == target_epoch);
+            self.setup_deal_broadcast(start_time_us, &target_validator_set)
+                .await?;
+        }
         Ok(())
     }
 
@@ -281,10 +292,20 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         } = req;
         ensure!(msg.epoch() == self.epoch_state.epoch);
         let response = match (&self.state, &msg) {
-            (InnerState::Finished { my_node, .. }, DKGMessage::NodeRequest(_))
-            | (InnerState::InProgress { my_node, .. }, DKGMessage::NodeRequest(_)) => {
-                Ok(DKGMessage::NodeResponse(my_node.clone()))
-            },
+            (
+                InnerState::Finished {
+                    my_transcript: my_node,
+                    ..
+                },
+                DKGMessage::NodeRequest(_),
+            )
+            | (
+                InnerState::InProgress {
+                    my_transcript: my_node,
+                    ..
+                },
+                DKGMessage::NodeRequest(_),
+            ) => Ok(DKGMessage::NodeResponse(my_node.clone())),
             _ => Err(anyhow!(
                 "msg {:?} unexpected in state {:?}",
                 msg.name(),

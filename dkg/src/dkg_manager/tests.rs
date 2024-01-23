@@ -5,7 +5,7 @@ use crate::{
     dkg_manager::{DKGManager, InnerState},
     dummy_dkg::{DummyDKG, DummyDKGTranscript},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
-    types::DKGNodeRequest,
+    types::DKGTranscriptRequest,
     DKGMessage,
 };
 use aptos_crypto::{
@@ -14,7 +14,7 @@ use aptos_crypto::{
 };
 use aptos_infallible::RwLock;
 use aptos_types::{
-    dkg::{DKGNode, DKGStartEvent, DKGTrait, DKGTranscriptMetadata},
+    dkg::{DKGStartEvent, DKGTrait, DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     on_chain_config::ValidatorSet,
     validator_config::ValidatorConfig,
@@ -81,15 +81,15 @@ async fn test_dkg_state_transition() {
     // In state `NotStarted`, DKGManager should accept `DKGStartEvent`:
     // it should record start time, compute its own node, and enter state `InProgress`.
     let handle_result = dkg_manager
-        .process_dkg_start_event(DKGStartEvent {
+        .process_dkg_start_event(Some(DKGStartEvent {
             target_epoch: 1000,
             start_time_us: 1700000000000000,
             target_validator_set: validator_set.clone(), // No validator set change!
-        })
+        }))
         .await;
     assert!(handle_result.is_ok());
     assert!(
-        matches!(&dkg_manager.state, InnerState::InProgress { start_time_us, my_node, .. } if *start_time_us == 1700000000000000 && my_node.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
+        matches!(&dkg_manager.state, InnerState::InProgress { start_time_us, my_transcript, .. } if *start_time_us == 1700000000000000 && my_transcript.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
     );
 
     // In state `InProgress`, DKGManager should respond to `DKGNodeRequest` with its own node.
@@ -122,7 +122,7 @@ async fn test_dkg_state_transition() {
         )
         .await;
     assert_eq!(
-        vec![ValidatorTransaction::DKGResult(DKGNode {
+        vec![ValidatorTransaction::DKGResult(DKGTranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: 999,
                 author: addrs[0],
@@ -155,7 +155,7 @@ fn new_rpc_node_request(
     response_collector: Arc<RwLock<Vec<anyhow::Result<DKGMessage>>>>,
 ) -> IncomingRpcRequest {
     IncomingRpcRequest {
-        msg: DKGMessage::NodeRequest(DKGNodeRequest::new(epoch)),
+        msg: DKGMessage::NodeRequest(DKGTranscriptRequest::new(epoch)),
         sender,
         response_sender: Box::new(DummyRpcResponseSender::new(response_collector)),
     }

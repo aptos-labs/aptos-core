@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    agg_trx_producer::RealAggTranscriptProducer,
+    agg_trx_producer::AggTranscriptProducer,
     dkg_manager::DKGManager,
     dummy_dkg::DummyDKG,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
@@ -16,7 +16,7 @@ use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
@@ -49,9 +49,10 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     vtxn_pull_notification_rx_from_pool: vtxn_pool::PullNotificationReceiver,
 
     // Msgs to DKG manager
-    dkg_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
+    dkg_rpc_msg_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-    dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
+    dkg_start_event_tx: Option<oneshot::Sender<DKGStartEvent>>,
     vtxn_pull_notification_tx_to_dkgmgr: Option<vtxn_pool::PullNotificationSender>,
     vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
 
@@ -96,21 +97,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if Some(dkg_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
             // Forward to DKGManager if it is alive.
             if let Some(tx) = &self.dkg_rpc_msg_tx {
-                let _ = tx.push((), (peer_id, dkg_request));
+                let _ = tx.push(peer_id, (peer_id, dkg_request));
             }
         }
         Ok(())
     }
 
     fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
-        let EventNotification {
-            subscribed_events, ..
-        } = notification;
-        for event in subscribed_events {
-            let dkg_start_event = DKGStartEvent::try_from(&event).unwrap();
-            // Forward to DKGManager if it is alive.
-            if let Some(tx) = self.dkg_start_event_tx.as_ref() {
-                let _ = tx.push((), dkg_start_event);
+        if let Some(tx) = self.dkg_start_event_tx.take() {
+            let EventNotification {
+                subscribed_events, ..
+            } = notification;
+            for event in subscribed_events {
+                if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
+                    let _ = tx.send(dkg_start_event);
+                    return Ok(());
+                } else {
+                    debug!("[DKG] on_dkg_start_notification: failed in converting a contract event to a dkg start event!");
+                }
             }
         }
         Ok(())
@@ -190,14 +194,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Duration::from_millis(1000),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
-            let agg_trx_producer = RealAggTranscriptProducer::new(rb);
+            let agg_trx_producer = AggTranscriptProducer::new(rb);
 
-            let (dkg_start_event_tx, dkg_start_event_rx) =
-                aptos_channel::new(QueueStyle::KLAST, 1, None);
+            let (dkg_start_event_tx, dkg_start_event_rx) = oneshot::channel();
             self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
-                (),
+                AccountAddress,
                 (AccountAddress, IncomingRpcRequest),
             >(QueueStyle::FIFO, 100, None);
             self.dkg_rpc_msg_tx = Some(dkg_rpc_msg_tx);

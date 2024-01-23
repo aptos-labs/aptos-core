@@ -4,7 +4,7 @@
 use crate::dummy_dkg::DummyDKG;
 #[cfg(test)]
 use crate::dummy_dkg::DummyDKGTranscript;
-use crate::{types::DKGNodeRequest, DKGMessage};
+use crate::{types::DKGTranscriptRequest, DKGMessage};
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 #[cfg(test)]
@@ -18,7 +18,7 @@ use aptos_types::validator_verifier::ValidatorConsensusInfo;
 #[cfg(test)]
 use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{
-    dkg::{DKGNode, DKGTrait},
+    dkg::{DKGTrait, DKGTranscript},
     epoch_state::EpochState,
 };
 use move_core_types::account_address::AccountAddress;
@@ -80,7 +80,7 @@ fn test_transcript_aggregation_state() {
     let good_trx_bytes = bcs::to_bytes(&good_transcript).unwrap();
 
     // Node with incorrect epoch should be rejected.
-    let result = trx_agg_state.add(addrs[0], DKGNode {
+    let result = trx_agg_state.add(addrs[0], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 998,
             author: addrs[0],
@@ -90,7 +90,7 @@ fn test_transcript_aggregation_state() {
     assert!(result.is_err());
 
     // Node authored by X but sent by Y should be rejected.
-    let result = trx_agg_state.add(addrs[1], DKGNode {
+    let result = trx_agg_state.add(addrs[1], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[0],
@@ -102,7 +102,7 @@ fn test_transcript_aggregation_state() {
     // Node with invalid transcript should be rejected.
     let mut bad_trx_bytes = good_trx_bytes.clone();
     bad_trx_bytes[0] = 0xAB;
-    let result = trx_agg_state.add(addrs[2], DKGNode {
+    let result = trx_agg_state.add(addrs[2], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[2],
@@ -112,7 +112,7 @@ fn test_transcript_aggregation_state() {
     assert!(result.is_err());
 
     // Good node should be accepted.
-    let result = trx_agg_state.add(addrs[3], DKGNode {
+    let result = trx_agg_state.add(addrs[3], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[3],
@@ -122,7 +122,7 @@ fn test_transcript_aggregation_state() {
     assert!(matches!(result, Ok(None)));
 
     // Node from contributed author should be ignored.
-    let result = trx_agg_state.add(addrs[3], DKGNode {
+    let result = trx_agg_state.add(addrs[3], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[3],
@@ -132,7 +132,7 @@ fn test_transcript_aggregation_state() {
     assert!(matches!(result, Ok(None)));
 
     // Aggregated trx should be returned if after adding a node, the threshold is exceeded.
-    let result = trx_agg_state.add(addrs[4], DKGNode {
+    let result = trx_agg_state.add(addrs[4], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[4],
@@ -144,14 +144,18 @@ fn test_transcript_aggregation_state() {
 
 impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState<S>> {
     type Aggregated = S::Transcript;
-    type Message = DKGNodeRequest;
-    type Response = DKGNode;
+    type Message = DKGTranscriptRequest;
+    type Response = DKGTranscript;
 
-    fn add(&self, sender: Author, dkg_node: DKGNode) -> anyhow::Result<Option<Self::Aggregated>> {
-        let DKGNode {
+    fn add(
+        &self,
+        sender: Author,
+        dkg_transcript: DKGTranscript,
+    ) -> anyhow::Result<Option<Self::Aggregated>> {
+        let DKGTranscript {
             metadata,
             transcript_bytes,
-        } = dkg_node;
+        } = dkg_transcript;
         ensure!(
             metadata.epoch == self.epoch_state.epoch,
             "adding dkg node failed with invalid node epoch",
