@@ -280,6 +280,87 @@ impl ControlFlowGraphCodeGenerator {
 	}
 }
 
+struct RemoveRedundantJump(pub ControlFlowGraphCodeGenerator);
+
+impl RemoveRedundantJump {
+    /// Wrapper
+    pub fn new(cfg_generator: ControlFlowGraphCodeGenerator) -> Self {
+        Self(cfg_generator)
+    }
+
+    pub fn transform(&mut self) {
+        for block in self.cfg.blocks() {
+            // the later condition says that `block` is unreachable or has been removed
+            if self.is_trivial_block(block) || !self.pred_map.contains_key(&block) {
+                continue;
+            }
+            self.transform_edges_from(block)
+        }
+    }
+
+    /// Requires: `block` still in the cfg
+    fn transform_edges_from(&mut self, block: BlockId) {
+        for suc in self.cfg.successors(block).clone() {
+            if self.remove_jump_if_possible(block, suc) {
+                // successors of `block` changes
+                self.transform_edges_from(block);
+            }
+        }
+    }
+
+    /// An edge can be removed if `from` has only one successor, and `to` has only one predecessor
+    fn can_remove_edge(&self, from: BlockId, to: BlockId) -> bool {
+        debug_assert!(!self.is_trivial_block(from));
+        debug_assert!(!self.is_trivial_block(to));
+        self.cfg.successors(from).len() == 1
+            && self.pred_map.get(&to).map_or(0, |preds| preds.len()) == 1
+    }
+
+    /// If possible, append `to` to `from` and remove `to` block
+    fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
+        debug_assert!(from != to);
+        debug_assert!(self.cfg.successors(from).contains(&to));
+        if !self.can_remove_edge(from, to) {
+            return false;
+        }
+        let mut to_codes = self.code_blocks.remove(&to).expect("codes");
+        if matches!(to_codes.first().expect("first instruction"), Bytecode::Label(..)) {
+            to_codes.remove(0);
+        }
+        let from_codes = self.code_blocks.get_mut(&from).expect("codes");
+        if matches!(from_codes.last().expect("last instruction"), Bytecode::Jump(..)) {
+            from_codes.pop();
+        }
+        from_codes.append(&mut to_codes);
+        self.cfg.successors_mut(from).clear();
+        // for all successors of `to`, update their preds of `to` to `from`
+        for suc_of_to in self.cfg.successors(to).clone() {
+            // successors of `from` becomes successors of `to`
+            self.cfg.successors_mut(from).push(suc_of_to);
+            for pred in self.pred_map.get_mut(&to).expect("predecessors") {
+                if *pred == to {
+                    *pred = from;
+                }
+            }
+        }
+        true
+    }
+}
+
+impl Deref for RemoveRedundantJump {
+    type Target = ControlFlowGraphCodeGenerator;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for RemoveRedundantJump {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// Computes the map from a blcok to its predecessors
 fn pred_map(cfg: &StacklessControlFlowGraph) -> BTreeMap<BlockId, Vec<BlockId>> {
     let mut pred_map = BTreeMap::new();
