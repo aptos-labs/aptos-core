@@ -5,6 +5,7 @@
 mod db;
 pub mod db_v2;
 mod metadata;
+mod metadata_v2;
 mod schema;
 
 use crate::{

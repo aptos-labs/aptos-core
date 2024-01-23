@@ -843,6 +843,19 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Returns the last db snapshot restored from gcs timestamp for indexer async v2
+    /// It is mainly used by table info service to whether to start syncing from the next_version directly
+    /// or to restore db snapshot from gcs
+    fn get_indexer_async_v2_restore_timestamp(&self) -> Result<Version> {
+        gauged_api("get_indexer_async_v2_restore_timestamp", || {
+            Ok(self
+                .indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.restore_timestamp())
+                .unwrap_or(0))
+        })
+    }
+
     fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool> {
         gauged_api("is_indexer_async_v2_pending_on_empty", || {
             Ok(self

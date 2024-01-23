@@ -36,7 +36,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use thiserror::Error;
 
 pub mod async_proof_fetcher;
@@ -456,6 +456,9 @@ pub trait DbReader: Send + Sync {
         /// Returns the next version which internal indexer async v2 DB should parse
         fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
 
+        /// Returns the timestamp which internal indexer async v2 DB was last restored
+        fn get_indexer_async_v2_restore_timestamp(&self) -> Result<u64>;
+
         /// Returns boolean whether indexer async v2 pending on items are empty
         /// if so, the whole batches are processed completely, if not, need to retry
         fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool>;
@@ -600,10 +603,11 @@ pub trait DbWriter: Send + Sync {
         unimplemented!()
     }
 
-    fn create_checkpoint(
-        &self,
-        path: PathBuf,
-    ) -> Result<()> {
+    fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn update_last_restored_timestamp(&self, restore_timestamp: u64) -> Result<()> {
         unimplemented!()
     }
 }

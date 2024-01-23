@@ -240,7 +240,19 @@ impl DbWriter for AptosDB {
         })
     }
 
-    fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
+    /// Update last restored timestamp when indexer async v2 db successfully restores
+    /// db from gcs, this timestamp is used to determine if restore is too frequent and
+    /// instead use next version to start syncing instead
+    fn update_last_restored_timestamp(&self, restore_timestamp: u64) -> Result<()> {
+        gauged_api("update_last_restored_timestamp", || {
+            self.indexer_async_v2
+                .as_ref()
+                .map(|indexer| indexer.update_last_restored_timestamp(restore_timestamp))
+                .unwrap_or(Ok(()))
+        })
+    }
+
+    fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {
         gauged_api("create_checkpoint", || {
             self.indexer_async_v2
                 .as_ref()

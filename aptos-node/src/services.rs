@@ -52,7 +52,7 @@ pub fn bootstrap_api_and_indexer(
     let (mempool_client_sender, mempool_client_receiver) =
         mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let indexer_table_info = bootstrap_indexer_table_info(
+    let indexer_table_info_runtime = bootstrap_indexer_table_info(
         node_config,
         chain_id,
         db_rw.clone(),
@@ -90,7 +90,7 @@ pub fn bootstrap_api_and_indexer(
     Ok((
         mempool_client_receiver,
         api_runtime,
-        indexer_table_info,
+        indexer_table_info_runtime,
         indexer_runtime,
         indexer_grpc,
     ))

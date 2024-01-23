@@ -16,11 +16,11 @@ anyhow = { workspace = true }
 aptos-rocksdb-options = { workspace = true }
 base64 = { workspace = true }
 bytes = { workspace = true }
-cloud-storage = { workspace = true }
 chrono = { workspace = true }
 fail = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
+google-cloud-storage = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-resource-viewer = { workspace = true }
@@ -49,6 +49,7 @@ aptos-sdk = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-schemadb = { workspace = true }
 
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
@@ -58,6 +59,7 @@ move-package = { workspace = true }
 goldenfile = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
+tempfile = { workspace = true }
 
 aptos-api-test-context = { workspace = true }
 aptos-crypto = { workspace = true }

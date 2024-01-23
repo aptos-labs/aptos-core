@@ -6,9 +6,9 @@
 /// from storage critical path to indexer, the other file will be removed
 /// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
 use crate::{
-    metadata::{MetadataKey, MetadataValue},
+    metadata_v2::{MetadataKey, MetadataValue},
     schema::{
-        column_families, indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema,
+        column_families_v2, indexer_metadata_v2::IndexerMetadataSchema, table_info::TableInfoSchema,
     },
 };
 use aptos_config::config::RocksdbConfig;
@@ -39,13 +39,14 @@ use move_core_types::{
 use move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
 use std::{
     collections::{BTreeMap, HashMap},
+    fs,
+    path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
     },
-    time::Duration, path::PathBuf, fs,
+    time::Duration,
 };
-
 
 pub const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
@@ -55,6 +56,8 @@ pub struct IndexerAsyncV2 {
     db: DB,
     // Next version to be processed
     next_version: AtomicU64,
+    // DB snapshot most recently restored from gcs timestamp
+    restore_timestamp: AtomicU64,
     // It is used in the context of processing write ops and extracting table information.
     // As the code iterates through the write ops, it checks if the state key corresponds to a table item.
     // If it does, the associated bytes are added to the pending_on map under the corresponding table handle.
@@ -77,17 +80,22 @@ impl IndexerAsyncV2 {
         let db = DB::open(
             db_path,
             "index_asnync_v2_db",
-            column_families(),
+            column_families_v2(),
             &gen_rocksdb_options(&rocksdb_config, false),
         )?;
 
         let next_version = db
             .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)?
             .map_or(0, |v| v.expect_version());
+        info!(next_version_init = next_version);
+        let restore_timestamp = db
+            .get::<IndexerMetadataSchema>(&MetadataKey::RestoreTimestamp)?
+            .map_or(0, |v| v.last_restored_timestamp());
 
         Ok(Self {
             db,
             next_version: AtomicU64::new(next_version),
+            restore_timestamp: AtomicU64::new(restore_timestamp),
             pending_on,
         })
     }
@@ -162,6 +170,18 @@ impl IndexerAsyncV2 {
         Ok(())
     }
 
+    pub fn update_last_restored_timestamp(&self, restore_timestamp: u64) -> Result<()> {
+        let batch = SchemaBatch::new();
+        batch.put::<IndexerMetadataSchema>(
+            &MetadataKey::RestoreTimestamp,
+            &MetadataValue::Timestamp(restore_timestamp),
+        )?;
+        self.db.write_schemas(batch)?;
+        self.restore_timestamp
+            .store(restore_timestamp, Ordering::Relaxed);
+        Ok(())
+    }
+
     /// Finishes the parsing process and writes the parsed table information to a SchemaBatch.
     pub fn finish_table_info_parsing(
         &self,
@@ -202,7 +222,23 @@ impl IndexerAsyncV2 {
     }
 
     pub fn next_version(&self) -> Version {
-        self.next_version.load(Ordering::Relaxed)
+        match self
+            .db
+            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)
+        {
+            Ok(Some(value)) => value.expect_version(),
+            _ => 0, // Returns 0 if there's no value or an error
+        }
+    }
+
+    pub fn restore_timestamp(&self) -> u64 {
+        match self
+            .db
+            .get::<IndexerMetadataSchema>(&MetadataKey::RestoreTimestamp)
+        {
+            Ok(Some(value)) => value.last_restored_timestamp(),
+            _ => 0, // Returns 0 if there's no value or an error
+        }
     }
 
     pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
@@ -229,14 +265,9 @@ impl IndexerAsyncV2 {
         self.pending_on.is_empty()
     }
 
-    pub fn create_checkpoint(&self, path: PathBuf) -> Result<()> {
-        if path.exists() {
-            fs::remove_dir_all(&path)?;
-        }
-        if !path.exists() {
-            fs::create_dir_all(&path)?;
-        }
-        self.db.create_checkpoint(path.as_path())
+    pub fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {
+        fs::remove_dir_all(path).unwrap_or(());
+        self.db.create_checkpoint(path)
     }
 }
 
