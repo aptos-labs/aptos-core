@@ -886,3 +886,11 @@ pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBloc
         }
     }
 }
+
+pub static EPOCH_PROOF_WRONG_EPOCH: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_proof_wrong_epoch",
+        "Count of the number of epoch proofs received for the wrong epoch",
+    )
+    .unwrap()
+});
