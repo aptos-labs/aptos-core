@@ -47,7 +47,7 @@ pub fn generate_ast(
         .project
         .move_sources
         .iter()
-        .map(|p| p.to_str().expect("Source path contains invalid characters"))
+        .map(|p| p.to_str().expect("source path contains invalid characters"))
         .collect::<Vec<_>>();
 
     // If -m option is specified we should use only `move_sources`. However, if `move_sources` is empty
@@ -91,7 +91,7 @@ pub fn generate_ast(
     .set_interface_files_dir(
         interface_files_dir
             .to_str()
-            .expect("Output path contains invalid characters.")
+            .expect("output path contains invalid characters")
             .to_string(),
     )
     .run::<PASS_PARSER>()?;
