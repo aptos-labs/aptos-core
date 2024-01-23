@@ -115,6 +115,11 @@ impl PendingVotes {
                 vote.vote_data().proposed().timestamp_usecs(),
                 BlockStage::FIRST_VOTE_RECEIVED,
             );
+        } else if self.author_to_vote.len() == 1 {
+            observe_block(
+                vote.vote_data().proposed().timestamp_usecs(),
+                BlockStage::SECOND_VOTE_RECEIVED,
+            );
         }
 
         //
