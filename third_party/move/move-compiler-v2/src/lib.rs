@@ -37,7 +37,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use pipeline::{
-    eliminate_empty_blocks_processor::ControlFlowGraphSimplifier,
+    control_flow_graph_simplifier::ControlFlowGraphSimplifier,
     split_critical_edges_processor::SplitCriticalEdgesProcessor,
 };
 use std::{collections::BTreeSet, path::Path};
