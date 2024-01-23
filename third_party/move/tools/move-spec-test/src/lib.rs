@@ -1,5 +1,6 @@
 pub mod cli;
 mod prover;
+mod report;
 
 extern crate pretty_env_logger;
 #[macro_use]
@@ -77,12 +78,11 @@ pub fn run_spec_test(
         return Err(anyhow!(msg));
     }
 
-    // TODO: change this to report generation
-    let mut total_mutants = 0;
-    let mut killed_mutants = 0;
+    let mut spec_report = report::Report::new();
 
     for elem in report.get_mutants() {
-        total_mutants += 1;
+        spec_report.increment_mutants_tested(&elem.original_file_path());
+
         let mutant_file = elem.mutant_path();
         // Strip prefix to get the path relative to the package directory (or take that path if it's already relative).
         let original_file = elem
@@ -110,14 +110,19 @@ pub fn run_spec_test(
 
         if let Err(e) = result {
             trace!("Mutant killed! Prover failed with error: {e}");
-            killed_mutants += 1;
+            spec_report.increment_mutants_killed(&elem.original_file_path());
         } else {
             trace!("Mutant hasn't been killed!");
         }
     }
 
-    println!("Total mutants: {total_mutants}");
-    println!("Killed mutants: {killed_mutants}");
+    if let Some(outfile) = &options.output {
+        spec_report.save_to_json_file(outfile)?;
+    }
+
+    println!("\nTotal mutants tested: {}", spec_report.mutants_tested());
+    println!("Total mutants killed: {}\n", spec_report.mutants_killed());
+    spec_report.print_table();
 
     Ok(())
 }
