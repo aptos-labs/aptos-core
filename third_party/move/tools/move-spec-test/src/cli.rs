@@ -21,6 +21,9 @@ pub struct CLIOptions {
     /// Optional configuration file for prover tool.
     #[clap(long, value_parser)]
     pub prover_conf: Option<PathBuf>,
+    /// Optional configuration file for prover tool.
+    #[clap(short, long, value_parser)]
+    pub output: Option<PathBuf>,
     /// Extra arguments to pass to the prover.
     #[clap(long, value_parser)]
     pub extra_prover_args: Option<Vec<String>>,
@@ -67,4 +70,72 @@ pub fn check_mutator_output_path(options: &move_mutator::cli::CLIOptions) -> Opt
     };
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn cli_options_starts_empty() {
+        let options = CLIOptions::default();
+        assert!(options.move_sources.is_empty());
+        assert!(options.include_only_files.is_none());
+        assert!(options.exclude_files.is_none());
+        assert!(options.mutator_conf.is_none());
+        assert!(options.prover_conf.is_none());
+        assert!(options.output.is_none());
+        assert!(options.extra_prover_args.is_none());
+    }
+
+    #[test]
+    fn create_mutator_options_copies_fields() {
+        let mut options = CLIOptions::default();
+        options.move_sources.push(PathBuf::from("path/to/file"));
+        options.include_only_files = Some(vec![PathBuf::from("path/to/include")]);
+        options.exclude_files = Some(vec![PathBuf::from("path/to/exclude")]);
+        options.mutator_conf = Some(PathBuf::from("path/to/mutator/conf"));
+
+        let mutator_options = create_mutator_options(&options);
+
+        assert_eq!(mutator_options.move_sources, options.move_sources);
+        assert_eq!(
+            mutator_options.include_only_files,
+            options.include_only_files
+        );
+        assert_eq!(mutator_options.exclude_files, options.exclude_files);
+        assert_eq!(mutator_options.configuration_file, options.mutator_conf);
+    }
+
+    #[test]
+    fn check_mutator_output_path_returns_none_when_no_conf() {
+        let options = move_mutator::cli::CLIOptions::default();
+        assert!(check_mutator_output_path(&options).is_none());
+    }
+
+    #[test]
+    fn check_mutator_output_path_returns_path_when_conf_exists() {
+        let json_content = r#"
+            {
+                "project": {
+                    "move_sources": ["/path/to/move/source"],
+                    "out_mutant_dir": "path/to/out_mutant_dir"
+                },
+                "project_path": "/path/to/project"
+            }
+        "#;
+
+        fs::write("test_mutator_conf.json", json_content).unwrap();
+
+        let mut options = move_mutator::cli::CLIOptions::default();
+        options.configuration_file = Some(PathBuf::from("test_mutator_conf.json"));
+
+        let path = check_mutator_output_path(&options);
+        fs::remove_file("test_mutator_conf.json").unwrap();
+
+        assert!(path.is_some());
+        assert_eq!(path.unwrap(), PathBuf::from("path/to/out_mutant_dir"));
+    }
 }
