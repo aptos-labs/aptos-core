@@ -81,12 +81,6 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
-PartialAuthenticatorAssertionResponse:
-  STRUCT:
-    - signature:
-        TYPENAME: AssertionSignature
-    - authenticator_data: BYTES
-    - client_data_json: BYTES
 AssertionSignature:
   ENUM:
     0:
@@ -97,6 +91,25 @@ AssertionSignature:
 BitVec:
   STRUCT:
     - inner: BYTES
+BlockEndInfo:
+  STRUCT:
+    - block_gas_limit_reached: BOOL
+    - block_output_limit_reached: BOOL
+    - block_effective_block_gas_units: U64
+    - block_approx_output_size: U64
+BlockEpiloguePayload:
+  ENUM:
+    0:
+      BlockId:
+        NEWTYPE:
+          TYPENAME: HashValue
+    1:
+      WithBlockEndInfo:
+        STRUCT:
+          - block_id:
+              TYPENAME: HashValue
+          - block_end_info:
+              TYPENAME: BlockEndInfo
 BlockMetadata:
   STRUCT:
     - id:
@@ -260,6 +273,12 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+PartialAuthenticatorAssertionResponse:
+  STRUCT:
+    - signature:
+        TYPENAME: AssertionSignature
+    - authenticator_data: BYTES
+    - client_data_json: BYTES
 Path:
   ENUM:
     0:
@@ -383,6 +402,10 @@ Transaction:
       ValidatorTransaction:
         NEWTYPE:
           TYPENAME: ValidatorTransaction
+    5:
+      BlockEpilogue:
+        NEWTYPE:
+          TYPENAME: BlockEpiloguePayload
 TransactionArgument:
   ENUM:
     0:
