@@ -7,7 +7,7 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    transaction::{Transaction, TransactionStatus, WriteSetPayload, ChangeSet},
+    transaction::{ChangeSet, Transaction, TransactionStatus, WriteSetPayload},
     write_set::TransactionWrite,
 };
 use move_core_types::vm_status::StatusCode;
@@ -53,8 +53,7 @@ fn execute_genesis_and_drop_other_transaction() {
 #[test]
 fn fail_no_epoch_change_write_set() {
     let mut executor = FakeExecutor::no_genesis();
-    let txn =
-        Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::empty()));
+    let txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::empty()));
 
     let sender = executor.create_raw_account_data(1_000_000, 10);
     let receiver = executor.create_raw_account_data(100_000, 10);

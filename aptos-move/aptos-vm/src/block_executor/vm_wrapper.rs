@@ -90,13 +90,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
-                    if (executor_with_group_view.is_delayed_field_optimization_capable()
-                        || executor_with_group_view.is_resource_group_split_in_change_set_capable())
-                        && !Self::is_transaction_dynamic_change_set_capable(txn)
-                    {
-                        return ExecutionStatus::DirectWriteSetTransactionNotCapableError;
-                    }
-
+                    assert!(
+                        Self::is_transaction_dynamic_change_set_capable(txn),
+                        "DirectWriteSet should always create SkipRest transaction, validate_waypoint_change_set provides this guarantee"
+                    );
                     ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },

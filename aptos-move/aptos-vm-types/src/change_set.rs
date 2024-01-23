@@ -232,22 +232,22 @@ impl VMChangeSet {
 
     /// Builds a new change set from the storage representation.
     ///
+    /// **WARNING**: this creates a write set that assumes dynamic change set optimizations to be disabled.
+    /// this needs to be applied directly to storage, you cannot get appropriate reads from this in a
+    /// dynamic change set optimization enabled context.
+    /// We have two dynamic change set optimizations, both there to reduce conflicts between transactions:
+    ///  - exchanging delayed fields and leaving their materialization to happen at the end
+    ///  - unpacking resource groups and treating each resource inside it separately
+    ///
     /// **WARNING**: Has complexity O(#write_ops) because we need to iterate
     /// over blobs and split them into resources or modules. Only used to
     /// support transactions with write-set payload.
     ///
     /// Note: does not separate out individual resource group updates.
-    pub fn try_from_storage_change_set(
+    pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
-        // Pass in within which resolver context are we creating this change set.
-        // Used to eagerly reject changes created in an incompatible way.
-        is_delayed_field_optimization_capable: bool,
     ) -> VMResult<Self> {
-        assert!(
-            !is_delayed_field_optimization_capable,
-            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
-
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -271,9 +271,6 @@ impl VMChangeSet {
         // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
-            // TODO[agg_v2](fix): do we use same or different capable flag for resource groups?
-            // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_capable
-            // context (i.e. if dynamic_change_set_optimizations_enabled is disabled)
             resource_write_set,
             module_write_set,
             delayed_field_change_set: BTreeMap::new(),

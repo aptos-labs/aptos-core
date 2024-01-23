@@ -1649,20 +1649,24 @@ impl AptosVM {
 
         match write_set_payload {
             WriteSetPayload::Direct(change_set) => {
-                let change = VMChangeSet::try_from_storage_change_set(
+                // this transaction is never delayed field capable.
+                // it requires restarting execution afterwards,
+                // which allows it to be used as last transaction in delayed_field_enabled context.
+                let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
                     change_set.clone(),
                     &change_set_configs,
-                    // this transaction is never delayed field capable.
-                    // it is required it requires restarting execution afterwards,
-                    // which allows it to be used as last transaction in delayed_field_enabled context.
-                    false,
                 )
                 .map_err(|e| e.into_vm_status())?;
 
                 // validate_waypoint_change_set checks that this is true, so we only log here.
                 if !Self::should_restart_execution(&change) {
+                    // This invariant needs to hold irrespectively, so we log error always.
+                    // but if we are in delayed_field_optimization_capable context, we cannot execute any transaction after this.
+                    // as transaction afterwards would be executed assuming delayed fields are exchanged and
+                    // resource groups are split, but WriteSetPayload::Direct has materialized writes,
+                    // and so after executing this transaction versioned state is inconsistent.
                     error!(
-                        "[aptos_vm] direct write set in delayed_field_optimization_capable context finished without requiring should_restart_execution");
+                        "[aptos_vm] direct write set finished without requiring should_restart_execution");
                 }
 
                 Ok(change)

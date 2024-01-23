@@ -759,7 +759,6 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
-    pub(crate) dynamic_change_set_optimizations_enabled: bool,
     pub(crate) incorrect_use: RefCell<bool>,
 }
 
@@ -768,14 +767,12 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
         unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
-        dynamic_change_set_optimizations_enabled: bool,
     ) -> Self {
         Self {
             unsync_map,
             read_set: RefCell::new(UnsyncReadSet::default()),
             start_counter,
             counter,
-            dynamic_change_set_optimizations_enabled,
             incorrect_use: RefCell::new(false),
         }
     }
@@ -1570,7 +1567,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     fn is_resource_group_split_in_change_set_capable(&self) -> bool {
         match &self.latest_view {
             ViewState::Sync(_) => true,
-            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+            ViewState::Unsync(_) => true,
         }
     }
 }
@@ -1659,7 +1656,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     fn is_delayed_field_optimization_capable(&self) -> bool {
         match &self.latest_view {
             ViewState::Sync(_) => true,
-            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+            ViewState::Unsync(_) => true,
         }
     }
 
@@ -2638,12 +2635,7 @@ mod test {
         let start_counter = 5;
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            ViewState::Unsync(SequentialState::new(
-                &unsync_map,
-                start_counter,
-                &counter,
-                true,
-            )),
+            ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
         );
 
@@ -2878,15 +2870,9 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-        dynamic_change_set_optimizations_enabled: bool,
     ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable> {
         let sequential_state: SequentialState<'a, TestTransactionType, MockExecutable> =
-            SequentialState::new(
-                &h.unsync_map,
-                *h.counter.borrow(),
-                &h.counter,
-                dynamic_change_set_optimizations_enabled,
-            );
+            SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
         LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
             &h.base_view,
@@ -2923,7 +2909,7 @@ mod test {
         }
 
         fn new_view(&self) -> ViewsComparison<'_> {
-            let latest_view_seq = create_sequential_latest_view(&self.holder, true);
+            let latest_view_seq = create_sequential_latest_view(&self.holder);
             let latest_view_par =
                 LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
                     &self.base_view,
