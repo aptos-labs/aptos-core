@@ -333,6 +333,12 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
+    /// Whether deploying to objects is enabled.
+    const OBJECT_CODE_DEPLOYMENT: u64 = 48;
+    public fun is_object_code_deployment_enabled(): bool acquires Features {
+        is_enabled(OBJECT_CODE_DEPLOYMENT)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

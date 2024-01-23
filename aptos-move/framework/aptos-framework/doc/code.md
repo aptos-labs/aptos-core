@@ -19,6 +19,8 @@ This module supports functionality related to code management.
 -  [Function `can_change_upgrade_policy_to`](#0x1_code_can_change_upgrade_policy_to)
 -  [Function `initialize`](#0x1_code_initialize)
 -  [Function `publish_package`](#0x1_code_publish_package)
+-  [Function `is_package_upgradeable`](#0x1_code_is_package_upgradeable)
+-  [Function `freeze_package_registry`](#0x1_code_freeze_package_registry)
 -  [Function `publish_package_txn`](#0x1_code_publish_package_txn)
 -  [Function `check_upgradability`](#0x1_code_check_upgradability)
 -  [Function `check_coexistence`](#0x1_code_check_coexistence)
@@ -32,6 +34,8 @@ This module supports functionality related to code management.
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `publish_package`](#@Specification_1_publish_package)
+    -  [Function `is_package_upgradeable`](#@Specification_1_is_package_upgradeable)
+    -  [Function `freeze_package_registry`](#@Specification_1_freeze_package_registry)
     -  [Function `publish_package_txn`](#@Specification_1_publish_package_txn)
     -  [Function `check_upgradability`](#@Specification_1_check_upgradability)
     -  [Function `check_coexistence`](#@Specification_1_check_coexistence)
@@ -44,6 +48,7 @@ This module supports functionality related to code management.
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -353,6 +358,16 @@ Package contains duplicate module names with existing modules publised in other 
 
 
 
+<a id="0x1_code_ENOT_OWNER"></a>
+
+Not the owner of the package.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ENOT_OWNER">ENOT_OWNER</a>: u64 = 9;
+</code></pre>
+
+
+
 <a id="0x1_code_EPACKAGE_DEP_MISSING"></a>
 
 Dependency could not be resolved to any published package.
@@ -591,6 +606,63 @@ package.
     // The new `request_publish_with_allowed_deps` <b>has</b> not yet rolled out, so call downwards
     // compatible <a href="code.md#0x1_code">code</a>.
         <a href="code.md#0x1_code_request_publish">request_publish</a>(addr, module_names, <a href="code.md#0x1_code">code</a>, policy.policy)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_code_is_package_upgradeable"></a>
+
+## Function `is_package_upgradeable`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_is_package_upgradeable">is_package_upgradeable</a>(metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_is_package_upgradeable">is_package_upgradeable</a>(metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool {
+    <b>let</b> metadata = <a href="util.md#0x1_util_from_bytes">util::from_bytes</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(metadata_serialized);
+    metadata.upgrade_policy.policy &lt; <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>().policy
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_code_freeze_package_registry"></a>
+
+## Function `freeze_package_registry`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_package_registry">freeze_package_registry</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, registry: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_package_registry">freeze_package_registry</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, registry: Object&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <b>let</b> registry_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&registry);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(registry_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_EPACKAGE_DEP_MISSING">EPACKAGE_DEP_MISSING</a>));
+    <b>assert</b>!(<a href="object.md#0x1_object_is_owner">object::is_owner</a>(registry, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher)), <a href="code.md#0x1_code_ENOT_OWNER">ENOT_OWNER</a>);
+
+    <b>let</b> registry = <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(registry_addr);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(&<b>mut</b> registry.packages, |pack| {
+        <b>let</b> package: &<b>mut</b> <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = pack;
+        package.upgrade_policy = <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>();
+    });
 }
 </code></pre>
 
@@ -1004,6 +1076,44 @@ Native function to initiate module loading, including a list of allowed dependen
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
 <b>modifies</b> <b>global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr);
 <b>aborts_if</b> pack.upgrade_policy.policy &lt;= <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_package_upgradeable"></a>
+
+### Function `is_package_upgradeable`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_is_package_upgradeable">is_package_upgradeable</a>(metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> metadata = <a href="util.md#0x1_util_spec_from_bytes">util::spec_from_bytes</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(metadata_serialized);
+<b>ensures</b> result == (metadata.upgrade_policy.policy &lt; <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>().policy);
+</code></pre>
+
+
+
+<a id="@Specification_1_freeze_package_registry"></a>
+
+### Function `freeze_package_registry`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_package_registry">freeze_package_registry</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, registry: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> registry_addr = registry.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(registry_addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(registry_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_is_owner">object::is_owner</a>(registry, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher));
+<b>modifies</b> <b>global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(registry_addr);
 </code></pre>
 
 

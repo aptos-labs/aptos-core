@@ -11,6 +11,7 @@ module aptos_framework::code {
     use aptos_std::copyable_any::Any;
     use std::option::Option;
     use std::string;
+    use aptos_framework::object::{Self, Object};
 
     // ----------------------------------------------------------------------
     // Code Publishing
@@ -89,6 +90,9 @@ module aptos_framework::code {
 
     /// Creating a package with incompatible upgrade policy is disabled.
     const EINCOMPATIBLE_POLICY_DISABLED: u64 = 0x8;
+
+    /// Not the owner of the package.
+    const ENOT_OWNER: u64 = 0x9;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
@@ -183,6 +187,23 @@ module aptos_framework::code {
         // The new `request_publish_with_allowed_deps` has not yet rolled out, so call downwards
         // compatible code.
             request_publish(addr, module_names, code, policy.policy)
+    }
+
+    public fun is_package_upgradeable(metadata_serialized: vector<u8>): bool {
+        let metadata = util::from_bytes<PackageMetadata>(metadata_serialized);
+        metadata.upgrade_policy.policy < upgrade_policy_immutable().policy
+    }
+
+    public fun freeze_package_registry(publisher: &signer, registry: Object<PackageRegistry>) acquires PackageRegistry {
+        let registry_addr = object::object_address(&registry);
+        assert!(exists<PackageRegistry>(registry_addr), error::not_found(EPACKAGE_DEP_MISSING));
+        assert!(object::is_owner(registry, signer::address_of(publisher)), ENOT_OWNER);
+
+        let registry = borrow_global_mut<PackageRegistry>(registry_addr);
+        vector::for_each_mut<PackageMetadata>(&mut registry.packages, |pack| {
+            let package: &mut PackageMetadata = pack;
+            package.upgrade_policy = upgrade_policy_immutable();
+        });
     }
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because

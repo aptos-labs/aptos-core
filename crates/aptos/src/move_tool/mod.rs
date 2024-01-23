@@ -42,6 +42,7 @@ use aptos_rest_client::aptos_api_types::{
 };
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
+    object_address::create_object_code_deployment_address,
     transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
@@ -79,6 +80,8 @@ pub enum MoveTool {
     CompileScript(CompileScript),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
+    CreateObjectAndPublishPackage(CreateObjectAndPublishPackage),
+    UpgradeObjectPackage(UpgradeObjectPackage),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
     Disassemble(Disassemble),
     Document(DocumentPackage),
@@ -104,6 +107,10 @@ impl MoveTool {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::CompileScript(tool) => tool.execute_serialized().await,
             MoveTool::Coverage(tool) => tool.execute().await,
+            MoveTool::CreateObjectAndPublishPackage(tool) => {
+                tool.execute_serialized_success().await
+            },
+            MoveTool::UpgradeObjectPackage(tool) => tool.execute_serialized_success().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
@@ -850,6 +857,159 @@ impl CliCommand<String> for BuildPublishPayload {
             "Publication payload entry function JSON file saved to {}",
             save_file.output_file.display()
         ))
+    }
+}
+
+/// Publishes the modules in a Move package to the Aptos blockchain, under an object.
+#[derive(Parser)]
+pub struct CreateObjectAndPublishPackage {
+    /// The named address for compiling and using in the contract
+    ///
+    /// This will take the derived account address for the object and put it in this location
+    #[clap(long)]
+    pub(crate) address_name: String,
+    /// Whether to override the check for maximal size of published data
+    ///
+    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
+    /// will still be blocked from publishing.
+    #[clap(long)]
+    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
+    fn command_name(&self) -> &'static str {
+        "CreateObjectAndPublishPackage"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let sender_address = self.txn_options.get_public_key_and_address()?.1;
+        let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
+        let object_address = create_object_code_deployment_address(sender_address, sequence_number);
+
+        println!("{}", &self.address_name);
+        self.move_options
+            .add_named_address(self.address_name, object_address.to_string());
+
+        let options = self
+            .included_artifacts_args
+            .included_artifacts
+            .build_options(
+                self.move_options.dev,
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+                self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
+            );
+        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let message = format!(
+            "Do you want to publish this package under the object address {}",
+            object_address
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
+            bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS"),
+            package.extract_code(),
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+
+        if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included-artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        self.txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
+    }
+}
+
+#[derive(Parser)]
+pub struct UpgradeObjectPackage {
+    /// Address of the object containing the package
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) object_address: AccountAddress,
+    /// Whether to override the check for maximal size of published data
+    ///
+    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
+    /// will still be blocked from publishing.
+    #[clap(long)]
+    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
+    fn command_name(&self) -> &'static str {
+        "UpgradeObjectPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let options = self
+            .included_artifacts_args
+            .included_artifacts
+            .build_options(
+                self.move_options.dev,
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+                self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
+            );
+        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let compiled_metadata = package.extract_metadata()?;
+        if compiled_metadata.upgrade_policy == UpgradePolicy::immutable() {
+            return Err(CliError::CommandArgumentError(
+                "A package with upgrade policy `immutable` cannot be upgraded".to_owned(),
+            ));
+        }
+
+        let message = format!(
+            "Do you want to upgrade this package under the object address {}",
+            self.object_address
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
+            bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS"),
+            package.extract_code(),
+            self.object_address,
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+
+        if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included-artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        self.txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from)
     }
 }
 

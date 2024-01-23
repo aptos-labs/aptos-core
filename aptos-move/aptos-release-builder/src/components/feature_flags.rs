@@ -98,6 +98,7 @@ pub enum FeatureFlag {
     ReconfigureWithDKG,
     ZkIdSignature,
     OpenIdSignature,
+    ObjectCodeDeployment,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -254,6 +255,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
             FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURE,
             FeatureFlag::OpenIdSignature => AptosFeatureFlag::OPEN_ID_SIGNATURE,
+            FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
         }
     }
 }
@@ -333,6 +335,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
             AptosFeatureFlag::ZK_ID_SIGNATURE => FeatureFlag::ZkIdSignature,
             AptosFeatureFlag::OPEN_ID_SIGNATURE => FeatureFlag::OpenIdSignature,
+            AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
         }
     }
 }

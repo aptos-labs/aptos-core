@@ -569,6 +569,13 @@ pub enum EntryFunctionCall {
         to: AccountAddress,
     },
 
+    /// Create a new object to host the code, and `PublisherRef` if the code is upgradeable,
+    /// Send `PublisherRef` to object signer.
+    ObjectCodeDeploymentPublish {
+        metadata_serialized: Vec<u8>,
+        code: Vec<Vec<u8>>,
+    },
+
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
@@ -1234,6 +1241,10 @@ impl EntryFunctionCall {
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
+            ObjectCodeDeploymentPublish {
+                metadata_serialized,
+                code,
+            } => object_code_deployment_publish(metadata_serialized, code),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -2933,6 +2944,29 @@ pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> Trans
         ident_str!("transfer_call").to_owned(),
         vec![],
         vec![bcs::to_bytes(&object).unwrap(), bcs::to_bytes(&to).unwrap()],
+    ))
+}
+
+/// Create a new object to host the code, and `PublisherRef` if the code is upgradeable,
+/// Send `PublisherRef` to object signer.
+pub fn object_code_deployment_publish(
+    metadata_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("object_code_deployment").to_owned(),
+        ),
+        ident_str!("publish").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
+        ],
     ))
 }
 
@@ -4872,6 +4906,19 @@ mod decoder {
         }
     }
 
+    pub fn object_code_deployment_publish(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ObjectCodeDeploymentPublish {
+                metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                code: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5794,6 +5841,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_transfer_call".to_string(),
             Box::new(decoder::object_transfer_call),
+        );
+        map.insert(
+            "object_code_deployment_publish".to_string(),
+            Box::new(decoder::object_code_deployment_publish),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

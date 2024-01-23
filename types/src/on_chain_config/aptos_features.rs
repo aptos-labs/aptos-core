@@ -55,6 +55,7 @@ pub enum FeatureFlag {
     RECONFIGURE_WITH_DKG = 45,
     ZK_ID_SIGNATURE = 46,
     OPEN_ID_SIGNATURE = 47,
+    OBJECT_CODE_DEPLOYMENT = 48,
 }
 
 /// Representation of features on chain as a bitset.

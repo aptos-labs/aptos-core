@@ -116,4 +116,21 @@ spec aptos_framework::code {
         ensures [abstract] len(result) == len(pack.modules);
         ensures [abstract] forall i in 0..len(result): result[i] == pack.modules[i].name;
     }
+
+    spec is_package_upgradeable(metadata_serialized: vector<u8>): bool {
+        let metadata = util::spec_from_bytes<PackageMetadata>(metadata_serialized);
+        ensures result == (metadata.upgrade_policy.policy < upgrade_policy_immutable().policy);
+    }
+
+    spec freeze_package_registry(publisher: &signer, registry: Object<PackageRegistry>) {
+        // TODO: Can't verify 'vector::for_each_mut' loop.
+        pragma aborts_if_is_partial;
+
+        let registry_addr = registry.inner;
+        aborts_if !exists<object::ObjectCore>(registry_addr);
+        aborts_if !exists<PackageRegistry>(registry_addr);
+        aborts_if !object::is_owner(registry, signer::address_of(publisher));
+
+        modifies global<PackageRegistry>(registry_addr);
+    }
 }
