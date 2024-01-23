@@ -17,9 +17,9 @@ use move_stackless_bytecode::{
 };
 use std::collections::BTreeMap;
 
-pub struct EliminateEmptyBlocksProcessor {}
+pub struct ControlFlowGraphSimplifier {}
 
-impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
+impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
@@ -30,7 +30,7 @@ impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
         if fun_env.is_native() {
             return data;
         }
-        let mut transformer = EliminateEmptyBlocksTransformation::new(data);
+        let mut transformer = ControlFlowGraphSimplifierTransformation::new(data);
         transformer.transform();
         transformer.data
     }
@@ -40,12 +40,12 @@ impl FunctionTargetProcessor for EliminateEmptyBlocksProcessor {
     }
 }
 
-struct EliminateEmptyBlocksTransformation {
+struct ControlFlowGraphSimplifierTransformation {
     data: FunctionData,
     cfg_code_generator: ControlFlowGraphCodeGenerator,
 }
 
-impl EliminateEmptyBlocksTransformation {
+impl ControlFlowGraphSimplifierTransformation {
     pub fn new(data: FunctionData) -> Self {
         let cfg = StacklessControlFlowGraph::new_forward(&data.code);
         let cfg_code_generator = ControlFlowGraphCodeGenerator::new(cfg, &data.code);
