@@ -367,7 +367,7 @@ impl BlockStore {
         // because we may inject a block prologue transaction.
         let pipeline_result = self
             .state_computer
-            .compute(&block, block.parent_id())
+            .compute(&block, block.parent_id(), None)
             .await?;
         let PipelineExecutionResult { input_txns, result } = pipeline_result;
         Ok(ExecutedBlock::new(block, input_txns, result))
