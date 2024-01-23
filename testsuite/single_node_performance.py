@@ -23,9 +23,9 @@ class Flow(Flag):
     # (i.e. for measuring speed of the machine)
     REPRESENTATIVE = auto()
     # Tests used for previewnet evaluation
-    PREVIEWNET = auto()
+    MAINNET = auto()
     # Tests used for previewnet evaluation
-    PREVIEWNET_LARGE_DB = auto()
+    MAINNET_LARGE_DB = auto()
     # Tests for Agg V2 performance
     AGG_V2 = auto()
     # Test resource groups
@@ -58,12 +58,12 @@ class RunGroupConfig:
 
 
 SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
-IS_PREVIEWNET = SELECTED_FLOW in [Flow.PREVIEWNET, Flow.PREVIEWNET_LARGE_DB]
+IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.PREVIEWNET_LARGE_DB else "2000000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
 )
-DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_PREVIEWNET else "10000"
+DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
 NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
@@ -151,22 +151,22 @@ TESTS = [
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
 
     # setting separately for previewnet, as we run on a different number of cores.
-    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer", smaller_working_set=True), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=1500 if NUM_ACCOUNTS < 5000000 else 1500, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 7000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=100), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB),
-    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
-    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.PREVIEWNET | Flow.PREVIEWNET_LARGE_DB, waived=True),
+    RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer", smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=1500 if NUM_ACCOUNTS < 5000000 else 1500, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 7000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=100), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
+    RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
 # fmt: on
 
-NOISE_LOWER_LIMIT = 0.98 if IS_PREVIEWNET else 0.8
-NOISE_LOWER_LIMIT_WARN = None if IS_PREVIEWNET else 0.9
+NOISE_LOWER_LIMIT = 0.98 if IS_MAINNET else 0.8
+NOISE_LOWER_LIMIT_WARN = None if IS_MAINNET else 0.9
 # If you want to calibrate the upper limit for perf improvement, you can
 # increase this value temporarily (i.e. to 1.3) and readjust back after a day or two of runs
-NOISE_UPPER_LIMIT = 5 if IS_PREVIEWNET else 1.15
-NOISE_UPPER_LIMIT_WARN = None if IS_PREVIEWNET else 1.05
+NOISE_UPPER_LIMIT = 5 if IS_MAINNET else 1.15
+NOISE_UPPER_LIMIT_WARN = None if IS_MAINNET else 1.05
 
 # bump after a perf improvement, so you can easily distinguish runs
 # that are on top of this commit
