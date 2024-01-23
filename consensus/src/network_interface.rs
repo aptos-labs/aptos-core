@@ -26,9 +26,9 @@ use aptos_network::{
 };
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use rand::seq::SliceRandom;
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
