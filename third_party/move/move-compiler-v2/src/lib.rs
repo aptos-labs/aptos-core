@@ -192,13 +192,13 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
+    pipeline.add_processor(Box::new(EliminateEmptyBlocksProcessor {}));
     if safety_on {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }
     // The default optimization pipeline is currently always run by the compiler.
     add_default_optimization_pipeline(&mut pipeline);
-    pipeline.add_processor(Box::new(EliminateEmptyBlocksProcessor {}));
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // and EliminateEmptyBlocksProcessor but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
