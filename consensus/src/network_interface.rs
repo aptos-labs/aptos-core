@@ -28,6 +28,7 @@ use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use rand::seq::SliceRandom;
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -153,8 +154,12 @@ impl<NetworkClient: NetworkClientInterface<ConsensusMsg>> ConsensusNetworkClient
         let peer_network_ids: Vec<PeerNetworkId> = peers
             .map(|peer| self.get_peer_network_id_for_peer(peer))
             .collect();
+        // Randomize the order
+        let mut rng = rand::thread_rng();
+        let mut shuffled_peer_network_ids = peer_network_ids.clone();
+        shuffled_peer_network_ids.shuffle(&mut rng);
         self.network_client
-            .send_to_peers(message, &peer_network_ids)
+            .send_to_peers(message, &shuffled_peer_network_ids)
     }
 
     /// Send a RPC to the destination peer
