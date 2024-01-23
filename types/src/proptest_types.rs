@@ -999,7 +999,7 @@ impl Arbitrary for BlockMetadataExt {
                     failed_proposer_indices,
                     timestamp,
                 )| {
-                    BlockMetadataExt::new_v2(
+                    BlockMetadataExt::new_v1(
                         id,
                         epoch,
                         round,
