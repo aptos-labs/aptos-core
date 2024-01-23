@@ -210,9 +210,8 @@ impl UninitializedUseChecker {
                         &format!(
                             "use of {}unassigned {}",
                             match state {
-                                Initialized::No => "",
                                 Initialized::Maybe => "possibly ",
-                                Initialized::Yes => panic!("ICE: should be unreachable"),
+                                _ => "",
                             },
                             target.get_local_name_for_error_message(*src)
                         ),
