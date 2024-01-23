@@ -84,6 +84,10 @@ pub enum SessionId {
         // block id
         id: HashValue,
     },
+    BlockMetaExt {
+        // block id
+        id: HashValue,
+    },
 }
 
 impl SessionId {

@@ -9,7 +9,6 @@ use std::fmt::Debug;
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
     DummyTopic1(DummyValidatorTransaction),
-    #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic2(DummyValidatorTransaction),
 }
 
