@@ -1943,6 +1943,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if n.value.as_str() == "update_field" {
                     return Some(self.translate_update_field(expected_type, loc, generics, args));
                 }
+                let builtin_module = self.parent.parent.builtin_module();
+                let full_name = QualifiedSymbol {
+                    module_name: builtin_module,
+                    symbol: self.symbol_pool().make(&n.value),
+                };
+                // For other built-in functions, type check is performed in translate_call
+                if self.parent.parent.spec_fun_table.get(&full_name).is_some() {
+                    return None;
+                }
             }
         }
         if let EA::ModuleAccess_::Name(n) = &maccess.value {
