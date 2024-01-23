@@ -34,7 +34,7 @@ pub enum Initialized {
 
 impl AbstractDomain for Initialized {
     /// Implements `join` for the initialized state lattice:
-    ///
+    /// ```diagram
     ///             +-------+
     ///             | Maybe |
     ///             +-------+
@@ -48,6 +48,7 @@ impl AbstractDomain for Initialized {
     ///            +--------+
     ///            | bottom |
     ///            +--------+
+    /// ```
     /// Note that bottom is not explicitly represented in the enum `Initialized`.
     /// Instead, it is implicit: it represents the initialized state for locals at unreachable program points.
     fn join(&mut self, other: &Self) -> JoinResult {
