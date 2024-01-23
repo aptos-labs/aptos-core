@@ -8,11 +8,15 @@ on:
       - 'aptos-move/e2e-move-tests/**'
       - 'aptos-move/framework/**'
       - 'third_party/move/**'
+      - '.github/workflows/move-test-compiler-v2.yaml'
+      - '.github/actions/move-tests-compiler-v2/**'
   pull_request:
     paths:
       - 'aptos-move/e2e-move-tests/**'
       - 'aptos-move/framework/**'
       - 'third_party/move/**'
+      - '.github/workflows/move-test-compiler-v2.yaml'
+      - '.github/actions/move-tests-compiler-v2/**'
 
 env:
   CARGO_INCREMENTAL: "0"
