@@ -853,7 +853,9 @@ pub enum TransactionType {
     User,
     Genesis,
     BlockMetadata,
+    BlockMetadataExt,
     StateCheckpoint,
+    Validator,
 }
 
 impl Display for TransactionType {
@@ -863,7 +865,9 @@ impl Display for TransactionType {
             User => "User",
             Genesis => "Genesis",
             BlockMetadata => "BlockResource",
+            BlockMetadataExt => "BlockResourceExt",
             StateCheckpoint => "StateCheckpoint",
+            Validator => "Validator",
         })
     }
 }
@@ -880,6 +884,12 @@ impl Transaction {
             },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
+            BlockMetadataExt(_) => (
+                TransactionType::BlockMetadataExt,
+                None,
+                txn.info,
+                txn.events,
+            ),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => todo!(),
         };

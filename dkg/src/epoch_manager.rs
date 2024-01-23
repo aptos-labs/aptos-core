@@ -96,7 +96,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if Some(dkg_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
             // Forward to DKGManager if it is alive.
             if let Some(tx) = &self.dkg_rpc_msg_tx {
-                tx.push((), (peer_id, dkg_request));
+                let _ = tx.push((), (peer_id, dkg_request));
             }
         }
         Ok(())

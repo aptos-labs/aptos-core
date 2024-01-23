@@ -54,9 +54,9 @@ pub mod webauthn;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::state_store::create_empty_sharded_state_updates;
 use crate::{
-    contract_event::TransactionEvent, executable::ModulePath, fee_statement::FeeStatement,
-    proof::accumulator::InMemoryEventAccumulator, validator_txn::ValidatorTransaction,
-    write_set::TransactionWrite,
+    block_metadata_ext::BlockMetadataExt, contract_event::TransactionEvent, executable::ModulePath,
+    fee_statement::FeeStatement, proof::accumulator::InMemoryEventAccumulator,
+    validator_txn::ValidatorTransaction, write_set::TransactionWrite,
 };
 pub use block_output::BlockOutput;
 pub use change_set::ChangeSet;
@@ -1843,7 +1843,8 @@ pub enum Transaction {
     /// Transaction that applies a WriteSet to the current storage, it's applied manually via aptos-db-bootstrapper.
     GenesisTransaction(WriteSetPayload),
 
-    /// Transaction to update the block metadata resource at the beginning of a block.
+    /// Transaction to update the block metadata resource at the beginning of a block,
+    /// when on-chain randomness is disabled.
     BlockMetadata(BlockMetadata),
 
     /// Transaction to let the executor update the global state tree and record the root hash
@@ -1853,6 +1854,19 @@ pub enum Transaction {
 
     /// Transaction that only proposed by a validator mainly to update on-chain configs.
     ValidatorTransaction(ValidatorTransaction),
+
+    /// Transaction to update the block metadata resource at the beginning of a block,
+    /// when on-chain randomness is enabled.
+    BlockMetadataExt(BlockMetadataExt),
+}
+
+impl From<BlockMetadataExt> for Transaction {
+    fn from(metadata: BlockMetadataExt) -> Self {
+        match metadata {
+            BlockMetadataExt::V0(v0) => Transaction::BlockMetadata(v0),
+            vx => Transaction::BlockMetadataExt(vx),
+        }
+    }
 }
 
 impl Transaction {
@@ -1890,6 +1904,10 @@ impl Transaction {
             Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
             // TODO: display proper information for client
             Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
+            // TODO: display proper information for client
+            Transaction::BlockMetadataExt(_block_metadata_ext) => {
+                String::from("block_metadata_ext")
+            },
         }
     }
 
@@ -1900,6 +1918,7 @@ impl Transaction {
             Transaction::BlockMetadata(_) => "block_metadata",
             Transaction::StateCheckpoint(_) => "state_checkpoint",
             Transaction::ValidatorTransaction(_) => "validator_transaction",
+            Transaction::BlockMetadataExt(_) => "block_metadata_ext",
         }
     }
 

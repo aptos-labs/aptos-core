@@ -2,7 +2,6 @@
 use crate::{agg_trx_producer::AggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::Uniform;
 use aptos_logger::error;
 use aptos_types::{
     dkg::{
@@ -20,6 +19,7 @@ use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 enum InnerState<DKG: DKGTrait> {
     NotStarted,
@@ -108,6 +108,17 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         mut dkg_txn_pulled_rx: vtxn_pool::PullNotificationReceiver,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
+        if let Some(session_state) = in_progress_session {
+            let DKGSessionState {
+                start_time_us,
+                target_validator_set,
+                ..
+            } = session_state;
+            self.setup_deal_broadcast(start_time_us, &target_validator_set)
+                .await
+                .expect("setup_deal_broadcast() should be infallible");
+        }
+
         let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
 
@@ -131,9 +142,8 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                 }
             };
 
-            match handling_result {
-                Err(e) => error!("{}", e),
-                _ => {},
+            if let Err(e) = handling_result {
+                error!("{}", e);
             }
         }
     }
@@ -157,12 +167,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         &mut self,
         _txn: Arc<ValidatorTransaction>,
     ) -> Result<()> {
-        if let InnerState::Finished {
-            start_time_us,
-            pull_confirmed,
-            ..
-        } = &mut self.state
-        {
+        if let InnerState::Finished { pull_confirmed, .. } = &mut self.state {
             if !*pull_confirmed {
                 // TODO(zjma): metric DKG_AGG_NODE_PROPOSED
             }
@@ -284,7 +289,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
             )),
         };
 
-        let _ = response_sender.send(response);
+        response_sender.send(response);
         Ok(())
     }
 }

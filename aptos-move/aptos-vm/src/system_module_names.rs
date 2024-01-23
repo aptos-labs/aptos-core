@@ -34,6 +34,7 @@ pub const MULTI_AGENT_SCRIPT_PROLOGUE_NAME: &IdentStr = ident_str!("multi_agent_
 pub const MODULE_PROLOGUE_NAME: &IdentStr = ident_str!("module_prologue");
 pub const USER_EPILOGUE_NAME: &IdentStr = ident_str!("epilogue");
 pub const BLOCK_PROLOGUE: &IdentStr = ident_str!("block_prologue");
+pub const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
 
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
