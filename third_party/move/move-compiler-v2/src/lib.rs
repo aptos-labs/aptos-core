@@ -37,7 +37,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use pipeline::{
-    eliminate_empty_blocks_processor::EliminateEmptyBlocksProcessor,
+    eliminate_empty_blocks_processor::ControlFlowGraphSimplifier,
     split_critical_edges_processor::SplitCriticalEdgesProcessor,
 };
 use std::{collections::BTreeSet, path::Path};
@@ -192,7 +192,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
-    pipeline.add_processor(Box::new(EliminateEmptyBlocksProcessor {}));
+    pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
     if safety_on {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
