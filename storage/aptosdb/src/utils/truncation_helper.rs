@@ -258,7 +258,7 @@ fn truncate_ledger_db_single_batch(
     delete_event_data(ledger_db, start_version, &batch.event_db_batches)?;
 
     truncate_transaction_accumulator(
-        ledger_db.transaction_accumulator_db(),
+        ledger_db.transaction_accumulator_db_raw(),
         start_version,
         &batch.transaction_accumulator_db_batches,
     )?;
@@ -341,7 +341,7 @@ fn delete_per_version_data(
     batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
     delete_per_version_data_impl::<TransactionInfoSchema>(
-        ledger_db.transaction_info_db(),
+        ledger_db.transaction_info_db_raw(),
         start_version,
         &batch.transaction_info_db_batches,
     )?;

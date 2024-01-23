@@ -4,7 +4,6 @@
 
 use crate::{
     ledger_db::LedgerDb,
-    ledger_store::LedgerStore,
     metrics::{
         BACKUP_EPOCH_ENDING_EPOCH, BACKUP_STATE_SNAPSHOT_LEAF_IDX, BACKUP_STATE_SNAPSHOT_VERSION,
         BACKUP_TXN_VERSION,
@@ -28,7 +27,6 @@ use std::{fmt, sync::Arc};
 /// `BackupHandler` provides functionalities for AptosDB data backup.
 #[derive(Clone)]
 pub struct BackupHandler {
-    ledger_store: Arc<LedgerStore>,
     transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
@@ -36,13 +34,11 @@ pub struct BackupHandler {
 
 impl BackupHandler {
     pub(crate) fn new(
-        ledger_store: Arc<LedgerStore>,
         transaction_store: Arc<TransactionStore>,
         state_store: Arc<StateStore>,
         ledger_db: Arc<LedgerDb>,
     ) -> Self {
         Self {
-            ledger_store,
             transaction_store,
             state_store,
             ledger_db,
@@ -62,7 +58,8 @@ impl BackupHandler {
             .transaction_db()
             .get_transaction_iter(start_version, num_transactions)?;
         let mut txn_info_iter = self
-            .ledger_store
+            .ledger_db
+            .transaction_info_db()
             .get_transaction_info_iter(start_version, num_transactions)?;
         let mut event_vec_iter = self
             .ledger_db
@@ -117,11 +114,14 @@ impl BackupHandler {
         let ledger_metadata_db = self.ledger_db.metadata_db();
         let epoch = ledger_metadata_db.get_epoch(last_version)?;
         let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
-        let accumulator_proof = self.ledger_store.get_transaction_range_proof(
-            Some(first_version),
-            num_transactions,
-            ledger_info.ledger_info().version(),
-        )?;
+        let accumulator_proof = self
+            .ledger_db
+            .transaction_accumulator_db()
+            .get_transaction_range_proof(
+                Some(first_version),
+                num_transactions,
+                ledger_info.ledger_info().version(),
+            )?;
         Ok((accumulator_proof, ledger_info))
     }
 
@@ -174,8 +174,13 @@ impl BackupHandler {
         let epoch = ledger_metadata_db.get_epoch(version)?;
         let ledger_info = ledger_metadata_db.get_latest_ledger_info_in_epoch(epoch)?;
         let txn_info = self
-            .ledger_store
-            .get_transaction_info_with_proof(version, ledger_info.ledger_info().version())?;
+            .ledger_db
+            .transaction_info_db()
+            .get_transaction_info_with_proof(
+                version,
+                ledger_info.ledger_info().version(),
+                self.ledger_db.transaction_accumulator_db(),
+            )?;
 
         Ok((txn_info, ledger_info))
     }

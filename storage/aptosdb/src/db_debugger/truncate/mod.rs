@@ -324,12 +324,12 @@ mod test {
             let ledger_metadata_db = ledger_db.metadata_db_arc();
 
             let num_frozen_nodes = num_frozen_nodes_in_accumulator(target_version + 1);
-            let mut iter = ledger_db.transaction_accumulator_db().iter::<TransactionAccumulatorSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_accumulator_db_raw().iter::<TransactionAccumulatorSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             let position = iter.next().transpose().unwrap().unwrap().0;
             prop_assert_eq!(position.to_postorder_index() + 1, num_frozen_nodes);
 
-            let mut iter = ledger_db.transaction_info_db().iter::<TransactionInfoSchema>(ReadOptions::default()).unwrap();
+            let mut iter = ledger_db.transaction_info_db_raw().iter::<TransactionInfoSchema>(ReadOptions::default()).unwrap();
             iter.seek_to_last();
             prop_assert_eq!(iter.next().transpose().unwrap().unwrap().0, target_version);
 
