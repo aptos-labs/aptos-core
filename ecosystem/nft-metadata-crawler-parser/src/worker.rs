@@ -6,7 +6,6 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        constants::URI_SKIP_LIST,
         counters::{
             DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
             DUPLICATE_RAW_IMAGE_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
@@ -50,6 +49,7 @@ pub struct ParserConfig {
     pub max_file_size_bytes: u32,
     pub image_quality: u8, // Quality up to 100
     pub ack_parsed_uris: Option<bool>,
+    pub uri_blacklist: Option<Vec<String>>,
     pub server_port: u16,
 }
 
@@ -311,13 +311,12 @@ impl Worker {
         }
 
         // Skip if asset_uri contains any of the uris in URI_SKIP_LIST
-        if URI_SKIP_LIST
-            .iter()
-            .any(|&uri| self.asset_uri.contains(uri))
-        {
-            self.log_info("Found match in URI skip list, skipping parse");
-            SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
-            return Ok(());
+        if let Some(blacklist) = self.config.uri_blacklist.clone() {
+            if blacklist.iter().any(|uri| self.asset_uri.contains(uri)) {
+                self.log_info("Found match in URI skip list, skipping parse");
+                SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
+                return Ok(());
+            }
         }
 
         // Skip if asset_uri is not a valid URI
