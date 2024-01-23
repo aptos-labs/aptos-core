@@ -143,7 +143,8 @@ impl ControlFlowGraphCodeGenerator {
         generated
     }
 
-    /// Checks whether a block falls to the next block without jump, branch, abort, or return
+    /// Checks whether a block falls to the next block without jump, branch, abort, or return;
+    /// i.e., the block is followed by the next in the original code
     fn falls_to_next_block(codes: &[Bytecode]) -> bool {
         let last_instr = codes.last().expect("last instr");
         !matches!(
