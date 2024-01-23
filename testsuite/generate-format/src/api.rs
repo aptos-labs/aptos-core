@@ -27,6 +27,7 @@ use move_core_types::language_storage;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};
+use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 /// Default output file.
 pub fn output_file() -> Option<&'static str> {
@@ -90,6 +91,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
+    tracer.trace_type::<BlockMetadataExt>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;

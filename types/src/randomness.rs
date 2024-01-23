@@ -52,6 +52,7 @@ impl RandMetadata {
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Randomness {
     metadata: RandMetadata,
+    #[serde(with = "serde_bytes")]
     randomness: Vec<u8>,
 }
 

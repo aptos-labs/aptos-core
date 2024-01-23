@@ -195,6 +195,31 @@ BlockMetadata:
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
+BlockMetadataExt:
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: BlockMetadata
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandomness
+BlockMetadataWithRandomness:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
 BlockRetrievalRequest:
   STRUCT:
     - block_id:
@@ -412,6 +437,20 @@ EntryFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
+EphemeralPublicKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+EphemeralSignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
 EpochChangeProof:
   STRUCT:
     - ledger_info_with_sigs:
@@ -432,20 +471,6 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
-EphemeralPublicKey:
-  ENUM:
-    0:
-      Ed25519:
-        STRUCT:
-          - public_key:
-              TYPENAME: Ed25519PublicKey
-EphemeralSignature:
-  ENUM:
-    0:
-      Ed25519:
-        STRUCT:
-          - signature:
-              TYPENAME: Ed25519Signature
 Groth16Zkp:
   STRUCT:
     - a:
@@ -538,7 +563,7 @@ OpenIdSig:
     - jwt_payload: STR
     - uid_key: STR
     - epk_blinder:
-        TUPLEARRAY: 
+        TUPLEARRAY:
           CONTENT: U8
           SIZE: 31
     - pepper:
@@ -616,6 +641,22 @@ RandGenMessage:
   STRUCT:
     - epoch: U64
     - data: BYTES
+RandMetadata:
+  STRUCT:
+    - metadata_to_sign:
+        TYPENAME: RandMetadataToSign
+    - block_id:
+        TYPENAME: HashValue
+    - timestamp: U64
+RandMetadataToSign:
+  STRUCT:
+    - epoch: U64
+    - round: U64
+Randomness:
+  STRUCT:
+    - metadata:
+        TYPENAME: RandMetadata
+    - randomness: BYTES
 RawTransaction:
   STRUCT:
     - sender:
@@ -752,6 +793,10 @@ Transaction:
       ValidatorTransaction:
         NEWTYPE:
           TYPENAME: ValidatorTransaction
+    5:
+      BlockMetadataExt:
+        NEWTYPE:
+          TYPENAME: BlockMetadataExt
 TransactionArgument:
   ENUM:
     0:
@@ -1000,6 +1045,11 @@ WriteSetPayload:
 WriteSetV0:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut
+ZkIdPublicKey:
+  STRUCT:
+    - iss: STR
+    - idc:
+        TYPENAME: IdCommitment
 ZkIdSignature:
   STRUCT:
     - sig:
@@ -1010,11 +1060,6 @@ ZkIdSignature:
         TYPENAME: EphemeralPublicKey
     - ephemeral_signature:
         TYPENAME: EphemeralSignature
-ZkIdPublicKey:
-  STRUCT:
-    - iss: STR
-    - idc:
-        TYPENAME: IdCommitment
 ZkpOrOpenIdSig:
   ENUM:
     0:
