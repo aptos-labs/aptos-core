@@ -261,8 +261,8 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_time = std::time::Instant::now();
         for transaction in transactions {
             let version = transaction.version;
-            let cache_key = CacheEntry::build_key(version, self.storage_format).to_string();
-            let timestamp_in_seconds = transaction
+            let _cache_key = CacheEntry::build_key(version, self.storage_format).to_string();
+            let _timestamp_in_seconds = transaction
                 .timestamp
                 .clone()
                 .map_or(0, |t| t.seconds as u64);
@@ -270,13 +270,13 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                 CacheEntry::from_transaction(transaction, self.storage_format);
             let bytes = cache_entry.into_inner();
             size_in_bytes += bytes.len();
-            redis_pipeline
-                .cmd("SET")
-                .arg(cache_key)
-                .arg(bytes)
-                .arg("EX")
-                .arg(get_ttl_in_seconds(timestamp_in_seconds))
-                .ignore();
+            // redis_pipeline
+            //     .cmd("SET")
+            //     .arg(cache_key)
+            //     .arg(bytes)
+            //     .arg("EX")
+            //     .arg(get_ttl_in_seconds(timestamp_in_seconds))
+            //     .ignore();
             // Actively evict the expired cache. This is to avoid using Redis
             // eviction policy, which is probabilistic-based and may evict the
             // cache that is still needed.
