@@ -11,10 +11,10 @@ use crate::{
         CommitNotification, CommittedTransactions, MempoolNotificationHandler,
         StorageServiceNotificationHandler,
     },
-    storage_synchronizer::StorageSynchronizerInterface,
+    storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
 };
 use aptos_data_streaming_service::{
-    data_notification::{DataNotification, NotificationId},
+    data_notification::DataNotification,
     data_stream::{DataStreamId, DataStreamListener},
     streaming_client::{DataStreamingClient, NotificationAndFeedback},
 };
@@ -209,6 +209,13 @@ pub async fn get_data_notification(
     let timeout_ms = Duration::from_millis(max_stream_wait_time_ms);
     if let Ok(data_notification) = timeout(timeout_ms, active_data_stream.select_next_some()).await
     {
+        // Update the metrics for the data notification receive latency
+        metrics::observe_duration(
+            &metrics::DATA_NOTIFICATION_LATENCIES,
+            metrics::NOTIFICATION_CREATE_TO_RECEIVE,
+            data_notification.creation_time,
+        );
+
         // Reset the number of consecutive timeouts for the data stream
         active_data_stream.num_consecutive_timeouts = 0;
         Ok(data_notification)
@@ -371,7 +378,7 @@ pub fn update_new_epoch_metrics() {
 /// returns the number of transactions in the list.
 pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + Clone>(
     mut storage_synchronizer: StorageSyncer,
-    notification_id: NotificationId,
+    notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_list_with_proof: TransactionListWithProof,
@@ -379,7 +386,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
     let num_transactions = transaction_list_with_proof.transactions.len();
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            notification_metadata,
             transaction_list_with_proof,
             proof_ledger_info,
             end_of_epoch_ledger_info,
@@ -392,7 +399,7 @@ pub async fn execute_transactions<StorageSyncer: StorageSynchronizerInterface + 
 /// returns the number of outputs in the list.
 pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterface + Clone>(
     mut storage_synchronizer: StorageSyncer,
-    notification_id: NotificationId,
+    notification_metadata: NotificationMetadata,
     proof_ledger_info: LedgerInfoWithSignatures,
     end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
     transaction_outputs_with_proof: TransactionOutputListWithProof,
@@ -402,7 +409,7 @@ pub async fn apply_transaction_outputs<StorageSyncer: StorageSynchronizerInterfa
         .len();
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            notification_metadata,
             transaction_outputs_with_proof,
             proof_ledger_info,
             end_of_epoch_ledger_info,

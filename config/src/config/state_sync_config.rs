@@ -147,8 +147,6 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
-    /// Maximum number of concurrent storage server tasks
-    pub max_concurrent_requests: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -182,7 +180,6 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
-            max_concurrent_requests: 4000,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
@@ -390,7 +387,7 @@ impl Default for AptosDataClientConfig {
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
-            latency_monitor_loop_interval_ms: 100,
+            latency_monitor_loop_interval_ms: 50,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
             max_optimistic_fetch_lag_secs: 30, // 30 seconds

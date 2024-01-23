@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::Error, metrics::increment_network_frame_overflow};
+use crate::{error::Error, metrics::increment_network_frame_overflow, STORAGE_SERVER_THREAD_POOL};
 use aptos_config::config::StorageServiceConfig;
 use aptos_logger::debug;
 use aptos_storage_interface::{AptosDbError, DbReader, Result as StorageResult};
@@ -597,13 +597,17 @@ fn inclusive_range_len(start: u64, end: u64) -> aptos_storage_service_types::Res
 /// Serializes the given data and returns true iff the data will overflow
 /// the maximum network frame size. Also returns the number of serialized
 /// bytes for logging purposes.
-pub(crate) fn check_overflow_network_frame<T: ?Sized + Serialize>(
+///
+/// Note: this function uses a rayon thread as BCS can be pretty CPU heavy.
+pub(crate) fn check_overflow_network_frame<T: ?Sized + Serialize + Sync>(
     data: &T,
     max_network_frame_bytes: u64,
 ) -> aptos_storage_service_types::Result<(bool, u64), Error> {
-    let num_serialized_bytes = bcs::to_bytes(&data)
-        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
-        .len() as u64;
-    let overflow_frame = num_serialized_bytes >= max_network_frame_bytes;
-    Ok((overflow_frame, num_serialized_bytes))
+    STORAGE_SERVER_THREAD_POOL.install(move || {
+        let num_serialized_bytes = bcs::to_bytes(&data)
+            .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
+            .len() as u64;
+        let overflow_frame = num_serialized_bytes >= max_network_frame_bytes;
+        Ok((overflow_frame, num_serialized_bytes))
+    })
 }

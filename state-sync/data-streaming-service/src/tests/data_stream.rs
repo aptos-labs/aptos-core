@@ -76,10 +76,7 @@ async fn test_stream_blocked() {
                 start_epoch: 0,
                 end_epoch: 0,
             });
-        let context = ResponseContext {
-            id: 0,
-            response_callback: Box::new(NoopResponseCallback),
-        };
+        let context = ResponseContext::new(0, Box::new(NoopResponseCallback));
         let pending_response = PendingClientResponse::new_with_response(
             client_request.clone(),
             Ok(Response::new(context, ResponsePayload::NumberOfStates(10))),
@@ -237,10 +234,7 @@ async fn test_stream_invalid_response() {
         start_epoch: MIN_ADVERTISED_EPOCH_END,
         end_epoch: MIN_ADVERTISED_EPOCH_END + 1,
     });
-    let context = ResponseContext {
-        id: 0,
-        response_callback: Box::new(NoopResponseCallback),
-    };
+    let context = ResponseContext::new(0, Box::new(NoopResponseCallback));
     let pending_response = PendingClientResponse::new_with_response(
         client_request.clone(),
         Ok(Response::new(context, ResponsePayload::NumberOfStates(10))),

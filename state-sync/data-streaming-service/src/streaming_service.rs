@@ -7,6 +7,7 @@ use crate::{
     error::Error,
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
+    metrics::start_timer,
     streaming_client::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
@@ -30,7 +31,7 @@ use tokio_stream::wrappers::IntervalStream;
 // to execute for every notification (because it will process all the updates at once, anyway).
 // Thus, if there are X pending notifications, the first one will handle all pending updates, and
 // the next X-1 will be no-ops. This prevents us from wasting the CPU, unnecessarily.
-const STREAM_PROGRESS_UPDATE_CHANNEL_SIZE: usize = 1;
+const STREAM_PROGRESS_UPDATE_CHANNEL_SIZE: usize = 5;
 
 // Useful constants for the Data Streaming Service
 const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 3;
@@ -129,6 +130,37 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
             self.streaming_service_config.progress_check_interval_ms,
         )))
         .fuse();
+
+        // Spawn the loop lag verifier
+        /*
+        let time_service = self.time_service.clone();
+        tokio::spawn(async move {
+            // Create a ticker that will fire every 50ms
+            let poll_loop_ticker = time_service.interval(Duration::from_millis(50));
+            futures::pin_mut!(poll_loop_ticker);
+
+            // Get the current time
+            let mut current_time = Instant::now();
+
+            loop {
+                // Wait for the next round before polling
+                poll_loop_ticker.next().await;
+
+                // Get the new current time
+                let new_current_time = Instant::now();
+
+                // Measure the difference and update the metrics
+                metrics::observe_duration(
+                    &metrics::DATA_NOTIFICATION_SEND_LATENCY,
+                    "service_loop_lag",
+                    current_time,
+                );
+
+                // Update the current time
+                current_time = new_current_time;
+            }
+        });
+         */
 
         // Start the service loop
         loop {
@@ -308,6 +340,12 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 
     /// Ensures that all existing data streams are making progress
     async fn check_progress_of_all_data_streams(&mut self) {
+        // Time the progress check (the timer will stop when it's dropped)
+        let _timer = start_timer(
+            &metrics::DATA_REQUEST_PROCESSING_LATENCY,
+            "check_progress".into(),
+        );
+
         // Drive the progress of each stream
         let data_stream_ids = self.get_all_data_stream_ids();
         for data_stream_id in &data_stream_ids {
@@ -412,7 +450,7 @@ fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clon
     aptos_data_client: T,
     cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 ) {
-    tokio::spawn(async move {
+    tokio::spawn(tokio::task::unconstrained(async move {
         loop {
             // Refresh the cached global data summary
             refresh_global_data_summary(
@@ -425,7 +463,7 @@ fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clon
                 data_streaming_service_config.global_summary_refresh_interval_ms;
             tokio::time::sleep(Duration::from_millis(sleep_duration_ms)).await;
         }
-    });
+    }));
 }
 
 /// Refreshes the global data summary and updates the cache

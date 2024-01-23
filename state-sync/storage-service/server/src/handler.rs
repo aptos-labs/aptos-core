@@ -14,7 +14,7 @@ use crate::{
     optimistic_fetch::OptimisticFetchRequest,
     storage::StorageReaderInterface,
     subscription::{SubscriptionRequest, SubscriptionStreamRequests},
-    utils,
+    utils, STORAGE_SERVER_THREAD_POOL,
 };
 use aptos_config::{config::StorageServiceConfig, network_id::PeerNetworkId};
 use aptos_logger::{debug, error, sample, sample::SampleRate, trace, warn};
@@ -422,10 +422,13 @@ impl<T: StorageReaderInterface> Handler<T> {
             None,
         )?;
 
-        // Create the storage response and time the operation
+        // Create the storage response and time the operation.
+        // We use a rayon thread to create the response (since it involves compression).
         let create_storage_response = || {
-            StorageServiceResponse::new(data_response, request.use_compression)
-                .map_err(|error| error.into())
+            STORAGE_SERVER_THREAD_POOL.install(move || {
+                StorageServiceResponse::new(data_response, request.use_compression)
+                    .map_err(|error| error.into())
+            })
         };
         let storage_response = utils::execute_and_time_duration(
             &metrics::STORAGE_RESPONSE_CREATION_LATENCY,

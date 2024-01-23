@@ -199,10 +199,42 @@ impl<
 
     /// Starts the state sync driver
     pub async fn start_driver(mut self) {
+        // Create the interval stream for checking progress
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
             self.driver_configuration.config.progress_check_interval_ms,
         )))
         .fuse();
+
+        // Spawn the loop lag verifier
+        /*
+        let time_service = self.time_service.clone();
+        tokio::spawn(async move {
+            // Create a ticker that will fire every 50ms
+            let poll_loop_ticker = time_service.interval(Duration::from_millis(50));
+            futures::pin_mut!(poll_loop_ticker);
+
+            // Get the current time
+            let mut current_time = Instant::now();
+
+            loop {
+                // Wait for the next round before polling
+                poll_loop_ticker.next().await;
+
+                // Get the new current time
+                let new_current_time = Instant::now();
+
+                // Measure the difference and update the metrics
+                metrics::observe_duration(
+                    &metrics::DATA_NOTIFICATION_LATENCIES,
+                    metrics::DRIVER_LOOP_LAG,
+                    current_time,
+                );
+
+                // Update the current time
+                current_time = new_current_time;
+            }
+        });
+         */
 
         // Start the driver
         info!(LogSchema::new(LogEntry::Driver).message("Started the state sync v2 driver!"));

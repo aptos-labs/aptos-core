@@ -695,7 +695,7 @@ impl AptosDataClient {
         request_timeout_ms: u64,
     ) -> crate::error::Result<Response<T>>
     where
-        T: TryFrom<StorageServiceResponse, Error = E>,
+        T: TryFrom<StorageServiceResponse, Error = E> + Send + 'static,
         E: Into<Error>,
     {
         // Start the timer for the request
@@ -719,8 +719,11 @@ impl AptosDataClient {
             },
         };
 
+        // Set the receive time on the response context
+        let (mut context, storage_response) = storage_response.into_parts();
+        context.set_receive_time();
+
         // Ensure the response obeys the compression requirements
-        let (context, storage_response) = storage_response.into_parts();
         if request.use_compression && !storage_response.is_compressed() {
             return Err(Error::InvalidResponse(format!(
                 "Requested compressed data, but the response was uncompressed! Response: {:?}",
@@ -733,17 +736,51 @@ impl AptosDataClient {
             )));
         }
 
-        // Try to convert the storage service enum into the exact variant we're expecting
-        match T::try_from(storage_response) {
-            Ok(new_payload) => Ok(Response::new(context, new_payload)),
-            // If the variant doesn't match what we're expecting, report the issue
-            Err(err) => {
-                context
-                    .response_callback
-                    .notify_bad_response(ResponseError::InvalidPayloadDataType);
-                Err(err.into())
-            },
-        }
+        // Try to convert the storage service enum into the exact variant we're expecting.
+        // We use a rayon thread because it involves serde and compression.-
+        /*
+        let (send, recv) = tokio::sync::oneshot::channel();
+        DATA_CLIENT_THREAD_POOL.install(move || {
+            let result = match T::try_from(storage_response) {
+                Ok(new_payload) => {
+                    // Set the transformation time on the response context
+                    context.set_transformation_time();
+
+                    // Create and return the response
+                    Ok(Response::new(context, new_payload))
+                },
+                // If the variant doesn't match what we're expecting, report the issue
+                Err(err) => {
+                    context
+                        .response_callback
+                        .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                    Err(err.into())
+                },
+            };
+            let _ = send.send(result);
+        });
+        recv.await.unwrap()
+         */
+        tokio::task::spawn_blocking(move || {
+            match T::try_from(storage_response) {
+                Ok(new_payload) => {
+                    // Set the transformation time on the response context
+                    context.set_transformation_time();
+
+                    // Create and return the response
+                    Ok(Response::new(context, new_payload))
+                },
+                // If the variant doesn't match what we're expecting, report the issue
+                Err(err) => {
+                    context
+                        .response_callback
+                        .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                    Err(err.into())
+                },
+            }
+        })
+        .await
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
     }
 
     /// Sends a request to a specific peer
@@ -805,10 +842,7 @@ impl AptosDataClient {
                     peer,
                     request,
                 };
-                let context = ResponseContext {
-                    id,
-                    response_callback: Box::new(response_callback),
-                };
+                let context = ResponseContext::new(id, Box::new(response_callback));
                 Ok(Response::new(context, response))
             },
             Err(error) => {

@@ -4,7 +4,7 @@
 use crate::{
     error::Error,
     metadata_storage::MetadataStorageInterface,
-    storage_synchronizer::StorageSynchronizerInterface,
+    storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info},
 };
 use anyhow::Result as AnyhowResult;
@@ -452,7 +452,7 @@ mock! {
     impl StorageSynchronizerInterface for StorageSynchronizer {
         async fn apply_transaction_outputs(
             &mut self,
-            notification_id: NotificationId,
+            notification_metadata: NotificationMetadata,
             output_list_with_proof: TransactionOutputListWithProof,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -460,7 +460,7 @@ mock! {
 
         async fn execute_transactions(
             &mut self,
-            notification_id: NotificationId,
+            notification_metadata: NotificationMetadata,
             transaction_list_with_proof: TransactionListWithProof,
             target_ledger_info: LedgerInfoWithSignatures,
             end_of_epoch_ledger_info: Option<LedgerInfoWithSignatures>,

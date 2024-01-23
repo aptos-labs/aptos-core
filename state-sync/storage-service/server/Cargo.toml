@@ -14,7 +14,6 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
 aptos-config = { workspace = true }
 aptos-infallible = { workspace = true }
@@ -33,6 +32,7 @@ dashmap = { workspace = true }
 futures = { workspace = true }
 mini-moka = { workspace = true }
 once_cell = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

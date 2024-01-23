@@ -36,6 +36,7 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 futures = { workspace = true }
 once_cell = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
