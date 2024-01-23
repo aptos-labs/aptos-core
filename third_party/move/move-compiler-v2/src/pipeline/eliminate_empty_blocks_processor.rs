@@ -118,6 +118,7 @@ impl ControlFlowGraphCodeGenerator {
             if block == self.cfg.entry_block() || block == self.cfg.exit_block() {
                 continue;
             }
+            // TODO:
 			// can't use `.remove` instead to avoid copying,
 			// because the following may look at visited block
             let mut code_block = self.code_blocks.get(&block).expect("code block").clone();
