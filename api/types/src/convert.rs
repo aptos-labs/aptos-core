@@ -4,8 +4,8 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        BlockEpilogueTransaction, DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem,
+        DeletedTableData, MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
         UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
@@ -200,7 +200,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
             BlockMetadataExt(txn) => (&txn, info, events).into(),
-            // TODO [fix] Create separate transaction type for API
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
