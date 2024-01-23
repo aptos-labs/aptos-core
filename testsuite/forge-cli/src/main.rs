@@ -1865,9 +1865,6 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
 
-            // Experimental delayed QC aggregation
-            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
-
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
                 config.execution.concurrency_level = 48;
