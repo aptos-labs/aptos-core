@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{types::DKGTranscriptRequest, DKGMessage};
-use anyhow::ensure;
+use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;

@@ -170,7 +170,7 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
-        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+        Box::new(move |_, _, _executed_rounds, executed_transactions, _, _| {
             assert!(
                 executed_transactions >= 4,
                 "no progress with active consensus, only {} transactions",

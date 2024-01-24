@@ -102,6 +102,9 @@ use std::{
         Arc,
     },
 };
+use aptos_types::block_metadata_ext::BlockMetadataWithRandomness;
+use aptos_types::move_utils::as_move_value::AsMoveValue;
+use aptos_types::randomness::Randomness;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();

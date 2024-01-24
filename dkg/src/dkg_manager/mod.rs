@@ -86,7 +86,6 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         dealer_sk: Arc<DKG::DealerPrivateKey>,
         my_index: usize,
         my_addr: AccountAddress,
-        my_index: usize,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
         vtxn_pool: VTxnPoolState,
@@ -132,24 +131,28 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
         let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
-
+        let mut dkg_start_event_rx = dkg_start_event_rx.into_stream();
         let mut close_rx = close_rx.into_stream();
         while !self.stopped {
             let handling_result = tokio::select! {
                 dkg_start_event = dkg_start_event_rx.select_next_some() => {
-                    self.process_dkg_start_event(dkg_start_event).await
+                    if let Ok(event) = dkg_start_event {
+                        self.process_dkg_start_event(event).await
+                    } else {
+                        self.process_close_cmd(None)
+                    }
                 },
                 (_sender, msg) = rpc_msg_rx.select_next_some() => {
                     self.process_peer_rpc_msg(msg).await
                 },
-                agg_node = agg_trx_rx.select_next_some() => {
-                    self.process_aggregated_transcript(agg_node).await
+                agg_transcript = agg_trx_rx.select_next_some() => {
+                    self.process_aggregated_transcript(agg_transcript).await
                 },
                 dkg_txn = self.pull_notification_rx.select_next_some() => {
                     self.process_dkg_txn_pulled_notification(dkg_txn).await
                 },
                 close_req = close_rx.select_next_some() => {
-                    self.process_close_cmd(close_req.unwrap())
+                    self.process_close_cmd(close_req.ok())
                 }
             };
 
@@ -162,7 +165,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     }
 
     /// On a CLOSE command from epoch manager, do clean-up.
-    fn process_close_cmd(&mut self, ack_tx: oneshot::Sender<()>) -> Result<()> {
+    fn process_close_cmd(&mut self, ack_tx: Option<oneshot::Sender<()>>) -> Result<()> {
         self.stopped = true;
 
         match std::mem::take(&mut self.state) {
@@ -176,7 +179,10 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             }
         }
 
-        let _ = ack_tx.send(());
+        if let Some(tx) = ack_tx {
+            let _ = tx.send(());
+        }
+
         Ok(())
     }
 

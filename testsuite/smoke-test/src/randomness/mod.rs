@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{anyhow, bail, ensure};
+use anyhow::{anyhow, ensure};
 use anyhow::Result;
-use aptos_crypto::{compat::Sha3_256, Uniform};
+use aptos_crypto::Uniform;
 use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
-use aptos_types::{randomness::{PerBlockRandomness, RandMetadataToSign}, validator_verifier::ValidatorVerifier, ValidatorConsensusInfoMoveStruct};
-use digest::Digest;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use num_traits::Zero;
-use rand::{prelude::StdRng, SeedableRng};
+use rand::SeedableRng;
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
 use aptos_logger::info;
@@ -24,6 +22,7 @@ mod dkg_with_validator_join_leave;
 mod e2e_correctness;
 mod validator_restart_during_dkg;
 
+#[allow(dead_code)]
 async fn get_current_version(rest_client: &Client) -> u64 {
     rest_client
         .get_ledger_information()
@@ -41,6 +40,7 @@ async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {
     response.into_inner()
 }
 
+#[allow(dead_code)]
 async fn get_on_chain_resource_at_version<T: OnChainConfig>(
     rest_client: &Client,
     version: u64,
@@ -136,7 +136,7 @@ fn dealt_secret_from_shares(
         })
         .collect();
 
-    DefaultDKG::reconstruct_secret_from_shares(&pub_params, player_share_pairs).unwrap()
+    DefaultDKG::reconstruct_secret_from_shares(pub_params, player_share_pairs).unwrap()
 }
 
 fn dealt_secret_from_input(

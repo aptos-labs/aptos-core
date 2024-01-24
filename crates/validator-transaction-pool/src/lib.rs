@@ -115,7 +115,7 @@ pub struct PoolStateInner {
 /// If this is dropped, `txn` will be deleted from the pool (if it has not been).
 ///
 /// This allows the pool to be emptied on epoch boundaries.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct TxnGuard {
     pool: Arc<Mutex<PoolStateInner>>,
     seq_num: u64,

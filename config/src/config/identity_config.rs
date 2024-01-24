@@ -14,7 +14,6 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
-use aptos_types::dkg::DefaultDKG;
 
 /// A single struct for reading / writing to a file for identity across configs
 #[derive(Deserialize, Serialize)]

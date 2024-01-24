@@ -53,7 +53,7 @@ impl AptosVM {
         dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         debug!("[DKG] process_dkg_result: BEGIN: dkg_node={:?}", dkg_transcript);
-        let ret = match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_node) {
+        let ret = match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_transcript) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.

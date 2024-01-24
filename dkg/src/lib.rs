@@ -21,7 +21,6 @@ use aptos_types::dkg::{DKGTrait, DefaultDKG};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use tokio::runtime::Runtime;
-use aptos_types::dkg::{DefaultDKG, DKGTrait};
 pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
@@ -51,5 +50,3 @@ pub fn start_dkg_runtime(
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
 }
-
-pub mod agg_trx_producer;

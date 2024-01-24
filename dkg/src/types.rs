@@ -44,20 +44,4 @@ impl DKGMessage {
     }
 }
 
-impl DKGMessage {
-    pub fn epoch(&self) -> u64 {
-        match self {
-            DKGMessage::NodeRequest(request) => request.dealer_epoch,
-            DKGMessage::NodeResponse(response) => response.metadata.epoch,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        match self {
-            DKGMessage::NodeRequest(_) => "DKGNodeRequest",
-            DKGMessage::NodeResponse(_) => "DKGNodeResponse",
-        }
-    }
-}
-
 impl RBMessage for DKGMessage {}
