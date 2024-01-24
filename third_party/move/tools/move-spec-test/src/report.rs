@@ -20,48 +20,25 @@ impl Report {
         }
     }
 
-    /// Adds an entry to the report.
-    pub fn add_entry(&mut self, path: PathBuf, entry: MutantStats) {
-        self.files.insert(path, entry);
-    }
-
-    /// Returns `true` if the report contains an entry for the given path.
-    pub fn contains(&self, path: &PathBuf) -> bool {
-        self.files.contains_key(path)
-    }
-
     /// Increments the number of mutants tested for the given path.
     /// If the path is not in the report, it adds it with the number of mutants tested set to 1.
     pub fn increment_mutants_tested(&mut self, path: &PathBuf) {
-        if self.contains(path) {
-            let entry = self.files.get_mut(path).unwrap();
-            entry.tested += 1;
-        } else {
-            self.add_entry(
-                path.clone(),
-                MutantStats {
-                    tested: 1,
-                    killed: 0,
-                },
-            );
-        }
+        let entry = self
+            .files
+            .entry(path.clone())
+            .or_insert(MutantStats::default());
+        entry.tested += 1;
     }
 
     /// Increments the number of mutants killed for the given path.
-    /// If the path is not in the report, it adds it with the number of mutants tested and killed set to 1.
+    /// If the path is not in the report, it adds it with the number of mutants tested and killed
+    /// set to the default (0) and then increases only killed count!
     pub fn increment_mutants_killed(&mut self, path: &PathBuf) {
-        if self.contains(path) {
-            let entry = self.files.get_mut(path).unwrap();
-            entry.killed += 1;
-        } else {
-            self.add_entry(
-                path.clone(),
-                MutantStats {
-                    tested: 1,
-                    killed: 1,
-                },
-            );
-        }
+        let entry = self
+            .files
+            .entry(path.clone())
+            .or_insert(MutantStats::default());
+        entry.killed += 1;
     }
 
     /// Returns the number of mutants tested.
@@ -78,14 +55,7 @@ impl Report {
     /// The file is created if it does not exist, otherwise it is overwritten.
     pub fn save_to_json_file(&self, path: &PathBuf) -> anyhow::Result<()> {
         let file = std::fs::File::create(path)?;
-        serde_json::to_writer_pretty(file, self)?;
-        Ok(())
-    }
-
-    /// Returns the list of entries in the report.
-    #[cfg(test)]
-    pub fn entries(&self) -> &HashMap<PathBuf, MutantStats> {
-        &self.files
+        Ok(serde_json::to_writer_pretty(file, self)?)
     }
 
     /// Prints the report to stdout in a table format.
@@ -109,6 +79,24 @@ impl Report {
         let table = builder.build().with(Style::modern_rounded()).to_string();
 
         println!("{}", table);
+    }
+
+    /// Returns the list of entries in the report.
+    #[cfg(test)]
+    pub fn entries(&self) -> &HashMap<PathBuf, MutantStats> {
+        &self.files
+    }
+
+    /// Adds an entry to the report.
+    #[cfg(test)]
+    fn add_entry(&mut self, path: PathBuf, entry: MutantStats) {
+        self.files.insert(path, entry);
+    }
+
+    /// Returns `true` if the report contains an entry for the given path.
+    #[cfg(test)]
+    fn contains(&self, path: &PathBuf) -> bool {
+        self.files.contains_key(path)
     }
 }
 
@@ -188,6 +176,7 @@ mod tests {
         report.increment_mutants_tested(&path1);
         report.increment_mutants_tested(&path2);
         assert_eq!(report.mutants_tested(), 2);
+        assert_eq!(report.mutants_killed(), 0);
     }
 
     #[test]
@@ -198,5 +187,6 @@ mod tests {
         report.increment_mutants_killed(&path1);
         report.increment_mutants_killed(&path2);
         assert_eq!(report.mutants_killed(), 2);
+        assert_eq!(report.mutants_tested(), 0);
     }
 }
