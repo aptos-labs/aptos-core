@@ -6,15 +6,14 @@
 //! state sync v2.
 use crate::{
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb, LedgerDb,
-        LedgerDbSchemaBatches,
+        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb,
+        write_set_db::WriteSetDb, LedgerDb, LedgerDbSchemaBatches,
     },
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator::TransactionAccumulatorSchema,
     },
     state_store::StateStore,
-    transaction_store::TransactionStore,
     utils::{new_sharded_kv_schema_batch, ShardedStateKvSchemaBatch},
 };
 use aptos_crypto::HashValue;
@@ -27,7 +26,7 @@ use aptos_types::{
         definition::LeafCount,
         position::{FrozenSubTreeIterator, Position},
     },
-    transaction::{Transaction, TransactionInfo, TransactionOutput, Version},
+    transaction::{Transaction, TransactionInfo, Version},
     write_set::WriteSet,
 };
 use std::sync::Arc;
@@ -109,7 +108,6 @@ pub fn confirm_or_save_frozen_subtrees(
 /// Saves the given transactions to the db. If a change set is provided, a batch
 /// of db alterations will be added to the change set without writing them to the db.
 pub(crate) fn save_transactions(
-    transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
     first_version: Version,
@@ -126,7 +124,6 @@ pub(crate) fn save_transactions(
 ) -> Result<()> {
     if let Some((ledger_db_batch, state_kv_batches, state_kv_metadata_batch)) = existing_batch {
         save_transactions_impl(
-            transaction_store,
             state_store,
             ledger_db,
             first_version,
@@ -144,7 +141,6 @@ pub(crate) fn save_transactions(
         let mut sharded_kv_schema_batch = new_sharded_kv_schema_batch();
         let state_kv_metadata_batch = SchemaBatch::new();
         save_transactions_impl(
-            transaction_store,
             Arc::clone(&state_store),
             Arc::clone(&ledger_db),
             first_version,
@@ -172,36 +168,6 @@ pub(crate) fn save_transactions(
     Ok(())
 }
 
-/// Saves the given transaction outputs to the db. If a change set is provided, a batch
-/// of db alterations will be added to the change set without writing them to the db.
-pub fn save_transaction_outputs(
-    db: Arc<DB>,
-    transaction_store: Arc<TransactionStore>,
-    first_version: Version,
-    transaction_outputs: Vec<TransactionOutput>,
-    existing_batch: Option<&mut SchemaBatch>,
-) -> Result<()> {
-    if let Some(existing_batch) = existing_batch {
-        save_transaction_outputs_impl(
-            transaction_store,
-            first_version,
-            transaction_outputs,
-            existing_batch,
-        )?;
-    } else {
-        let mut batch = SchemaBatch::new();
-        save_transaction_outputs_impl(
-            transaction_store,
-            first_version,
-            transaction_outputs,
-            &mut batch,
-        )?;
-        db.write_schemas(batch)?;
-    }
-
-    Ok(())
-}
-
 /// A helper function that saves the ledger infos to the given change set
 fn save_ledger_infos_impl(
     ledger_metadata_db: &LedgerMetadataDb,
@@ -218,7 +184,6 @@ fn save_ledger_infos_impl(
 
 /// A helper function that saves the transactions to the given change set
 pub(crate) fn save_transactions_impl(
-    transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
     first_version: Version,
@@ -263,7 +228,7 @@ pub(crate) fn save_transactions_impl(
     )?;
     // insert changes in write set schema batch
     for (idx, ws) in write_sets.iter().enumerate() {
-        transaction_store.put_write_set(
+        WriteSetDb::put_write_set(
             first_version + idx as Version,
             ws,
             &ledger_db_batch.write_set_db_batches,
@@ -294,20 +259,6 @@ pub(crate) fn save_transactions_impl(
             &DbMetadataKey::OverallCommitProgress,
             &DbMetadataValue::Version(last_version),
         )?;
-
-    Ok(())
-}
-
-/// A helper function that saves the transaction outputs to the given change set
-pub fn save_transaction_outputs_impl(
-    transaction_store: Arc<TransactionStore>,
-    first_version: Version,
-    transaction_outputs: Vec<TransactionOutput>,
-    batch: &mut SchemaBatch,
-) -> Result<()> {
-    for output in transaction_outputs {
-        transaction_store.put_write_set(first_version, output.write_set(), batch)?;
-    }
 
     Ok(())
 }
