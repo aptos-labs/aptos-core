@@ -49,14 +49,8 @@ impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
         if fun_env.is_native() {
             return data;
         }
-        println!("{}", generate_cfg_in_dot_format(&FunctionTarget::new(fun_env, &data)));
-        let cfg = StacklessControlFlowGraph::new_forward(&data.code);
-        println!("before {}", cfg.blocks().len() - 2);
         let mut transformer = ControlFlowGraphSimplifierTransformation::new(data);
         transformer.transform();
-        let cfg = StacklessControlFlowGraph::new_forward(&transformer.data.code);
-        println!("after {}", cfg.blocks().len() - 2);
-        println!("{}", generate_cfg_in_dot_format(&FunctionTarget::new(fun_env, &transformer.data)));
         transformer.data
     }
 
