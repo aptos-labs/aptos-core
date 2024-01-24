@@ -3,7 +3,7 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
@@ -23,10 +23,7 @@ use aptos_protos::{
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use itertools::Itertools;
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tonic::Status;
 
@@ -150,7 +147,6 @@ impl IndexerStreamCoordinator {
             let task = tokio::spawn(async move {
                 let raw_txns = batch;
                 let api_txns = Self::convert_to_api_txns(context, raw_txns);
-                api_txns.last().map(record_fetched_transaction_latency);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
                 let mut responses = vec![];
                 // Wrap in stream response object and send to channel
@@ -206,17 +202,6 @@ impl IndexerStreamCoordinator {
             Some(highest_known_version),
             None,
             Some(sending_start_time.elapsed().as_secs_f64()),
-            Some(num_transactions as i64),
-        );
-
-        log_grpc_step_fullnode(
-            IndexerGrpcStep::FullnodeProcessedBatch,
-            Some(first_version),
-            Some(end_version),
-            last_transaction_timestamp.as_ref(),
-            Some(highest_known_version),
-            None,
-            Some(fetching_start_time.elapsed().as_secs_f64()),
             Some(num_transactions as i64),
         );
         vec![Ok(end_version as u64)]
@@ -500,19 +485,5 @@ impl IndexerStreamCoordinator {
                 );
             }
         }
-    }
-}
-
-/// Record the transaction fetched from the storage latency.
-fn record_fetched_transaction_latency(txn: &aptos_api_types::Transaction) {
-    let current_time_in_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Current time is before UNIX_EPOCH")
-        .as_secs_f64();
-    let txn_timestamp = txn.timestamp();
-
-    if txn_timestamp > 0 {
-        let txn_timestemp_in_secs = txn_timestamp as f64 / 1_000_000.0;
-        FETCHED_LATENCY_IN_SECS.set(current_time_in_secs - txn_timestemp_in_secs);
     }
 }
