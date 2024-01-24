@@ -267,15 +267,17 @@ The Move mutator tool is designed to be easily extensible. It's possible to add 
 
 To add a new mutation operator, you need to:
 1. Add a new mutation operator to the `MutationOperator` enum in the `operator.rs` file.
-2. Implement mutation logic in the `apply` function in the `operator.rs` file.
-3. Update AST traversal code in the `mutate.rs` file - add or modify a place in the AST where the mutation operator should be applied.
-4. Add a test for the new mutation operator.
+2. Add appropriate calls to the `MutationOperator` implementation in the `operator.rs` file.
+3. Create new file with the mutation operator implementation in the `operators` directory.
+4. Implement mutation logic in the `apply` and `get_file_hash` functions in the newly created file.
+5. Update AST traversal code in the `mutate.rs` file - add or modify a place in the AST where the mutation operator should be applied.
+6. Add a test for the new mutation operator.
 
 ### Adding a new mutation category
 
 Sometimes, it's helpful to group mutation operators into categories. For example, it's useful to group arithmetic operators together. It's possible to do it by adding a new mutation category.
 
-Categories exist only to group mutation operators. They are not used anywhere else. They reside in the `operator.rs` file inside the `apply` function. To add a new category, simply modify the existing operator, adding or excluding new groups based on the already present code (look at the `BinaryOperator`, `ops` vector).
+Categories exist only to group mutation operators. They are not used anywhere else. They reside in the file with mutation operator in `operators` directory, inside the `apply` function. To add a new category, simply modify the existing operator, adding or excluding new groups based on the already present code (look at the `BinaryOperator`, `ops` vector).
 
 
 
