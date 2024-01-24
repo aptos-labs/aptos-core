@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use move_core_types::{account_address::AccountAddress, errmap::ErrorMapping};
-use move_stdlib::natives::{all_natives, nursery_natives, GasParameters, NurseryGasParameters};
+use move_stdlib::natives::{all_natives, GasParameters};
 
 fn main() -> Result<()> {
     let error_descriptions: ErrorMapping = bcs::from_bytes(move_stdlib::error_descriptions())?;
@@ -12,7 +12,6 @@ fn main() -> Result<()> {
     let addr = AccountAddress::from_hex_literal("0x1").unwrap();
     let natives = all_natives(addr, GasParameters::zeros())
         .into_iter()
-        .chain(nursery_natives(addr, NurseryGasParameters::zeros()))
         .collect();
 
     move_cli::move_cli(natives, cost_table, &error_descriptions)

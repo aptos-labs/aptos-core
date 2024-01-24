@@ -32,9 +32,6 @@ fn cost_table() -> CostTable {
 }
 
 fn main() -> Result<()> {
-    // let error_descriptions: ErrorMapping =
-    //     bcs::from_bytes(diem_framework_releases::current_error_descriptions())?;
-
     let natives = move_stdlib::natives::all_natives(
         CORE_CODE_ADDRESS,
         // We may want to switch to a different gas schedule in the future, but for now,
@@ -42,12 +39,6 @@ fn main() -> Result<()> {
         move_stdlib::natives::GasParameters::zeros(),
     )
     .into_iter()
-    .chain(move_stdlib::natives::nursery_natives(
-        CORE_CODE_ADDRESS,
-        // We may want to switch to a different gas schedule in the future, but for now,
-        // the all-zero one should be enough.
-        move_stdlib::natives::NurseryGasParameters::zeros(),
-    ))
     .chain(diem_framework_natives::all_natives(CORE_CODE_ADDRESS))
     .collect::<Vec<_>>();
 

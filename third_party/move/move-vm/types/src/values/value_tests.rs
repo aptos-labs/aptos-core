@@ -2,9 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loaded_data::runtime_types::Type, values::*, views::*};
+use crate::values::*;
 use move_binary_format::errors::*;
-use move_core_types::{account_address::AccountAddress, u256::U256};
+use move_core_types::u256::U256;
 
 #[test]
 fn locals() -> PartialVMResult<()> {
@@ -134,87 +134,6 @@ fn global_value_non_struct() -> PartialVMResult<()> {
     locals.store_loc(0, Value::u8(0), false)?;
     let r = locals.borrow_loc(0)?;
     assert!(GlobalValue::cached(r).is_err());
-
-    Ok(())
-}
-
-#[test]
-fn leagacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let mut locals = Locals::new(10);
-
-    locals.store_loc(0, Value::u128(0), false)?;
-    let r = locals.borrow_loc(0)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    locals.store_loc(1, Value::vector_u8([1, 2, 3]), false)?;
-    let r = locals.borrow_loc(1)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    let r: VectorRef = r.value_as()?;
-    let r = r.borrow_elem(0, &Type::U8)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    locals.store_loc(2, Value::struct_(Struct::pack([])), false)?;
-    let r: Reference = locals.borrow_loc(2)?.value_as()?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    Ok(())
-}
-
-#[test]
-fn legacy_struct_abstract_memory_size_consistenty() -> PartialVMResult<()> {
-    let structs = [
-        Struct::pack([]),
-        Struct::pack([Value::struct_(Struct::pack([Value::u8(0), Value::u64(0)]))]),
-    ];
-
-    for s in &structs {
-        assert_eq!(s.legacy_abstract_memory_size(), s.legacy_size());
-    }
-
-    Ok(())
-}
-
-#[test]
-fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let vals = [
-        Value::u8(0),
-        Value::u16(0),
-        Value::u32(0),
-        Value::u64(0),
-        Value::u128(0),
-        Value::u256(U256::zero()),
-        Value::bool(true),
-        Value::address(AccountAddress::ZERO),
-        Value::vector_u8([0, 1, 2]),
-        Value::vector_u16([0, 1, 2]),
-        Value::vector_u32([0, 1, 2]),
-        Value::vector_u64([]),
-        Value::vector_u128([1, 2, 3, 4]),
-        Value::vector_u256([1, 2, 3, 4].iter().map(|q| U256::from(*q as u64))),
-        Value::struct_(Struct::pack([])),
-        Value::struct_(Struct::pack([Value::u8(0), Value::bool(false)])),
-        Value::vector_for_testing_only([]),
-        Value::vector_for_testing_only([Value::u8(0), Value::u8(1)]),
-    ];
-
-    let mut locals = Locals::new(vals.len());
-    for (idx, val) in vals.iter().enumerate() {
-        locals.store_loc(idx, val.copy_value()?, false)?;
-
-        let val_size_new = val.legacy_abstract_memory_size();
-        let val_size_old = val.legacy_size();
-
-        assert_eq!(val_size_new, val_size_old);
-
-        let val_size_through_ref = locals
-            .borrow_loc(idx)?
-            .value_as::<Reference>()?
-            .value_view()
-            .legacy_abstract_memory_size();
-
-        assert_eq!(val_size_through_ref, val_size_old)
-    }
 
     Ok(())
 }

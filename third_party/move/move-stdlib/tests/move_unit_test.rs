@@ -5,25 +5,19 @@
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_core_types::account_address::AccountAddress;
 use move_stdlib::{
-    natives::{all_natives, nursery_natives, GasParameters, NurseryGasParameters},
+    natives::{all_natives, GasParameters},
     path_in_crate,
 };
 use move_unit_test::UnitTestingConfig;
 use tempfile::tempdir;
 
-fn run_tests_for_pkg(path_to_pkg: impl Into<String>, include_nursery_natives: bool) {
+fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     let pkg_path = path_in_crate(path_to_pkg);
 
-    let mut natives = all_natives(
+    let natives = all_natives(
         AccountAddress::from_hex_literal("0x1").unwrap(),
         GasParameters::zeros(),
     );
-    if include_nursery_natives {
-        natives.extend(nursery_natives(
-            AccountAddress::from_hex_literal("0x1").unwrap(),
-            NurseryGasParameters::zeros(),
-        ))
-    }
 
     let result = run_move_unit_tests(
         &pkg_path,
@@ -46,6 +40,5 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, include_nursery_natives: bo
 
 #[test]
 fn move_unit_tests() {
-    run_tests_for_pkg(".", false);
-    run_tests_for_pkg("nursery", true);
+    run_tests_for_pkg(".");
 }
