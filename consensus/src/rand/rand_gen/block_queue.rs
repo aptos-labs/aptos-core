@@ -5,12 +5,9 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     pipeline::buffer_manager::OrderedBlocks,
 };
-use aptos_consensus_types::{
-    common::Round,
-    executed_block::ExecutedBlock,
-    randomness::{RandMetadata, Randomness},
-};
+use aptos_consensus_types::{common::Round, executed_block::ExecutedBlock};
 use aptos_reliable_broadcast::DropGuard;
+use aptos_types::randomness::{RandMetadata, Randomness};
 use std::collections::{BTreeMap, HashMap};
 
 /// Maintain the ordered blocks received from consensus and corresponding randomness
@@ -151,7 +148,7 @@ mod tests {
         block_queue::{BlockQueue, QueueItem},
         test_utils::create_ordered_blocks,
     };
-    use aptos_consensus_types::randomness::Randomness;
+    use aptos_types::randomness::Randomness;
     use std::collections::HashSet;
 
     #[test]

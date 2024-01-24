@@ -165,11 +165,12 @@ async fn schedule_compute_should_discover_validator_txns() {
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        false,
     );
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(&block, HashValue::zero())
+        .schedule_compute(&block, HashValue::zero(), None)
         .await
         .await;
 
@@ -230,6 +231,7 @@ async fn commit_should_discover_validator_txns() {
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        false,
     );
 
     let (tx, rx) = oneshot::channel::<()>();
