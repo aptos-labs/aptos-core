@@ -117,7 +117,9 @@ pub trait DKGTrait: Debug {
     type NewValidatorDecryptKey;
 
     fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
-    fn generate_predictable_input_secret_for_testing(dealer_sk: &Self::DealerPrivateKey) -> Self::InputSecret;
+    fn generate_predictable_input_secret_for_testing(
+        dealer_sk: &Self::DealerPrivateKey,
+    ) -> Self::InputSecret;
     fn aggregate_input_secret(secrets: Vec<Self::InputSecret>) -> Self::InputSecret;
     fn dealt_secret_from_input(input: &Self::InputSecret) -> Self::DealtSecret;
     fn generate_transcript<R: CryptoRng>(

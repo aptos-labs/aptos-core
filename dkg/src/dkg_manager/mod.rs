@@ -4,10 +4,7 @@ use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_logger::{debug, error};
 use aptos_types::{
-    dkg::{
-        DKGNode, DKGSessionState, DKGStartEvent, DKGTrait,
-        DKGTranscriptMetadata,
-    },
+    dkg::{DKGNode, DKGSessionState, DKGStartEvent, DKGTrait},
     epoch_state::EpochState,
     validator_txn::ValidatorTransaction,
 };

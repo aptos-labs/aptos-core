@@ -113,7 +113,7 @@ impl DbWriter for AptosDB {
                 .ledger_info_to_transaction_infos_proof
                 .left_siblings();
             restore_utils::confirm_or_save_frozen_subtrees(
-                self.ledger_db.transaction_accumulator_db(),
+                self.ledger_db.transaction_accumulator_db_raw(),
                 version,
                 frozen_subtrees,
                 None,
@@ -141,8 +141,6 @@ impl DbWriter for AptosDB {
             let transaction_infos = output_with_proof.proof.transaction_infos;
             // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
-                self.ledger_store.clone(),
-                self.transaction_store.clone(),
                 self.state_store.clone(),
                 self.ledger_db.clone(),
                 version,
@@ -332,7 +330,9 @@ impl AptosDB {
                     .unwrap()
             });
             s.spawn(|_| {
-                self.commit_write_sets(txns_to_commit, first_version)
+                self.ledger_db
+                    .write_set_db()
+                    .commit_write_sets(txns_to_commit, first_version)
                     .unwrap()
             });
             s.spawn(|_| {
@@ -494,9 +494,17 @@ impl AptosDB {
             .start_timer();
 
         let batch = SchemaBatch::new();
-        let root_hash =
-            self.ledger_store
-                .put_transaction_accumulator(first_version, txns_to_commit, &batch)?;
+        let root_hash = self
+            .ledger_db
+            .transaction_accumulator_db()
+            .put_transaction_accumulator(
+                first_version,
+                &txns_to_commit
+                    .iter()
+                    .map(|txn_to_commit| txn_to_commit.transaction_info())
+                    .collect::<Vec<_>>(),
+                &batch,
+            )?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_accumulator___commit"])
@@ -524,7 +532,7 @@ impl AptosDB {
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 let version = first_version + i as u64;
-                self.ledger_store.put_transaction_info(
+                TransactionInfoDb::put_transaction_info(
                     version,
                     txn_to_commit.transaction_info(),
                     &batch,
@@ -537,35 +545,6 @@ impl AptosDB {
             .with_label_values(&["commit_transaction_infos___commit"])
             .start_timer();
         self.ledger_db.transaction_info_db().write_schemas(batch)
-    }
-
-    fn commit_write_sets(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets"])
-            .start_timer();
-        let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
-        txns_to_commit
-            .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 128))
-            .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
-                self.transaction_store.put_write_set(
-                    first_version + i as u64,
-                    txn_to_commit.write_set(),
-                    &batch,
-                )?;
-
-                Ok(())
-            })?;
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets___commit"])
-            .start_timer();
-        self.ledger_db.write_set_db().write_schemas(batch)
     }
 
     fn commit_ledger_info(

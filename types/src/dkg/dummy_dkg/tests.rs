@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 
-use rand::thread_rng;
+use crate::{
+    dkg::{
+        dummy_dkg::{DummyDKG, DummyDKGTranscript, DummySecret},
+        DKGSessionMetadata, DKGTrait,
+    },
+    validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
+};
 use aptos_crypto::{bls12381, Uniform};
 use move_core_types::account_address::AccountAddress;
-use crate::dkg::{DKGSessionMetadata, DKGTrait};
-use crate::dkg::dummy_dkg::{DummyDKG, DummyDKGTranscript, DummySecret};
-use crate::validator_verifier::ValidatorConsensusInfo;
-use crate::ValidatorConsensusInfoMoveStruct;
+use rand::thread_rng;
 
 struct DealerState {
     addr: AccountAddress,
@@ -138,15 +141,12 @@ fn test_dummy_dkg_correctness() {
     let player_share_pairs = new_validator_states
         .iter()
         .enumerate()
-        .map(|(idx, nvi)| (idx as u64, nvi.secret_share.clone().unwrap()))
+        .map(|(idx, nvi)| (idx as u64, nvi.secret_share.unwrap()))
         .collect();
     let dealt_secret_from_reconstruct =
         DummyDKG::reconstruct_secret_from_shares(&pub_params, player_share_pairs).unwrap();
 
-    let all_input_secrets = dealer_states
-        .iter()
-        .map(|ds| ds.input_secret.clone())
-        .collect();
+    let all_input_secrets = dealer_states.iter().map(|ds| ds.input_secret).collect();
     let dealt_secret_from_input =
         DummyDKG::dealt_secret_from_input(&DummyDKG::aggregate_input_secret(all_input_secrets));
     assert_eq!(dealt_secret_from_reconstruct, dealt_secret_from_input);

@@ -216,7 +216,7 @@ fun explicate_drop::id<#0>($t0: #0): #0 {
 
 [variant baseline]
 fun explicate_drop::unused_arg<#0>($t0: #0) {
-  0: destroy($t0)
+  0: drop($t0)
   1: return ()
 }
 

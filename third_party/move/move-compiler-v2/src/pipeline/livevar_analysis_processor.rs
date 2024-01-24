@@ -7,6 +7,8 @@
 //!
 //! After transformation, this also runs copy inference transformation, which inserts
 //! copies as needed, and reports errors for invalid copies.
+//!
+//! This processor assumes that the CFG of the code has no critical edges.
 
 use super::ability_checker::check_copy;
 use crate::pipeline::ability_checker::has_ability;
@@ -27,7 +29,7 @@ use move_stackless_bytecode::{
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     iter::{empty, once},
 };
 
@@ -62,6 +64,18 @@ impl LiveVarInfoAtCodeOffset {
             .keys()
             .filter(|t| !self.after.contains_key(t))
             .cloned()
+    }
+
+    /// Returns the temporaries that are alive before the program point and dead after, or introduced
+    /// by the given bytecode and dead after.
+    pub fn released_and_unused_temps(&self, bc: &Bytecode) -> BTreeSet<TempIndex> {
+        let mut result: BTreeSet<_> = self.released_temps().collect();
+        for dest in bc.dests() {
+            if !self.after.contains_key(&dest) {
+                result.insert(dest);
+            }
+        }
+        result
     }
 
     /// Creates a set of the temporaries alive before this program point.
@@ -141,12 +155,56 @@ impl LiveVarAnalysisProcessor {
             code,
             &cfg,
         );
-        analyzer.state_per_instruction(state_map, code, &cfg, |before, after| {
-            LiveVarInfoAtCodeOffset {
-                before: before.livevars.clone().into_iter().collect(),
-                after: after.livevars.clone().into_iter().collect(),
+        // Prepare the result as a map from CodeOffset to LiveVarInfo
+        let mut code_map =
+            analyzer.state_per_instruction(state_map, code, &cfg, |before, after| {
+                LiveVarInfoAtCodeOffset {
+                    before: before.livevars.clone().into_iter().collect(),
+                    after: after.livevars.clone().into_iter().collect(),
+                }
+            });
+
+        // Now propagate to all branches in the code the `after` set of the branch instruction. Consider code as follows:
+        // ```
+        // L0: if c goto L1 else L2
+        // <x alive>
+        // L1: ..
+        //     goto L0
+        // L2: ..
+        // ```
+        // The backwards analysis will not populate the before state of `L1` and `L2` with `x` being alive unless it
+        // is used in the branch. However, from the forward program flow it follows that `x` is alive before
+        // `L1` and `L2` regardless of its usage. More specifically, it may have to be _dropped_ if it goes out
+        // of scope after the branch.
+        //
+        // This problem of values which "are lost on the edge" of the control graph can be dealt with by
+        // introducing extra edges. However, assuming that there are no critical edges, a simpler
+        // solution is the join `pre(L1) := pre(L1) join after(L0)`, and similar for `L2`.
+        let label_to_offset = Bytecode::label_offsets(code);
+        for (offs, bc) in code.iter().enumerate() {
+            let offs = offs as CodeOffset;
+            if let Bytecode::Branch(_, then_label, else_label, _) = bc {
+                let this = code_map[&offs].clone();
+                let then = code_map.get_mut(&label_to_offset[then_label]).unwrap();
+                Self::join_maps(&mut then.before, &this.after);
+                let else_ = code_map.get_mut(&label_to_offset[else_label]).unwrap();
+                Self::join_maps(&mut else_.before, &this.after);
             }
-        })
+        }
+        code_map
+    }
+
+    fn join_maps(m1: &mut BTreeMap<TempIndex, LiveVarInfo>, m2: &BTreeMap<TempIndex, LiveVarInfo>) {
+        for (k, v) in m2 {
+            match m1.entry(*k) {
+                Entry::Vacant(e) => {
+                    e.insert(v.clone());
+                },
+                Entry::Occupied(mut e) => {
+                    e.get_mut().join(v);
+                },
+            }
+        }
     }
 
     /// Registers annotation formatter at the given function target. This is for debugging and

@@ -205,7 +205,7 @@ fun vectors::test_for_each_mut() {
  27: $t9 := copy($t18)
      # live vars: $t0, $t5, $t7, $t9
  28: goto 31
-     # live vars: $t0
+     # live vars: $t0, $t5, $t7, $t9
  29: label L3
      # live vars: $t0
  30: goto 33
@@ -339,7 +339,7 @@ fun vectors::test_for_each_mut() {
  27: $t9 := copy($t18)
      # live vars: $t0, $t5, $t7, $t9
  28: goto 31
-     # live vars: $t0
+     # live vars: $t0, $t5, $t7, $t9
  29: label L3
      # live vars: $t0
  30: goto 33
@@ -573,14 +573,14 @@ fun vectors::test_for_each_mut() {
      # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
      # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
      # global_to_label: {}
-     # moved: {$t2,$t3,$t4,$t5,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
      #
  22: $t17 := 1
      # live vars: $t0, $t5, $t7, $t9, $t17
      # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
      # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
      # global_to_label: {}
-     # moved: {$t2,$t3,$t4,$t5,$t8,$t9,$t12,$t13,$t15,$t19,$t26,$t27}
+     # moved: {$t2,$t3,$t4,$t8,$t9,$t12,$t13,$t15,$t19,$t26,$t27}
      #
  23: $t16 := +($t5, $t17)
      # live vars: $t0, $t7, $t9, $t16
@@ -618,7 +618,7 @@ fun vectors::test_for_each_mut() {
      # moved: {$t2,$t3,$t4,$t8,$t12,$t13,$t15,$t17,$t19,$t26,$t27}
      #
  28: goto 31
-     # live vars: $t0
+     # live vars: $t0, $t5, $t7, $t9
      # graph: {L1792=local($t0)[borrow(true) -> L1793],L1793=local($t8)[skip -> L2049],L2049=local($t7)[]}
      # local_to_label: {$t0=L1792,$t7=L2049,$t8=L1793}
      # global_to_label: {}

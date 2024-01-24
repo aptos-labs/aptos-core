@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    dkg::{DKGSessionMetadata, DKGTrait},
-};
+use crate::dkg::{DKGSessionMetadata, DKGTrait};
 use anyhow::{anyhow, ensure};
 use aptos_crypto::{bls12381, Uniform};
 use rand::{CryptoRng, Rng, RngCore};
@@ -111,7 +109,9 @@ impl DKGTrait for DummyDKG {
         transcript.contributions_by_dealer.keys().copied().collect()
     }
 
-    fn generate_predictable_input_secret_for_testing(dealer_sk: &bls12381::PrivateKey) -> DummySecret {
+    fn generate_predictable_input_secret_for_testing(
+        dealer_sk: &bls12381::PrivateKey,
+    ) -> DummySecret {
         let bytes_8: [u8; 8] = dealer_sk.to_bytes()[0..8].try_into().unwrap();
         DummySecret {
             val: u64::from_be_bytes(bytes_8),

@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::DKGManager,
     DKGMessage,
+    dkg_manager::{agg_trx_producer::RealAggTranscriptProducer, DKGManager},
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
 };
@@ -18,7 +18,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState},
+    dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -66,8 +66,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
-            my_addr,
             dkg_dealer_sk: Arc::new(dkg_dealer_sk),
+            my_addr,
             epoch_state: None,
             reconfig_events,
             dkg_start_events,
@@ -153,28 +153,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if let (true, Some(my_index))  = (features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG), my_index) {
-            let DKGState { in_progress: in_progress_session, .. } = payload.get::< DKGState > ().unwrap_or_default();
+        if features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
+            let DKGState {
+                in_progress: in_progress_session,
+                ..
+            } = payload.get::<DKGState>().unwrap_or_default();
 
             let network_sender = self.create_network_sender();
             let rb = ReliableBroadcast::new(
-            epoch_state.verifier.get_ordered_account_addresses(),
-            Arc::new(network_sender),
-            ExponentialBackoff::from_millis(5),
-            aptos_time_service::TimeService::real(),
-            Duration::from_millis(1000),
-            BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+                epoch_state.verifier.get_ordered_account_addresses(),
+                Arc::new(network_sender),
+                ExponentialBackoff::from_millis(5),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(1000),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
             let agg_trx_producer = RealAggTranscriptProducer::new(rb);
 
             let (dkg_start_event_tx, dkg_start_event_rx) =
-            aptos_channel::new(QueueStyle::KLAST, 1, None);
+                aptos_channel::new(QueueStyle::KLAST, 1, None);
             self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
-            (),
-            (AccountAddress, IncomingRpcRequest),
-            > (QueueStyle::FIFO, 100, None);
+                (),
+                (AccountAddress, IncomingRpcRequest),
+            >(QueueStyle::FIFO, 100, None);
             self.dkg_rpc_msg_tx = Some(dkg_rpc_msg_tx);
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);

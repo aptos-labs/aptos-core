@@ -1,16 +1,20 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::dkg::{DKGNode, DKGSessionMetadata, DKGTrait, DKGTranscriptMetadata};
-use aptos_types::validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier};
-use aptos_types::ValidatorConsensusInfoMoveStruct;
+use crate::transcript_aggregation::TranscriptAggregationState;
+use aptos_crypto::{bls12381::bls12381_keys, Uniform};
+use aptos_reliable_broadcast::BroadcastStatus;
+use aptos_types::{
+    dkg::{
+        dummy_dkg::{DummyDKG, DummyDKGTranscript},
+        DKGNode, DKGSessionMetadata, DKGTrait, DKGTranscriptMetadata,
+    },
+    epoch_state::EpochState,
+    validator_verifier::{
+        ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
+    },
+};
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
-use aptos_crypto::bls12381::bls12381_keys;
-use aptos_crypto::Uniform;
-use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::dkg::dummy_dkg::{DummyDKG, DummyDKGTranscript};
-use aptos_types::epoch_state::EpochState;
-use crate::transcript_aggregation::TranscriptAggregationState;
 
 #[test]
 fn test_transcript_aggregation_state() {
@@ -29,7 +33,11 @@ fn test_transcript_aggregation_state() {
     let validator_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
-    let validator_consensus_info_move_structs = validator_infos.clone().into_iter().map(ValidatorConsensusInfoMoveStruct::from).collect::<Vec<_>>();
+    let validator_consensus_info_move_structs = validator_infos
+        .clone()
+        .into_iter()
+        .map(ValidatorConsensusInfoMoveStruct::from)
+        .collect::<Vec<_>>();
     let verifier = ValidatorVerifier::new(validator_infos.clone());
     let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,

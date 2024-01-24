@@ -5,7 +5,7 @@ use crate::{config::SecureBackend, keys::ConfigKey};
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_types::{
     account_address::{AccountAddress, AccountAddress as PeerId},
-    dkg::{DKGTrait},
+    dkg::{DKGTrait, DefaultDKG},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -42,11 +42,15 @@ impl IdentityBlob {
         Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
     }
 
-    pub fn try_into_dkg_dealer_private_key(self) -> Option<<DefaultDKG as DKGTrait>::DealerPrivateKey> {
+    pub fn try_into_dkg_dealer_private_key(
+        self,
+    ) -> Option<<DefaultDKG as DKGTrait>::DealerPrivateKey> {
         self.consensus_private_key
     }
 
-    pub fn try_into_dkg_new_validator_decrypt_key(self) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+    pub fn try_into_dkg_new_validator_decrypt_key(
+        self,
+    ) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
         self.consensus_private_key
     }
 }

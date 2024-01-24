@@ -30,11 +30,14 @@ use move_core_types::{
 use move_vm_types::gas::UnmeteredGasMeter;
 
 enum ExpectedFailure {
-    MissingResourceDKGState = 0,
-    MissingResourceInprogressDKGSession,
-    EpochNotCurrent,
-    TranscriptDeserializationFailed,
-    TranscriptVerificationFailed,
+    // Move equivalent: `errors::invalid_argument(*)`
+    EpochNotCurrent = 0x10001,
+    TranscriptDeserializationFailed = 0x10002,
+    TranscriptVerificationFailed = 0x10003,
+
+    // Move equivalent: `errors::invalid_state(*)`
+    MissingResourceDKGState = 0x30001,
+    MissingResourceInprogressDKGSession = 0x30002,
 }
 
 enum ExecutionFailure {
@@ -86,11 +89,13 @@ impl AptosVM {
         }
 
         // Deserialize transcript and verify it.
-        let pub_params = DummyDKG::new_public_params(&in_progress_session_state.metadata);
-        let transcript = bcs::from_bytes::<DummyDKGTranscript>(dkg_node.transcript_bytes.as_slice())
-            .map_err(|_| Expected(TranscriptDeserializationFailed))?;
+        let pub_params = DefaultDKG::new_public_params(&in_progress_session_state.metadata);
+        let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
+            dkg_node.transcript_bytes.as_slice(),
+        )
+        .map_err(|_| Expected(TranscriptDeserializationFailed))?;
 
-        DummyDKG::verify_transcript(&pub_params, &transcript)
+        DefaultDKG::verify_transcript(&pub_params, &transcript)
             .map_err(|_| Expected(TranscriptVerificationFailed))?;
 
         // All check passed, invoke VM to publish DKG result on chain.

@@ -4,7 +4,7 @@
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
-        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
+        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_infos},
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -162,7 +162,7 @@ fn test_get_latest_executed_trees() {
         0,
         ExecutionStatus::MiscellaneousError(None),
     );
-    put_transaction_info(&db, 0, &txn_info);
+    put_transaction_infos(&db, 0, &[txn_info.clone()]);
 
     let bootstrapped = db.get_latest_executed_trees().unwrap();
     assert!(

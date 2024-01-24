@@ -662,7 +662,9 @@ pub fn setup_environment_and_start_node(
         .consensus
         .safety_rules
         .initial_safety_rules_config
-        .identity_blob().ok().and_then(|blob| blob.try_into_dkg_dealer_private_key());
+        .identity_blob()
+        .ok()
+        .and_then(|blob| blob.try_into_dkg_dealer_private_key());
 
     let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
         (Some(interfaces), Some(dkg_dealer_sk)) => {

@@ -40,9 +40,6 @@ impl<DKG: DKGTrait> TranscriptAggregationState<DKG> {
     }
 }
 
-#[cfg(test)]
-mod tests;
-
 impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState<S>> {
     type Aggregated = S::Transcript;
     type Message = DKGNodeRequest;
@@ -72,7 +69,7 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         // All checks passed. Aggregating.
         trx_aggregator.contributors.insert(metadata.author);
         if let Some(agg_trx) = trx_aggregator.trx.as_mut() {
-            let acc = mem::take(agg_trx);
+            let acc = std::mem::take(agg_trx);
             *agg_trx = S::aggregate_transcripts(&self.dkg_pub_params, vec![acc, transcript]);
         } else {
             trx_aggregator.trx = Some(transcript);
@@ -86,3 +83,6 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         Ok(maybe_aggregated)
     }
 }
+
+#[cfg(test)]
+mod tests;

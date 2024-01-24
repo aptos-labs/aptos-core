@@ -260,7 +260,13 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             .into_os_string()
             .into_string()
             .unwrap();
-        pipeline.run_with_dump(env, &mut targets, &dump_file_base, options.prover.dump_cfg)
+        pipeline.run_with_dump(
+            env,
+            &mut targets,
+            &dump_file_base,
+            options.prover.dump_cfg,
+            &|_| {},
+        )
     } else {
         pipeline.run(env, &mut targets);
     }
