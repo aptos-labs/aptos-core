@@ -208,7 +208,7 @@ impl StateComputer for DagStateSyncComputer {
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
         _block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_deduper: Arc<dyn TransactionDeduper>,
-        _: bool,
+        _randomness_enabled: bool,
     ) {
         unimplemented!("method not supported");
     }

@@ -158,7 +158,7 @@ ContractEventV2:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
-DKGNode:
+DKGTranscript:
   STRUCT:
     - metadata:
         TYPENAME: DKGTranscriptMetadata
@@ -554,13 +554,13 @@ TypeTag:
 ValidatorTransaction:
   ENUM:
     0:
-      DKGResult:
-        NEWTYPE:
-          TYPENAME: DKGNode
-    1:
       DummyTopic1:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
+    1:
+      DKGResult:
+        NEWTYPE:
+          TYPENAME: DKGTranscript
     2:
       DummyTopic2:
         NEWTYPE:

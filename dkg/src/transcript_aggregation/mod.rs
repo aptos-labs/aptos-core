@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::{types::DKGNodeRequest, DKGMessage};
+use crate::{types::DKGTranscriptRequest, DKGMessage};
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    dkg::{DKGNode, DKGTrait},
+    dkg::{DKGTrait, DKGTranscript},
     epoch_state::EpochState,
 };
 use move_core_types::account_address::AccountAddress;
@@ -45,14 +45,18 @@ impl<DKG: DKGTrait> TranscriptAggregationState<DKG> {
 
 impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState<S>> {
     type Aggregated = S::Transcript;
-    type Message = DKGNodeRequest;
-    type Response = DKGNode;
+    type Message = DKGTranscriptRequest;
+    type Response = DKGTranscript;
 
-    fn add(&self, sender: Author, dkg_node: DKGNode) -> anyhow::Result<Option<Self::Aggregated>> {
-        let DKGNode {
+    fn add(
+        &self,
+        sender: Author,
+        dkg_transcript: DKGTranscript,
+    ) -> anyhow::Result<Option<Self::Aggregated>> {
+        let DKGTranscript {
             metadata,
             transcript_bytes,
-        } = dkg_node;
+        } = dkg_transcript;
         ensure!(
             metadata.epoch == self.epoch_state.epoch,
             "adding dkg node failed with invalid node epoch",

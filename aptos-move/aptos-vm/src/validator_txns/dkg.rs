@@ -12,7 +12,7 @@ use crate::{
     AptosVM,
 };
 use aptos_types::{
-    dkg::{DKGNode, DKGState, DKGTrait, DefaultDKG},
+    dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
@@ -49,9 +49,9 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
-        dkg_node: DKGNode,
+        dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_node) {
+        match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_transcript) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
@@ -69,7 +69,7 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
-        dkg_node: DKGNode,
+        dkg_node: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
         let dkg_state = OnChainConfig::fetch_config(resolver)
             .ok_or_else(|| Expected(MissingResourceDKGState))?;
