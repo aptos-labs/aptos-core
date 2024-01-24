@@ -178,11 +178,22 @@ ContractEventV2:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
+DKGNode:
+  STRUCT:
+    - metadata:
+        TYPENAME: DKGTranscriptMetadata
+    - transcript_bytes: BYTES
+DKGTranscriptMetadata:
+  STRUCT:
+    - epoch: U64
+    - author:
+        TYPENAME: AccountAddress
 DepositEvent:
   STRUCT:
     - amount: U64
 DummyValidatorTransaction:
   STRUCT:
+    - valid: BOOL
     - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
@@ -658,10 +669,14 @@ TypeTag:
 ValidatorTransaction:
   ENUM:
     0:
+      DKGResult:
+        NEWTYPE:
+          TYPENAME: DKGNode
+    1:
       DummyTopic1:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
-    1:
+    2:
       DummyTopic2:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction

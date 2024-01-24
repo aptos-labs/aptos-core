@@ -20,7 +20,7 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, IdentityBlob, NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -658,16 +658,16 @@ pub fn setup_environment_and_start_node(
             peers_and_metadata,
         );
     let vtxn_pool = VTxnPoolState::default();
-    let identity_blob: Option<Arc<IdentityBlob>> = node_config
+    let maybe_dkg_dealer_sk = node_config
         .consensus
         .safety_rules
         .initial_safety_rules_config
         .identity_blob()
         .ok()
-        .map(Arc::new);
+        .and_then(|blob| blob.try_into_dkg_dealer_private_key());
 
-    let dkg_runtime = match (dkg_network_interfaces, identity_blob.clone()) {
-        (Some(interfaces), Some(identity_blob)) => {
+    let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
+        (Some(interfaces), Some(dkg_dealer_sk)) => {
             let ApplicationNetworkInterfaces {
                 network_client,
                 network_service_events,
@@ -677,7 +677,7 @@ pub fn setup_environment_and_start_node(
             let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
             let dkg_runtime = start_dkg_runtime(
                 my_addr,
-                identity_blob,
+                dkg_dealer_sk,
                 network_client,
                 network_service_events,
                 reconfig_events,
