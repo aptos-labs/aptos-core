@@ -6,6 +6,7 @@ use aptos_infallible::Mutex;
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    fmt::{Debug, Formatter},
     sync::Arc,
     time::Instant,
 };
@@ -118,6 +119,14 @@ pub struct PoolStateInner {
 pub struct TxnGuard {
     pool: Arc<Mutex<PoolStateInner>>,
     seq_num: u64,
+}
+
+impl Debug for TxnGuard {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TxnGuard")
+            .field("seq_num", &self.seq_num)
+            .finish()
+    }
 }
 
 impl PoolStateInner {

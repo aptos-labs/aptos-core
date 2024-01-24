@@ -1,12 +1,16 @@
 // Copyright © Aptos Foundation
-use crate::{agg_trx_producer::AggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
+use crate::{agg_trx_producer::TAggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_crypto::Uniform;
 use aptos_logger::{debug, error};
 use aptos_types::{
-    dkg::{DKGNode, DKGSessionState, DKGStartEvent, DKGTrait},
+    dkg::{
+        DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
+        DKGTranscriptMetadata,
+    },
     epoch_state::EpochState,
-    validator_txn::ValidatorTransaction,
+    validator_txn::{Topic, ValidatorTransaction},
 };
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
@@ -15,22 +19,19 @@ use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
 use std::time::Duration;
-use aptos_crypto::Uniform;
-use aptos_types::dkg::DKGSessionMetadata;
-use aptos_types::validator_txn::Topic;
 
 #[derive(Clone, Debug)]
 enum InnerState {
     NotStarted,
     InProgress {
         start_time_us: u64,
-        my_node: DKGNode,
+        my_transcript: DKGTranscript,
         abort_handle: AbortHandle,
     },
     Finished {
         vtxn_guard: TxnGuard,
         start_time_us: u64,
-        my_node: DKGNode,
+        my_transcript: DKGTranscript,
         pull_confirmed: bool,
     },
 }
@@ -43,13 +44,12 @@ impl Default for InnerState {
 
 pub struct DKGManager<DKG: DKGTrait> {
     dealer_sk: Arc<DKG::DealerPrivateKey>,
-
-    my_addr: AccountAddress,
     my_index: usize,
+    my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
 
     vtxn_pool: VTxnPoolState,
-    agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
+    agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
     agg_trx_tx: Option<aptos_channel::Sender<(), DKG::Transcript>>,
 
     // When we put vtxn in the pool, we also put a copy of this so later pool can notify us.
@@ -71,11 +71,11 @@ impl InnerState {
     }
 
     #[cfg(test)]
-    pub fn my_node_cloned(&self) -> DKGNode {
+    pub fn my_node_cloned(&self) -> DKGTranscript {
         match self {
             InnerState::NotStarted => panic!("my_node unavailable"),
-            InnerState::InProgress { my_node, .. } | InnerState::Finished { my_node, .. } => {
-                my_node.clone()
+            InnerState::InProgress { my_transcript, .. } | InnerState::Finished { my_transcript, .. } => {
+                my_transcript.clone()
             },
         }
     }
@@ -84,13 +84,15 @@ impl InnerState {
 impl<DKG: DKGTrait> DKGManager<DKG> {
     pub fn new(
         dealer_sk: Arc<DKG::DealerPrivateKey>,
+        my_index: usize,
         my_addr: AccountAddress,
         my_index: usize,
         epoch_state: Arc<EpochState>,
-        agg_trx_producer: Arc<dyn AggTranscriptProducer<DKG>>,
+        agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
-        let (pull_notification_tx, pull_notification_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
+        let (pull_notification_tx, pull_notification_rx) =
+            aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             dealer_sk,
             my_addr,
@@ -109,8 +111,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     pub async fn run(
         mut self,
         in_progress_session: Option<DKGSessionState>,
-        mut dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
-        mut rpc_msg_rx: aptos_channel::Receiver<(), (AccountAddress, IncomingRpcRequest)>,
+        dkg_start_event_rx: oneshot::Receiver<DKGStartEvent>,
+        mut rpc_msg_rx: aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingRpcRequest),
+        >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         debug!("[DKG] manager start");
@@ -220,7 +225,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                     &self.dealer_sk,
                 );
 
-                let dkg_node = DKGNode::new(
+                let dkg_node = DKGTranscript::new(
                     self.epoch_state.epoch,
                     self.my_addr,
                     bcs::to_bytes(&trx).map_err(|e|anyhow!("setup_deal_broadcast failed with trx serialization error: {e}"))?,
@@ -237,7 +242,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 // Switch to the next stage.
                 InnerState::InProgress {
                     start_time_us,
-                    my_node: dkg_node,
+                    my_transcript: dkg_node,
                     abort_handle,
                 }
             },
@@ -253,11 +258,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         self.state = match std::mem::take(&mut self.state) {
             InnerState::InProgress {
                 start_time_us,
-                my_node,
+                my_transcript,
                 ..
             } => {
                 // TODO(zjma): metric DKG_AGG_NODE_READY
-                let txn = ValidatorTransaction::DKGResult(DKGNode {
+                let txn = ValidatorTransaction::DKGResult(DKGTranscript {
                     metadata: DKGTranscriptMetadata {
                         epoch: self.epoch_state.epoch,
                         author: self.my_addr,
@@ -268,7 +273,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 InnerState::Finished {
                     vtxn_guard,
                     start_time_us,
-                    my_node,
+                    my_transcript,
                     pull_confirmed: false,
                 }
             },
@@ -297,10 +302,20 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         } = req;
         ensure!(msg.epoch() == self.epoch_state.epoch);
         let response = match (&self.state, &msg) {
-            (InnerState::Finished { my_node, .. }, DKGMessage::NodeRequest(_))
-            | (InnerState::InProgress { my_node, .. }, DKGMessage::NodeRequest(_)) => {
-                Ok(DKGMessage::NodeResponse(my_node.clone()))
-            },
+            (
+                InnerState::Finished {
+                    my_transcript: my_node,
+                    ..
+                },
+                DKGMessage::NodeRequest(_),
+            )
+            | (
+                InnerState::InProgress {
+                    my_transcript: my_node,
+                    ..
+                },
+                DKGMessage::NodeRequest(_),
+            ) => Ok(DKGMessage::NodeResponse(my_node.clone())),
             _ => Err(anyhow!(
                 "msg {:?} unexpected in state {:?}",
                 msg.name(),

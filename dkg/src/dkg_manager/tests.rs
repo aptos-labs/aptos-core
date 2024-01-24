@@ -3,22 +3,32 @@
 use crate::{
     agg_trx_producer::DummyAggTranscriptProducer,
     dkg_manager::{DKGManager, InnerState},
-    DKGMessage,
     network::{DummyRpcResponseSender, IncomingRpcRequest},
-    types::DKGNodeRequest,
+    types::DKGTranscriptRequest,
+    DKGMessage,
 };
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
     Uniform,
 };
 use aptos_infallible::RwLock;
-use aptos_types::{dkg::{DKGNode, DKGStartEvent, DKGTrait, DKGTranscriptMetadata}, epoch_state::EpochState, validator_txn::ValidatorTransaction, validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier}, ValidatorConsensusInfoMoveStruct};
+use aptos_types::{
+    dkg::{
+        dummy_dkg::DummyDKG, DKGSessionMetadata, DKGStartEvent, DKGTrait, DKGTranscript,
+        DKGTranscriptMetadata,
+    },
+    epoch_state::EpochState,
+    validator_txn::ValidatorTransaction,
+    validator_verifier::{
+        ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
+    },
+};
 use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use move_core_types::account_address::AccountAddress;
-use std::{sync::Arc, time::Duration};
-use std::time::Instant;
-use aptos_types::dkg::DKGSessionMetadata;
-use aptos_types::dkg::dummy_dkg::DummyDKG;
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 #[tokio::test]
 async fn test_dkg_state_transition() {
@@ -36,7 +46,11 @@ async fn test_dkg_state_transition() {
     let validator_consensus_infos: Vec<ValidatorConsensusInfo> = (0..4)
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
-    let validator_consensus_info_move_structs = validator_consensus_infos.clone().into_iter().map(ValidatorConsensusInfoMoveStruct::from).collect::<Vec<_>>();
+    let validator_consensus_info_move_structs = validator_consensus_infos
+        .clone()
+        .into_iter()
+        .map(ValidatorConsensusInfoMoveStruct::from)
+        .collect::<Vec<_>>();
     let epoch_state = EpochState {
         epoch: 999,
         verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
@@ -44,8 +58,8 @@ async fn test_dkg_state_transition() {
     let agg_node_producer = DummyAggTranscriptProducer {};
     let mut dkg_manager: DKGManager<DummyDKG> = DKGManager::new(
         private_keys[0].clone(),
-        addrs[0],
         0,
+        addrs[0],
         Arc::new(epoch_state),
         Arc::new(agg_node_producer),
         vtxn_pool_handle.clone(),
@@ -67,18 +81,18 @@ async fn test_dkg_state_transition() {
     // In state `NotStarted`, DKGManager should accept `DKGStartEvent`:
     // it should record start time, compute its own node, and enter state `InProgress`.
     let handle_result = dkg_manager
-        .process_dkg_start_event(DKGStartEvent {
+        .process_dkg_start_event(Some(DKGStartEvent {
             session_metadata: DKGSessionMetadata {
                 dealer_epoch: 999,
                 dealer_validator_set: validator_consensus_info_move_structs.clone(),
                 target_validator_set: validator_consensus_info_move_structs.clone(),
             },
             start_time_us: 1700000000000000,
-        })
+        }))
         .await;
     assert!(handle_result.is_ok());
     assert!(
-        matches!(&dkg_manager.state, InnerState::InProgress { start_time_us, my_node, .. } if *start_time_us == 1700000000000000 && my_node.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
+        matches!(&dkg_manager.state, InnerState::InProgress { start_time_us, my_transcript, .. } if *start_time_us == 1700000000000000 && my_transcript.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
     );
 
     // In state `InProgress`, DKGManager should respond to `DKGNodeRequest` with its own node.
@@ -102,15 +116,14 @@ async fn test_dkg_state_transition() {
         .process_aggregated_transcript(agg_trx.clone())
         .await;
     assert!(handle_result.is_ok());
-    let available_vtxns = vtxn_pool_handle
-        .pull(
-            Instant::now() + Duration::from_secs(10),
-            999,
-            2048,
-            TransactionFilter::no_op(),
-        );
+    let available_vtxns = vtxn_pool_handle.pull(
+        Instant::now() + Duration::from_secs(10),
+        999,
+        2048,
+        TransactionFilter::no_op(),
+    );
     assert_eq!(
-        vec![ValidatorTransaction::DKGResult(DKGNode {
+        vec![ValidatorTransaction::DKGResult(DKGTranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: 999,
                 author: addrs[0],
@@ -143,7 +156,7 @@ fn new_rpc_node_request(
     response_collector: Arc<RwLock<Vec<anyhow::Result<DKGMessage>>>>,
 ) -> IncomingRpcRequest {
     IncomingRpcRequest {
-        msg: DKGMessage::NodeRequest(DKGNodeRequest::new(epoch)),
+        msg: DKGMessage::NodeRequest(DKGTranscriptRequest::new(epoch)),
         sender,
         response_sender: Box::new(DummyRpcResponseSender::new(response_collector)),
     }

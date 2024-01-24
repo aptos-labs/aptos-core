@@ -51,3 +51,5 @@ pub fn start_dkg_runtime(
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
 }
+
+pub mod agg_trx_producer;

@@ -408,7 +408,7 @@ DAGNetworkMessage:
   STRUCT:
     - epoch: U64
     - data: BYTES
-DKGNode:
+DKGTranscript:
   STRUCT:
     - metadata:
         TYPENAME: DKGTranscriptMetadata
@@ -945,13 +945,13 @@ ValidatorConsensusInfo:
 ValidatorTransaction:
   ENUM:
     0:
-      DKGResult:
-        NEWTYPE:
-          TYPENAME: DKGNode
-    1:
       DummyTopic1:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
+    1:
+      DKGResult:
+        NEWTYPE:
+          TYPENAME: DKGTranscript
     2:
       DummyTopic2:
         NEWTYPE:
