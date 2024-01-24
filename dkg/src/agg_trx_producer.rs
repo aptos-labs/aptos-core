@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    transcript_aggregation::TranscriptAggregationState, types::DKGNodeRequest, DKGMessage,
+    transcript_aggregation::TranscriptAggregationState, types::DKGTranscriptRequest, DKGMessage,
 };
 use aptos_channels::aptos_channel::Sender;
 use aptos_reliable_broadcast::ReliableBroadcast;
@@ -15,7 +15,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 /// Once invoked by `DKGManager` to `start_produce`,
 /// it starts producing an aggregated transcript and returns an abort handle.
 /// Once an aggregated transcript is available, it is sent back via channel `agg_trx_tx`.
-pub trait AggTranscriptProducer<S: DKGTrait>: Send + Sync {
+pub trait TAggTranscriptProducer<S: DKGTrait>: Send + Sync {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
@@ -25,11 +25,11 @@ pub trait AggTranscriptProducer<S: DKGTrait>: Send + Sync {
 }
 
 /// The real implementation of `AggTranscriptProducer` that broadcasts a `NodeRequest`, collects and verifies nodes from network.
-pub struct RealAggTranscriptProducer {
+pub struct AggTranscriptProducer {
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
 }
 
-impl RealAggTranscriptProducer {
+impl AggTranscriptProducer {
     pub fn new(reliable_broadcast: ReliableBroadcast<DKGMessage, ExponentialBackoff>) -> Self {
         Self {
             reliable_broadcast: Arc::new(reliable_broadcast),
@@ -37,7 +37,7 @@ impl RealAggTranscriptProducer {
     }
 }
 
-impl<DKG: DKGTrait + 'static> AggTranscriptProducer<DKG> for RealAggTranscriptProducer {
+impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProducer {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
@@ -45,7 +45,7 @@ impl<DKG: DKGTrait + 'static> AggTranscriptProducer<DKG> for RealAggTranscriptPr
         agg_trx_tx: Option<Sender<(), DKG::Transcript>>,
     ) -> AbortHandle {
         let rb = self.reliable_broadcast.clone();
-        let req = DKGNodeRequest::new(epoch_state.epoch);
+        let req = DKGTranscriptRequest::new(epoch_state.epoch);
         let agg_state = Arc::new(TranscriptAggregationState::<DKG>::new(params, epoch_state));
         let task = async move {
             let agg_trx = rb.broadcast(req, agg_state).await;
@@ -63,7 +63,7 @@ impl<DKG: DKGTrait + 'static> AggTranscriptProducer<DKG> for RealAggTranscriptPr
 pub struct DummyAggTranscriptProducer {}
 
 #[cfg(test)]
-impl<DKG: DKGTrait> AggTranscriptProducer<DKG> for DummyAggTranscriptProducer {
+impl<DKG: DKGTrait> TAggTranscriptProducer<DKG> for DummyAggTranscriptProducer {
     fn start_produce(
         &self,
         _epoch_state: Arc<EpochState>,

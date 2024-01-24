@@ -6,12 +6,19 @@ use aptos_infallible::Mutex;
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    fmt::{Debug, Formatter},
     sync::Arc,
     time::Instant,
 };
 
 pub enum TransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),
+}
+
+impl TransactionFilter {
+    pub fn no_op() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
 }
 
 impl TransactionFilter {
@@ -107,9 +114,18 @@ pub struct PoolStateInner {
 /// If this is dropped, `txn` will be deleted from the pool (if it has not been).
 ///
 /// This allows the pool to be emptied on epoch boundaries.
+#[derive(Clone)]
 pub struct TxnGuard {
     pool: Arc<Mutex<PoolStateInner>>,
     seq_num: u64,
+}
+
+impl Debug for TxnGuard {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TxnGuard")
+            .field("seq_num", &self.seq_num)
+            .finish()
+    }
 }
 
 impl PoolStateInner {
