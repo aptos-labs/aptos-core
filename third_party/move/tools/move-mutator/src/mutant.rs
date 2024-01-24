@@ -1,4 +1,4 @@
-use crate::operator::{MutantInfo, MutationOperator};
+use crate::operator::{MutantInfo, MutationOperator, MutationOperatorTrait};
 use move_command_line_common::files::FileHash;
 use std::fmt;
 
@@ -40,14 +40,15 @@ mod tests {
     use move_command_line_common::files::FileHash;
     use move_compiler::parser::ast::{BinOp, BinOp_};
     use move_ir_types::location::Loc;
+    use crate::operators::binary::BinaryOperator;
 
     #[test]
     fn test_new() {
         let loc = Loc::new(FileHash::new(""), 0, 0);
-        let operator = MutationOperator::BinaryOperator(BinOp {
+        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(BinOp {
             value: BinOp_::Add,
             loc,
-        });
+        }));
         let mutant = Mutant::new(operator);
         assert_eq!(format!("{}", mutant), "Mutant: BinaryOperator(+, location: file hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, index start: 0, index stop: 0)");
     }
@@ -55,10 +56,10 @@ mod tests {
     #[test]
     fn test_get_file_hash() {
         let loc = Loc::new(FileHash::new(""), 0, 0);
-        let operator = MutationOperator::BinaryOperator(BinOp {
+        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(BinOp {
             value: BinOp_::Add,
             loc,
-        });
+        }));
         let mutant = Mutant::new(operator);
         assert_eq!(mutant.get_file_hash(), FileHash::new(""));
     }
@@ -66,10 +67,10 @@ mod tests {
     #[test]
     fn test_apply() {
         let loc = Loc::new(FileHash::new(""), 0, 1);
-        let operator = MutationOperator::BinaryOperator(BinOp {
+        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(BinOp {
             value: BinOp_::Add,
             loc,
-        });
+        }));
         let mutant = Mutant::new(operator);
         let source = "+";
         let expected = vec!["-", "*", "/", "%"];

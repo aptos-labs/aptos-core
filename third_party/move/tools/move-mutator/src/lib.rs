@@ -10,6 +10,7 @@ mod mutate;
 pub mod configuration;
 mod mutant;
 mod operator;
+mod operators;
 mod output;
 pub mod report;
 

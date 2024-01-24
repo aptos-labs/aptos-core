@@ -6,6 +6,8 @@ use move_compiler::parser::ast::{
 
 use crate::mutant::Mutant;
 use crate::operator::MutationOperator;
+use crate::operators::binary::BinaryOperator;
+use crate::operators::unary::UnaryOperator;
 
 /// Traverses the AST, identifies places where mutation operators can be applied
 /// and returns a list of mutants.
@@ -123,7 +125,9 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             mutants.extend(parse_expression_and_find_mutants(*right)?);
 
             // Add the mutation operator to the list of mutants.
-            mutants.push(Mutant::new(MutationOperator::BinaryOperator(binop)));
+            mutants.push(Mutant::new(MutationOperator::BinaryOperator(
+                BinaryOperator::new(binop),
+            )));
 
             trace!("Found possible mutation in BinaryExp {binop:?}");
 
@@ -134,7 +138,9 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             let mut mutants = parse_expression_and_find_mutants(*exp)?;
 
             // Add the mutation operator to the list of mutants.
-            mutants.push(Mutant::new(MutationOperator::UnaryOperator(unop)));
+            mutants.push(Mutant::new(MutationOperator::UnaryOperator(
+                UnaryOperator::new(unop),
+            )));
 
             trace!("Found possible mutation in UnaryExp {unop:?}");
 
