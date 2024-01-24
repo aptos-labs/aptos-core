@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::{agg_trx_producer::RealAggTranscriptProducer, DKGManager},
-    dummy_dkg::DummyDKG,
+    agg_trx_producer::AggTranscriptProducer,
+    dkg_manager::DKGManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
@@ -10,17 +10,16 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
 };
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState},
+    dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -32,23 +31,21 @@ use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
-#[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
+    dkg_dealer_sk: Arc<<DefaultDKG as DKGTrait>::DealerPrivateKey>,
     // Some useful metadata
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
-
-    // some DKG private params
-    identity_blob: Arc<IdentityBlob>,
 
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
     dkg_start_events: EventNotificationListener,
 
     // Msgs to DKG manager
-    dkg_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
+    dkg_rpc_msg_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-    dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
+    dkg_start_event_tx: Option<oneshot::Sender<DKGStartEvent>>,
     vtxn_pool: VTxnPoolState,
 
     // Network utils
@@ -59,7 +56,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
         my_addr: AccountAddress,
-        identity_blob: Arc<IdentityBlob>,
+        dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
         reconfig_events: ReconfigNotificationListener<P>,
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -67,8 +64,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
+            dkg_dealer_sk: Arc::new(dkg_dealer_sk),
             my_addr,
-            identity_blob,
             epoch_state: None,
             reconfig_events,
             dkg_start_events,
@@ -83,15 +80,32 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn process_rpc_request(
         &mut self,
-        _peer_id: AccountAddress,
-        _dkg_request: IncomingRpcRequest,
+        peer_id: AccountAddress,
+        dkg_request: IncomingRpcRequest,
     ) -> Result<()> {
-        //TODO
+        if Some(dkg_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
+            // Forward to DKGManager if it is alive.
+            if let Some(tx) = &self.dkg_rpc_msg_tx {
+                let _ = tx.push(peer_id, (peer_id, dkg_request));
+            }
+        }
         Ok(())
     }
 
-    fn on_dkg_start_notification(&mut self, _notification: EventNotification) -> Result<()> {
-        //TODO
+    fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
+        if let Some(tx) = self.dkg_start_event_tx.take() {
+            let EventNotification {
+                subscribed_events, ..
+            } = notification;
+            for event in subscribed_events {
+                if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
+                    let _ = tx.send(dkg_start_event);
+                    return Ok(());
+                } else {
+                    debug!("[DKG] on_dkg_start_notification: failed in converting a contract event to a dkg start event!");
+                }
+            }
+        }
         Ok(())
     }
 
@@ -136,10 +150,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
         self.epoch_state = Some(epoch_state.clone());
+        let my_index = epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self.my_addr)
+            .copied();
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
+        if let (true, Some(my_index)) = (
+            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
+            my_index,
+        ) {
             let DKGState {
                 in_progress: in_progress_session,
                 ..
@@ -154,22 +176,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Duration::from_millis(1000),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
-            let agg_trx_producer = RealAggTranscriptProducer::new(rb);
+            let agg_trx_producer = AggTranscriptProducer::new(rb);
 
-            let (dkg_start_event_tx, dkg_start_event_rx) =
-                aptos_channel::new(QueueStyle::KLAST, 1, None);
+            let (dkg_start_event_tx, dkg_start_event_rx) = oneshot::channel();
             self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<
-                (),
+                AccountAddress,
                 (AccountAddress, IncomingRpcRequest),
             >(QueueStyle::FIFO, 100, None);
             self.dkg_rpc_msg_tx = Some(dkg_rpc_msg_tx);
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::<DummyDKG, _>::new(
-                self.identity_blob.clone(),
+            let dkg_manager = DKGManager::<DefaultDKG>::new(
+                self.dkg_dealer_sk.clone(),
+                my_index,
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_trx_producer),

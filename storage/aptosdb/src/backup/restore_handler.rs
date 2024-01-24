@@ -8,7 +8,6 @@ use crate::{
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
-    transaction_store::TransactionStore,
     AptosDB,
 };
 use aptos_crypto::HashValue;
@@ -27,21 +26,15 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct RestoreHandler {
     pub aptosdb: Arc<AptosDB>,
-    transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
 }
 
 impl RestoreHandler {
-    pub(crate) fn new(
-        aptosdb: Arc<AptosDB>,
-        transaction_store: Arc<TransactionStore>,
-        state_store: Arc<StateStore>,
-    ) -> Self {
+    pub(crate) fn new(aptosdb: Arc<AptosDB>, state_store: Arc<StateStore>) -> Self {
         Self {
             ledger_db: Arc::clone(&aptosdb.ledger_db),
             aptosdb,
-            transaction_store,
             state_store,
         }
     }
@@ -92,7 +85,6 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.transaction_store.clone(),
             self.state_store.clone(),
             self.ledger_db.clone(),
             first_version,
@@ -114,7 +106,6 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.transaction_store.clone(),
             self.state_store.clone(),
             self.ledger_db.clone(),
             first_version,

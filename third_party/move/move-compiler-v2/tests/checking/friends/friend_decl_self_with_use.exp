@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: cannot declare module `0xc0ffee::o` as a friend of itself
+  ┌─ tests/checking/friends/friend_decl_self_with_use.move:3:5
+  │
+3 │     friend o;
+  │     ^^^^^^^^^

@@ -414,6 +414,7 @@ pub enum Bytecode {
     Abort(AttrId, TempIndex),
     Nop(AttrId),
 
+    // Extended bytecode: spec-only.
     SaveMem(AttrId, MemoryLabel, QualifiedInstId<StructId>),
     SaveSpecVar(AttrId, MemoryLabel, QualifiedInstId<SpecVarId>),
     Prop(AttrId, PropKind, Exp),
@@ -487,6 +488,12 @@ impl Bytecode {
 
     pub fn is_branch(&self) -> bool {
         self.is_conditional_branch() || self.is_unconditional_branch()
+    }
+
+    /// Returns true if the bytecode is spec-only.
+    pub fn is_spec_only(&self) -> bool {
+        use Bytecode::*;
+        matches!(self, SaveMem(..) | SaveSpecVar(..) | Prop(..))
     }
 
     /// Return the sources of the instruction (for non-spec-only instructions).

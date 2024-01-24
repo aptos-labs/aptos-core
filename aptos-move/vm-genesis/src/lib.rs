@@ -443,7 +443,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::BN254_STRUCTURES,
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
-        FeatureFlag::RECONFIGURE_WITH_DKG,
+        // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
         FeatureFlag::ZK_ID_SIGNATURE,
         FeatureFlag::OPEN_ID_SIGNATURE,
     ]

@@ -4,6 +4,7 @@
 
 use crate::{
     account_config::{DepositEvent, NewBlockEvent, NewEpochEvent, WithdrawEvent},
+    dkg::DKGStartEvent,
     event::EventKey,
     on_chain_config::new_epoch_event_key,
     transaction::Version,
@@ -290,6 +291,24 @@ impl From<(u64, NewEpochEvent)> for ContractEvent {
             TypeTag::from(NewEpochEvent::struct_tag()),
             bcs::to_bytes(&event).unwrap(),
         )
+    }
+}
+
+impl TryFrom<&ContractEvent> for DKGStartEvent {
+    type Error = Error;
+
+    fn try_from(event: &ContractEvent) -> Result<Self> {
+        match event {
+            ContractEvent::V1(_) => {
+                bail!("conversion to dkg start event failed with wrong contract event version");
+            },
+            ContractEvent::V2(event) => {
+                if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
+                    bail!("conversion to dkg start event failed with wrong type tag")
+                }
+                bcs::from_bytes(&event.event_data).map_err(Into::into)
+            },
+        }
     }
 }
 

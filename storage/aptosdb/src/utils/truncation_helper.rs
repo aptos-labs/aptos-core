@@ -356,7 +356,7 @@ fn delete_per_version_data(
         &batch.ledger_metadata_db_batches,
     )?;
     delete_per_version_data_impl::<WriteSetSchema>(
-        ledger_db.write_set_db(),
+        ledger_db.write_set_db_raw(),
         start_version,
         &batch.write_set_db_batches,
     )?;
