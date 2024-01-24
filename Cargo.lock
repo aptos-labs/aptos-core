@@ -1317,6 +1317,61 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-events-websocket"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-db",
+ "aptos-executor",
+ "aptos-executor-types",
+ "aptos-framework",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-indexer-grpc-utils",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-mempool-notifications",
+ "aptos-metrics-core",
+ "aptos-moving-average",
+ "aptos-proptest-helpers",
+ "aptos-protos 1.1.2",
+ "aptos-runtimes",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-storage-interface",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptos-vm-validator",
+ "base64 0.13.1",
+ "bytes",
+ "chrono",
+ "fail 0.5.1",
+ "futures",
+ "goldenfile",
+ "hex",
+ "hyper",
+ "move-binary-format",
+ "move-core-types",
+ "move-package",
+ "once_cell",
+ "rand 0.7.3",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.10.2",
+ "tonic-reflection",
+]
+
+[[package]]
 name = "aptos-executable-store"
 version = "0.1.0"
 dependencies = [

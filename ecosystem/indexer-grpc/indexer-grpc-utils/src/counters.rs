@@ -256,9 +256,9 @@ pub fn log_grpc_step(
 
 pub fn log_grpc_step_fullnode(
     step: IndexerGrpcStep,
-    start_version: Option<i64>,
-    end_version: Option<i64>,
-    end_version_timestamp: Option<&Timestamp>,
+    start_version: Option<u64>,
+    end_version: Option<u64>,
+    end_version_timestamp: Option<&u64>,
     highest_known_version: Option<i64>,
     tps: Option<f64>,
     duration_in_secs: Option<f64>,
@@ -279,13 +279,13 @@ pub fn log_grpc_step_fullnode(
     if let Some(end_version) = end_version {
         LATEST_PROCESSED_VERSION
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(end_version);
+            .set(end_version as i64);
     }
     if let Some(end_version_timestamp) = end_version_timestamp {
-        let end_txn_timestamp_unixtime = timestamp_to_unixtime(end_version_timestamp);
+        let end_txn_timestamp_unixtime = end_version_timestamp;
         TRANSACTION_UNIX_TIMESTAMP
             .with_label_values(&[service_type, step.get_step(), step.get_label()])
-            .set(end_txn_timestamp_unixtime);
+            .set(*end_txn_timestamp_unixtime as f64);
     }
 
     tracing::info!(
