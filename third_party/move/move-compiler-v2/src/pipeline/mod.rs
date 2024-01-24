@@ -13,9 +13,9 @@ use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_checker;
 pub mod avail_copies_analysis;
+pub mod control_flow_graph_simplifier;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
-pub mod control_flow_graph_simplifier;
 pub mod explicit_drop;
 pub mod livevar_analysis_processor;
 pub mod reference_safety_processor;

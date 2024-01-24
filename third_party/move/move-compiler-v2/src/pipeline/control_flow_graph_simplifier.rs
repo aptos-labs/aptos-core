@@ -93,12 +93,11 @@ impl ControlFlowGraphSimplifierTransformation {
     /// Transforms `if _ goto L else goto L` to `goto L`
     fn eliminate_branch_to_same_target(&mut self) {
         let codes = std::mem::take(&mut self.data.code);
-        self.data.code = codes.into_iter()
-            .map(|bytecode| {
-                match bytecode {
-                    Bytecode::Branch(attr_id, l0, l1, _) if l0 == l1 => Bytecode::Jump(attr_id, l0),
-                    _ => bytecode
-                }
+        self.data.code = codes
+            .into_iter()
+            .map(|bytecode| match bytecode {
+                Bytecode::Branch(attr_id, l0, l1, _) if l0 == l1 => Bytecode::Jump(attr_id, l0),
+                _ => bytecode,
             })
             .collect();
     }
@@ -149,7 +148,12 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Generates code for block.
-    fn gen_code_for_block(&self, mut code_block: Vec<Bytecode>, block: BlockId, next_block_to_visit: Option<&BlockId>) -> Vec<Bytecode> {
+    fn gen_code_for_block(
+        &self,
+        mut code_block: Vec<Bytecode>,
+        block: BlockId,
+        next_block_to_visit: Option<&BlockId>,
+    ) -> Vec<Bytecode> {
         // since we may generate the blocks in a different order, we may need to add explicit jump or eliminate unnecessary jump.
         if Self::falls_to_next_block(&code_block) {
             // if we have block 0 followed by block 1 without jump/branch

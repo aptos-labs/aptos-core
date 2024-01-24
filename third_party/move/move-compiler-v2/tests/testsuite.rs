@@ -10,9 +10,9 @@ use move_compiler_v2::{
     function_checker, inliner, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-        control_flow_graph_simplifier::ControlFlowGraphSimplifier, explicit_drop::ExplicitDrop,
-        livevar_analysis_processor::LiveVarAnalysisProcessor,
+        explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
