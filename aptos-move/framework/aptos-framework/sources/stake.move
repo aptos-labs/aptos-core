@@ -79,7 +79,7 @@ module aptos_framework::stake {
     const EINVALID_LOCKUP: u64 = 18;
     /// Table to store collected transaction fees for each validator already exists.
     const EFEES_TABLE_ALREADY_EXISTS: u64 = 19;
-    /// User-level validator set change temporarily disabled because of in-progress reconfiguration.
+    /// Validator set change temporarily disabled because of in-progress reconfiguration.
     const ERECONFIGURATION_IN_PROGRESS: u64 = 20;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
@@ -434,7 +434,7 @@ module aptos_framework::stake {
         aptos_framework: &signer,
         validators: &vector<address>,
     ) acquires ValidatorSet {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         system_addresses::assert_aptos_framework(aptos_framework);
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let active_validators = &mut validator_set.active_validators;
@@ -619,7 +619,7 @@ module aptos_framework::stake {
 
     /// Add `coins` into `pool_address`. this requires the corresponding `owner_cap` to be passed in.
     public fun add_stake_with_cap(owner_cap: &OwnerCapability, coins: Coin<AptosCoin>) acquires StakePool, ValidatorSet {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
 
@@ -663,7 +663,7 @@ module aptos_framework::stake {
 
     /// Move `amount` of coins from pending_inactive to active.
     public entry fun reactivate_stake(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -671,7 +671,7 @@ module aptos_framework::stake {
     }
 
     public fun reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) acquires StakePool {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
 
@@ -702,7 +702,7 @@ module aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
 
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -736,7 +736,7 @@ module aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) acquires StakePool, ValidatorConfig {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         force_update_network_and_fullnode_addresses(operator, pool_address, new_network_addresses, new_fullnode_addresses);
     }
 
@@ -822,7 +822,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorConfig, ValidatorSet {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(operator) == stake_pool.operator_address, error::unauthenticated(ENOT_OPERATOR));
@@ -858,7 +858,7 @@ module aptos_framework::stake {
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
     public entry fun unlock(owner: &signer, amount: u64) acquires OwnerCapability, StakePool {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         let owner_address = signer::address_of(owner);
         assert_owner_cap_exists(owner_address);
         let ownership_cap = borrow_global<OwnerCapability>(owner_address);
@@ -867,7 +867,7 @@ module aptos_framework::stake {
 
     /// Unlock `amount` from the active stake. Only possible if the lockup has expired.
     public fun unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) acquires StakePool {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         // Short-circuit if amount to unlock is 0 so we don't emit events.
         if (amount == 0) {
             return
@@ -909,7 +909,7 @@ module aptos_framework::stake {
         owner_cap: &OwnerCapability,
         withdraw_amount: u64
     ): Coin<AptosCoin> acquires StakePool, ValidatorSet {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         let pool_address = owner_cap.pool_address;
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -947,7 +947,7 @@ module aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) acquires StakePool, ValidatorSet {
-        assert_not_in_a_reconfig();
+        assert_reconfig_not_in_progress();
         let config = staking_config::get();
         assert!(
             staking_config::get_allow_validator_set_change(&config),
@@ -1524,7 +1524,7 @@ module aptos_framework::stake {
         assert!(exists<OwnerCapability>(owner), error::not_found(EOWNER_CAP_NOT_FOUND));
     }
 
-    fun assert_not_in_a_reconfig() {
+    fun assert_reconfig_not_in_progress() {
         assert!(!reconfiguration_state::is_in_progress(), error::invalid_state(ERECONFIGURATION_IN_PROGRESS));
     }
 
