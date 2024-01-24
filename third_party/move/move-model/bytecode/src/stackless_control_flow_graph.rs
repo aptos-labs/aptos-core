@@ -254,10 +254,10 @@ impl StacklessControlFlowGraph {
         self.blocks.keys().cloned().collect()
     }
 
-    /// DFS traversal visiting left-most child first.
-    /// Blocks unreachable from the entry is not iterated.
-    pub fn iter_dfs_left(&self) -> DFSLeft {
-        DFSLeft::new(self)
+    /// Iterates over all blocks in DFS order starting from the entry block
+    /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
+    pub fn iter_dfs_left(&self, visit_all: bool) -> DFSLeft {
+        DFSLeft::new(self, visit_all)
     }
 
     pub fn entry_block(&self) -> BlockId {
@@ -306,20 +306,50 @@ impl StacklessControlFlowGraph {
     }
 }
 
-/// DFS traversal always visiting the left-most child first
+/// Iterator over blocks of a control flow graph in DFS order
 pub struct DFSLeft<'a> {
     cfg: &'a StacklessControlFlowGraph,
+    // blocks scheduled to visit
     to_visit: Vec<BlockId>,
+    // blocks visited
     visited: BTreeSet<BlockId>,
+    // blocks unvisited, used only when iterating over all blocks
+    unvisited: Option<BTreeSet<BlockId>>,
 }
 
 impl<'a> DFSLeft<'a> {
-    fn new(cfg: &'a StacklessControlFlowGraph) -> Self {
+    /// Iterates over all blocks in DFS order (and always choosing the left-most child to visit) starting from the entry block
+    /// `visit_all`: whether to visit all blocks or just blocks reachable from the entry block
+    fn new(cfg: &'a StacklessControlFlowGraph, visit_all: bool) -> Self {
         let to_visit = vec![cfg.entry_block()];
         Self {
             cfg,
             to_visit,
             visited: BTreeSet::new(),
+            unvisited: if visit_all { Some(cfg.blocks.keys().cloned().collect()) } else { None },
+        }
+    }
+
+    /// Gets the next block scheduled, but it may have been visited when scheduled by multiple predecessors
+    fn get_next_to_visit(&mut self) -> Option<BlockId> {
+        if let Some(to_visit) = self.to_visit.pop() {
+            Some(to_visit)
+        } else if let Some(unvisited_blocks) = &mut self.unvisited {
+            let to_visit = *unvisited_blocks.first()?;
+            unvisited_blocks.remove(&to_visit);
+            Some(to_visit)
+        } else {
+            return None;
+        }
+    }
+
+    /// Gets the next block to visit
+    fn get_next_unvisited(&mut self) -> Option<BlockId> {
+        let next_to_visit = self.get_next_to_visit()?;
+        if self.visited.contains(&next_to_visit) {
+            self.get_next_unvisited()
+        } else {
+            Some(next_to_visit)
         }
     }
 }
@@ -328,11 +358,11 @@ impl<'a> Iterator for DFSLeft<'a> {
     type Item = BlockId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut visiting = self.to_visit.pop()?;
-        while self.visited.contains(&visiting) {
-            visiting = self.to_visit.pop()?;
-        }
+        let visiting = self.get_next_unvisited()?;
         self.visited.insert(visiting);
+        if let Some(unvisited) = &mut self.unvisited {
+            unvisited.remove(&visiting);
+        }
         for suc_block in self.cfg.successors(visiting).iter().rev() {
             self.to_visit.push(*suc_block);
         }
