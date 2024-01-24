@@ -128,10 +128,10 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Generates code from the control flow graph
-    /// Unreachable codes are also discarded
-    pub fn gen_codes(self) -> Vec<Bytecode> {
+    pub fn gen_code(self) -> Vec<Bytecode> {
         let mut generated = Vec::new();
-        let mut iter_dfs_left = self.cfg.iter_dfs_left().peekable();
+        let mut iter_dfs_left = self.cfg.iter_dfs_left(true).peekable();
+        // let mut iter_dfs_left = self.cfg.blocks().into_iter().peekable();
         while let Some(block) = iter_dfs_left.next() {
             if self.is_trivial_block(block) {
                 continue;
@@ -140,29 +140,35 @@ impl ControlFlowGraphCodeGenerator {
             // can't use `.remove` instead to avoid copying,
             // because the following may look at visited block
             let mut code_block = self.code_blocks.get(&block).expect("code block").clone();
-            let maybe_next_to_visit = iter_dfs_left.peek();
-            if Self::falls_to_next_block(&code_block) {
-                // if we have block 0 followed by block 1 without jump/branch
-                // and we don't visit block 1 after block 0, then we have to add an explicit jump
-                let suc_block = self.get_the_non_trivial_successor(block);
-                if maybe_next_to_visit.is_none() || *maybe_next_to_visit.unwrap() != suc_block {
-                    self.add_explicit_jump(&mut code_block, suc_block);
-                }
-            } else if matches!(
-                code_block.last().expect("last instruction"),
-                Bytecode::Jump(..)
-            ) {
-                // no need to jump to the next instruction
-                let suc_block = self.get_the_non_trivial_successor(block);
-                if let Some(next_to_vist) = maybe_next_to_visit {
-                    if *next_to_vist == suc_block {
-                        debug_assert!(code_block.pop().is_some());
-                    }
-                }
-            }
+            code_block = self.gen_code_for_block(code_block, block, iter_dfs_left.peek());
             generated.append(&mut code_block);
         }
         generated
+    }
+
+    /// Generates code for block.
+    fn gen_code_for_block(&self, mut code_block: Vec<Bytecode>, block: BlockId, next_block_to_visit: Option<&BlockId>) -> Vec<Bytecode> {
+        // since we may generate the blocks in a different order, we may need to add explicit jump or eliminate unnecessary jump.
+        if Self::falls_to_next_block(&code_block) {
+            // if we have block 0 followed by block 1 without jump/branch
+            // and we don't visit block 1 after block 0, then we have to add an explicit jump
+            let suc_block = self.get_the_non_trivial_successor(block);
+            if next_block_to_visit.is_none() || *next_block_to_visit.unwrap() != suc_block {
+                self.add_explicit_jump(&mut code_block, suc_block);
+            }
+        } else if matches!(
+            code_block.last().expect("last instruction"),
+            Bytecode::Jump(..)
+        ) {
+            // no need to jump to the next instruction
+            let suc_block = self.get_the_non_trivial_successor(block);
+            if let Some(next_to_vist) = next_block_to_visit {
+                if *next_to_vist == suc_block {
+                    debug_assert!(code_block.pop().is_some());
+                }
+            }
+        }
+        code_block
     }
 
     /// Checks whether a block falls to the next block without jump, branch, abort, or return;
