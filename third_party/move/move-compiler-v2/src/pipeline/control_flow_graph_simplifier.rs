@@ -10,10 +10,10 @@
 
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
-    function_target::FunctionData,
+    function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
-    stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
+    stackless_control_flow_graph::{generate_cfg_in_dot_format, BlockId, StacklessControlFlowGraph},
 };
 use std::collections::BTreeMap;
 
@@ -30,8 +30,14 @@ impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
         if fun_env.is_native() {
             return data;
         }
+        println!("{}", generate_cfg_in_dot_format(&FunctionTarget::new(fun_env, &data)));
+        let cfg = StacklessControlFlowGraph::new_forward(&data.code);
+        println!("before {}", cfg.blocks().len() - 2);
         let mut transformer = ControlFlowGraphSimplifierTransformation::new(data);
         transformer.transform();
+        let cfg = StacklessControlFlowGraph::new_forward(&transformer.data.code);
+        println!("after {}", cfg.blocks().len() - 2);
+        println!("{}", generate_cfg_in_dot_format(&FunctionTarget::new(fun_env, &transformer.data)));
         transformer.data
     }
 
@@ -63,6 +69,20 @@ impl ControlFlowGraphSimplifierTransformation {
             RemoveRedundantJump::new(elim_empty_blocks_transformer.0);
         remove_redundant_jump_transformer.transform();
         self.data.code = remove_redundant_jump_transformer.0.gen_codes();
+        self.eliminate_branch_to_same_target();
+    }
+
+    /// Transforms `if _ goto L else goto L` to `goto L`
+    fn eliminate_branch_to_same_target(&mut self) {
+        let codes = std::mem::take(&mut self.data.code);
+        self.data.code = codes.into_iter()
+            .map(|bytecode| {
+                match bytecode {
+                    Bytecode::Branch(attr_id, l0, l1, _) if l0 == l1 => Bytecode::Jump(attr_id, l0),
+                    _ => bytecode
+                }
+            })
+            .collect();
     }
 }
 
@@ -328,11 +348,18 @@ impl RemoveRedundantJump {
         }
     }
 
+    /// Removes all redundant edges from `block`
     /// Requires: `block` still in the cfg, `block` is not entry/exit
     fn transform_edges_from(&mut self, block: BlockId) {
         for suc in self.cfg.successors(block).clone() {
             if !self.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
                 // successors of `block` changes
+                // consider L0: goto L1; L1: goto L2; L2: goto L3;
+                // suc L0: L1
+                // after merging block L1 into block L0
+                // L0: goto L2; L2: goto L3;
+                // suc L0: L2
+                // we continue to merge block L3 into block L0
                 self.transform_edges_from(block);
             }
         }
