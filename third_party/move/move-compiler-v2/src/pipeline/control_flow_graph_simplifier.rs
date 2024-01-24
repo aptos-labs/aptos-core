@@ -84,8 +84,13 @@ impl ControlFlowGraphSimplifierTransformation {
         let mut remove_redundant_jump_transformer =
             RemoveRedundantJump::new(elim_empty_blocks_transformer.0);
         remove_redundant_jump_transformer.transform();
-        self.data.code = remove_redundant_jump_transformer.0.gen_codes();
+        self.data.code = remove_redundant_jump_transformer.0.gen_code();
         self.eliminate_branch_to_same_target();
+        // may introduce new empty blocks
+        let mut elim_empty_blocks_transformer =
+            RemoveEmptyBlock::new(ControlFlowGraphCodeGenerator::new(&self.data.code));
+        elim_empty_blocks_transformer.transform();
+        self.data.code = elim_empty_blocks_transformer.0.gen_code();
     }
 
     /// Transforms `if _ goto L else goto L` to `goto L`
