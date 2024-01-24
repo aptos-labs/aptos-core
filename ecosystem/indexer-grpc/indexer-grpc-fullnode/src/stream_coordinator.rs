@@ -184,7 +184,7 @@ impl IndexerStreamCoordinator {
             Some(end_version),
             last_transaction_timestamp.as_ref(),
             Some(highest_known_version),
-            Some(num_transactions as f64 / decoding_start_time.elapsed().as_secs_f64()),
+            None,
             Some(decoding_start_time.elapsed().as_secs_f64()),
             Some(num_transactions as i64),
         );
