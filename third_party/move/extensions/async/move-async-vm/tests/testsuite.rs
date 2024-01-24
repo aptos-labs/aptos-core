@@ -27,7 +27,7 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
-use move_vm_test_utils::gas_schedule::TestGasStatus;
+use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -84,14 +84,14 @@ datatest_stable::harness!(test_runner, "tests/sources", r".*\.move");
 
 impl Harness {
     fn run(&self, _module: &str) -> anyhow::Result<()> {
-        let mut gas = TestGasStatus::new_unmetered();
+        let mut gas_meter = UnmeteredGasMeter;
         let mut tick = 0;
         // Publish modules.
         let mut proxy = HarnessProxy { harness: self };
         let mut session = self.vm.new_session(test_account(), 0, &mut proxy);
         let mut done = BTreeSet::new();
         for id in self.module_cache.keys() {
-            self.publish_module(&mut session, id, &mut gas, &mut done)?;
+            self.publish_module(&mut session, id, &mut gas_meter, &mut done)?;
         }
         // Initialize actors
         let mut mailbox: VecDeque<Message> = Default::default();
@@ -104,7 +104,7 @@ impl Harness {
             {
                 let mut proxy = HarnessProxy { harness: self };
                 let session = self.vm.new_session(addr, 0, &mut proxy);
-                let result = session.new_actor(&actor, addr, &mut gas);
+                let result = session.new_actor(&actor, addr, &mut gas_meter);
                 self.handle_result(&mut mailbox, result);
             };
 
@@ -136,7 +136,7 @@ impl Harness {
             let mut proxy = HarnessProxy { harness: self };
             let session = self.vm.new_session(actor, tick, &mut proxy);
             tick += 1000_1000; // micros
-            let result = session.handle_message(actor, message_hash, args, &mut gas);
+            let result = session.handle_message(actor, message_hash, args, &mut gas_meter);
             self.handle_result(&mut mailbox, result);
         }
         Ok(())
@@ -146,7 +146,7 @@ impl Harness {
         &self,
         session: &mut AsyncSession,
         id: &IdentStr,
-        gas: &mut TestGasStatus,
+        gas_meter: &mut impl GasMeter,
         done: &mut BTreeSet<Identifier>,
     ) -> anyhow::Result<()> {
         if done.insert(id.to_owned()) {
@@ -154,13 +154,15 @@ impl Harness {
             if let CompiledUnit::Module(m) = cu {
                 for dep in &m.module.module_handles {
                     let dep_id = m.module.identifier_at(dep.name);
-                    self.publish_module(session, dep_id, gas, done)?
+                    self.publish_module(session, dep_id, gas_meter, done)?
                 }
             }
             self.log(format!("publishing {}", id));
-            session
-                .get_move_session()
-                .publish_module(cu.serialize(None), test_account(), gas)?
+            session.get_move_session().publish_module(
+                cu.serialize(None),
+                test_account(),
+                gas_meter,
+            )?
         }
         Ok(())
     }

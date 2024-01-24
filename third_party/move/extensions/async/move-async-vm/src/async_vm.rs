@@ -23,8 +23,11 @@ use move_vm_runtime::{
     native_functions::NativeFunction,
     session::{SerializedReturnValues, Session},
 };
-use move_vm_test_utils::gas_schedule::{Gas, TestGasStatus};
-use move_vm_types::values::{Reference, Value};
+use move_vm_test_utils::gas_schedule::Gas;
+use move_vm_types::{
+    gas::GasMeter,
+    values::{Reference, Value},
+};
 use std::{
     collections::HashMap,
     error::Error,
@@ -169,7 +172,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         mut self,
         module_id: &ModuleId,
         actor_addr: AccountAddress,
-        gas_status: &mut TestGasStatus,
+        gas_meter: &mut impl GasMeter,
     ) -> AsyncResult<'r> {
         let actor = self
             .vm
@@ -197,7 +200,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         }
 
         // Execute the initializer.
-        let gas_before = gas_status.remaining_gas();
+        let gas_before = gas_meter.balance_internal().to_unit_round_down();
         let result = self
             .vm_session
             .execute_function_bypass_visibility(
@@ -205,10 +208,12 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
                 &actor.initializer,
                 vec![],
                 Vec::<Vec<u8>>::new(),
-                gas_status,
+                gas_meter,
             )
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
-        let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
+        let gas_used = gas_before
+            .checked_sub(gas_meter.balance_internal().to_unit_round_down())
+            .unwrap();
 
         // Process the result, moving the return value of the initializer function into the
         // changeset.
@@ -255,7 +260,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         actor_addr: AccountAddress,
         message_hash: u64,
         mut args: Vec<Vec<u8>>,
-        gas_status: &mut TestGasStatus,
+        gas_meter: &mut impl GasMeter,
     ) -> AsyncResult<'r> {
         // Resolve actor and function which handles the message.
         let (module_id, handler_id) =
@@ -293,13 +298,15 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         );
 
         // Execute the handler.
-        let gas_before = gas_status.remaining_gas();
+        let gas_before = gas_meter.balance_internal().to_unit_round_down();
         let result = self
             .vm_session
-            .execute_function_bypass_visibility(module_id, handler_id, vec![], args, gas_status)
+            .execute_function_bypass_visibility(module_id, handler_id, vec![], args, gas_meter)
             .and_then(|ret| Ok((ret, self.vm_session.finish_with_extensions()?)));
 
-        let gas_used = gas_before.checked_sub(gas_status.remaining_gas()).unwrap();
+        let gas_used = gas_before
+            .checked_sub(gas_meter.balance_internal().to_unit_round_down())
+            .unwrap();
 
         // Process the result, moving the mutated value of the handlers first parameter
         // into the changeset.

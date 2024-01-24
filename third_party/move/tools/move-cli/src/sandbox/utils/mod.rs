@@ -54,6 +54,7 @@ pub fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result
         TestGasStatus::new(cost_table, Gas::new(gas_budget))
     } else {
         // no budget specified. Disable gas metering
+        // TODO: Replace with UnmeteredGasMeter if possible.
         TestGasStatus::new_unmetered()
     };
     Ok(gas_status)
