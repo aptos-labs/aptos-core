@@ -138,7 +138,8 @@ impl AptosDB {
                 info!(next_version = next_version, "AptosDB Indexer catching up. ",);
                 let end_version = std::cmp::min(ledger_next_version, next_version + BATCH_SIZE);
                 let write_sets = self
-                    .transaction_store
+                    .ledger_db
+                    .write_set_db()
                     .get_write_sets(next_version, end_version)?;
                 let write_sets_ref: Vec<_> = write_sets.iter().collect();
                 indexer.index_with_annotator(&annotator, next_version, &write_sets_ref)?;

@@ -5,16 +5,14 @@
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
 use crate::{
-    ledger_db::LedgerDb,
-    schema::{transaction_by_account::TransactionByAccountSchema, write_set::WriteSetSchema},
-    utils::iterators::{AccountTransactionVersionIter, ExpectContinuousVersions},
+    ledger_db::LedgerDb, schema::transaction_by_account::TransactionByAccountSchema,
+    utils::iterators::AccountTransactionVersionIter,
 };
 use aptos_schemadb::{ReadOptions, SchemaBatch};
-use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
+use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Transaction, Version},
-    write_set::WriteSet,
 };
 use std::sync::Arc;
 
@@ -79,82 +77,6 @@ impl TransactionStore {
         ))
     }
 
-    /// Gets an iterator that yields `num_transactions` write sets starting from `start_version`.
-    pub fn get_write_set_iter(
-        &self,
-        start_version: Version,
-        num_transactions: usize,
-    ) -> Result<impl Iterator<Item = Result<WriteSet>> + '_> {
-        let mut iter = self
-            .ledger_db
-            .write_set_db()
-            .iter::<WriteSetSchema>(ReadOptions::default())?;
-        iter.seek(&start_version)?;
-        iter.expect_continuous_versions(start_version, num_transactions)
-    }
-
-    /// Get executed transaction vm output given `version`
-    pub fn get_write_set(&self, version: Version) -> Result<WriteSet> {
-        self.ledger_db
-            .write_set_db()
-            .get::<WriteSetSchema>(&version)?
-            .ok_or(AptosDbError::NotFound(format!(
-                "WriteSet at version {}",
-                version
-            )))
-    }
-
-    /// Get write sets in `[begin_version, end_version)` half-open range.
-    ///
-    /// N.b. an empty `Vec` is returned when `begin_version == end_version`
-    pub fn get_write_sets(
-        &self,
-        begin_version: Version,
-        end_version: Version,
-    ) -> Result<Vec<WriteSet>> {
-        if begin_version == end_version {
-            return Ok(Vec::new());
-        }
-        ensure!(
-            begin_version < end_version,
-            "begin_version {} >= end_version {}",
-            begin_version,
-            end_version
-        );
-
-        let mut iter = self
-            .ledger_db
-            .write_set_db()
-            .iter::<WriteSetSchema>(Default::default())?;
-        iter.seek(&begin_version)?;
-
-        let mut ret = Vec::with_capacity((end_version - begin_version) as usize);
-        for current_version in begin_version..end_version {
-            let (version, write_set) = iter.next().transpose()?.ok_or_else(|| {
-                AptosDbError::NotFound(format!("Write set missing for version {}", current_version))
-            })?;
-            ensure!(
-                version == current_version,
-                "Write set missing for version {}, got version {}",
-                current_version,
-                version,
-            );
-            ret.push(write_set);
-        }
-
-        Ok(ret)
-    }
-
-    /// Save executed transaction vm output given `version`
-    pub fn put_write_set(
-        &self,
-        version: Version,
-        write_set: &WriteSet,
-        batch: &SchemaBatch,
-    ) -> Result<()> {
-        batch.put::<WriteSetSchema>(&version, write_set)
-    }
-
     /// Prune the transaction by account store given a list of transaction
     pub fn prune_transaction_by_account(
         &self,
@@ -166,19 +88,6 @@ impl TransactionStore {
                 db_batch
                     .delete::<TransactionByAccountSchema>(&(txn.sender(), txn.sequence_number()))?;
             }
-        }
-        Ok(())
-    }
-
-    /// Prune the transaction schema store between a range of version in [begin, end)
-    pub fn prune_write_set(
-        &self,
-        begin: Version,
-        end: Version,
-        db_batch: &SchemaBatch,
-    ) -> Result<()> {
-        for version in begin..end {
-            db_batch.delete::<WriteSetSchema>(&version)?;
         }
         Ok(())
     }

@@ -228,7 +228,7 @@ impl DbReader for AptosDB {
                         .transaction_info_db()
                         .get_transaction_info(version)?;
                     let events = self.ledger_db.event_db().get_events_by_version(version)?;
-                    let write_set = self.transaction_store.get_write_set(version)?;
+                    let write_set = self.ledger_db.write_set_db().get_write_set(version)?;
                     let txn = self.ledger_db.transaction_db().get_transaction(version)?;
                     let txn_output = TransactionOutput::new(
                         write_set,
@@ -333,7 +333,8 @@ impl DbReader for AptosDB {
             self.error_if_ledger_pruned("Transaction", start_version)?;
 
             let iter = self
-                .transaction_store
+                .ledger_db
+                .write_set_db()
                 .get_write_set_iter(start_version, limit as usize)?;
             Ok(Box::new(iter) as Box<dyn Iterator<Item = Result<WriteSet>> + '_>)
         })

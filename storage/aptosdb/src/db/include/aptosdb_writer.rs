@@ -141,7 +141,6 @@ impl DbWriter for AptosDB {
             let transaction_infos = output_with_proof.proof.transaction_infos;
             // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
-                self.transaction_store.clone(),
                 self.state_store.clone(),
                 self.ledger_db.clone(),
                 version,
@@ -331,7 +330,9 @@ impl AptosDB {
                     .unwrap()
             });
             s.spawn(|_| {
-                self.commit_write_sets(txns_to_commit, first_version)
+                self.ledger_db
+                    .write_set_db()
+                    .commit_write_sets(txns_to_commit, first_version)
                     .unwrap()
             });
             s.spawn(|_| {
@@ -544,35 +545,6 @@ impl AptosDB {
             .with_label_values(&["commit_transaction_infos___commit"])
             .start_timer();
         self.ledger_db.transaction_info_db().write_schemas(batch)
-    }
-
-    fn commit_write_sets(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets"])
-            .start_timer();
-        let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
-        txns_to_commit
-            .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 128))
-            .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
-                self.transaction_store.put_write_set(
-                    first_version + i as u64,
-                    txn_to_commit.write_set(),
-                    &batch,
-                )?;
-
-                Ok(())
-            })?;
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets___commit"])
-            .start_timer();
-        self.ledger_db.write_set_db().write_schemas(batch)
     }
 
     fn commit_ledger_info(

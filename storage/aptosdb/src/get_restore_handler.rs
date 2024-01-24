@@ -11,10 +11,6 @@ pub trait GetRestoreHandler {
 
 impl GetRestoreHandler for Arc<AptosDB> {
     fn get_restore_handler(&self) -> RestoreHandler {
-        RestoreHandler::new(
-            Arc::clone(self),
-            Arc::clone(&self.transaction_store),
-            Arc::clone(&self.state_store),
-        )
+        RestoreHandler::new(Arc::clone(self), Arc::clone(&self.state_store))
     }
 }
