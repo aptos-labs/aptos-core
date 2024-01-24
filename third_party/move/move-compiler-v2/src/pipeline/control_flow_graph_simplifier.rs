@@ -29,10 +29,10 @@
 
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
-    function_target::{FunctionData, FunctionTarget},
+    function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Label},
-    stackless_control_flow_graph::{generate_cfg_in_dot_format, BlockId, StacklessControlFlowGraph},
+    stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
 };
 use std::collections::BTreeMap;
 
@@ -139,8 +139,7 @@ impl ControlFlowGraphCodeGenerator {
     /// `visit_all`: determines whether to generate code for unreachable blocks
     pub fn gen_code(self, visit_all: bool) -> Vec<Bytecode> {
         let mut generated = Vec::new();
-        let mut iter_dfs_left = self.cfg.iter_dfs_left(true).peekable();
-        // let mut iter_dfs_left = self.cfg.blocks().into_iter().peekable();
+        let mut iter_dfs_left = self.cfg.iter_dfs_left(visit_all).peekable();
         while let Some(block) = iter_dfs_left.next() {
             if self.is_trivial_block(block) {
                 continue;
