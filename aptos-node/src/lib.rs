@@ -34,6 +34,8 @@ use aptos_validator_transaction_pool::VTxnPoolState;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
+use pyroscope::PyroscopeAgent;
+use pyroscope_pprofrs::{pprof_backend, PprofConfig};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
     fs,
@@ -175,8 +177,20 @@ impl AptosNodeArgs {
                 )
             });
 
+            let agent = PyroscopeAgent::builder(
+                "http://pyroscope.pyroscope.svc.cluster.local:4040",
+                "aptos-node",
+            )
+            .backend(pprof_backend(PprofConfig::new().sample_rate(100)))
+            .build()
+            .expect("Pyroscope agent should build correctly");
+
+            let agent_running = agent.start().expect("Agent should start correctly");
+
             // Start the node
             start(config, None, true).expect("Node should start correctly");
+
+            agent_running.stop().expect("Agent should stop correctly");
         };
     }
 }

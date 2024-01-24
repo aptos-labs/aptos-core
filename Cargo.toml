@@ -600,7 +600,7 @@ poem = { version = "=1.3.59", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
 poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
-pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
+pprof = { version = "0.12", features = ["flamegraph", "protobuf-codec"] }
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
 proc-macro2 = "1.0.38"
@@ -612,6 +612,8 @@ proptest = "1.4.0"
 proptest-derive = "0.4.0"
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
+pyroscope = "0.5.4"
+pyroscope_pprofrs = "0.2"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
