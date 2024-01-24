@@ -83,6 +83,7 @@ pub enum SessionId {
     BlockMetaExt {
         // block id
         id: HashValue,
+    },
     ValidatorTxn {
         script_hash: Vec<u8>,
     },
