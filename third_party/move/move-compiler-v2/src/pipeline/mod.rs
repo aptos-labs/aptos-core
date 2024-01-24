@@ -6,6 +6,7 @@ use crate::pipeline::{
     avail_copies_analysis::AvailCopiesAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
+    uninitialized_use_checker::UninitializedUseChecker,
 };
 use move_stackless_bytecode::function_target::FunctionTarget;
 
@@ -26,4 +27,5 @@ pub fn register_formatters(target: &FunctionTarget) {
     LiveVarAnalysisProcessor::register_formatters(target);
     ReferenceSafetyProcessor::register_formatters(target);
     AvailCopiesAnalysisProcessor::register_formatters(target);
+    UninitializedUseChecker::register_formatters(target);
 }
