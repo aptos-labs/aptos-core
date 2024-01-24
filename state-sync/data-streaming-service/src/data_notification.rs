@@ -9,7 +9,10 @@ use aptos_types::{
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
 };
-use std::fmt::{Debug, Formatter};
+use std::{
+    fmt::{Debug, Formatter},
+    time::Instant,
+};
 
 /// A unique ID used to identify each notification.
 pub type NotificationId = u64;
@@ -17,8 +20,19 @@ pub type NotificationId = u64;
 /// A single data notification with an ID and data payload.
 #[derive(Clone, Debug)]
 pub struct DataNotification {
+    pub creation_time: Instant,
     pub notification_id: NotificationId,
     pub data_payload: DataPayload,
+}
+
+impl DataNotification {
+    pub fn new(notification_id: NotificationId, data_payload: DataPayload) -> Self {
+        Self {
+            creation_time: Instant::now(),
+            notification_id,
+            data_payload,
+        }
+    }
 }
 
 /// A single payload (e.g. chunk) of data delivered to a data listener.

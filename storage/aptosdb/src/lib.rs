@@ -33,7 +33,6 @@ pub mod fast_sync_storage_wrapper;
 mod db_options;
 mod event_store;
 mod ledger_db;
-mod ledger_store;
 mod lru_node_cache;
 mod pruner;
 mod state_kv_db;

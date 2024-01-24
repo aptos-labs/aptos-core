@@ -124,6 +124,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
+    let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
@@ -149,8 +150,9 @@ pub fn run_benchmark<V>(
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
-        let transaction_generator_creator = init_workload::<V>(
+        let (transaction_generator_creator, phase) = init_workload::<V>(
             transaction_mix,
+            &mut root_account,
             main_signer_accounts,
             burner_accounts,
             db.clone(),
@@ -159,7 +161,7 @@ pub fn run_benchmark<V>(
             &PipelineConfig::default(),
         );
         // need to initialize all workers and finish with all transactions before we start the timer:
-        (0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>()
+        ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
     let version = db.reader.get_latest_version().unwrap();
@@ -186,7 +188,7 @@ pub fn run_benchmark<V>(
     }
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        genesis_key,
+        root_account,
         block_sender,
         source_dir,
         Some(num_accounts_to_load),
@@ -195,11 +197,12 @@ pub fn run_benchmark<V>(
 
     let mut overall_measuring = OverallMeasuring::start();
 
-    if let Some(transaction_generators) = transaction_generators {
+    if let Some((transaction_generators, phase)) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
             transaction_generators,
+            phase,
             transactions_per_sender,
         );
     } else {
@@ -239,11 +242,12 @@ pub fn run_benchmark<V>(
 
 fn init_workload<V>(
     transaction_mix: Vec<(TransactionType, usize)>,
+    root_account: &mut LocalAccount,
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
     pipeline_config: &PipelineConfig,
-) -> Box<dyn TransactionGeneratorCreator>
+) -> (Box<dyn TransactionGeneratorCreator>, Arc<AtomicUsize>)
 where
     V: TransactionBlockExecutor + 'static,
 {
@@ -257,10 +261,9 @@ where
 
     let runtime = Runtime::new().unwrap();
     let transaction_factory = TransactionGenerator::create_transaction_factory();
-
+    let phase = Arc::new(AtomicUsize::new(0));
+    let phase_clone = phase.clone();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
-        let phase = Arc::new(AtomicUsize::new(0));
-
         let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),
             block_sender,
@@ -268,19 +271,20 @@ where
 
         create_txn_generator_creator(
             &[transaction_mix],
+            root_account,
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
             &transaction_factory,
             &transaction_factory,
-            phase,
+            phase_clone,
         )
         .await
     });
 
     pipeline.join();
 
-    txn_generator_creator
+    (txn_generator_creator, phase)
 }
 
 pub fn add_accounts<V>(
@@ -345,7 +349,7 @@ fn add_accounts_impl<V>(
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        genesis_key,
+        TransactionGenerator::read_root_account(genesis_key, &db),
         block_sender,
         &source_dir,
         None,
@@ -704,9 +708,9 @@ mod tests {
         println!("run_benchmark");
 
         super::run_benchmark::<E>(
-            6, /* block_size */
-            5, /* num_blocks */
-            transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
+            10, /* block_size */
+            30, /* num_blocks */
+            transaction_type.map(|t| vec![(t.materialize(1, true), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */

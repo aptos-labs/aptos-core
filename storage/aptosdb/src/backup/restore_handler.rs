@@ -5,11 +5,9 @@
 use crate::{
     backup::restore_utils,
     ledger_db::LedgerDb,
-    ledger_store::LedgerStore,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
     state_restore::{StateSnapshotRestore, StateSnapshotRestoreMode},
     state_store::StateStore,
-    transaction_store::TransactionStore,
     AptosDB,
 };
 use aptos_crypto::HashValue;
@@ -28,24 +26,15 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct RestoreHandler {
     pub aptosdb: Arc<AptosDB>,
-    ledger_store: Arc<LedgerStore>,
-    transaction_store: Arc<TransactionStore>,
     state_store: Arc<StateStore>,
     ledger_db: Arc<LedgerDb>,
 }
 
 impl RestoreHandler {
-    pub(crate) fn new(
-        aptosdb: Arc<AptosDB>,
-        ledger_store: Arc<LedgerStore>,
-        transaction_store: Arc<TransactionStore>,
-        state_store: Arc<StateStore>,
-    ) -> Self {
+    pub(crate) fn new(aptosdb: Arc<AptosDB>, state_store: Arc<StateStore>) -> Self {
         Self {
             ledger_db: Arc::clone(&aptosdb.ledger_db),
             aptosdb,
-            ledger_store,
-            transaction_store,
             state_store,
         }
     }
@@ -80,7 +69,7 @@ impl RestoreHandler {
         frozen_subtrees: &[HashValue],
     ) -> Result<()> {
         restore_utils::confirm_or_save_frozen_subtrees(
-            self.aptosdb.ledger_db.transaction_accumulator_db(),
+            self.aptosdb.ledger_db.transaction_accumulator_db_raw(),
             num_leaves,
             frozen_subtrees,
             None,
@@ -96,8 +85,6 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.ledger_store.clone(),
-            self.transaction_store.clone(),
             self.state_store.clone(),
             self.ledger_db.clone(),
             first_version,
@@ -119,8 +106,6 @@ impl RestoreHandler {
         write_sets: Vec<WriteSet>,
     ) -> Result<()> {
         restore_utils::save_transactions(
-            self.ledger_store.clone(),
-            self.transaction_store.clone(),
             self.state_store.clone(),
             self.ledger_db.clone(),
             first_version,

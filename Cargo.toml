@@ -458,6 +458,7 @@ async-stream = "0.3"
 async-trait = "0.1.53"
 axum = "0.5.16"
 base64 = "0.13.0"
+base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
@@ -590,6 +591,7 @@ pin-project = "1.0.10"
 poem = { version = "=1.3.59", features = ["anyhow", "rustls"] }
 poem-openapi = { version = "=2.0.11", features = ["swagger-ui", "url"] }
 poem-openapi-derive = "=2.0.11"
+poseidon-ark = { git = "https://github.com/arnaucube/poseidon-ark.git", rev = "6d2487aa1308d9d3860a2b724c485d73095c1c68" }
 pprof = { version = "0.11", features = ["flamegraph", "protobuf-codec"] }
 pretty_assertions = "1.2.1"
 procfs = "0.14.1"
@@ -641,6 +643,7 @@ serde_merge = "0.1.3"
 serde-name = "0.1.1"
 serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
+serde_with = "3.4.0"
 serde_yaml = "0.8.24"
 shadow-rs = "0.16.2"
 smallvec = "1.8.0"

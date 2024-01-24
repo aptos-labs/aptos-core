@@ -43,7 +43,7 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
   3: $t2 := >($t3, $t5)
      # live vars: $t0, $t2
   4: if ($t2) goto 5 else goto 9
-     # live vars:
+     # live vars: $t0
   5: label L0
      # live vars:
   6: $t6 := 1
@@ -106,7 +106,7 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      # moved: {$t3,$t4,$t5}
      #
   4: if ($t2) goto 5 else goto 9
-     # live vars:
+     # live vars: $t0
      # graph: {L0=local($t0)[]}
      # local_to_label: {$t0=L0}
      # global_to_label: {}
@@ -180,7 +180,7 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
   3: $t2 := >($t3, $t5)
   4: if ($t2) goto 5 else goto 10
   5: label L0
-  6: destroy($t0)
+  6: drop($t0)
   7: $t6 := 1
   8: abort($t6)
   9: goto 11
@@ -214,7 +214,7 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
   3: $t2 := >($t3, $t5)
   4: if ($t2) goto 5 else goto 10
   5: label L0
-  6: destroy($t0)
+  6: drop($t0)
   7: $t6 := 1
   8: abort($t6)
   9: goto 11

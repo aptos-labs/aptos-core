@@ -15,7 +15,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -37,6 +37,7 @@ use aptos_types::{
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     fee_statement::FeeStatement,
     on_chain_config::{
@@ -56,8 +57,8 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -138,7 +139,7 @@ macro_rules! unwrap_or_discard {
     };
 }
 
-fn get_transaction_output(
+pub(crate) fn get_transaction_output(
     session: SessionExt,
     fee_statement: FeeStatement,
     status: ExecutionStatus,
@@ -168,7 +169,7 @@ pub struct AptosVM {
     move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
-    storage_gas_params: Result<StorageGasParameters, String>,
+    pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     features: Features,
     timed_features: TimedFeatures,
 }
@@ -1385,6 +1386,8 @@ impl AptosVM {
             ));
         }
 
+        zkid_validation::validate_zkid_authenticators(transaction, resolver, session, log_context)?;
+
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -1433,18 +1436,6 @@ impl AptosVM {
                 &storage_gas_params.change_set_configs,
             )
         }
-    }
-
-    fn process_validator_transaction(
-        &self,
-        _resolver: &impl AptosMoveResolver,
-        _txn: ValidatorTransaction,
-        _log_context: &AdapterLogSchema,
-    ) -> (VMStatus, VMOutput) {
-        (
-            VMStatus::Executed,
-            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-        )
     }
 
     fn execute_user_transaction_impl(
@@ -1789,6 +1780,47 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
+    pub(crate) fn process_block_prologue_ext(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        block_metadata_ext: BlockMetadataExt,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        fail_point!("move_adapter::process_block_prologue_ext", |_| {
+            Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
+        let mut gas_meter = UnmeteredGasMeter;
+        let mut session =
+            self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
+
+        let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args());
+        session
+            .execute_function_bypass_visibility(
+                &BLOCK_MODULE,
+                BLOCK_PROLOGUE_EXT,
+                vec![],
+                args,
+                &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .or_else(|e| {
+                expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
+            })?;
+        SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let output = get_transaction_output(
+            session,
+            FeeStatement::zero(),
+            ExecutionStatus::Success,
+            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+        )?;
+        Ok((VMStatus::Executed, output))
+    }
+
     fn extract_module_metadata(&self, module: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module)
@@ -1933,6 +1965,15 @@ impl AptosVM {
                     self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
                 (vm_status, output, Some("block_prologue".to_string()))
             },
+            Transaction::BlockMetadataExt(block_metadata_ext) => {
+                fail_point!("aptos_vm::execution::block_metadata_ext");
+                let (vm_status, output) = self.process_block_prologue_ext(
+                    resolver,
+                    block_metadata_ext.clone(),
+                    log_context,
+                )?;
+                (vm_status, output, Some("block_prologue_ext".to_string()))
+            },
             GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
                     resolver,
@@ -2022,9 +2063,8 @@ impl AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
-                fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context);
+                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output, Some("validator_transaction".to_string()))
             },
         })
@@ -2151,6 +2191,25 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
+
+        if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
+            if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                    if !self.features.is_open_id_signature_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            };
+        };
 
         let txn = match transaction.check_signature() {
             Ok(t) => t,

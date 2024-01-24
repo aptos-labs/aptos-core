@@ -2,7 +2,6 @@
 
 use crate::{
     dkg_manager::{agg_trx_producer::RealAggTranscriptProducer, DKGManager},
-    dummy_dkg::DummyDKG,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
@@ -10,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
@@ -20,7 +18,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState},
+    dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
@@ -34,12 +32,10 @@ use tokio_retry::strategy::ExponentialBackoff;
 
 #[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
+    dkg_dealer_sk: Arc<<DefaultDKG as DKGTrait>::DealerPrivateKey>,
     // Some useful metadata
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
-
-    // some DKG private params
-    identity_blob: Arc<IdentityBlob>,
 
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
@@ -59,7 +55,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
         my_addr: AccountAddress,
-        identity_blob: Arc<IdentityBlob>,
+        dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
         reconfig_events: ReconfigNotificationListener<P>,
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -67,8 +63,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
+            dkg_dealer_sk: Arc::new(dkg_dealer_sk),
             my_addr,
-            identity_blob,
             epoch_state: None,
             reconfig_events,
             dkg_start_events,
@@ -168,8 +164,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::<DummyDKG, _>::new(
-                self.identity_blob.clone(),
+            let dkg_manager = DKGManager::<DefaultDKG>::new(
+                self.dkg_dealer_sk.clone(),
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_trx_producer),

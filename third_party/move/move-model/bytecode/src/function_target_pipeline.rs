@@ -4,7 +4,7 @@
 
 use crate::{
     function_target::{FunctionData, FunctionTarget},
-    print_targets_for_test,
+    print_targets_with_annotations_for_test,
     stackless_bytecode_generator::StacklessBytecodeGenerator,
     stackless_control_flow_graph::generate_cfg_in_dot_format,
 };
@@ -369,15 +369,18 @@ impl FunctionTargetPipeline {
     /// Runs the pipeline on all functions in the targets holder. Processors are run on each
     /// individual function in breadth-first fashion; i.e. a processor can expect that processors
     /// preceding it in the pipeline have been executed for all functions before it is called.
-    pub fn run_with_hook<H1, H2>(
+    /// `hook_before_pipeline` is called before the pipeline is run, and `hook_after_each_processor`
+    /// is called after each processor in the pipeline has been run on all functions.
+    /// Note that `hook_after_each_processor` is called with index starting at 1.
+    pub fn run_with_hook<Before, AfterEach>(
         &self,
         env: &GlobalEnv,
         targets: &mut FunctionTargetsHolder,
-        hook_before_pipeline: H1,
-        hook_after_each_processor: H2,
+        hook_before_pipeline: Before,
+        hook_after_each_processor: AfterEach,
     ) where
-        H1: Fn(&FunctionTargetsHolder),
-        H2: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder),
+        Before: Fn(&FunctionTargetsHolder),
+        AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder),
     {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
         info!("transforming bytecode");
@@ -438,6 +441,7 @@ impl FunctionTargetPipeline {
         targets: &mut FunctionTargetsHolder,
         dump_base_name: &str,
         dump_cfg: bool,
+        register_annotations: &impl Fn(&FunctionTarget),
     ) {
         self.run_with_hook(
             env,
@@ -456,7 +460,7 @@ impl FunctionTargetPipeline {
                     dump_base_name,
                     step_count,
                     &suffix,
-                    &Self::get_per_processor_dump(env, holders, processor),
+                    &Self::get_per_processor_dump(env, holders, processor, register_annotations),
                 );
                 if dump_cfg {
                     Self::dump_cfg(env, holders, dump_base_name, step_count, &suffix);
@@ -465,18 +469,29 @@ impl FunctionTargetPipeline {
         );
     }
 
-    fn print_targets(env: &GlobalEnv, name: &str, targets: &FunctionTargetsHolder) -> String {
-        print_targets_for_test(env, &format!("after processor `{}`", name), targets)
+    fn print_targets(
+        env: &GlobalEnv,
+        name: &str,
+        targets: &FunctionTargetsHolder,
+        register_annotations: &impl Fn(&FunctionTarget),
+    ) -> String {
+        print_targets_with_annotations_for_test(
+            env,
+            &format!("after processor `{}`", name),
+            targets,
+            register_annotations,
+        )
     }
 
     fn get_pre_pipeline_dump(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> String {
-        Self::print_targets(env, "stackless", targets)
+        Self::print_targets(env, "stackless", targets, &|_| {})
     }
 
     fn get_per_processor_dump(
         env: &GlobalEnv,
         targets: &FunctionTargetsHolder,
         processor: &dyn FunctionTargetProcessor,
+        register_annotations: &impl Fn(&FunctionTarget),
     ) -> String {
         let mut dump = format!("{}", ProcessorResultDisplay {
             env,
@@ -487,7 +502,12 @@ impl FunctionTargetPipeline {
             if !dump.is_empty() {
                 dump = format!("\n\n{}", dump);
             }
-            dump.push_str(&Self::print_targets(env, &processor.name(), targets));
+            dump.push_str(&Self::print_targets(
+                env,
+                &processor.name(),
+                targets,
+                register_annotations,
+            ));
         }
         dump
     }

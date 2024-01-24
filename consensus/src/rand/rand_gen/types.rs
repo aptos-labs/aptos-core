@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::ensure;
-use aptos_consensus_types::{
-    common::{Author, Round},
-    randomness::{RandMetadata, Randomness},
-};
+use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::{aggregate_signature::AggregateSignature, validator_verifier::ValidatorVerifier};
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    randomness::{RandMetadata, Randomness},
+    validator_verifier::ValidatorVerifier,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
 

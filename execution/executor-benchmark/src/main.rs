@@ -313,6 +313,9 @@ enum Command {
         #[clap(long, default_value_t = 1)]
         module_working_set_size: usize,
 
+        #[clap(long)]
+        use_sender_account_pool: bool,
+
         #[clap(long, value_parser)]
         data_dir: PathBuf,
 
@@ -362,6 +365,7 @@ where
             transaction_type,
             transaction_weights,
             module_working_set_size,
+            use_sender_account_pool,
             data_dir,
             checkpoint_dir,
         } => {
@@ -373,7 +377,7 @@ where
                     &transaction_weights,
                     &[],
                     module_working_set_size,
-                    false,
+                    use_sender_account_pool,
                 );
                 assert!(mix_per_phase.len() == 1);
                 Some(mix_per_phase[0].clone())

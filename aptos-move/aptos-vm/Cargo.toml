@@ -36,6 +36,7 @@ aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+base64-url = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
@@ -43,6 +44,7 @@ crossbeam-channel = { workspace = true }
 dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
+jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
