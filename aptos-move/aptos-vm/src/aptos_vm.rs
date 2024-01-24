@@ -1778,8 +1778,8 @@ impl AptosVM {
                 &mut gas_meter,
             )
             .map(|_return_vals| ())
-            .or_else(|e| {
-                expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
+            .or_else(|err| {
+                expect_only_successful_execution(err, BLOCK_PROLOGUE.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
