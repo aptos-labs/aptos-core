@@ -16,7 +16,6 @@ module aptos_framework::execution_config {
 
     /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
-    const EAPI_DISABLED: u64 = 2;
 
     /// This can be called by on-chain governance to update on-chain execution configs.
     public fun set(account: &signer, config: vector<u8>) acquires ExecutionConfig {

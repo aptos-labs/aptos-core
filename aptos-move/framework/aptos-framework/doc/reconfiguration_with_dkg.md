@@ -45,12 +45,12 @@ Do nothing if one is already in progress.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">try_start</a>() {
     <b>if</b> (<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>()) { <b>return</b> };
-    <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">reconfiguration_state::try_mark_as_in_progress</a>();
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">reconfiguration_state::on_reconfig_start</a>();
     <b>let</b> cur_epoch = <a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>();
     <a href="dkg.md#0x1_dkg_start">dkg::start</a>(
         cur_epoch,
         <a href="stake.md#0x1_stake_cur_validator_consensus_infos">stake::cur_validator_consensus_infos</a>(),
-        <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">stake::update_validator_set_on_new_epoch</a>(<b>false</b>)
+        <a href="stake.md#0x1_stake_next_validator_consensus_infos">stake::next_validator_consensus_infos</a>(),
     );
 }
 </code></pre>

@@ -63,7 +63,6 @@
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
 <b>use</b> <a href="transaction_validation.md#0x1_transaction_validation">0x1::transaction_validation</a>;
-<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="version.md#0x1_version">0x1::version</a>;
 <b>use</b> <a href="vesting.md#0x1_vesting">0x1::vesting</a>;
@@ -655,7 +654,7 @@ If it exists, it just returns the signer.
     // validators.
     <a href="aptos_coin.md#0x1_aptos_coin_destroy_mint_cap">aptos_coin::destroy_mint_cap</a>(aptos_framework);
 
-    <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">stake::update_validator_set_on_new_epoch</a>(<b>true</b>);
+    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
 }
 </code></pre>
 
