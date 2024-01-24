@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Simplifies the control flow graph by
+//! (Implemented by `ControlFlowGraphSimplifier`)
 //! - eliminating branch/jump to jump
 //!     L1: goto L2 (L1 != L2)
 //!     replacing all goto L1 by goto L2, and deleting L1: goto L2
@@ -22,6 +23,7 @@
 //!     if ... goto L else goto L
 //!     =>
 //!     goto L
+//! (Implemented by `UnreachableCodeElimination`)
 //! - removes unreachable codes
 //! (TODO: eliminate jump to branch)
 
@@ -77,6 +79,7 @@ impl ControlFlowGraphSimplifierTransformation {
         }
     }
 
+    /// Does the first four transformations described in the module doc
     fn transform(&mut self) {
         let mut elim_empty_blocks_transformer =
             RemoveEmptyBlock::new(std::mem::take(&mut self.cfg_code_generator));
@@ -133,7 +136,8 @@ impl ControlFlowGraphCodeGenerator {
     }
 
     /// Generates code from the control flow graph
-    pub fn gen_code(self) -> Vec<Bytecode> {
+    /// `visit_all`: determines whether to generate code for unreachable blocks
+    pub fn gen_code(self, visit_all: bool) -> Vec<Bytecode> {
         let mut generated = Vec::new();
         let mut iter_dfs_left = self.cfg.iter_dfs_left(true).peekable();
         // let mut iter_dfs_left = self.cfg.blocks().into_iter().peekable();
