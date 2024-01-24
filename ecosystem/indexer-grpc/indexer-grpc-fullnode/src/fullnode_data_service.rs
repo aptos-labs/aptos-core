@@ -134,7 +134,7 @@ impl FullnodeData for FullnodeDataService {
                                 Some(highest_known_version as i64),
                                 Some(ma.avg() * 1000.0),
                                 Some(start_time.elapsed().as_secs_f64()),
-                                Some(ma.sum() as i64),
+                                Some((max_version - coordinator.current_version + 1) as i64),
                             );
                         }
                     },

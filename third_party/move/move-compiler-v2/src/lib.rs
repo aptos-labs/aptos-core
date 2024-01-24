@@ -14,7 +14,8 @@ use crate::pipeline::{
     ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
     explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
-    reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
+    reference_safety_processor::ReferenceSafetyProcessor,
+    uninitialized_use_checker::UninitializedUseChecker, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -176,6 +177,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
     if safety_on {
+        pipeline.add_processor(Box::new(UninitializedUseChecker {}));
         pipeline.add_processor(Box::new(VisibilityChecker()));
     }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {

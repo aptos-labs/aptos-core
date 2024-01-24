@@ -58,6 +58,7 @@ members = [
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
     "crates/aptos-debugger",
+    "crates/aptos-dkg",
     "crates/aptos-drop-helper",
     "crates/aptos-enum-conversion-derive",
     "crates/aptos-faucet/cli",
@@ -304,6 +305,7 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
+aptos-dkg = { path = "crates/aptos-dkg" }
 aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
@@ -463,12 +465,14 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
+bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
 blst = "0.3.7"
+blstrs = { version = "0.7.1", features = ["serde"] }
 bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
@@ -515,6 +519,7 @@ env_logger = "0.10.0"
 erased-serde = "0.3.13"
 event-listener = "2.5.3"
 fail = "0.5.0"
+ff = "0.13"
 field_count = "0.1.1"
 flate2 = "1.0.24"
 futures = "0.3.29"
@@ -527,6 +532,7 @@ git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
+group = "0.13"
 guppy = "0.17.0"
 handlebars = "4.2.2"
 heck = "0.4.1"
@@ -567,7 +573,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
-num-bigint = { version = "0.4.4", features = ["rand"] }
+num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
@@ -580,6 +586,7 @@ owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
 signature = "2.1.0"
 sec1 = "0.7.0"
+pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
 passkey-authenticator = { version = "0.2.0", features = ["testable"] }
