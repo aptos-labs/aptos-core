@@ -17,7 +17,7 @@ use tokio::time::timeout;
 pub trait TxnNotifier: Send + Sync {
     /// Notification of txns which failed execution. (Committed txns is notified by
     /// state sync.)
-    async fn notify_failed_txn(
+    async fn notify_executed_txns(
         &self,
         txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
@@ -46,7 +46,7 @@ impl MempoolNotifier {
 
 #[async_trait::async_trait]
 impl TxnNotifier for MempoolNotifier {
-    async fn notify_failed_txn(
+    async fn notify_executed_txns(
         &self,
         user_txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,

@@ -56,19 +56,30 @@ impl QuorumStoreCoordinator {
             monitor!("quorum_store_coordinator_loop", {
                 match cmd {
                     CoordinatorCommand::ExecutedBlockNotification(block_id, payload) => {
-                        // TODO: proof coordinator
+                        self.proof_coordinator_cmd_tx
+                            .send(ProofCoordinatorCommand::ExecutedBlockNotification(
+                                block_id,
+                                payload.clone(),
+                            ))
+                            .await
+                            .expect("Failed to send to ProofCoordinator");
 
                         self.proof_manager_cmd_tx
                             .send(ProofManagerCommand::ExecutedBlockNotification(
-                                block_id, payload,
+                                block_id,
+                                payload.clone(),
                             ))
                             .await
                             .expect("Failed to send to ProofManager");
 
-                        // TODO: batch generator
+                        self.batch_generator_cmd_tx
+                            .send(BatchGeneratorCommand::ExecutedBlockNotification(
+                                block_id, payload,
+                            ))
+                            .await
+                            .expect("Failed to send to BatchGenerator");
                     },
                     CoordinatorCommand::CommitNotification(block_timestamp, batches) => {
-                        // TODO: need a callback or not?
                         self.proof_coordinator_cmd_tx
                             .send(ProofCoordinatorCommand::CommitNotification(batches.clone()))
                             .await

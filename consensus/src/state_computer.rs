@@ -235,10 +235,10 @@ impl StateComputer for ExecutionProxy {
             if let Some(payload_manager) = payload_manager {
                 payload_manager.notify_executed_block(block_id, payload);
             }
-            // notify mempool about failed transaction
-            if let Err(e) = txn_notifier.notify_failed_txn(input_txns, result).await {
+            // notify mempool about executed transactions
+            if let Err(e) = txn_notifier.notify_executed_txns(input_txns, result).await {
                 error!(
-                    error = ?e, "Failed to notify mempool of rejected txns",
+                    error = ?e, "Failed to notify mempool of executed txns",
                 );
             }
             Ok(pipeline_execution_result)
@@ -462,7 +462,7 @@ async fn test_commit_sync_race() {
 
     #[async_trait::async_trait]
     impl TxnNotifier for RecordedCommit {
-        async fn notify_failed_txn(
+        async fn notify_executed_txns(
             &self,
             _txns: Vec<SignedTransaction>,
             _compute_results: &StateComputeResult,
