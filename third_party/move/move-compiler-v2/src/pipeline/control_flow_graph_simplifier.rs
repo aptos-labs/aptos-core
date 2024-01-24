@@ -2,11 +2,28 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Implements a compiler pass that
-//! - eliminates all empty blocks
+//! Simplifies the control flow graph by
+//! - eliminating branch/jump to jump
+//!     L1: goto L2 (L1 != L2)
+//!     replacing all goto L1 by goto L2, and deleting L1: goto L2
 //! - removes edges where the source has only one successors and the target has only one predecessors
-//! - removes all jumps to the next instruction
+//!     BB1: ...
+//!          goto L2
+//!     BB2: L2 (no other goto L2)
+//!          ...
+//!     =>
+//!     BB1: BB1 content
+//!          BB2 content
+//!          goto L2
+//! - removes all jumps to the next instruction:
+//!     goto L;
+//!     L;
+//! - replaces branch to same target by jump
+//!     if ... goto L else goto L
+//!     =>
+//!     goto L
 //! - removes unreachable codes
+//! (TODO: eliminate jump to branch)
 
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
@@ -246,7 +263,7 @@ impl RemoveEmptyBlock {
         Self(generator)
     }
 
-    /// Removes all empty blocks from the CFG except for empty loops (Label; jump Label)
+    /// Eliminating branch/jump to jump
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             if self.is_empty_block(block) {
@@ -374,6 +391,7 @@ impl RemoveRedundantJump {
     }
 
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
+    /// Returns true if the edge is removed
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
         debug_assert!(self.cfg.successors(from).contains(&to));
         debug_assert!(!self.is_trivial_block(from));
