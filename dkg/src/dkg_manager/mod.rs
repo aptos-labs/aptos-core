@@ -298,6 +298,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
     /// On a DKG start event, execute DKG.
     async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
+        debug!("[DKG] process_dkg_start_event: BEGIN");
         let DKGStartEvent {
             session_metadata,
             start_time_us,
@@ -306,8 +307,14 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             self.epoch_state.epoch == session_metadata.dealer_epoch,
             "process_dkg_start_event failed with epoch mismatch"
         );
-        self.setup_deal_broadcast(start_time_us, &session_metadata)
-            .await?;
+
+        if matches!(&self.state, InnerState::NotStarted) {
+            self.setup_deal_broadcast(start_time_us, &session_metadata)
+                .await?;
+        } else {
+            debug!("[DKG] process_dkg_start_event: received a 2nd DKGStartEvents!");
+        }
+        debug!("[DKG] process_dkg_start_event: END");
         Ok(())
     }
 

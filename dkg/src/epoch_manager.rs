@@ -93,7 +93,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
-        if let Some(tx) = self.dkg_start_event_tx.take() {
+        if let Some(tx) = self.dkg_start_event_tx.as_ref() {
             let EventNotification {
                 subscribed_events, ..
             } = notification;
