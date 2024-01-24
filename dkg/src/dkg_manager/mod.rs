@@ -2,11 +2,15 @@
 use crate::{agg_trx_producer::TAggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_crypto::Uniform;
 use aptos_logger::error;
 use aptos_types::{
-    dkg::{DKGTranscript, DKGSessionState, DKGStartEvent, DKGTrait},
+    dkg::{
+        DKGSessionMetadata, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
+        DKGTranscriptMetadata,
+    },
     epoch_state::EpochState,
-    validator_txn::ValidatorTransaction,
+    validator_txn::{Topic, ValidatorTransaction},
 };
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
@@ -14,9 +18,6 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
-use aptos_crypto::Uniform;
-use aptos_types::dkg::{DKGSessionMetadata, DKGTranscriptMetadata};
-use aptos_types::validator_txn::Topic;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -96,7 +97,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
-        let (pull_notification_tx, pull_notification_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
+        let (pull_notification_tx, pull_notification_rx) =
+            aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             dealer_sk,
             my_index,
@@ -124,7 +126,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     ) {
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
-                metadata, start_time_us, ..
+                metadata,
+                start_time_us,
+                ..
             } = session_state;
             self.setup_deal_broadcast(start_time_us, &metadata)
                 .await
@@ -198,7 +202,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     async fn setup_deal_broadcast(
         &mut self,
         start_time_us: u64,
-        dkg_session_metadata: &DKGSessionMetadata
+        dkg_session_metadata: &DKGSessionMetadata,
     ) -> Result<()> {
         self.state = match &self.state {
             InnerState::NotStarted => {
@@ -221,7 +225,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 let dkg_transcript = DKGTranscript::new(
                     self.epoch_state.epoch,
                     self.my_addr,
-                    bcs::to_bytes(&trx).map_err(|e|anyhow!("setup_deal_broadcast failed with trx serialization error: {e}"))?,
+                    bcs::to_bytes(&trx).map_err(|e| {
+                        anyhow!("setup_deal_broadcast failed with trx serialization error: {e}")
+                    })?,
                 );
 
                 // TODO(zjma): DKG_NODE_READY metric
@@ -262,7 +268,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                     },
                     transcript_bytes: bcs::to_bytes(&agg_trx).map_err(|e|anyhow!("process_aggregated_transcript failed with trx serialization error: {e}"))?,
                 });
-                let vtxn_guard = self.vtxn_pool.put(Topic::DKG, Arc::new(txn), Some(self.pull_notification_tx.clone()));
+                let vtxn_guard = self.vtxn_pool.put(
+                    Topic::DKG,
+                    Arc::new(txn),
+                    Some(self.pull_notification_tx.clone()),
+                );
                 InnerState::Finished {
                     vtxn_guard,
                     start_time_us,
@@ -279,7 +289,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     async fn process_dkg_start_event(&mut self, maybe_event: Option<DKGStartEvent>) -> Result<()> {
         if let Some(event) = maybe_event {
             let DKGStartEvent {
-                session_metadata, start_time_us
+                session_metadata,
+                start_time_us,
             } = event;
             ensure!(self.epoch_state.epoch == session_metadata.dealer_epoch);
             self.setup_deal_broadcast(start_time_us, &session_metadata)

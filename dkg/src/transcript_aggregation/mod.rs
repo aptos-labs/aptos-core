@@ -6,7 +6,7 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    dkg::{DKGTranscript, DKGTrait},
+    dkg::{DKGTrait, DKGTranscript},
     epoch_state::EpochState,
 };
 use move_core_types::account_address::AccountAddress;
@@ -48,7 +48,11 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
     type Message = DKGTranscriptRequest;
     type Response = DKGTranscript;
 
-    fn add(&self, sender: Author, dkg_transcript: DKGTranscript) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(
+        &self,
+        sender: Author,
+        dkg_transcript: DKGTranscript,
+    ) -> anyhow::Result<Option<Self::Aggregated>> {
         let DKGTranscript {
             metadata,
             transcript_bytes,

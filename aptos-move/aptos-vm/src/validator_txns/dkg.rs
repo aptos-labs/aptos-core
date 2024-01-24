@@ -12,13 +12,12 @@ use crate::{
     AptosVM,
 };
 use aptos_types::{
-    dkg::{DKGState, DKGTrait, DefaultDKG},
+    dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use aptos_types::dkg::DKGTranscript;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use move_core_types::{

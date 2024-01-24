@@ -4,8 +4,12 @@ use aptos_channels::aptos_channel;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_infallible::Mutex;
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
-use std::{collections::{BTreeMap, HashMap, HashSet}, sync::Arc, time::Instant};
-use std::fmt::{Debug, Formatter};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    fmt::{Debug, Formatter},
+    sync::Arc,
+    time::Instant,
+};
 
 pub enum TransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),

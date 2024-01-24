@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg_manager::DKGManager,
     agg_trx_producer::AggTranscriptProducer,
+    dkg_manager::DKGManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
@@ -150,11 +150,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
         self.epoch_state = Some(epoch_state.clone());
-        let my_index = epoch_state.verifier.address_to_validator_index().get(&self.my_addr).copied();
+        let my_index = epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self.my_addr)
+            .copied();
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if let (true, Some(my_index)) = (features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG), my_index) {
+        if let (true, Some(my_index)) = (
+            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
+            my_index,
+        ) {
             let DKGState {
                 in_progress: in_progress_session,
                 ..
