@@ -326,7 +326,11 @@ impl<'a> DFSLeft<'a> {
             cfg,
             to_visit,
             visited: BTreeSet::new(),
-            unvisited: if visit_all { Some(cfg.blocks.keys().cloned().collect()) } else { None },
+            unvisited: if visit_all {
+                Some(cfg.blocks.keys().cloned().collect())
+            } else {
+                None
+            },
         }
     }
 
