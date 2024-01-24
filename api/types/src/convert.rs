@@ -145,7 +145,8 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
-            StateCheckpoint(_) => {
+            // TODO [fix] Create separate transaction type for API
+            StateCheckpoint(_) | BlockEpilogue { .. } => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,
                     timestamp: timestamp.into(),

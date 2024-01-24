@@ -50,8 +50,8 @@ use aptos_types::{
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
         Transaction::{
-            BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
+            BlockEpilogue, BlockMetadata as BlockMetadataTransaction, GenesisTransaction,
+            StateCheckpoint, UserTransaction,
         },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
@@ -2010,6 +2010,11 @@ impl AptosVM {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
+            },
+            BlockEpilogue(_) => {
+                let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                let output = VMOutput::empty_with_status(status);
+                (VMStatus::Executed, output, Some("block_epilogue".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
                 let (vm_status, output) =

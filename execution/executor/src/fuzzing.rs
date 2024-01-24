@@ -93,7 +93,7 @@ impl VMExecutor for FakeVM {
         _state_view: &impl StateView,
         _onchain_config: BlockExecutorConfigFromOnchain,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
-        Ok(BlockOutput::new(vec![]))
+        Ok(BlockOutput::new(vec![], None))
     }
 }
 
