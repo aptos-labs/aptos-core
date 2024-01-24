@@ -1546,6 +1546,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-active-state-set"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-storage-interface",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "fail 0.5.1",
+ "once_cell",
+ "serde",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [

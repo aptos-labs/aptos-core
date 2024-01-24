@@ -131,6 +131,7 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
+    "experimental/storage/active-state-set",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -319,6 +320,7 @@ aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
 aptos-experimental-ptx-executor = { path = "experimental/execution/ptx-executor" }
 aptos-experimental-runtimes = { path = "experimental/runtimes" }
+aptos-experimental-active-state-set = { path = "experimental/storage/active-state-set" }
 aptos-faucet-cli = { path = "crates/aptos-faucet/cli" }
 aptos-faucet-core = { path = "crates/aptos-faucet/core" }
 aptos-faucet-service = { path = "crates/aptos-faucet/service" }
