@@ -83,10 +83,7 @@ impl IndexerStreamCoordinator {
     /// 2. Convert transactions to rust objects (for example stringifying move structs into json)
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
-    pub async fn process_next_batch(
-        &mut self,
-        _enable_expensive_logging: bool,
-    ) -> Vec<Result<EndVersion, Status>> {
+    pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
         let fetching_start_time = std::time::Instant::now();
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
