@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::jwks;
+use crate::{dkg::DKGNode, jwks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
+    DKGResult(DKGNode),
     DummyTopic1(DummyValidatorTransaction),
     #[cfg(any(test, feature = "fuzzing"))]
     DummyTopic2(DummyValidatorTransaction),
@@ -15,18 +16,26 @@ pub enum ValidatorTransaction {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct DummyValidatorTransaction {
+    pub valid: bool,
     #[serde(with = "serde_bytes")]
     pub payload: Vec<u8>,
 }
 
 impl ValidatorTransaction {
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy1(payload: Vec<u8>) -> Self {
-        Self::DummyTopic1(DummyValidatorTransaction { payload })
+        Self::DummyTopic1(DummyValidatorTransaction {
+            valid: true,
+            payload,
+        })
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy2(payload: Vec<u8>) -> Self {
-        Self::DummyTopic2(DummyValidatorTransaction { payload })
+        Self::DummyTopic2(DummyValidatorTransaction {
+            valid: true,
+            payload,
+        })
     }
 
     pub fn size_in_bytes(&self) -> usize {
