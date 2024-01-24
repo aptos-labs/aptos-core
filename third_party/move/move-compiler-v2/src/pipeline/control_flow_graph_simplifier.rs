@@ -53,8 +53,7 @@ struct ControlFlowGraphSimplifierTransformation {
 
 impl ControlFlowGraphSimplifierTransformation {
     pub fn new(data: FunctionData) -> Self {
-        let cfg = StacklessControlFlowGraph::new_forward(&data.code);
-        let cfg_code_generator = ControlFlowGraphCodeGenerator::new(cfg, &data.code);
+        let cfg_code_generator = ControlFlowGraphCodeGenerator::new(&data.code);
         Self {
             data,
             cfg_code_generator,
@@ -96,7 +95,8 @@ struct ControlFlowGraphCodeGenerator {
 
 impl ControlFlowGraphCodeGenerator {
     // TODO: take `Vec<Bytecode>` instead to avoid copying
-    pub fn new(cfg: StacklessControlFlowGraph, codes: &[Bytecode]) -> Self {
+    pub fn new(codes: &[Bytecode]) -> Self {
+        let cfg = StacklessControlFlowGraph::new_forward(codes);
         let code_blocks = cfg
             .blocks()
             .into_iter()
