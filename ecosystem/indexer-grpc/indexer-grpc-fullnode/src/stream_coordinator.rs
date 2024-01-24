@@ -109,6 +109,7 @@ impl IndexerStreamCoordinator {
             Some(num_transactions as i64),
         );
         // Stage 2: convert transactions to rust objects. CPU-bound load.
+        let decoding_start_time = std::time::Instant::now();
         let mut task_batches = vec![];
         let mut current_batch = vec![];
         let mut current_batch_size = 0;
@@ -152,8 +153,6 @@ impl IndexerStreamCoordinator {
                     Some(pb_txns.len() as i64),
                 );
 
-                // let send_start_time = std::time::Instant::now();
-
                 let mut responses = vec![];
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
@@ -187,10 +186,11 @@ impl IndexerStreamCoordinator {
             None,
             Some(highest_known_version),
             None,
-            Some(fetching_start_time.elapsed().as_secs_f64()),
+            Some(decoding_start_time.elapsed().as_secs_f64()),
             Some(num_transactions as i64),
         );
-        // Stage 4: send responses to stream
+        // Stage 3: send responses to stream
+        let sending_start_time = std::time::Instant::now();
         for response in responses {
             if let Err(err) = self.transactions_sender.send(Ok(response)).await {
                 panic!(
@@ -199,6 +199,17 @@ impl IndexerStreamCoordinator {
                 );
             }
         }
+        log_grpc_step_fullnode(
+            IndexerGrpcStep::FullnodeSentBatch,
+            Some(first_version),
+            Some(end_version),
+            None,
+            Some(highest_known_version),
+            None,
+            Some(sending_start_time.elapsed().as_secs_f64()),
+            Some(num_transactions as i64),
+        );
+
         log_grpc_step_fullnode(
             IndexerGrpcStep::FullnodeProcessedBatch,
             Some(first_version),
