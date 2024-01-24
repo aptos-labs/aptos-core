@@ -11,7 +11,7 @@ fun <SELF>_0::main() {
 
 Diagnostics:
 error: use of unassigned local `x`
-  ┌─ tests/uninit-use-checker/use_before_assign.move:4:9
+  ┌─ tests/uninit-use-checker/v1-commands/use_before_assign.move:4:9
   │
 4 │     let y = x;
   │         ^
