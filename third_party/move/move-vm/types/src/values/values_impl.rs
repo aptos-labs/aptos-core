@@ -3181,7 +3181,7 @@ impl Value {
 * Destructors
 *
 **************************************************************************************/
-// Locals may contain reference values that points to the same cotnainer through Rc, hencing forming
+// Locals may contain reference values that points to the same container through Rc, hence forming
 // a cycle. Therefore values need to be manually taken out of the Locals in order to not leak memory.
 impl Drop for Locals {
     fn drop(&mut self) {
@@ -3453,6 +3453,7 @@ impl GlobalValue {
 #[cfg(feature = "fuzzing")]
 pub mod prop {
     use super::*;
+    use move_core_types::value::LayoutTag;
     #[allow(unused_imports)]
     use move_core_types::value::{MoveStruct, MoveValue};
     use proptest::{collection::vec, prelude::*};
@@ -3580,78 +3581,5 @@ pub mod prop {
             let value_strategy = value_strategy_with_layout(&layout);
             (Just(layout), value_strategy)
         })
-    }
-}
-
-use move_core_types::value::{LayoutTag, MoveStruct, MoveValue};
-
-impl ValueImpl {
-    pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
-        use MoveTypeLayout as L;
-
-        // Make sure to strip all tags from the type layout.
-        if let L::Tagged(LayoutTag::IdentifierMapping(_), layout) = layout {
-            return self.as_move_value(layout.as_ref());
-        }
-
-        match (layout, &self) {
-            (L::U8, ValueImpl::U8(x)) => MoveValue::U8(*x),
-            (L::U16, ValueImpl::U16(x)) => MoveValue::U16(*x),
-            (L::U32, ValueImpl::U32(x)) => MoveValue::U32(*x),
-            (L::U64, ValueImpl::U64(x)) => MoveValue::U64(*x),
-            (L::U128, ValueImpl::U128(x)) => MoveValue::U128(*x),
-            (L::U256, ValueImpl::U256(x)) => MoveValue::U256(*x),
-            (L::Bool, ValueImpl::Bool(x)) => MoveValue::Bool(*x),
-            (L::Address, ValueImpl::Address(x)) => MoveValue::Address(*x),
-
-            (L::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
-                let mut fields = vec![];
-                for (v, field_layout) in r.borrow().iter().zip(struct_layout.fields().iter()) {
-                    fields.push(v.as_move_value(field_layout));
-                }
-                MoveValue::Struct(MoveStruct::new(fields))
-            },
-
-            (L::Vector(inner_layout), ValueImpl::Container(c)) => MoveValue::Vector(match c {
-                Container::VecU8(r) => r.borrow().iter().map(|u| MoveValue::U8(*u)).collect(),
-                Container::VecU16(r) => r.borrow().iter().map(|u| MoveValue::U16(*u)).collect(),
-                Container::VecU32(r) => r.borrow().iter().map(|u| MoveValue::U32(*u)).collect(),
-                Container::VecU64(r) => r.borrow().iter().map(|u| MoveValue::U64(*u)).collect(),
-                Container::VecU128(r) => r.borrow().iter().map(|u| MoveValue::U128(*u)).collect(),
-                Container::VecU256(r) => r.borrow().iter().map(|u| MoveValue::U256(*u)).collect(),
-                Container::VecBool(r) => r.borrow().iter().map(|u| MoveValue::Bool(*u)).collect(),
-                Container::VecAddress(r) => {
-                    r.borrow().iter().map(|u| MoveValue::Address(*u)).collect()
-                },
-                Container::Vec(r) => r
-                    .borrow()
-                    .iter()
-                    .map(|v| v.as_move_value(inner_layout.as_ref()))
-                    .collect(),
-                Container::Struct(_) => {
-                    panic!("got struct container when converting vec")
-                },
-                Container::Locals(_) => panic!("got locals container when converting vec"),
-            }),
-
-            (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
-                let v = r.borrow();
-                if v.len() != 1 {
-                    panic!("Unexpected signer layout: {:?}", v);
-                }
-                match &v[0] {
-                    ValueImpl::Address(a) => MoveValue::Signer(*a),
-                    v => panic!("Unexpected non-address while converting signer: {:?}", v),
-                }
-            },
-
-            (layout, val) => panic!("Cannot convert value {:?} as {:?}", val, layout),
-        }
-    }
-}
-
-impl Value {
-    pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
-        self.0.as_move_value(layout)
     }
 }
