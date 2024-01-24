@@ -249,9 +249,9 @@ impl RemoveEmptyBlock {
             )
     }
 
-    /// Removes block from the control flow graph, and redirects any block jumpping to it
-    /// to `redirect_to` instead
-    /// Requires: `block_to_remove` doesn't have itself as a successor;
+    /// Removes the block from the control flow graph, and let any block jumpping to it
+    /// to jump to `redirect_to` directly
+    /// Requires: `block_to_remove` doesn't have itself as a successor. We don't remove `loop {}`.
     fn remove_empty_block(&mut self, block_to_remove: BlockId, redirect_to: BlockId) {
         debug_assert!(block_to_remove != redirect_to);
         debug_assert!(!self
