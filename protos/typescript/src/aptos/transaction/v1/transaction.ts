@@ -1097,7 +1097,7 @@ export const Block = {
     }
     if (message.height !== undefined && message.height !== BigInt("0")) {
       if (BigInt.asUintN(64, message.height) !== message.height) {
-        throw new Error("value provided for field message.height of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.height of type uint64 too large");
       }
       writer.uint32(16).uint64(message.height.toString());
     }
@@ -1254,7 +1254,7 @@ export const Transaction = {
     }
     if (message.version !== undefined && message.version !== BigInt("0")) {
       if (BigInt.asUintN(64, message.version) !== message.version) {
-        throw new Error("value provided for field message.version of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.version of type uint64 too large");
       }
       writer.uint32(16).uint64(message.version.toString());
     }
@@ -1263,13 +1263,13 @@ export const Transaction = {
     }
     if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
       if (BigInt.asUintN(64, message.epoch) !== message.epoch) {
-        throw new Error("value provided for field message.epoch of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.epoch of type uint64 too large");
       }
       writer.uint32(32).uint64(message.epoch.toString());
     }
     if (message.blockHeight !== undefined && message.blockHeight !== BigInt("0")) {
       if (BigInt.asUintN(64, message.blockHeight) !== message.blockHeight) {
-        throw new Error("value provided for field message.blockHeight of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.blockHeight of type uint64 too large");
       }
       writer.uint32(40).uint64(message.blockHeight.toString());
     }
@@ -1527,7 +1527,7 @@ export const BlockMetadataTransaction = {
     }
     if (message.round !== undefined && message.round !== BigInt("0")) {
       if (BigInt.asUintN(64, message.round) !== message.round) {
-        throw new Error("value provided for field message.round of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.round of type uint64 too large");
       }
       writer.uint32(16).uint64(message.round.toString());
     }
@@ -2094,7 +2094,7 @@ export const Event = {
     }
     if (message.sequenceNumber !== undefined && message.sequenceNumber !== BigInt("0")) {
       if (BigInt.asUintN(64, message.sequenceNumber) !== message.sequenceNumber) {
-        throw new Error("value provided for field message.sequenceNumber of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.sequenceNumber of type uint64 too large");
       }
       writer.uint32(16).uint64(message.sequenceNumber.toString());
     }
@@ -2267,7 +2267,7 @@ export const TransactionInfo = {
     }
     if (message.gasUsed !== undefined && message.gasUsed !== BigInt("0")) {
       if (BigInt.asUintN(64, message.gasUsed) !== message.gasUsed) {
-        throw new Error("value provided for field message.gasUsed of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.gasUsed of type uint64 too large");
       }
       writer.uint32(40).uint64(message.gasUsed.toString());
     }
@@ -2475,7 +2475,7 @@ export const EventKey = {
   encode(message: EventKey, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.creationNumber !== undefined && message.creationNumber !== BigInt("0")) {
       if (BigInt.asUintN(64, message.creationNumber) !== message.creationNumber) {
-        throw new Error("value provided for field message.creationNumber of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.creationNumber of type uint64 too large");
       }
       writer.uint32(8).uint64(message.creationNumber.toString());
     }
@@ -2595,19 +2595,19 @@ export const UserTransactionRequest = {
     }
     if (message.sequenceNumber !== undefined && message.sequenceNumber !== BigInt("0")) {
       if (BigInt.asUintN(64, message.sequenceNumber) !== message.sequenceNumber) {
-        throw new Error("value provided for field message.sequenceNumber of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.sequenceNumber of type uint64 too large");
       }
       writer.uint32(16).uint64(message.sequenceNumber.toString());
     }
     if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
       if (BigInt.asUintN(64, message.maxGasAmount) !== message.maxGasAmount) {
-        throw new Error("value provided for field message.maxGasAmount of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.maxGasAmount of type uint64 too large");
       }
       writer.uint32(24).uint64(message.maxGasAmount.toString());
     }
     if (message.gasUnitPrice !== undefined && message.gasUnitPrice !== BigInt("0")) {
       if (BigInt.asUintN(64, message.gasUnitPrice) !== message.gasUnitPrice) {
-        throw new Error("value provided for field message.gasUnitPrice of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.gasUnitPrice of type uint64 too large");
       }
       writer.uint32(32).uint64(message.gasUnitPrice.toString());
     }
