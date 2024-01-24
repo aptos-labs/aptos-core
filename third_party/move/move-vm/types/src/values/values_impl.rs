@@ -27,6 +27,23 @@ use std::{
     rc::Rc,
 };
 
+macro_rules! return_delayed_value_error {
+    () => {
+        // TODO[agg_v2](fix):
+        //   What is the best error code here? It cannot be invariant violation
+        //   because equality or similar operation can fail at runtime for delayed
+        //   values, and there is no way to gate it at this point.
+        return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+            .with_message("Delayed values should not be processed by the VM".to_string()))
+    };
+}
+
+/// Handle into delayed value. We use a struct here so Move values can
+/// be casted both to u64 and handles.
+// TODO[agg_v2](cleanup): See if we combine this with delayed field IDs.
+#[derive(Debug, Clone, Copy)]
+pub struct DelayedValueHandle(pub u64);
+
 /***************************************************************************************
  *
  * Internal Types
@@ -55,6 +72,13 @@ pub(crate) enum ValueImpl {
 
     ContainerRef(ContainerRef),
     IndexedRef(IndexedRef),
+
+    // Stores a handle to data or values stored outside of the MoveVM and
+    // processed in a "delayed" fashion, e.g., aggregators. Can only be
+    // manipulated by native functions and so any VM operation on it will
+    // result in an error.
+    // TODO[agg_v2](cleanup): consider adding size?
+    Delayed { handle: DelayedValueHandle },
 }
 
 /// A container is a collection of values. It is used to represent data structures like a
@@ -221,7 +245,9 @@ pub struct Locals(Rc<RefCell<Vec<ValueImpl>>>);
 impl Container {
     fn len(&self) -> usize {
         match self {
-            Self::Locals(r) | Self::Struct(r) | Self::Vec(r) => r.borrow().len(),
+            Self::Vec(r) => r.borrow().len(),
+            Self::Struct(r) => r.borrow().len(),
+
             Self::VecU8(r) => r.borrow().len(),
             Self::VecU16(r) => r.borrow().len(),
             Self::VecU32(r) => r.borrow().len(),
@@ -230,12 +256,16 @@ impl Container {
             Self::VecU256(r) => r.borrow().len(),
             Self::VecBool(r) => r.borrow().len(),
             Self::VecAddress(r) => r.borrow().len(),
+
+            Self::Locals(r) => r.borrow().len(),
         }
     }
 
     fn rc_count(&self) -> usize {
         match self {
-            Self::Locals(r) | Self::Struct(r) | Self::Vec(r) => Rc::strong_count(r),
+            Self::Vec(r) => Rc::strong_count(r),
+            Self::Struct(r) => Rc::strong_count(r),
+
             Self::VecU8(r) => Rc::strong_count(r),
             Self::VecU16(r) => Rc::strong_count(r),
             Self::VecU32(r) => Rc::strong_count(r),
@@ -244,6 +274,8 @@ impl Container {
             Self::VecU256(r) => Rc::strong_count(r),
             Self::VecBool(r) => Rc::strong_count(r),
             Self::VecAddress(r) => Rc::strong_count(r),
+
+            Self::Locals(r) => Rc::strong_count(r),
         }
     }
 
@@ -361,6 +393,9 @@ impl ValueImpl {
             // When cloning a container, we need to make sure we make a deep
             // copy of the data instead of a shallow copy of the Rc.
             Container(c) => Container(c.copy_value()?),
+
+            // Disallow copying of delayed values.
+            Delayed { .. } => return_delayed_value_error!(),
         })
     }
 }
@@ -402,6 +437,7 @@ impl Container {
         match self {
             Self::Vec(r) => Self::Vec(Rc::clone(r)),
             Self::Struct(r) => Self::Struct(Rc::clone(r)),
+
             Self::VecU8(r) => Self::VecU8(Rc::clone(r)),
             Self::VecU16(r) => Self::VecU16(Rc::clone(r)),
             Self::VecU32(r) => Self::VecU32(Rc::clone(r)),
@@ -410,6 +446,7 @@ impl Container {
             Self::VecU256(r) => Self::VecU256(Rc::clone(r)),
             Self::VecBool(r) => Self::VecBool(Rc::clone(r)),
             Self::VecAddress(r) => Self::VecAddress(Rc::clone(r)),
+
             Self::Locals(r) => Self::Locals(Rc::clone(r)),
         }
     }
@@ -477,6 +514,10 @@ impl ValueImpl {
 
             (ContainerRef(l), ContainerRef(r)) => l.equals(r)?,
             (IndexedRef(l), IndexedRef(r)) => l.equals(r)?,
+
+            // Disallow equality for delayed values.
+            (Delayed { .. }, Delayed { .. }) => return_delayed_value_error!(),
+
             (Invalid, _)
             | (U8(_), _)
             | (U16(_), _)
@@ -488,7 +529,8 @@ impl ValueImpl {
             | (Address(_), _)
             | (Container(_), _)
             | (ContainerRef(_), _)
-            | (IndexedRef(_), _) => {
+            | (IndexedRef(_), _)
+            | (Delayed { .. }, _) => {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                     .with_message(format!("cannot compare values: {:?}, {:?}", self, other)))
             },
@@ -799,6 +841,11 @@ impl IndexedRef {
                         )),
                 )
             },
+
+            // We should not be able to write delayed values, as they need to be
+            // encapsulated.
+            ValueImpl::Delayed { .. } => return_delayed_value_error!(),
+
             _ => (),
         }
 
@@ -922,9 +969,6 @@ impl StructRef {
 
 impl Locals {
     pub fn borrow_loc(&self, idx: usize) -> PartialVMResult<Value> {
-        // TODO: this is very similar to SharedContainer::borrow_elem. Find a way to
-        // reuse that code?
-
         let v = self.0.borrow();
         if idx >= v.len() {
             return Err(
@@ -951,9 +995,13 @@ impl Locals {
             | ValueImpl::U256(_)
             | ValueImpl::Bool(_)
             | ValueImpl::Address(_) => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
-                container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
                 idx,
+                container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
             }))),
+
+            // Delayed values have to be encapsulated, and we should not be able
+            // to get a reference to them here.
+            ValueImpl::Delayed { .. } => return_delayed_value_error!(),
 
             ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1088,6 +1136,12 @@ impl Locals {
  *
  **************************************************************************************/
 impl Value {
+    pub fn delayed_value(handle: u64) -> Self {
+        Self(ValueImpl::Delayed {
+            handle: DelayedValueHandle(handle),
+        })
+    }
+
     pub fn u8(x: u8) -> Self {
         Self(ValueImpl::U8(x))
     }
@@ -1138,7 +1192,6 @@ impl Value {
         ))))
     }
 
-    // TODO: consider whether we want to replace these with fn vector(v: Vec<Value>).
     pub fn vector_u8(it: impl IntoIterator<Item = u8>) -> Self {
         Self(ValueImpl::Container(Container::VecU8(Rc::new(
             RefCell::new(it.into_iter().collect()),
@@ -1236,6 +1289,16 @@ impl_vm_value_cast!(bool, Bool);
 impl_vm_value_cast!(AccountAddress, Address);
 impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
+
+impl VMValueCast<DelayedValueHandle> for Value {
+    fn cast(self) -> PartialVMResult<DelayedValueHandle> {
+        match self.0 {
+            ValueImpl::Delayed { handle } => Ok(handle),
+            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                .with_message(format!("cannot cast {:?} to delayed value", v))),
+        }
+    }
+}
 
 impl VMValueCast<IntegerValue> for Value {
     fn cast(self) -> PartialVMResult<IntegerValue> {
@@ -2348,6 +2411,8 @@ impl ValueImpl {
             IndexedRef(r) => r.legacy_size(),
             // TODO: in case the borrow fails the VM will panic.
             Container(c) => c.legacy_size(),
+
+            Delayed { .. } => unreachable!("Delayed values do not have legacy size!"),
         }
     }
 }
@@ -2609,6 +2674,13 @@ impl Display for ValueImpl {
 
             Self::ContainerRef(r) => write!(f, "{}", r),
             Self::IndexedRef(r) => write!(f, "{}", r),
+
+            Self::Delayed { .. } => {
+                // Display should not be used to show delayed values.
+                Err(fmt::Error::custom(
+                    "Delayed values should not be processed by the VM and displayed",
+                ))
+            },
         }
     }
 }
@@ -2724,6 +2796,11 @@ pub mod debug {
     use super::*;
     use std::fmt::Write;
 
+    // Allow debug prints of the delayed values, as these are not used on-chain.
+    fn print_delayed<B: Write>(buf: &mut B, x: &DelayedValueHandle) -> PartialVMResult<()> {
+        debug_write!(buf, "<{}>", x.0)
+    }
+
     fn print_invalid<B: Write>(buf: &mut B) -> PartialVMResult<()> {
         debug_write!(buf, "-")
     }
@@ -2777,6 +2854,8 @@ pub mod debug {
 
             ValueImpl::ContainerRef(r) => print_container_ref(buf, r),
             ValueImpl::IndexedRef(r) => print_indexed_ref(buf, r),
+
+            ValueImpl::Delayed { handle } => print_delayed(buf, handle),
         }
     }
 
@@ -2864,14 +2943,6 @@ pub mod debug {
             Container::VecU256(r) => print_slice_elem(buf, &r.borrow(), idx, print_u256),
             Container::VecBool(r) => print_slice_elem(buf, &r.borrow(), idx, print_bool),
             Container::VecAddress(r) => print_slice_elem(buf, &r.borrow(), idx, print_address),
-        }
-    }
-
-    // TODO: This function was used in an old implementation of std::debug::print, and can probably be removed.
-    pub fn print_reference<B: Write>(buf: &mut B, r: &Reference) -> PartialVMResult<()> {
-        match &r.0 {
-            ReferenceImpl::ContainerRef(r) => print_container_ref(buf, r),
-            ReferenceImpl::IndexedRef(r) => print_indexed_ref(buf, r),
         }
     }
 
@@ -3052,8 +3123,15 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                     // If values are supposed to be transformed, first clone
                     // ValueImpl to construct a Value.
                     // TODO[agg_v2](optimize)(?): Clone is cheap for current use cases, revisit if needed.
-                    let value_to_transform =
-                        Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?);
+                    // TODO[agg_v2](cleanup): Move deserialization outside of the VM to make
+                    //   the handling of this variant less ugly?
+                    let value_to_transform = match value_impl {
+                        ValueImpl::Delayed { handle } => Value::delayed_value(handle.0),
+                        value_impl => {
+                            Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?)
+                        },
+                    };
+
                     let transformed_value = transformation
                         .pre_serialization_transform(tag, layout.as_ref(), value_to_transform)
                         .map_err(serde::ser::Error::custom)?;
@@ -3399,6 +3477,8 @@ impl ValueImpl {
 
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
+
+            Delayed { handle } => visitor.visit_delayed(depth, *handle),
         }
     }
 }

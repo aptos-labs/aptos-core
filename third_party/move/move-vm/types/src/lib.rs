@@ -30,6 +30,3 @@ pub mod natives;
 pub mod value_transformation;
 pub mod values;
 pub mod views;
-
-#[cfg(test)]
-mod unit_tests;

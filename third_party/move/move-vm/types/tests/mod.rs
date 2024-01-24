@@ -4,3 +4,6 @@
 
 #[cfg(feature = "fuzzing")]
 mod identifier_prop_tests;
+
+#[cfg(test)]
+mod test_value_to_identifier_mapping;
