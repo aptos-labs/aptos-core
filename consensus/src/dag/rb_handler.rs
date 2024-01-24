@@ -205,6 +205,15 @@ impl RpcHandler for NodeBroadcastHandler {
             NodeBroadcastHandleError::VoteRefused
         );
 
+        let key = (node.round(), *node.author());
+        ensure!(
+            self.votes_fine_grained_lock.insert(key),
+            "concurrent insertion"
+        );
+        defer!({
+            assert_some!(self.votes_fine_grained_lock.remove(&key));
+        });
+
         let node = self.validate(node)?;
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
@@ -220,17 +229,6 @@ impl RpcHandler for NodeBroadcastHandler {
         {
             return Ok(ack.clone());
         }
-
-        ensure!(
-            self.votes_fine_grained_lock
-                .insert((node.round(), *node.author())),
-            "concurrent insertion"
-        );
-        defer!({
-            assert_some!(self
-                .votes_fine_grained_lock
-                .remove(&(node.round(), *node.author())));
-        });
 
         let signature = node.sign_vote(&self.signer)?;
         let vote = Vote::new(node.metadata().clone(), signature);
