@@ -51,7 +51,7 @@ pub(crate) struct DagDriver {
     time_service: TimeService,
     rb_abort_handle: Mutex<Option<(AbortHandle, u64)>>,
     storage: Arc<dyn DAGStorage>,
-    order_rule: OrderRule,
+    order_rule: Mutex<OrderRule>,
     fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: tokio::sync::Mutex<RoundState>,
@@ -95,7 +95,7 @@ impl DagDriver {
             time_service,
             rb_abort_handle: Mutex::new(None),
             storage,
-            order_rule,
+            order_rule: Mutex::new(order_rule),
             fetch_requester,
             ledger_info_provider,
             round_state: tokio::sync::Mutex::new(round_state),
@@ -350,7 +350,7 @@ impl RpcHandler for DagDriver {
         let node_metadata = certified_node.metadata().clone();
         self.add_node(certified_node)
             .await
-            .map(|_| self.order_rule.process_new_node(&node_metadata))?;
+            .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
     }
