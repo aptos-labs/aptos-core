@@ -65,13 +65,17 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             metadata.author == sender,
             "adding dkg node failed with node author mismatch"
         );
-        let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e|anyhow!("transcript_aggregation::add failed with trx deserialization error: {e}"))?;
+        let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e| {
+            anyhow!("transcript_aggregation::add failed with trx deserialization error: {e}")
+        })?;
         let mut trx_aggregator = self.trx_aggregator.lock();
         if trx_aggregator.contributors.contains(&metadata.author) {
             return Ok(None);
         }
 
-        S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e|anyhow!("transcript_aggregation::add failed with trx verification failure: {e}"))?;
+        S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e| {
+            anyhow!("transcript_aggregation::add failed with trx verification failure: {e}")
+        })?;
 
         // All checks passed. Aggregating.
         trx_aggregator.contributors.insert(metadata.author);

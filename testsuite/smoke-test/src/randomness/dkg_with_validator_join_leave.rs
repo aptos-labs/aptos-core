@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    randomness,
     randomness::{decrypt_key_map, num_validators, verify_dkg_transcript, wait_for_dkg_finish},
     smoke_test_environment::SwarmBuilder,
 };
-use aptos::{common::types::GasOptions, test::CliTestFramework};
+use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
 use std::sync::Arc;
 
@@ -82,10 +81,7 @@ async fn dkg_with_validator_join_leave() {
     )
     .await;
     let idx = cli.add_account_to_cli(victim_validator_sk);
-    let txn_result = cli
-        .leave_validator_set(idx, None)
-        .await
-        .unwrap();
+    let txn_result = cli.leave_validator_set(idx, None).await.unwrap();
     println!("Txn result: {:?}", txn_result);
 
     println!(

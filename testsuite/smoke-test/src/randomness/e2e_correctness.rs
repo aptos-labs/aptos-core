@@ -1,23 +1,20 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource,
-    },
+    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
     smoke_test_environment::SwarmBuilder,
 };
-use aptos_forge::{NodeExt, Swarm, SwarmExt};
+use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
-use digest::Digest;
-use std::{sync::Arc, time::Duration};
 use aptos_types::dkg::DKGState;
-use crate::randomness::{get_current_version, verify_dkg_transcript};
+use std::{sync::Arc, time::Duration};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
 #[tokio::test]
 async fn randomness_correctness() {
     let epoch_duration_secs = 20;
 
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 
-use aptos_logger::debug;
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
     errors::expect_only_successful_execution,
@@ -12,6 +11,7 @@ use crate::{
     },
     AptosVM,
 };
+use aptos_logger::debug;
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
     fee_statement::FeeStatement,
@@ -52,8 +52,16 @@ impl AptosVM {
         session_id: SessionId,
         dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        debug!("[DKG] process_dkg_result: BEGIN: dkg_node={:?}", dkg_transcript);
-        let ret = match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_transcript) {
+        debug!(
+            "[DKG] process_dkg_result: BEGIN: dkg_node={:?}",
+            dkg_transcript
+        );
+        let ret = match self.process_dkg_result_inner(
+            resolver,
+            log_context,
+            session_id,
+            dkg_transcript,
+        ) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.

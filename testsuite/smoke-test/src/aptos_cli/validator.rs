@@ -1198,7 +1198,7 @@ async fn test_join_and_leave_validator() {
         &transaction_factory,
         swarm.chain_info().root_account(),
     )
-        .await;
+    .await;
 
     let withdraw_stake = 2;
     gas_used += get_gas(

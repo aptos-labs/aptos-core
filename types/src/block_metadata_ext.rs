@@ -2,7 +2,7 @@
 
 use crate::{block_metadata::BlockMetadata, randomness::Randomness};
 use aptos_crypto::HashValue;
-use move_core_types::{account_address::AccountAddress};
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
 /// The extended block metadata.

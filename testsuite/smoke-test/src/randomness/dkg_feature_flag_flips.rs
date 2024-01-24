@@ -5,8 +5,8 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
-use std::{sync::Arc, time::Duration};
 use aptos_types::dkg::DKGState;
+use std::{sync::Arc, time::Duration};
 
 /// A quick overview of what this test does.
 ///             Has randomness?     What else happened?

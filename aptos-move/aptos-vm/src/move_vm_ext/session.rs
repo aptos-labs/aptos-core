@@ -15,8 +15,8 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    access_path::AccessPath, block_metadata::BlockMetadata, contract_event::ContractEvent,
-    on_chain_config::Features, state_store::state_key::StateKey,
+    access_path::AccessPath, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
+    contract_event::ContractEvent, on_chain_config::Features, state_store::state_key::StateKey,
     validator_txn::ValidatorTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
@@ -37,7 +37,6 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
-use aptos_types::block_metadata_ext::BlockMetadataExt;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.

@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    on_chain_config::OnChainConfig, validator_verifier::ValidatorConsensusInfo,
+    dkg::dummy_dkg::DummyDKG,
+    on_chain_config::OnChainConfig,
+    validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use anyhow::Result;
 use aptos_crypto::Uniform;
@@ -12,8 +14,6 @@ use move_core_types::{
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fmt::Debug};
-use crate::dkg::dummy_dkg::DummyDKG;
-use crate::validator_verifier::ValidatorConsensusInfoMoveStruct;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {

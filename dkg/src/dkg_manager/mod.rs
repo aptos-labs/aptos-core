@@ -17,8 +17,7 @@ use futures_channel::oneshot;
 use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 enum InnerState {
@@ -74,9 +73,8 @@ impl InnerState {
     pub fn my_node_cloned(&self) -> DKGTranscript {
         match self {
             InnerState::NotStarted => panic!("my_node unavailable"),
-            InnerState::InProgress { my_transcript, .. } | InnerState::Finished { my_transcript, .. } => {
-                my_transcript.clone()
-            },
+            InnerState::InProgress { my_transcript, .. }
+            | InnerState::Finished { my_transcript, .. } => my_transcript.clone(),
         }
     }
 }
@@ -110,7 +108,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     pub async fn run(
         mut self,
         in_progress_session: Option<DKGSessionState>,
-        dkg_start_event_rx: oneshot::Receiver<DKGStartEvent>,
+        mut dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
         mut rpc_msg_rx: aptos_channel::Receiver<
             AccountAddress,
             (AccountAddress, IncomingRpcRequest),
@@ -131,16 +129,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
         let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
-        let mut dkg_start_event_rx = dkg_start_event_rx.into_stream();
         let mut close_rx = close_rx.into_stream();
         while !self.stopped {
             let handling_result = tokio::select! {
                 dkg_start_event = dkg_start_event_rx.select_next_some() => {
-                    if let Ok(event) = dkg_start_event {
-                        self.process_dkg_start_event(event).await
-                    } else {
-                        self.process_close_cmd(None)
-                    }
+                    self.process_dkg_start_event(dkg_start_event).await
                 },
                 (_sender, msg) = rpc_msg_rx.select_next_some() => {
                     self.process_peer_rpc_msg(msg).await
@@ -169,14 +162,14 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         self.stopped = true;
 
         match std::mem::take(&mut self.state) {
-            InnerState::NotStarted => {}
+            InnerState::NotStarted => {},
             InnerState::InProgress { abort_handle, .. } => {
                 abort_handle.abort();
-            }
+            },
             InnerState::Finished { vtxn_guard, .. } => {
                 // Just being explicit here...
                 drop(vtxn_guard);
-            }
+            },
         }
 
         if let Some(tx) = ack_tx {
@@ -191,9 +184,15 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         &mut self,
         _txn: Arc<ValidatorTransaction>,
     ) -> Result<()> {
-        if let InnerState::Finished { pull_confirmed, start_time_us, .. } = &mut self.state {
+        if let InnerState::Finished {
+            pull_confirmed,
+            start_time_us,
+            ..
+        } = &mut self.state
+        {
             if !*pull_confirmed {
-                let start_to_propose = aptos_infallible::duration_since_epoch() - Duration::from_micros(*start_time_us);
+                let start_to_propose = aptos_infallible::duration_since_epoch()
+                    - Duration::from_micros(*start_time_us);
                 debug!("[DKG] vtxn pulled, start_to_propose={:?}", start_to_propose);
                 // TODO(zjma): metric DKG_AGG_NODE_PROPOSED
             }
@@ -212,7 +211,10 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         start_time_us: u64,
         dkg_session_metadata: &DKGSessionMetadata,
     ) -> Result<()> {
-        debug!("[DKG] setup_deal_broadcast: BEGIN: start_time_us={}, dkg_session_metadata={:?}", start_time_us, dkg_session_metadata);
+        debug!(
+            "[DKG] setup_deal_broadcast: BEGIN: start_time_us={}, dkg_session_metadata={:?}",
+            start_time_us, dkg_session_metadata
+        );
         self.state = match &self.state {
             InnerState::NotStarted => {
                 let public_params = DKG::new_public_params(dkg_session_metadata);
@@ -234,7 +236,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 let dkg_node = DKGTranscript::new(
                     self.epoch_state.epoch,
                     self.my_addr,
-                    bcs::to_bytes(&trx).map_err(|e|anyhow!("setup_deal_broadcast failed with trx serialization error: {e}"))?,
+                    bcs::to_bytes(&trx).map_err(|e| {
+                        anyhow!("setup_deal_broadcast failed with trx serialization error: {e}")
+                    })?,
                 );
 
                 // TODO(zjma): DKG_NODE_READY metric
@@ -275,7 +279,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                     },
                     transcript_bytes: bcs::to_bytes(&agg_trx).map_err(|e|anyhow!("process_aggregated_transcript failed with trx serialization error: {e}"))?,
                 });
-                let vtxn_guard = self.vtxn_pool.put(Topic::DKG, Arc::new(txn), Some(self.pull_notification_tx.clone()));
+                let vtxn_guard = self.vtxn_pool.put(
+                    Topic::DKG,
+                    Arc::new(txn),
+                    Some(self.pull_notification_tx.clone()),
+                );
                 InnerState::Finished {
                     vtxn_guard,
                     start_time_us,
@@ -291,9 +299,13 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     /// On a DKG start event, execute DKG.
     async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
         let DKGStartEvent {
-            session_metadata, start_time_us
+            session_metadata,
+            start_time_us,
         } = event;
-        ensure!(self.epoch_state.epoch == session_metadata.dealer_epoch, "process_dkg_start_event failed with epoch mismatch");
+        ensure!(
+            self.epoch_state.epoch == session_metadata.dealer_epoch,
+            "process_dkg_start_event failed with epoch mismatch"
+        );
         self.setup_deal_broadcast(start_time_us, &session_metadata)
             .await?;
         Ok(())

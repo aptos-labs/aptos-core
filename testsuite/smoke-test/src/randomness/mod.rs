@@ -1,19 +1,17 @@
 // Copyright © Aptos Foundation
 
-use anyhow::{anyhow, ensure};
-use anyhow::Result;
-use aptos_crypto::Uniform;
+use anyhow::{anyhow, ensure, Result};
 use aptos_forge::LocalSwarm;
+use aptos_logger::info;
 use aptos_rest_client::Client;
+use aptos_types::{
+    dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
+    on_chain_config::OnChainConfig,
+    validator_verifier::ValidatorConsensusInfo,
+};
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
-use num_traits::Zero;
-use rand::SeedableRng;
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
-use aptos_logger::info;
-use aptos_types::dkg::{DefaultDKG, DKGSessionState, DKGState, DKGTrait};
-use aptos_types::on_chain_config::OnChainConfig;
-use aptos_types::validator_verifier::ValidatorConsensusInfo;
 
 mod dkg_basic;
 mod dkg_feature_flag_flips;
@@ -93,14 +91,17 @@ fn verify_dkg_transcript(
         dkg_session.metadata.dealer_epoch,
     );
     let pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
-    let transcript = bcs::from_bytes(dkg_session.transcript.as_slice())
-        .map_err(|e|anyhow!("DKG transcript verification failed with transcript deserialization error: {e}"))?;
+    let transcript = bcs::from_bytes(dkg_session.transcript.as_slice()).map_err(|e| {
+        anyhow!("DKG transcript verification failed with transcript deserialization error: {e}")
+    })?;
     println!("transcript={:?}", transcript);
     DefaultDKG::verify_transcript(&pub_params, &transcript)?;
 
     info!("Double-verifying by reconstructing the dealt secret.");
     let dealt_secret_from_shares = dealt_secret_from_shares(
-        dkg_session.metadata.target_validator_consensus_infos_cloned(),
+        dkg_session
+            .metadata
+            .target_validator_consensus_infos_cloned(),
         decrypt_key_map,
         &pub_params,
         &transcript,
@@ -110,12 +111,21 @@ fn verify_dkg_transcript(
 
     let dealt_secret_from_inputs = dealt_secret_from_input(
         &transcript,
-        dkg_session.metadata.dealer_validator_set.clone().into_iter().map(|obj| obj.try_into().unwrap()).collect(),
+        dkg_session
+            .metadata
+            .dealer_validator_set
+            .clone()
+            .into_iter()
+            .map(|obj| obj.try_into().unwrap())
+            .collect(),
         decrypt_key_map,
     );
     println!("dealt_secret_from_inputs={:?}", dealt_secret_from_inputs);
 
-    ensure!(dealt_secret_from_shares == dealt_secret_from_inputs, "dkg transcript verification failed with final check failure");
+    ensure!(
+        dealt_secret_from_shares == dealt_secret_from_inputs,
+        "dkg transcript verification failed with final check failure"
+    );
     Ok(())
 }
 
@@ -130,8 +140,10 @@ fn dealt_secret_from_shares(
         .enumerate()
         .map(|(idx, validator_info)| {
             let dk = decrypt_key_map.get(&validator_info.address).unwrap();
-            let secret_key_share =
-                DefaultDKG::decrypt_secret_share_from_transcript(pub_params, transcript, idx as u64, dk).unwrap();
+            let secret_key_share = DefaultDKG::decrypt_secret_share_from_transcript(
+                pub_params, transcript, idx as u64, dk,
+            )
+            .unwrap();
             (idx as u64, secret_key_share)
         })
         .collect();
@@ -146,10 +158,15 @@ fn dealt_secret_from_input(
 ) -> <DefaultDKG as DKGTrait>::DealtSecret {
     let dealers = DefaultDKG::get_dealers(trx);
     println!("dealers={:?}", dealers);
-    let input_secrets = dealers.into_iter().map(|dealer_idx|{
-        let dealer_sk = decrypt_key_map.get(&dealer_validator_set[dealer_idx as usize].address).unwrap();
-        DefaultDKG::generate_predictable_input_secret_for_testing(dealer_sk)
-    }).collect();
+    let input_secrets = dealers
+        .into_iter()
+        .map(|dealer_idx| {
+            let dealer_sk = decrypt_key_map
+                .get(&dealer_validator_set[dealer_idx as usize].address)
+                .unwrap();
+            DefaultDKG::generate_predictable_input_secret_for_testing(dealer_sk)
+        })
+        .collect();
 
     let aggregated_input_secret = DefaultDKG::aggregate_input_secret(input_secrets);
     DefaultDKG::dealt_secret_from_input(&aggregated_input_secret)
@@ -159,7 +176,9 @@ fn num_validators(dkg_state: &DKGSessionState) -> usize {
     dkg_state.metadata.target_validator_set.len()
 }
 
-fn decrypt_key_map(swarm: &LocalSwarm) -> HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+fn decrypt_key_map(
+    swarm: &LocalSwarm,
+) -> HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
     swarm
         .validators()
         .map(|validator| {

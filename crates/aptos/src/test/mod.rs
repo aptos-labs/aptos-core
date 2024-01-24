@@ -478,7 +478,7 @@ impl CliTestFramework {
             &source_path.as_display().to_string(),
             content.as_bytes(),
         )
-            .unwrap();
+        .unwrap();
     }
 
     pub async fn update_validator_network_addresses(

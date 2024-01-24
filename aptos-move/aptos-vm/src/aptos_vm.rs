@@ -37,13 +37,15 @@ use aptos_types::{
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
+    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     chain_id::ChainId,
     fee_statement::FeeStatement,
+    move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
+    randomness::Randomness,
     state_store::StateView,
     transaction::{
         authenticator::AnySignature,
@@ -102,9 +104,6 @@ use std::{
         Arc,
     },
 };
-use aptos_types::block_metadata_ext::BlockMetadataWithRandomness;
-use aptos_types::move_utils::as_move_value::AsMoveValue;
-use aptos_types::randomness::Randomness;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -1796,7 +1795,10 @@ impl AptosVM {
             ))
         });
 
-        debug!("[DKG] process_block_prologue_ext: BEGIN: block_metadata_ext={:?}", block_metadata_ext);
+        debug!(
+            "[DKG] process_block_prologue_ext: BEGIN: block_metadata_ext={:?}",
+            block_metadata_ext
+        );
 
         let mut gas_meter = UnmeteredGasMeter;
         let mut session =
@@ -1824,10 +1826,17 @@ impl AptosVM {
             MoveValue::U64(epoch),
             MoveValue::U64(round),
             MoveValue::Address(proposer),
-            failed_proposer_indices.into_iter().map(|i|i as u64).collect::<Vec<_>>().as_move_value(),
+            failed_proposer_indices
+                .into_iter()
+                .map(|i| i as u64)
+                .collect::<Vec<_>>()
+                .as_move_value(),
             previous_block_votes_bitvec.as_move_value(),
             MoveValue::U64(timestamp_usecs),
-            randomness.as_ref().map(Randomness::randomness_cloned).as_move_value(),
+            randomness
+                .as_ref()
+                .map(Randomness::randomness_cloned)
+                .as_move_value(),
         ];
 
         session

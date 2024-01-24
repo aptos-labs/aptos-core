@@ -9,9 +9,9 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
+use aptos_types::dkg::DKGState;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
-use aptos_types::dkg::DKGState;
 
 #[ignore]
 #[tokio::test]
@@ -44,7 +44,10 @@ async fn validator_restart_during_dkg() {
         swarm.validators().map(|node| node.rest_client()).collect();
     let dkg_session_1 = wait_for_dkg_finish(&validator_clients[3], None, time_limit_secs).await;
 
-    info!("Current epoch is {}.", dkg_session_1.metadata.dealer_epoch + 1);
+    info!(
+        "Current epoch is {}.",
+        dkg_session_1.metadata.dealer_epoch + 1
+    );
 
     info!("Inject fault to all validators so they get stuck upon the first DKG message received.");
     let tasks = validator_clients
