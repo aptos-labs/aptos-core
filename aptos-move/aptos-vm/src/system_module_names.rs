@@ -39,8 +39,6 @@ pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const FINISH_WITH_DKG_RESULT: &IdentStr = ident_str!("finish_with_dkg_result");
 
-pub const BLOCK_PROLOGUE_EXT: &IdentStr = ident_str!("block_prologue_ext");
-
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,
