@@ -1282,14 +1282,11 @@ where
                             )
                         });
 
-                    if block_limit_processor.use_module_publishing_block_conflict()
-                        && !block_limit_processor.has_seen_module_rw_conflict()
-                        && !last_input_output.append_and_check_module_rw_conflict(
-                            sequential_reads.module_reads.iter(),
-                            output.module_write_set().keys(),
-                        )
-                    {
-                        block_limit_processor.update_on_first_module_rw_conflict();
+                    if last_input_output.check_and_append_module_rw_conflict(
+                        sequential_reads.module_reads.iter(),
+                        output.module_write_set().keys(),
+                    ) {
+                        block_limit_processor.process_module_rw_conflict();
                     }
 
                     block_limit_processor.accumulate_fee_statement(

@@ -138,8 +138,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
         };
 
-        if !self
-            .append_and_check_module_rw_conflict(input.module_reads.iter(), written_modules.keys())
+        if self
+            .check_and_append_module_rw_conflict(input.module_reads.iter(), written_modules.keys())
         {
             return false;
         }
@@ -150,26 +150,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         true
     }
 
-    pub(crate) fn append_and_check_module_rw_conflict<'a>(
+    pub(crate) fn check_and_append_module_rw_conflict<'a>(
         &self,
         module_reads_keys: impl Iterator<Item = &'a T::Key>,
-        written_modules_keys: impl Iterator<Item = &'a T::Key>,
+        module_writes_keys: impl Iterator<Item = &'a T::Key>,
     ) -> bool {
-        if !self.module_read_write_intersection.load(Ordering::Relaxed) {
-            // Check if adding new read & write modules leads to intersections.
-            if Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
-                || Self::append_and_check(
-                    written_modules_keys,
-                    &self.module_writes,
-                    &self.module_reads,
-                )
-            {
-                self.module_read_write_intersection
-                    .store(true, Ordering::Release);
-                return false;
-            }
+        if self.module_read_write_intersection.load(Ordering::Relaxed) {
+            return true;
         }
-        true
+
+        // Check if adding new read & write modules leads to intersections.
+        if Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
+            || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
+        {
+            self.module_read_write_intersection
+                .store(true, Ordering::Release);
+            return true;
+        }
+        false
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
