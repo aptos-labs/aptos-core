@@ -1884,7 +1884,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(512);
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
