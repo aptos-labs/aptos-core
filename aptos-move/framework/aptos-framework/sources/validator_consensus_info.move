@@ -1,5 +1,5 @@
-/// Common types.
-module aptos_framework::types {
+/// Common type: `ValidatorConsensusInfo`.
+module aptos_framework::validator_consensus_info {
     /// Information about a validator that participates consensus.
     struct ValidatorConsensusInfo has copy, drop, store {
         addr: address,
@@ -7,8 +7,8 @@ module aptos_framework::types {
         voting_power: u64,
     }
 
-    /// Create a `ValidatorConsensusInfo` object.
-    public fun default_validator_consensus_info(): ValidatorConsensusInfo {
+    /// Create a default `ValidatorConsensusInfo` object. Value may be invalid. Only for place holding prupose.
+    public fun default(): ValidatorConsensusInfo {
         ValidatorConsensusInfo {
             addr: @vm,
             pk_bytes: vector[],
@@ -17,7 +17,7 @@ module aptos_framework::types {
     }
 
     /// Create a `ValidatorConsensusInfo` object.
-    public fun new_validator_consensus_info(addr: address, pk_bytes: vector<u8>, voting_power: u64): ValidatorConsensusInfo {
+    public fun new(addr: address, pk_bytes: vector<u8>, voting_power: u64): ValidatorConsensusInfo {
         ValidatorConsensusInfo {
             addr,
             pk_bytes,
@@ -26,17 +26,17 @@ module aptos_framework::types {
     }
 
     /// Get `ValidatorConsensusInfo.addr`.
-    public fun addr_from_validator_consensus_info(vci: &ValidatorConsensusInfo): address {
+    public fun get_addr(vci: &ValidatorConsensusInfo): address {
         vci.addr
     }
 
     /// Get `ValidatorConsensusInfo.pk_bytes`.
-    public fun pk_bytes_from_validator_consensus_info(vci: &ValidatorConsensusInfo): vector<u8> {
+    public fun get_pk_bytes(vci: &ValidatorConsensusInfo): vector<u8> {
         vci.pk_bytes
     }
 
     /// Get `ValidatorConsensusInfo.voting_power`.
-    public fun voting_power_from_validator_consensus_info(vci: &ValidatorConsensusInfo): u64 {
+    public fun get_voting_power(vci: &ValidatorConsensusInfo): u64 {
         vci.voting_power
     }
 }

@@ -100,6 +100,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `validator_consensus_infos_from_validator_set`](#0x1_stake_validator_consensus_infos_from_validator_set)
 -  [Function `addresses_from_validator_infos`](#0x1_stake_addresses_from_validator_infos)
 -  [Function `update_stake_pool`](#0x1_stake_update_stake_pool)
+-  [Function `get_reconfig_start_time_secs`](#0x1_stake_get_reconfig_start_time_secs)
 -  [Function `calculate_rewards_amount`](#0x1_stake_calculate_rewards_amount)
 -  [Function `distribute_rewards`](#0x1_stake_distribute_rewards)
 -  [Function `append`](#0x1_stake_append)
@@ -168,7 +169,7 @@ or if their stake drops below the min required, they would get removed at the en
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
-<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
+<b>use</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info">0x1::validator_consensus_info</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
@@ -3185,20 +3186,13 @@ power.
         // Automatically renew a validator's lockup for validators that will still be in the validator set in the
         // next epoch.
         <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(validator_info.addr);
-
-        <b>let</b> now_secs = <b>if</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">reconfiguration_state::is_initialized</a>()) {
-            <a href="reconfiguration_state.md#0x1_reconfiguration_state_start_time_secs">reconfiguration_state::start_time_secs</a>()
-        } <b>else</b> {
-            // It is guaranteed that We are in the middle of an immediate <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a>, in which case unlock time is now.
-            <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
-        };
-
-        <b>if</b> (stake_pool.locked_until_secs &lt;= now_secs) {
+        <b>let</b> reconfig_start_secs = <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>();
+        <b>let</b> now_secs = <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>();
+        <b>if</b> (stake_pool.locked_until_secs &lt;= reconfig_start_secs) {
             <b>spec</b> {
-                <b>assume</b> <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() + recurring_lockup_duration_secs &lt;= <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>;
+                <b>assume</b> now_secs + recurring_lockup_duration_secs &lt;= <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>;
             };
-            stake_pool.locked_until_secs =
-                now_secs + recurring_lockup_duration_secs;
+            stake_pool.locked_until_secs = now_secs + recurring_lockup_duration_secs;
         };
 
         validator_index = validator_index + 1;
@@ -3222,7 +3216,7 @@ power.
 Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted by current validator index.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_consensus_infos">cur_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_cur_validator_consensus_infos">cur_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;
 </code></pre>
 
 
@@ -3247,7 +3241,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_next_validator_consensus_infos">next_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="stake.md#0x1_stake_next_validator_consensus_infos">next_validator_consensus_infos</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;
 </code></pre>
 
 
@@ -3289,19 +3283,17 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         } <b>else</b> {
             0
         };
-        <b>let</b> cur_fee = <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
+
+        <b>let</b> cur_fee = 0;
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_collect_and_distribute_gas_fees">features::collect_and_distribute_gas_fees</a>()) {
             <b>let</b> fees_table = &<b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">ValidatorFees</a>&gt;(@aptos_framework).fees_table;
             <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(fees_table, candidate.addr)) {
-                <b>let</b> fee = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(fees_table, candidate.addr);
-                <a href="coin.md#0x1_coin_value">coin::value</a>(fee)
-            } <b>else</b> {
-                0
+                <b>let</b> fee_coin = <a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(fees_table, candidate.addr);
+                cur_fee = <a href="coin.md#0x1_coin_value">coin::value</a>(fee_coin);
             }
-        } <b>else</b> {
-            0
         };
 
-        <b>let</b> lockup_expired = <a href="reconfiguration_state.md#0x1_reconfiguration_state_start_time_secs">reconfiguration_state::start_time_secs</a>() &gt;= stake_pool.locked_until_secs;
+        <b>let</b> lockup_expired = <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>() &gt;= stake_pool.locked_until_secs;
         <b>let</b> new_voting_power =
             cur_active
             + <b>if</b> (lockup_expired) { 0 } <b>else</b> { cur_pending_inactive }
@@ -3349,7 +3341,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
 
 
 
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(validator_set: &<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="types.md#0x1_types_ValidatorConsensusInfo">types::ValidatorConsensusInfo</a>&gt;
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_validator_consensus_infos_from_validator_set">validator_consensus_infos_from_validator_set</a>(validator_set: &<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;
 </code></pre>
 
 
@@ -3368,14 +3360,14 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
     // Pre-fill the <b>return</b> value <b>with</b> dummy values.
     <b>let</b> idx = 0;
     <b>while</b> (idx &lt; total) {
-        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validator_consensus_infos, <a href="types.md#0x1_types_default_validator_consensus_info">types::default_validator_consensus_info</a>());
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> validator_consensus_infos, <a href="validator_consensus_info.md#0x1_validator_consensus_info_default">validator_consensus_info::default</a>());
         idx = idx + 1;
     };
 
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.active_validators, |obj| {
         <b>let</b> vi: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = obj;
         <b>let</b> vci = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> validator_consensus_infos, vi.config.validator_index);
-        *vci = <a href="types.md#0x1_types_new_validator_consensus_info">types::new_validator_consensus_info</a>(
+        *vci = <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">validator_consensus_info::new</a>(
             vi.addr,
             vi.config.consensus_pubkey,
             vi.voting_power
@@ -3385,7 +3377,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.pending_inactive, |obj| {
         <b>let</b> vi: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = obj;
         <b>let</b> vci = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> validator_consensus_infos, vi.config.validator_index);
-        *vci = <a href="types.md#0x1_types_new_validator_consensus_info">types::new_validator_consensus_info</a>(
+        *vci = <a href="validator_consensus_info.md#0x1_validator_consensus_info_new">validator_consensus_info::new</a>(
             vi.addr,
             vi.config.consensus_pubkey,
             vi.voting_power
@@ -3497,7 +3489,7 @@ This function shouldn't abort.
 
     // Pending inactive <a href="stake.md#0x1_stake">stake</a> is only fully unlocked and moved into inactive <b>if</b> the current lockup cycle <b>has</b> expired
     <b>let</b> current_lockup_expiration = stake_pool.locked_until_secs;
-    <b>if</b> (<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &gt;= current_lockup_expiration) {
+    <b>if</b> (<a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>() &gt;= current_lockup_expiration) {
         <a href="coin.md#0x1_coin_merge">coin::merge</a>(
             &<b>mut</b> stake_pool.inactive,
             <a href="coin.md#0x1_coin_extract_all">coin::extract_all</a>(&<b>mut</b> stake_pool.pending_inactive),
@@ -3511,6 +3503,35 @@ This function shouldn't abort.
             rewards_amount,
         },
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_get_reconfig_start_time_secs"></a>
+
+## Function `get_reconfig_start_time_secs`
+
+Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>(): u64 {
+    <b>if</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">reconfiguration_state::is_initialized</a>()) {
+        <a href="reconfiguration_state.md#0x1_reconfiguration_state_start_time_secs">reconfiguration_state::start_time_secs</a>()
+    } <b>else</b> {
+        <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
+    }
 }
 </code></pre>
 

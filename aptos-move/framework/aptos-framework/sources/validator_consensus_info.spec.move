@@ -1,4 +1,4 @@
-spec aptos_framework::types {
+spec aptos_framework::validator_consensus_info {
     spec module {
         pragma verify = false;
     }

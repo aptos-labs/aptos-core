@@ -6,7 +6,7 @@ module aptos_framework::dkg {
     use aptos_framework::event::emit;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
-    use aptos_framework::types::ValidatorConsensusInfo;
+    use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
     friend aptos_framework::block;
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;

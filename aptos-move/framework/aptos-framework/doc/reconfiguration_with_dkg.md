@@ -20,7 +20,7 @@ Reconfiguration with DKG helper functions.
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state">0x1::reconfiguration_state</a>;
 <b>use</b> <a href="stake.md#0x1_stake">0x1::stake</a>;
-<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
+<b>use</b> <a href="validator_consensus_info.md#0x1_validator_consensus_info">0x1::validator_consensus_info</a>;
 <b>use</b> <a href="version.md#0x1_version">0x1::version</a>;
 </code></pre>
 

@@ -1154,20 +1154,13 @@ module aptos_framework::stake {
             // Automatically renew a validator's lockup for validators that will still be in the validator set in the
             // next epoch.
             let stake_pool = borrow_global_mut<StakePool>(validator_info.addr);
-
-            let now_secs = if (reconfiguration_state::is_initialized()) {
-                reconfiguration_state::start_time_secs()
-            } else {
-                // It is guaranteed that We are in the middle of an immediate reconfiguration, in which case unlock time is now.
-                timestamp::now_seconds()
-            };
-
-            if (stake_pool.locked_until_secs <= now_secs) {
+            let reconfig_start_secs = get_reconfig_start_time_secs();
+            let now_secs = timestamp::now_seconds();
+            if (stake_pool.locked_until_secs <= reconfig_start_secs) {
                 spec {
-                    assume timestamp::spec_now_seconds() + recurring_lockup_duration_secs <= MAX_U64;
+                    assume now_secs + recurring_lockup_duration_secs <= MAX_U64;
                 };
-                stake_pool.locked_until_secs =
-                    now_secs + recurring_lockup_duration_secs;
+                stake_pool.locked_until_secs = now_secs + recurring_lockup_duration_secs;
             };
 
             validator_index = validator_index + 1;
@@ -1219,19 +1212,17 @@ module aptos_framework::stake {
             } else {
                 0
             };
-            let cur_fee = if (features::collect_and_distribute_gas_fees()) {
+
+            let cur_fee = 0;
+            if (features::collect_and_distribute_gas_fees()) {
                 let fees_table = &borrow_global<ValidatorFees>(@aptos_framework).fees_table;
                 if (table::contains(fees_table, candidate.addr)) {
-                    let fee = table::borrow(fees_table, candidate.addr);
-                    coin::value(fee)
-                } else {
-                    0
+                    let fee_coin = table::borrow(fees_table, candidate.addr);
+                    cur_fee = coin::value(fee_coin);
                 }
-            } else {
-                0
             };
 
-            let lockup_expired = reconfiguration_state::start_time_secs() >= stake_pool.locked_until_secs;
+            let lockup_expired = get_reconfig_start_time_secs() >= stake_pool.locked_until_secs;
             let new_voting_power =
                 cur_active
                 + if (lockup_expired) { 0 } else { cur_pending_inactive }
@@ -1278,14 +1269,14 @@ module aptos_framework::stake {
         // Pre-fill the return value with dummy values.
         let idx = 0;
         while (idx < total) {
-            vector::push_back(&mut validator_consensus_infos, types::default_validator_consensus_info());
+            vector::push_back(&mut validator_consensus_infos, validator_consensus_info::default());
             idx = idx + 1;
         };
 
         vector::for_each_ref(&validator_set.active_validators, |obj| {
             let vi: &ValidatorInfo = obj;
             let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
-            *vci = types::new_validator_consensus_info(
+            *vci = validator_consensus_info::new(
                 vi.addr,
                 vi.config.consensus_pubkey,
                 vi.voting_power
@@ -1295,7 +1286,7 @@ module aptos_framework::stake {
         vector::for_each_ref(&validator_set.pending_inactive, |obj| {
             let vi: &ValidatorInfo = obj;
             let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
-            *vci = types::new_validator_consensus_info(
+            *vci = validator_consensus_info::new(
                 vi.addr,
                 vi.config.consensus_pubkey,
                 vi.voting_power
@@ -1367,7 +1358,7 @@ module aptos_framework::stake {
 
         // Pending inactive stake is only fully unlocked and moved into inactive if the current lockup cycle has expired
         let current_lockup_expiration = stake_pool.locked_until_secs;
-        if (timestamp::now_seconds() >= current_lockup_expiration) {
+        if (get_reconfig_start_time_secs() >= current_lockup_expiration) {
             coin::merge(
                 &mut stake_pool.inactive,
                 coin::extract_all(&mut stake_pool.pending_inactive),
@@ -1381,6 +1372,15 @@ module aptos_framework::stake {
                 rewards_amount,
             },
         );
+    }
+
+    /// Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
+    fun get_reconfig_start_time_secs(): u64 {
+        if (reconfiguration_state::is_initialized()) {
+            reconfiguration_state::start_time_secs()
+        } else {
+            timestamp::now_seconds()
+        }
     }
 
     /// Calculate the rewards amount.
@@ -1532,8 +1532,8 @@ module aptos_framework::stake {
     use aptos_framework::aptos_coin;
     use aptos_std::bls12381::proof_of_possession_from_bytes;
     use aptos_framework::reconfiguration_state;
-    use aptos_framework::types;
-    use aptos_framework::types::ValidatorConsensusInfo;
+    use aptos_framework::validator_consensus_info;
+    use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
     #[test_only]
     use aptos_std::fixed_point64;
 
@@ -2516,15 +2516,15 @@ module aptos_framework::stake {
         let vci_vec_0 = validator_consensus_infos_from_validator_set(borrow_global<ValidatorSet>(@aptos_framework));
         let vci_addrs = vector::map_ref(&vci_vec_0, |obj|{
             let vci: &ValidatorConsensusInfo = obj;
-            types::addr_from_validator_consensus_info(vci)
+            validator_consensus_info::get_addr(vci)
         });
         let vci_pks = vector::map_ref(&vci_vec_0, |obj|{
             let vci: &ValidatorConsensusInfo = obj;
-            types::pk_bytes_from_validator_consensus_info(vci)
+            validator_consensus_info::get_pk_bytes(vci)
         });
         let vci_voting_powers = vector::map_ref(&vci_vec_0, |obj|{
             let vci: &ValidatorConsensusInfo = obj;
-            types::voting_power_from_validator_consensus_info(vci)
+            validator_consensus_info::get_voting_power(vci)
         });
         assert!(vector[@0x5, @aptos_framework, @0x3] == vci_addrs, 1);
         assert!(vector[pk_5_bytes, pk_1_bytes, pk_3_bytes] == vci_pks, 2);
