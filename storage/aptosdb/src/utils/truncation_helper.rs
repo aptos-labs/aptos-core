@@ -27,13 +27,13 @@ use crate::{
     transaction_store::TransactionStore,
     utils::get_progress,
 };
-use anyhow::Result;
 use aptos_jellyfish_merkle::{node_type::NodeKey, StaleNodeIndex};
 use aptos_logger::info;
 use aptos_schemadb::{
     schema::{Schema, SeekKeyCodec},
     ReadOptions, SchemaBatch, DB,
 };
+use aptos_storage_interface::Result;
 use aptos_types::{proof::position::Position, transaction::Version};
 use claims::{assert_ge, assert_lt};
 use rayon::prelude::*;
@@ -45,14 +45,6 @@ use std::{
         Arc,
     },
 };
-
-pub(crate) fn get_overall_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::OverallCommitProgress)
-}
-
-pub(crate) fn get_ledger_commit_progress(ledger_metadata_db: &DB) -> Result<Option<Version>> {
-    get_progress(ledger_metadata_db, &DbMetadataKey::LedgerCommitProgress)
-}
 
 pub(crate) fn get_state_kv_commit_progress(state_kv_db: &StateKvDb) -> Result<Option<Version>> {
     get_progress(
@@ -257,7 +249,7 @@ fn truncate_ledger_db_single_batch(
         &batch.transaction_db_batches,
     )?;
     delete_per_epoch_data(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;
@@ -266,7 +258,7 @@ fn truncate_ledger_db_single_batch(
     delete_event_data(ledger_db, start_version, &batch.event_db_batches)?;
 
     truncate_transaction_accumulator(
-        ledger_db.transaction_accumulator_db(),
+        ledger_db.transaction_accumulator_db_raw(),
         start_version,
         &batch.transaction_accumulator_db_batches,
     )?;
@@ -349,7 +341,7 @@ fn delete_per_version_data(
     batch: &LedgerDbSchemaBatches,
 ) -> Result<()> {
     delete_per_version_data_impl::<TransactionInfoSchema>(
-        ledger_db.transaction_info_db(),
+        ledger_db.transaction_info_db_raw(),
         start_version,
         &batch.transaction_info_db_batches,
     )?;
@@ -359,7 +351,7 @@ fn delete_per_version_data(
         &batch.transaction_db_batches,
     )?;
     delete_per_version_data_impl::<VersionDataSchema>(
-        ledger_db.metadata_db(),
+        &ledger_db.metadata_db_arc(),
         start_version,
         &batch.ledger_metadata_db_batches,
     )?;

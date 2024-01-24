@@ -9,7 +9,7 @@ use aptos_types::{
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-enum Matcher {
+pub enum Matcher {
     All,
     BlockId(HashValue),
     BlockTimeStampGreaterThan(u64),
@@ -48,9 +48,18 @@ impl Matcher {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-enum Rule {
+pub enum Rule {
     Allow(Matcher),
     Deny(Matcher),
+}
+
+impl Rule {
+    pub fn matcher(&self) -> &Matcher {
+        match self {
+            Rule::Allow(matcher) => matcher,
+            Rule::Deny(matcher) => matcher,
+        }
+    }
 }
 
 enum EvalResult {
@@ -186,6 +195,10 @@ impl Filter {
             function,
         )));
         self
+    }
+
+    pub fn rules(&self) -> &[Rule] {
+        &self.rules
     }
 
     pub fn allows(&self, block_id: HashValue, timestamp: u64, txn: &SignedTransaction) -> bool {

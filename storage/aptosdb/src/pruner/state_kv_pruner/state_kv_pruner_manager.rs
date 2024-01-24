@@ -9,8 +9,8 @@ use crate::{
     },
     state_kv_db::StateKvDb,
 };
-use anyhow::Result;
 use aptos_config::config::LedgerPrunerConfig;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::{AtomicVersion, Version};
 use std::sync::{atomic::Ordering, Arc};
 

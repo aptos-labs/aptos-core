@@ -13,7 +13,6 @@ impl GetRestoreHandler for Arc<AptosDB> {
     fn get_restore_handler(&self) -> RestoreHandler {
         RestoreHandler::new(
             Arc::clone(self),
-            Arc::clone(&self.ledger_store),
             Arc::clone(&self.transaction_store),
             Arc::clone(&self.state_store),
         )

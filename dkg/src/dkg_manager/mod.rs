@@ -4,20 +4,19 @@ use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_logger::error;
 use aptos_types::{
-    dkg::{
-        DKGPrivateParamsProvider, DKGSessionState, DKGStartEvent, DKGTrait, DKGTranscript,
-        DKGTranscriptMetadata,
-    },
+    dkg::{DKGTranscript, DKGSessionState, DKGStartEvent, DKGTrait},
     epoch_state::EpochState,
-    on_chain_config::ValidatorSet,
     validator_txn::ValidatorTransaction,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
 use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::sync::Arc;
+use aptos_crypto::Uniform;
+use aptos_types::dkg::{DKGSessionMetadata, DKGTranscriptMetadata};
+use aptos_types::validator_txn::Topic;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -30,34 +29,11 @@ enum InnerState<DKG: DKGTrait> {
         abort_handle: AbortHandle,
     },
     Finished {
+        vtxn_guard: TxnGuard,
         start_time_us: u64,
         my_transcript: DKGTranscript,
         pull_confirmed: bool,
     },
-}
-
-impl<DKG: DKGTrait> Default for InnerState<DKG> {
-    fn default() -> Self {
-        Self::NotStarted
-    }
-}
-
-#[allow(dead_code)]
-pub struct DKGManager<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> {
-    private_params_provider: P,
-
-    // Some useful metadata
-    my_addr: AccountAddress,
-    epoch_state: Arc<EpochState>,
-
-    //
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
-    agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
-    agg_trx_tx: Option<aptos_channel::Sender<(), DKG::Transcript>>,
-
-    // Control states.
-    stopped: bool,
-    state: InnerState<DKG>,
 }
 
 impl<DKG: DKGTrait> InnerState<DKG> {
@@ -85,20 +61,51 @@ impl<DKG: DKGTrait> InnerState<DKG> {
     }
 }
 
-impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
+impl<DKG: DKGTrait> Default for InnerState<DKG> {
+    fn default() -> Self {
+        Self::NotStarted
+    }
+}
+
+#[allow(dead_code)]
+pub struct DKGManager<DKG: DKGTrait> {
+    dealer_sk: Arc<DKG::DealerPrivateKey>,
+    my_index: usize,
+    my_addr: AccountAddress,
+    epoch_state: Arc<EpochState>,
+
+    vtxn_pool: VTxnPoolState,
+    agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
+    agg_trx_tx: Option<aptos_channel::Sender<(), DKG::Transcript>>,
+
+    // When we put vtxn in the pool, we also put a copy of this so later pool can notify us.
+    pull_notification_tx: aptos_channel::Sender<(), Arc<ValidatorTransaction>>,
+    pull_notification_rx: aptos_channel::Receiver<(), Arc<ValidatorTransaction>>,
+
+    // Control states.
+    stopped: bool,
+    state: InnerState<DKG>,
+}
+
+impl<DKG: DKGTrait> DKGManager<DKG> {
     pub fn new(
-        private_params_provider: P,
+        dealer_sk: Arc<DKG::DealerPrivateKey>,
+        my_index: usize,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         agg_trx_producer: Arc<dyn TAggTranscriptProducer<DKG>>,
-        vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
+        let (pull_notification_tx, pull_notification_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
-            private_params_provider,
+            dealer_sk,
+            my_index,
             my_addr,
             epoch_state,
-            vtxn_pool_write_cli,
+            vtxn_pool,
             agg_trx_tx: None,
+            pull_notification_tx,
+            pull_notification_rx,
             agg_trx_producer,
             stopped: false,
             state: InnerState::NotStarted,
@@ -113,16 +120,13 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
             AccountAddress,
             (AccountAddress, IncomingRpcRequest),
         >,
-        mut dkg_txn_pulled_rx: vtxn_pool::PullNotificationReceiver,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
-                start_time_us,
-                target_validator_set,
-                ..
+                metadata, start_time_us, ..
             } = session_state;
-            self.setup_deal_broadcast(start_time_us, &target_validator_set)
+            self.setup_deal_broadcast(start_time_us, &metadata)
                 .await
                 .expect("setup_deal_broadcast() should be infallible");
         }
@@ -143,7 +147,7 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                 agg_node = agg_trx_rx.select_next_some() => {
                     self.process_aggregated_transcript(agg_node).await
                 },
-                dkg_txn = dkg_txn_pulled_rx.select_next_some() => {
+                dkg_txn = self.pull_notification_rx.select_next_some() => {
                     self.process_dkg_txn_pulled_notification(dkg_txn).await
                 },
                 close_req = close_rx.select_next_some() => {
@@ -164,8 +168,6 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
         if let InnerState::InProgress { abort_handle, .. } = &self.state {
             abort_handle.abort();
         }
-
-        self.vtxn_pool_write_cli.put(None);
 
         if let Some(tx) = ack_tx {
             let _ = tx.send(());
@@ -196,26 +198,30 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     async fn setup_deal_broadcast(
         &mut self,
         start_time_us: u64,
-        target_validator_set: &ValidatorSet,
+        dkg_session_metadata: &DKGSessionMetadata
     ) -> Result<()> {
         self.state = match &self.state {
             InnerState::NotStarted => {
-                let public_params = DKG::new_public_params(
-                    self.epoch_state.as_ref(),
-                    self.my_addr,
-                    target_validator_set,
-                );
+                let public_params = DKG::new_public_params(dkg_session_metadata);
                 let mut rng = thread_rng();
+                let input_secret = if cfg!(feature = "smoke-test") {
+                    DKG::generate_predictable_input_secret_for_testing(self.dealer_sk.as_ref())
+                } else {
+                    DKG::InputSecret::generate(&mut rng)
+                };
+
                 let trx = DKG::generate_transcript(
                     &mut rng,
-                    self.private_params_provider.dkg_private_params(),
                     &public_params,
+                    &input_secret,
+                    self.my_index as u64,
+                    &self.dealer_sk,
                 );
 
                 let dkg_transcript = DKGTranscript::new(
                     self.epoch_state.epoch,
                     self.my_addr,
-                    DKG::serialize_transcript(&trx),
+                    bcs::to_bytes(&trx).map_err(|e|anyhow!("setup_deal_broadcast failed with trx serialization error: {e}"))?,
                 );
 
                 // TODO(zjma): DKG_NODE_READY metric
@@ -254,10 +260,11 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
                         epoch: self.epoch_state.epoch,
                         author: self.my_addr,
                     },
-                    transcript_bytes: DKG::serialize_transcript(&agg_trx),
+                    transcript_bytes: bcs::to_bytes(&agg_trx).map_err(|e|anyhow!("process_aggregated_transcript failed with trx serialization error: {e}"))?,
                 });
-                self.vtxn_pool_write_cli.put(Some(Arc::new(txn)));
+                let vtxn_guard = self.vtxn_pool.put(Topic::DKG, Arc::new(txn), Some(self.pull_notification_tx.clone()));
                 InnerState::Finished {
+                    vtxn_guard,
                     start_time_us,
                     my_transcript: my_node,
                     pull_confirmed: false,
@@ -272,12 +279,10 @@ impl<DKG: DKGTrait, P: DKGPrivateParamsProvider<DKG>> DKGManager<DKG, P> {
     async fn process_dkg_start_event(&mut self, maybe_event: Option<DKGStartEvent>) -> Result<()> {
         if let Some(event) = maybe_event {
             let DKGStartEvent {
-                target_epoch,
-                start_time_us,
-                target_validator_set,
+                session_metadata, start_time_us
             } = event;
-            ensure!(self.epoch_state.epoch + 1 == target_epoch);
-            self.setup_deal_broadcast(start_time_us, &target_validator_set)
+            ensure!(self.epoch_state.epoch == session_metadata.dealer_epoch);
+            self.setup_deal_broadcast(start_time_us, &session_metadata)
                 .await?;
         }
         Ok(())

@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    agg_trx_producer::AggTranscriptProducer,
     dkg_manager::DKGManager,
-    dummy_dkg::DummyDKG,
+    agg_trx_producer::AggTranscriptProducer,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
     DKGMessage,
@@ -11,7 +10,6 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
@@ -21,40 +19,34 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGStartEvent, DKGState},
+    dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
     },
-    validator_txn::ValidatorTransaction,
 };
-use aptos_validator_transaction_pool as vtxn_pool;
+use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
-#[allow(dead_code)]
 pub struct EpochManager<P: OnChainConfigProvider> {
+    dkg_dealer_sk: Arc<<DefaultDKG as DKGTrait>::DealerPrivateKey>,
     // Some useful metadata
     my_addr: AccountAddress,
     epoch_state: Option<Arc<EpochState>>,
 
-    // some DKG private params
-    identity_blob: Arc<IdentityBlob>,
-
     // Inbound events
     reconfig_events: ReconfigNotificationListener<P>,
     dkg_start_events: EventNotificationListener,
-    vtxn_pull_notification_rx_from_pool: vtxn_pool::PullNotificationReceiver,
 
     // Msgs to DKG manager
     dkg_rpc_msg_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dkg_start_event_tx: Option<oneshot::Sender<DKGStartEvent>>,
-    vtxn_pull_notification_tx_to_dkgmgr: Option<vtxn_pool::PullNotificationSender>,
-    vtxn_pool_write_cli: Arc<vtxn_pool::SingleTopicWriteClient>,
+    vtxn_pool: VTxnPoolState,
 
     // Network utils
     self_sender: aptos_channels::Sender<Event<DKGMessage>>,
@@ -64,17 +56,16 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
         my_addr: AccountAddress,
-        identity_blob: Arc<IdentityBlob>,
+        dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
         reconfig_events: ReconfigNotificationListener<P>,
         dkg_start_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<DKGMessage>>,
         network_sender: DKGNetworkClient<NetworkClient<DKGMessage>>,
-        vtxn_pool_write_cli: vtxn_pool::SingleTopicWriteClient,
-        vtxn_pull_notification_rx: vtxn_pool::PullNotificationReceiver,
+        vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
+            dkg_dealer_sk: Arc::new(dkg_dealer_sk),
             my_addr,
-            identity_blob,
             epoch_state: None,
             reconfig_events,
             dkg_start_events,
@@ -82,9 +73,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dkg_manager_close_tx: None,
             self_sender,
             network_sender,
-            vtxn_pool_write_cli: Arc::new(vtxn_pool_write_cli),
-            vtxn_pull_notification_rx_from_pool: vtxn_pull_notification_rx,
-            vtxn_pull_notification_tx_to_dkgmgr: None,
+            vtxn_pool,
             dkg_start_event_tx: None,
         }
     }
@@ -120,18 +109,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         Ok(())
     }
 
-    fn process_vtxn_pull_notification(
-        &mut self,
-        pulled_txn: Arc<ValidatorTransaction>,
-    ) -> Result<()> {
-        // Forward to DKGManager if it is alive.
-        if let Some(tx) = self.vtxn_pull_notification_tx_to_dkgmgr.as_mut() {
-            tx.push((), pulled_txn)
-        } else {
-            Ok(())
-        }
-    }
-
     pub async fn start(mut self, mut network_receivers: NetworkReceivers) {
         self.await_reconfig_notification().await;
         loop {
@@ -145,9 +122,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 (peer, rpc_request) = network_receivers.rpc_rx.select_next_some() => {
                     self.process_rpc_request(peer, rpc_request)
                 },
-                msg = self.vtxn_pull_notification_rx_from_pool.select_next_some() => {
-                    self.process_vtxn_pull_notification(msg)
-                }
             };
 
             if let Err(e) = handling_result {
@@ -176,10 +150,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
         self.epoch_state = Some(epoch_state.clone());
+        let my_index = epoch_state.verifier.address_to_validator_index().get(&self.my_addr).copied();
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
+        if let (true, Some(my_index)) = (features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG), my_index) {
             let DKGState {
                 in_progress: in_progress_session,
                 ..
@@ -207,21 +182,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let (dkg_manager_close_tx, dkg_manager_close_rx) = oneshot::channel();
             self.dkg_manager_close_tx = Some(dkg_manager_close_tx);
 
-            let dkg_manager = DKGManager::<DummyDKG, _>::new(
-                self.identity_blob.clone(),
+            let dkg_manager = DKGManager::<DefaultDKG>::new(
+                self.dkg_dealer_sk.clone(),
+                my_index,
                 self.my_addr,
                 epoch_state,
                 Arc::new(agg_trx_producer),
-                self.vtxn_pool_write_cli.clone(),
+                self.vtxn_pool.clone(),
             );
-            let (vtxn_pull_notification_tx, vtxn_pull_notification_rx) =
-                aptos_channel::new(QueueStyle::KLAST, 1, None);
-            self.vtxn_pull_notification_tx_to_dkgmgr = Some(vtxn_pull_notification_tx);
             tokio::spawn(dkg_manager.run(
                 in_progress_session,
                 dkg_start_event_rx,
                 dkg_rpc_msg_rx,
-                vtxn_pull_notification_rx,
                 dkg_manager_close_rx,
             ));
         }

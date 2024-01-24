@@ -4441,7 +4441,7 @@ object "test_A2_Vectors_test_pop_back_empty_fail" {
             $t1 := $MakePtr(false, $locals)
             // $t2 := vector::pop_back<address>($t1)
             $t2 := A1_vector_pop_back$address$($t1)
-            // destroy($t2)
+            // drop($t2)
             // return ()
             $Free($locals, 32)
         }

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::AptosDbError,
     metrics::OTHER_TIMERS_SECONDS,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -12,9 +11,9 @@ use crate::{
     },
     utils::iterators::ExpectContinuousVersions,
 };
-use anyhow::Result;
 use aptos_crypto::hash::{CryptoHash, HashValue};
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
+use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::transaction::{Transaction, TransactionToCommit, Version};
 use rayon::prelude::*;
 use std::{path::Path, sync::Arc};
@@ -52,7 +51,7 @@ impl TransactionDb {
     pub(crate) fn get_transaction(&self, version: Version) -> Result<Transaction> {
         self.db
             .get::<TransactionSchema>(&version)?
-            .ok_or_else(|| AptosDbError::NotFound(format!("Txn {version}")).into())
+            .ok_or_else(|| AptosDbError::NotFound(format!("Txn {version}")))
     }
 
     /// Returns an iterator that yields at most `num_transactions` transactions starting from `start_version`.

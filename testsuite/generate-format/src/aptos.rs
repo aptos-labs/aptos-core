@@ -11,6 +11,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
+    block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{
         state_key::StateKey,
@@ -86,6 +87,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
+    tracer.trace_type::<BlockMetadataExt>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
@@ -97,6 +99,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::authenticator::TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
+    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
 
     // aliases within StructTag

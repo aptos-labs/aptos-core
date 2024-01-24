@@ -3,29 +3,23 @@
 use crate::{
     agg_trx_producer::DummyAggTranscriptProducer,
     dkg_manager::{DKGManager, InnerState},
-    dummy_dkg::{DummyDKG, DummyDKGTranscript},
+    DKGMessage,
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::DKGTranscriptRequest,
-    DKGMessage,
 };
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
     Uniform,
 };
 use aptos_infallible::RwLock;
-use aptos_types::{
-    dkg::{DKGStartEvent, DKGTrait, DKGTranscript, DKGTranscriptMetadata},
-    epoch_state::EpochState,
-    on_chain_config::ValidatorSet,
-    validator_config::ValidatorConfig,
-    validator_info::ValidatorInfo,
-    validator_txn::{Topic, ValidatorTransaction},
-    validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
-};
-use aptos_validator_transaction_pool as vtxn_pool;
-use aptos_validator_transaction_pool::TransactionFilter;
+use aptos_types::{dkg::{DKGTranscript, DKGStartEvent, DKGTrait, DKGTranscriptMetadata}, epoch_state::EpochState, validator_txn::ValidatorTransaction, validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier}};
+use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
+use std::time::Instant;
+use aptos_types::dkg::DKGSessionMetadata;
+use aptos_types::dkg::dummy_dkg::DummyDKG;
+use aptos_types::validator_verifier::ValidatorConsensusInfoMoveStruct;
 
 #[tokio::test]
 async fn test_dkg_state_transition() {
@@ -39,30 +33,23 @@ async fn test_dkg_state_transition() {
         .collect();
     let addrs: Vec<AccountAddress> = (0..4).map(|_| AccountAddress::random()).collect();
     let voting_powers: Vec<u64> = vec![1, 1, 1, 1];
-    let (vtxn_read_client, mut vtxn_write_clients) = vtxn_pool::new(vec![(Topic::DKG, None)]);
-    let vtxn_write_client = vtxn_write_clients.pop().unwrap();
+    let vtxn_pool_handle = VTxnPoolState::default();
     let validator_consensus_infos: Vec<ValidatorConsensusInfo> = (0..4)
         .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
         .collect();
-    let validator_configs: Vec<ValidatorConfig> = (0..4)
-        .map(|i| ValidatorConfig::new(public_keys[i].clone(), vec![], vec![], i as u64))
-        .collect();
-    let validator_infos: Vec<ValidatorInfo> = (0..4)
-        .map(|i| ValidatorInfo::new(addrs[i], voting_powers[i], validator_configs[i].clone()))
-        .collect();
-    let validator_set = ValidatorSet::new(validator_infos.clone());
-
+    let validator_consensus_info_move_structs = validator_consensus_infos.clone().into_iter().map(ValidatorConsensusInfoMoveStruct::from).collect::<Vec<_>>();
     let epoch_state = EpochState {
         epoch: 999,
         verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
     };
     let agg_node_producer = DummyAggTranscriptProducer {};
-    let mut dkg_manager = DKGManager::new(
+    let mut dkg_manager: DKGManager<DummyDKG> = DKGManager::new(
         private_keys[0].clone(),
+        0,
         addrs[0],
         Arc::new(epoch_state),
         Arc::new(agg_node_producer),
-        Arc::new(vtxn_write_client),
+        vtxn_pool_handle.clone(),
     );
 
     // Initial state should be `NotStarted`.
@@ -82,9 +69,12 @@ async fn test_dkg_state_transition() {
     // it should record start time, compute its own node, and enter state `InProgress`.
     let handle_result = dkg_manager
         .process_dkg_start_event(Some(DKGStartEvent {
-            target_epoch: 1000,
+            session_metadata: DKGSessionMetadata {
+                dealer_epoch: 999,
+                dealer_validator_set: validator_consensus_info_move_structs.clone(),
+                target_validator_set: validator_consensus_info_move_structs.clone(),
+            },
             start_time_us: 1700000000000000,
-            target_validator_set: validator_set.clone(), // No validator set change!
         }))
         .await;
     assert!(handle_result.is_ok());
@@ -108,26 +98,25 @@ async fn test_dkg_state_transition() {
 
     // In state `InProgress`, DKGManager should accept `DKGAggNode`:
     // it should update validator txn pool, and enter state `Finished`.
-    let agg_trx = DummyDKGTranscript::default();
+    let agg_trx = <DummyDKG as DKGTrait>::Transcript::default();
     let handle_result = dkg_manager
         .process_aggregated_transcript(agg_trx.clone())
         .await;
     assert!(handle_result.is_ok());
-    let available_vtxns = vtxn_read_client
+    let available_vtxns = vtxn_pool_handle
         .pull(
-            Duration::from_secs(10),
+            Instant::now() + Duration::from_secs(10),
             999,
             2048,
             TransactionFilter::no_op(),
-        )
-        .await;
+        );
     assert_eq!(
         vec![ValidatorTransaction::DKGResult(DKGTranscript {
             metadata: DKGTranscriptMetadata {
                 epoch: 999,
                 author: addrs[0],
             },
-            transcript_bytes: DummyDKG::serialize_transcript(&agg_trx),
+            transcript_bytes: bcs::to_bytes(&agg_trx).unwrap(),
         })],
         available_vtxns
     );

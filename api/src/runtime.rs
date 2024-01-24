@@ -9,7 +9,6 @@ use crate::{
     view_function::ViewFunctionApi,
 };
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::X_APTOS_CLIENT;
 use aptos_config::config::{ApiConfig, NodeConfig};
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
@@ -17,7 +16,7 @@ use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use poem::{
     handler,
-    http::{header, Method},
+    http::Method,
     listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
     middleware::Cors,
     web::Html,
@@ -194,12 +193,7 @@ pub fn attach_poem_to_runtime(
             // routing in the LB) we must enable this:
             // https://stackoverflow.com/a/24689738/3846032
             .allow_credentials(true)
-            .allow_methods(vec![Method::GET, Method::POST])
-            .allow_headers(vec![
-                header::HeaderName::from_static(X_APTOS_CLIENT),
-                header::CONTENT_TYPE,
-                header::ACCEPT,
-            ]);
+            .allow_methods(vec![Method::GET, Method::POST]);
 
         // Build routes for the API
         let route = Route::new()

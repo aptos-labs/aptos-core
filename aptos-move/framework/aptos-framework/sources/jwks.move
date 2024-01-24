@@ -74,7 +74,10 @@ module aptos_framework::jwks {
         /// The utf-8 encoding of the issuer string (e.g., "https://www.facebook.com").
         issuer: vector<u8>,
 
+        /// A version number is needed by JWK consensus to dedup the updates.
+        /// e.g, when on chain version = 5, multiple nodes can propose an update with version = 6.
         /// Bumped every time the JWKs for the current issuer is updated.
+        /// The Rust authenticator only uses the latest version.
         version: u64,
 
         /// Vector of `JWK`'s sorted by their unique ID (from `get_jwk_id`) in dictionary order.

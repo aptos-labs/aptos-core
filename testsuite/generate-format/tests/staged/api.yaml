@@ -64,6 +64,11 @@ AnyPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Secp256r1EcdsaPublicKey
+    3:
+      ZkId:
+        STRUCT:
+          - public_key:
+              TYPENAME: ZkIdPublicKey
 AnySignature:
   ENUM:
     0:
@@ -81,12 +86,11 @@ AnySignature:
         STRUCT:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
-PartialAuthenticatorAssertionResponse:
-  STRUCT:
-    - signature:
-        TYPENAME: AssertionSignature
-    - authenticator_data: BYTES
-    - client_data_json: BYTES
+    3:
+      ZkId:
+        STRUCT:
+          - signature:
+              TYPENAME: ZkIdSignature
 AssertionSignature:
   ENUM:
     0:
@@ -109,6 +113,31 @@ BlockMetadata:
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
+BlockMetadataExt:
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: BlockMetadata
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandomness
+BlockMetadataWithRandomness:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -149,11 +178,22 @@ ContractEventV2:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
+DKGNode:
+  STRUCT:
+    - metadata:
+        TYPENAME: DKGTranscriptMetadata
+    - transcript_bytes: BYTES
+DKGTranscriptMetadata:
+  STRUCT:
+    - epoch: U64
+    - author:
+        TYPENAME: AccountAddress
 DepositEvent:
   STRUCT:
     - amount: U64
 DummyValidatorTransaction:
   STRUCT:
+    - valid: BOOL
     - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
@@ -170,6 +210,20 @@ EntryFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
+EphemeralPublicKey:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - public_key:
+              TYPENAME: Ed25519PublicKey
+EphemeralSignature:
+  ENUM:
+    0:
+      Ed25519:
+        STRUCT:
+          - signature:
+              TYPENAME: Ed25519Signature
 EventHandle:
   STRUCT:
     - count: U64
@@ -206,12 +260,26 @@ ExecutionStatus:
       MiscellaneousError:
         NEWTYPE:
           OPTION: U64
+Groth16Zkp:
+  STRUCT:
+    - a:
+        SEQ: STR
+    - b:
+        SEQ:
+          SEQ: STR
+    - c:
+        SEQ: STR
 HashValue:
   STRUCT:
     - hash:
         TUPLEARRAY:
           CONTENT: U8
           SIZE: 32
+IdCommitment:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 Module:
@@ -260,6 +328,23 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+OpenIdSig:
+  STRUCT:
+    - jwt_sig: STR
+    - jwt_payload: STR
+    - uid_key: STR
+    - epk_blinder:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 31
+    - pepper:
+        TYPENAME: Pepper
+PartialAuthenticatorAssertionResponse:
+  STRUCT:
+    - signature:
+        TYPENAME: AssertionSignature
+    - authenticator_data: BYTES
+    - client_data_json: BYTES
 Path:
   ENUM:
     0:
@@ -274,6 +359,27 @@ Path:
       ResourceGroup:
         NEWTYPE:
           TYPENAME: StructTag
+Pepper:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 31
+RandMetadata:
+  STRUCT:
+    - metadata_to_sign:
+        TYPENAME: RandMetadataToSign
+    - block_id:
+        TYPENAME: HashValue
+    - timestamp: U64
+RandMetadataToSign:
+  STRUCT:
+    - epoch: U64
+    - round: U64
+Randomness:
+  STRUCT:
+    - metadata:
+        TYPENAME: RandMetadata
+    - randomness: BYTES
 RawTransaction:
   STRUCT:
     - sender:
@@ -383,6 +489,10 @@ Transaction:
       ValidatorTransaction:
         NEWTYPE:
           TYPENAME: ValidatorTransaction
+    5:
+      BlockMetadataExt:
+        NEWTYPE:
+          TYPENAME: BlockMetadataExt
 TransactionArgument:
   ENUM:
     0:
@@ -559,10 +669,14 @@ TypeTag:
 ValidatorTransaction:
   ENUM:
     0:
+      DKGResult:
+        NEWTYPE:
+          TYPENAME: DKGNode
+    1:
       DummyTopic1:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
-    1:
+    2:
       DummyTopic2:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
@@ -626,3 +740,28 @@ WriteSetPayload:
 WriteSetV0:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut
+ZkIdPublicKey:
+  STRUCT:
+    - iss: STR
+    - idc:
+        TYPENAME: IdCommitment
+ZkIdSignature:
+  STRUCT:
+    - sig:
+        TYPENAME: ZkpOrOpenIdSig
+    - jwt_header: STR
+    - exp_timestamp_secs: U64
+    - ephemeral_pubkey:
+        TYPENAME: EphemeralPublicKey
+    - ephemeral_signature:
+        TYPENAME: EphemeralSignature
+ZkpOrOpenIdSig:
+  ENUM:
+    0:
+      Groth16Zkp:
+        NEWTYPE:
+          TYPENAME: Groth16Zkp
+    1:
+      OpenIdSig:
+        NEWTYPE:
+          TYPENAME: OpenIdSig

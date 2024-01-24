@@ -159,7 +159,7 @@ pub trait NetworkLoadTest: Test {
         Ok(())
     }
 
-    fn finish(&self, _swarm: &mut dyn Swarm) -> Result<()> {
+    fn finish(&self, _ctx: &mut NetworkContext) -> Result<()> {
         Ok(())
     }
 }
@@ -223,8 +223,7 @@ impl NetworkTest for dyn NetworkLoadTest {
             .block_on(ctx.swarm().get_client_with_newest_ledger_version())
             .context("no clients replied for end version")?;
 
-        self.finish(ctx.swarm())
-            .context("finish NetworkLoadTest ")?;
+        self.finish(ctx).context("finish NetworkLoadTest ")?;
 
         for (_phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
             ctx.check_for_success(
@@ -499,7 +498,7 @@ impl NetworkTest for CompositeNetworkTest {
         }
         self.test.run(ctx)?;
         for wrapper in &self.wrappers {
-            wrapper.finish(ctx.swarm())?;
+            wrapper.finish(ctx)?;
         }
         Ok(())
     }

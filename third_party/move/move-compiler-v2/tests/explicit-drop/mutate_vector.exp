@@ -1,0 +1,244 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
+     var $t1: m::Scalar
+     var $t2: m::Scalar
+     var $t3: m::Scalar
+     var $t4: &mut u8
+     var $t5: &mut u8
+     var $t6: &mut vector<u8>
+     var $t7: &mut m::Scalar
+     var $t8: u64
+  0: $t3 := m::scalar_zero()
+  1: $t2 := infer($t3)
+  2: $t7 := borrow_local($t2)
+  3: $t6 := borrow_field<m::Scalar>.data($t7)
+  4: $t8 := 0
+  5: $t5 := vector::borrow_mut<u8>($t6, $t8)
+  6: $t4 := infer($t5)
+  7: write_ref($t4, $t0)
+  8: $t1 := infer($t2)
+  9: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): m::Scalar {
+     var $t0: m::Scalar
+     var $t1: vector<u8>
+  0: $t1 := [0]
+  1: $t0 := pack m::Scalar($t1)
+  2: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
+     var $t1: m::Scalar
+     var $t2: m::Scalar
+     var $t3: m::Scalar
+     var $t4: &mut u8
+     var $t5: &mut u8
+     var $t6: &mut vector<u8>
+     var $t7: &mut m::Scalar
+     var $t8: u64
+     # live vars: $t0
+  0: $t3 := m::scalar_zero()
+     # live vars: $t0, $t3
+  1: $t2 := copy($t3)
+     # live vars: $t0, $t2
+  2: $t7 := borrow_local($t2)
+     # live vars: $t0, $t2, $t7
+  3: $t6 := borrow_field<m::Scalar>.data($t7)
+     # live vars: $t0, $t2, $t6
+  4: $t8 := 0
+     # live vars: $t0, $t2, $t6, $t8
+  5: $t5 := vector::borrow_mut<u8>($t6, $t8)
+     # live vars: $t0, $t2, $t5
+  6: $t4 := move($t5)
+     # live vars: $t0, $t2, $t4
+  7: write_ref($t4, $t0)
+     # live vars: $t2
+  8: $t1 := copy($t2)
+     # live vars: $t1
+  9: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): m::Scalar {
+     var $t0: m::Scalar
+     var $t1: vector<u8>
+     var $t2: vector<u8>
+     # live vars:
+  0: $t1 := [0]
+     # live vars: $t1
+  1: $t2 := copy($t1)
+     # live vars: $t2
+  2: $t0 := pack m::Scalar($t2)
+     # live vars: $t0
+  3: return $t0
+}
+
+============ after MemorySafetyProcessor: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
+     var $t1: m::Scalar
+     var $t2: m::Scalar
+     var $t3: m::Scalar
+     var $t4: &mut u8
+     var $t5: &mut u8
+     var $t6: &mut vector<u8>
+     var $t7: &mut m::Scalar
+     var $t8: u64
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t3 := m::scalar_zero()
+     # live vars: $t0, $t3
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: $t2 := copy($t3)
+     # live vars: $t0, $t2
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  2: $t7 := borrow_local($t2)
+     # live vars: $t0, $t2, $t7
+     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[]}
+     # local_to_label: {$t2=L512,$t7=L513}
+     # global_to_label: {}
+     # moved: {}
+     #
+  3: $t6 := borrow_field<m::Scalar>.data($t7)
+     # live vars: $t0, $t2, $t6
+     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[]}
+     # local_to_label: {$t2=L512,$t6=L769,$t7=L513}
+     # global_to_label: {}
+     # moved: {}
+     #
+  4: $t8 := 0
+     # live vars: $t0, $t2, $t6, $t8
+     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[]}
+     # local_to_label: {$t2=L512,$t6=L769,$t7=L513}
+     # global_to_label: {}
+     # moved: {}
+     #
+  5: $t5 := vector::borrow_mut<u8>($t6, $t8)
+     # live vars: $t0, $t2, $t5
+     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[call(true) -> L1280],L1280=local($t5)[]}
+     # local_to_label: {$t2=L512,$t5=L1280,$t6=L769,$t7=L513}
+     # global_to_label: {}
+     # moved: {$t6,$t8}
+     #
+  6: $t4 := move($t5)
+     # live vars: $t0, $t2, $t4
+     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[call(true) -> L1280],L1280=local($t5)[skip -> L1537],L1537=local($t4)[]}
+     # local_to_label: {$t2=L512,$t4=L1537,$t5=L1280,$t6=L769,$t7=L513}
+     # global_to_label: {}
+     # moved: {$t5,$t6,$t8}
+     #
+  7: write_ref($t4, $t0)
+     # live vars: $t2
+     # graph: {L512=local($t2)[]}
+     # local_to_label: {$t2=L512}
+     # global_to_label: {}
+     # moved: {$t5,$t6,$t8}
+     #
+  8: $t1 := copy($t2)
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t5,$t6,$t8}
+     #
+  9: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): m::Scalar {
+     var $t0: m::Scalar
+     var $t1: vector<u8>
+     var $t2: vector<u8>
+     # live vars:
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  0: $t1 := [0]
+     # live vars: $t1
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  1: $t2 := copy($t1)
+     # live vars: $t2
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {}
+     #
+  2: $t0 := pack m::Scalar($t2)
+     # live vars: $t0
+     # graph: {}
+     # local_to_label: {}
+     # global_to_label: {}
+     # moved: {$t2}
+     #
+  3: return $t0
+}
+
+============ after ExplicitDrop: ================
+
+[variant baseline]
+public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
+     var $t1: m::Scalar
+     var $t2: m::Scalar
+     var $t3: m::Scalar
+     var $t4: &mut u8
+     var $t5: &mut u8
+     var $t6: &mut vector<u8>
+     var $t7: &mut m::Scalar
+     var $t8: u64
+  0: $t3 := m::scalar_zero()
+  1: $t2 := copy($t3)
+  2: drop($t3)
+  3: $t7 := borrow_local($t2)
+  4: $t6 := borrow_field<m::Scalar>.data($t7)
+  5: drop($t7)
+  6: $t8 := 0
+  7: $t5 := vector::borrow_mut<u8>($t6, $t8)
+  8: $t4 := move($t5)
+  9: write_ref($t4, $t0)
+ 10: drop($t4)
+ 11: $t1 := copy($t2)
+ 12: drop($t2)
+ 13: return $t1
+}
+
+
+[variant baseline]
+public fun m::scalar_zero(): m::Scalar {
+     var $t0: m::Scalar
+     var $t1: vector<u8>
+     var $t2: vector<u8>
+  0: $t1 := [0]
+  1: $t2 := copy($t1)
+  2: drop($t1)
+  3: $t0 := pack m::Scalar($t2)
+  4: return $t0
+}

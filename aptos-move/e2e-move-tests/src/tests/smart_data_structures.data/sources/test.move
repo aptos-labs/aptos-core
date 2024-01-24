@@ -24,7 +24,7 @@ module 0xcafe::test {
     public entry fun create_smart_vector(acct: &signer) {
         let v = smart_vector::empty();
         let i: u64 = 0;
-        while (i < 10000) {
+        while (i < 5000) {
             smart_vector::push_back(&mut v, i);
             i = i + 1;
         };
@@ -33,18 +33,18 @@ module 0xcafe::test {
 
     public entry fun update_smart_vector(acct: &signer) acquires SmartVectorStore {
         let v = &mut borrow_global_mut<SmartVectorStore>(signer::address_of(acct)).v;
-        smart_vector::push_back(v, 10000);
+        smart_vector::push_back(v, 5000);
     }
 
     public entry fun read_smart_vector(acct: &signer) acquires SmartVectorStore {
         let v = &borrow_global<SmartVectorStore>(signer::address_of(acct)).v;
-        smart_vector::borrow(v, 5000);
+        smart_vector::borrow(v, 2000);
     }
 
     public entry fun create_vector(acct: &signer) {
         let v = vector::empty();
         let i: u64 = 0;
-        while (i < 10000) {
+        while (i < 5000) {
             vector::push_back(&mut v, i);
             i = i + 1;
         };
@@ -53,12 +53,12 @@ module 0xcafe::test {
 
     public entry fun update_vector(acct: &signer) acquires VectorStore {
         let v = &mut borrow_global_mut<VectorStore>(signer::address_of(acct)).v;
-        vector::push_back(v, 10000);
+        vector::push_back(v, 5000);
     }
 
     public entry fun read_vector(acct: &signer) acquires VectorStore {
         let v = &borrow_global<VectorStore>(signer::address_of(acct)).v;
-        vector::borrow(v, 5000);
+        vector::borrow(v, 2000);
     }
 
     public entry fun create_smart_table(acct: &signer) {

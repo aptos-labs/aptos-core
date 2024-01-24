@@ -12,6 +12,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_config::{CoinStoreResource, DepositEvent, WithdrawEvent},
+    block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{
         state_key::StateKey,
@@ -90,6 +91,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
+    tracer.trace_type::<BlockMetadataExt>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
@@ -103,6 +105,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<AbortLocation>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
+    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;

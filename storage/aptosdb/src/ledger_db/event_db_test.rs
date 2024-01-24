@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::db::AptosDB;
-use anyhow::Result;
 use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::Result;
 use aptos_temppath::TempPath;
 use aptos_types::contract_event::ContractEvent;
 use proptest::{collection::vec, prelude::*, proptest};

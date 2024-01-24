@@ -15,7 +15,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -57,8 +57,8 @@ use aptos_types::{
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
-    validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -75,7 +75,7 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
     CompiledModule, IndexKind,
 };
@@ -139,7 +139,7 @@ macro_rules! unwrap_or_discard {
     };
 }
 
-fn get_transaction_output(
+pub(crate) fn get_transaction_output(
     session: SessionExt,
     fee_statement: FeeStatement,
     status: ExecutionStatus,
@@ -169,7 +169,7 @@ pub struct AptosVM {
     move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
-    storage_gas_params: Result<StorageGasParameters, String>,
+    pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     features: Features,
     timed_features: TimedFeatures,
 }
@@ -1386,6 +1386,8 @@ impl AptosVM {
             ));
         }
 
+        zkid_validation::validate_zkid_authenticators(transaction, resolver, session, log_context)?;
+
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -1434,18 +1436,6 @@ impl AptosVM {
                 &storage_gas_params.change_set_configs,
             )
         }
-    }
-
-    fn process_validator_transaction(
-        &self,
-        _resolver: &impl AptosMoveResolver,
-        _txn: ValidatorTransaction,
-        _log_context: &AdapterLogSchema,
-    ) -> (VMStatus, VMOutput) {
-        (
-            VMStatus::Executed,
-            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-        )
     }
 
     fn execute_user_transaction_impl(
@@ -1669,7 +1659,7 @@ impl AptosVM {
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
         change_set: &VMChangeSet,
-    ) -> Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         assert!(
             change_set.aggregator_v1_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
@@ -1678,19 +1668,17 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for state_key in change_set.module_write_set().keys() {
-            executor_view
-                .get_module_state_value(state_key)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            executor_view.get_module_state_value(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
-            executor_view
-                .get_resource_state_value(state_key, None)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            executor_view.get_resource_state_value(state_key, None)?;
             if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
                 for (tag, (_, maybe_layout)) in group_write.inner_ops() {
-                    resource_group_view
-                        .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
-                        .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+                    resource_group_view.get_resource_from_group(
+                        state_key,
+                        tag,
+                        maybe_layout.as_deref(),
+                    )?;
                 }
             }
         }
@@ -1741,7 +1729,8 @@ impl AptosVM {
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
             &change_set,
-        )?;
+        )
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -2043,9 +2032,6 @@ impl AptosVM {
                             },
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
-                        // Ignore Storage Error as currently it sometimes wraps speculative errors
-                        // TODO[agg_v2](fix) propagate SPECULATIVE_EXECUTION_ABORT_ERROR correctly, and remove storage from valid errors here.
-                        StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.
@@ -2077,9 +2063,8 @@ impl AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
-                fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context);
+                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output, Some("validator_transaction".to_string()))
             },
         })
@@ -2206,6 +2191,25 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
+
+        if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
+            if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                    if !self.features.is_open_id_signature_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+                    }
+                }
+            } else {
+                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
+            };
+        };
 
         let txn = match transaction.check_signature() {
             Ok(t) => t,

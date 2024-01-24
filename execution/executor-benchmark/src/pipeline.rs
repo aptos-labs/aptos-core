@@ -3,14 +3,11 @@
 
 use crate::{
     block_preparation::BlockPreparationStage, ledger_update_stage::LedgerUpdateStage,
-    metrics::NUM_TXNS, GasMeasuring, TransactionCommitter, TransactionExecutor,
+    metrics::NUM_TXNS, OverallMeasuring, TransactionCommitter, TransactionExecutor,
 };
 use aptos_block_partitioner::v2::config::PartitionerV2Config;
 use aptos_crypto::HashValue;
-use aptos_executor::{
-    block_executor::{BlockExecutor, TransactionBlockExecutor},
-    metrics::APTOS_PROCESSED_TXNS_OUTPUT_SIZE,
-};
+use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::{state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait};
 use aptos_logger::info;
 use aptos_types::{
@@ -147,71 +144,54 @@ where
             .name("txn_executor".to_string())
             .spawn(move || {
                 start_execution_rx.map(|rx| rx.recv());
-                let start_time = Instant::now();
+                let overall_measuring = OverallMeasuring::start();
                 let mut executed = 0;
-                let start_gas_measurement = GasMeasuring::start();
-                let start_output_size = APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum();
+
+                let mut stage_index = 0;
+                let mut stage_overall_measuring = overall_measuring.clone();
+                let mut stage_executed = 0;
+
                 while let Ok(msg) = executable_block_receiver.recv() {
                     let ExecuteBlockMessage {
                         current_block_start_time,
                         partition_time,
                         block,
                     } = msg;
-                    let block_size = block.transactions.num_transactions();
+                    let block_size = block.transactions.num_transactions() as u64;
                     NUM_TXNS
                         .with_label_values(&["execution"])
-                        .inc_by(block_size as u64);
+                        .inc_by(block_size);
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
+                    stage_executed += block_size;
                     exe.execute_block(current_block_start_time, partition_time, block);
                     info!("Finished executing block");
+
+                    // Empty blocks indicate the end of a stage.
+                    // Print the accumulated stage stats at that point.
+                    if block_size == 0 {
+                        if stage_executed > 0 {
+                            info!("Execution finished stage {}", stage_index);
+                            stage_overall_measuring.print_end(
+                                &format!("Staged execution: stage {}: ", stage_index),
+                                stage_executed,
+                            );
+                        }
+                        stage_index += 1;
+                        stage_overall_measuring = OverallMeasuring::start();
+                        stage_executed = 0;
+                    }
                 }
 
-                let delta_gas = start_gas_measurement.end();
-                let delta_output_size =
-                    APTOS_PROCESSED_TXNS_OUTPUT_SIZE.get_sample_sum() - start_output_size;
+                if stage_index > 0 && stage_executed > 0 {
+                    info!("Execution finished stage {}", stage_index);
+                    stage_overall_measuring.print_end(
+                        &format!("Staged execution: stage {}: ", stage_index),
+                        stage_executed,
+                    );
+                }
 
-                let elapsed = start_time.elapsed().as_secs_f64();
-                info!(
-                    "Overall execution TPS: {} txn/s (over {} txns, in {} s)",
-                    executed as f64 / elapsed,
-                    executed,
-                    elapsed
-                );
-                info!(
-                    "Overall execution GPS: {} gas/s (over {} txns)",
-                    delta_gas.gas / elapsed,
-                    executed
-                );
-                info!(
-                    "Overall execution effectiveGPS: {} gas/s (over {} txns)",
-                    delta_gas.effective_block_gas / elapsed,
-                    executed
-                );
-                info!(
-                    "Overall execution ioGPS: {} gas/s (over {} txns)",
-                    delta_gas.io_gas / elapsed,
-                    executed
-                );
-                info!(
-                    "Overall execution executionGPS: {} gas/s (over {} txns)",
-                    delta_gas.execution_gas / elapsed,
-                    executed
-                );
-                info!(
-                    "Overall execution GPT: {} gas/txn (over {} txns)",
-                    delta_gas.gas / (delta_gas.gas_count as f64).max(1.0),
-                    executed
-                );
-                info!(
-                    "Overall execution approx_output: {} bytes/s",
-                    delta_gas.approx_block_output / elapsed
-                );
-                info!(
-                    "Overall execution output: {} bytes/s",
-                    delta_output_size / elapsed
-                );
-
+                overall_measuring.print_end("Overall execution", executed);
                 start_commit_tx.map(|tx| tx.send(()));
             })
             .expect("Failed to spawn transaction executor thread.");

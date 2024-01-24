@@ -217,6 +217,7 @@ impl MoveVmExt {
                 sequence_number: _,
                 script_hash,
             } => script_hash,
+            SessionId::ValidatorTxn { script_hash } => script_hash,
             _ => vec![],
         };
 
