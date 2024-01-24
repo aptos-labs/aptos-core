@@ -346,7 +346,7 @@ impl RemoveRedundantJump {
             && self.pred_map.get(&to).map_or(0, |preds| preds.len()) == 1
     }
 
-    /// If possible, append `to` to `from` and remove `to` block
+    /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
     fn remove_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
         debug_assert!(self.cfg.successors(from).contains(&to));
         debug_assert!(!self.is_trivial_block(from));
