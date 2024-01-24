@@ -1,10 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::{
-    account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
-};
-use std::mem::size_of_val;
+use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
 
 /// Trait that provides an abstract view into a Move type.
 ///
@@ -21,105 +18,6 @@ pub trait TypeView {
 /// usually in a lazily evaluated fashion.
 pub trait ValueView {
     fn visit(&self, visitor: &mut impl ValueVisitor);
-
-    /// Returns the abstract memory size of the value.
-    ///
-    /// The concept of abstract memory size is not well-defined and is only kept for backward compatibility.
-    /// New applications should avoid using this.
-    ///
-    /// TODO(Gas): Encourage clients to replicate this in their own repo and get this removed once
-    ///            they are done.
-    fn legacy_abstract_memory_size(&self) -> AbstractMemorySize {
-        use crate::values::{LEGACY_CONST_SIZE, LEGACY_REFERENCE_SIZE, LEGACY_STRUCT_SIZE};
-
-        struct Acc(AbstractMemorySize);
-
-        impl ValueVisitor for Acc {
-            fn visit_u8(&mut self, _depth: usize, _val: u8) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_u16(&mut self, _depth: usize, _val: u16) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_u32(&mut self, _depth: usize, _val: u32) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_u64(&mut self, _depth: usize, _val: u64) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_u128(&mut self, _depth: usize, _val: u128) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_u256(&mut self, _depth: usize, _val: move_core_types::u256::U256) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_bool(&mut self, _depth: usize, _val: bool) {
-                self.0 += LEGACY_CONST_SIZE;
-            }
-
-            fn visit_address(&mut self, _depth: usize, _val: AccountAddress) {
-                self.0 += AbstractMemorySize::new(AccountAddress::LENGTH as u64);
-            }
-
-            fn visit_struct(&mut self, _depth: usize, _len: usize) -> bool {
-                self.0 += LEGACY_STRUCT_SIZE;
-                true
-            }
-
-            fn visit_vec(&mut self, _depth: usize, _len: usize) -> bool {
-                self.0 += LEGACY_STRUCT_SIZE;
-                true
-            }
-
-            fn visit_vec_u8(&mut self, _depth: usize, vals: &[u8]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_u16(&mut self, _depth: usize, vals: &[u16]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_u32(&mut self, _depth: usize, vals: &[u32]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_u64(&mut self, _depth: usize, vals: &[u64]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_u128(&mut self, _depth: usize, vals: &[u128]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_u256(&mut self, _depth: usize, vals: &[move_core_types::u256::U256]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_bool(&mut self, _depth: usize, vals: &[bool]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_vec_address(&mut self, _depth: usize, vals: &[AccountAddress]) {
-                self.0 += (size_of_val(vals) as u64).into();
-            }
-
-            fn visit_ref(&mut self, _depth: usize, _is_global: bool) -> bool {
-                self.0 += LEGACY_REFERENCE_SIZE;
-                false
-            }
-        }
-
-        let mut acc = Acc(0.into());
-        self.visit(&mut acc);
-
-        acc.0
-    }
 }
 
 /// Trait that defines a visitor that could be used to traverse a value recursively.
@@ -199,10 +97,6 @@ impl<T> ValueView for &T
 where
     T: ValueView,
 {
-    fn legacy_abstract_memory_size(&self) -> AbstractMemorySize {
-        <T as ValueView>::legacy_abstract_memory_size(*self)
-    }
-
     fn visit(&self, visitor: &mut impl ValueVisitor) {
         <T as ValueView>::visit(*self, visitor)
     }

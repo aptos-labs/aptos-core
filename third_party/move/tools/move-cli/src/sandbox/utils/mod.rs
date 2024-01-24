@@ -40,21 +40,21 @@ pub mod on_disk_state_view;
 pub mod package_context;
 
 use move_bytecode_utils::module_cache::GetModule;
-use move_vm_test_utils::gas_schedule::{CostTable, GasStatus};
+use move_vm_test_utils::gas_schedule::{CostTable, TestGasStatus};
 pub use on_disk_state_view::*;
 pub use package_context::*;
 
-pub fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<GasStatus> {
+pub fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<TestGasStatus> {
     let gas_status = if let Some(gas_budget) = gas_budget {
         // TODO(Gas): This should not be hardcoded.
         let max_gas_budget = u64::MAX.checked_div(1000).unwrap();
         if gas_budget >= max_gas_budget {
             bail!("Gas budget set too high; maximum is {}", max_gas_budget)
         }
-        GasStatus::new(cost_table, Gas::new(gas_budget))
+        TestGasStatus::new(cost_table, Gas::new(gas_budget))
     } else {
         // no budget specified. Disable gas metering
-        GasStatus::new_unmetered()
+        TestGasStatus::new_unmetered()
     };
     Ok(gas_status)
 }

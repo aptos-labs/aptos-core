@@ -15,7 +15,6 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
-    gas_algebra::AbstractMemorySize,
     u256,
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::{sub_status::NFE_VECTOR_ERROR_BASE, StatusCode},
@@ -2263,27 +2262,6 @@ impl Vector {
         }
     }
 }
-
-/***************************************************************************************
- *
- * Abstract Memory Size
- *
- *   TODO(Gas): This is the oldest implementation of abstract memory size.
- *              It is now kept only as a reference impl, which is used to ensure
- *              the new implementation is fully backward compatible.
- *              We should be able to get this removed after we use the new impl
- *              for a while and gain enough confidence in that.
- *
- **************************************************************************************/
-
-/// The size in bytes for a non-string or address constant on the stack
-pub(crate) const LEGACY_CONST_SIZE: AbstractMemorySize = AbstractMemorySize::new(16);
-
-/// The size in bytes for a reference on the stack
-pub(crate) const LEGACY_REFERENCE_SIZE: AbstractMemorySize = AbstractMemorySize::new(8);
-
-/// The size of a struct in bytes
-pub(crate) const LEGACY_STRUCT_SIZE: AbstractMemorySize = AbstractMemorySize::new(2);
 
 /***************************************************************************************
  *

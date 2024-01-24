@@ -5,7 +5,7 @@ use move_binary_format::file_format::{
     Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
 use move_vm_runtime::move_vm::MoveVM;
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_test_utils::{gas_schedule::TestGasStatus, InMemoryStorage};
 
 #[ignore] // TODO: figure whether to reactive this test
 #[test]
@@ -57,7 +57,7 @@ fn leak_with_abort() {
             script_bytes.as_slice(),
             vec![],
             Vec::<Vec<u8>>::new(),
-            &mut GasStatus::new_unmetered(),
+            &mut TestGasStatus::new_unmetered(),
         );
     }
 

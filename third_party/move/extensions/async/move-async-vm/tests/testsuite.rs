@@ -27,7 +27,7 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
-use move_vm_test_utils::gas_schedule::GasStatus;
+use move_vm_test_utils::gas_schedule::TestGasStatus;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -84,7 +84,7 @@ datatest_stable::harness!(test_runner, "tests/sources", r".*\.move");
 
 impl Harness {
     fn run(&self, _module: &str) -> anyhow::Result<()> {
-        let mut gas = GasStatus::new_unmetered();
+        let mut gas = TestGasStatus::new_unmetered();
         let mut tick = 0;
         // Publish modules.
         let mut proxy = HarnessProxy { harness: self };
@@ -146,7 +146,7 @@ impl Harness {
         &self,
         session: &mut AsyncSession,
         id: &IdentStr,
-        gas: &mut GasStatus,
+        gas: &mut TestGasStatus,
         done: &mut BTreeSet<Identifier>,
     ) -> anyhow::Result<()> {
         if done.insert(id.to_owned()) {

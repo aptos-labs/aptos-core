@@ -16,7 +16,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::move_vm::MoveVM;
-use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
+use move_vm_test_utils::{gas_schedule::TestGasStatus, InMemoryStorage};
 
 #[test]
 fn instantiation_err() {
@@ -108,7 +108,7 @@ fn instantiation_err() {
     cm.serialize(&mut mod_bytes).unwrap();
 
     session
-        .publish_module(mod_bytes, addr, &mut GasStatus::new_unmetered())
+        .publish_module(mod_bytes, addr, &mut TestGasStatus::new_unmetered())
         .expect("Module must publish");
 
     let mut ty_arg = TypeTag::U128;
@@ -127,7 +127,7 @@ fn instantiation_err() {
         ident_str!("f"),
         vec![ty_arg],
         Vec::<Vec<u8>>::new(),
-        &mut GasStatus::new_unmetered(),
+        &mut TestGasStatus::new_unmetered(),
     );
     assert!(err.is_err(), "Instantiation must fail at runtime");
     assert_eq!(

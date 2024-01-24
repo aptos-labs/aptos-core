@@ -23,7 +23,7 @@ use move_vm_runtime::{
     native_functions::NativeFunction,
     session::{SerializedReturnValues, Session},
 };
-use move_vm_test_utils::gas_schedule::{Gas, GasStatus};
+use move_vm_test_utils::gas_schedule::{Gas, TestGasStatus};
 use move_vm_types::values::{Reference, Value};
 use std::{
     collections::HashMap,
@@ -169,7 +169,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         mut self,
         module_id: &ModuleId,
         actor_addr: AccountAddress,
-        gas_status: &mut GasStatus,
+        gas_status: &mut TestGasStatus,
     ) -> AsyncResult<'r> {
         let actor = self
             .vm
@@ -255,7 +255,7 @@ impl<'r, 'l> AsyncSession<'r, 'l> {
         actor_addr: AccountAddress,
         message_hash: u64,
         mut args: Vec<Vec<u8>>,
-        gas_status: &mut GasStatus,
+        gas_status: &mut TestGasStatus,
     ) -> AsyncResult<'r> {
         // Resolve actor and function which handles the message.
         let (module_id, handler_id) =

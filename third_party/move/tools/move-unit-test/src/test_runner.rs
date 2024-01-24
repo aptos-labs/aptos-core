@@ -26,7 +26,7 @@ use move_vm_runtime::{
     native_functions::NativeFunctionTable,
 };
 use move_vm_test_utils::{
-    gas_schedule::{zero_cost_schedule, CostTable, Gas, GasCost, GasStatus},
+    gas_schedule::{zero_cost_schedule, CostTable, Gas, GasCost, TestGasStatus},
     InMemoryStorage,
 };
 use rayon::prelude::*;
@@ -263,7 +263,7 @@ impl SharedTestingConfig {
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
-        let mut gas_meter = GasStatus::new(&self.cost_table, Gas::new(self.execution_bound));
+        let mut gas_meter = TestGasStatus::new(&self.cost_table, Gas::new(self.execution_bound));
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
