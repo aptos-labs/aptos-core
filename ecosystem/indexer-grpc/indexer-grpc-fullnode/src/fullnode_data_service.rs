@@ -16,6 +16,7 @@ use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
+    pub enable_expensive_logging: bool,
 }
 
 type FullnodeResponseStream =
@@ -49,6 +50,7 @@ impl FullnodeData for FullnodeDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let enable_expensive_logging = self.enable_expensive_logging;
 
         // Some node metadata
         let context = self.service_context.context.clone();
@@ -91,7 +93,9 @@ impl FullnodeData for FullnodeDataService {
             loop {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
-                let results = coordinator.process_next_batch().await;
+                let results = coordinator
+                    .process_next_batch(enable_expensive_logging)
+                    .await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {
