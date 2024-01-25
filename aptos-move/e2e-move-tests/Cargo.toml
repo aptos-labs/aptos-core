@@ -52,3 +52,6 @@ test-case = { workspace = true }
 
 [lib]
 doctest = false
+
+[features]
+ignore-in-aptos-move-test = []
