@@ -48,3 +48,6 @@ harness = false
 [[bench]]
 name = "lagrange"
 harness = false
+
+[profile.bench]
+debug = true    # for running cargo flamegraph on benchmarks
