@@ -10,7 +10,6 @@ use aptos_types::account_address::AccountAddress;
 
 /// Run with `cargo test test_smart_data_structures_gas -- --nocapture` to see output.
 #[test]
-#[cfg_attr(feature = "ignore-in-aptos-move-test", ignore)]
 fn test_smart_data_structures_gas() {
     let mut h = MoveHarness::new();
     // Load the code
