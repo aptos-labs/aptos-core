@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_language_e2e_tests::{
-    account::AccountData, compile::compile_script, current_function_name, executor::FakeExecutor,
+    account::AccountData, compile::compile_script, current_function_name,
+    data_store::FakeDataStore, executor::FakeExecutor,
 };
 use aptos_types::transaction::{
-    ExecutionStatus, Module, SignedTransaction, Transaction, TransactionStatus,
+    ExecutionStatus, SignedTransaction, Transaction, TransactionStatus,
 };
 use move_binary_format::CompiledModule;
 use move_bytecode_verifier::verify_module;
@@ -20,8 +21,7 @@ fn move_from_across_blocks() {
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
-    let (module, txn) = add_module_txn(&sender, 10);
-    executor.execute_and_apply(txn);
+    let module = add_module(executor.data_store_mut(), &sender);
 
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
@@ -99,8 +99,7 @@ fn borrow_after_move() {
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
-    let (module, txn) = add_module_txn(&sender, 10);
-    executor.execute_and_apply(txn);
+    let module = add_module(executor.data_store_mut(), &sender);
 
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
@@ -150,8 +149,7 @@ fn change_after_move() {
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
-    let (module, txn) = add_module_txn(&sender, 10);
-    executor.execute_and_apply(txn);
+    let module = add_module(executor.data_store_mut(), &sender);
 
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
@@ -203,8 +201,8 @@ fn change_after_move() {
     executor.apply_write_set(output.write_set());
 }
 
-fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, SignedTransaction) {
-    let module_code = format!(
+fn add_module(data_store: &mut FakeDataStore, sender: &AccountData) -> CompiledModule {
+    let code = format!(
         "
         module 0x{}.M {{
             import 0x1.signer;
@@ -247,22 +245,17 @@ fn add_module_txn(sender: &AccountData, seq_num: u64) -> (CompiledModule, Signed
         deps: framework_modules.iter().collect(),
     };
     let module = compiler
-        .into_compiled_module(module_code.as_str())
+        .into_compiled_module(code.as_str())
         .expect("Module compilation failed");
-    let mut module_blob = vec![];
-    module
-        .serialize(&mut module_blob)
-        .expect("Module must serialize");
     verify_module(&module).expect("Module must verify");
-    (
-        module,
-        sender
-            .account()
-            .transaction()
-            .module(Module::new(module_blob))
-            .sequence_number(seq_num)
-            .sign(),
-    )
+
+    let mut module_bytes = vec![];
+    module
+        .serialize(&mut module_bytes)
+        .expect("Module must serialize");
+
+    data_store.add_module(&module.self_id(), module_bytes);
+    module
 }
 
 fn add_resource_txn(
@@ -283,11 +276,11 @@ fn add_resource_txn(
         sender.address().to_hex(),
     );
 
-    let module = compile_script(&program, extra_deps);
+    let script = compile_script(&program, extra_deps);
     sender
         .account()
         .transaction()
-        .script(module)
+        .script(script)
         .sequence_number(seq_num)
         .sign()
 }

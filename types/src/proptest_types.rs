@@ -22,10 +22,10 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
-        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
-        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
-        TransactionToCommit, Version, WriteSetPayload,
+        ChangeSet, ExecutionStatus, Module, RawTransaction, Script, SignatureCheckedTransaction,
+        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
+        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
+        Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -366,15 +366,9 @@ fn new_raw_transaction(
 ) -> RawTransaction {
     let chain_id = ChainId::test();
     match payload {
-        TransactionPayload::ModuleBundle(module) => RawTransaction::new_module_bundle(
-            sender,
-            sequence_number,
-            module,
-            max_gas_amount,
-            gas_unit_price,
-            expiration_time_secs,
-            chain_id,
-        ),
+        TransactionPayload::ModuleBundle(_) => {
+            unreachable!("Module bundle transaction has been deprecated")
+        },
         TransactionPayload::Script(script) => RawTransaction::new_script(
             sender,
             sequence_number,
@@ -421,12 +415,6 @@ impl SignatureCheckedTransaction {
         keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
     ) -> impl Strategy<Value = Self> {
         Self::strategy_impl(keypair_strategy, TransactionPayload::script_strategy())
-    }
-
-    pub fn module_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
-        Self::strategy_impl(keypair_strategy, TransactionPayload::module_strategy())
     }
 
     fn strategy_impl(
@@ -503,11 +491,6 @@ impl TransactionPayload {
     pub fn script_strategy() -> impl Strategy<Value = Self> {
         any::<Script>().prop_map(TransactionPayload::Script)
     }
-
-    pub fn module_strategy() -> impl Strategy<Value = Self> {
-        any::<Module>()
-            .prop_map(|module| TransactionPayload::ModuleBundle(ModuleBundle::from(module)))
-    }
 }
 
 prop_compose! {
@@ -536,12 +519,8 @@ impl Arbitrary for TransactionPayload {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        // Most transactions in practice will be programs, but other parts of the system should
-        // at least not choke on write set strategies so introduce them with decent probability.
-        // The figures below are probability weights.
         prop_oneof![
             4 => Self::script_strategy(),
-            1 => Self::module_strategy(),
         ]
         .boxed()
     }

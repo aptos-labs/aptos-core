@@ -198,50 +198,6 @@ impl RawTransaction {
         }
     }
 
-    /// Create a new `RawTransaction` with a module to publish.
-    pub fn new_module(
-        sender: AccountAddress,
-        sequence_number: u64,
-        module: Module,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::ModuleBundle(ModuleBundle::from(module)),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` with a list of modules to publish.
-    ///
-    /// Multiple modules per transaction can be published.
-    pub fn new_module_bundle(
-        sender: AccountAddress,
-        sequence_number: u64,
-        modules: ModuleBundle,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::ModuleBundle(modules),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
     /// into a `SignatureCheckedTransaction`.
     ///
@@ -487,13 +443,18 @@ impl RawTransactionWithData {
     }
 }
 
+/// Marks payload as deprecated. We need to use it to ensure serialization or
+/// deserialization is not broken.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DeprecatedPayload;
+
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayload {
     /// A transaction that executes code.
     Script(Script),
     /// Deprecated.
-    ModuleBundle(ModuleBundle),
+    ModuleBundle(DeprecatedPayload),
     /// A transaction that executes an existing entry function published on-chain.
     EntryFunction(EntryFunction),
     /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved

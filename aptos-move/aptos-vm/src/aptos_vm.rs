@@ -46,14 +46,9 @@ use aptos_types::{
     },
     state_store::StateView,
     transaction::{
-        authenticator::AnySignature,
-        signature_verified_transaction::SignatureVerifiedTransaction,
+        authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
         MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        Transaction::{
-            BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
-            UserTransaction,
-        },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         WriteSetPayload,
     },
@@ -75,9 +70,9 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
-    CompiledModule, IndexKind,
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -97,10 +92,7 @@ use std::{
     cmp::{max, min},
     collections::{BTreeMap, BTreeSet},
     marker::Sync,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
@@ -120,12 +112,6 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
             .unwrap(),
     )
 });
-
-/// Remove this once the bundle is removed from the code.
-static MODULE_BUNDLE_DISALLOWED: AtomicBool = AtomicBool::new(true);
-pub fn allow_module_bundle_for_test() {
-    MODULE_BUNDLE_DISALLOWED.store(false, Ordering::Relaxed);
-}
 
 macro_rules! unwrap_or_discard {
     ($res:expr) => {
@@ -426,7 +412,7 @@ impl AptosVM {
                 // The transaction should be kept. Run the appropriate post transaction workflows
                 // including epilogue. This runs a new session that ignores any side effects that
                 // might abort the execution (e.g., spending additional funds needed to pay for
-                // gas). Eeven if the previous failure occurred while running the epilogue, it
+                // gas). Even if the previous failure occurred while running the epilogue, it
                 // should not fail now. If it somehow fails here, there is no choice but to
                 // discard the transaction.
                 let txn_output = match self.finish_aborted_transaction(
@@ -1071,32 +1057,6 @@ impl AptosVM {
         Ok(respawned_session)
     }
 
-    fn verify_module_bundle(
-        session: &mut SessionExt,
-        module_bundle: &ModuleBundle,
-    ) -> VMResult<()> {
-        for module_blob in module_bundle.iter() {
-            match CompiledModule::deserialize_with_config(
-                module_blob.code(),
-                &session.get_vm_config().deserializer_config,
-            ) {
-                Ok(module) => {
-                    // verify the module doesn't exist
-                    if session.load_module(&module.self_id()).is_ok() {
-                        return Err(verification_error(
-                            StatusCode::DUPLICATE_MODULE_NAME,
-                            IndexKind::AddressIdentifier,
-                            module.self_handle_idx().0,
-                        )
-                        .finish(Location::Undefined));
-                    }
-                },
-                Err(err) => return Err(err.finish(Location::Undefined)),
-            }
-        }
-        Ok(())
-    }
-
     /// Execute all module initializers.
     fn execute_module_initialization(
         &self,
@@ -1167,73 +1127,6 @@ impl AptosVM {
             }
         }
         Ok(result)
-    }
-
-    /// Execute a module bundle load request.
-    /// TODO: this is going to be deprecated and removed in favor of code publishing via
-    /// NativeCodeContext
-    fn execute_modules(
-        &self,
-        resolver: &impl AptosMoveResolver,
-        mut session: SessionExt,
-        gas_meter: &mut impl AptosGasMeter,
-        txn_data: &TransactionMetadata,
-        modules: &ModuleBundle,
-        log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed) {
-            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-        }
-        fail_point!("move_adapter::execute_module", |_| {
-            Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                None,
-            ))
-        });
-
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-
-        Self::verify_module_bundle(&mut session, modules)?;
-        session.publish_module_bundle_with_compat_config(
-            modules.clone().into_inner(),
-            txn_data.sender(),
-            gas_meter,
-            Compatibility::new(
-                true,
-                true,
-                !self
-                    .features
-                    .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
-            ),
-        )?;
-
-        // call init function of the each module
-        self.execute_module_initialization(
-            &mut session,
-            gas_meter,
-            &self.deserialize_module_bundle(modules)?,
-            BTreeSet::new(),
-            &[txn_data.sender()],
-            new_published_modules_loaded,
-        )?;
-
-        let respawned_session = self.charge_change_set_and_respawn_session(
-            session,
-            resolver,
-            gas_meter,
-            change_set_configs,
-            txn_data,
-        )?;
-
-        self.success_transaction_cleanup(
-            respawned_session,
-            gas_meter,
-            txn_data,
-            log_context,
-            change_set_configs,
-        )
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -1535,17 +1428,10 @@ impl AptosVM {
                 }
             },
 
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundle(m) => self.execute_modules(
-                resolver,
-                session,
-                gas_meter,
-                &txn_data,
-                m,
-                log_context,
-                &mut new_published_modules_loaded,
-                &storage_gas_params.change_set_configs,
-            ),
+            // Deprecated.
+            TransactionPayload::ModuleBundle(_) => {
+                unreachable!("Module bundle has been deprecated")
+            },
         };
 
         let gas_usage = txn_data
@@ -1886,13 +1772,6 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        // Deprecated. Will be removed in the future.
-        if matches!(payload, TransactionPayload::ModuleBundle(_))
-            && MODULE_BUNDLE_DISALLOWED.load(Ordering::Relaxed)
-        {
-            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-        }
-
         check_gas(
             get_or_vm_startup_failure(&self.gas_params, log_context)?,
             self.gas_feature_version,
@@ -1925,9 +1804,10 @@ impl AptosVM {
                     Ok(())
                 }
             },
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundle(_module) => {
-                transaction_validation::run_module_prologue(session, txn_data, log_context)
+
+            // Deprecated.
+            TransactionPayload::ModuleBundle(_) => {
+                unreachable!("Module bundle transaction has been deprecated")
             },
         }
     }
@@ -1959,7 +1839,7 @@ impl AptosVM {
         }
 
         Ok(match txn.expect_valid() {
-            BlockMetadataTransaction(block_metadata) => {
+            Transaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
                 let (vm_status, output) =
                     self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
@@ -1974,7 +1854,7 @@ impl AptosVM {
                 )?;
                 (vm_status, output, Some("block_prologue_ext".to_string()))
             },
-            GenesisTransaction(write_set_payload) => {
+            Transaction::GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
                     resolver,
                     write_set_payload.clone(),
@@ -1982,7 +1862,7 @@ impl AptosVM {
                 )?;
                 (vm_status, output, Some("waypoint_write_set".to_string()))
             },
-            UserTransaction(txn) => {
+            Transaction::UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_hex();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
@@ -2057,7 +1937,7 @@ impl AptosVM {
                 }
                 (vm_status, output, Some(sender))
             },
-            StateCheckpoint(_) => {
+            Transaction::StateCheckpoint(_) => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
