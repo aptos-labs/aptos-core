@@ -9,12 +9,9 @@ pub struct CLIOptions {
     /// The paths to the Move sources.
     #[clap(long, short, value_parser)]
     pub move_sources: Vec<PathBuf>,
-    /// The paths to the Move sources to include.
-    #[clap(long, short, value_parser)]
-    pub include_only_files: Option<Vec<PathBuf>>,
-    /// The paths to the Move sources to exclude.
-    #[clap(long, short, value_parser)]
-    pub exclude_files: Option<Vec<PathBuf>>,
+    /// Work only over specified modules.
+    #[clap(long, short)]
+    pub include_modules: Option<Vec<String>>,
     /// Optional configuration file for mutator tool.
     #[clap(long, value_parser)]
     pub mutator_conf: Option<PathBuf>,
@@ -34,8 +31,7 @@ pub struct CLIOptions {
 pub fn create_mutator_options(options: &CLIOptions) -> move_mutator::cli::CLIOptions {
     move_mutator::cli::CLIOptions {
         move_sources: options.move_sources.clone(),
-        include_only_files: options.include_only_files.clone(),
-        exclude_files: options.exclude_files.clone(),
+        mutate_modules: options.include_modules.clone(),
         configuration_file: options.mutator_conf.clone(),
         ..Default::default()
     }
@@ -82,8 +78,7 @@ mod tests {
     fn cli_options_starts_empty() {
         let options = CLIOptions::default();
         assert!(options.move_sources.is_empty());
-        assert!(options.include_only_files.is_none());
-        assert!(options.exclude_files.is_none());
+        assert!(options.include_modules.is_none());
         assert!(options.mutator_conf.is_none());
         assert!(options.prover_conf.is_none());
         assert!(options.output.is_none());
@@ -94,18 +89,16 @@ mod tests {
     fn create_mutator_options_copies_fields() {
         let mut options = CLIOptions::default();
         options.move_sources.push(PathBuf::from("path/to/file"));
-        options.include_only_files = Some(vec![PathBuf::from("path/to/include")]);
-        options.exclude_files = Some(vec![PathBuf::from("path/to/exclude")]);
+        options.include_modules = Some(vec!["test1".to_string(), "test2".to_string()]);
         options.mutator_conf = Some(PathBuf::from("path/to/mutator/conf"));
 
         let mutator_options = create_mutator_options(&options);
 
         assert_eq!(mutator_options.move_sources, options.move_sources);
         assert_eq!(
-            mutator_options.include_only_files,
-            options.include_only_files
+            mutator_options.mutate_modules,
+            options.include_modules
         );
-        assert_eq!(mutator_options.exclude_files, options.exclude_files);
         assert_eq!(mutator_options.configuration_file, options.mutator_conf);
     }
 
