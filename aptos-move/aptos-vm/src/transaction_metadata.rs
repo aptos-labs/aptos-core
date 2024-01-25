@@ -56,8 +56,10 @@ impl TransactionMetadata {
                 TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::Multisig(_) => vec![],
 
-                // Deprecated. Will be removed in the future.
-                TransactionPayload::ModuleBundle(_) => vec![],
+                // Deprecated.
+                TransactionPayload::ModuleBundle(_) => {
+                    unreachable!("Module bundle payload has been removed")
+                },
             },
             script_size: match txn.payload() {
                 TransactionPayload::Script(s) => (s.code().len() as u64).into(),

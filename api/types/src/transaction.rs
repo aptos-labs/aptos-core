@@ -655,7 +655,8 @@ pub enum TransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
 
-    // Deprecated. Will be removed in the future.
+    // Deprecated. We cannot remove the enum variant because it breaks the
+    // ordering, unfortunately.
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
 
     MultisigPayload(MultisigPayload),

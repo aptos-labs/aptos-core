@@ -693,7 +693,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
 
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
-                unreachable!("Module bundle payload has been deprecated")
+                unreachable!("Module bundle payload has been removed")
             },
         };
         Ok(ret)

@@ -935,8 +935,10 @@ impl TransactionsApi {
                         }
                     },
 
-                    // Deprecated. Will be removed in the future.
-                    TransactionPayload::ModuleBundle(_) => {},
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(_) => {
+                        unreachable!("Module bundle payload has been removed")
+                    },
                 }
                 // TODO: Verify script args?
 

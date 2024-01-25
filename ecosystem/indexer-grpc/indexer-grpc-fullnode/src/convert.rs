@@ -171,9 +171,9 @@ pub fn convert_transaction_payload(
             )),
         },
 
-        // Deprecated. Will be removed in the future.
+        // Deprecated.
         TransactionPayload::ModuleBundlePayload(_) => {
-            unreachable!("Module bundle has been deprecated")
+            unreachable!("Module bundle payload has been removed")
         },
     }
 }
