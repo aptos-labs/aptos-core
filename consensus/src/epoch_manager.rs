@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::IncomingRandGenRequest;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -30,7 +29,8 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingCommitRequest,
-        IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
+        IncomingDAGRequest, IncomingRandGenRequest, IncomingRpcRequest, NetworkReceivers,
+        NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
@@ -48,6 +48,11 @@ use crate::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
         quorum_store_db::QuorumStoreStorage,
+    },
+    rand::rand_gen::{
+        rand_manager::RandManager,
+        storage::db::RandDb,
+        types::{RandConfig, RealAugmentedData, RealShare},
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -69,7 +74,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_dkg::{
-    pvss::Player,
+    pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
@@ -82,12 +87,12 @@ use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
+    dkg::{DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload,
-        OnChainConfigProvider, OnChainConsensusConfig, OnChainExecutionConfig,
-        ProposerElectionType, ValidatorSet,
+        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
@@ -113,11 +118,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_dkg::pvss::traits::Transcript;
-use aptos_types::dkg::{DefaultDKG, DKGState, DKGTrait};
-use crate::rand::rand_gen::rand_manager::RandManager;
-use crate::rand::rand_gen::storage::db::RandDb;
-use crate::rand::rand_gen::types::{RandConfig, RealAugmentedData, RealShare};
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -609,12 +609,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             // channel for sending rand ready blocks to buffer_manager
             let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
-            let (rand_msg_tx, rand_msg_rx) =
-                aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
-                    QueueStyle::FIFO,
-                    100,
-                    None,
-                );
+            let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<
+                AccountAddress,
+                IncomingRandGenRequest,
+            >(QueueStyle::FIFO, 100, None);
 
             self.rand_manager_msg_tx = Some(rand_msg_tx);
             self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
@@ -1067,7 +1065,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
 
         let dkg_state = maybe_dkg_state.map_err(NoRandomnessReason::DKGStateResourceMissing)?;
-        let dkg_session = dkg_state.last_completed.ok_or_else(||NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
+        let dkg_session = dkg_state
+            .last_completed
+            .ok_or_else(|| NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
         if dkg_session.metadata.dealer_epoch + 1 != new_epoch_state.epoch {
             return Err(NoRandomnessReason::CompletedSessionTooOld);
         }
@@ -1077,17 +1077,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .address_to_validator_index()
             .get(&self.author)
             .copied()
-            .ok_or_else(||NoRandomnessReason::NotInValidatorSet)?;
+            .ok_or_else(|| NoRandomnessReason::NotInValidatorSet)?;
 
-        let transcript =
-            bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice()).map_err(NoRandomnessReason::TranscriptDeserializationError)?;
+        let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
+            dkg_session.transcript.as_slice(),
+        )
+        .map_err(NoRandomnessReason::TranscriptDeserializationError)?;
 
         let vuf_pp = WvufPP::from(&dkg_pub_params.pvss_config.pp);
 
         // No need to verify the transcript.
 
         let dealt_pk = transcript.get_dealt_public_key();
-        let mut rng = StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
+        let mut rng =
+            StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
 
         // keys for randomness generation
         let (sk, pk) = DefaultDKG::decrypt_secret_share_from_transcript(
@@ -1095,26 +1098,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &transcript,
             my_index as u64,
             &self.dkg_decrypt_key,
-        ).map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
+        )
+        .map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
 
-        let (ask, apk) = <WVUF as WeightedVUF>::augment_key_pair(
-            &vuf_pp,
-            sk,
-            pk.clone(),
-            &mut rng,
-        );
+        let (ask, apk) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk, pk.clone(), &mut rng);
 
         let pk_shares = (0..new_epoch_state.verifier.len())
             .map(|id| {
-                transcript.get_public_key_share(
-                    &dkg_pub_params.pvss_config.wconfig,
-                    &Player { id },
-                )
+                transcript.get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
             })
             .collect::<Vec<_>>();
 
-        let keys =
-            RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
+        let keys = RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
 
         let rand_config = RandConfig::new(
             self.author,
@@ -1142,8 +1137,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let features = payload.get::<Features>().ok().unwrap_or_default();
         let dkg_state = payload.get::<DKGState>();
-        let rand_config = self.try_get_rand_config_for_new_epoch(&epoch_state, &features, dkg_state);
-        info!("[Randomness] start_new_epoch: epoch={}, rand_config={:?}, ", epoch_state.epoch, rand_config); // The sk inside has `SlientDebug`.
+        let rand_config =
+            self.try_get_rand_config_for_new_epoch(&epoch_state, &features, dkg_state);
+        info!(
+            "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, ",
+            epoch_state.epoch, rand_config
+        ); // The sk inside has `SlientDebug`.
         let rand_config = rand_config.ok();
 
         if let Err(error) = &onchain_consensus_config {
@@ -1175,7 +1174,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
-                rand_config.clone(),
+                rand_config,
             )
             .await
         } else {
