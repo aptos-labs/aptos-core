@@ -1,6 +1,6 @@
 
 Diagnostics:
-warning: Unused parameter 'length'.  Consider removing or prefixing with an underscore: '_length'
+warning: Unused parameter `length`. Consider removing or prefixing with an underscore: `_length`
   ┌─ tests/checking/specs/inline_spec_inference_bitvector.move:3:18
   │
 3 │   public fun new(length: u64) {

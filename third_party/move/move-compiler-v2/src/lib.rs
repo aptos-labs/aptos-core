@@ -5,9 +5,9 @@
 mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
+pub mod flow_insensitive_checkers;
 pub mod function_checker;
 pub mod inliner;
-pub mod insensitive_checker;
 mod options;
 pub mod pipeline;
 
@@ -61,13 +61,16 @@ pub fn run_move_compiler(
     }
 
     // Flow-insensitive checks on AST
-    insensitive_checker::run_unused_vars(&mut env);
+    flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
     function_checker::check_for_function_typed_parameters(&mut env);
     function_checker::check_access_and_use(&mut env);
     check_errors(&env, error_writer, "checking errors")?;
 
     if options.debug {
-        eprintln!("After insensitive checks, GlobalEnv={}", env.dump_env());
+        eprintln!(
+            "After flow-insensitive checks, GlobalEnv={}",
+            env.dump_env()
+        );
     }
 
     // Run inlining.
