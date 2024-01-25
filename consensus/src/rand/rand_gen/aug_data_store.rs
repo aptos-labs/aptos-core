@@ -62,6 +62,12 @@ impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
             );
         }
 
+        for (_, certified_data) in &certified_data {
+            certified_data
+                .data()
+                .augment(&config, certified_data.author());
+        }
+
         Self {
             epoch,
             signer,
