@@ -43,9 +43,9 @@ impl<S: Share> ShareAggregator<S> {
         self,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-        decision_tx: Sender<Randomness>,
+        mut decision_tx: Sender<Randomness>,
     ) -> Either<Self, RandShare<S>> {
-        if self.total_weight < rand_config.threshold_weight() {
+        if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
         let rand_config = rand_config.clone();
@@ -53,7 +53,7 @@ impl<S: Share> ShareAggregator<S> {
             .get_self_share()
             .expect("Aggregated item should have self share");
         tokio::task::spawn_blocking(move || {
-            decision_tx.send(S::aggregate(
+            decision_tx.unbounded_send(S::aggregate(
                 self.shares.values(),
                 &rand_config,
                 rand_metadata,
@@ -285,6 +285,7 @@ mod tests {
     use aptos_consensus_types::common::Author;
     use aptos_types::randomness::RandMetadata;
     use std::{collections::HashMap, str::FromStr};
+    use futures_channel::mpsc::unbounded;
     use tokio::sync::mpsc::unbounded_channel;
 
     #[test]
@@ -316,7 +317,7 @@ mod tests {
     async fn test_rand_item() {
         let weights = HashMap::from([(Author::ONE, 1), (Author::TWO, 2), (Author::ZERO, 3)]);
         let config = RandConfig::new(1, Author::ZERO, weights);
-        let (tx, _rx) = unbounded_channel();
+        let (tx, _rx) = unbounded();
         let shares = vec![
             create_share_for_round(2, Author::ONE),
             create_share_for_round(1, Author::TWO),

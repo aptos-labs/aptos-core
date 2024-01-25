@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::block::Block;
 use aptos_types::randomness::RandMetadata;
+use crate::block::Block;
 
 impl From<&Block> for RandMetadata {
     fn from(block: &Block) -> Self {

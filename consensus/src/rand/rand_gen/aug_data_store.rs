@@ -79,11 +79,11 @@ impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
     }
 
     pub fn get_my_aug_data(&self) -> Option<AugData<D>> {
-        self.data.get(self.config.author()).cloned()
+        self.data.get(&self.config.author()).cloned()
     }
 
     pub fn get_my_certified_aug_data(&self) -> Option<CertifiedAugData<D>> {
-        self.certified_data.get(self.config.author()).cloned()
+        self.certified_data.get(&self.config.author()).cloned()
     }
 
     pub fn add_aug_data(&mut self, data: AugData<D>) -> anyhow::Result<AugDataSignature> {

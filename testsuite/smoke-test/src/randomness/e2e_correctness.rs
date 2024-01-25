@@ -8,6 +8,7 @@ use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
 use aptos_types::dkg::DKGState;
 use std::{sync::Arc, time::Duration};
+use crate::randomness::{get_current_version, verify_randomness};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
 #[tokio::test]
@@ -36,5 +37,31 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    //TODO: verify randomness seed.
+    /// Verify the randomness in 5 versions.
+    for _ in 0..5 {
+        let cur_txn_version = get_current_version(&rest_client).await;
+        info!("Verifying WVUF output for version {}.", cur_txn_version);
+        let wvuf_verify_result =
+            verify_randomness(&decrypt_key_map, &rest_client, cur_txn_version).await;
+        assert!(wvuf_verify_result.is_ok());
+    }
+
+    info!("Wait for epoch 3.");
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))
+        .await
+        .expect("Epoch 2 taking too long to arrive!");
+
+    info!("Verify DKG correctness for epoch 3.");
+    let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
+    assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
+
+    /// Again, verify the randomness in 5 versions.
+    for _ in 0..5 {
+        let cur_txn_version = get_current_version(&rest_client).await;
+        info!("Verifying WVUF output for version {}.", cur_txn_version);
+        let wvuf_verify_result =
+            verify_randomness(&decrypt_key_map, &rest_client, cur_txn_version).await;
+        assert!(wvuf_verify_result.is_ok());
+    }
 }

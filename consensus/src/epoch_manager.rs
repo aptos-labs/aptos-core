@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::IncomingRandGenRequest;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -67,6 +68,10 @@ use aptos_consensus_types::{
     delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
 };
+use aptos_dkg::{
+    pvss::Player,
+    weighted_vuf::traits::WeightedVUF,
+};
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
@@ -80,9 +85,11 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload,
+        OnChainConfigProvider, OnChainConsensusConfig, OnChainExecutionConfig,
+        ProposerElectionType, ValidatorSet,
     },
+    randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -96,14 +103,21 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
+use rand::{rngs::StdRng, thread_rng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
     hash::Hash,
     mem::{discriminant, Discriminant},
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
+use aptos_dkg::pvss::traits::Transcript;
+use aptos_types::dkg::{DefaultDKG, DKGState, DKGTrait};
+use crate::rand::rand_gen::rand_manager::RandManager;
+use crate::rand::rand_gen::storage::db::RandDb;
+use crate::rand::rand_gen::types::{RandConfig, RealAugmentedData, RealShare};
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -136,6 +150,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     safety_rules_manager: SafetyRulesManager,
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
+    // channels to rand manager
+    rand_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>,
+    rand_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
     // channels to buffer manager
     buffer_manager_msg_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
     buffer_manager_reset_tx: Option<UnboundedSender<ResetRequest>>,
@@ -162,6 +179,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
+    storage_path: PathBuf,
+    dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -179,6 +198,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
+        dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -186,6 +206,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
+        let storage_path = node_config.storage.dir();
         Self {
             author,
             config,
@@ -202,6 +223,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             safety_rules_manager,
             vtxn_pool,
             reconfig_events,
+            rand_manager_msg_tx: None,
+            rand_manager_reset_tx: None,
             buffer_manager_msg_tx: None,
             buffer_manager_reset_tx: None,
             round_manager_tx: None,
@@ -220,6 +243,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aptos_time_service,
             dag_config,
             payload_manager: Arc::new(PayloadManager::DirectMempool),
+            storage_path,
+            dkg_decrypt_key,
         }
     }
 
@@ -561,8 +586,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &mut self,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
+        rand_config: Option<RandConfig>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
+        UnboundedSender<ResetRequest>,
         UnboundedSender<ResetRequest>,
     ) {
         let network_sender = NetworkSender::new(
@@ -571,9 +598,51 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
         );
+        // reset channel between epoch_manager and rand_manager
+        let (reset_rand_manager_tx, reset_rand_manager_rx) = unbounded::<ResetRequest>();
+        // reset channel between epoch_manager and buffer_manager
+        let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
-        let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
-        let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
+        let (ordered_block_tx, ordered_block_rx) = if let Some(rand_config) = rand_config {
+            // channel for sending ordered blocks to rand_manager
+            let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+            // channel for sending rand ready blocks to buffer_manager
+            let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+
+            let (rand_msg_tx, rand_msg_rx) =
+                aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
+                    QueueStyle::FIFO,
+                    100,
+                    None,
+                );
+
+            self.rand_manager_msg_tx = Some(rand_msg_tx);
+            self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
+
+            let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
+
+            let db = Arc::new(RandDb::new(&self.storage_path));
+            let rand_manager = RandManager::<RealShare, RealAugmentedData, RandDb>::new(
+                self.author,
+                Arc::new(self.epoch_state().clone()),
+                signer,
+                rand_config,
+                rand_ready_block_tx,
+                Arc::new(network_sender.clone()),
+                db,
+                self.bounded_executor.clone(),
+            );
+            tokio::spawn(rand_manager.start(
+                ordered_block_rx,
+                rand_msg_rx,
+                reset_rand_manager_rx,
+                self.bounded_executor.clone(),
+            ));
+
+            (ordered_block_tx, rand_ready_block_rx)
+        } else {
+            unbounded()
+        };
 
         let (commit_msg_tx, commit_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
@@ -583,7 +652,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
 
         self.buffer_manager_msg_tx = Some(commit_msg_tx);
-        self.buffer_manager_reset_tx = Some(reset_tx.clone());
+        self.buffer_manager_reset_tx = Some(reset_buffer_manager_tx.clone());
 
         let (
             execution_schedule_phase,
@@ -598,8 +667,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             network_sender,
             commit_msg_rx,
             self.commit_state_computer.clone(),
-            block_rx,
-            reset_rx,
+            ordered_block_rx,
+            reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
         );
@@ -610,7 +679,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start());
 
-        (block_tx, reset_tx)
+        (
+            ordered_block_tx,
+            reset_rand_manager_tx,
+            reset_buffer_manager_tx,
+        )
     }
 
     async fn shutdown_current_processor(&mut self) {
@@ -637,6 +710,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .expect("[EpochManager] Fail to drop DAG bootstrapper");
         }
         self.dag_shutdown_tx = None;
+
+        // Shutdown the previous rand manager
+        self.rand_manager_msg_tx = None;
+        if let Some(mut tx) = self.rand_manager_reset_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            tx.send(ResetRequest {
+                tx: ack_tx,
+                signal: ResetSignal::Stop,
+            })
+            .await
+            .expect("[EpochManager] Fail to drop rand manager");
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop rand manager");
+        }
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.buffer_manager_msg_tx = None;
@@ -780,14 +868,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: &OnChainConsensusConfig,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
+        rand_config: Option<RandConfig>,
     ) -> Arc<dyn StateComputer> {
         if onchain_consensus_config.decoupled_execution() {
-            let (block_tx, reset_tx) =
-                self.spawn_decoupled_execution(commit_signer_provider, epoch_state);
+            let (block_tx, reset_rand_manager_tx, reset_buffer_manager_tx) =
+                self.spawn_decoupled_execution(commit_signer_provider, epoch_state, rand_config);
             Arc::new(OrderingStateComputer::new(
                 block_tx,
                 self.commit_state_computer.clone(),
-                reset_tx,
+                reset_rand_manager_tx,
+                reset_buffer_manager_tx,
             ))
         } else {
             self.commit_state_computer.clone()
@@ -823,6 +913,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        rand_config: Option<RandConfig>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -867,6 +958,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch_state.clone(),
             &onchain_consensus_config,
             safety_rules_container.clone(),
+            rand_config,
         );
 
         info!(epoch = epoch, "Create BlockStore");
@@ -964,6 +1056,79 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
     }
 
+    fn try_get_rand_config_for_new_epoch(
+        &self,
+        new_epoch_state: &EpochState,
+        features: &Features,
+        maybe_dkg_state: anyhow::Result<DKGState>,
+    ) -> Result<RandConfig, NoRandomnessReason> {
+        if !features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
+            return Err(NoRandomnessReason::FeatureDisabled);
+        }
+
+        let dkg_state = maybe_dkg_state.map_err(NoRandomnessReason::DKGStateResourceMissing)?;
+        let dkg_session = dkg_state.last_completed.ok_or_else(||NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
+        if dkg_session.metadata.dealer_epoch + 1 != new_epoch_state.epoch {
+            return Err(NoRandomnessReason::CompletedSessionTooOld);
+        }
+        let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+        let my_index = new_epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self.author)
+            .copied()
+            .ok_or_else(||NoRandomnessReason::NotInValidatorSet)?;
+
+        let transcript =
+            bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice()).map_err(NoRandomnessReason::TranscriptDeserializationError)?;
+
+        let vuf_pp = WvufPP::from(&dkg_pub_params.pvss_config.pp);
+
+        // No need to verify the transcript.
+
+        let dealt_pk = transcript.get_dealt_public_key();
+        let mut rng = StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
+
+        // keys for randomness generation
+        let (sk, pk) = DefaultDKG::decrypt_secret_share_from_transcript(
+            &dkg_pub_params,
+            &transcript,
+            my_index as u64,
+            &self.dkg_decrypt_key,
+        ).map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
+
+        let (ask, apk) = <WVUF as WeightedVUF>::augment_key_pair(
+            &vuf_pp,
+            sk,
+            pk.clone(),
+            &mut rng,
+        );
+
+        let pk_shares = (0..new_epoch_state.verifier.len())
+            .map(|id| {
+                transcript.get_public_key_share(
+                    &dkg_pub_params.pvss_config.wconfig,
+                    &Player { id },
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let keys =
+            RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
+
+        let rand_config = RandConfig::new(
+            self.author,
+            self.epoch(),
+            new_epoch_state.verifier.clone(),
+            vuf_pp,
+            dealt_pk,
+            keys,
+            dkg_pub_params.pvss_config.wconfig.clone(),
+        );
+
+        Ok(rand_config)
+    }
+
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload<P>) {
         let validator_set: ValidatorSet = payload
             .get()
@@ -976,6 +1141,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let features = payload.get::<Features>().ok().unwrap_or_default();
+        let dkg_state = payload.get::<DKGState>();
+        let rand_config = self.try_get_rand_config_for_new_epoch(&epoch_state, &features, dkg_state);
+        info!("[Randomness] start_new_epoch: epoch={}, rand_config={:?}, ", epoch_state.epoch, rand_config); // The sk inside has `SlientDebug`.
+        let rand_config = rand_config.ok();
 
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
@@ -1006,6 +1175,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
+                rand_config.clone(),
             )
             .await
         } else {
@@ -1015,6 +1185,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
+                rand_config,
             )
             .await
         }
@@ -1061,6 +1232,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        rand_config: Option<RandConfig>,
     ) {
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1072,6 +1244,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     network_sender,
                     payload_client,
                     payload_manager,
+                    rand_config,
                 )
                 .await
             },
@@ -1095,6 +1268,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        rand_config: Option<RandConfig>,
     ) {
         let epoch = epoch_state.epoch;
 
@@ -1105,11 +1279,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.decoupled_execution(),
             "decoupled execution must be enabled"
         );
-        let (block_tx, reset_tx) =
-            self.spawn_decoupled_execution(commit_signer, epoch_state.clone());
+        let (block_tx, reset_rand_manager_tx, reset_buffer_manager_tx) =
+            self.spawn_decoupled_execution(commit_signer, epoch_state.clone(), rand_config);
         let state_computer = Arc::new(DagStateSyncComputer::new(
             self.commit_state_computer.clone(),
-            reset_tx,
+            reset_rand_manager_tx,
+            reset_buffer_manager_tx,
         ));
 
         let onchain_dag_consensus_config = onchain_consensus_config.unwrap_dag_config_v1();
@@ -1421,7 +1596,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Err(anyhow::anyhow!("Buffer manager not started"))
                 }
             },
-            IncomingRpcRequest::RandGenRequest(_) => Ok(()),
+            IncomingRpcRequest::RandGenRequest(request) => {
+                if let Some(tx) = &self.rand_manager_msg_tx {
+                    tx.push(peer_id, request)
+                } else {
+                    bail!("Rand manager not started");
+                }
+            },
         }
     }
 
@@ -1499,4 +1680,16 @@ fn new_signer_from_storage(author: Author, backend: &SecureBackend) -> Arc<Valid
         .map(|v| v.value)
         .expect("Unable to get private key");
     Arc::new(ValidatorSigner::new(author, private_key))
+}
+
+#[derive(Debug)]
+enum NoRandomnessReason {
+    FeatureDisabled,
+    DKGStateResourceMissing(anyhow::Error),
+    DKGCompletedSessionResourceMissing,
+    CompletedSessionTooOld,
+    NotInValidatorSet,
+    TranscriptDeserializationError(bcs::Error),
+    SecretShareDecryptionFailed(anyhow::Error),
+    RngCreationError(rand::Error),
 }
