@@ -52,7 +52,7 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
 fn get_jwk_for_zk_authenticator(
     jwks: &PatchedJWKs,
     zkid_pub_key: &ZkIdPublicKey,
-    zkid_sig: &ZkIdSignature
+    zkid_sig: &ZkIdSignature,
 ) -> anyhow::Result<JWK, VMStatus> {
     let jwt_header_parsed = zkid_sig.parse_jwt_header().map_err(|_| {
         VMStatus::error(
@@ -120,39 +120,34 @@ pub fn validate_zkid_authenticators(
     let patched_jwks = get_jwks_onchain(resolver)?;
 
     for (zkid_pub_key, zkid_sig) in &zkid_authenticators {
-
         let jwk = get_jwk_for_zk_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
 
         match &zkid_sig.sig {
-            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                match jwk {
-                    JWK::RSA(rsa_jwk) => {
-                        let public_inputs_hash =
-                            get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk).map_err(
-                                |_| {
-                                    VMStatus::error(
-                                        StatusCode::INVALID_SIGNATURE,
-                                        Some("Could not compute public inputs hash".to_owned()),
-                                    )
-                                },
-                            )?;
-                        let chain_id = get_chain_id(resolver)?;
-                        proof
-                            .verify_proof(public_inputs_hash, chain_id)
-                            .map_err(|_| {
-                                VMStatus::error(
-                                    StatusCode::INVALID_SIGNATURE,
-                                    Some("Proof verification failed".to_owned()),
-                                )
+            ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
+                JWK::RSA(rsa_jwk) => {
+                    let public_inputs_hash =
+                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk).map_err(|_| {
+                            VMStatus::error(
+                                StatusCode::INVALID_SIGNATURE,
+                                Some("Could not compute public inputs hash".to_owned()),
+                            )
                         })?;
-                    },
-                    JWK::Unsupported(_) => {
-                        return Err(VMStatus::error(
-                            StatusCode::INVALID_SIGNATURE,
-                            Some("JWK is not supported".to_owned()),
-                        ))
-                    },
-                }
+                    let chain_id = get_chain_id(resolver)?;
+                    proof
+                        .verify_proof(public_inputs_hash, chain_id)
+                        .map_err(|_| {
+                            VMStatus::error(
+                                StatusCode::INVALID_SIGNATURE,
+                                Some("Proof verification failed".to_owned()),
+                            )
+                        })?;
+                },
+                JWK::Unsupported(_) => {
+                    return Err(VMStatus::error(
+                        StatusCode::INVALID_SIGNATURE,
+                        Some("JWK is not supported".to_owned()),
+                    ))
+                },
             },
             ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
                 match jwk {

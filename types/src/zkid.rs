@@ -120,7 +120,6 @@ impl OpenIdSig {
                 &claims.oidc_claims.aud,
                 &self.uid_key,
                 &uid_val
-
             )?
             .eq(&pk.idc),
             "Address IDC verification failed"
