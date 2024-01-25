@@ -72,7 +72,19 @@ pub fn run_move_mutator(
         // This `i` must be here as we must iterate over all mutants for a given file (ext and internal loop).
         let mut i = 0;
         for mutant in mutants.iter().filter(|m| m.get_file_hash() == hash) {
-            let mutated_sources = mutant.apply(&source);
+            let mut mutated_sources = mutant.apply(&source);
+
+            // If the downsample ratio is set, we need to downsample the mutants.
+            if let Some(ratio) = mutator_configuration.project.downsample_ratio {
+                // Delete averagely n-th element in vector
+                mutated_sources = mutated_sources
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(index, _)| index % ratio as usize != 0)
+                    .map(|(_, mutant)| mutant)
+                    .collect();
+            }
+
             for mutated in mutated_sources {
                 if mutator_configuration.project.verify_mutants {
                     let res = verify_mutant(config, &mutated.mutated_source, path);

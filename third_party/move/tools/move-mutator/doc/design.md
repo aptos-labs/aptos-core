@@ -130,7 +130,15 @@ The above means that the operator tool can produce many mutants within one place
 
 Once generated, mutants can be checked to see if they are valid. It's possible to run the Move compiler to check if the mutant is valid, as some of the mutations can create mutants that cannot be compiled properly.
 
-The last module in the main logic layer filters the mutants and reduces the outcome.
+The last module in the main logic layer filters the mutants and reduces the outcome. Filtering is done using `ratio` given in the configuration file or CLI. `ratio` factor works as wollows:
+- if `ratio` is 1, no mutants are returned,
+- if `ratio` is 2, averagely 50% mutants are returned,
+- if `ratio` is 3, averagely 66% mutants are returned,
+- and so on - `ratio` says how often mutant should be removed.
+
+There is additional behaviour:
+- mutator tries to return at least one mutant per file,
+- mutator tries to return at least one mutant per mutation operator.
 
 ### Data layer
 
