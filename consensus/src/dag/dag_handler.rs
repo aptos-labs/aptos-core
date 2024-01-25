@@ -106,57 +106,6 @@ impl NetworkHandler {
             },
         );
 
-        let dag_driver_clone = dag_driver.clone();
-        let node_receiver_clone = node_receiver.clone();
-        let task1 = tokio::spawn(async move {
-            loop {
-                if let Some(new_round) = new_round_event.recv().await {
-                    monitor!("dag_on_new_round_event", {
-                        dag_driver_clone.enter_new_round(new_round).await;
-                        node_receiver_clone.gc();
-                    });
-                }
-            }
-        });
-
-        let node_receiver_clone = node_receiver.clone();
-        let task2 = tokio::spawn(async move {
-            loop {
-                monitor!(
-                    "dag_on_node_fetch",
-                    match node_fetch_waiter.select_next_some().await {
-                        Ok(node) => {
-                            if let Err(e) = node_receiver_clone.process(node).await {
-                                warn!(error = ?e, "error processing node fetch notification");
-                            }
-                        },
-                        Err(e) => {
-                            debug!("sender dropped channel: {}", e);
-                        },
-                    }
-                );
-            }
-        });
-
-        let dag_driver_clone = dag_driver.clone();
-        let task3 = tokio::spawn(async move {
-            loop {
-                monitor!("dag_on_cert_node_fetch", match certified_node_fetch_waiter
-                    .select_next_some()
-                    .await
-                {
-                    Ok(certified_node) => {
-                        if let Err(e) = dag_driver_clone.process(certified_node).await {
-                            warn!(error = ?e, "error processing certified node fetch notification");
-                        }
-                    },
-                    Err(e) => {
-                        debug!("sender dropped channel: {}", e);
-                    },
-                });
-            }
-        });
-
         let mut futures = FuturesUnordered::new();
         // A separate executor to ensure the message verification sender (above) and receiver (below) are
         // not blocking each other.
@@ -187,16 +136,48 @@ impl NetworkHandler {
                 },
                 Some(status) = futures.next() => {
                     if let Some(status) = status.expect("must finish") {
-                        debug!("aborting handler tasks");
-                        task1.abort();
-                        task2.abort();
-                        task3.abort();
-
-                        _ = task1.await;
-                        _ = task2.await;
-                        _ = task3.await;
                         return status;
                     }
+                },
+                Some(new_round) = new_round_event.recv() => {
+                    let dag_driver_clone = dag_driver.clone();
+                    let node_receiver_clone = node_receiver.clone();
+                    executor.spawn(async move {
+                        monitor!("dag_on_new_round_event", {
+                            dag_driver_clone.enter_new_round(new_round).await;
+                            node_receiver_clone.gc();
+                        });
+                    }).await;
+                },
+                Some(result) = certified_node_fetch_waiter.next() => {
+                    let dag_driver_clone = dag_driver.clone();
+                    executor.spawn(async move {
+                        monitor!("dag_on_cert_node_fetch", match result {
+                            Ok(certified_node) => {
+                                if let Err(e) = dag_driver_clone.process(certified_node).await {
+                                    warn!(error = ?e, "error processing certified node fetch notification");
+                                }
+                            },
+                            Err(e) => {
+                                debug!("sender dropped channel: {}", e);
+                            },
+                        });
+                    }).await;
+                },
+                Some(result) = node_fetch_waiter.next() => {
+                    let node_receiver_clone = node_receiver.clone();
+                    executor.spawn(async move {
+                        monitor!("dag_on_node_fetch", match result {
+                            Ok(node) => {
+                                if let Err(e) = node_receiver_clone.process(node).await {
+                                    warn!(error = ?e, "error processing node fetch notification");
+                                }
+                            },
+                            Err(e) => {
+                                debug!("sender dropped channel: {}", e);
+                            },
+                        });
+                    }).await;
                 },
             }
         }
