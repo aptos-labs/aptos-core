@@ -50,7 +50,11 @@ impl IdentityBlob {
     pub fn try_into_dkg_new_validator_decrypt_key(
         self,
     ) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-        self.consensus_private_key
+        self.consensus_private_key.and_then(|key| {
+            let mut bytes = key.to_bytes(); // in big-endian
+            bytes.reverse();
+            <DefaultDKG as DKGTrait>::NewValidatorDecryptKey::try_from(bytes.as_slice()).ok()
+        })
     }
 }
 

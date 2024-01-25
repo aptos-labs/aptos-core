@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 
 use anyhow::{anyhow, ensure, Result};
+use aptos_crypto::Uniform;
 use aptos_forge::LocalSwarm;
 use aptos_logger::info;
 use aptos_rest_client::Client;
@@ -10,6 +11,7 @@ use aptos_types::{
     validator_verifier::ValidatorConsensusInfo,
 };
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
+use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
 
@@ -73,7 +75,7 @@ async fn wait_for_dkg_finish(
                     .map(|session| session.metadata.dealer_epoch + 1)
                     == target_epoch))
     {
-        std::thread::sleep(Duration::from_secs(1));
+        tokio::time::sleep(Duration::from_secs(1)).await;
         dkg_state = get_on_chain_resource::<DKGState>(client).await;
     }
     assert!(timer.elapsed().as_secs() < time_limit_secs);
@@ -111,14 +113,8 @@ fn verify_dkg_transcript(
 
     let dealt_secret_from_inputs = dealt_secret_from_input(
         &transcript,
-        dkg_session
-            .metadata
-            .dealer_validator_set
-            .clone()
-            .into_iter()
-            .map(|obj| obj.try_into().unwrap())
-            .collect(),
-        decrypt_key_map,
+        &pub_params,
+        &pub_params.session_metadata.dealer_consensus_infos_cloned(),
     );
     println!("dealt_secret_from_inputs={:?}", dealt_secret_from_inputs);
 
@@ -140,11 +136,11 @@ fn dealt_secret_from_shares(
         .enumerate()
         .map(|(idx, validator_info)| {
             let dk = decrypt_key_map.get(&validator_info.address).unwrap();
-            let secret_key_share = DefaultDKG::decrypt_secret_share_from_transcript(
+            let (secret_share, _pub_key_share) = DefaultDKG::decrypt_secret_share_from_transcript(
                 pub_params, transcript, idx as u64, dk,
             )
             .unwrap();
-            (idx as u64, secret_key_share)
+            (idx as u64, secret_share)
         })
         .collect();
 
@@ -153,23 +149,23 @@ fn dealt_secret_from_shares(
 
 fn dealt_secret_from_input(
     trx: &<DefaultDKG as DKGTrait>::Transcript,
-    dealer_validator_set: Vec<ValidatorConsensusInfo>,
-    decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::DealerPrivateKey>,
+    pub_params: &<DefaultDKG as DKGTrait>::PublicParams,
+    dealer_validator_infos: &[ValidatorConsensusInfo],
 ) -> <DefaultDKG as DKGTrait>::DealtSecret {
     let dealers = DefaultDKG::get_dealers(trx);
     println!("dealers={:?}", dealers);
     let input_secrets = dealers
         .into_iter()
         .map(|dealer_idx| {
-            let dealer_sk = decrypt_key_map
-                .get(&dealer_validator_set[dealer_idx as usize].address)
-                .unwrap();
-            DefaultDKG::generate_predictable_input_secret_for_testing(dealer_sk)
+            let cur_addr = dealer_validator_infos[dealer_idx as usize].address;
+            // Same seed is used in `DKGManager::setup_deal_broadcast` for smoke tests.
+            let mut rng = StdRng::from_seed(cur_addr.into_bytes());
+            <DefaultDKG as DKGTrait>::InputSecret::generate(&mut rng)
         })
         .collect();
 
     let aggregated_input_secret = DefaultDKG::aggregate_input_secret(input_secrets);
-    DefaultDKG::dealt_secret_from_input(&aggregated_input_secret)
+    DefaultDKG::dealt_secret_from_input(pub_params, &aggregated_input_secret)
 }
 
 fn num_validators(dkg_state: &DKGSessionState) -> usize {

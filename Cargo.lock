@@ -4127,6 +4127,7 @@ dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-dkg",
  "aptos-experimental-runtimes",
  "ark-bn254",
  "ark-ff",
