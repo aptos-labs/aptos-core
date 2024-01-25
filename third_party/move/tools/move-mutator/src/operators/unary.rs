@@ -1,21 +1,21 @@
-use crate::operator::{MutantInfo, MutationOperatorTrait};
+use crate::operator::{MutantInfo, MutationOperator};
 use crate::report::{Mutation, Range};
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::ast::UnaryOp;
 use std::fmt;
 
 #[derive(Debug, Copy, Clone)]
-pub struct UnaryOperator {
+pub struct Unary {
     op: UnaryOp,
 }
 
-impl UnaryOperator {
+impl Unary {
     pub fn new(op: UnaryOp) -> Self {
         Self { op }
     }
 }
 
-impl MutationOperatorTrait for UnaryOperator {
+impl MutationOperator for Unary {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
         let start = self.op.loc.start() as usize;
         let end = self.op.loc.end() as usize;
@@ -45,7 +45,7 @@ impl MutationOperatorTrait for UnaryOperator {
     }
 }
 
-impl fmt::Display for UnaryOperator {
+impl fmt::Display for Unary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -72,7 +72,7 @@ mod tests {
             value: UnaryOp_::Not,
             loc,
         };
-        let operator = UnaryOperator::new(unary_op);
+        let operator = Unary::new(unary_op);
         let source = "!";
         let expected = vec![" "];
         let result = operator.apply(source);
@@ -89,7 +89,7 @@ mod tests {
             value: UnaryOp_::Not,
             loc,
         };
-        let operator = UnaryOperator::new(unary_op);
+        let operator = Unary::new(unary_op);
         assert_eq!(operator.get_file_hash(), FileHash::new(""));
     }
 }
