@@ -17,6 +17,55 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 }
 
 #[proc_macro_derive(AbstractDomain, attributes(join))]
+/// Derives `AbstractDomain` for structs. The derived `join` method joins selected fields of a struct, or all fields for structs with anonymous fields, and returns the combined join results.
+/// The joined fields must implement `AbstractDomain`.
+/// # Usage
+///
+/// Add `#[derive(AbstractDomain)]` attribute on the struct definition, and `#[join]` on the fields to be.
+/// For example,
+/// ```
+/// pub struct BorrowInfo {
+///     live_nodes: SetDomain<BorrowNode>,
+
+///     borrowed_by: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
+///     /// Backward borrow information. This field is not used during analysis, but computed once
+///     /// analysis is done.
+///     borrows_from: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
+/// }
+///
+/// impl AbstractDomain for BorrowInfo {
+///     fn join(&mut self, other: &Self) -> JoinResult {
+///         let live_changed = self.live_nodes.join(&other.live_nodes);
+///         let borrowed_changed = self.borrowed_by.join(&other.borrowed_by);
+///         borrowed_changed.combine(live_changed)
+///     }
+/// }
+/// ```
+/// Can be derived with
+/// ```
+/// #[derive(AbstractDomain)]
+/// pub struct BorrowInfo {
+///     #[join]
+///     live_nodes: SetDomain<BorrowNode>,
+///     #[join]
+///     borrowed_by: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
+///     // this field is not joined
+///     borrows_from: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
+/// }
+/// ```
+/// For structs with unnamed fields, the derived `join` method joins *every* field, and no need to write `#[join]`. For example,
+/// ```
+/// #[derive(AbstractDomain)]
+/// struct LiveVars(SetDomain);
+/// ```
+/// derives a `join` that joins the wrapped field.
+///
+/// This also works for unit structs. For example,
+/// ```
+/// #[derive(AbstractDomain)]
+/// struct Unit;
+/// ```
+/// derives a `join` that does nothing and always returns `Unchanged` since `Unit` has no fields.
 pub fn abstract_domain_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
