@@ -1,6 +1,7 @@
 [package]
 name = "lottery"
 version = "0.0.1"
+upgrade_policy = "immutable"
 
 [dependencies]
 AptosFramework = { local = "../../framework/aptos-framework" }
