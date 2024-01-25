@@ -11,6 +11,7 @@ module aptos_framework::code {
     use aptos_std::copyable_any::Any;
     use std::option::Option;
     use std::string;
+    use aptos_framework::event;
     use aptos_framework::object::{Self, Object};
 
     // ----------------------------------------------------------------------
@@ -67,6 +68,12 @@ module aptos_framework::code {
         policy: u8
     }
 
+    #[event]
+    /// Event emitted when code is published to an address.
+    struct PublishPackage has drop, store {
+        code_address: address,
+    }
+
     /// Package contains duplicate module names with existing modules publised in other packages on this address
     const EMODULE_NAME_CLASH: u64 = 0x1;
 
@@ -91,8 +98,8 @@ module aptos_framework::code {
     /// Creating a package with incompatible upgrade policy is disabled.
     const EINCOMPATIBLE_POLICY_DISABLED: u64 = 0x8;
 
-    /// Not the owner of the package.
-    const ENOT_OWNER: u64 = 0x9;
+    /// Not the owner of the package registry.
+    const ENOT_PACKAGE_OWNER: u64 = 0x9;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
@@ -180,6 +187,8 @@ module aptos_framework::code {
             vector::push_back(packages, pack)
         };
 
+        event::emit(PublishPackage { code_address: addr });
+
         // Request publish
         if (features::code_dependency_check_enabled())
             request_publish_with_allowed_deps(addr, module_names, allowed_deps, code, policy.policy)
@@ -189,15 +198,13 @@ module aptos_framework::code {
             request_publish(addr, module_names, code, policy.policy)
     }
 
-    public fun is_package_upgradeable(metadata_serialized: vector<u8>): bool {
-        let metadata = util::from_bytes<PackageMetadata>(metadata_serialized);
-        metadata.upgrade_policy.policy < upgrade_policy_immutable().policy
-    }
-
     public fun freeze_package_registry(publisher: &signer, registry: Object<PackageRegistry>) acquires PackageRegistry {
         let registry_addr = object::object_address(&registry);
         assert!(exists<PackageRegistry>(registry_addr), error::not_found(EPACKAGE_DEP_MISSING));
-        assert!(object::is_owner(registry, signer::address_of(publisher)), ENOT_OWNER);
+        assert!(
+            object::is_owner(registry, signer::address_of(publisher)),
+            error::permission_denied(ENOT_PACKAGE_OWNER)
+        );
 
         let registry = borrow_global_mut<PackageRegistry>(registry_addr);
         vector::for_each_mut<PackageMetadata>(&mut registry.packages, |pack| {

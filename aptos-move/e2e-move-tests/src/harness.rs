@@ -464,17 +464,6 @@ impl MoveHarness {
         )
     }
 
-    pub fn create_object_code_freeze_package_registry(
-        &mut self,
-        account: &Account,
-        package_registry: AccountAddress,
-    ) -> SignedTransaction {
-        self.create_transaction_payload(
-            account,
-            aptos_stdlib::object_code_deployment_freeze_package_registry(package_registry),
-        )
-    }
-
     pub fn create_object_code_deployment_package(
         &mut self,
         account: &Account,
@@ -556,7 +545,10 @@ impl MoveHarness {
         account: &Account,
         package_registry: AccountAddress,
     ) -> TransactionStatus {
-        let txn = self.create_object_code_freeze_package_registry(account, package_registry);
+        let txn = self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_freeze_package_registry(package_registry),
+        );
         self.run(txn)
     }
 

@@ -1229,6 +1229,9 @@ where
             num_txns,
         );
 
+        let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
+            TxnLastInputOutput::new(num_txns as TxnIndex);
+
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
@@ -1241,7 +1244,6 @@ where
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
-
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -1267,6 +1269,7 @@ where
                                 } as u64
                         });
 
+                    let sequential_reads = latest_view.take_sequential_reads();
                     let read_write_summary = self
                         .config
                         .onchain
@@ -1274,10 +1277,18 @@ where
                         .conflict_penalty_window()
                         .map(|_| {
                             ReadWriteSummary::new(
-                                latest_view.take_sequential_reads().get_read_summary(),
+                                sequential_reads.get_read_summary(),
                                 output.get_write_summary(),
                             )
                         });
+
+                    if last_input_output.check_and_append_module_rw_conflict(
+                        sequential_reads.module_reads.iter(),
+                        output.module_write_set().keys(),
+                    ) {
+                        block_limit_processor.process_module_rw_conflict();
+                    }
+
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,
                         read_write_summary,
@@ -1417,7 +1428,7 @@ where
                         msg,
                     )));
                 },
-            }
+            };
             // When the txn is a SkipRest txn, halt sequential execution.
             if must_skip {
                 break;

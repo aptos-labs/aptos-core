@@ -20,6 +20,9 @@ use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
 use rstest::rstest;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+/// This tests the `object_code_deployment.move` module under the `aptos-framework` package.
+/// The feature `OBJECT_CODE_DEPLOYMENT` is on by default for tests.
+
 /// Mimics `object::test::State`
 #[derive(Serialize, Deserialize)]
 struct State {
@@ -40,10 +43,15 @@ enum ObjectCodeAction {
 
 impl TestContext {
     fn new(enabled: Option<Vec<FeatureFlag>>, disabled: Option<Vec<FeatureFlag>>) -> Self {
-        let mut harness = MoveHarness::new_with_features(
-            enabled.unwrap_or_default(),
-            disabled.unwrap_or_default(),
-        );
+        let mut harness = if enabled.is_some() || disabled.is_some() {
+            MoveHarness::new_with_features(
+                enabled.unwrap_or_default(),
+                disabled.unwrap_or_default(),
+            )
+        } else {
+            MoveHarness::new()
+        };
+
         let account = harness.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
         let sequence_number = harness.sequence_number(account.address());
         let object_address =
@@ -112,13 +120,14 @@ impl TestContext {
 const MODULE_ADDRESS_NAME: &str = "object";
 const PACKAGE_REGISTRY_ACCESS_PATH: &str = "0x1::code::PackageRegistry";
 const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: &str = "EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED";
-const ENOT_OWNER: &str = "ENOT_OWNER";
+const ENOT_PUBLISHER_REF_OWNER: &str = "ENOT_PUBLISHER_REF_OWNER";
+const ENOT_PACKAGE_OWNER: &str = "ENOT_PACKAGE_OWNER";
 
 /// Tests the `publish` object code deployment function with feature flags enabled/disabled.
 /// Deployment should only happen when feature is enabled.
 #[rstest(enabled, disabled,
-case(vec ! [], vec ! [FeatureFlag::OBJECT_CODE_DEPLOYMENT]),
-case(vec ! [FeatureFlag::OBJECT_CODE_DEPLOYMENT], vec ! []),
+    case(vec![], vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]),
+    case(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT], vec![]),
 )]
 fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
     let mut context = TestContext::new(Some(enabled.clone()), Some(disabled));
@@ -172,75 +181,43 @@ fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: V
     }
 }
 
+/// Tests the `upgrade` object code deployment function after `publish`ing a package prior calling.
 #[test]
-fn publisher_ref_not_created_when_deploying_immutable_package() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+fn object_code_deployment_upgrade_success_compat() {
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
+    // Install the initial version with compat requirements
     assert_success!(context.execute_object_code_action(
-        &acc,
-        "object_code_deployment.data/pack_initial_immutable",
-        ObjectCodeAction::Deploy,
-    ));
-
-    let publisher_ref: Option<PublisherRef> = context.harness.read_resource_from_resource_group(
-        &context.object_address,
-        parse_struct_tag("0x1::object::ObjectGroup").unwrap(),
-        parse_struct_tag("0x1::object_code_deployment::PublisherRef").unwrap(),
-    );
-    // Verify `PublisherRef` not created.
-    assert_eq!(publisher_ref, None);
-}
-
-/// Tests the `upgrade` object code deployment function with feature flags enabled/disabled.
-/// Upgrading should only happen when feature is enabled.
-#[rstest(enabled, disabled,
-case(vec ! [], vec ! [FeatureFlag::OBJECT_CODE_DEPLOYMENT]),
-case(vec ! [FeatureFlag::OBJECT_CODE_DEPLOYMENT], vec ! []),
-)]
-fn object_code_deployment_upgrade_success_compat(
-    enabled: Vec<FeatureFlag>,
-    disabled: Vec<FeatureFlag>,
-) {
-    let mut context = TestContext::new(Some(enabled.clone()), Some(disabled));
-    let acc = context.account.clone();
-
-    let status = context.execute_object_code_action(
         &acc,
         "object_code_deployment.data/pack_initial",
         ObjectCodeAction::Deploy,
-    );
+    ));
 
-    if enabled.contains(&FeatureFlag::OBJECT_CODE_DEPLOYMENT) {
-        assert_success!(status);
+    // We should be able to upgrade it with the compatible version
+    assert_success!(context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_upgrade_compat",
+        ObjectCodeAction::Upgrade,
+    ));
 
-        // We should be able to upgrade it with the compatible version
-        assert_success!(context.execute_object_code_action(
-            &acc,
-            "object_code_deployment.data/pack_upgrade_compat",
-            ObjectCodeAction::Upgrade,
-        ));
-
-        let module_address = context.object_address.to_string();
-        // Call the new function added to the module
-        assert_success!(context.harness.run_entry_function(
-            &acc,
-            str::parse(&format!("{}::test::hello2", module_address)).unwrap(),
-            vec![],
-            vec![bcs::to_bytes::<u64>(&42).unwrap()]
-        ));
-        let state = context
-            .read_resource::<State>(acc.address(), &format!("{}::test::State", module_address))
-            .unwrap();
-        assert_eq!(state.value, 42);
-    } else {
-        context.assert_feature_flag_error(status, EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED);
-    }
+    let module_address = context.object_address.to_string();
+    // Call the new function added to the module
+    assert_success!(context.harness.run_entry_function(
+        &acc,
+        str::parse(&format!("{}::test::hello2", module_address)).unwrap(),
+        vec![],
+        vec![bcs::to_bytes::<u64>(&42).unwrap()]
+    ));
+    let state = context
+        .read_resource::<State>(acc.address(), &format!("{}::test::State", module_address))
+        .unwrap();
+    assert_eq!(state.value, 42);
 }
 
 #[test]
 fn object_code_deployment_upgrade_fail_when_not_owner() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     // Install the initial version with compat requirements
@@ -256,15 +233,30 @@ fn object_code_deployment_upgrade_fail_when_not_owner() {
         .new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
     let status = context.execute_object_code_action(
         &different_account,
-        "object_code_deployment.data/pack_upgrade_incompat",
+        "object_code_deployment.data/pack_upgrade_compat",
         ObjectCodeAction::Upgrade,
     );
-    context.assert_feature_flag_error(status, ENOT_OWNER);
+    context.assert_feature_flag_error(status, ENOT_PUBLISHER_REF_OWNER);
+}
+
+#[test]
+fn object_code_deployment_upgrade_fail_when_publisher_ref_does_not_exist() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    // We should not be able to `upgrade` as `PublisherRef` does not exist.
+    // `PublisherRef` is only created when calling `publish` first, i.e. deploying a package.
+    let status = context.execute_object_code_action(
+        &acc,
+        "object_code_deployment.data/pack_initial",
+        ObjectCodeAction::Upgrade,
+    );
+    assert_abort!(status, _);
 }
 
 #[test]
 fn object_code_deployment_upgrade_fail_compat() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     // Install the initial version with compat requirements
@@ -285,7 +277,7 @@ fn object_code_deployment_upgrade_fail_compat() {
 
 #[test]
 fn object_code_deployment_upgrade_fail_immutable() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     // Install the initial version with immutable requirements
@@ -306,7 +298,7 @@ fn object_code_deployment_upgrade_fail_immutable() {
 
 #[test]
 fn object_code_deployment_upgrade_fail_overlapping_module() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     // Install the initial version
@@ -328,7 +320,7 @@ fn object_code_deployment_upgrade_fail_overlapping_module() {
 /// Tests the `freeze_package_registry` object code deployment function.
 #[test]
 fn object_code_deployment_freeze_package_registry() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     // First deploy the package to an object.
@@ -352,7 +344,7 @@ fn object_code_deployment_freeze_package_registry() {
 
 #[test]
 fn freeze_package_registry_fail_when_not_owner() {
-    let mut context = TestContext::new(Some(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]), None);
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     assert_success!(context.execute_object_code_action(
@@ -367,5 +359,17 @@ fn freeze_package_registry_fail_when_not_owner() {
     let status =
         context.execute_object_code_action(&different_account, "", ObjectCodeAction::Freeze);
 
-    context.assert_feature_flag_error(status, ENOT_OWNER);
+    context.assert_feature_flag_error(status, ENOT_PACKAGE_OWNER);
+}
+
+#[test]
+fn freeze_package_registry_fail_when_package_registry_does_not_exist() {
+    let mut context = TestContext::new(None, None);
+    let acc = context.account.clone();
+
+    // We should not be able to `freeze_package_registry` as `PackageRegistry` does not exist.
+    // `PackageRegistry` is only created when calling `publish` first, i.e. deploying a package.
+    let status =
+        context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    assert_abort!(status, _);
 }

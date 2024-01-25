@@ -1,53 +1,119 @@
+/// This module allows users to deploy, upgrade and freeze modules deployed to objects on-chain.
+/// This enables users to deploy modules to an object with a unique address each time they are published.
+/// This modules provides an alternative method to publish code on-chain, where code is deployed to objects rather than accounts.
+/// This is encouraged as it abstracts the necessary resources needed for deploying modules,
+/// along with the required authorization to upgrade and freeze modules.
+///
+/// The functionalities of this module are as follows.
+///
+/// Publishing modules flow:
+/// 1. Create a new object with the address derived from the publisher address and the object seed.
+/// 2. Publish the module passed in the function via `metadata_serialized` and `code` to the newly created object.
+/// 3. Emits 'PublishObjectCode' event with the address of the newly created object.
+/// 4. Create a `PublisherRef` which stores the extend ref of the newly created object.
+/// Note: This is needed to upgrade the code as the signer must be generated to upgrade the existing code in an object.
+///
+/// Upgrading modules flow:
+/// 1. Assert the `publisher_ref` passed in the function is owned by the `publisher`.
+/// 2. Assert the `publisher_ref` passed in the function exists in global storage.
+/// 2. Retrieve the `ExtendRef` from the `publisher_ref` and generate the signer from this.
+/// 3. Upgrade the module with the `metadata_serialized` and `code` passed in the function.
+/// 4. Emits 'UpgradeObjectCode' event with the address of the object with the upgraded code.
+/// Note: If the modules were deployed as immutable when calling `publish`, the upgrade will fail.
+///
+/// Freezing modules flow:
+/// 1. Assert the `package_registry` passed in the function exists in global storage.
+/// 2. Assert the `package_registry` passed in the function is owned by the `publisher`.
+/// 3. Mark all the modules in the `package_registry` as immutable.
+/// 4. Emits 'FreezeObjectCode' event with the address of the object with the frozen code.
+/// Note: There is no unfreeze function as this gives no benefit if the user can freeze/unfreeze modules at will.
+///       Once modules are marked as immutable, they cannot be made mutable again.
 module aptos_framework::object_code_deployment {
     use std::bcs;
+    use std::error;
     use std::features;
     use std::signer;
-    use std::string;
+    use std::vector;
     use aptos_framework::account;
     use aptos_framework::code;
     use aptos_framework::code::PackageRegistry;
+    use aptos_framework::event;
     use aptos_framework::object;
     use aptos_framework::object::{ExtendRef, Object};
 
-    /// Object code deployment not supported.
-    const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: u64 = 0x1;
+    /// Object code deployment feature not supported.
+    const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: u64 = 1;
     /// Not the owner of the `PublisherRef`
-    const ENOT_OWNER: u64 = 0x2;
+    const ENOT_PUBLISHER_REF_OWNER: u64 = 2;
+    /// `PublisherRef` does not exist.
+    const EPUBLISHER_REF_DOES_NOT_EXIST: u64 = 3;
+
+    const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: vector<u8> = b"aptos_framework::object_code_deployment";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct PublisherRef has key {
+        /// We need to keep the extend ref to be able to generate the signer to upgrade existing code.
         extend_ref: ExtendRef,
     }
 
-    /// Create a new object to host the code, and `PublisherRef` if the code is upgradeable,
-    /// Send `PublisherRef` to object signer.
+    #[event]
+    /// Event emitted when code is published to an object.
+    struct PublishObjectCode has drop, store {
+        object_address: address,
+    }
+
+    #[event]
+    /// Event emitted when code in an existing object is upgraded.
+    struct UpgradeObjectCode has drop, store {
+        object_address: address,
+    }
+
+    #[event]
+    /// Event emitted when code in an existing object is made immutable.
+    struct FreezeObjectCode has drop, store {
+        object_address: address,
+    }
+
+    /// Creates a new object with a unique address derived from the publisher address and the object seed.
+    /// Publishes the code passed in the function to the newly created object.
+    /// The caller must provide package metadata describing the package via `metadata_serialized` and
+    /// the code to be published via `code`. This contains a vector of modules to be deployed on-chain.
     public entry fun publish(
         publisher: &signer,
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
     ) {
-        assert!(features::is_object_code_deployment_enabled(), EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED);
+        assert!(
+            features::is_object_code_deployment_enabled(),
+            error::unavailable(EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED),
+        );
 
-        let object_seed = object_seed(signer::address_of(publisher));
+        let publisher_address = signer::address_of(publisher);
+        let object_seed = object_seed(publisher_address);
         let constructor_ref = &object::create_named_object(publisher, object_seed);
-        let module_signer = &object::generate_signer(constructor_ref);
-        code::publish_package_txn(module_signer, metadata_serialized, code);
+        let code_signer = &object::generate_signer(constructor_ref);
+        code::publish_package_txn(code_signer, metadata_serialized, code);
 
-        if (code::is_package_upgradeable(metadata_serialized)) {
-            move_to(module_signer, PublisherRef {
-                extend_ref: object::generate_extend_ref(constructor_ref)
-            });
-        };
+        event::emit(PublishObjectCode {
+            object_address: signer::address_of(code_signer),
+        });
+
+        move_to(code_signer, PublisherRef {
+            extend_ref: object::generate_extend_ref(constructor_ref),
+        });
     }
 
     inline fun object_seed(publisher: address): vector<u8> {
-        let object_seed = &mut string::utf8(b"aptos_framework::object_code_deployment");
         let sequence_number = account::get_sequence_number(publisher) + 1;
-        string::append(object_seed, string::utf8(bcs::to_bytes(&sequence_number)));
-        *string::bytes(object_seed)
+        let seeds = vector[];
+        vector::append(&mut seeds, bcs::to_bytes(&OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR));
+        vector::append(&mut seeds, bcs::to_bytes(&sequence_number));
+        seeds
     }
 
-    /// Upgrade the code in an existing code object.
+    /// Upgrades the existing modules at the `publisher_ref` address with the new modules passed in `code`,
+    /// along with the metadata `metadata_serialized`.
+    /// Note: If the modules were deployed as immutable when calling `publish`, the upgrade will fail.
     /// Requires the publisher to be the owner of the `PublisherRef` object.
     public entry fun upgrade(
         publisher: &signer,
@@ -55,17 +121,31 @@ module aptos_framework::object_code_deployment {
         code: vector<vector<u8>>,
         publisher_ref: Object<PublisherRef>,
     ) acquires PublisherRef {
-        assert!(features::is_object_code_deployment_enabled(), EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED);
-        assert!(object::is_owner(publisher_ref, signer::address_of(publisher)), ENOT_OWNER);
+        let publisher_address = signer::address_of(publisher);
+        assert!(
+            object::is_owner(publisher_ref, publisher_address),
+            error::permission_denied(ENOT_PUBLISHER_REF_OWNER),
+        );
 
-        let extend_ref = &borrow_global<PublisherRef>(object::object_address(&publisher_ref)).extend_ref;
+        let publisher_ref_address = object::object_address(&publisher_ref);
+        assert!(exists<PublisherRef>(publisher_ref_address), error::not_found(EPUBLISHER_REF_DOES_NOT_EXIST));
+
+        let extend_ref = &borrow_global<PublisherRef>(publisher_ref_address).extend_ref;
         let code_signer = &object::generate_signer_for_extending(extend_ref);
         code::publish_package_txn(code_signer, metadata_serialized, code);
+
+        event::emit(UpgradeObjectCode {
+            object_address: signer::address_of(code_signer),
+        });
     }
 
-    /// Make an existing upgradable package immutable.
+    /// Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.
     /// Requires the `publisher` to be the owner of the `package_registry` object.
     public entry fun freeze_package_registry(publisher: &signer, package_registry: Object<PackageRegistry>) {
         code::freeze_package_registry(publisher, package_registry);
+
+        event::emit(FreezeObjectCode {
+            object_address: object::object_address(&package_registry),
+        });
     }
 }

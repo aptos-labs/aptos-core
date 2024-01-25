@@ -16,7 +16,7 @@ use crate::{
             load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
             ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
             MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary,
+            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, OverrideSizeCheckOption
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -623,9 +623,8 @@ pub struct IncludedArtifactsArgs {
 /// Publishes the modules in a Move package to the Aptos blockchain
 #[derive(Parser)]
 pub struct PublishPackage {
-    /// Whether to override the check for maximal size of published data
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
 
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
@@ -679,7 +678,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include fewer artifacts via `--included-artifacts`. \
@@ -868,12 +867,8 @@ pub struct CreateObjectAndPublishPackage {
     /// This will take the derived account address for the object and put it in this location
     #[clap(long)]
     pub(crate) address_name: String,
-    /// Whether to override the check for maximal size of published data
-    ///
-    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
-    /// will still be blocked from publishing.
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -893,7 +888,6 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
         let object_address = create_object_code_deployment_address(sender_address, sequence_number);
 
-        println!("{}", &self.address_name);
         self.move_options
             .add_named_address(self.address_name, object_address.to_string());
 
@@ -911,19 +905,19 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
             );
         let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
         let message = format!(
-            "Do you want to publish this package under the object address {}",
+            "Do you want to publish this package at object address {}",
             object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
-            bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS"),
+            bcs::to_bytes(&package.extract_metadata()?).expect("Failed to serialize PackageMetadata"),
             package.extract_code(),
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
 
-        if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -931,24 +925,28 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        self.txn_options
+        let result = self.txn_options
             .submit_transaction(payload)
             .await
-            .map(TransactionSummary::from)
+            .map(TransactionSummary::from);
+
+        if let Ok(_) = result {
+            println!("Code was successfully deployed to object address {}.", object_address);
+        }
+        result
     }
 }
 
 #[derive(Parser)]
 pub struct UpgradeObjectPackage {
-    /// Address of the object containing the package
+    /// Address of the object the package was deployed to
+    ///
+    /// This must be an already deployed object containing the package
+    /// if the package is not already created, it will fail.
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
     pub(crate) object_address: AccountAddress,
-    /// Whether to override the check for maximal size of published data
-    ///
-    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
-    /// will still be blocked from publishing.
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
@@ -976,29 +974,37 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
-        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
-        let compiled_metadata = package.extract_metadata()?;
-        if compiled_metadata.upgrade_policy == UpgradePolicy::immutable() {
+        let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let url = self.txn_options.rest_options.url(&self.txn_options.profile_options)?;
+
+        // Get the `PackageRegistry` at the given object address.
+        let registry = CachedPackageRegistry::create(url, self.object_address).await?;
+        let package = registry
+            .get_package(built_package.name())
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+
+        if package.upgrade_policy() == UpgradePolicy::immutable() {
             return Err(CliError::CommandArgumentError(
                 "A package with upgrade policy `immutable` cannot be upgraded".to_owned(),
             ));
         }
 
         let message = format!(
-            "Do you want to upgrade this package under the object address {}",
-            self.object_address
+            "Do you want to upgrade the package '{}' at object address {}",
+            package.name() ,self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
-            bcs::to_bytes(&package.extract_metadata()?).expect("PackageMetadata has BCS"),
-            package.extract_code(),
+            bcs::to_bytes(&built_package.extract_metadata()?).expect("Failed to serialize PackageMetadata"),
+            built_package.extract_code(),
             self.object_address,
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
 
-        if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -1006,10 +1012,15 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        self.txn_options
+        let result = self.txn_options
             .submit_transaction(payload)
             .await
-            .map(TransactionSummary::from)
+            .map(TransactionSummary::from);
+
+        if let Ok(_) = result {
+            println!("Code was successfully upgraded at object address {}.", self.object_address);
+        }
+        result
     }
 }
 
@@ -1022,12 +1033,8 @@ pub struct CreateResourceAccountAndPublishPackage {
     #[clap(long)]
     pub(crate) address_name: String,
 
-    /// Whether to override the check for maximal size of published data
-    ///
-    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
-    /// will still be blocked from publishing.
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
 
     #[clap(flatten)]
     pub(crate) seed_args: ResourceAccountSeed,
@@ -1050,7 +1057,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             address_name,
             mut move_options,
             txn_options,
-            override_size_check,
+            override_size_check_option,
             included_artifacts_args,
             seed_args,
         } = self;
@@ -1101,7 +1108,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
