@@ -5,12 +5,12 @@ use crate::backup_restore::gcs::GcsBackupRestoreOperator;
 use anyhow::Error;
 use aptos_api::context::Context;
 use aptos_api_types::TransactionOnChainData;
+use aptos_db_indexer::db_v2::IndexerAsyncV2;
 use aptos_indexer_grpc_fullnode::stream_coordinator::{
     IndexerStreamCoordinator, TransactionBatchInfo,
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
-use aptos_storage_interface::{DbReaderWriter, DbWriter};
 use aptos_types::write_set::WriteSet;
 use std::{sync::Arc, time::Duration};
 use tonic::Status;
@@ -26,6 +26,7 @@ pub struct TableInfoService {
     pub context: Arc<Context>,
     pub enable_expensive_logging: bool,
     pub backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
+    pub indexer_async_v2: Arc<IndexerAsyncV2>,
 }
 
 impl TableInfoService {
@@ -36,6 +37,7 @@ impl TableInfoService {
         parser_batch_size: u16,
         enable_expensive_logging: bool,
         backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
+        indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Self {
         Self {
             current_version: request_start_version,
@@ -44,6 +46,7 @@ impl TableInfoService {
             context,
             enable_expensive_logging,
             backup_restore_operator,
+            indexer_async_v2,
         }
     }
 
@@ -54,29 +57,29 @@ impl TableInfoService {
     /// 5. after all batches from the loop complete, if pending on items not empty, move on to 6, otherwise, start from 1 again
     /// 6. retry all the txns in the loop sequentially to clean up the pending on items
     /// 7. try to backup rocksdb snapshot if enough transactions have been processed
-    pub async fn run(&mut self, db: DbReaderWriter) {
+    pub async fn run(&mut self) {
         loop {
             let start_time = std::time::Instant::now();
             let ledger_version = self.get_highest_known_version().await.unwrap_or_default();
             let batches = self.get_batches(ledger_version).await;
             let results = self
-                .process_multiple_batches(db.clone(), batches, ledger_version)
+                .process_multiple_batches(self.indexer_async_v2.clone(), batches, ledger_version)
                 .await;
             let max_version = self.get_max_batch_version(results).unwrap_or_default();
             let versions_processed = max_version - self.current_version + 1;
             let context = self.context.clone();
             let backup_restore_operator = self.backup_restore_operator.clone();
-            let db_writer = db.writer.clone();
-            let start_version = self.current_version.clone();
+            let start_version = self.current_version;
+            let indexer_async_v2 = self.indexer_async_v2.clone();
 
             // Try uploading the rocksdb snapshot by taking a full db checkpoint and save it to gcs if enough transactions
             // running backup logic in a separate thread to not let it block the main thread to parse table info, since
             // gcs operation could be slow
             tokio::spawn(async move {
-                Self::try_upload_snapshot(
+                Self::try_backup_db_snapshot(
                     context.clone(),
-                    start_version.clone(),
-                    db_writer.clone(),
+                    max_version,
+                    indexer_async_v2.clone(),
                     backup_restore_operator.clone(),
                 )
                 .await;
@@ -85,7 +88,7 @@ impl TableInfoService {
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
-                Some(start_version.clone() as i64),
+                Some(start_version as i64),
                 Some(max_version as i64),
                 None,
                 None,
@@ -107,18 +110,17 @@ impl TableInfoService {
     /// 2. Get write sets from transactions and parse write sets to get handle -> key,value type mapping, write the mapping to the rocksdb
     async fn process_multiple_batches(
         &self,
-        db: DbReaderWriter,
+        indexer_async_v2: Arc<IndexerAsyncV2>,
         batches: Vec<TransactionBatchInfo>,
         ledger_version: u64,
     ) -> Vec<Result<EndVersion, Status>> {
         let mut tasks = vec![];
-        let db_writer = db.writer.clone();
         let context = self.context.clone();
 
         for batch in batches.iter().cloned() {
             let task = tokio::spawn(Self::process_single_batch(
                 context.clone(),
-                db_writer.clone(),
+                indexer_async_v2.clone(),
                 ledger_version,
                 batch,
                 false, /* end_early_if_pending_on_empty */
@@ -137,8 +139,7 @@ impl TableInfoService {
                     last_batch.start_version + last_batch.num_transactions_to_fetch as u64;
 
                 // Clean up pending on items across threads
-                db.writer
-                    .clone()
+                self.indexer_async_v2
                     .cleanup_pending_on_items()
                     .expect("[Table Info] Failed to clean up the pending on items");
 
@@ -148,12 +149,7 @@ impl TableInfoService {
                 //
                 // Risk of this sequential approach is that it could be slow when the txns to process contain extremely
                 // nested table items, but the risk is bounded by the the configuration of the number of txns to process and number of threads
-                if !db
-                    .reader
-                    .clone()
-                    .is_indexer_async_v2_pending_on_empty()
-                    .unwrap_or(false)
-                {
+                if !self.indexer_async_v2.is_indexer_async_v2_pending_on_empty() {
                     let retry_batch = TransactionBatchInfo {
                         start_version: self.current_version,
                         num_transactions_to_fetch: total_txns_to_process as u16,
@@ -162,7 +158,7 @@ impl TableInfoService {
 
                     Self::process_single_batch(
                         context.clone(),
-                        db_writer,
+                        indexer_async_v2.clone(),
                         ledger_version,
                         retry_batch,
                         true, /* end_early_if_pending_on_empty */
@@ -173,16 +169,12 @@ impl TableInfoService {
                 }
 
                 assert!(
-                    db.reader
-                        .clone()
-                        .is_indexer_async_v2_pending_on_empty()
-                        .unwrap_or(false),
+                    self.indexer_async_v2.is_indexer_async_v2_pending_on_empty(),
                     "Missing data in table info parsing after sequential retry"
                 );
 
                 // Update rocksdb's to be processed next version after verifying all txns are successfully parsed
-                db.writer
-                    .clone()
+                self.indexer_async_v2
                     .update_next_version(end_version + 1)
                     .unwrap();
 
@@ -201,7 +193,7 @@ impl TableInfoService {
     /// if pending on items are not empty
     async fn process_single_batch(
         context: Arc<Context>,
-        db_writer: Arc<dyn DbWriter>,
+        indexer_async_v2: Arc<IndexerAsyncV2>,
         ledger_version: u64,
         batch: TransactionBatchInfo,
         end_early_if_pending_on_empty: bool,
@@ -219,7 +211,7 @@ impl TableInfoService {
         Self::parse_table_info(
             context.clone(),
             raw_txns.clone(),
-            db_writer.clone(),
+            indexer_async_v2,
             end_early_if_pending_on_empty,
         )
         .await
@@ -293,7 +285,7 @@ impl TableInfoService {
     async fn parse_table_info(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
-        db_writer: Arc<dyn DbWriter>,
+        indexer_async_v2: Arc<IndexerAsyncV2>,
         end_early_if_pending_on_empty: bool,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
@@ -304,7 +296,7 @@ impl TableInfoService {
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
-        db_writer
+        indexer_async_v2
             .index_table_info(
                 context.db.clone(),
                 first_version,
@@ -328,10 +320,10 @@ impl TableInfoService {
     /// Tries to upload a snapshot of the database if the backup service is enabled.
     /// This function is called to periodically back up the database state to Google Cloud Storage (GCS).
     /// It checks the latest version of data already backed up in GCS and compares it with the current version.
-    async fn try_upload_snapshot(
+    async fn try_backup_db_snapshot(
         context: Arc<Context>,
-        first_version: u64,
-        db_writer: Arc<dyn DbWriter>,
+        last_version: u64,
+        indexer_async_v2: Arc<IndexerAsyncV2>,
         backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
     ) {
         // only try backup db if backup service is enabled
@@ -342,16 +334,13 @@ impl TableInfoService {
                 .get_metadata_epoch();
             let (_, _, block_event) = context
                 .db
-                .get_block_info_by_version(first_version)
+                .get_block_info_by_version(last_version)
                 .unwrap_or_else(|_| {
-                    panic!(
-                        "Could not get block_info for start version {}",
-                        first_version,
-                    )
+                    panic!("Could not get block_info for last version {}", last_version,)
                 });
             let block_event_epoch = block_event.epoch();
+            // If gcs most recent transaction version in metadata is behind, take a snapshot of rocksdb and upload
             if metadata_epoch < block_event_epoch {
-                // If gcs most recent transaction version in metadata is behind, take a snapshot of rocksdb and upload
                 let start_time = std::time::Instant::now();
                 // temporary path to store the snapshot
                 let snapshot_dir = context
@@ -361,10 +350,10 @@ impl TableInfoService {
                 let ledger_chain_id = context.chain_id().id();
                 backup_restore_operator
                     .unwrap()
-                    .upload_snapshot(
+                    .backup_db_snapshot(
                         ledger_chain_id as u64,
                         block_event_epoch,
-                        db_writer.clone(),
+                        indexer_async_v2,
                         snapshot_dir.clone(),
                     )
                     .await

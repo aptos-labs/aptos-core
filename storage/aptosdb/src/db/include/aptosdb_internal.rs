@@ -56,7 +56,6 @@ impl AptosDB {
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
-            indexer_async_v2: None,
         }
     }
 
@@ -69,7 +68,6 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
-        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -96,13 +94,6 @@ impl AptosDB {
 
         if !readonly && enable_indexer {
             myself.open_indexer(
-                db_paths.default_root_path(),
-                rocksdb_configs.index_db_config,
-            )?;
-        }
-
-        if enable_indexer_async_v2 {
-            myself.open_indexer_async_v2(
                 db_paths.default_root_path(),
                 rocksdb_configs.index_db_config,
             )?;
@@ -153,16 +144,6 @@ impl AptosDB {
         Ok(())
     }
 
-    fn open_indexer_async_v2(
-        &mut self,
-        db_root_path: impl AsRef<Path>,
-        rocksdb_config: RocksdbConfig,
-    ) -> Result<()> {
-        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config, DashMap::new())?;
-        self.indexer_async_v2 = Some(indexer_async_v2);
-        Ok(())
-    }
-
     #[cfg(any(test, feature = "fuzzing"))]
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
@@ -170,7 +151,6 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
-        enable_indexer_async_v2: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
@@ -180,7 +160,6 @@ impl AptosDB {
             enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
-            enable_indexer_async_v2,
         )
         .expect("Unable to open AptosDB")
     }

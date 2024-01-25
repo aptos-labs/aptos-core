@@ -6,14 +6,11 @@
 /// from storage critical path to indexer, the other file will be removed
 /// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
 use crate::{
+    db_ops::{read_db, write_db},
     metadata_v2::{MetadataKey, MetadataValue},
-    schema::{
-        column_families_v2, indexer_metadata_v2::IndexerMetadataSchema, table_info::TableInfoSchema,
-    },
+    schema::{indexer_metadata_v2::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
-use aptos_config::config::RocksdbConfig;
 use aptos_logger::info;
-use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
     db_other_bail as bail, state_view::DbStateView, AptosDbError, DbReader, Result,
@@ -48,12 +45,11 @@ use std::{
     time::Duration,
 };
 
-pub const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
 const TABLE_INFO_RETRY_TIME_MILLIS: u64 = 10;
 
 #[derive(Debug)]
 pub struct IndexerAsyncV2 {
-    db: DB,
+    pub db: DB,
     // Next version to be processed
     next_version: AtomicU64,
     // DB snapshot most recently restored from gcs timestamp
@@ -69,34 +65,25 @@ pub struct IndexerAsyncV2 {
 }
 
 impl IndexerAsyncV2 {
-    /// Opens up this rocksdb to get ready for read and write when bootstraping the aptosdb
-    pub fn open(
-        db_root_path: impl AsRef<std::path::Path>,
-        rocksdb_config: RocksdbConfig,
-        pending_on: DashMap<TableHandle, DashSet<Bytes>>,
-    ) -> Result<Self> {
-        let db_path = db_root_path.as_ref().join(INDEX_ASYNC_V2_DB_NAME);
-
-        let db = DB::open(
-            db_path,
-            "index_asnync_v2_db",
-            column_families_v2(),
-            &gen_rocksdb_options(&rocksdb_config, false),
-        )?;
-
-        let next_version = db
-            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)?
-            .map_or(0, |v| v.expect_version());
-        info!(next_version_init = next_version);
-        let restore_timestamp = db
-            .get::<IndexerMetadataSchema>(&MetadataKey::RestoreTimestamp)?
-            .map_or(0, |v| v.last_restored_timestamp());
+    pub fn new(db: DB) -> Result<Self> {
+        let next_version = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &db,
+            &MetadataKey::LatestVersion,
+        )
+        .unwrap()
+        .map_or(0, |v| v.expect_version());
+        let last_restored_timestamp = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &db,
+            &MetadataKey::RestoreTimestamp,
+        )
+        .unwrap()
+        .map_or(0, |v| v.last_restored_timestamp());
 
         Ok(Self {
             db,
             next_version: AtomicU64::new(next_version),
-            restore_timestamp: AtomicU64::new(restore_timestamp),
-            pending_on,
+            restore_timestamp: AtomicU64::new(last_restored_timestamp),
+            pending_on: DashMap::new(),
         })
     }
 
@@ -160,23 +147,21 @@ impl IndexerAsyncV2 {
     }
 
     pub fn update_next_version(&self, end_version: u64) -> Result<()> {
-        let batch = SchemaBatch::new();
-        batch.put::<IndexerMetadataSchema>(
-            &MetadataKey::LatestVersion,
-            &MetadataValue::Version(end_version - 1),
+        write_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &self.db,
+            MetadataKey::LatestVersion,
+            MetadataValue::Version(end_version),
         )?;
-        self.db.write_schemas(batch)?;
         self.next_version.store(end_version, Ordering::Relaxed);
         Ok(())
     }
 
     pub fn update_last_restored_timestamp(&self, restore_timestamp: u64) -> Result<()> {
-        let batch = SchemaBatch::new();
-        batch.put::<IndexerMetadataSchema>(
-            &MetadataKey::RestoreTimestamp,
-            &MetadataValue::Timestamp(restore_timestamp),
+        write_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &self.db,
+            MetadataKey::RestoreTimestamp,
+            MetadataValue::Timestamp(restore_timestamp),
         )?;
-        self.db.write_schemas(batch)?;
         self.restore_timestamp
             .store(restore_timestamp, Ordering::Relaxed);
         Ok(())
@@ -222,23 +207,21 @@ impl IndexerAsyncV2 {
     }
 
     pub fn next_version(&self) -> Version {
-        match self
-            .db
-            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)
-        {
-            Ok(Some(value)) => value.expect_version(),
-            _ => 0, // Returns 0 if there's no value or an error
-        }
+        read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &self.db,
+            &MetadataKey::LatestVersion,
+        )
+        .unwrap()
+        .map_or(0, |v| v.expect_version())
     }
 
     pub fn restore_timestamp(&self) -> u64 {
-        match self
-            .db
-            .get::<IndexerMetadataSchema>(&MetadataKey::RestoreTimestamp)
-        {
-            Ok(Some(value)) => value.last_restored_timestamp(),
-            _ => 0, // Returns 0 if there's no value or an error
-        }
+        read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &self.db,
+            &MetadataKey::RestoreTimestamp,
+        )
+        .unwrap()
+        .map_or(0, |v| v.last_restored_timestamp())
     }
 
     pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {

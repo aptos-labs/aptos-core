@@ -1,46 +1,62 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{backup_restore::gcs::GcsBackupRestoreOperator, table_info_service::TableInfoService};
+use crate::{
+    backup_restore::{fs_ops::rename_db_folders_and_cleanup, gcs::GcsBackupRestoreOperator},
+    table_info_service::TableInfoService,
+};
+use anyhow::Error;
 use aptos_api::context::Context;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NodeConfig, RocksdbConfig};
+use aptos_db_indexer::{
+    db_ops::{close_db, open_db, read_db, write_db},
+    db_v2::IndexerAsyncV2,
+    metadata_v2::{MetadataKey, MetadataValue},
+    schema::indexer_metadata_v2::IndexerMetadataSchema,
+};
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
+use aptos_schemadb::DB;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_types::chain_id::{ChainId, NamedChain};
 use std::{
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    thread::sleep,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::runtime::Runtime;
 
 const INDEX_ASYNC_V2_DB_NAME: &str = "index_indexer_async_v2_db";
-/// if last restore timestamp is less than RESTORE_TIME_DIFF_SECS, do not restore to avoid gcs read spam
+/// if last restore timestamp is less than RESTORE_TIME_DIFF_SECS, do not restore to avoid gcs download spam
 const RESTORE_TIME_DIFF_SECS: u64 = 600;
+const DB_OPERATION_INTERVAL_MS: u64 = 500;
 
 /// Creates a runtime which creates a thread pool which sets up fullnode indexer table info service
 /// Returns corresponding Tokio runtime
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
-    db: DbReaderWriter,
+    db_rw: DbReaderWriter,
     mp_sender: MempoolClientSender,
-) -> Option<Runtime> {
+) -> Option<(Runtime, Arc<IndexerAsyncV2>)> {
     if !config.indexer_table_info.enabled {
         return None;
     }
 
     let runtime = aptos_runtimes::spawn_named_runtime("table-info".to_string(), None);
 
+    // Set up db config and open up the db initially to read metadata
     let node_config = config.clone();
-    let parser_task_count = node_config.indexer_table_info.parser_task_count;
-    let parser_batch_size = node_config.indexer_table_info.parser_batch_size;
-    let enable_expensive_logging = node_config.indexer_table_info.enable_expensive_logging;
-    let next_version = db.reader.get_indexer_async_v2_next_version().unwrap();
-    let db_backup_enabled = node_config.indexer_table_info.db_backup_enabled.clone();
-    let version_diff = node_config.indexer_table_info.version_diff.clone();
+    let db_path = node_config
+        .storage
+        .get_dir_paths()
+        .default_root_path()
+        .join(INDEX_ASYNC_V2_DB_NAME);
+    let rocksdb_config = node_config.storage.rocksdb_configs.index_db_config;
+    let db =
+        open_db(db_path, &rocksdb_config).expect("Failed to open up indexer async v2 db initially");
 
-    // Set up backup and restore config
+    // Set up the gcs bucket
     let gcs_bucket_name = node_config.indexer_table_info.gcs_bucket_name.clone();
     let named_chain = match NamedChain::from_chain_id(&chain_id) {
         Ok(named_chain) => format!("{}", named_chain).to_lowercase(),
@@ -51,50 +67,187 @@ pub fn bootstrap(
     };
 
     // Before runtime's spawned, conditionally restore db snapshot from gcs
-    runtime.block_on(async {
+    let db = runtime
+        .block_on(async {
+            handle_db_restore(
+                &node_config,
+                chain_id,
+                db,
+                db_rw.clone(),
+                node_config.indexer_table_info.version_diff,
+                rocksdb_config,
+            )
+            .await
+        })
+        .expect("Failed to handle db restore");
+    // Get the right next version from db in case db's re-opened
+    let next_version = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+        &db,
+        &MetadataKey::LatestVersion,
+    )
+    .unwrap()
+    .map_or(0, |v| v.expect_version());
+
+    let indexer_async_v2 =
+        Arc::new(IndexerAsyncV2::new(db).expect("Failed to initialize indexer async v2"));
+    let indexer_async_v2_clone = Arc::clone(&indexer_async_v2);
+
+    // Spawn the runtime for table info parsing
+    runtime.spawn(async move {
         let backup_restore_operator: Arc<GcsBackupRestoreOperator> = Arc::new(
-            GcsBackupRestoreOperator::new(gcs_bucket_name.clone() + "-" + &named_chain).await,
+            GcsBackupRestoreOperator::new(format!("{}-{}", gcs_bucket_name.clone(), named_chain))
+                .await,
         );
-        let latest_committed_version = db.reader.get_latest_version().unwrap();
-        let current_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        let context = Arc::new(Context::new(
+            chain_id,
+            db_rw.reader.clone(),
+            mp_sender,
+            node_config.clone(),
+            None,
+        ));
+        // DB backup is optional
+        let backup_restore_operator = if node_config.indexer_table_info.db_backup_enabled {
+            Some(backup_restore_operator)
+        } else {
+            None
+        };
 
-        // Check the time duration since the last restore
-        let last_restored_timestamp = db.reader.get_indexer_async_v2_restore_timestamp().unwrap();
-        assert!(
-            current_timestamp >= last_restored_timestamp,
-            "Last restored timestamp from db should be less or equal to the current timestamp"
+        let mut parser = TableInfoService::new(
+            context,
+            next_version,
+            node_config.indexer_table_info.parser_task_count,
+            node_config.indexer_table_info.parser_batch_size,
+            node_config.indexer_table_info.enable_expensive_logging,
+            backup_restore_operator,
+            indexer_async_v2_clone,
         );
-        let should_restore_based_on_time_duration = current_timestamp
-            - db.reader.get_indexer_async_v2_restore_timestamp().unwrap()
-            > RESTORE_TIME_DIFF_SECS;
 
-        // Check the version difference
-        let should_restore_based_on_version = latest_committed_version > next_version
-            && latest_committed_version - next_version > version_diff;
+        parser.run().await;
+    });
 
-        if should_restore_based_on_time_duration || should_restore_based_on_version {
-            backup_restore_operator
-                .verify_storage_bucket_existence()
-                .await;
-            // the indexer async v2 db file path to take snapshot from
-            let db_path = node_config
-                .storage
-                .get_dir_paths()
-                .default_root_path()
-                .join(INDEX_ASYNC_V2_DB_NAME);
-            let base_path = node_config.get_data_dir().to_path_buf();
-            backup_restore_operator
-                .restore_snapshot(chain_id.id() as u64, db_path.clone(), base_path.clone())
-                .await
-                .expect("Failed to restore snapshot");
-            db.writer
-                .clone()
-                .update_last_restored_timestamp(current_timestamp)
-                .expect("Failed to update last restored timestamp");
-        }
+    Some((runtime, indexer_async_v2))
+}
+
+/// This function handles the conditional restoration of the database from a GCS snapshot.
+/// It checks if the database needs to be restored based on metadata file existence
+/// and metadata epoch and the time since the last restore and the version differences.
+/// If a restore is needed, it:
+/// 1. close the db
+/// 2. performs the restore to a different folder
+/// 3. rename the folder to atomically move restored db snapshot to the right db path
+/// 4. re-open the db
+/// 5. update the last restore timestamp in the restored db
+/// If a restore is not needed, it:
+/// 1. returns the original db
+async fn handle_db_restore(
+    node_config: &NodeConfig,
+    chain_id: ChainId,
+    db: DB,
+    db_rw: DbReaderWriter,
+    version_diff: u64,
+    rocksdb_config: RocksdbConfig,
+) -> Result<DB, Error> {
+    let binding = node_config.storage.get_dir_paths();
+    let db_root_path = binding.default_root_path();
+    let db_path = db_root_path.join(INDEX_ASYNC_V2_DB_NAME);
+    // Set up backup and restore config
+    let gcs_bucket_name = node_config.indexer_table_info.gcs_bucket_name.clone();
+    let named_chain = match NamedChain::from_chain_id(&chain_id) {
+        Ok(named_chain) => format!("{}", named_chain).to_lowercase(),
+        Err(_err) => {
+            info!("Getting chain name from not named chains");
+            chain_id.id().to_string()
+        },
+    };
+
+    let backup_restore_operator: Arc<GcsBackupRestoreOperator> = Arc::new(
+        GcsBackupRestoreOperator::new(format!("{}-{}", gcs_bucket_name.clone(), &named_chain))
+            .await,
+    );
+
+    // If there's no metadata json file in gcs, we will create a default one with epoch 0 and return early since there's no snapshot to restore from, and early return.
+    // If metadata epoch is 0, early return.
+    let metadata = backup_restore_operator.get_metadata().await;
+    if metadata.is_none() {
+        backup_restore_operator
+            .create_default_metadata_if_absent(chain_id.id() as u64)
+            .await
+            .expect("Failed to create default metadata");
+        return Ok(db);
+    } else if metadata.unwrap().epoch == 0 {
+        return Ok(db);
+    }
+
+    // Check the time duration since the last restore
+    let last_restored_timestamp = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+        &db,
+        &MetadataKey::RestoreTimestamp,
+    )
+    .unwrap()
+    .map_or(0, |v| v.last_restored_timestamp());
+    // Current timestamp will be used to compare duration from last restored timestamp, and to save db if restore is performed
+    let current_timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    assert!(
+        current_timestamp >= last_restored_timestamp,
+        "Last restored timestamp from db should be less or equal to the current timestamp"
+    );
+    let should_restore_based_on_time_duration =
+        current_timestamp - last_restored_timestamp > RESTORE_TIME_DIFF_SECS;
+
+    // Check the version difference
+    let latest_committed_version = db_rw.reader.get_latest_version().unwrap();
+    let next_version = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+        &db,
+        &MetadataKey::LatestVersion,
+    )
+    .unwrap()
+    .map_or(0, |v| v.expect_version());
+    let should_restore_based_on_version = latest_committed_version > next_version
+        && latest_committed_version - next_version > version_diff;
+
+    if should_restore_based_on_time_duration && should_restore_based_on_version {
+        // after reading db metadata info and deciding to restore, drop the db so that we could re-open it later
+        close_db(db);
+
+        sleep(Duration::from_millis(DB_OPERATION_INTERVAL_MS));
+
+        backup_restore_operator
+            .verify_storage_bucket_existence()
+            .await;
+
+        // a different path to restore backup db snapshot to, to avoid db corruption
+        let restore_db_path = node_config
+            .storage
+            .get_dir_paths()
+            .default_root_path()
+            .join("restore");
+        backup_restore_operator
+            .restore_db_snapshot(
+                chain_id.id() as u64,
+                metadata.unwrap(),
+                restore_db_path.clone(),
+                node_config.get_data_dir().to_path_buf(),
+            )
+            .await
+            .expect("Failed to restore snapshot");
+
+        // Restore to a different folder and replace the target folder atomically
+        let tmp_db_path = db_root_path.join("tmp");
+        rename_db_folders_and_cleanup(&db_path, &tmp_db_path, &restore_db_path)
+            .expect("Failed to operate atomic restore in file system.");
+
+        sleep(Duration::from_millis(DB_OPERATION_INTERVAL_MS));
+
+        let db = open_db(&db_path, &rocksdb_config).expect("Failed to reopen db after restore");
+        write_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
+            &db,
+            MetadataKey::RestoreTimestamp,
+            MetadataValue::Timestamp(current_timestamp),
+        )
+        .expect("Failed to write restore timestamp to indexer async v2");
 
         info!(
             should_restore_based_on_time_duration = should_restore_based_on_time_duration,
@@ -102,38 +255,9 @@ pub fn bootstrap(
             latest_committed_version = latest_committed_version,
             db_next_version = next_version,
             last_restored_timestamp = last_restored_timestamp,
-            "[Table Info] Table info conditional restore successfully"
+            "[Table Info] Table info restored successfully"
         );
-    });
-
-    // Spawn the runtime for table info parsing
-    runtime.spawn(async move {
-        // Read the new next version after db restore
-        let next_version = db.reader.get_indexer_async_v2_next_version().unwrap();
-        let context = Arc::new(Context::new(
-            chain_id,
-            db.reader.clone(),
-            mp_sender,
-            node_config,
-        ));
-        // Backing up rocksdb is optional
-        let backup_restore_operator: Arc<GcsBackupRestoreOperator> = Arc::new(
-            GcsBackupRestoreOperator::new(gcs_bucket_name.clone() + "-" + &named_chain).await,
-        );
-        let backup_restore_operator = if db_backup_enabled {
-            Some(backup_restore_operator)
-        } else {
-            None
-        };
-        let mut parser = TableInfoService::new(
-            context,
-            next_version,
-            parser_task_count,
-            parser_batch_size,
-            enable_expensive_logging,
-            backup_restore_operator,
-        );
-        parser.run(db.clone()).await
-    });
-    Some(runtime)
+        return Ok(db);
+    }
+    Ok(db)
 }

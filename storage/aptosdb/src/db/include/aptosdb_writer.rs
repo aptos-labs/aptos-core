@@ -198,68 +198,6 @@ impl DbWriter for AptosDB {
             Ok(())
         })
     }
-
-    /// Open up dbwriter for table info indexing on indexer async v2 rocksdb
-    fn index_table_info(
-        &self,
-        db_reader: Arc<dyn DbReader>,
-        first_version: Version,
-        write_sets: &[&WriteSet],
-        end_early_if_pending_on_empty: bool,
-    ) -> Result<()> {
-        gauged_api("index_table_info", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| {
-                    indexer.index_table_info(
-                        db_reader,
-                        first_version,
-                        write_sets,
-                        end_early_if_pending_on_empty,
-                    )
-                })
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn cleanup_pending_on_items(&self) -> Result<()> {
-        gauged_api("cleanup_pending_on_items", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.cleanup_pending_on_items())
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn update_next_version(&self, end_version: u64) -> Result<()> {
-        gauged_api("update_next_version", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.update_next_version(end_version))
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    /// Update last restored timestamp when indexer async v2 db successfully restores
-    /// db from gcs, this timestamp is used to determine if restore is too frequent and
-    /// instead use next version to start syncing instead
-    fn update_last_restored_timestamp(&self, restore_timestamp: u64) -> Result<()> {
-        gauged_api("update_last_restored_timestamp", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.update_last_restored_timestamp(restore_timestamp))
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn create_checkpoint(&self, path: &PathBuf) -> Result<()> {
-        gauged_api("create_checkpoint", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.create_checkpoint(path))
-                .unwrap_or(Ok(()))
-        })
-    }
 }
 
 impl AptosDB {

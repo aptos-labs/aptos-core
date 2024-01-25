@@ -6,9 +6,9 @@
 //!
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
-pub(crate) mod indexer_metadata;
-pub(crate) mod indexer_metadata_v2;
-pub(crate) mod table_info;
+pub mod indexer_metadata;
+pub mod indexer_metadata_v2;
+pub mod table_info;
 
 use aptos_schemadb::ColumnFamilyName;
 

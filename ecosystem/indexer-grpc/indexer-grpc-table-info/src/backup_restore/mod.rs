@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod fs_ops;
 pub mod gcs;
 
 pub const FILE_FOLDER_NAME: &str = "files";
@@ -24,5 +25,12 @@ pub struct BackupRestoreMetadata {
 impl BackupRestoreMetadata {
     pub fn new(chain_id: u64, epoch: u64) -> Self {
         Self { chain_id, epoch }
+    }
+}
+
+impl From<Vec<u8>> for BackupRestoreMetadata {
+    fn from(bytes: Vec<u8>) -> Self {
+        serde_json::from_slice(bytes.as_slice())
+            .expect("Failed to deserialize BackupRestoreMetadata file.")
     }
 }
