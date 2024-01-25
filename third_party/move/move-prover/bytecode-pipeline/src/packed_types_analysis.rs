@@ -18,6 +18,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Operation},
     COMPILED_MODULE_AVAILABLE,
 };
+use abstract_domain_derive::AbstractDomain;
 use std::collections::BTreeSet;
 
 /// Get all closed types that may be packed by (1) genesis and (2) all transaction scripts.
