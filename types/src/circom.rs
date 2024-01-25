@@ -18,14 +18,14 @@ pub static DEV_VERIFYING_KEY: Lazy<PreparedVerifyingKey<ark_bn254::Bn254>> = Laz
 
 fn dev_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
     // Convert the projective points to affine.
-    let vk_alpha_1 = G1::new(
+    let alpha_g1 = G1::new(
         "16672231080302629756836614130913173861541009360974119524782950408048375831661",
         "1076145001163048025135533382088266750240489485046298539187659509488738517245",
     )
     .to_affine()
     .unwrap();
 
-    let vk_beta_2 = G2::new(
+    let beta_g2 = G2::new(
         [
             "1125365732643211423779651913319958385653115422366520671538751860820509133538",
             "10055196097002324305342942912758079446356594743098794928675544207400347950287",
@@ -38,7 +38,7 @@ fn dev_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
     .to_affine()
     .unwrap();
 
-    let vk_gamma_2 = G2::new(
+    let gamma_g2 = G2::new(
         [
             "10857046999023057135944570762232829481370756359578518086990519993285655852781",
             "11559732032986387107991004021392285783925812861821192530917403151452391805634",
@@ -51,11 +51,10 @@ fn dev_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
     .to_affine()
     .unwrap();
 
-    let vk_delta_2 = vk_gamma_2;
+    let delta_g2 = gamma_g2;
 
-    // Create a vector of G1Affine elements from the IC
-    let mut vk_gamma_abc_g1 = Vec::new();
-    for e in [
+    let mut gamma_abc_g1 = Vec::new();
+    for points in [
         G1::new(
             "10630119204695129176884860852234232187032863639334371023708138007302523646865",
             "8100947059469766601395165113187306282631271312167186605231839390439402060594",
@@ -69,18 +68,17 @@ fn dev_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
         .to_affine()
         .unwrap(),
     ] {
-        vk_gamma_abc_g1.push(e);
+        gamma_abc_g1.push(points);
     }
 
     let vk = VerifyingKey {
-        alpha_g1: vk_alpha_1,
-        beta_g2: vk_beta_2,
-        gamma_g2: vk_gamma_2,
-        delta_g2: vk_delta_2,
-        gamma_abc_g1: vk_gamma_abc_g1,
+        alpha_g1,
+        beta_g2,
+        gamma_g2,
+        delta_g2,
+        gamma_abc_g1,
     };
 
-    // Convert the verifying key into the prepared form.
     PreparedVerifyingKey::from(vk)
 }
 
