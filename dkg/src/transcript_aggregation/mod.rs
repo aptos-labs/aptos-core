@@ -62,6 +62,13 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             "adding dkg node failed with invalid node epoch",
         );
         ensure!(
+            self.epoch_state
+                .verifier
+                .get_voting_power(&sender)
+                .is_some(),
+            "adding dkg node failed with illegal dealer"
+        );
+        ensure!(
             metadata.author == sender,
             "adding dkg node failed with node author mismatch"
         );
