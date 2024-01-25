@@ -81,14 +81,14 @@ async fn test_dkg_state_transition() {
     // In state `NotStarted`, DKGManager should accept `DKGStartEvent`:
     // it should record start time, compute its own node, and enter state `InProgress`.
     let handle_result = dkg_manager
-        .process_dkg_start_event(Some(DKGStartEvent {
+        .process_dkg_start_event(DKGStartEvent {
             session_metadata: DKGSessionMetadata {
                 dealer_epoch: 999,
                 dealer_validator_set: validator_consensus_info_move_structs.clone(),
                 target_validator_set: validator_consensus_info_move_structs.clone(),
             },
             start_time_us: 1700000000000000,
-        }))
+        })
         .await;
     assert!(handle_result.is_ok());
     assert!(

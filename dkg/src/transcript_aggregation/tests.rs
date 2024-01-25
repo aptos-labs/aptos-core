@@ -23,6 +23,7 @@ fn test_transcript_aggregation_state() {
     let addrs: Vec<AccountAddress> = (0..num_validators)
         .map(|_| AccountAddress::random())
         .collect();
+    let vfn_addr = AccountAddress::random();
     let private_keys: Vec<bls12381_keys::PrivateKey> = (0..num_validators)
         .map(|_| bls12381_keys::PrivateKey::generate_for_testing())
         .collect();
@@ -68,6 +69,16 @@ fn test_transcript_aggregation_state() {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[0],
+        },
+        transcript_bytes: good_trx_bytes.clone(),
+    });
+    assert!(result.is_err());
+
+    // Node authored by non-active-validator should be rejected.
+    let result = trx_agg_state.add(vfn_addr, DKGTranscript {
+        metadata: DKGTranscriptMetadata {
+            epoch: 999,
+            author: vfn_addr,
         },
         transcript_bytes: good_trx_bytes.clone(),
     });
