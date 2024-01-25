@@ -39,8 +39,7 @@ impl RSA_JWK {
 
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
-        // println!("{:?}",hex::encode(modulus.clone()));
-        modulus.reverse();
+        modulus.reverse(); // This is done to match the circuit TODO(zkid): finalize the jwk hashing scheme.
         let mut scalars = modulus
             .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
             .map(|chunk| {
