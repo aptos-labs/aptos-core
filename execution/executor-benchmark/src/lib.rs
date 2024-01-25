@@ -596,11 +596,9 @@ impl OverallMeasuring {
         );
         info!("{} GPS: {} gas/s", prefix, delta_gas.gas / elapsed);
         info!(
-            "{} effectiveGPS: {} gas/s ({} effective block gas, in {} s)",
+            "{} effectiveGPS: {} gas/s",
             prefix,
-            delta_gas.effective_block_gas / elapsed,
-            delta_gas.effective_block_gas,
-            elapsed
+            delta_gas.effective_block_gas / elapsed
         );
         info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
         info!(
