@@ -60,7 +60,7 @@ pub fn run_move_mutator(
     trace!("Mutator configuration: {mutator_configuration:?}");
 
     let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
-    let mutants = mutate::mutate(ast)?;
+    let mutants = mutate::mutate(ast, &mutator_configuration)?;
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
 
@@ -69,26 +69,9 @@ pub fn run_move_mutator(
 
         trace!("Processing file: {path:?}");
 
-        // Check if file is not excluded from mutant generation.
-        //TODO(asmie): refactor this when proper filtering will be introduced in the M3
-        if let Some(excluded) = mutator_configuration.project.exclude_files.as_ref() {
-            if excluded.contains(&path.to_path_buf()) {
-                continue;
-            }
-        }
-
-        // Check if file is explicitly included in mutant generation (if include_only_files is set).
-        if let Some(included) = mutator_configuration.project.include_only_files.as_ref() {
-            if !included.contains(&path.to_path_buf()) {
-                continue;
-            }
-        }
-
-        for (i, mutant) in mutants
-            .iter()
-            .filter(|m| m.get_file_hash() == hash)
-            .enumerate()
-        {
+        // This `i` must be here as we must iterate over all mutants for a given file (ext and internal loop).
+        let mut i = 0;
+        for mutant in mutants.iter().filter(|m| m.get_file_hash() == hash) {
             let mutated_sources = mutant.apply(&source);
             for mutated in mutated_sources {
                 if mutator_configuration.project.verify_mutants {
@@ -104,6 +87,8 @@ pub fn run_move_mutator(
                 }
 
                 let mutant_path = output::setup_mutant_path(&output_dir, path, i as u64)?;
+                i += 1;
+
                 fs::write(&mutant_path, &mutated.mutated_source)?;
 
                 info!("{} written to {}", mutant, mutant_path.display());

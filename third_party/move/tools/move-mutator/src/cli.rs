@@ -11,12 +11,9 @@ pub struct CLIOptions {
     /// The paths to the Move sources.
     #[clap(long, short, value_parser)]
     pub move_sources: Vec<PathBuf>,
-    /// The paths to the Move sources to include.
-    #[clap(long, short, value_parser)]
-    pub include_only_files: Option<Vec<PathBuf>>,
-    /// The paths to the Move sources to exclude.
-    #[clap(long, short, value_parser)]
-    pub exclude_files: Option<Vec<PathBuf>>,
+    /// Module names to be mutated.
+    #[clap(long)]
+    pub mutate_modules: Option<Vec<String>>,
     /// The path where to put the output files.
     #[clap(long, short, value_parser)]
     pub out_mutant_dir: Option<PathBuf>,
@@ -44,8 +41,7 @@ impl Default for CLIOptions {
     fn default() -> Self {
         Self {
             move_sources: vec![],
-            include_only_files: None,
-            exclude_files: None,
+            mutate_modules: None,
             out_mutant_dir: Some(PathBuf::from(DEFAULT_OUTPUT_DIR)),
             verify_mutants: true,
             no_overwrite: None,

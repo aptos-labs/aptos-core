@@ -1,3 +1,4 @@
+use crate::configuration::Configuration;
 use move_compiler::parser::ast;
 use move_compiler::parser::ast::{
     Definition::{Address, Module, Script},
@@ -11,7 +12,7 @@ use crate::operators::unary::Unary;
 
 /// Traverses the AST, identifies places where mutation operators can be applied
 /// and returns a list of mutants.
-pub fn mutate(ast: ast::Program) -> anyhow::Result<Vec<Mutant>> {
+pub fn mutate(ast: ast::Program, conf: &Configuration) -> anyhow::Result<Vec<Mutant>> {
     trace!("Starting mutation process");
     let mutants = ast
         .source_definitions
@@ -20,9 +21,9 @@ pub fn mutate(ast: ast::Program) -> anyhow::Result<Vec<Mutant>> {
             Address(addr) => addr
                 .modules
                 .into_iter()
-                .map(traverse_module)
+                .map(|m| traverse_module(m, conf))
                 .collect::<Vec<Result<Vec<_>, _>>>(),
-            Module(module) => vec![traverse_module(module)],
+            Module(module) => vec![traverse_module(module, conf)],
             Script(script) => vec![traverse_function(script.function)],
         })
         .collect::<Result<Vec<_>, _>>()?
@@ -35,7 +36,20 @@ pub fn mutate(ast: ast::Program) -> anyhow::Result<Vec<Mutant>> {
 
 /// Traverses a single module and returns a list of mutants.
 /// Checks all the functions and constants defined in the module.
-fn traverse_module(module: ast::ModuleDefinition) -> anyhow::Result<Vec<Mutant>> {
+fn traverse_module(
+    module: ast::ModuleDefinition,
+    conf: &Configuration,
+) -> anyhow::Result<Vec<Mutant>> {
+    if conf
+        .project
+        .mutate_modules
+        .as_ref()
+        .is_some_and(|modules| !modules.contains(&module.name.to_string()))
+    {
+        trace!("Skipping module {}", module.name);
+        return Ok(vec![]);
+    }
+
     trace!("Traversing module {}", module.name);
     let mut mutants = module
         .members
