@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Simplifies the control flow graph by
@@ -8,14 +7,14 @@
 //!     L1: goto L2 (L1 != L2)
 //!     replacing all goto L1 by goto L2, and deleting L1: goto L2
 //! - removes edges where the source has only one successors and the target has only one predecessors
-//!     BB1: ...
+//!     BB1: xx
 //!          goto L2
+//!     // BB1 BB2 don't have to be consecutive
 //!     BB2: L2 (no other goto L2)
-//!          ...
+//!          yy
 //!     =>
-//!     BB1: BB1 content
-//!          BB2 content
-//!          goto L2
+//!     BB1: xx
+//!          yy
 //! - removes all jumps to the next instruction:
 //!     goto L;
 //!     L;
