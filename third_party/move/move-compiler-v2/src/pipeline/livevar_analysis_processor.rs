@@ -291,6 +291,7 @@ impl LiveVarAnalysisProcessor {
 /// State of the livevar analysis,
 #[derive(AbstractDomain, Debug, Clone, Eq, PartialEq, PartialOrd)]
 struct LiveVarState {
+    #[join]
     livevars: MapDomain<TempIndex, LiveVarInfo>,
 }
 

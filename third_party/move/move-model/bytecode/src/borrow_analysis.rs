@@ -29,9 +29,11 @@ use std::{borrow::BorrowMut, collections::BTreeMap, fmt};
 pub struct BorrowInfo {
     /// Contains the nodes which are alive. This excludes nodes which are alive because
     /// other nodes which are alive borrow from them.
+    #[join]
     live_nodes: SetDomain<BorrowNode>,
 
     /// Forward borrow information.
+    #[join]
     borrowed_by: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
 
     /// Backward borrow information. This field is not used during analysis, but computed once
