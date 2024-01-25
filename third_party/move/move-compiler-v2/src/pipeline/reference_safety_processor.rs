@@ -175,8 +175,10 @@ struct LifetimeNode {
     /// Memory locations associated with this node. This is a set as a result of joins.
     locations: SetDomain<MemoryLocation>,
     /// Outgoing edges to children.
+    #[join]
     children: SetDomain<BorrowEdge>,
     /// Backlinks to parents.
+    #[join]
     parents: SetDomain<LifetimeLabel>,
 }
 
