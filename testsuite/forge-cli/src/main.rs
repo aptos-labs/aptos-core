@@ -793,10 +793,10 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
 
     config
         .consensus
-        .max_sending_block_txns_quorum_store_override = 30000;
+        .max_sending_block_txns_quorum_store_override = 12000;
     config
         .consensus
-        .max_receiving_block_txns_quorum_store_override = 40000;
+        .max_receiving_block_txns_quorum_store_override = 13000;
     config
         .consensus
         .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
@@ -1842,16 +1842,14 @@ fn realistic_env_max_load_test(
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // THE MOST COMMONLY USED TUNE-ABLES:
-    const USE_CRAZY_MACHINES: bool = false;
+    const USE_CRAZY_MACHINES: bool = true;
     const ENABLE_VFNS: bool = true;
-    const VALIDATOR_COUNT: usize = 12;
+    const VALIDATOR_COUNT: usize = 10;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
-        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 500_000,
-        }))
+        .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::ConstTps { tps: 10_000 }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
@@ -1860,10 +1858,6 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             optimize_for_maximum_throughput(config);
 
             // Other consensus / Quroum store configs
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
