@@ -7,6 +7,7 @@ use crate::{
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
     check_change_set::CheckChangeSet,
+    resolver::ExecutorView,
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -364,18 +365,40 @@ impl VMChangeSet {
 
     /// Deposit amount is inserted into metadata at a different time than the WriteOp is created.
     /// So this method is needed to be able to update metadata generically across different variants.
-    pub fn write_set_iter_mut(
-        &mut self,
-    ) -> impl Iterator<Item = (&StateKey, WriteOpSize, &mut StateValueMetadata)> {
-        self.resource_write_set
-            .iter_mut()
-            .map(|(k, v)| (k, v.materialized_size(), v.get_metadata_mut()))
-            .chain(
-                self.module_write_set
-                    .iter_mut()
-                    .chain(self.aggregator_v1_write_set.iter_mut())
-                    .map(|(k, v)| (k, v.write_op_size(), v.get_metadata_mut())),
-            )
+    pub fn write_op_info_iter_mut<'a>(
+        &'a mut self,
+        executor_view: &'a dyn ExecutorView,
+    ) -> impl Iterator<Item = PartialVMResult<WriteOpInfo>> {
+        let resources = self.resource_write_set.iter_mut().map(|(key, op)| {
+            Ok(WriteOpInfo {
+                key,
+                op_size: op.materialized_size(),
+                prev_size: executor_view
+                    .get_resource_state_value_size(key)?
+                    .unwrap_or(0),
+                metadata_mut: op.get_metadata_mut(),
+            })
+        });
+        let modules = self.module_write_set.iter_mut().map(|(key, op)| {
+            Ok(WriteOpInfo {
+                key,
+                op_size: op.write_op_size(),
+                prev_size: executor_view.get_module_state_value_size(key)?.unwrap_or(0),
+                metadata_mut: op.get_metadata_mut(),
+            })
+        });
+        let v1_aggregators = self.aggregator_v1_write_set.iter_mut().map(|(key, op)| {
+            Ok(WriteOpInfo {
+                key,
+                op_size: op.write_op_size(),
+                prev_size: executor_view
+                    .get_aggregator_v1_state_value_size(key)?
+                    .unwrap_or(0),
+                metadata_mut: op.get_metadata_mut(),
+            })
+        });
+
+        resources.chain(modules).chain(v1_aggregators)
     }
 
     pub fn resource_write_set(&self) -> &BTreeMap<StateKey, AbstractResourceWriteOp> {
@@ -872,6 +895,13 @@ impl VMChangeSet {
         self.write_set_size_iter()
             .any(|(_key, op_size)| matches!(op_size, WriteOpSize::Creation { .. }))
     }
+}
+
+pub struct WriteOpInfo<'a> {
+    pub key: &'a StateKey,
+    pub op_size: WriteOpSize,
+    pub prev_size: usize,
+    pub metadata_mut: &'a mut StateValueMetadata,
 }
 
 // Tests are in test_change_set.rs.

@@ -521,7 +521,8 @@ impl AptosVM {
                 })?;
 
             let mut change_set = session.finish(change_set_configs)?;
-            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data) {
+            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)
+            {
                 info!(
                     *log_context,
                     "Failed during charge_change_set: {:?}. Most likely exceded gas limited.", err,
@@ -767,6 +768,7 @@ impl AptosVM {
         change_set: &mut VMChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
+        resolver: &impl AptosMoveResolver,
     ) -> Result<GasQuantity<Octa>, VMStatus> {
         for (key, op_size) in change_set.write_set_size_iter() {
             gas_meter.charge_io_gas_for_write(key, &op_size)?;
@@ -776,6 +778,7 @@ impl AptosVM {
             change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
+            resolver.as_executor_view(),
         )?;
         if !self.features.is_storage_deletion_refund_enabled() {
             storage_refund = 0.into();
@@ -793,7 +796,8 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let mut change_set = session.finish(change_set_configs)?;
-        let storage_refund = self.charge_change_set(&mut change_set, gas_meter, txn_data)?;
+        let storage_refund =
+            self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
 
         // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
