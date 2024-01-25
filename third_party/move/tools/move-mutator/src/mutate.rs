@@ -1,9 +1,11 @@
 use crate::configuration::Configuration;
+use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::parser::ast;
 use move_compiler::parser::ast::{
     Definition::{Address, Module, Script},
     Exp, FunctionBody_, ModuleMember, SequenceItem_,
 };
+use std::path::Path;
 
 use crate::mutant::Mutant;
 use crate::operator::MutationOp;
@@ -12,7 +14,11 @@ use crate::operators::unary::Unary;
 
 /// Traverses the AST, identifies places where mutation operators can be applied
 /// and returns a list of mutants.
-pub fn mutate(ast: ast::Program, conf: &Configuration) -> anyhow::Result<Vec<Mutant>> {
+pub fn mutate(
+    ast: ast::Program,
+    conf: &Configuration,
+    files: &FilesSourceText,
+) -> anyhow::Result<Vec<Mutant>> {
     trace!("Starting mutation process");
     let mutants = ast
         .source_definitions
@@ -21,10 +27,10 @@ pub fn mutate(ast: ast::Program, conf: &Configuration) -> anyhow::Result<Vec<Mut
             Address(addr) => addr
                 .modules
                 .into_iter()
-                .map(|m| traverse_module(m, conf))
+                .map(|m| traverse_module(m, conf, files))
                 .collect::<Vec<Result<Vec<_>, _>>>(),
-            Module(module) => vec![traverse_module(module, conf)],
-            Script(script) => vec![traverse_function(script.function)],
+            Module(module) => vec![traverse_module(module, conf, files)],
+            Script(script) => vec![traverse_function(script.function, conf, files)],
         })
         .collect::<Result<Vec<_>, _>>()?
         .concat();
@@ -39,6 +45,7 @@ pub fn mutate(ast: ast::Program, conf: &Configuration) -> anyhow::Result<Vec<Mut
 fn traverse_module(
     module: ast::ModuleDefinition,
     conf: &Configuration,
+    files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
     if conf
         .project
@@ -55,7 +62,7 @@ fn traverse_module(
         .members
         .into_iter()
         .filter_map(|member| match member {
-            ModuleMember::Function(func) => Some(traverse_function(func)),
+            ModuleMember::Function(func) => Some(traverse_function(func, conf, files)),
             ModuleMember::Constant(constant) => {
                 Some(parse_expression_and_find_mutants(constant.value))
             },
@@ -78,7 +85,25 @@ fn traverse_module(
 
 /// Traverses a single function and returns a list of mutants.
 /// Checks the body of the function by traversing all the sequences.
-fn traverse_function(function: ast::Function) -> anyhow::Result<Vec<Mutant>> {
+fn traverse_function(
+    function: ast::Function,
+    conf: &Configuration,
+    files: &FilesSourceText,
+) -> anyhow::Result<Vec<Mutant>> {
+    let (filename, _) = files.get(&function.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
+
+    // Check if function is included in individual configuration.
+    if let Some(ind) = conf.get_file_configuration(Path::new(filename.as_str())) {
+        if ind
+            .include_functions
+            .as_ref()
+            .is_some_and(|functions| !functions.contains(&function.name.to_string()))
+        {
+            trace!("Skipping function {}", function.name);
+            return Ok(vec![]);
+        }
+    }
+
     trace!("Traversing function {}", function.name);
     match function.body.value {
         FunctionBody_::Defined(elem) => traverse_sequence(elem),
