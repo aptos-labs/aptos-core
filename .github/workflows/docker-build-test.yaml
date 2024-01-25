@@ -322,7 +322,9 @@ jobs:
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null ||
+        contains(github.event.pull_request.body, '#e2e')
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
