@@ -149,8 +149,7 @@ mod tests {
             {
                 "project": {
                     "move_sources": ["/path/to/move/source"],
-                    "include_only_files": ["/path/to/include/file"],
-                    "exclude_files": ["/path/to/exclude/file"],
+                    "mutate_modules": ["mod1"],
                     "out_mutant_dir": "/path/to/output",
                     "verify_mutants": true,
                     "no_overwrite": false,
@@ -184,12 +183,8 @@ mod tests {
             vec![Path::new("/path/to/move/source")]
         );
         assert_eq!(
-            config.project.include_only_files.unwrap(),
-            vec![Path::new("/path/to/include/file")]
-        );
-        assert_eq!(
-            config.project.exclude_files.unwrap(),
-            vec![Path::new("/path/to/exclude/file")]
+            config.project.mutate_modules.unwrap(),
+            vec!["mod1".to_string()]
         );
         assert_eq!(
             config.project.out_mutant_dir,
