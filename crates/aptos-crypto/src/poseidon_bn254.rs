@@ -46,7 +46,7 @@ pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr>
 ///
 /// This function calls `pad_and_pack_bytes_to_scalars_no_len` safely as strings will not contain the zero byte except to terminate.
 pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
-    pad_and_hash_bytes_no_len(str.as_bytes(), max_bytes)
+    pad_and_hash_bytes_with_len(str.as_bytes(), max_bytes)
 }
 
 /// Given $n$ bytes, this function returns $k$ field elements that pack those bytes as tightly as
@@ -96,9 +96,9 @@ pub fn pad_and_pack_bytes_to_scalars_with_len(
     }
 
     let len_scalar = pack_bytes_to_one_scalar(&len.to_le_bytes())?;
-    let scalars = [len_scalar]
+    let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?
         .into_iter()
-        .chain(pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?)
+        .chain([len_scalar])
         .collect::<Vec<ark_bn254::Fr>>();
     Ok(scalars)
 }
@@ -152,6 +152,7 @@ fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
 /// example ASCII strings. Otherwise unexpected collisions can occur.
 ///
 /// Due to risk of collisions due to improper use by the caller, it is not exposed.
+#[allow(unused)]
 fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?;
     hash_scalars(scalars)

@@ -18,17 +18,261 @@ use aptos_types::{
         authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
         SignedTransaction,
     },
-    zkid::{IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
+    zkid::{IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, Groth16Zkp},
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
 
-async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
-    let maybe_response = rest_client
-        .get_account_resource_bcs::<PatchedJWKs>(AccountAddress::ONE, "0x1::jwks::PatchedJWKs")
+#[tokio::test]
+async fn test_openid_signature_transaction_submission() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(0)
         .await;
-    let response = maybe_response.unwrap();
-    response.into_inner()
+    test_setup(&mut swarm, &mut cli).await;
+
+    let mut info = swarm.aptos_public_info();
+
+    let pepper = Pepper::new([0u8; 31]);
+    let idc =
+        IdCommitment::new_from_preimage(&pepper, "test_client_id", "sub", "test_account").unwrap();
+    let sender_zkid_public_key = ZkIdPublicKey {
+        iss: "https://accounts.google.com".to_owned(),
+        idc,
+    };
+    let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key.clone());
+    let account_address = info
+        .create_user_account_with_any_key(&sender_any_public_key)
+        .await
+        .unwrap();
+    info.mint(account_address, 10_000_000_000).await.unwrap();
+
+    let ephemeral_private_key: Ed25519PrivateKey = EncodingType::Hex
+        .decode_key(
+            "zkid test ephemeral private key",
+            "0x1111111111111111111111111111111111111111111111111111111111111111"
+                .as_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+    let ephemeral_account: aptos_sdk::types::LocalAccount = LocalAccount::new(
+        account_address,
+        AccountKey::from_private_key(ephemeral_private_key),
+        0,
+    );
+    let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_account.public_key().clone());
+
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let raw_txn = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
+        .sender(account_address)
+        .sequence_number(1)
+        .build();
+
+    let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
+    let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
+
+    let epk_blinder: [u8; 31] = [0u8; 31];
+    let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
+
+    let openid_signature = OpenIdSig {
+        jwt_sig,
+        jwt_payload,
+        uid_key: "sub".to_string(),
+        epk_blinder,
+        pepper,
+    };
+
+    let zk_sig = ZkIdSignature {
+        sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
+        jwt_header,
+        exp_timestamp_secs: 1707812836,
+        ephemeral_pubkey: ephemeral_public_key,
+        ephemeral_signature,
+    };
+
+    let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
+
+    info!("Submit openid transaction");
+    info.client()
+        .submit_without_serializing_response(&signed_txn)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+    test_setup(&mut swarm, &mut cli).await;
+    let mut info = swarm.aptos_public_info();
+
+    let pepper = Pepper::new([0u8; 31]);
+    let idc =
+        IdCommitment::new_from_preimage(&pepper, "test_client_id", "sub", "test_account").unwrap();
+    let sender_zkid_public_key = ZkIdPublicKey {
+        iss: "https://accounts.google.com".to_owned(),
+        idc,
+    };
+    let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key.clone());
+    let account_address = info
+        .create_user_account_with_any_key(&sender_any_public_key)
+        .await
+        .unwrap();
+    info.mint(account_address, 10_000_000_000).await.unwrap();
+
+    let ephemeral_private_key: Ed25519PrivateKey = EncodingType::Hex
+        .decode_key(
+            "zkid test ephemeral private key",
+            "0x1111111111111111111111111111111111111111111111111111111111111111"
+                .as_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+    let ephemeral_account: aptos_sdk::types::LocalAccount = LocalAccount::new(
+        account_address,
+        AccountKey::from_private_key(ephemeral_private_key),
+        0,
+    );
+    let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_account.public_key().clone());
+
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let raw_txn = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
+        .sender(account_address)
+        .sequence_number(1)
+        .build();
+
+    let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
+    let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
+
+    let epk_blinder: [u8; 31] = [0u8; 31];
+    let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "bad_signature".to_string();
+
+    let openid_signature = OpenIdSig {
+        jwt_sig,
+        jwt_payload,
+        uid_key: "sub".to_string(),
+        epk_blinder,
+        pepper,
+    };
+
+    let zk_sig = ZkIdSignature {
+        sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
+        jwt_header,
+        exp_timestamp_secs: 1707812836,
+        ephemeral_pubkey: ephemeral_public_key,
+        ephemeral_signature,
+    };
+
+    let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
+
+    info!("Submit openid transaction");
+    let _err = info
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await
+        .unwrap_err();
+}
+
+#[tokio::test]
+async fn test_openid_signature_transaction_submission_epk_expired() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+    test_setup(&mut swarm, &mut cli).await;
+    let mut info = swarm.aptos_public_info();
+
+    let pepper = Pepper::new([0u8; 31]);
+    let idc =
+        IdCommitment::new_from_preimage(&pepper, "test_client_id", "sub", "test_account").unwrap();
+    let sender_zkid_public_key = ZkIdPublicKey {
+        iss: "https://accounts.google.com".to_owned(),
+        idc,
+    };
+    let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key.clone());
+    let account_address = info
+        .create_user_account_with_any_key(&sender_any_public_key)
+        .await
+        .unwrap();
+    info.mint(account_address, 10_000_000_000).await.unwrap();
+
+    let ephemeral_private_key: Ed25519PrivateKey = EncodingType::Hex
+        .decode_key(
+            "zkid test ephemeral private key",
+            "0x1111111111111111111111111111111111111111111111111111111111111111"
+                .as_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+    let ephemeral_account: aptos_sdk::types::LocalAccount = LocalAccount::new(
+        account_address,
+        AccountKey::from_private_key(ephemeral_private_key),
+        0,
+    );
+    let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_account.public_key().clone());
+
+    let recipient = info
+        .create_and_fund_user_account(20_000_000_000)
+        .await
+        .unwrap();
+
+    let raw_txn = info
+        .transaction_factory()
+        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
+        .sender(account_address)
+        .sequence_number(1)
+        .build();
+
+    let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
+    let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
+
+    let epk_blinder: [u8; 31] = [0u8; 31];
+    let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
+
+    let openid_signature = OpenIdSig {
+        jwt_sig,
+        jwt_payload,
+        uid_key: "sub".to_string(),
+        epk_blinder,
+        pepper,
+    };
+
+    let zk_sig = ZkIdSignature {
+        sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
+        jwt_header,
+        exp_timestamp_secs: 1704909236,
+        ephemeral_pubkey: ephemeral_public_key,
+        ephemeral_signature,
+    };
+
+    let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
+
+    info!("Submit openid transaction");
+    let _err = info
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await
+        .unwrap_err();
 }
 
 async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
@@ -99,254 +343,10 @@ fun main(core_resources: &signer) {{
     info.root_account().increment_sequence_number();
 }
 
-#[tokio::test]
-async fn test_openid_signature_transaction_submission() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_aptos()
-        .build_with_cli(0)
+async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
+    let maybe_response = rest_client
+        .get_account_resource_bcs::<PatchedJWKs>(AccountAddress::ONE, "0x1::jwks::PatchedJWKs")
         .await;
-    test_setup(&mut swarm, &mut cli).await;
-
-    let mut info = swarm.aptos_public_info();
-
-    let pepper = Pepper::new([0u8; 31]);
-    let idc =
-        IdCommitment::new_from_preimage("test_client_id", "sub", "test_account", &pepper).unwrap();
-    let sender_zkid_public_key = ZkIdPublicKey {
-        iss: "https://accounts.google.com".to_owned(),
-        idc,
-    };
-    let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key.clone());
-    let account_address = info
-        .create_user_account_with_any_key(&sender_any_public_key)
-        .await
-        .unwrap();
-    info.mint(account_address, 10_000_000_000).await.unwrap();
-
-    let ephemeral_private_key: Ed25519PrivateKey = EncodingType::Hex
-        .decode_key(
-            "zkid test ephemeral private key",
-            "0x1111111111111111111111111111111111111111111111111111111111111111"
-                .as_bytes()
-                .to_vec(),
-        )
-        .unwrap();
-    let ephemeral_account: aptos_sdk::types::LocalAccount = LocalAccount::new(
-        account_address,
-        AccountKey::from_private_key(ephemeral_private_key),
-        0,
-    );
-    let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_account.public_key().clone());
-
-    let recipient = info
-        .create_and_fund_user_account(20_000_000_000)
-        .await
-        .unwrap();
-
-    let raw_txn = info
-        .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
-        .sender(account_address)
-        .sequence_number(1)
-        .build();
-
-    let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
-    let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-    let epk_blinder: [u8; 31] = [0u8; 31];
-    let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJFVVRhSE9HdDcwRTNxbk9QMUJibnUzbE03QjR5TTdzaHZTb1NvdXF1VVJ3IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "CEgO4S7hRgASaINsGST5Ygtl_CY-mUn2GaQ6d7q9q1eGz1MjW0o0yusJQDU6Hi1nDfXlNSvCF2SgD9ayG3uDGC5-18H0AWo2QgyZ2rC_OUa36RCTmhdo-i_H8xmwPxa3yHZZsGC-gJy_vVX-rfMLIh-JgdIFFIzGVPN75MwXLP3bYUaB9Lw52g50rf_006Qg5ubkZ70I13vGUTVbRVWanQIN69naFqHreLCjVsGsEBVBoUtexZw6Ulr8s0VajBpcTUqlMvbvqMfQ33NXaBQYvu3YZivpkus8rcG_eAMrFbYFY9AZF7AaW2HUaYo5QjzMQDsIA1lpnAcOW3GzWvb0vw".to_string();
-
-    let openid_signature = OpenIdSig {
-        jwt_sig,
-        jwt_payload,
-        uid_key: "sub".to_string(),
-        epk_blinder,
-        pepper,
-    };
-
-    let zk_sig = ZkIdSignature {
-        sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-        jwt_header,
-        exp_timestamp_secs: 2000000000,
-        ephemeral_pubkey: ephemeral_public_key,
-        ephemeral_signature,
-    };
-
-    let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
-
-    info!("Submit openid transaction");
-    info.client()
-        .submit_without_serializing_response(&signed_txn)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_aptos()
-        .build_with_cli(0)
-        .await;
-    test_setup(&mut swarm, &mut cli).await;
-    let mut info = swarm.aptos_public_info();
-
-    let pepper = Pepper::new([0u8; 31]);
-    let idc =
-        IdCommitment::new_from_preimage("test_client_id", "sub", "test_account", &pepper).unwrap();
-    let sender_zkid_public_key = ZkIdPublicKey {
-        iss: "https://accounts.google.com".to_owned(),
-        idc,
-    };
-    let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key.clone());
-    let account_address = info
-        .create_user_account_with_any_key(&sender_any_public_key)
-        .await
-        .unwrap();
-    info.mint(account_address, 10_000_000_000).await.unwrap();
-
-    let ephemeral_private_key: Ed25519PrivateKey = EncodingType::Hex
-        .decode_key(
-            "zkid test ephemeral private key",
-            "0x1111111111111111111111111111111111111111111111111111111111111111"
-                .as_bytes()
-                .to_vec(),
-        )
-        .unwrap();
-    let ephemeral_account: aptos_sdk::types::LocalAccount = LocalAccount::new(
-        account_address,
-        AccountKey::from_private_key(ephemeral_private_key),
-        0,
-    );
-    let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_account.public_key().clone());
-
-    let recipient = info
-        .create_and_fund_user_account(20_000_000_000)
-        .await
-        .unwrap();
-
-    let raw_txn = info
-        .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
-        .sender(account_address)
-        .sequence_number(1)
-        .build();
-
-    let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
-    let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-    let epk_blinder: [u8; 31] = [0u8; 31];
-    let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJFVVRhSE9HdDcwRTNxbk9QMUJibnUzbE03QjR5TTdzaHZTb1NvdXF1VVJ3IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "bad_signature".to_string();
-
-    let openid_signature = OpenIdSig {
-        jwt_sig,
-        jwt_payload,
-        uid_key: "sub".to_string(),
-        epk_blinder,
-        pepper,
-    };
-
-    let zk_sig = ZkIdSignature {
-        sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-        jwt_header,
-        exp_timestamp_secs: 2000000000,
-        ephemeral_pubkey: ephemeral_public_key,
-        ephemeral_signature,
-    };
-
-    let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
-
-    info!("Submit openid transaction");
-    let _err = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await
-        .unwrap_err();
-}
-
-#[tokio::test]
-async fn test_openid_signature_transaction_submission_epk_expired() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_aptos()
-        .build_with_cli(0)
-        .await;
-    test_setup(&mut swarm, &mut cli).await;
-    let mut info = swarm.aptos_public_info();
-
-    let pepper = Pepper::new([0u8; 31]);
-    let idc =
-        IdCommitment::new_from_preimage("test_client_id", "sub", "test_account", &pepper).unwrap();
-    let sender_zkid_public_key = ZkIdPublicKey {
-        iss: "https://accounts.google.com".to_owned(),
-        idc,
-    };
-    let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key.clone());
-    let account_address = info
-        .create_user_account_with_any_key(&sender_any_public_key)
-        .await
-        .unwrap();
-    info.mint(account_address, 10_000_000_000).await.unwrap();
-
-    let ephemeral_private_key: Ed25519PrivateKey = EncodingType::Hex
-        .decode_key(
-            "zkid test ephemeral private key",
-            "0x1111111111111111111111111111111111111111111111111111111111111111"
-                .as_bytes()
-                .to_vec(),
-        )
-        .unwrap();
-    let ephemeral_account: aptos_sdk::types::LocalAccount = LocalAccount::new(
-        account_address,
-        AccountKey::from_private_key(ephemeral_private_key),
-        0,
-    );
-    let ephemeral_public_key = EphemeralPublicKey::ed25519(ephemeral_account.public_key().clone());
-
-    let recipient = info
-        .create_and_fund_user_account(20_000_000_000)
-        .await
-        .unwrap();
-
-    let raw_txn = info
-        .transaction_factory()
-        .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
-        .sender(account_address)
-        .sequence_number(1)
-        .build();
-
-    let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
-    let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
-
-    let epk_blinder: [u8; 31] = [0u8; 31];
-    let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJIVEtvTDVGTDFOb0N1Vm1faHF1UWk2ZzAxckxPNjVhT2hQck5BVWxETVNNIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "yX7vGd87u3O78GyBU7IuKnimM69yusEURgN4bXsXhJsujWTGQfvwVrXemO_gmWkykw2Awx-Vr8sNFD7vbNdbkLIdRAxoYow0hMNNvpcvAKriOiRX3ObGEJjpJNbiexQt6hJLh5sSfOW0wCmD_82KsOrNqDvegj1y-d_uemgrX9-I52tLemO76bplJQdFx5X-q2pC8y5HV4VsSgsigxpPfZ7lIwSB5db6vubTgPIYvzXnAajZkpAR-uMRFo1RoOtukeQjGBVxt104DIBh0sLW_9EH2f9j_7L6YWBtilpLSWBea2qDJ1dGPG_BvpBqVm5hcVy8qHRnX6fJXKMXnXvTKQ".to_string();
-
-    let openid_signature = OpenIdSig {
-        jwt_sig,
-        jwt_payload,
-        uid_key: "sub".to_string(),
-        epk_blinder,
-        pepper,
-    };
-
-    let zk_sig = ZkIdSignature {
-        sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
-        jwt_header,
-        exp_timestamp_secs: 1704909236,
-        ephemeral_pubkey: ephemeral_public_key,
-        ephemeral_signature,
-    };
-
-    let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
-
-    info!("Submit openid transaction");
-    let _err = info
-        .client()
-        .submit_without_serializing_response(&signed_txn)
-        .await
-        .unwrap_err();
+    let response = maybe_response.unwrap();
+    response.into_inner()
 }

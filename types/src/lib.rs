@@ -60,6 +60,7 @@ pub mod aggregate_signature;
 pub mod aggregator;
 pub mod block_executor;
 pub mod bytes;
+pub mod circom;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

@@ -20,6 +20,7 @@ aptos-crypto-derive = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ff = { workspace = true }
+ark-groth16 = "0.4.0"
 ark-serialize = { workspace = true }
 arr_macro = { workspace = true }
 base64 = { workspace = true }

@@ -1683,7 +1683,7 @@ mod tests {
             "iss": "{}",
             "{}": "{}",
             "aud": "{}",
-            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "nonce": "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
             "exp": 1311281970,
             "iat": 1311280970,
             "name": "Jane Doe",
@@ -1697,7 +1697,7 @@ mod tests {
             iss, uid_key, uid_val, aud
         );
         let idc =
-            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+            IdCommitment::new_from_preimage(&Pepper::from_number(pepper), aud, uid_key, uid_val)
                 .unwrap();
         let zkid_pubkey = ZkIdPublicKey {
             iss: iss.to_owned(),
@@ -1712,7 +1712,7 @@ mod tests {
             &jwt_payload_json,
         );
         let verification_result = signed_txn.verify_signature();
-        assert!(verification_result.is_ok());
+        verification_result.unwrap();
     }
 
     #[test]
@@ -1733,7 +1733,7 @@ mod tests {
             "iss": "{}",
             "{}": "{}",
             "aud": "{}",
-            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "nonce": "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
             "exp": 1311281970,
             "iat": 1311280970,
             "name": "Jane Doe",
@@ -1747,7 +1747,7 @@ mod tests {
             iss, uid_key, uid_val, aud
         );
         let idc =
-            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+            IdCommitment::new_from_preimage(&Pepper::from_number(pepper), aud, uid_key, uid_val)
                 .unwrap();
         let zkid_pubkey = ZkIdPublicKey {
             iss: iss.to_owned(),
@@ -1781,7 +1781,7 @@ mod tests {
             "iss": "{}",
             "{}": "{}",
             "aud": "{}",
-            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "nonce": "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
             "exp": 1311281970,
             "iat": 1311280970,
             "name": "Jane Doe",
@@ -1795,7 +1795,7 @@ mod tests {
             iss, uid_key, uid_val, aud
         );
         let idc =
-            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+            IdCommitment::new_from_preimage(&Pepper::from_number(pepper), aud, uid_key, uid_val)
                 .unwrap();
         let zkid_pubkey = ZkIdPublicKey {
             iss: iss.to_owned(),
@@ -1830,7 +1830,7 @@ mod tests {
             "iss": "{}",
             "{}": "{}",
             "aud": "{}",
-            "nonce": "7BgjE1MZgLKY_4NwVWoJKUKPgpBcB0espRwKYASGkgw",
+            "nonce": "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
             "exp": {},
             "iat": 1311280970,
             "name": "Jane Doe",
@@ -1844,7 +1844,7 @@ mod tests {
             iss, uid_key, "bad_uid_val", aud, exp_timestamp_secs
         );
         let idc =
-            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+            IdCommitment::new_from_preimage(&Pepper::from_number(pepper), aud, uid_key, uid_val)
                 .unwrap();
         let zkid_pubkey = ZkIdPublicKey {
             iss: iss.to_owned(),
@@ -1893,7 +1893,7 @@ mod tests {
             iss, uid_key, uid_val, aud, exp_timestamp_secs
         );
         let idc =
-            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+            IdCommitment::new_from_preimage(&Pepper::from_number(pepper), aud, uid_key, uid_val)
                 .unwrap();
         let zkid_pubkey = ZkIdPublicKey {
             iss: iss.to_owned(),
@@ -1915,7 +1915,7 @@ mod tests {
     fn verify_zkid_open_id_single_key_auth_fails_with_bad_ephemeral_signature() {
         let pepper = Pepper::from_number(76);
         let idc =
-            IdCommitment::new_from_preimage("s6BhdRkqt3", "sub", "248289761001", &pepper).unwrap();
+            IdCommitment::new_from_preimage(&pepper, "s6BhdRkqt3", "sub", "248289761001").unwrap();
         let sender_zkid_public_key = ZkIdPublicKey {
             iss: "https://server.example.com".to_owned(),
             idc,
@@ -2017,7 +2017,7 @@ mod tests {
             iss, uid_key, uid_val, aud, exp_timestamp_secs
         );
         let idc =
-            IdCommitment::new_from_preimage(aud, uid_key, uid_val, &Pepper::from_number(pepper))
+            IdCommitment::new_from_preimage(&Pepper::from_number(pepper), aud, uid_key, uid_val)
                 .unwrap();
         let zkid_pubkey = ZkIdPublicKey {
             iss: "bad_iss".to_owned(),

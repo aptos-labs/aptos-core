@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    chain_id::ChainId,
+    circom::{DEV_VERIFYING_KEY, G1, G2},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -10,9 +12,10 @@ use crate::{
         SignedTransaction,
     },
 };
-use anyhow::{anyhow, ensure, Context, Ok, Result};
+use anyhow::{anyhow, bail, ensure, Context, Ok, Result};
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use ark_bn254;
+use ark_groth16::{Groth16, Proof};
 use ark_serialize::CanonicalSerialize;
 use base64::{URL_SAFE, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -32,12 +35,12 @@ pub const IDC_NUM_BYTES: usize = 32;
 // TODO(ZkIdGroth16Zkp): add some static asserts here that these don't exceed the MAX poseidon input sizes
 // TODO(ZkIdGroth16Zkp): determine what our circuit will accept
 
-pub const MAX_EPK_BYTES: usize = 93; // Supports public key lengths of up to 93 bytes.
-pub const MAX_ISS_BYTES: usize = 248;
-pub const MAX_AUD_VAL_BYTES: usize = 248;
-pub const MAX_UID_KEY_BYTES: usize = 248;
-pub const MAX_UID_VAL_BYTES: usize = 248;
-pub const MAX_JWT_HEADER_BYTES: usize = 248;
+pub const MAX_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR; // Supports public key lengths of up to 93 bytes.
+pub const MAX_ISS_BYTES: usize = 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_JWT_HEADER_BYTES: usize = 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
 pub const MAX_ZK_PUBLIC_KEY_BYTES: usize = MAX_ISS_BYTES + MAX_EPK_BYTES;
 
@@ -49,7 +52,7 @@ pub const MAX_ZK_SIGNATURE_BYTES: usize = 2048;
 pub const MAX_ZK_ID_AUTHENTICATORS_ALLOWED: usize = 10;
 
 // How far in the future from the JWT issued at time the EPK expiry can be set.
-pub const MAX_EXPIRY_HORIZON_SECS: u64 = 1728000000; // 20000 days TODO(zkid): finalize this value
+pub const MAX_EXPIRY_HORIZON_SECS: u64 = 100255944; // 1159.55 days TODO(zkid): finalize this value
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct JwkId {
@@ -113,10 +116,11 @@ impl OpenIdSig {
 
         ensure!(
             IdCommitment::new_from_preimage(
+                &self.pepper,
                 &claims.oidc_claims.aud,
                 &self.uid_key,
-                &uid_val,
-                &self.pepper
+                &uid_val
+
             )?
             .eq(&pk.idc),
             "Address IDC verification failed"
@@ -225,8 +229,6 @@ impl Claims {
     }
 }
 
-pub type G1 = Vec<String>;
-pub type G2 = Vec<Vec<String>>;
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct Groth16Zkp {
     a: G1,
@@ -239,6 +241,31 @@ impl TryFrom<&[u8]> for Groth16Zkp {
 
     fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
         bcs::from_bytes::<Groth16Zkp>(bytes).map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+impl Groth16Zkp {
+    pub fn new(a: G1, b: G2, c: G1) -> Self {
+        Groth16Zkp { a, b, c }
+    }
+
+    pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
+        let vk = match chain_id.is_mainnet() {
+            true => {
+                bail!("verifying key for main net missing")
+            },
+            false => &DEV_VERIFYING_KEY,
+        };
+        let proof: Proof<ark_bn254::Bn254> = Proof {
+            a: self.a.to_affine()?,
+            b: self.b.to_affine()?,
+            c: self.c.to_affine()?,
+        };
+        let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
+        if !result {
+            bail!("groth16 proof verification failed")
+        }
+        Ok(())
     }
 }
 
@@ -339,10 +366,10 @@ pub struct IdCommitment(pub(crate) [u8; IDC_NUM_BYTES]);
 
 impl IdCommitment {
     pub fn new_from_preimage(
+        pepper: &Pepper,
         aud: &str,
         uid_key: &str,
         uid_val: &str,
-        pepper: &Pepper,
     ) -> Result<Self> {
         let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES)?;
         let uid_key_hash = poseidon_bn254::pad_and_hash_string(uid_key, MAX_UID_KEY_BYTES)?;
@@ -350,10 +377,10 @@ impl IdCommitment {
         let pepper_scalar = poseidon_bn254::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
 
         let fr = poseidon_bn254::hash_scalars(vec![
-            aud_val_hash,
-            uid_key_hash,
-            uid_val_hash,
             pepper_scalar,
+            aud_val_hash,
+            uid_val_hash,
+            uid_key_hash,
         ])?;
 
         let mut idc_bytes = [0u8; IDC_NUM_BYTES];

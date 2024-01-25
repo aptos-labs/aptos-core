@@ -4,11 +4,15 @@
 use crate::move_any::Any as MoveAny;
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
 use anyhow::{anyhow, ensure, Result};
+use aptos_crypto::poseidon_bn254;
+use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::str::FromStr;
+
+pub const RSA_MODULUS_BYTES: usize = 256;
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 #[allow(non_camel_case_types)]
@@ -31,6 +35,20 @@ impl RSA_JWK {
             e: e.to_string(),
             n: n.to_string(),
         }
+    }
+
+    pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
+        let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
+        // println!("{:?}",hex::encode(modulus.clone()));
+        modulus.reverse();
+        let mut scalars = modulus
+            .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
+            .map(|chunk| {
+                poseidon_bn254::pack_bytes_to_one_scalar(chunk).expect("chunk converts to scalar")
+            })
+            .collect::<Vec<ark_bn254::Fr>>();
+        scalars.push(ark_bn254::Fr::from(RSA_MODULUS_BYTES as i32));
+        poseidon_bn254::hash_scalars(scalars)
     }
 
     pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {

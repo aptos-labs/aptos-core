@@ -4,15 +4,26 @@
 
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
 use aptos_types::{
+    chain_id::ChainId,
+    circom::get_public_inputs_hash,
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     transaction::SignedTransaction,
     vm_status::{StatusCode, VMStatus},
-    zkid::{ZkpOrOpenIdSig, MAX_ZK_ID_AUTHENTICATORS_ALLOWED},
+    zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_ZK_ID_AUTHENTICATORS_ALLOWED},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+
+fn get_chain_id(resolver: &impl AptosMoveResolver) -> anyhow::Result<ChainId, VMStatus> {
+    ChainId::fetch_config(resolver).ok_or_else(|| {
+        VMStatus::error(
+            StatusCode::VALUE_DESERIALIZATION_ERROR,
+            Some("could not fetch ChainId from on-chain config".to_string()),
+        )
+    })
+}
 
 fn get_current_time_onchain(
     resolver: &impl AptosMoveResolver,
@@ -36,6 +47,35 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
         .ok_or_else(|| error_status.clone())?;
     let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes).map_err(|_| error_status.clone())?;
     Ok(jwks)
+}
+
+fn get_jwk_for_zk_authenticator(
+    jwks: &PatchedJWKs,
+    zkid_pub_key: &ZkIdPublicKey,
+    zkid_sig: &ZkIdSignature
+) -> anyhow::Result<JWK, VMStatus> {
+    let jwt_header_parsed = zkid_sig.parse_jwt_header().map_err(|_| {
+        VMStatus::error(
+            StatusCode::INVALID_SIGNATURE,
+            Some("Failed to get JWT header".to_owned()),
+        )
+    })?;
+    let jwk_move_struct = jwks
+        .get_jwk(&zkid_pub_key.iss, &jwt_header_parsed.kid)
+        .map_err(|_| {
+            VMStatus::error(
+                StatusCode::INVALID_SIGNATURE,
+                Some("JWK not found".to_owned()),
+            )
+        })?;
+
+    let jwk = JWK::try_from(jwk_move_struct).map_err(|_| {
+        VMStatus::error(
+            StatusCode::INVALID_SIGNATURE,
+            Some("Could not parse JWK".to_owned()),
+        )
+    })?;
+    Ok(jwk)
 }
 
 pub fn validate_zkid_authenticators(
@@ -80,32 +120,40 @@ pub fn validate_zkid_authenticators(
     let patched_jwks = get_jwks_onchain(resolver)?;
 
     for (zkid_pub_key, zkid_sig) in &zkid_authenticators {
-        let jwt_header_parsed = zkid_sig.parse_jwt_header().map_err(|_| {
-            VMStatus::error(
-                StatusCode::INVALID_SIGNATURE,
-                Some("Failed to get JWT header".to_owned()),
-            )
-        })?;
-        let jwk_move_struct = patched_jwks
-            .get_jwk(&zkid_pub_key.iss, &jwt_header_parsed.kid)
-            .map_err(|_| {
-                VMStatus::error(
-                    StatusCode::INVALID_SIGNATURE,
-                    Some("JWK not found".to_owned()),
-                )
-            })?;
 
-        let jwk = JWK::try_from(jwk_move_struct).map_err(|_| {
-            VMStatus::error(
-                StatusCode::INVALID_SIGNATURE,
-                Some("Could not parse JWK".to_owned()),
-            )
-        })?;
-
-        let jwt_header = &zkid_sig.jwt_header;
+        let jwk = get_jwk_for_zk_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
 
         match &zkid_sig.sig {
-            ZkpOrOpenIdSig::Groth16Zkp(_) => {},
+            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+                match jwk {
+                    JWK::RSA(rsa_jwk) => {
+                        let public_inputs_hash =
+                            get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk).map_err(
+                                |_| {
+                                    VMStatus::error(
+                                        StatusCode::INVALID_SIGNATURE,
+                                        Some("Could not compute public inputs hash".to_owned()),
+                                    )
+                                },
+                            )?;
+                        let chain_id = get_chain_id(resolver)?;
+                        proof
+                            .verify_proof(public_inputs_hash, chain_id)
+                            .map_err(|_| {
+                                VMStatus::error(
+                                    StatusCode::INVALID_SIGNATURE,
+                                    Some("Proof verification failed".to_owned()),
+                                )
+                        })?;
+                    },
+                    JWK::Unsupported(_) => {
+                        return Err(VMStatus::error(
+                            StatusCode::INVALID_SIGNATURE,
+                            Some("JWK is not supported".to_owned()),
+                        ))
+                    },
+                }
+            },
             ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
                 match jwk {
                     JWK::RSA(rsa_jwk) => {
@@ -121,7 +169,7 @@ pub fn validate_zkid_authenticators(
                         //
                         // We are now ready to verify the RSA signature
                         openid_sig
-                            .verify_jwt_signature(rsa_jwk, jwt_header)
+                            .verify_jwt_signature(rsa_jwk, &zkid_sig.jwt_header)
                             .map_err(|_| {
                                 VMStatus::error(
                                     StatusCode::INVALID_SIGNATURE,
