@@ -18,7 +18,7 @@ use aptos_types::{
         authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
         SignedTransaction,
     },
-    zkid::{IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, Groth16Zkp},
+    zkid::{IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
