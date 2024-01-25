@@ -10607,6 +10607,7 @@ dependencies = [
 name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "bcs 0.1.4",
  "clap 4.4.16",
@@ -10977,6 +10978,7 @@ dependencies = [
 name = "move-prover-bytecode-pipeline"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "async-trait",
  "atty",
