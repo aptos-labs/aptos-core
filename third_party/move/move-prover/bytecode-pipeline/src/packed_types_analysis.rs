@@ -17,6 +17,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Operation},
     COMPILED_MODULE_AVAILABLE,
 };
+use abstract_domain_derive::AbstractDomain;
 use std::collections::BTreeSet;
 
 /// Get all closed types that may be packed by (1) genesis and (2) all transaction scripts.
@@ -74,25 +75,12 @@ pub fn get_packed_types(
     packed_types
 }
 
-#[derive(Debug, Clone, Default, Eq, PartialOrd, PartialEq)]
+#[derive(AbstractDomain, Debug, Clone, Default, Eq, PartialOrd, PartialEq)]
 struct PackedTypesState {
     // Closed types (i.e., with no free type variables) that may be directly or transitively packed by this function.
     closed_types: SetDomain<StructTag>,
     // Open types (i.e., with free type variables) that may be directly or transitively packed by this function.
     open_types: SetDomain<Type>,
-}
-
-impl AbstractDomain for PackedTypesState {
-    // TODO: would be cool to add a derive(Join) macro for this
-    fn join(&mut self, other: &Self) -> JoinResult {
-        match (
-            self.closed_types.join(&other.closed_types),
-            self.open_types.join(&other.open_types),
-        ) {
-            (JoinResult::Unchanged, JoinResult::Unchanged) => JoinResult::Unchanged,
-            _ => JoinResult::Changed,
-        }
-    }
 }
 
 struct PackedTypesAnalysis<'a> {
