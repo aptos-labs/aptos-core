@@ -1672,6 +1672,19 @@ impl GlobalEnv {
         self.get_module(fun.module_id).into_function(fun.id)
     }
 
+    /// Sets the AST based definition of the function.
+    pub fn set_function_def(&mut self, fun: QualifiedId<FunId>, def: Exp) {
+        let data = self
+            .module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .function_data
+            .get_mut(&fun.id)
+            .unwrap();
+        data.called_funs = Some(def.called_funs());
+        data.def = Some(def);
+    }
+
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
@@ -2204,7 +2217,7 @@ impl GlobalEnv {
             writer.unindent()
         }
         let fun_def = fun.get_def();
-        if let Some(exp) = fun_def.as_deref() {
+        if let Some(exp) = fun_def {
             emitln!(writer, " {");
             writer.indent();
             emitln!(writer, "{}", exp.display_for_fun(fun.clone()));
@@ -3499,7 +3512,7 @@ pub struct FunctionData {
 
     /// Optional definition associated with this function. The definition is available if
     /// the model is build with option `ModelBuilderOptions::compile_via_model`.
-    pub(crate) def: RefCell<Option<Exp>>,
+    pub(crate) def: Option<Exp>,
 
     /// A cache for the called functions.
     pub(crate) called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
@@ -4021,13 +4034,8 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns associated definition. The definition of the function, in Exp form, is available
     /// if the model is build with `ModelBuilderOptions::compile_via_model`
-    pub fn get_def(&'env self) -> Ref<Option<Exp>> {
-        self.data.def.borrow()
-    }
-
-    /// Replaces mutable reference to associated definition, allowing modification.
-    pub fn get_mut_def(&'env self) -> RefMut<Option<Exp>> {
-        self.data.def.borrow_mut()
+    pub fn get_def(&self) -> Option<&Exp> {
+        self.data.def.as_ref()
     }
 
     /// Returns the acquired global resource types, if a bytecode module is attached.

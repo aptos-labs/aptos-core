@@ -104,11 +104,11 @@ fn update_rocksdb_properties(
         }
 
         for cf in write_set_db_column_families() {
-            set_property(cf, ledger_db.write_set_db())?;
+            set_property(cf, ledger_db.write_set_db_raw())?;
         }
 
         for cf in transaction_info_db_column_families() {
-            set_property(cf, ledger_db.transaction_info_db())?;
+            set_property(cf, ledger_db.transaction_info_db_raw())?;
         }
 
         for cf in transaction_db_column_families() {
@@ -120,7 +120,7 @@ fn update_rocksdb_properties(
         }
 
         for cf in transaction_accumulator_db_column_families() {
-            set_property(cf, ledger_db.transaction_accumulator_db())?;
+            set_property(cf, ledger_db.transaction_accumulator_db_raw())?;
         }
 
         for cf in state_kv_db_column_families() {

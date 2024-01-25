@@ -18,6 +18,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     transaction::{
         authenticator::{
@@ -302,6 +303,22 @@ impl From<(TransactionInfo, WriteSetPayload, Vec<Event>)> for Transaction {
 
 impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
     fn from((txn, info, events): (&BlockMetadata, TransactionInfo, Vec<Event>)) -> Self {
+        Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
+            info,
+            id: txn.id().into(),
+            epoch: txn.epoch().into(),
+            round: txn.round().into(),
+            events,
+            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
+            proposer: txn.proposer().into(),
+            failed_proposer_indices: txn.failed_proposer_indices().clone(),
+            timestamp: txn.timestamp_usecs().into(),
+        })
+    }
+}
+
+impl From<(&BlockMetadataExt, TransactionInfo, Vec<Event>)> for Transaction {
+    fn from((txn, info, events): (&BlockMetadataExt, TransactionInfo, Vec<Event>)) -> Self {
         Transaction::BlockMetadataTransaction(BlockMetadataTransaction {
             info,
             id: txn.id().into(),

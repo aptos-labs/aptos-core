@@ -271,7 +271,7 @@ object "A3_AccountStateMachine" {
                     }
                     case 5 {
                         // label L0
-                        // destroy($t5)
+                        // drop($t5)
                         // return ()
                         leave
                     }
@@ -302,7 +302,7 @@ object "A3_AccountStateMachine" {
                         // label L4
                         // $t18 := vector::remove<AccountStateMachine::PendingTransfer>($t5, $t2)
                         $t18 := A1_vector_remove$A3_AccountStateMachine_PendingTransfer$($t5, i)
-                        // destroy($t18)
+                        // drop($t18)
                         $Free($t18, 32)
                         // goto L5
                         $block := 9
@@ -336,7 +336,7 @@ object "A3_AccountStateMachine" {
                     }
                     case 3 {
                         // label L0
-                        // destroy($t0)
+                        // drop($t0)
                         // $t7 := 1
                         $t7 := 1
                         // abort($t7)
@@ -388,7 +388,7 @@ object "A3_AccountStateMachine" {
                     }
                     case 3 {
                         // label L0
-                        // destroy($t0)
+                        // drop($t0)
                         // $t5 := 2
                         $t5 := 2
                         // abort($t5)
@@ -436,7 +436,7 @@ object "A3_AccountStateMachine" {
                     }
                     case 3 {
                         // label L0
-                        // destroy($t0)
+                        // drop($t0)
                         // $t7 := 1
                         $t7 := 1
                         // abort($t7)
@@ -508,7 +508,7 @@ object "A3_AccountStateMachine" {
                 $t11 := this
                 // $t12 := vector::remove<AccountStateMachine::PendingTransfer>($t11, $t6)
                 $t12 := A1_vector_remove$A3_AccountStateMachine_PendingTransfer$($t11, $t6)
-                // destroy($t12)
+                // drop($t12)
                 $Free($t12, 32)
                 // AccountStateMachine::withdraw($t0, $t10)
                 A3_AccountStateMachine_withdraw(this, $t10)
@@ -522,7 +522,7 @@ object "A3_AccountStateMachine" {
                     switch $block
                     case 2 {
                         // label L1
-                        // destroy($t0)
+                        // drop($t0)
                         // $t8 := 131072
                         $t8 := 131072
                         // abort($t8)

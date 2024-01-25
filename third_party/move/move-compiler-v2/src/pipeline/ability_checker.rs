@@ -244,7 +244,7 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
                 BorrowField(mod_id, struct_id, insts, _) => {
                     check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
                 },
-                Destroy => check_drop_for_temp_with_msg(target, srcs[0], &loc, "cannot drop"),
+                Drop => check_drop_for_temp_with_msg(target, srcs[0], &loc, "cannot drop"),
                 ReadRef => check_read_ref(target, srcs[0], &loc),
                 WriteRef => check_write_ref(target, srcs[0], &loc),
                 _ => (),

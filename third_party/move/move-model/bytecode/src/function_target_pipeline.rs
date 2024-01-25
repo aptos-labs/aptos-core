@@ -4,7 +4,7 @@
 
 use crate::{
     function_target::{FunctionData, FunctionTarget},
-    print_targets_for_test,
+    print_targets_with_annotations_for_test,
     stackless_bytecode_generator::StacklessBytecodeGenerator,
     stackless_control_flow_graph::generate_cfg_in_dot_format,
 };
@@ -441,6 +441,7 @@ impl FunctionTargetPipeline {
         targets: &mut FunctionTargetsHolder,
         dump_base_name: &str,
         dump_cfg: bool,
+        register_annotations: &impl Fn(&FunctionTarget),
     ) {
         self.run_with_hook(
             env,
@@ -459,7 +460,7 @@ impl FunctionTargetPipeline {
                     dump_base_name,
                     step_count,
                     &suffix,
-                    &Self::get_per_processor_dump(env, holders, processor),
+                    &Self::get_per_processor_dump(env, holders, processor, register_annotations),
                 );
                 if dump_cfg {
                     Self::dump_cfg(env, holders, dump_base_name, step_count, &suffix);
@@ -468,18 +469,29 @@ impl FunctionTargetPipeline {
         );
     }
 
-    fn print_targets(env: &GlobalEnv, name: &str, targets: &FunctionTargetsHolder) -> String {
-        print_targets_for_test(env, &format!("after processor `{}`", name), targets)
+    fn print_targets(
+        env: &GlobalEnv,
+        name: &str,
+        targets: &FunctionTargetsHolder,
+        register_annotations: &impl Fn(&FunctionTarget),
+    ) -> String {
+        print_targets_with_annotations_for_test(
+            env,
+            &format!("after processor `{}`", name),
+            targets,
+            register_annotations,
+        )
     }
 
     fn get_pre_pipeline_dump(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> String {
-        Self::print_targets(env, "stackless", targets)
+        Self::print_targets(env, "stackless", targets, &|_| {})
     }
 
     fn get_per_processor_dump(
         env: &GlobalEnv,
         targets: &FunctionTargetsHolder,
         processor: &dyn FunctionTargetProcessor,
+        register_annotations: &impl Fn(&FunctionTarget),
     ) -> String {
         let mut dump = format!("{}", ProcessorResultDisplay {
             env,
@@ -490,7 +502,12 @@ impl FunctionTargetPipeline {
             if !dump.is_empty() {
                 dump = format!("\n\n{}", dump);
             }
-            dump.push_str(&Self::print_targets(env, &processor.name(), targets));
+            dump.push_str(&Self::print_targets(
+                env,
+                &processor.name(),
+                targets,
+                register_annotations,
+            ));
         }
         dump
     }

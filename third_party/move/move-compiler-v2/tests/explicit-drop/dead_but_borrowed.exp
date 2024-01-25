@@ -86,7 +86,7 @@ fun explicate_drop::test0(): u8 {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t3,$t4}
+     # moved: {$t4}
      #
   5: return $t0
 }
@@ -105,5 +105,6 @@ fun explicate_drop::test0(): u8 {
   2: $t4 := borrow_local($t1)
   3: $t3 := move($t4)
   4: $t0 := read_ref($t3)
-  5: return $t0
+  5: drop($t3)
+  6: return $t0
 }

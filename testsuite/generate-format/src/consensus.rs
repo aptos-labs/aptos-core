@@ -12,6 +12,7 @@ use aptos_crypto::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
+    block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{
         state_key::StateKey,
@@ -93,6 +94,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
+    tracer.trace_type::<BlockMetadataExt>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;

@@ -52,7 +52,6 @@ use std::{
     fmt::Debug,
     iter,
     iter::{zip, IntoIterator, Iterator},
-    ops::Deref,
     vec::Vec,
 };
 
@@ -85,7 +84,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         let mut visited_functions = BTreeSet::new();
         while let Some(id) = todo.pop_first() {
             if visited_functions.insert(id) {
-                if let Some(def) = env.get_function(id).get_def().deref() {
+                if let Some(def) = env.get_function(id).get_def() {
                     let callees_with_sites = def.called_funs_with_callsites();
                     for (callee, sites) in callees_with_sites {
                         todo.insert(callee);
@@ -115,9 +114,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
             // Now that all inlining finished, actually update function bodies in env.
             for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
                 if let Some(changed_funexpr) = funexpr_after_inlining {
-                    let oldexp = env.get_function(fun_id);
-                    let mut old_def = oldexp.get_mut_def();
-                    *old_def = Some(changed_funexpr);
+                    env.set_function_def(fun_id, changed_funexpr)
                 }
             }
         }
@@ -386,8 +383,8 @@ impl<'env> Inliner<'env> {
         assert!(!self.funexprs_after_inlining.contains_key(&func_id));
         let func_env = self.env.get_function(func_id);
 
-        let optional_def_ref = func_env.get_def();
-        if let Some(def) = &*optional_def_ref {
+        let optional_def = func_env.get_def();
+        if let Some(def) = optional_def {
             let mut rewriter = OuterInlinerRewriter::new(self.env, self);
 
             let rewritten = rewriter.rewrite_exp(def.clone());
@@ -439,7 +436,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     } else {
                         // `qfid` was not previously inlined into, look for the original body expr.
                         let func_env_def = func_env.get_def();
-                        (*func_env_def).as_ref().cloned()
+                        func_env_def.cloned()
                     };
                 // inline here
                 if let Some(expr) = body_expr {

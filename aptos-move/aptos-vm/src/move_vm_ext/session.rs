@@ -15,8 +15,9 @@ use aptos_framework::natives::{
 };
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
-    access_path::AccessPath, block_metadata::BlockMetadata, contract_event::ContractEvent,
-    on_chain_config::Features, state_store::state_key::StateKey,
+    access_path::AccessPath, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
+    contract_event::ContractEvent, on_chain_config::Features, state_store::state_key::StateKey,
+    validator_txn::ValidatorTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
 use bytes::Bytes;
@@ -79,6 +80,13 @@ pub enum SessionId {
         sequence_number: u64,
         script_hash: Vec<u8>,
     },
+    BlockMetaExt {
+        // block id
+        id: HashValue,
+    },
+    ValidatorTxn {
+        script_hash: Vec<u8>,
+    },
 }
 
 impl SessionId {
@@ -97,6 +105,12 @@ impl SessionId {
     pub fn block_meta(block_meta: &BlockMetadata) -> Self {
         Self::BlockMeta {
             id: block_meta.id(),
+        }
+    }
+
+    pub fn block_meta_ext(block_meta_ext: &BlockMetadataExt) -> Self {
+        Self::BlockMetaExt {
+            id: block_meta_ext.id(),
         }
     }
 
@@ -126,6 +140,12 @@ impl SessionId {
 
     pub fn void() -> Self {
         Self::Void
+    }
+
+    pub fn validator_txn(txn: &ValidatorTransaction) -> Self {
+        Self::ValidatorTxn {
+            script_hash: txn.hash().to_vec(),
+        }
     }
 
     pub fn as_uuid(&self) -> HashValue {

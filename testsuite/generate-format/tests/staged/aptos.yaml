@@ -101,6 +101,31 @@ BlockMetadata:
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
+BlockMetadataExt:
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: BlockMetadata
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: BlockMetadataWithRandomness
+BlockMetadataWithRandomness:
+  STRUCT:
+    - id:
+        TYPENAME: HashValue
+    - epoch: U64
+    - round: U64
+    - proposer:
+        TYPENAME: AccountAddress
+    - previous_block_votes_bitvec: BYTES
+    - failed_proposer_indices:
+        SEQ: U32
+    - timestamp_usecs: U64
+    - randomness:
+        OPTION:
+          TYPENAME: Randomness
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -133,8 +158,19 @@ ContractEventV2:
     - type_tag:
         TYPENAME: TypeTag
     - event_data: BYTES
+DKGTranscript:
+  STRUCT:
+    - metadata:
+        TYPENAME: DKGTranscriptMetadata
+    - transcript_bytes: BYTES
+DKGTranscriptMetadata:
+  STRUCT:
+    - epoch: U64
+    - author:
+        TYPENAME: AccountAddress
 DummyValidatorTransaction:
   STRUCT:
+    - valid: BOOL
     - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
@@ -151,11 +187,6 @@ EntryFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
-EventKey:
-  STRUCT:
-    - creation_number: U64
-    - account_address:
-        TYPENAME: AccountAddress
 EphemeralPublicKey:
   ENUM:
     0:
@@ -170,6 +201,11 @@ EphemeralSignature:
         STRUCT:
           - signature:
               TYPENAME: Ed25519Signature
+EventKey:
+  STRUCT:
+    - creation_number: U64
+    - account_address:
+        TYPENAME: AccountAddress
 Groth16Zkp:
   STRUCT:
     - a:
@@ -244,7 +280,7 @@ OpenIdSig:
     - jwt_payload: STR
     - uid_key: STR
     - epk_blinder:
-        TUPLEARRAY: 
+        TUPLEARRAY:
           CONTENT: U8
           SIZE: 31
     - pepper:
@@ -260,6 +296,22 @@ Pepper:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 31
+RandMetadata:
+  STRUCT:
+    - metadata_to_sign:
+        TYPENAME: RandMetadataToSign
+    - block_id:
+        TYPENAME: HashValue
+    - timestamp: U64
+RandMetadataToSign:
+  STRUCT:
+    - epoch: U64
+    - round: U64
+Randomness:
+  STRUCT:
+    - metadata:
+        TYPENAME: RandMetadata
+    - randomness: BYTES
 RawTransaction:
   STRUCT:
     - sender:
@@ -369,6 +421,10 @@ Transaction:
       ValidatorTransaction:
         NEWTYPE:
           TYPENAME: ValidatorTransaction
+    5:
+      BlockMetadataExt:
+        NEWTYPE:
+          TYPENAME: BlockMetadataExt
 TransactionArgument:
   ENUM:
     0:
@@ -502,6 +558,10 @@ ValidatorTransaction:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
     1:
+      DKGResult:
+        NEWTYPE:
+          TYPENAME: DKGTranscript
+    2:
       DummyTopic2:
         NEWTYPE:
           TYPENAME: DummyValidatorTransaction
