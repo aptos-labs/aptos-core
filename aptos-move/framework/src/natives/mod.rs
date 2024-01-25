@@ -11,6 +11,7 @@ pub mod debug;
 pub mod event;
 pub mod hash;
 pub mod object;
+pub mod randomness;
 pub mod state_storage;
 pub mod string_utils;
 pub mod transaction_context;
@@ -61,6 +62,7 @@ pub fn all_natives(
     add_natives_from_module!("type_info", type_info::make_all(builder));
     add_natives_from_module!("util", util::make_all(builder));
     add_natives_from_module!("from_bcs", util::make_all(builder));
+    add_natives_from_module!("randomness", randomness::make_all(builder));
     add_natives_from_module!(
         "ristretto255_bulletproofs",
         cryptography::bulletproofs::make_all(builder)
