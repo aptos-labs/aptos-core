@@ -10,7 +10,6 @@ use crate::{
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
 use ark_bn254::{Fq, Fq2, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
-use num_bigint::BigUint;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
