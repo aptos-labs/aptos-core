@@ -8,7 +8,6 @@ use crate::{
     dag::DAGNetworkMessage,
     pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::RandGenMessage,
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -28,6 +27,7 @@ use aptos_types::{epoch_change::EpochChangeProof, PeerId};
 pub use pipeline::commit_reliable_broadcast::CommitMessage;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use crate::rand::rand_gen::network_messages::RandGenMessage;
 
 /// Network type for consensus
 #[derive(Clone, Debug, Deserialize, Serialize)]

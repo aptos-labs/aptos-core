@@ -19,7 +19,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, warn};
+use aptos_logger::{debug, error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -32,8 +32,10 @@ use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use futures::StreamExt;
+use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_channels::aptos_channel;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -78,7 +80,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             Duration::from_secs(10),
             bounded_executor,
         ));
-        let (decision_tx, decision_rx) = unbounded_channel();
+        let (decision_tx, decision_rx) = unbounded();
         let rand_store = Arc::new(Mutex::new(RandStore::new(
             epoch_state.epoch,
             author,
@@ -105,6 +107,8 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
+        let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b|b.round()).collect();
+        debug!("[RandManager] process_incoming_blocks: BEGIN: rounds={:?}", rounds);
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -128,8 +132,11 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
+        let rounds: Vec<u64> = ready_blocks.iter().flat_map(|b|b.ordered_blocks.iter().map(|b3|b3.round())).collect();
+        debug!("[RandManager] process_ready_blocks: BEGIN: rounds={:?}", rounds);
+
         for blocks in ready_blocks {
-            let _ = self.outgoing_blocks.send(blocks);
+            let _ = self.outgoing_blocks.unbounded_send(blocks);
         }
     }
 
@@ -146,6 +153,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_randomness(&mut self, randomness: Randomness) {
+        debug!("[RandManager] process_randomness: BEGIN: info={:?}", &randomness.metadata().metadata_to_sign);
         if let Some(block) = self.block_queue.item_mut(randomness.round()) {
             block.set_randomness(randomness.round(), randomness);
         }
@@ -163,12 +171,12 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
 
     async fn verification_task(
         epoch_state: Arc<EpochState>,
-        mut incoming_rpc_request: Receiver<IncomingRandGenRequest>,
+        mut incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         verified_msg_tx: UnboundedSender<RpcRequest<S, D>>,
         rand_config: RandConfig,
         bounded_executor: BoundedExecutor,
     ) {
-        while let Some(rand_gen_msg) = incoming_rpc_request.recv().await {
+        while let Some(rand_gen_msg) = incoming_rpc_request.next().await {
             let tx = verified_msg_tx.clone();
             let epoch_state_clone = epoch_state.clone();
             let config_clone = rand_config.clone();
@@ -180,7 +188,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
                                 .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
                                 .is_ok()
                             {
-                                let _ = tx.send(RpcRequest {
+                                let _ = tx.unbounded_send(RpcRequest {
                                     req: msg,
                                     protocol: rand_gen_msg.protocol,
                                     response_sender: rand_gen_msg.response_sender,
@@ -278,12 +286,12 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     pub async fn start(
         mut self,
         mut incoming_blocks: Receiver<OrderedBlocks>,
-        incoming_rpc_request: Receiver<IncomingRandGenRequest>,
+        incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
     ) {
         info!("RandManager started");
-        let (verified_msg_tx, mut verified_msg_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (verified_msg_tx, mut verified_msg_rx) = unbounded();
         let epoch_state = self.epoch_state.clone();
         let rand_config = self.config.clone();
         spawn_named!(
@@ -302,17 +310,17 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
 
         while !self.stop {
             tokio::select! {
-                Some(blocks) = incoming_blocks.recv() => {
+                Some(blocks) = incoming_blocks.next() => {
                     self.process_incoming_blocks(blocks);
                 }
-                Some(reset) = reset_rx.recv() => {
-                    while incoming_blocks.try_recv().is_ok() {}
+                Some(reset) = reset_rx.next() => {
+                    while incoming_blocks.try_next().is_ok() {}
                     self.process_reset(reset);
                 }
-                Some(randomness) = self.decision_rx.recv()  => {
+                Some(randomness) = self.decision_rx.next()  => {
                     self.process_randomness(randomness);
                 }
-                Some(request) = verified_msg_rx.recv() => {
+                Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {
                         req: rand_gen_msg,
                         protocol,

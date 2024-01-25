@@ -39,6 +39,15 @@ pub enum LogEvent {
     Timeout,
     Vote,
     VoteNIL,
+    // log events related to randomness generation
+    BroadcastRandShare,
+    ReceiveProactiveRandShare,
+    ReceiveReactiveRandShare,
+    AggregateRandDecision,
+    BroadcastAugData,
+    ReceiveAugData,
+    BroadcastCertifiedAugData,
+    ReceiveCertifiedAugData,
 }
 
 impl LogSchema {
