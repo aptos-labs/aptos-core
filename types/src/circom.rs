@@ -208,10 +208,5 @@ pub fn get_public_inputs_hash(
 
     frs.push(jwk.to_poseidon_scalar()?);
 
-    // frs.push(ark_bn254::Fr::from(BigUint::from_str_radix("21366443663243672670145080524890440598691865966596422242516089850860743501958",10)?));
-    println!("HELLO");
-    for s in frs.clone() {
-        println!("{:?}", s.to_string());
-    }
     poseidon_bn254::hash_scalars(frs)
 }
