@@ -2,7 +2,7 @@
 
 use crate::utils::{
     counters::{
-        GOT_CONNECTION_COUNT, EVENT_RECEIVED_COUNT, PUBSUB_ACK_SUCCESS_COUNT,
+        EVENT_RECEIVED_COUNT, GOT_CONNECTION_COUNT, PUBSUB_ACK_SUCCESS_COUNT,
         UNABLE_TO_GET_CONNECTION_COUNT,
     },
     database::{check_or_update_chain_id, establish_connection_pool, run_migrations},
@@ -29,7 +29,7 @@ pub struct EventStreamConfig {
     pub server_port: u16,
 }
 
-/// Struct to hold context required for parsing
+/// Struct to hold context required for event ingesetion
 #[derive(Clone)]
 pub struct IngestionContext {
     pub channel: broadcast::Sender<String>,
@@ -37,7 +37,7 @@ pub struct IngestionContext {
     pub pool: Pool<ConnectionManager<PgConnection>>,
 }
 
-/// Repeatedly pulls workers from Channel and perform parsing operations
+/// Performs validation checks and adds event to channel
 async fn spawn_ingestor(
     channel: broadcast::Sender<String>,
     msg_base64: Bytes,
@@ -90,7 +90,7 @@ async fn spawn_ingestor(
     );
 }
 
-/// Handles calling parser for the root endpoint
+/// Handles ingestion from the root endpoint
 async fn handle_root(
     msg: Bytes,
     context: Arc<IngestionContext>,
@@ -119,6 +119,7 @@ async fn handle_root(
     ))
 }
 
+/// Maintains websocket connection and sends messages from channel
 async fn spawn_stream(ws: WebSocket, channel: Arc<broadcast::Sender<String>>) {
     let (mut tx, _) = ws.split();
     let mut channel = channel.subscribe();
@@ -135,6 +136,7 @@ async fn spawn_stream(ws: WebSocket, channel: Arc<broadcast::Sender<String>>) {
     }
 }
 
+/// Handles websocket connection from stream endpoint
 async fn handle_websocket(
     websocket: warp::ws::Ws,
     channel: Arc<broadcast::Sender<String>>,

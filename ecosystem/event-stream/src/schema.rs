@@ -1,3 +1,4 @@
+// Copyright © Aptos Foundation
 // @generated automatically by Diesel CLI.
 
 pub mod event_stream {

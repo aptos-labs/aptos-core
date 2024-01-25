@@ -1358,6 +1358,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-event-stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-metrics-core",
+ "aptos-runtimes",
+ "async-trait",
+ "bytes",
+ "clap 4.4.12",
+ "diesel",
+ "diesel_migrations",
+ "field_count",
+ "futures",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "warp",
+]
+
+[[package]]
 name = "aptos-executable-store"
 version = "0.1.0"
 dependencies = [
