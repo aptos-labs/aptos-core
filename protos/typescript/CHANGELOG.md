@@ -4,8 +4,5 @@ All notable changes to the Aptos Protos will be captured in this file. This chan
 
 ## Unreleased
 
-## 1.1.3
-- Regenerated code with latest codegen tooling.
-
 ## 1.1.2
 - Initial release.

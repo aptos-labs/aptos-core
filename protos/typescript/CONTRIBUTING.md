@@ -4,7 +4,8 @@
 To update the changelog do the following:
 
 1. Bump the version in `package.json` according to [semver](https://semver.org/).
-1. Add the change description in the CHANGELOG under the "Unreleased" section.
+2. Bump the version in `version.ts`.
+3. Add the change description in the CHANGELOG under the "Unreleased" section.
 
 ## Release process
 To release a new version of the package do the following.
