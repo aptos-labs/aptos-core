@@ -66,6 +66,15 @@ impl Configuration {
         debug!("Reading configuration from JSON file: {:?}", json_file);
         Ok(serde_json::from_str(&std::fs::read_to_string(json_file)?)?)
     }
+
+    /// Returns the configuration for the given file path.
+    pub fn get_file_configuration(&self, file_path: &Path) -> Option<&FileConfiguration> {
+        self.individual.as_ref().and_then(|individual| {
+            individual
+                .iter()
+                .find(|file_conf| file_conf.file == file_path)
+        })
+    }
 }
 
 /// Configuration of the mutation operators.
@@ -86,10 +95,8 @@ pub struct FileConfiguration {
     pub verify_mutants: Option<bool>,
     /// Names of the mutation operators to use. If not provided, all operators will be used.
     pub mutation_operators: Option<MutationConfig>,
-    /// Mutate only the functions with the given names.
+    /// Mutate only the functions with the given names (otherwise, mutate all).
     pub include_functions: Option<Vec<String>>,
-    /// Mutate all functions except the ones with the given names.
-    pub exclude_functions: Option<Vec<String>>,
 }
 
 #[cfg(test)]
@@ -110,7 +117,6 @@ mod tests {
             file = "/path/to/file"
             verify_mutants = true
             include_functions = ["function1", "function2"]
-            exclude_functions = ["function3", "function4"]
         "#;
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_toml_file(Path::new("test.toml")).unwrap();
@@ -169,8 +175,7 @@ mod tests {
                             "operators": ["operator3", "operator4"],
                             "categories": ["category3", "category4"]
                         },
-                        "include_functions": ["function1", "function2"],
-                        "exclude_functions": ["function3", "function4"]
+                        "include_functions": ["function1", "function2"]
                     }
                 ]
             }
@@ -245,5 +250,25 @@ mod tests {
     fn configuration_from_file_fails_for_unknown_file_type() {
         let result = Configuration::from_file(Path::new("test.unknown"));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn get_file_configuration_returns_none_for_unknown_file() {
+        let file_path = PathBuf::from("/path/to/file");
+        let file_config = FileConfiguration {
+            file: file_path.clone(),
+            verify_mutants: Some(true),
+            mutation_operators: None,
+            include_functions: None,
+        };
+        let config = Configuration {
+            project: CLIOptions::default(),
+            project_path: None,
+            mutation: None,
+            individual: Some(vec![file_config]),
+        };
+
+        let result = config.get_file_configuration(&PathBuf::from("/unknown/path"));
+        assert!(result.is_none());
     }
 }

@@ -60,7 +60,7 @@ pub fn run_move_mutator(
     trace!("Mutator configuration: {mutator_configuration:?}");
 
     let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
-    let mutants = mutate::mutate(ast, &mutator_configuration)?;
+    let mutants = mutate::mutate(ast, &mutator_configuration, &files)?;
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
 
