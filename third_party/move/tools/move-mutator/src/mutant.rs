@@ -1,5 +1,6 @@
 use crate::operator::{MutantInfo, MutationOp, MutationOperator};
 use move_command_line_common::files::FileHash;
+use move_compiler::parser::ast::ModuleName;
 use std::fmt;
 
 /// A mutant is a piece of code that has been mutated by the mutation operator.
@@ -7,12 +8,16 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub struct Mutant {
     operator: MutationOp,
+    module_name: Option<ModuleName>,
 }
 
 impl Mutant {
     /// Creates a new mutant.
-    pub fn new(operator: MutationOp) -> Self {
-        Self { operator }
+    pub fn new(operator: MutationOp, module_name: Option<ModuleName>) -> Self {
+        Self {
+            operator,
+            module_name,
+        }
     }
 
     /// Returns the file hash of the file that this mutant is in.
@@ -26,6 +31,16 @@ impl Mutant {
         trace!("Applying mutation operator: {}", self.operator);
         self.operator.apply(source)
     }
+
+    /// Returns the module name that this mutant is in.
+    pub fn get_module_name(&self) -> Option<ModuleName> {
+        self.module_name.clone()
+    }
+
+    /// Sets the module name that this mutant is in.
+    pub fn set_module_name(&mut self, module_name: ModuleName) {
+        self.module_name = Some(module_name);
+    }
 }
 
 impl fmt::Display for Mutant {
@@ -37,10 +52,10 @@ impl fmt::Display for Mutant {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::operators::binary::Binary;
     use move_command_line_common::files::FileHash;
     use move_compiler::parser::ast::{BinOp, BinOp_};
     use move_ir_types::location::Loc;
-    use crate::operators::binary::Binary;
 
     #[test]
     fn test_new() {
@@ -49,7 +64,7 @@ mod tests {
             value: BinOp_::Add,
             loc,
         }));
-        let mutant = Mutant::new(operator);
+        let mutant = Mutant::new(operator, None);
         assert_eq!(format!("{}", mutant), "Mutant: BinaryOperator(+, location: file hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, index start: 0, index stop: 0)");
     }
 
@@ -60,7 +75,7 @@ mod tests {
             value: BinOp_::Add,
             loc,
         }));
-        let mutant = Mutant::new(operator);
+        let mutant = Mutant::new(operator, None);
         assert_eq!(mutant.get_file_hash(), FileHash::new(""));
     }
 
@@ -71,7 +86,7 @@ mod tests {
             value: BinOp_::Add,
             loc,
         }));
-        let mutant = Mutant::new(operator);
+        let mutant = Mutant::new(operator, None);
         let source = "+";
         let expected = vec!["-", "*", "/", "%"];
         let result = mutant.apply(source);

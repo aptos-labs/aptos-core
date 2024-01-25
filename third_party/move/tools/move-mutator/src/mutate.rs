@@ -37,7 +37,7 @@ pub fn mutate(ast: ast::Program) -> anyhow::Result<Vec<Mutant>> {
 /// Checks all the functions and constants defined in the module.
 fn traverse_module(module: ast::ModuleDefinition) -> anyhow::Result<Vec<Mutant>> {
     trace!("Traversing module {}", module.name);
-    let mutants = module
+    let mut mutants = module
         .members
         .into_iter()
         .filter_map(|member| match member {
@@ -49,6 +49,10 @@ fn traverse_module(module: ast::ModuleDefinition) -> anyhow::Result<Vec<Mutant>>
         })
         .collect::<Result<Vec<_>, _>>()?
         .concat();
+
+    mutants
+        .iter_mut()
+        .for_each(|m| m.set_module_name(module.name.clone()));
 
     trace!(
         "Found {} possible mutations in module {}",
@@ -125,9 +129,7 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             mutants.extend(parse_expression_and_find_mutants(*right)?);
 
             // Add the mutation operator to the list of mutants.
-            mutants.push(Mutant::new(MutationOp::BinaryOp(
-                Binary::new(binop),
-            )));
+            mutants.push(Mutant::new(MutationOp::BinaryOp(Binary::new(binop)), None));
 
             trace!("Found possible mutation in BinaryExp {binop:?}");
 
@@ -138,9 +140,7 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             let mut mutants = parse_expression_and_find_mutants(*exp)?;
 
             // Add the mutation operator to the list of mutants.
-            mutants.push(Mutant::new(MutationOp::UnaryOp(
-                Unary::new(unop),
-            )));
+            mutants.push(Mutant::new(MutationOp::UnaryOp(Unary::new(unop)), None));
 
             trace!("Found possible mutation in UnaryExp {unop:?}");
 
