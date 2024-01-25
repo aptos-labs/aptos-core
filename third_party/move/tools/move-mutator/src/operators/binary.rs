@@ -1,4 +1,4 @@
-use crate::operator::{MutantInfo, MutationOperatorTrait};
+use crate::operator::{MutantInfo, MutationOperator};
 use crate::report::{Mutation, Range};
 use move_command_line_common::files::FileHash;
 use move_compiler::parser::ast::{BinOp, BinOp_};
@@ -6,17 +6,17 @@ use std::fmt;
 
 /// The binary mutation operator.
 #[derive(Debug, Copy, Clone)]
-pub struct BinaryOperator {
+pub struct Binary {
     operation: BinOp,
 }
 
-impl BinaryOperator {
+impl Binary {
     pub fn new(operation: BinOp) -> Self {
         Self { operation }
     }
 }
 
-impl MutationOperatorTrait for BinaryOperator {
+impl MutationOperator for Binary {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
         let start = self.operation.loc.start() as usize;
         let end = self.operation.loc.end() as usize;
@@ -60,7 +60,7 @@ impl MutationOperatorTrait for BinaryOperator {
     }
 }
 
-impl fmt::Display for BinaryOperator {
+impl fmt::Display for Binary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -87,7 +87,7 @@ mod tests {
             value: BinOp_::Add,
             loc,
         };
-        let operator = BinaryOperator::new(bin_op);
+        let operator = Binary::new(bin_op);
         let source = "+";
         let expected = vec!["-", "*", "/", "%"];
         let result = operator.apply(source);
@@ -104,7 +104,7 @@ mod tests {
             value: BinOp_::Add,
             loc,
         };
-        let operator = BinaryOperator::new(bin_op);
+        let operator = Binary::new(bin_op);
         assert_eq!(operator.get_file_hash(), FileHash::new(""));
     }
 }

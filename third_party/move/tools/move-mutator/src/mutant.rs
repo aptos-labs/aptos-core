@@ -1,4 +1,4 @@
-use crate::operator::{MutantInfo, MutationOperator, MutationOperatorTrait};
+use crate::operator::{MutantInfo, MutationOp, MutationOperator};
 use move_command_line_common::files::FileHash;
 use std::fmt;
 
@@ -6,12 +6,12 @@ use std::fmt;
 /// This represents mutant as a mutation operator.
 #[derive(Debug, Clone)]
 pub struct Mutant {
-    operator: MutationOperator,
+    operator: MutationOp,
 }
 
 impl Mutant {
     /// Creates a new mutant.
-    pub fn new(operator: MutationOperator) -> Self {
+    pub fn new(operator: MutationOp) -> Self {
         Self { operator }
     }
 
@@ -40,12 +40,12 @@ mod tests {
     use move_command_line_common::files::FileHash;
     use move_compiler::parser::ast::{BinOp, BinOp_};
     use move_ir_types::location::Loc;
-    use crate::operators::binary::BinaryOperator;
+    use crate::operators::binary::Binary;
 
     #[test]
     fn test_new() {
         let loc = Loc::new(FileHash::new(""), 0, 0);
-        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(BinOp {
+        let operator = MutationOp::BinaryOp(Binary::new(BinOp {
             value: BinOp_::Add,
             loc,
         }));
@@ -56,7 +56,7 @@ mod tests {
     #[test]
     fn test_get_file_hash() {
         let loc = Loc::new(FileHash::new(""), 0, 0);
-        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(BinOp {
+        let operator = MutationOp::BinaryOp(Binary::new(BinOp {
             value: BinOp_::Add,
             loc,
         }));
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn test_apply() {
         let loc = Loc::new(FileHash::new(""), 0, 1);
-        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(BinOp {
+        let operator = MutationOp::BinaryOp(Binary::new(BinOp {
             value: BinOp_::Add,
             loc,
         }));
