@@ -178,7 +178,7 @@ pub fn get_public_inputs_hash(
     )?;
 
     // Add the id_commitment as a scalar
-    frs.push(ark_bn254::Fr::from(BigUint::from_bytes_le(&pk.idc.0)));
+    frs.push(poseidon_bn254::pack_bytes_to_one_scalar(&pk.idc.0)?);
 
     let iat_val = 1700255944;
     // Add the exp_timestamp_secs as a scalar
