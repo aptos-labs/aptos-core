@@ -5,17 +5,20 @@ use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_dkg::{
+    pvss::{Player, WeightedConfig},
+    weighted_vuf::traits::WeightedVUF,
+};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
-    randomness::{RandMetadata, Randomness},
+    randomness::{
+        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, PK, WVUF,
+    },
     validator_verifier::ValidatorVerifier,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::fmt::Debug;
-use std::sync::Arc;
-use aptos_dkg::pvss::{Player, WeightedConfig};
-use aptos_dkg::weighted_vuf::traits::WeightedVUF;
-use aptos_types::randomness::{APK, Delta, PK, PKShare, ProofShare, RandKeys, WVUF, WvufPP};
+use sha3::{Digest, Sha3_256};
+use std::{fmt::Debug, sync::Arc};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
@@ -64,8 +67,8 @@ impl Share for RealShare {
     }
 
     fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         let share = RealShare {
             share: <WVUF as WeightedVUF>::create_share(
@@ -76,15 +79,44 @@ impl Share for RealShare {
         RandShare::new(rand_config.author(), rand_metadata, share)
     }
 
-    fn aggregate<'a>(shares: impl Iterator<Item=&'a RandShare<Self>>, rand_config: &RandConfig, rand_metadata: RandMetadata) -> Randomness where Self: Sized {
-        todo!()
+    fn aggregate<'a>(
+        shares: impl Iterator<Item = &'a RandShare<Self>>,
+        rand_config: &RandConfig,
+        rand_metadata: RandMetadata,
+    ) -> Randomness
+    where
+        Self: Sized,
+    {
+        let mut apks_and_proofs = vec![];
+        for share in shares {
+            let id = *rand_config
+                .validator
+                .address_to_validator_index()
+                .get(share.author())
+                .unwrap();
+            let apk = rand_config.get_certified_apk(share.author()).unwrap(); // needs to have apk to verify the share
+            apks_and_proofs.push((Player { id }, apk.clone(), share.share().share.clone()));
+        }
+
+        let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+        let eval = <WVUF as WeightedVUF>::derive_eval(
+            &rand_config.wconfig,
+            &rand_config.vuf_pp,
+            rand_metadata.to_bytes().as_slice(),
+            &rand_config.get_all_certified_apk(),
+            &proof,
+        )
+        .expect("All APK should exist");
+        let eval_bytes = bcs::to_bytes(&eval).unwrap();
+        let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
+        Randomness::new(rand_metadata.clone(), rand_bytes)
     }
 }
 
 impl AugmentedData for RealAugmentedData {
     fn generate(rand_config: &RandConfig) -> AugData<Self>
-        where
-            Self: Sized,
+    where
+        Self: Sized,
     {
         let delta = rand_config.get_my_delta().clone();
         rand_config
@@ -214,6 +246,10 @@ impl<S: Share> RandShare<S> {
 
     pub fn author(&self) -> &Author {
         &self.author
+    }
+
+    pub fn share(&self) -> &S {
+        &self.share
     }
 
     pub fn metadata(&self) -> &RandMetadata {

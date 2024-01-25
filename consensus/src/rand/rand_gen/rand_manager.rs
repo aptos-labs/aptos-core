@@ -17,6 +17,7 @@ use crate::{
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error, info, spawn_named, warn};
@@ -29,13 +30,16 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
-use futures::future::{AbortHandle, Abortable};
-use futures_channel::oneshot;
+use futures::{
+    future::{AbortHandle, Abortable},
+    FutureExt, StreamExt,
+};
+use futures_channel::{
+    mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 use std::{sync::Arc, time::Duration};
-use futures::StreamExt;
-use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_channels::aptos_channel;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -107,8 +111,11 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
-        let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b|b.round()).collect();
-        debug!("[RandManager] process_incoming_blocks: BEGIN: rounds={:?}", rounds);
+        let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
+        debug!(
+            "[RandManager] process_incoming_blocks: BEGIN: rounds={:?}",
+            rounds
+        );
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -132,8 +139,14 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
-        let rounds: Vec<u64> = ready_blocks.iter().flat_map(|b|b.ordered_blocks.iter().map(|b3|b3.round())).collect();
-        debug!("[RandManager] process_ready_blocks: BEGIN: rounds={:?}", rounds);
+        let rounds: Vec<u64> = ready_blocks
+            .iter()
+            .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
+            .collect();
+        debug!(
+            "[RandManager] process_ready_blocks: BEGIN: rounds={:?}",
+            rounds
+        );
 
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.unbounded_send(blocks);
@@ -153,7 +166,10 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_randomness(&mut self, randomness: Randomness) {
-        debug!("[RandManager] process_randomness: BEGIN: info={:?}", &randomness.metadata().metadata_to_sign);
+        debug!(
+            "[RandManager] process_randomness: BEGIN: info={:?}",
+            &randomness.metadata().metadata_to_sign
+        );
         if let Some(block) = self.block_queue.item_mut(randomness.round()) {
             block.set_randomness(randomness.round(), randomness);
         }
@@ -244,11 +260,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
         DropGuard::new(abort_handle)
     }
 
-    async fn broadcast_aug_data(&mut self) -> CertifiedAugData<D> {
-        if let Some(certified_data) = self.aug_data_store.get_my_certified_aug_data() {
-            info!("[RandManager] Already have certified aug data");
-            return certified_data;
-        }
+    async fn broadcast_aug_data(&mut self) -> DropGuard {
         let data = self
             .aug_data_store
             .get_my_aug_data()
@@ -259,25 +271,25 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             .expect("Add self aug data should succeed");
         let aug_ack = AugDataCertBuilder::new(data.clone(), self.epoch_state.clone());
         let rb = self.reliable_broadcast.clone();
-        info!("[RandManager] Start broadcasting aug data");
-        let certified_data = rb.broadcast(data, aug_ack).await;
-        info!("[RandManager] Finish broadcasting aug data");
-        certified_data
-    }
-
-    fn broadcast_certified_aug_data(&mut self, certified_data: CertifiedAugData<D>) -> DropGuard {
-        let rb = self.reliable_broadcast.clone();
+        let rb2 = self.reliable_broadcast.clone();
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
-        // Add it synchronously to be able to sign without a race that we get to sign before the broadcast reaches aug store.
-        self.aug_data_store
-            .add_certified_aug_data(certified_data.clone())
-            .expect("Add self aug data should succeed");
-        let task = async move {
-            let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
-            info!("[RandManager] Start broadcasting certified aug data");
-            rb.broadcast(certified_data, ack_state).await;
-            info!("[RandManager] Finish broadcasting certified aug data");
+        let maybe_existing_certified_data = self.aug_data_store.get_my_certified_aug_data();
+        let phase1 = async move {
+            if let Some(certified_data) = maybe_existing_certified_data {
+                info!("[RandManager] Already have certified aug data");
+                return certified_data;
+            }
+            info!("[RandManager] Start broadcasting aug data");
+            let certified_data = rb.broadcast(data, aug_ack).await;
+            info!("[RandManager] Finish broadcasting aug data");
+            certified_data
         };
+        let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
+        let task = phase1.then(|certified_data| async move {
+            info!("[RandManager] Start broadcasting certified aug data");
+            rb2.broadcast(certified_data, ack_state).await;
+            info!("[RandManager] Finish broadcasting certified aug data");
+        });
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -305,8 +317,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             )
         );
 
-        let certified_data = self.broadcast_aug_data().await;
-        let _guard = self.broadcast_certified_aug_data(certified_data);
+        let _guard = self.broadcast_aug_data().await;
 
         while !self.stop {
             tokio::select! {
