@@ -81,7 +81,7 @@ pub fn run_move_compiler(
         // from the first input file.
         let dump_base_name = options
             .sources
-            .get(0)
+            .first()
             .and_then(|f| {
                 Path::new(f)
                     .file_name()

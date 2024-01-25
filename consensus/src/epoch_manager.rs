@@ -1490,7 +1490,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
 #[allow(dead_code)]
 fn new_signer_from_storage(author: Author, backend: &SecureBackend) -> Arc<ValidatorSigner> {
-    let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+    let storage: Storage = backend.into();
     if let Err(error) = storage.available() {
         panic!("Storage is not available: {:?}", error);
     }

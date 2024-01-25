@@ -14,11 +14,11 @@ use crate::{
 use aptos_config::config::{InitialSafetyRulesConfig, SafetyRulesConfig, SafetyRulesService};
 use aptos_infallible::RwLock;
 use aptos_secure_storage::{KVStorage, Storage};
-use std::{convert::TryInto, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
     let backend = &config.backend;
-    let internal_storage: Storage = backend.try_into().expect("Unable to initialize storage");
+    let internal_storage: Storage = backend.into();
     if let Err(error) = internal_storage.available() {
         panic!("Storage is not available: {:?}", error);
     }
@@ -53,8 +53,7 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             let waypoint = config.initial_safety_rules_config.waypoint();
 
             let backend = &config.backend;
-            let internal_storage: Storage =
-                backend.try_into().expect("Unable to initialize storage");
+            let internal_storage: Storage = backend.into();
             PersistentSafetyStorage::initialize(
                 internal_storage,
                 identity_blob
