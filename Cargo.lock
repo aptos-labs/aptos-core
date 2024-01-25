@@ -5220,7 +5220,7 @@ version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb9fb9fb058cc3063b5fc88d9a21eefa2735871498a04e1650da76ed511c8569"
 dependencies = [
- "base64 0.21.5",
+ "base64 0.21.7",
 ]
 
 [[package]]
@@ -6705,7 +6705,7 @@ checksum = "859d65a907b6852c9361e3185c862aae7fafd2887876799fa55f5f99dc40d610"
 dependencies = [
  "fnv",
  "ident_case",
- "proc-macro2 1.0.75",
+ "proc-macro2 1.0.76",
  "quote 1.0.35",
  "strsim 0.10.0",
  "syn 1.0.109",
@@ -6733,10 +6733,10 @@ checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
 dependencies = [
  "fnv",
  "ident_case",
- "proc-macro2 1.0.75",
+ "proc-macro2 1.0.76",
  "quote 1.0.35",
  "strsim 0.10.0",
- "syn 2.0.47",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -6769,7 +6769,7 @@ checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
 dependencies = [
  "darling_core 0.20.3",
  "quote 1.0.35",
- "syn 2.0.47",
+ "syn 2.0.48",
 ]
 
 [[package]]
@@ -9655,7 +9655,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b98ff3d647085c6c025083efad0435890867f4bea042fc62d408ab3aeb1cdf66"
 dependencies = [
  "darling 0.13.4",
- "proc-macro2 1.0.75",
+ "proc-macro2 1.0.76",
  "quote 1.0.35",
  "serde_json",
  "syn 1.0.109",
@@ -14437,9 +14437,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93634eb5f75a2323b16de4748022ac4297f9e76b6dced2be287a099f41b5e788"
 dependencies = [
  "darling 0.20.3",
- "proc-macro2 1.0.75",
+ "proc-macro2 1.0.76",
  "quote 1.0.35",
- "syn 2.0.47",
+ "syn 2.0.48",
 ]
 
 [[package]]

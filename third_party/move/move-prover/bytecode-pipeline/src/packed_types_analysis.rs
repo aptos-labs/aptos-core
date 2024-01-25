@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use abstract_domain_derive::AbstractDomain;
 use move_binary_format::file_format::CodeOffset;
 use move_core_types::language_storage::{StructTag, TypeTag};
 use move_model::{
@@ -17,7 +18,6 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Operation},
     COMPILED_MODULE_AVAILABLE,
 };
-use abstract_domain_derive::AbstractDomain;
 use std::collections::BTreeSet;
 
 /// Get all closed types that may be packed by (1) genesis and (2) all transaction scripts.
