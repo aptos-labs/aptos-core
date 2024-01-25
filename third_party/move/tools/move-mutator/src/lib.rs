@@ -111,6 +111,7 @@ pub fn run_move_mutator(
                 let mut entry = report::MutationReport::new(
                     mutant_path.as_path(),
                     path,
+                    mutant.get_module_name().unwrap().0.value.as_str(),
                     &mutated.mutated_source,
                     &source,
                 );
