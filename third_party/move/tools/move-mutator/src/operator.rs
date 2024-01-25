@@ -1,5 +1,5 @@
-use crate::operators::binary::BinaryOperator;
-use crate::operators::unary::UnaryOperator;
+use crate::operators::binary::Binary;
+use crate::operators::unary::Unary;
 use crate::report::Mutation;
 use move_command_line_common::files::FileHash;
 use std::fmt;
@@ -26,7 +26,7 @@ impl MutantInfo {
 /// Trait for mutation operators.
 /// Mutation operators are used to apply mutations to the source code. To keep adding new mutation operators simple,
 /// we use a trait that all mutation operators implement.
-pub trait MutationOperatorTrait {
+pub trait MutationOperator {
     /// Applies the mutation operator to the given source code.
     /// Returns differently mutated source code listings in a vector.
     ///
@@ -45,34 +45,34 @@ pub trait MutationOperatorTrait {
 
 /// The mutation operator to apply.
 #[derive(Debug, Copy, Clone)]
-pub enum MutationOperator {
-    BinaryOperator(BinaryOperator),
-    UnaryOperator(UnaryOperator),
+pub enum MutationOp {
+    BinaryOp(Binary),
+    UnaryOp(Unary),
 }
 
-impl MutationOperatorTrait for MutationOperator {
+impl MutationOperator for MutationOp {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
         debug!("Applying mutation operator: {self}");
 
         match self {
-            MutationOperator::BinaryOperator(bin_op) => bin_op.apply(source),
-            MutationOperator::UnaryOperator(unary_op) => unary_op.apply(source),
+            MutationOp::BinaryOp(bin_op) => bin_op.apply(source),
+            MutationOp::UnaryOp(unary_op) => unary_op.apply(source),
         }
     }
 
     fn get_file_hash(&self) -> FileHash {
         match self {
-            MutationOperator::BinaryOperator(bin_op) => bin_op.get_file_hash(),
-            MutationOperator::UnaryOperator(unary_op) => unary_op.get_file_hash(),
+            MutationOp::BinaryOp(bin_op) => bin_op.get_file_hash(),
+            MutationOp::UnaryOp(unary_op) => unary_op.get_file_hash(),
         }
     }
 }
 
-impl fmt::Display for MutationOperator {
+impl fmt::Display for MutationOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MutationOperator::BinaryOperator(bin_op) => write!(f, "{}", bin_op),
-            MutationOperator::UnaryOperator(unary_op) => write!(f, "{}", unary_op),
+            MutationOp::BinaryOp(bin_op) => write!(f, "{}", bin_op),
+            MutationOp::UnaryOp(unary_op) => write!(f, "{}", unary_op),
         }
     }
 }
@@ -91,7 +91,7 @@ mod tests {
             value: BinOp_::Mul,
             loc,
         };
-        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(bin_op));
+        let operator = MutationOp::BinaryOp(Binary::new(bin_op));
         let source = "*";
         let expected = vec!["+", "-", "/", "%"];
         let result = operator.apply(source);
@@ -108,7 +108,7 @@ mod tests {
             value: UnaryOp_::Not,
             loc,
         };
-        let operator = MutationOperator::UnaryOperator(UnaryOperator::new(unary_op));
+        let operator = MutationOp::UnaryOp(Unary::new(unary_op));
         let source = "!";
         let expected = vec![" "];
         let result = operator.apply(source);
@@ -125,7 +125,7 @@ mod tests {
             value: BinOp_::Add,
             loc,
         };
-        let operator = MutationOperator::BinaryOperator(BinaryOperator::new(bin_op));
+        let operator = MutationOp::BinaryOp(Binary::new(bin_op));
         assert_eq!(operator.get_file_hash(), FileHash::new(""));
     }
 }
