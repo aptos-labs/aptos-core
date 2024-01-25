@@ -161,9 +161,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_fee_per_state_slot: FeePerSlot,
             { 13.. => "storage_fee_per_state_slot" },
-            // 1 million APT for 2 billion state slots
-            // FIXME(aldenhu): maybe make it cheaper to compensate for bytes fee
-            50_000,
+            // 0.8 million APT for 2 billion state slots
+            40_000,
         ],
         [
             legacy_storage_fee_per_excess_state_byte: FeePerByte,
@@ -173,8 +172,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             storage_fee_per_state_byte: FeePerByte,
             { 13.. => "storage_fee_per_state_byte" },
-            // 1 million APT for 4 TB state bytes
-            25,
+            // 0.8 million APT for 2 TB state bytes
+            40,
         ],
         [
             legacy_storage_fee_per_event_byte: FeePerByte,
