@@ -1,6 +1,5 @@
 module aptos_std_extra::randomness {
     use std::vector;
-    use aptos_framework::transaction_context;
 
     /// Generates a byte uniformly at random.
     public fun byte(): u8 { 0u8 }

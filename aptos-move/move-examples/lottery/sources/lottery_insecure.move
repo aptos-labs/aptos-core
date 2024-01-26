@@ -19,6 +19,9 @@ module lottery::lottery_insecure {
     /// Error code for when the somebody tries to draw an already-closed lottery
     const E_LOTTERY_HAS_CLOSED: u64 = 2;
 
+    /// Error code for when somebody who is not admin tries to draw the lottery
+    const E_ACCESS_DENIED: u64 = 3;
+
     /// The minimum price of a lottery ticket, in APT.
     const TICKET_PRICE: u64 = 10_000;
 
@@ -85,19 +88,15 @@ module lottery::lottery_insecure {
     /// Securely wraps around `decide_winners_internal` so it can only be called
     /// as a top-level call from a TXN, preventing **test-and-abort** attacks (see
     /// [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md)).
-    entry fun randomly_pick_winner() acquires Lottery {
-        let v = randomly_pick_winner_internal();
-        smart_vector::destroy(v);
+    entry fun randomly_pick_winner(admin: signer) acquires Lottery {
+        let _ = randomly_pick_winner_internal(admin);
     }
 
     /// Allows anyone to close the lottery (if enough time has elapsed & more than
     /// 1 user bought tickets) and to draw a random winner.
     public(friend) fun randomly_pick_winner_internal(admin: signer): vector<address> acquires Lottery {
         let lottery = borrow_global_mut<Lottery>(@lottery);
-        // TODO: check admin
-        // check that TXN has gas set to max gas.
-        // this will likely be the default behavior for randapp transactions anyway since TXN simulation
-        // cannot predict the gas cost.
+        assert!(signer::address_of(&admin) == @admin_address, E_ACCESS_DENIED);
         assert!(!lottery.is_closed, E_LOTTERY_HAS_CLOSED);
         assert!(!smart_vector::is_empty(&lottery.tickets), E_NO_TICKETS);
 

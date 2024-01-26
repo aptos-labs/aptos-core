@@ -12,6 +12,7 @@ std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
 lottery = "_"
+admin_address = "0xad1"
 
 #[dev-addresses]
 aptos_std_extra = "0x1"
