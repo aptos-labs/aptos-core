@@ -43,7 +43,7 @@ impl<S: Share> ShareAggregator<S> {
         self,
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
-        mut decision_tx: Sender<Randomness>,
+        decision_tx: Sender<Randomness>,
     ) -> Either<Self, RandShare<S>> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
@@ -284,8 +284,8 @@ mod tests {
     };
     use aptos_consensus_types::common::Author;
     use aptos_types::randomness::RandMetadata;
-    use std::{collections::HashMap, str::FromStr};
     use futures_channel::mpsc::unbounded;
+    use std::{collections::HashMap, str::FromStr};
     use tokio::sync::mpsc::unbounded_channel;
 
     #[test]

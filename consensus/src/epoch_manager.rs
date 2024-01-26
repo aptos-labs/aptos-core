@@ -1133,6 +1133,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
 
+        self.epoch_state = Some(epoch_state.clone());
+
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let features = payload.get::<Features>().ok().unwrap_or_default();
@@ -1152,8 +1154,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if let Err(error) = &onchain_execution_config {
             error!("Failed to read on-chain execution config {}", error);
         }
-
-        self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config

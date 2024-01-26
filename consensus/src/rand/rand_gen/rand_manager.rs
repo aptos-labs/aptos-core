@@ -13,7 +13,7 @@ use crate::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::AugDataStorage,
-        types::{AugmentedData, CertifiedAugData, RandConfig, RequestShare, Share},
+        types::{AugmentedData, RandConfig, RequestShare, Share},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -129,10 +129,10 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.clone());
         let mut rand_store = self.rand_store.lock();
-        rand_store.add_rand_metadata(metadata.clone());
         rand_store
             .add_share(self_share.clone())
             .expect("Add self share should succeed");
+        rand_store.add_rand_metadata(metadata.clone());
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
         self.spawn_aggregate_shares_task(metadata)

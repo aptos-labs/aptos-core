@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
+    randomness::{
+        decrypt_key_map, get_current_version, get_on_chain_resource, verify_dkg_transcript,
+        verify_randomness,
+    },
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
 use aptos_types::dkg::DKGState;
 use std::{sync::Arc, time::Duration};
-use crate::randomness::{get_current_version, verify_randomness};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
 #[tokio::test]
@@ -37,7 +39,7 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    /// Verify the randomness in 5 versions.
+    // Verify the randomness in 5 versions.
     for _ in 0..5 {
         let cur_txn_version = get_current_version(&rest_client).await;
         info!("Verifying WVUF output for version {}.", cur_txn_version);
@@ -56,7 +58,7 @@ async fn randomness_correctness() {
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
     assert!(verify_dkg_transcript(dkg_session.last_complete(), &decrypt_key_map).is_ok());
 
-    /// Again, verify the randomness in 5 versions.
+    // Again, verify the randomness in 5 versions.
     for _ in 0..5 {
         let cur_txn_version = get_current_version(&rest_client).await;
         info!("Verifying WVUF output for version {}.", cur_txn_version);
