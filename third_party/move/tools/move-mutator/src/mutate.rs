@@ -11,6 +11,7 @@ use std::path::Path;
 use crate::mutant::Mutant;
 use crate::operator::MutationOp;
 use crate::operators::binary::Binary;
+use crate::operators::break_continue::BreakContinue;
 use crate::operators::unary::Unary;
 
 /// Traverses the AST, identifies places where mutation operators can be applied
@@ -226,6 +227,11 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             mutants.extend(parse_expression_and_find_mutants(*exp)?);
             Ok(mutants)
         },
+        ast::Exp_::Break | ast::Exp_::Continue => {
+            let mut mutants = vec![];
+            mutants.push(Mutant::new(MutationOp::BreakContinue(BreakContinue::new(exp)), None));
+            Ok(mutants)
+        },
         ast::Exp_::Abort(exp)
         | ast::Exp_::Annotate(exp, _)
         | ast::Exp_::Borrow(_, exp)
@@ -240,8 +246,6 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
         | ast::Exp_::Copy(_)
         | ast::Exp_::Name(_, _)
         | ast::Exp_::Unit
-        | ast::Exp_::Break
-        | ast::Exp_::Continue
         | ast::Exp_::Spec(_)
         | ast::Exp_::Index(_, _)
         | ast::Exp_::UnresolvedError

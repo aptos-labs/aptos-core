@@ -1,0 +1,6 @@
+[package]
+name = "breakcontinue"
+version = "0.0.0"
+
+[addresses]
+TestAccount = "0xCAFE"
