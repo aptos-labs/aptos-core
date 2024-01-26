@@ -81,14 +81,14 @@ pub fn run_spec_test(
     let mut spec_report = report::Report::new();
 
     for elem in report.get_mutants() {
-        spec_report.increment_mutants_tested(&elem.original_file_path());
+        spec_report.increment_mutants_tested(elem.original_file_path(), elem.get_module_name());
 
         let mutant_file = elem.mutant_path();
         // Strip prefix to get the path relative to the package directory (or take that path if it's already relative).
         let original_file = elem
             .original_file_path()
             .strip_prefix(package_path)
-            .unwrap_or(&elem.original_file_path());
+            .unwrap_or(elem.original_file_path());
         let outdir_prove = outdir.join("prove");
 
         let _ = fs::remove_dir_all(&outdir_prove);
@@ -110,7 +110,7 @@ pub fn run_spec_test(
 
         if let Err(e) = result {
             trace!("Mutant killed! Prover failed with error: {e}");
-            spec_report.increment_mutants_killed(&elem.original_file_path());
+            spec_report.increment_mutants_killed(elem.original_file_path(), elem.get_module_name());
         } else {
             trace!("Mutant hasn't been killed!");
         }
