@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use claims::assert_matches;
 use aptos_language_e2e_tests::{
     account::AccountData, compile::compile_script, current_function_name,
     data_store::FakeDataStore, executor::FakeExecutor,
@@ -17,7 +18,7 @@ use move_ir_compiler::Compiler;
 fn move_from_across_blocks() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, 11);
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
@@ -26,11 +27,11 @@ fn move_from_across_blocks() {
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    assert_matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     executor.apply_write_set(output.write_set());
 
     // publish resource
@@ -48,21 +49,21 @@ fn move_from_across_blocks() {
     // remove resource fails given it was removed already
     let rem_txn = remove_resource_txn(&sender, 15, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    assert_matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     executor.apply_write_set(output.write_set());
 
     // borrow resource fail given it was removed
     let borrow_txn = borrow_resource_txn(&sender, 16, vec![module.clone()]);
     let output = executor.execute_transaction(borrow_txn);
-    assert!(matches!(
+    assert_matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     executor.apply_write_set(output.write_set());
 
     // publish resource again
@@ -81,11 +82,11 @@ fn move_from_across_blocks() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    assert!(matches!(
+    assert_matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     for out in output {
         executor.apply_write_set(out.write_set());
     }
@@ -95,7 +96,7 @@ fn move_from_across_blocks() {
 fn borrow_after_move() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, 11);
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
@@ -104,11 +105,11 @@ fn borrow_after_move() {
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    assert_matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     executor.apply_write_set(output.write_set());
 
     // publish resource
@@ -131,11 +132,11 @@ fn borrow_after_move() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    assert!(matches!(
+    assert_matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     for out in output {
         executor.apply_write_set(out.write_set());
     }
@@ -145,7 +146,7 @@ fn borrow_after_move() {
 fn change_after_move() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, 11);
     executor.add_account_data(&sender);
 
     // publish module with add and remove resource
@@ -154,11 +155,11 @@ fn change_after_move() {
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    assert_matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     executor.apply_write_set(output.write_set());
 
     // publish resource
@@ -181,11 +182,11 @@ fn change_after_move() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    assert!(matches!(
+    assert_matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     for out in output {
         executor.apply_write_set(out.write_set());
     }
@@ -193,11 +194,11 @@ fn change_after_move() {
     // borrow resource
     let borrow_txn = borrow_resource_txn(&sender, 16, vec![module]);
     let output = executor.execute_transaction(borrow_txn);
-    assert!(matches!(
+    assert_matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
-    ));
+    );
     executor.apply_write_set(output.write_set());
 }
 
