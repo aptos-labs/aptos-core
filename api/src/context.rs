@@ -1471,7 +1471,6 @@ impl FunctionStats {
                 top_6 = sorted.get(5),
                 top_7 = sorted.get(6),
                 top_8 = sorted.get(7),
-                top_9 = sorted.get(8),
             );
 
             stats.invalidate_all();
