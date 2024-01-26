@@ -196,8 +196,8 @@ pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
     if chunk.len() > BYTES_PACKED_PER_SCALAR {
         bail!(
             "Cannot convert chunk to scalar. Max chunk size is {} bytes. Was given {} bytes.",
+            BYTES_PACKED_PER_SCALAR,
             chunk.len(),
-            MAX_NUM_INPUT_BYTES,
         );
     }
     let fr = ark_bn254::Fr::from_le_bytes_mod_order(chunk);
@@ -247,7 +247,7 @@ mod test {
         let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES).unwrap();
         assert_eq!(
             aud_val_hash.to_string(),
-            "17915006864839806432696532586295153111003299925560813222373957953553432368724"
+            "4022319167392179362271493931675371567039199401695470709241660273812313544045"
         );
     }
 

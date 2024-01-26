@@ -2,7 +2,7 @@
 
 use crate::{
     chain_id::ChainId,
-    circom::{DEV_VERIFYING_KEY, G1, G2},
+    circom::{DEV_VERIFYING_KEY, G1Projective, G2Projective},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -230,9 +230,9 @@ impl Claims {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct Groth16Zkp {
-    a: G1,
-    b: G2,
-    c: G1,
+    a: G1Projective,
+    b: G2Projective,
+    c: G1Projective,
 }
 
 impl TryFrom<&[u8]> for Groth16Zkp {
@@ -244,7 +244,7 @@ impl TryFrom<&[u8]> for Groth16Zkp {
 }
 
 impl Groth16Zkp {
-    pub fn new(a: G1, b: G2, c: G1) -> Self {
+    pub fn new(a: G1Projective, b: G2Projective, c: G1Projective) -> Self {
         Groth16Zkp { a, b, c }
     }
 
@@ -350,7 +350,7 @@ impl Pepper {
         &self.0
     }
 
-    #[cfg(test)]
+    // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
     pub fn from_number(num: u128) -> Self {
         let big_int = num_bigint::BigUint::from(num);
         let bytes: Vec<u8> = big_int.to_bytes_le();
@@ -458,4 +458,109 @@ fn base64url_to_str(b64: &str) -> Result<String> {
 
 fn seconds_from_epoch(secs: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_secs(secs)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        chain_id::ChainId,
+        circom::get_public_inputs_hash,
+        jwks::rsa::RSA_JWK,
+        transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
+        zkid::{
+            Groth16Zkp, IdCommitment, Pepper, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, G1Projective, G2Projective,
+        },
+    };
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+
+    #[test]
+    fn test_groth16_proof_verification() {
+        let a = G1Projective::new(
+            "1907126976448947356704944105344209113638990410557947012673208951620306955174",
+            "17097841389334484537002270117994572082468093744192028455285259782280121815827",
+        );
+
+        let b = G2Projective::new(
+            [
+                "14278925284257190513783990706425850880455091796981997205331609327118642516481",
+                "17097607407652600947387126931757770909307167892677374080172672352832759068745",
+            ],
+            [
+                "7687617115387785661307256452150283923250690531057496828650235733289385638174",
+                "3239034819556393279790911890493935486535645694372327998553930102845350873928",
+            ],
+        );
+
+        let c = G1Projective::new(
+            "9876071200350307730744340079355477868341654287378700221239624353906380175962",
+            "13133068658514075998179066471453323614948823643788895538568027023859471128512",
+        );
+        let proof = Groth16Zkp { a, b, c };
+
+        let sender = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender.public_key();
+        let sender_auth_key = AuthenticationKey::ed25519(&sender_pub);
+        let sender_addr = sender_auth_key.account_address();
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+            sender_addr,
+            0,
+            &sender,
+            sender.public_key(),
+            None,
+            0,
+            0,
+            None,
+        )
+        .into_raw_transaction();
+
+        let sender_sig = sender.sign(&raw_txn).unwrap();
+
+        let epk = EphemeralPublicKey::ed25519(sender.public_key());
+        let es = EphemeralSignature::ed25519(sender_sig);
+
+        let _bit_string: String = epk
+            .to_bytes()
+            .iter()
+            .flat_map(|&byte| {
+                (0..8)
+                    .rev()
+                    .map(move |i| if (byte & (1 << i)) != 0 { '1' } else { '0' })
+            })
+            .collect();
+
+        let zk_sig = ZkIdSignature {
+            sig: ZkpOrOpenIdSig::Groth16Zkp(proof.clone()),
+            jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
+            exp_timestamp_secs: 1900255944,
+            ephemeral_pubkey: epk,
+            ephemeral_signature: es,
+        };
+
+        let pepper = Pepper::from_number(76);
+        let addr_seed = IdCommitment::new_from_preimage(
+            &pepper,
+            "407408718192.apps.googleusercontent.com",
+            "sub",
+            "113990307082899718775",
+        )
+        .unwrap();
+
+        let zk_pk = ZkIdPublicKey {
+            iss: "https://accounts.google.com".to_owned(),
+            idc: addr_seed,
+        };
+        let jwk = RSA_JWK {
+            kid:"1".to_owned(),
+            kty:"RSA".to_owned(),
+            alg:"RS256".to_owned(),
+            e:"AQAB".to_owned(),
+            n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
+        };
+
+        let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &jwk).unwrap();
+
+        proof
+            .verify_proof(public_inputs_hash, ChainId::test())
+            .unwrap();
+    }
 }
