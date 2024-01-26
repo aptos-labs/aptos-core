@@ -279,7 +279,7 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
 }
 
 #[tokio::test]
-async fn test_zkid_signature_transaction_submission_epk_expired() {
+async fn test_groth16_signature_transaction_submission() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(0)

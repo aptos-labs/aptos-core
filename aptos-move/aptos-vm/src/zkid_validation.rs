@@ -16,15 +16,6 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 
-fn get_chain_id(resolver: &impl AptosMoveResolver) -> anyhow::Result<ChainId, VMStatus> {
-    ChainId::fetch_config(resolver).ok_or_else(|| {
-        VMStatus::error(
-            StatusCode::VALUE_DESERIALIZATION_ERROR,
-            Some("could not fetch ChainId from on-chain config".to_string()),
-        )
-    })
-}
-
 fn get_current_time_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
@@ -83,6 +74,7 @@ pub fn validate_zkid_authenticators(
     resolver: &impl AptosMoveResolver,
     _session: &mut SessionExt,
     _log_context: &AdapterLogSchema,
+    chain_id: ChainId,
 ) -> anyhow::Result<(), VMStatus> {
     // TODO(ZkIdGroth16Zkp): The ZKP/OpenID sig verification does not charge gas. So, we could have DoS attacks.
     let zkid_authenticators =
@@ -132,7 +124,6 @@ pub fn validate_zkid_authenticators(
                                 Some("Could not compute public inputs hash".to_owned()),
                             )
                         })?;
-                    let chain_id = get_chain_id(resolver)?;
                     proof
                         .verify_proof(public_inputs_hash, chain_id)
                         .map_err(|_| {
