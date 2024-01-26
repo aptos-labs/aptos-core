@@ -52,7 +52,7 @@ use crate::{
     rand::rand_gen::{
         rand_manager::RandManager,
         storage::db::RandDb,
-        types::{RandConfig, RealAugmentedData, RealShare},
+        types::{AugmentedData, RandConfig, Share},
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -620,7 +620,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
 
             let db = Arc::new(RandDb::new(&self.storage_path));
-            let rand_manager = RandManager::<RealShare, RealAugmentedData, RandDb>::new(
+            let rand_manager = RandManager::<Share, AugmentedData, RandDb>::new(
                 self.author,
                 Arc::new(self.epoch_state().clone()),
                 signer,

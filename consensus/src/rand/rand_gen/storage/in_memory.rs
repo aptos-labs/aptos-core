@@ -3,7 +3,7 @@
 
 use crate::rand::rand_gen::{
     storage::interface::AugDataStorage,
-    types::{AugData, AugDataId, AugmentedData, CertifiedAugData},
+    types::{AugData, AugDataId, CertifiedAugData, TAugmentedData},
 };
 use aptos_infallible::RwLock;
 use std::collections::HashMap;
@@ -22,7 +22,7 @@ impl<D> InMemRandDb<D> {
     }
 }
 
-impl<D: AugmentedData> AugDataStorage<D> for InMemRandDb<D> {
+impl<D: TAugmentedData> AugDataStorage<D> for InMemRandDb<D> {
     fn save_aug_data(&self, aug_data: &AugData<D>) -> anyhow::Result<()> {
         self.aug_data
             .write()

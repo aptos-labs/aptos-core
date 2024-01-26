@@ -4,8 +4,8 @@
 use crate::rand::rand_gen::{
     storage::interface::AugDataStorage,
     types::{
-        AugData, AugDataId, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck,
-        RandConfig,
+        AugData, AugDataId, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig,
+        TAugmentedData,
     },
 };
 use anyhow::ensure;
@@ -23,7 +23,7 @@ pub struct AugDataStore<D, Storage> {
     db: Arc<Storage>,
 }
 
-impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
+impl<D: TAugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
     fn filter_by_epoch<T>(
         epoch: u64,
         all_data: impl Iterator<Item = (AugDataId, T)>,

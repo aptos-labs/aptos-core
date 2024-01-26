@@ -10,7 +10,7 @@ use crate::{
                 AugDataSchema, CertifiedAugDataSchema, AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME,
             },
         },
-        types::{AugData, AugDataId, AugmentedData, CertifiedAugData},
+        types::{AugData, AugDataId, CertifiedAugData, TAugmentedData},
     },
 };
 use anyhow::Result;
@@ -77,7 +77,7 @@ impl RandDb {
     }
 }
 
-impl<D: AugmentedData> AugDataStorage<D> for RandDb {
+impl<D: TAugmentedData> AugDataStorage<D> for RandDb {
     fn save_aug_data(&self, aug_data: &AugData<D>) -> anyhow::Result<()> {
         Ok(self.put::<AugDataSchema<D>>(&aug_data.id(), aug_data)?)
     }

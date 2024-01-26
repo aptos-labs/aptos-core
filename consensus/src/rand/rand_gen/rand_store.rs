@@ -5,7 +5,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     rand::rand_gen::{
         rand_manager::Sender,
-        types::{RandConfig, RandShare, Share},
+        types::{RandConfig, RandShare, TShare},
     },
 };
 use anyhow::ensure;
@@ -22,7 +22,7 @@ pub struct ShareAggregator<S> {
     total_weight: u64,
 }
 
-impl<S: Share> ShareAggregator<S> {
+impl<S: TShare> ShareAggregator<S> {
     pub fn new(author: Author) -> Self {
         Self {
             author,
@@ -92,7 +92,7 @@ enum RandItem<S> {
     },
 }
 
-impl<S: Share> RandItem<S> {
+impl<S: TShare> RandItem<S> {
     fn new(author: Author) -> Self {
         Self::PendingMetadata(ShareAggregator::new(author))
     }
@@ -198,7 +198,7 @@ pub struct RandStore<S> {
     decision_tx: Sender<Randomness>,
 }
 
-impl<S: Share> RandStore<S> {
+impl<S: TShare> RandStore<S> {
     pub fn new(
         epoch: u64,
         author: Author,

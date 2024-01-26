@@ -27,16 +27,16 @@ pub(super) struct MockShare;
 pub(super) struct MockAugData;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RealShare {
+pub struct Share {
     share: ProofShare,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct RealAugmentedData {
+pub struct AugmentedData {
     delta: Delta,
 }
 
-impl Share for RealShare {
+impl TShare for Share {
     fn verify(
         &self,
         rand_config: &RandConfig,
@@ -70,7 +70,7 @@ impl Share for RealShare {
     where
         Self: Sized,
     {
-        let share = RealShare {
+        let share = Share {
             share: <WVUF as WeightedVUF>::create_share(
                 &rand_config.keys.ask,
                 rand_metadata.to_bytes().as_slice(),
@@ -113,7 +113,7 @@ impl Share for RealShare {
     }
 }
 
-impl AugmentedData for RealAugmentedData {
+impl TAugmentedData for AugmentedData {
     fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized,
@@ -122,14 +122,14 @@ impl AugmentedData for RealAugmentedData {
         rand_config
             .add_certified_delta(&rand_config.author(), delta.clone())
             .expect("Add self delta should succeed");
-        let data = RealAugmentedData {
+        let data = AugmentedData {
             delta: delta.clone(),
         };
         AugData::new(rand_config.epoch(), rand_config.author(), data)
     }
 
     fn augment(&self, rand_config: &RandConfig, author: &Author) {
-        let RealAugmentedData { delta } = self;
+        let AugmentedData { delta } = self;
         rand_config
             .add_certified_delta(author, delta.clone())
             .expect("Add delta should succeed")
@@ -142,7 +142,7 @@ impl AugmentedData for RealAugmentedData {
     }
 }
 
-impl Share for MockShare {
+impl TShare for MockShare {
     fn verify(
         &self,
         _rand_config: &RandConfig,
@@ -171,7 +171,7 @@ impl Share for MockShare {
     }
 }
 
-impl AugmentedData for MockAugData {
+impl TAugmentedData for MockAugData {
     fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized,
@@ -186,7 +186,7 @@ impl AugmentedData for MockAugData {
     }
 }
 
-pub trait Share:
+pub trait TShare:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     fn verify(
@@ -209,7 +209,7 @@ pub trait Share:
         Self: Sized;
 }
 
-pub trait AugmentedData:
+pub trait TAugmentedData:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     fn generate(rand_config: &RandConfig) -> AugData<Self>
@@ -235,7 +235,7 @@ pub struct RandShare<S> {
     share: S,
 }
 
-impl<S: Share> RandShare<S> {
+impl<S: TShare> RandShare<S> {
     pub fn new(author: Author, metadata: RandMetadata, share: S) -> Self {
         Self {
             author,
@@ -327,7 +327,7 @@ pub struct AugData<D> {
     data: D,
 }
 
-impl<D: AugmentedData> AugData<D> {
+impl<D: TAugmentedData> AugData<D> {
     pub fn new(epoch: u64, author: Author, data: D) -> Self {
         Self {
             epoch,
@@ -373,7 +373,7 @@ impl AugDataSignature {
         self.epoch
     }
 
-    pub fn verify<D: AugmentedData>(
+    pub fn verify<D: TAugmentedData>(
         &self,
         author: Author,
         verifier: &ValidatorVerifier,
@@ -393,7 +393,7 @@ pub struct CertifiedAugData<D> {
     signatures: AggregateSignature,
 }
 
-impl<D: AugmentedData> CertifiedAugData<D> {
+impl<D: TAugmentedData> CertifiedAugData<D> {
     pub fn new(aug_data: AugData<D>, signatures: AggregateSignature) -> Self {
         Self {
             aug_data,

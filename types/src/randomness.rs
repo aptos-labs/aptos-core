@@ -2,16 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use once_cell::sync::OnceCell;
 use crate::{block_info::Round, on_chain_config::OnChainConfig};
 use aptos_crypto::HashValue;
-use serde::{Deserialize, Serialize};
 use aptos_crypto_derive::SilentDebug;
-use aptos_dkg::weighted_vuf;
-use aptos_dkg::weighted_vuf::traits::WeightedVUF;
+use aptos_dkg::{weighted_vuf, weighted_vuf::traits::WeightedVUF};
+use once_cell::sync::OnceCell;
+use serde::{Deserialize, Serialize};
 
 pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
-// pub type WVUF = weighted_vuf::gjm21_insecure::g1::GjmInsecureWVUF;
 pub type WvufPP = <WVUF as WeightedVUF>::PublicParameters;
 pub type PK = <WVUF as WeightedVUF>::PubKey;
 pub type PKShare = <WVUF as WeightedVUF>::PubKeyShare;
@@ -171,19 +169,6 @@ impl RandDecision {
     pub fn timestamp(&self) -> u64 {
         self.metadata().timestamp
     }
-
-    // pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
-    //     // If the caller locally does not have all the certified apks corresponding to self.proof, the verification should fail.
-    //     // Then RandShare multicast may be retried periodically and the caller will receive RandDecision.
-    //     // Eventually the caller will receive certified apks to verify the proof in RandDecision.
-    //     <WVUF as WeightedVUF>::verify_proof(
-    //         &rand_config.vuf_pp,
-    //         &rand_config.pk,
-    //         rand_config.get_all_certified_apk(),
-    //         self.randomness.metadata.to_bytes().as_slice(),
-    //         &self.proof,
-    //     )
-    // }
 }
 
 #[derive(Clone, SilentDebug)]
