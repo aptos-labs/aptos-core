@@ -1,0 +1,18 @@
+Ok(
+    [
+        TransactionOutput {
+            write_set: V0(
+                WriteSetV0(
+                    WriteSetMut {
+                        write_set: {},
+                    },
+                ),
+            ),
+            events: [],
+            gas_used: 0,
+            status: Discard(
+                SIGNERS_CONTAIN_DUPLICATES,
+            ),
+        },
+    ],
+)
