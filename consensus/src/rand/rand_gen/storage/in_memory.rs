@@ -59,7 +59,7 @@ impl<D: TAugmentedData> RandStorage<D> for InMemRandDb<D> {
         Ok(self.certified_aug_data.read().clone().into_iter().collect())
     }
 
-    fn remove_aug_data(&self, aug_data: impl Iterator<Item = AugData<D>>) -> anyhow::Result<()> {
+    fn remove_aug_data(&self, aug_data: Vec<AugData<D>>) -> anyhow::Result<()> {
         for data in aug_data {
             self.aug_data.write().remove(&data.id());
         }
@@ -68,7 +68,7 @@ impl<D: TAugmentedData> RandStorage<D> for InMemRandDb<D> {
 
     fn remove_certified_aug_data(
         &self,
-        certified_aug_data: impl Iterator<Item = CertifiedAugData<D>>,
+        certified_aug_data: Vec<CertifiedAugData<D>>,
     ) -> anyhow::Result<()> {
         for data in certified_aug_data {
             self.certified_aug_data.write().remove(&data.id());

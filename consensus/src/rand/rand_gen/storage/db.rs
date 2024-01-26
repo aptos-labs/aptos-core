@@ -107,14 +107,15 @@ impl<D: TAugmentedData> RandStorage<D> for RandDb {
         Ok(self.get_all::<CertifiedAugDataSchema<D>>()?)
     }
 
-    fn remove_aug_data(&self, aug_data: impl Iterator<Item = AugData<D>>) -> Result<()> {
-        Ok(self.delete::<AugDataSchema<D>>(aug_data.map(|d| d.id()))?)
+    fn remove_aug_data(&self, aug_data: Vec<AugData<D>>) -> Result<()> {
+        Ok(self.delete::<AugDataSchema<D>>(aug_data.into_iter().map(|d| d.id()))?)
     }
 
     fn remove_certified_aug_data(
         &self,
-        certified_aug_data: impl Iterator<Item = CertifiedAugData<D>>,
+        certified_aug_data: Vec<CertifiedAugData<D>>,
     ) -> Result<()> {
-        Ok(self.delete::<CertifiedAugDataSchema<D>>(certified_aug_data.map(|d| d.id()))?)
+        Ok(self
+            .delete::<CertifiedAugDataSchema<D>>(certified_aug_data.into_iter().map(|d| d.id()))?)
     }
 }

@@ -44,7 +44,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
-pub struct RandManager<S: TShare, D: TAugmentedData, Storage> {
+pub struct RandManager<S: TShare, D: TAugmentedData> {
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
@@ -58,11 +58,11 @@ pub struct RandManager<S: TShare, D: TAugmentedData, Storage> {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     rand_store: Arc<Mutex<RandStore<S>>>,
-    aug_data_store: AugDataStore<D, Storage>,
+    aug_data_store: AugDataStore<D>,
     block_queue: BlockQueue,
 }
 
-impl<S: TShare, D: TAugmentedData, Storage: RandStorage<D>> RandManager<S, D, Storage> {
+impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
@@ -70,7 +70,7 @@ impl<S: TShare, D: TAugmentedData, Storage: RandStorage<D>> RandManager<S, D, St
         config: RandConfig,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
-        db: Arc<Storage>,
+        db: Arc<dyn RandStorage<D>>,
         bounded_executor: BoundedExecutor,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)

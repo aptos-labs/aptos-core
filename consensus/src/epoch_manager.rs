@@ -178,7 +178,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
-    rand_storage: Arc<RandDb>,
+    rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 }
 
@@ -197,6 +197,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         bounded_executor: BoundedExecutor,
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
+        rand_storage: Arc<dyn RandStorage<AugmentedData>>,
         dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
@@ -205,7 +206,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
-        let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
         Self {
             author,
             config,
@@ -618,7 +618,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
 
-            let rand_manager = RandManager::<Share, AugmentedData, RandDb>::new(
+            let rand_manager = RandManager::<Share, AugmentedData>::new(
                 self.author,
                 Arc::new(self.epoch_state().clone()),
                 signer,
@@ -1105,23 +1105,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .collect::<Vec<_>>();
 
         // Recover existing augmented key pair or generate a new one
-        let (ask, apk) = if let Some((_, key_pair)) =
-            <RandDb as RandStorage<AugmentedData>>::get_key_pair_bytes(&self.rand_storage)
-                .map_err(NoRandomnessReason::RandDbNotAvailable)?
-                .filter(|(epoch, _)| *epoch == new_epoch)
+        let (ask, apk) = if let Some((_, key_pair)) = self
+            .rand_storage
+            .get_key_pair_bytes()
+            .map_err(NoRandomnessReason::RandDbNotAvailable)?
+            .filter(|(epoch, _)| *epoch == new_epoch)
         {
             bcs::from_bytes(&key_pair).map_err(NoRandomnessReason::KeyPairDeserializationError)?
         } else {
             let mut rng =
                 StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
             let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk, pk, &mut rng);
-            <RandDb as RandStorage<AugmentedData>>::save_key_pair_bytes(
-                &self.rand_storage,
-                new_epoch,
-                bcs::to_bytes(&augmented_key_pair)
-                    .map_err(NoRandomnessReason::KeyPairSerializationError)?,
-            )
-            .map_err(NoRandomnessReason::KeyPairPersistError)?;
+            self.rand_storage
+                .save_key_pair_bytes(
+                    new_epoch,
+                    bcs::to_bytes(&augmented_key_pair)
+                        .map_err(NoRandomnessReason::KeyPairSerializationError)?,
+                )
+                .map_err(NoRandomnessReason::KeyPairPersistError)?;
             augmented_key_pair
         };
 

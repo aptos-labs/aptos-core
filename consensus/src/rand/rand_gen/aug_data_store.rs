@@ -14,16 +14,16 @@ use aptos_logger::error;
 use aptos_types::validator_signer::ValidatorSigner;
 use std::{collections::HashMap, sync::Arc};
 
-pub struct AugDataStore<D, Storage> {
+pub struct AugDataStore<D> {
     epoch: u64,
     signer: Arc<ValidatorSigner>,
     config: RandConfig,
     data: HashMap<Author, AugData<D>>,
     certified_data: HashMap<Author, CertifiedAugData<D>>,
-    db: Arc<Storage>,
+    db: Arc<dyn RandStorage<D>>,
 }
 
-impl<D: TAugmentedData, Storage: RandStorage<D>> AugDataStore<D, Storage> {
+impl<D: TAugmentedData> AugDataStore<D> {
     fn filter_by_epoch<T>(
         epoch: u64,
         all_data: impl Iterator<Item = (AugDataId, T)>,
@@ -44,18 +44,18 @@ impl<D: TAugmentedData, Storage: RandStorage<D>> AugDataStore<D, Storage> {
         epoch: u64,
         signer: Arc<ValidatorSigner>,
         config: RandConfig,
-        db: Arc<Storage>,
+        db: Arc<dyn RandStorage<D>>,
     ) -> Self {
         let all_data = db.get_all_aug_data().unwrap_or_default();
         let (to_remove, aug_data) = Self::filter_by_epoch(epoch, all_data.into_iter());
-        if let Err(e) = db.remove_aug_data(to_remove.into_iter()) {
+        if let Err(e) = db.remove_aug_data(to_remove) {
             error!("[AugDataStore] failed to remove aug data: {:?}", e);
         }
 
         let all_certified_data = db.get_all_certified_aug_data().unwrap_or_default();
         let (to_remove, certified_data) =
             Self::filter_by_epoch(epoch, all_certified_data.into_iter());
-        if let Err(e) = db.remove_certified_aug_data(to_remove.into_iter()) {
+        if let Err(e) = db.remove_certified_aug_data(to_remove) {
             error!(
                 "[AugDataStore] failed to remove certified aug data: {:?}",
                 e

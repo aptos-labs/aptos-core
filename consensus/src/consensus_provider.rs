@@ -9,6 +9,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     persistent_liveness_storage::StorageWriteProxy,
     quorum_store::quorum_store_db::QuorumStoreDB,
+    rand::rand_gen::storage::db::RandDb,
     state_computer::ExecutionProxy,
     transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
@@ -67,6 +68,7 @@ pub fn start_consensus(
 
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
+    let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
@@ -81,6 +83,7 @@ pub fn start_consensus(
         bounded_executor,
         aptos_time_service::TimeService::real(),
         vtxn_pool,
+        rand_storage,
         dkg_decrypt_key,
     );
 
