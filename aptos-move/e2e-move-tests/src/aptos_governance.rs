@@ -78,6 +78,7 @@ pub fn get_remaining_voting_power(
             bcs::to_bytes(&stake_pool).unwrap(),
             bcs::to_bytes(&proposal_id).unwrap(),
         ])
+        .values
         .unwrap();
     bcs::from_bytes::<u64>(&res[0]).unwrap()
 }
