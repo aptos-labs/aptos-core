@@ -1367,6 +1367,7 @@ dependencies = [
  "aptos-runtimes",
  "async-trait",
  "bytes",
+ "chrono",
  "clap 4.4.12",
  "diesel",
  "diesel_migrations",
