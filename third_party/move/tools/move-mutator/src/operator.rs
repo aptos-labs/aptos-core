@@ -6,6 +6,7 @@ use std::fmt;
 use std::fmt::Debug;
 
 /// Mutation result that contains the mutated source code and the modification that was applied.
+#[derive(Debug, Clone, PartialEq)]
 pub struct MutantInfo {
     /// The mutated source code.
     pub mutated_source: String,
@@ -44,7 +45,7 @@ pub trait MutationOperator {
 }
 
 /// The mutation operator to apply.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum MutationOp {
     BinaryOp(Binary),
     UnaryOp(Unary),

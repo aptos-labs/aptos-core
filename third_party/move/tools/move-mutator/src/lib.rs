@@ -15,6 +15,8 @@ mod output;
 pub mod report;
 
 use crate::compiler::{generate_ast, verify_mutant};
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::fs;
 use std::path::Path;
 
@@ -70,19 +72,25 @@ pub fn run_move_mutator(
         trace!("Processing file: {path:?}");
 
         // This `i` must be here as we must iterate over all mutants for a given file (ext and internal loop).
-        let mut i = 0;
+        let mut mutant_file_idx = 0u64;
         for mutant in mutants.iter().filter(|m| m.get_file_hash() == hash) {
             let mut mutated_sources = mutant.apply(&source);
 
             // If the downsample ratio is set, we need to downsample the mutants.
-            if let Some(ratio) = mutator_configuration.project.downsample_ratio {
-                // Delete averagely n-th element in vector
-                mutated_sources = mutated_sources
-                    .into_iter()
-                    .enumerate()
-                    .filter(|(index, _)| index % ratio as usize != 0)
-                    .map(|(_, mutant)| mutant)
+            if let Some(percentage) = mutator_configuration.project.downsampling_ratio_percentage {
+                let to_remove = (mutated_sources.len() as f64 * percentage as f64 / 100.0) as usize;
+
+                // Delete randomly elements from the vector.
+                let mut rng = thread_rng();
+                let chosen_elements: Vec<_> = mutated_sources
+                    .choose_multiple(&mut rng, to_remove)
+                    .cloned()
                     .collect();
+
+                // Remove the chosen elements from the original vector
+                for element in &chosen_elements {
+                    mutated_sources.retain(|x| x != element);
+                }
             }
 
             for mutated in mutated_sources {
@@ -98,8 +106,8 @@ pub fn run_move_mutator(
                     }
                 }
 
-                let mutant_path = output::setup_mutant_path(&output_dir, path, i as u64)?;
-                i += 1;
+                let mutant_path = output::setup_mutant_path(&output_dir, path, mutant_file_idx)?;
+                mutant_file_idx += 1;
 
                 fs::write(&mutant_path, &mutated.mutated_source)?;
 

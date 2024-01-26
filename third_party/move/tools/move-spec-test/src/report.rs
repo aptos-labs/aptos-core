@@ -52,25 +52,23 @@ impl Report {
 
     /// Prints the report to stdout in a table format.
     pub fn print_table(&self) {
+        let mut builder = Builder::new();
+        builder.push_record(["Module", "Mutants tested", "Mutants killed", "Percentage"]);
+
         for (path, stats) in &self.files {
-            println!("Statistics for file: {}", path.to_string_lossy());
-
-            let mut builder = Builder::new();
-            builder.push_record(["Module", "Mutants tested", "Mutants killed", "Percentage"]);
-
             for stat in stats {
                 builder.push_record([
-                    stat.module.clone(),
+                    format!("{}::{}", path.to_string_lossy(), stat.module.clone()),
                     stat.tested.to_string(),
                     stat.killed.to_string(),
                     format!("{:.2}%", (stat.killed as f64 / stat.tested as f64) * 100.0),
                 ]);
             }
-
-            let table = builder.build().with(Style::modern_rounded()).to_string();
-
-            println!("{table}\n\n");
         }
+
+        let table = builder.build().with(Style::modern_rounded()).to_string();
+
+        println!("{table}\n\n");
     }
 
     // Internal function to increment the chosen stat.
