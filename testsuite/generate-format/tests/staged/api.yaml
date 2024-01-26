@@ -260,15 +260,33 @@ ExecutionStatus:
       MiscellaneousError:
         NEWTYPE:
           OPTION: U64
+G1Projective:
+  STRUCT:
+    - x: STR
+    - y: STR
+    - z: STR
+G2Projective:
+  STRUCT:
+    - x:
+        TUPLEARRAY:
+          CONTENT: STR
+          SIZE: 2
+    - y:
+        TUPLEARRAY:
+          CONTENT: STR
+          SIZE: 2
+    - z:
+        TUPLEARRAY:
+          CONTENT: STR
+          SIZE: 2
 Groth16Zkp:
   STRUCT:
     - a:
-        SEQ: STR
+        TYPENAME: G1Projective
     - b:
-        SEQ:
-          SEQ: STR
+        TYPENAME: G2Projective
     - c:
-        SEQ: STR
+        TYPENAME: G1Projective
 HashValue:
   STRUCT:
     - hash:

@@ -125,8 +125,8 @@ pub type Fq2Str = [String; 2];
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct G2Projective {
-    y: Fq2Str,
     x: Fq2Str,
+    y: Fq2Str,
     z: Fq2Str,
 }
 
