@@ -7187,6 +7187,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "claims",
  "hex",

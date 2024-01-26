@@ -47,6 +47,7 @@ tempfile = { workspace = true }
 test-case = { workspace = true }
 
 [dev-dependencies]
+aptos-vm-types = { workspace = true }
 claims = { workspace = true }
 test-case = { workspace = true }
 
