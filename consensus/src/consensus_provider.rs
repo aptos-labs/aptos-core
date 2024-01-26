@@ -41,6 +41,7 @@ pub fn start_consensus(
     vtxn_pool: VTxnPoolState,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
+    let verification_runtime = aptos_runtimes::spawn_named_runtime("verification".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
 
@@ -64,7 +65,7 @@ pub fn start_consensus(
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let bounded_executor = BoundedExecutor::new(128, runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(60, verification_runtime.handle().clone());
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
