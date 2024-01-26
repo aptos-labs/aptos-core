@@ -11,7 +11,9 @@ use aptos_types::on_chain_config::{
     ApprovedExecutionHashes, ConfigStorage, Features, GasSchedule, GasScheduleV2, OnChainConfig,
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_log, speculative_warn};
-use aptos_vm_types::storage::{io_pricing::IoPricing, StorageGasParameters};
+use aptos_vm_types::storage::{
+    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+};
 use move_core_types::{
     gas_algebra::NumArgs,
     language_storage::CORE_CODE_ADDRESS,
@@ -248,11 +250,12 @@ pub(crate) fn check_gas(
     {
         let gas_unit_price: u64 = txn_metadata.gas_unit_price().into();
         let max_gas_amount: u64 = txn_metadata.max_gas_amount().into();
-        let storage_fee_per_state_slot_create: u64 = txn_gas_params
-            .legacy_storage_fee_per_state_slot_create
+        let pricing = DiskSpacePricing::new(gas_feature_version, features);
+        let storage_fee_per_account_create: u64 = pricing
+            .hack_estimated_fee_for_account_creation(txn_gas_params)
             .into();
 
-        let expected = gas_unit_price * 10 + 2 * storage_fee_per_state_slot_create;
+        let expected = gas_unit_price * 10 + 2 * storage_fee_per_account_create;
         let actual = gas_unit_price * max_gas_amount;
 
         if actual < expected {

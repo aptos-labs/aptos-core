@@ -5,8 +5,8 @@ use crate::change_set::WriteOpInfo;
 use aptos_gas_algebra::{Fee, NumSlots};
 use aptos_gas_schedule::TransactionGasParameters;
 use aptos_types::{
-    contract_event::ContractEvent, on_chain_config::Features, state_store::state_key::StateKey,
-    write_set::WriteOpSize,
+    account_config::AccountResource, contract_event::ContractEvent, on_chain_config::Features,
+    state_store::state_key::StateKey, write_set::WriteOpSize,
 };
 use move_core_types::gas_algebra::NumBytes;
 use std::fmt::Debug;
@@ -215,7 +215,36 @@ impl DiskSpacePricing {
             },
         }
     }
+
+    pub fn hack_estimated_fee_for_account_creation(
+        &self,
+        params: &TransactionGasParameters,
+    ) -> Fee {
+        match self {
+            Self::V1 => params.legacy_storage_fee_per_state_slot_create * NumSlots::new(1),
+            Self::V2 => {
+                params.storage_fee_per_state_slot * NumSlots::new(1)
+                    + NumBytes::new(ACCOUNT_RESOURCE_BYTES_OVER_ESTIMATE)
+                        * params.storage_fee_per_state_byte
+            },
+        }
+    }
+
+    pub fn hack_account_creation_fee_lower_bound(&self, params: &TransactionGasParameters) -> Fee {
+        match self {
+            Self::V1 => params.legacy_storage_fee_per_state_slot_create * NumSlots::new(1),
+            Self::V2 => {
+                // This is an underestimation of the fee for account creation, because AccountResource has a
+                // vector and two optional addresses in it which will expand to more bytes on-chain
+                params.storage_fee_per_state_slot * NumSlots::new(1)
+                    + params.storage_fee_per_state_byte
+                        * NumBytes::new(std::mem::size_of::<AccountResource>() as u64)
+            },
+        }
+    }
 }
+
+const ACCOUNT_RESOURCE_BYTES_OVER_ESTIMATE: u64 = 300;
 
 #[cfg(test)]
 mod tests {
@@ -223,6 +252,14 @@ mod tests {
     use aptos_types::{
         on_chain_config::CurrentTimeMicroseconds, state_store::state_value::StateValueMetadata,
     };
+
+    /// to make sure hack_estimated_fee_for_account_creation() is safe
+    #[test]
+    fn account_resource_bytes_over_estimate() {
+        let lower_bound = std::mem::size_of::<AccountResource>() as u64;
+        println!("lower_bound: {}", lower_bound);
+        assert!(ACCOUNT_RESOURCE_BYTES_OVER_ESTIMATE > lower_bound);
+    }
 
     #[test]
     fn test_bytes_deposit() {

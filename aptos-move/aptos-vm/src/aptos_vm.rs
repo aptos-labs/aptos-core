@@ -540,7 +540,11 @@ impl AptosVM {
             let storage_refund = fee_statement.storage_fee_refund();
 
             let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-            let expected = u64::from(gas_params.vm.txn.legacy_storage_fee_per_state_slot_create);
+            let expected = u64::from(
+                gas_meter
+                    .disk_space_pricing()
+                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+            );
             // With the current gas schedule actual is expected to be 50_000 or higher, the cost
             // for the account slot.
             if actual < expected {
