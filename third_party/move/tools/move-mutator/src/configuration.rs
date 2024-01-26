@@ -102,6 +102,7 @@ pub struct FileConfiguration {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::ModuleFilter;
     use std::fs;
     use std::path::Path;
 
@@ -155,7 +156,7 @@ mod tests {
             {
                 "project": {
                     "move_sources": ["/path/to/move/source"],
-                    "mutate_modules": ["mod1"],
+                    "mutate_modules": "all",
                     "out_mutant_dir": "/path/to/output",
                     "verify_mutants": true,
                     "no_overwrite": false,
@@ -187,10 +188,7 @@ mod tests {
             config.project.move_sources,
             vec![Path::new("/path/to/move/source")]
         );
-        assert_eq!(
-            config.project.mutate_modules.unwrap(),
-            vec!["mod1".to_string()]
-        );
+        assert_eq!(config.project.mutate_modules.unwrap(), ModuleFilter::All);
         assert_eq!(
             config.project.out_mutant_dir,
             Some(PathBuf::from("/path/to/output"))
