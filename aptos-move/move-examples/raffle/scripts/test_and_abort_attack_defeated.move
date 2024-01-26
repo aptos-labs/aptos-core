@@ -29,7 +29,7 @@ script {
 
         // TODO: Uncomment this call to reproduce the error above & see the attack failing.
         // (Commented out to ensure this Move example compiles.)
-        //lottery::lottery::decide_winners();
+        //raffle::raffle::randomly_pick_winner_internal();
 
         let new_balance = coin::balance<aptos_coin::AptosCoin>(attacker_addr);
 

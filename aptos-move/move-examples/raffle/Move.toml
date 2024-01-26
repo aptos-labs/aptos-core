@@ -1,5 +1,5 @@
 [package]
-name = "lottery"
+name = "raffle"
 version = "0.0.1"
 upgrade_policy = "immutable"
 
@@ -11,7 +11,7 @@ AptosStdlib = { local = "../../framework/aptos-stdlib" }
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-lottery = "_"
+raffle = "_"
 
 #[dev-addresses]
 aptos_std_extra = "0x1"

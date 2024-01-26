@@ -19,20 +19,26 @@ module lottery::lottery_test {
     use std::vector;
 
     #[test_only]
-    use lottery::lottery;
+    use lottery::lottery_insecure;
 
     #[test_only]
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
+    #[test_only]
+    use aptos_std::debug::print;
+    #[test_only]
+    use aptos_std::smart_vector;
+    #[test_only]
+    use lottery::lottery_insecure::{Ticket, get_ticket_owner};
 
     #[test_only]
-    fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
+    fun give_coins_for_one_ticket(mint_cap: &MintCapability<AptosCoin>, to: &signer) {
         let to_addr = signer::address_of(to);
         if (!account::exists_at(to_addr)) {
             account::create_account_for_test(to_addr);
         };
         coin::register<AptosCoin>(to);
 
-        let coins = coin::mint(lottery::get_ticket_price(), mint_cap);
+        let coins = coin::mint(lottery_insecure::get_ticket_price(), mint_cap);
         coin::deposit(to_addr, coins);
     }
 
@@ -50,21 +56,25 @@ module lottery::lottery_test {
 
         // Deploy the lottery smart contract
         account::create_account_for_test(signer::address_of(&deployer));
-        lottery::init_module_for_testing(&deployer);
+        lottery_insecure::init_module_for_testing(&deployer);
 
         // Needed to mint coins out of thin air for testing
         let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&fx);
 
         // Create fake coins for users participating in lottery & initialize aptos_framework
-        give_coins(&mint_cap, &u1);
-        give_coins(&mint_cap, &u2);
-        give_coins(&mint_cap, &u3);
-        give_coins(&mint_cap, &u4);
+        give_coins_for_one_ticket(&mint_cap, &u1);
+        give_coins_for_one_ticket(&mint_cap, &u2);
+        give_coins_for_one_ticket(&mint_cap, &u3);
+        give_coins_for_one_ticket(&mint_cap, &u4);
 
+        let jackpot = 4 * lottery_insecure::get_ticket_price();
+        print(&jackpot);
 
-        let winner = test_lottery_with_randomness(
+        let winners = test_lottery_with_randomness(
             &u1, &u2, &u3, &u4,
+            0, 0, 1, 1,
         );
+        let num_winners = vector::length(&winners);
 
         let players = vector[
             signer::address_of(&u1),
@@ -73,20 +83,16 @@ module lottery::lottery_test {
             signer::address_of(&u4)
         ];
 
-        // Assert the winner got all the money
-        let i = 0;
-        let num_players = vector::length(&players);
-        while (i < num_players) {
-            let player = *vector::borrow(&players, i);
-
-            if (player == winner) {
-                assert!(coin::balance<AptosCoin>(player) == lottery::get_ticket_price() * num_players, 1);
+        // Assert the winners got all the money
+        vector::for_each_ref(&players, |addr| {
+            let balance = coin::balance<AptosCoin>(*addr);
+            let (found, _) = vector::find(&winners, |winner| winner == addr);
+            if (!found) {
+                assert!(balance == 0, 0);
             } else {
-                assert!(coin::balance<AptosCoin>(player) == 0, 1);
-            };
-
-            i = i+1;
-        };
+                assert!(balance == jackpot / num_winners, 0);
+            }
+        });
 
         // Clean up
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
@@ -96,23 +102,26 @@ module lottery::lottery_test {
     #[test_only]
     fun test_lottery_with_randomness(
         u1: &signer, u2: &signer, u3: &signer, u4: &signer,
-    ): address {
+        g1: u32, g2: u32, g3: u32, g4: u32,
+    ): vector<address> {
         //
         // Each user sends a TXN to buy their ticket
         //
-        lottery::buy_a_ticket(u1);
-        lottery::buy_a_ticket(u2);
-        lottery::buy_a_ticket(u3);
-        lottery::buy_a_ticket(u4);
+        lottery_insecure::buy_a_ticket(u1, g1);
+        lottery_insecure::buy_a_ticket(u2, g2);
+        lottery_insecure::buy_a_ticket(u3, g3);
+        lottery_insecure::buy_a_ticket(u4, g4);
 
         //
         // Send a TXN  to close the lottery and determine the winner
         //
-        let winner_addr = lottery::randomly_pick_winner_internal();
+        let winners = lottery_insecure::randomly_pick_winner_internal();
 
-        debug::print(&string::utf8(b"The winner is: "));
-        debug::print(&winner_addr);
+        debug::print(&string::utf8(b"The winners are: "));
+        vector::for_each_ref(&winners, |addr| {
+            debug::print(addr);
+        });
 
-        winner_addr
+        winners
     }
 }

@@ -1,0 +1,11 @@
+# Raffle example
+
+This is the code that was included in [AIP-41](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-41.md), except for some cosmetic edits.
+
+The purpose of the code is to help AIP-41 showcase two things:
+
+1. The API interface of the proposed `aptos_std::randomness` module, in [`sources/randomness.move`](sources/randomness.move)
+2. An example of a simple lottery based on `aptos_std::randomness`, in [`sources/raffle.move`](sources/raffle.move)
+3. An example of a **test-and-abort** attack failing on the lottery example in [`scripts/test_and_abort_attack_defeated.move`](scripts/test_and_abort_attack_defeated.move)
+
+In addition, we make sure this code is syntactically-correct as well as semantically-correct via some tests in [`sources/raffle_test.move`](sources/raffle_test.move).

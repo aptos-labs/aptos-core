@@ -1,6 +1,5 @@
 module aptos_std_extra::randomness {
     use std::vector;
-    use aptos_framework::transaction_context;
 
     /// Generates a byte uniformly at random.
     public fun byte(): u8 { 0u8 }
@@ -19,12 +18,10 @@ module aptos_std_extra::randomness {
     }
 
     /// Generates a number uniformly at random.
-    public fun u32_integer(): u32 { 0 }
-    public fun u64_integer(): u32 { 0 }
+    public fun u64_integer(): u64 { 0 }
     public fun u256_integer(): u256 { 0 }
 
     /// Generates a number $n \in [min_incl, max_excl)$ uniformly at random.
-    public fun u32_range(min_incl: u32, max_excl: u32): u32 { max_excl; min_incl }
     public fun u64_range(min_incl: u64, max_excl: u64): u64 { max_excl; min_incl }
     public fun u256_range(min_incl: u256, max_excl: u256): u256 { max_excl; min_incl }
 
