@@ -5,7 +5,8 @@
 mod db;
 pub mod db_ops;
 pub mod db_v2;
-pub mod metadata;
+mod metadata;
+pub mod metadata_v2;
 pub mod schema;
 pub mod table_info_reader;
 

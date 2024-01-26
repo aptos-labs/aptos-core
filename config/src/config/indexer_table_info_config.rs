@@ -4,9 +4,10 @@
 use serde::{Deserialize, Serialize};
 
 // Useful defaults
-pub const DEFAULT_PARSER_TASK_COUNT: u16 = 10;
-pub const DEFAULT_PARSER_BATCH_SIZE: u16 = 100;
+pub const DEFAULT_PARSER_TASK_COUNT: u16 = 20;
+pub const DEFAULT_PARSER_BATCH_SIZE: u16 = 1000;
 pub const DEFAULT_BUCKET_NAME: &str = "table-info";
+pub const DEFAULT_VERSION_DIFF: u64 = 100_000;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -27,6 +28,10 @@ pub struct IndexerTableInfoConfig {
 
     /// Backup and restore service config
     pub gcs_bucket_name: String,
+
+    /// if version difference btw this FN and latest ledger version is less than VERSION_DIFF
+    /// do not restore, start from the FN version, to avoid time consuming db restore from gcs
+    pub version_diff: u64,
 }
 
 // Reminder, #[serde(default)] on IndexerTableInfoConfig means that the default values for
@@ -41,6 +46,7 @@ impl Default for IndexerTableInfoConfig {
             enable_expensive_logging: false,
             db_backup_enabled: false,
             gcs_bucket_name: DEFAULT_BUCKET_NAME.to_owned(),
+            version_diff: DEFAULT_VERSION_DIFF,
         }
     }
 }

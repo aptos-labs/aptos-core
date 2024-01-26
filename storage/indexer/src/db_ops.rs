@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::schema::column_families;
+use crate::schema::column_families_v2;
 use anyhow::Result;
 use aptos_config::config::RocksdbConfig;
 use aptos_rocksdb_options::gen_rocksdb_options;
@@ -15,7 +15,7 @@ pub fn open_db<P: AsRef<Path>>(db_path: P, rocksdb_config: &RocksdbConfig) -> Re
     Ok(DB::open(
         db_path,
         "index_asnync_v2_db",
-        column_families(),
+        column_families_v2(),
         &gen_rocksdb_options(rocksdb_config, false),
     )?)
 }

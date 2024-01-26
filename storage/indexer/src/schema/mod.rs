@@ -7,18 +7,29 @@
 //! All schemas are `pub(crate)` so not shown in rustdoc, refer to the source code to see details.
 
 pub mod indexer_metadata;
+pub mod indexer_metadata_v2;
 pub mod table_info;
 
 use aptos_schemadb::ColumnFamilyName;
 
 pub const DEFAULT_COLUMN_FAMILY_NAME: ColumnFamilyName = "default";
+/// TODO(jill): to be deleted once INDEXER_METADATA_V2_CF_NAME is deployed
 pub const INDEXER_METADATA_CF_NAME: ColumnFamilyName = "indexer_metadata";
+pub const INDEXER_METADATA_V2_CF_NAME: ColumnFamilyName = "indexer_metadata_v2";
 pub const TABLE_INFO_CF_NAME: ColumnFamilyName = "table_info";
 
 pub fn column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         INDEXER_METADATA_CF_NAME,
+        TABLE_INFO_CF_NAME,
+    ]
+}
+
+pub fn column_families_v2() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        INDEXER_METADATA_V2_CF_NAME,
         TABLE_INFO_CF_NAME,
     ]
 }
