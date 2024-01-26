@@ -35,8 +35,9 @@ struct Foo(Three, Three);
 
 #[derive(AbstractDomain)]
 struct Bar {
-    #[join]
+    // #[join]
     x: Three,
+	#[no_join]
     y: Three,
 }
 
