@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 //! Derive macro for `AbstractDomain`
 //!
 //! Currently we can only derive for structs.
