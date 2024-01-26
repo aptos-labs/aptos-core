@@ -3,9 +3,9 @@
 
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
-
+use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -89,14 +89,34 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
-    pub fn enable(&mut self, flag: FeatureFlag) {
+    fn resize_for_flag(&mut self, flag: FeatureFlag) -> (usize, u8) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
         while self.features.len() <= byte_index {
             self.features.push(0);
         }
+        (byte_index, bit_mask)
+    }
 
+    pub fn enable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
         self.features[byte_index] |= bit_mask;
+    }
+
+    pub fn disable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
+        self.features[byte_index] &= !bit_mask;
+    }
+
+    pub fn into_flag_vec(self) -> Vec<FeatureFlag> {
+        let Self { features } = self;
+        features
+            .into_iter()
+            .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
+            .enumerate()
+            .filter(|(_feature_idx, enabled)| *enabled)
+            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .collect()
     }
 
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
@@ -158,4 +178,19 @@ impl Features {
     pub fn is_open_id_signature_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::OPEN_ID_SIGNATURE)
     }
+}
+
+#[test]
+fn test_features_into_flag_vec() {
+    let mut features = Features { features: vec![] };
+    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+    features.enable(FeatureFlag::BN254_STRUCTURES);
+    let flag_vec = features.into_flag_vec();
+    assert_eq!(
+        vec![
+            FeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::BN254_STRUCTURES
+        ],
+        flag_vec
+    );
 }

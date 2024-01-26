@@ -26,12 +26,13 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     network_address::DnsName,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerAndVoterConfig,
-        ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, FeatureFlag,
+        LeaderReputationType, OnChainConsensusConfig, OnChainExecutionConfig,
+        ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
 };
+use aptos_vm_genesis::default_features_resource_for_genesis;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
@@ -555,6 +556,9 @@ async fn test_large_total_stake() {
             genesis_config.epoch_duration_secs = 4;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
+            let mut features = default_features_resource_for_genesis();
+            features.disable(FeatureFlag::RECONFIGURE_WITH_DKG);
+            genesis_config.initial_features_override = Some(features);
         }))
         .build_with_cli(0)
         .await;
@@ -1055,6 +1059,9 @@ async fn test_join_and_leave_validator() {
             genesis_config.epoch_duration_secs = 5;
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
+            let mut features = default_features_resource_for_genesis();
+            features.disable(FeatureFlag::RECONFIGURE_WITH_DKG);
+            genesis_config.initial_features_override = Some(features);
         }))
         .build_with_cli(0)
         .await;
@@ -1174,8 +1181,6 @@ async fn test_join_and_leave_validator() {
     )
     .await;
 
-    println!("dkg_1");
-
     let unlock_stake = 3;
 
     // Unlock stake.
@@ -1186,19 +1191,8 @@ async fn test_join_and_leave_validator() {
             .clone(),
     );
 
-    println!("dkg_2");
-
     // Conservatively wait until the recurring lockup is over.
     tokio::time::sleep(Duration::from_secs(10)).await;
-
-    println!("dkg_3");
-
-    reconfig(
-        &rest_client,
-        &transaction_factory,
-        swarm.chain_info().root_account(),
-    )
-    .await;
 
     let withdraw_stake = 2;
     gas_used += get_gas(
@@ -1208,15 +1202,11 @@ async fn test_join_and_leave_validator() {
             .remove(0),
     );
 
-    println!("dkg_4");
-
     cli.assert_account_balance_now(
         validator_cli_index,
         (3 * DEFAULT_FUNDED_COINS) - stake_coins + withdraw_stake - gas_used,
     )
     .await;
-
-    println!("dkg_5");
 }
 
 #[tokio::test]

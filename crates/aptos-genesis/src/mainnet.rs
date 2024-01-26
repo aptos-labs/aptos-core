@@ -10,7 +10,9 @@ use aptos_db::AptosDB;
 use aptos_framework::ReleaseBundle;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    chain_id::ChainId, on_chain_config::Features, transaction::Transaction, waypoint::Waypoint,
+};
 use aptos_vm::AptosVM;
 use aptos_vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
@@ -54,6 +56,8 @@ pub struct MainnetGenesisInfo {
     employee_vesting_start: u64,
     /// Duration of each vesting period (in seconds).
     employee_vesting_period_duration: u64,
+
+    initial_features_override: Option<Features>,
 }
 
 impl MainnetGenesisInfo {
@@ -93,6 +97,7 @@ impl MainnetGenesisInfo {
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
             employee_vesting_start,
             employee_vesting_period_duration,
+            initial_features_override: genesis_config.initial_features_override.clone(),
         })
     }
 
@@ -126,6 +131,7 @@ impl MainnetGenesisInfo {
                 voting_power_increase_limit: self.voting_power_increase_limit,
                 employee_vesting_start: self.employee_vesting_start,
                 employee_vesting_period_duration: self.employee_vesting_period_duration,
+                initial_features_override: self.initial_features_override.clone(),
             },
         )
     }
