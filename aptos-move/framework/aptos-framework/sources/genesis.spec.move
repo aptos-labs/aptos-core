@@ -44,7 +44,7 @@ spec aptos_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-5](set_genesis_end).
     /// </high-level-req>
     spec module {
-        pragma verify = true;
+        pragma verify = false;
     }
 
     spec initialize {

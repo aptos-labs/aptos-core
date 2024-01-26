@@ -296,7 +296,7 @@ module aptos_framework::genesis {
         // validators.
         aptos_coin::destroy_mint_cap(aptos_framework);
 
-        stake::update_validator_set_on_new_epoch(true);
+        stake::on_new_epoch();
     }
 
     /// Sets up the initial validator set for the network.

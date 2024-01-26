@@ -44,7 +44,6 @@ to synchronize configuration changes for the validators.
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 <b>use</b> <a href="timestamp.md#0x1_timestamp">0x1::timestamp</a>;
 <b>use</b> <a href="transaction_fee.md#0x1_transaction_fee">0x1::transaction_fee</a>;
-<b>use</b> <a href="types.md#0x1_types">0x1::types</a>;
 </code></pre>
 
 
@@ -362,7 +361,7 @@ Signal validators to start using new configuration. Must be called from friend c
         <b>return</b>
     };
 
-    <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">reconfiguration_state::try_mark_as_in_progress</a>();
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">reconfiguration_state::on_reconfig_start</a>();
 
     // Reconfiguration "forces the <a href="block.md#0x1_block">block</a>" <b>to</b> end, <b>as</b> mentioned above. Therefore, we must process the collected fees
     // explicitly so that staking can distribute them.
@@ -379,7 +378,7 @@ Signal validators to start using new configuration. Must be called from friend c
     };
 
     // Call <a href="stake.md#0x1_stake">stake</a> <b>to</b> compute the new validator set and distribute rewards and transaction fees.
-    <a href="stake.md#0x1_stake_update_validator_set_on_new_epoch">stake::update_validator_set_on_new_epoch</a>(<b>true</b>);
+    <a href="stake.md#0x1_stake_on_new_epoch">stake::on_new_epoch</a>();
     <a href="storage_gas.md#0x1_storage_gas_on_reconfig">storage_gas::on_reconfig</a>();
 
     <b>assert</b>!(current_time &gt; config_ref.last_reconfiguration_time, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration.md#0x1_reconfiguration_EINVALID_BLOCK_TIME">EINVALID_BLOCK_TIME</a>));
@@ -396,7 +395,7 @@ Signal validators to start using new configuration. Must be called from friend c
         },
     );
 
-    <a href="reconfiguration_state.md#0x1_reconfiguration_state_mark_as_completed">reconfiguration_state::mark_as_completed</a>();
+    <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">reconfiguration_state::on_reconfig_finish</a>();
 }
 </code></pre>
 

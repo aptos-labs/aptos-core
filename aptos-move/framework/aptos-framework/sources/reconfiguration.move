@@ -120,7 +120,7 @@ module aptos_framework::reconfiguration {
             return
         };
 
-        reconfiguration_state::try_mark_as_in_progress();
+        reconfiguration_state::on_reconfig_start();
 
         // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
         // explicitly so that staking can distribute them.
@@ -137,7 +137,7 @@ module aptos_framework::reconfiguration {
         };
 
         // Call stake to compute the new validator set and distribute rewards and transaction fees.
-        stake::update_validator_set_on_new_epoch(true);
+        stake::on_new_epoch();
         storage_gas::on_reconfig();
 
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
@@ -154,7 +154,7 @@ module aptos_framework::reconfiguration {
             },
         );
 
-        reconfiguration_state::mark_as_completed();
+        reconfiguration_state::on_reconfig_finish();
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

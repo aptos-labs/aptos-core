@@ -5,7 +5,6 @@ module aptos_framework::block {
     use std::vector;
     use std::option;
     use std::option::Option;
-    use std::signer;
     use aptos_std::randomness;
 
     use aptos_framework::account;
@@ -103,7 +102,7 @@ module aptos_framework::block {
 
 
     fun block_prologue_common(
-        account: &signer,
+        vm: &signer,
         hash: address,
         epoch: u64,
         round: u64,
@@ -113,7 +112,7 @@ module aptos_framework::block {
         timestamp: u64
     ): u64 acquires BlockResource {
         // Operational constraint: can only be invoked by the VM.
-        system_addresses::is_reserved_address(signer::address_of(account));
+        system_addresses::assert_vm(vm);
 
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
@@ -139,7 +138,7 @@ module aptos_framework::block {
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        emit_new_block_event(account, &mut block_metadata_ref.new_block_events, new_block_event);
+        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.

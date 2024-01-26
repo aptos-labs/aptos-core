@@ -1,4 +1,6 @@
 /// Reconfiguration meta-state resources and util functions.
+///
+/// WARNING: `reconfiguration_state::initialize()` is required before `RECONFIGURE_WITH_DKG` can be enabled.
 module aptos_framework::reconfiguration_state {
     use std::error;
     use std::string;
@@ -31,6 +33,10 @@ module aptos_framework::reconfiguration_state {
         start_time_secs: u64,
     }
 
+    public fun is_initialized(): bool {
+        exists<State>(@aptos_framework)
+    }
+
     public(friend) fun initialize(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         if (!exists<State>(@aptos_framework)) {
@@ -55,15 +61,19 @@ module aptos_framework::reconfiguration_state {
         variant_type_name == b"0x1::reconfiguration_state::StateActive"
     }
 
-    /// Mark the reconfiguration state "in progress" if it is currently "stopped".
-    /// The current time is also recorded as the reconfiguration start time. (Some module, e.g., `stake.move`, needs this info).
-    public(friend) fun try_mark_as_in_progress() acquires State {
-        let state = borrow_global_mut<State>(@aptos_framework);
-        let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
-        if (variant_type_name == b"0x1::reconfiguration_state::StateInactive") {
-            state.variant = copyable_any::pack(StateActive {
-                start_time_secs: timestamp::now_seconds()
-            });
+    /// Called at the beginning of a reconfiguration (either immediate or async)
+    /// to mark the reconfiguration state "in progress" if it is currently "stopped".
+    ///
+    /// Also record the current time as the reconfiguration start time. (Some module, e.g., `stake.move`, needs this info).
+    public(friend) fun on_reconfig_start() acquires State {
+        if (exists<State>(@aptos_framework)) {
+            let state = borrow_global_mut<State>(@aptos_framework);
+            let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+            if (variant_type_name == b"0x1::reconfiguration_state::StateInactive") {
+                state.variant = copyable_any::pack(StateActive {
+                    start_time_secs: timestamp::now_seconds()
+                });
+            }
         };
     }
 
@@ -82,13 +92,15 @@ module aptos_framework::reconfiguration_state {
 
     /// Called at the end of every reconfiguration to mark the state as "stopped".
     /// Abort if the current state is not "in progress".
-    public(friend) fun mark_as_completed() acquires State {
-        let state = borrow_global_mut<State>(@aptos_framework);
-        let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
-        if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
-            state.variant = copyable_any::pack(StateInactive {});
-        } else {
-            abort(error::invalid_state(ERECONFIG_NOT_IN_PROGRESS))
+    public(friend) fun on_reconfig_finish() acquires State {
+        if (exists<State>(@aptos_framework)) {
+            let state = borrow_global_mut<State>(@aptos_framework);
+            let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
+            if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
+                state.variant = copyable_any::pack(StateInactive {});
+            } else {
+                abort(error::invalid_state(ERECONFIG_NOT_IN_PROGRESS))
+            }
         }
     }
 
@@ -103,19 +115,19 @@ module aptos_framework::reconfiguration_state {
 
         // "try_start" should work.
         timestamp::fast_forward_seconds(123);
-        try_mark_as_in_progress();
+        on_reconfig_start();
         assert!(is_in_progress(), 1);
         assert!(123 == start_time_secs(), 1);
 
         // Redundant `try_start` should be no-op.
         timestamp::fast_forward_seconds(1);
-        try_mark_as_in_progress();
+        on_reconfig_start();
         assert!(is_in_progress(), 1);
         assert!(123 == start_time_secs(), 1);
 
         // A `finish` call should work when the state is marked "in progess".
         timestamp::fast_forward_seconds(10);
-        mark_as_completed();
+        on_reconfig_finish();
         assert!(!is_in_progress(), 1);
     }
 }

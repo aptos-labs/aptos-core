@@ -12,6 +12,7 @@ Common types.
 -  [Function `addr_from_validator_consensus_info`](#0x1_types_addr_from_validator_consensus_info)
 -  [Function `pk_bytes_from_validator_consensus_info`](#0x1_types_pk_bytes_from_validator_consensus_info)
 -  [Function `voting_power_from_validator_consensus_info`](#0x1_types_voting_power_from_validator_consensus_info)
+-  [Specification](#@Specification_0)
 
 
 <pre><code></code></pre>
@@ -190,6 +191,15 @@ Get <code><a href="types.md#0x1_types_ValidatorConsensusInfo">ValidatorConsensus
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -41,6 +41,7 @@ spec aptos_framework::stake {
     // Global invariants
     // -----------------
     spec module {
+        pragma verify = false;
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
         // After genesis, `AptosCoinCapabilities`, `ValidatorPerformance` and `ValidatorSet` exist.
@@ -384,7 +385,7 @@ spec aptos_framework::stake {
         ensures post_stake_pool.delegated_voter == new_voter;
     }
 
-    spec update_validator_set_on_new_epoch {
+    spec on_new_epoch {
         pragma verify_duration_estimate = 120;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global

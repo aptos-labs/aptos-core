@@ -15,12 +15,12 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
         if (dkg::in_progress()) { return };
-        reconfiguration_state::try_mark_as_in_progress();
+        reconfiguration_state::on_reconfig_start();
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(
             cur_epoch,
             stake::cur_validator_consensus_infos(),
-            stake::update_validator_set_on_new_epoch(false)
+            stake::next_validator_consensus_infos(),
         );
     }
 

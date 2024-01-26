@@ -5,17 +5,20 @@
 
 Reconfiguration meta-state resources and util functions.
 
+WARNING: <code><a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize">reconfiguration_state::initialize</a>()</code> is required before <code>RECONFIGURE_WITH_DKG</code> can be enabled.
+
 
 -  [Resource `State`](#0x1_reconfiguration_state_State)
 -  [Struct `StateInactive`](#0x1_reconfiguration_state_StateInactive)
 -  [Struct `StateActive`](#0x1_reconfiguration_state_StateActive)
 -  [Constants](#@Constants_0)
+-  [Function `is_initialized`](#0x1_reconfiguration_state_is_initialized)
 -  [Function `initialize`](#0x1_reconfiguration_state_initialize)
 -  [Function `initialize_for_testing`](#0x1_reconfiguration_state_initialize_for_testing)
 -  [Function `is_in_progress`](#0x1_reconfiguration_state_is_in_progress)
--  [Function `try_mark_as_in_progress`](#0x1_reconfiguration_state_try_mark_as_in_progress)
+-  [Function `on_reconfig_start`](#0x1_reconfiguration_state_on_reconfig_start)
 -  [Function `start_time_secs`](#0x1_reconfiguration_state_start_time_secs)
--  [Function `mark_as_completed`](#0x1_reconfiguration_state_mark_as_completed)
+-  [Function `on_reconfig_finish`](#0x1_reconfiguration_state_on_reconfig_finish)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
@@ -128,6 +131,30 @@ A state variant indicating a reconfiguration is in progress.
 
 
 
+<a id="0x1_reconfiguration_state_is_initialized"></a>
+
+## Function `is_initialized`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">is_initialized</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">is_initialized</a>(): bool {
+    <b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_reconfiguration_state_initialize"></a>
 
 ## Function `initialize`
@@ -212,15 +239,17 @@ Return whether the reconfiguration state is marked "in progress".
 
 </details>
 
-<a id="0x1_reconfiguration_state_try_mark_as_in_progress"></a>
+<a id="0x1_reconfiguration_state_on_reconfig_start"></a>
 
-## Function `try_mark_as_in_progress`
+## Function `on_reconfig_start`
 
-Mark the reconfiguration state "in progress" if it is currently "stopped".
-The current time is also recorded as the reconfiguration start time. (Some module, e.g., <code><a href="stake.md#0x1_stake">stake</a>.<b>move</b></code>, needs this info).
+Called at the beginning of a reconfiguration (either immediate or async)
+to mark the reconfiguration state "in progress" if it is currently "stopped".
+
+Also record the current time as the reconfiguration start time. (Some module, e.g., <code><a href="stake.md#0x1_stake">stake</a>.<b>move</b></code>, needs this info).
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">try_mark_as_in_progress</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">on_reconfig_start</a>()
 </code></pre>
 
 
@@ -229,13 +258,15 @@ The current time is also recorded as the reconfiguration start time. (Some modul
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">try_mark_as_in_progress</a>() <b>acquires</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a> {
-    <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
-    <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&state.variant));
-    <b>if</b> (variant_type_name == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">0x1::reconfiguration_state::StateInactive</a>") {
-        state.variant = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">StateActive</a> {
-            start_time_secs: <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
-        });
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_start">on_reconfig_start</a>() <b>acquires</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)) {
+        <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
+        <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&state.variant));
+        <b>if</b> (variant_type_name == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">0x1::reconfiguration_state::StateInactive</a>") {
+            state.variant = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">StateActive</a> {
+                start_time_secs: <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
+            });
+        }
     };
 }
 </code></pre>
@@ -277,15 +308,15 @@ Abort if the reconfiguration state is not "in progress".
 
 </details>
 
-<a id="0x1_reconfiguration_state_mark_as_completed"></a>
+<a id="0x1_reconfiguration_state_on_reconfig_finish"></a>
 
-## Function `mark_as_completed`
+## Function `on_reconfig_finish`
 
 Called at the end of every reconfiguration to mark the state as "stopped".
 Abort if the current state is not "in progress".
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_mark_as_completed">mark_as_completed</a>()
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">on_reconfig_finish</a>()
 </code></pre>
 
 
@@ -294,13 +325,15 @@ Abort if the current state is not "in progress".
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_mark_as_completed">mark_as_completed</a>() <b>acquires</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a> {
-    <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
-    <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&state.variant));
-    <b>if</b> (variant_type_name == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">0x1::reconfiguration_state::StateActive</a>") {
-        state.variant = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">StateInactive</a> {});
-    } <b>else</b> {
-        <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_ERECONFIG_NOT_IN_PROGRESS">ERECONFIG_NOT_IN_PROGRESS</a>))
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">on_reconfig_finish</a>() <b>acquires</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)) {
+        <b>let</b> state = <b>borrow_global_mut</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
+        <b>let</b> variant_type_name = *<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(<a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(&state.variant));
+        <b>if</b> (variant_type_name == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">0x1::reconfiguration_state::StateActive</a>") {
+            state.variant = <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_pack">copyable_any::pack</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">StateInactive</a> {});
+        } <b>else</b> {
+            <b>abort</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_ERECONFIG_NOT_IN_PROGRESS">ERECONFIG_NOT_IN_PROGRESS</a>))
+        }
     }
 }
 </code></pre>
