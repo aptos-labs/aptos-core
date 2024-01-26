@@ -14,7 +14,10 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
-use aptos_types::{chain_id::ChainId, on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures}};
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
+};
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::VMResult,
