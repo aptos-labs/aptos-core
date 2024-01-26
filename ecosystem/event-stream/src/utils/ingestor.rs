@@ -1,22 +1,21 @@
 // Copyright © Aptos Foundation
 
+use super::event_message::{PubSubEventMessage, StreamEventMessage};
 use bytes::Bytes;
 use chrono::Duration;
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
-use crate::EventMessage;
-
 #[derive(Clone)]
 pub struct Ingestor {
-    channel: broadcast::Sender<EventMessage>,
+    channel: broadcast::Sender<StreamEventMessage>,
     chain_id: i64,
     num_sec_valid: i64,
 }
 
 impl Ingestor {
     pub fn new(
-        channel: broadcast::Sender<EventMessage>,
+        channel: broadcast::Sender<StreamEventMessage>,
         chain_id: i64,
         num_sec_valid: i64,
     ) -> Self {
@@ -43,25 +42,29 @@ impl Ingestor {
             return Ok(());
         }
 
-        self.channel
-            .send(pubsub_message.clone())
-            .unwrap_or_else(|e| {
-                error!(
-                    pubsub_message = pubsub_message.to_string(),
-                    error = ?e,
-                    "[Event Stream] Failed to broadcast message"
-                );
-                panic!();
-            });
+        let stream_messages = StreamEventMessage::list_from_pubsub(pubsub_message.clone());
+        for stream_message in stream_messages {
+            self.channel
+                .send(stream_message.clone())
+                .unwrap_or_else(|e| {
+                    error!(
+                        pubsub_message = pubsub_message.to_string(),
+                        stream_message = stream_message.to_string(),
+                        error = ?e,
+                        "[Event Stream] Failed to broadcast message"
+                    );
+                    panic!();
+                });
+            info!(
+                stream_message = stream_message.to_string(),
+                "[Event Stream] Broadcasted message"
+            );
+        }
 
-        info!(
-            pubsub_message = pubsub_message.to_string(),
-            "[Event Stream] Broadcasted message"
-        );
         Ok(())
     }
 
-    fn validate_pubsub_message(&self, event_message: &EventMessage) -> anyhow::Result<()> {
+    fn validate_pubsub_message(&self, event_message: &PubSubEventMessage) -> anyhow::Result<()> {
         if event_message.chain_id != self.chain_id {
             error!(
                 chain_id = event_message.chain_id,
@@ -89,9 +92,9 @@ impl Ingestor {
         Ok(())
     }
 
-    fn parse_pubsub_message(&self, msg_base64: Bytes) -> anyhow::Result<EventMessage> {
+    fn parse_pubsub_message(&self, msg_base64: Bytes) -> anyhow::Result<PubSubEventMessage> {
         let pubsub_message = String::from_utf8(msg_base64.to_vec())?;
-        let event_message = serde_json::from_str::<EventMessage>(&pubsub_message)?;
+        let event_message = serde_json::from_str::<PubSubEventMessage>(&pubsub_message)?;
         Ok(event_message)
     }
 }

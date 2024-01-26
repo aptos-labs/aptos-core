@@ -1,13 +1,11 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    utils::{
-        counters::EVENT_RECEIVED_COUNT,
-        database::{check_or_update_chain_id, establish_connection_pool, run_migrations},
-        ingestor::Ingestor,
-        stream::spawn_stream,
-    },
-    EventMessage,
+use crate::utils::{
+    counters::EVENT_RECEIVED_COUNT,
+    database::{check_or_update_chain_id, establish_connection_pool, run_migrations},
+    event_message::StreamEventMessage,
+    ingestor::Ingestor,
+    stream::spawn_stream,
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use bytes::Bytes;
@@ -66,7 +64,7 @@ async fn handle_root(
 
 #[derive(Clone)]
 pub struct StreamContext {
-    pub channel: broadcast::Sender<EventMessage>,
+    pub channel: broadcast::Sender<StreamEventMessage>,
     pub websocket_alive_duration: u64,
 }
 
@@ -120,7 +118,7 @@ impl RunnableConfig for EventStreamConfig {
         );
 
         // Create Event broadcast channel
-        let (tx, _rx) = broadcast::channel::<EventMessage>(100);
+        let (tx, _rx) = broadcast::channel::<StreamEventMessage>(100);
 
         // Create web server
         let ingestion_context = Arc::new(IngestionContext {

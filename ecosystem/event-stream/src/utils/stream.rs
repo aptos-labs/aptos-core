@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::EventMessage;
+use super::event_message::StreamEventMessage;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
 use std::time::Duration;
 use tokio::{sync::broadcast, time};
@@ -9,14 +9,14 @@ use warp::filters::ws::{Message, WebSocket};
 
 pub struct Stream {
     tx: SplitSink<WebSocket, Message>,
-    channel: broadcast::Receiver<EventMessage>,
+    channel: broadcast::Receiver<StreamEventMessage>,
     websocket_alive_duration: u64,
 }
 
 impl Stream {
     pub fn new(
         tx: SplitSink<WebSocket, Message>,
-        channel: broadcast::Receiver<EventMessage>,
+        channel: broadcast::Receiver<StreamEventMessage>,
         websocket_alive_duration: u64,
     ) -> Self {
         Self {
@@ -56,7 +56,7 @@ impl Stream {
 
 pub async fn spawn_stream(
     ws: WebSocket,
-    channel: broadcast::Sender<EventMessage>,
+    channel: broadcast::Sender<StreamEventMessage>,
     websocket_alive_duration: u64,
 ) {
     let (tx, _) = ws.split();
