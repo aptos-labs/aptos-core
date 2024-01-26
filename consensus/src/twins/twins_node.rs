@@ -52,6 +52,8 @@ use futures::{channel::mpsc, StreamExt};
 use maplit::hashmap;
 use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 use tokio::runtime::Runtime;
+use aptos_crypto::Uniform;
+use aptos_types::dkg::{DefaultDKG, DKGTrait};
 
 /// Auxiliary struct that is preparing SMR for the test
 pub struct SMRNode {
@@ -146,14 +148,7 @@ impl SMRNode {
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
-        let dkg_decrypt_key = config
-            .consensus
-            .safety_rules
-            .initial_safety_rules_config
-            .identity_blob()
-            .unwrap()
-            .try_into_dkg_new_validator_decrypt_key()
-            .unwrap();
+        let dkg_decrypt_key = <DefaultDKG as DKGTrait>::NewValidatorDecryptKey::generate_for_testing();
         let epoch_mgr = EpochManager::new(
             &config,
             time_service,

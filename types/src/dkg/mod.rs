@@ -13,7 +13,10 @@ use move_core_types::{
 };
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug};
+use std::{
+    collections::BTreeSet,
+    fmt::{Debug, Formatter},
+};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {
@@ -34,11 +37,20 @@ impl MoveStructType for DKGStartEvent {
 }
 
 /// DKG transcript and its metadata.
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DKGTranscript {
     pub metadata: DKGTranscriptMetadata,
     #[serde(with = "serde_bytes")]
     pub transcript_bytes: Vec<u8>,
+}
+
+impl Debug for DKGTranscript {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DKGTranscript")
+            .field("metadata", &self.metadata)
+            .field("transcript_bytes_len", &self.transcript_bytes.len())
+            .finish()
+    }
 }
 
 impl DKGTranscript {
@@ -123,7 +135,7 @@ pub trait DKGTrait: Debug {
     type DealtSecret;
     type DealtSecretShare;
     type DealtPubKeyShare;
-    type NewValidatorDecryptKey;
+    type NewValidatorDecryptKey: Uniform;
 
     fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
     fn aggregate_input_secret(secrets: Vec<Self::InputSecret>) -> Self::InputSecret;
