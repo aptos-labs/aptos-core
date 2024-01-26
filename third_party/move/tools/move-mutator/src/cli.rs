@@ -1,6 +1,7 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::str::FromStr;
 
 pub const DEFAULT_OUTPUT_DIR: &str = "mutants_output";
 
@@ -12,8 +13,8 @@ pub struct CLIOptions {
     #[clap(long, short, value_parser)]
     pub move_sources: Vec<PathBuf>,
     /// Module names to be mutated.
-    #[clap(long)]
-    pub mutate_modules: Option<Vec<String>>,
+    #[clap(long, value_parser, default_value = "all")]
+    pub mutate_modules: ModuleFilter,
     /// The path where to put the output files.
     #[clap(long, short, value_parser)]
     pub out_mutant_dir: Option<PathBuf>,
@@ -41,13 +42,32 @@ impl Default for CLIOptions {
     fn default() -> Self {
         Self {
             move_sources: vec![],
-            mutate_modules: None,
+            mutate_modules: ModuleFilter::All,
             out_mutant_dir: Some(PathBuf::from(DEFAULT_OUTPUT_DIR)),
             verify_mutants: true,
             no_overwrite: None,
             downsample_filter: None,
             downsample_ratio: None,
             configuration_file: None,
+        }
+    }
+}
+
+/// Filter allowing to select modules to be mutated.
+#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+pub enum ModuleFilter {
+    #[default]
+    All,
+    Selected(Vec<String>),
+}
+
+impl FromStr for ModuleFilter {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" => Ok(ModuleFilter::All),
+            _ => Ok(ModuleFilter::Selected(vec![s.to_string()])),
         }
     }
 }
