@@ -446,7 +446,10 @@ impl RawTransactionWithData {
 /// Marks payload as deprecated. We need to use it to ensure serialization or
 /// deserialization is not broken.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DeprecatedPayload;
+pub struct DeprecatedPayload {
+    // Used because 'analyze_serde_formats' complains with "Please avoid 0-sized containers".
+    dummy_value: u64,
+}
 
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
