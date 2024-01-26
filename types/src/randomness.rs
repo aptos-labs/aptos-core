@@ -115,7 +115,7 @@ impl Default for Randomness {
 pub struct PerBlockRandomness {
     pub epoch: u64,
     pub round: u64,
-    pub seed: Vec<u8>,
+    pub seed: Option<Vec<u8>>,
 }
 
 impl OnChainConfig for PerBlockRandomness {

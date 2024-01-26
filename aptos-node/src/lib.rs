@@ -20,7 +20,7 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{IdentityBlob, merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, IdentityBlob, NodeConfig, PersistableConfig};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -738,7 +738,7 @@ pub fn setup_environment_and_start_node(
             );
             admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
             Some(runtime)
-        }
+        },
         _ => None,
     };
 

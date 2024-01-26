@@ -45,6 +45,7 @@ async fn randomness_correctness() {
         info!("Verifying WVUF output for version {}.", cur_txn_version);
         let wvuf_verify_result =
             verify_randomness(&decrypt_key_map, &rest_client, cur_txn_version).await;
+        println!("wvuf_verify_result={:?}", wvuf_verify_result);
         assert!(wvuf_verify_result.is_ok());
     }
 
@@ -64,6 +65,7 @@ async fn randomness_correctness() {
         info!("Verifying WVUF output for version {}.", cur_txn_version);
         let wvuf_verify_result =
             verify_randomness(&decrypt_key_map, &rest_client, cur_txn_version).await;
+        println!("wvuf_verify_result={:?}", wvuf_verify_result);
         assert!(wvuf_verify_result.is_ok());
     }
 }

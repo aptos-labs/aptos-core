@@ -129,12 +129,14 @@ pub fn prepare_buffer_manager(
     );
 
     let (result_tx, result_rx) = create_channel::<OrderedBlocks>();
-    let (reset_tx, _) = create_channel::<ResetRequest>();
+    let (reset_rand_tx, _) = create_channel::<ResetRequest>();
+    let (reset_bufmgr_tx, _) = create_channel::<ResetRequest>();
 
     let persisting_proxy = Arc::new(OrderingStateComputer::new(
         result_tx,
         Arc::new(EmptyStateComputer),
-        reset_tx,
+        reset_rand_tx,
+        reset_bufmgr_tx,
     ));
 
     let (block_tx, block_rx) = create_channel::<OrderedBlocks>();

@@ -8,7 +8,7 @@ use crate::{
             interface::RandStorage,
             schema::{
                 AugDataSchema, CertifiedAugDataSchema, KeyPairSchema, AUG_DATA_CF_NAME,
-                CERTIFIED_AUG_DATA_CF_NAME,
+                CERTIFIED_AUG_DATA_CF_NAME, KEY_PAIR_CF_NAME,
             },
         },
         types::{AugData, AugDataId, CertifiedAugData, TAugmentedData},
@@ -27,7 +27,11 @@ pub const RAND_DB_NAME: &str = "rand_db";
 
 impl RandDb {
     pub(crate) fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        let column_families = vec![AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME];
+        let column_families = vec![
+            KEY_PAIR_CF_NAME,
+            AUG_DATA_CF_NAME,
+            CERTIFIED_AUG_DATA_CF_NAME,
+        ];
 
         let path = db_root_path.as_ref().join(RAND_DB_NAME);
         let instant = Instant::now();

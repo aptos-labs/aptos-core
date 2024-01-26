@@ -23,12 +23,12 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
+use aptos_types::dkg::{DKGTrait, DefaultDKG};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-use aptos_types::dkg::{DefaultDKG, DKGTrait};
 
 /// Helper function to start consensus based on configuration and return the runtime
 pub fn start_consensus(

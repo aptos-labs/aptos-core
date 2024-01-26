@@ -46,7 +46,7 @@ impl TShare for Share {
         let index = *rand_config
             .validator
             .address_to_validator_index()
-            .get(&author)
+            .get(author)
             .unwrap();
         let maybe_apk = &rand_config.keys.certified_apks[index];
         if let Some(apk) = maybe_apk.get() {
@@ -92,7 +92,7 @@ impl TShare for Share {
                 .get(share.author())
                 .unwrap();
             let apk = rand_config.get_certified_apk(share.author()).unwrap(); // needs to have apk to verify the share
-            apks_and_proofs.push((Player { id }, apk.clone(), share.share().share.clone()));
+            apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);

@@ -146,7 +146,14 @@ impl SMRNode {
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
-
+        let dkg_decrypt_key = config
+            .consensus
+            .safety_rules
+            .initial_safety_rules_config
+            .identity_blob()
+            .unwrap()
+            .try_into_dkg_new_validator_decrypt_key()
+            .unwrap();
         let epoch_mgr = EpochManager::new(
             &config,
             time_service,
@@ -161,6 +168,7 @@ impl SMRNode {
             bounded_executor,
             aptos_time_service::TimeService::real(),
             vtxn_pool,
+            dkg_decrypt_key,
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);

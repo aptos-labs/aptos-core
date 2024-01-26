@@ -206,8 +206,13 @@ async fn verify_randomness(
 ) -> Result<()> {
     // Fetch resources.
     let (dkg_state, on_chain_block_randomness) = tokio::join!(
-        get_on_chain_resource_at_version::<DKGState>(&rest_client, version),
-        get_on_chain_resource_at_version::<PerBlockRandomness>(&rest_client, version)
+        get_on_chain_resource_at_version::<DKGState>(rest_client, version),
+        get_on_chain_resource_at_version::<PerBlockRandomness>(rest_client, version)
+    );
+
+    ensure!(
+        on_chain_block_randomness.seed.is_some(),
+        "randomness verification failed with seed missing"
     );
 
     // Derive the shared secret.
@@ -226,7 +231,7 @@ async fn verify_randomness(
         dkg_session
             .metadata
             .target_validator_consensus_infos_cloned(),
-        &decrypt_key_map,
+        decrypt_key_map,
         &dkg_pub_params,
         &transcript,
     );
@@ -242,7 +247,7 @@ async fn verify_randomness(
     let expected_randomness_seed = Sha3_256::digest(output_serialized.as_slice()).to_vec();
 
     ensure!(
-        expected_randomness_seed == on_chain_block_randomness.seed,
+        expected_randomness_seed == on_chain_block_randomness.seed.clone().unwrap(),
         "randomness verification failed with final check failure"
     );
     Ok(())

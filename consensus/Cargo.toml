@@ -75,12 +75,12 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sha3 = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
 tokio-retry = { workspace = true }
-sha3 = { workspace = true }
 
 [dev-dependencies]
 aptos-cached-packages = { workspace = true }
