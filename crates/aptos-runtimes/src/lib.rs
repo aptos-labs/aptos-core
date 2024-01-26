@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{
+    cmp::min,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use tokio::runtime::{Builder, Runtime};
 
 /// The max thread name length before the name will be truncated
@@ -25,6 +28,7 @@ where
     F: Fn() + Send + Sync + 'static,
 {
     const MAX_BLOCKING_THREADS: usize = 64;
+    const MAX_UNSPECIFIED_WORKER_THREADS: usize = 16;
 
     // Verify the given name has an appropriate length
     if thread_name.len() > MAX_THREAD_NAME_LENGTH {
@@ -49,9 +53,14 @@ where
         // Rest API calls overwhelm the node.
         .max_blocking_threads(MAX_BLOCKING_THREADS)
         .enable_all();
-    if let Some(num_worker_threads) = num_worker_threads {
-        builder.worker_threads(num_worker_threads);
-    }
+
+    // Set the number of worker threads
+    let num_worker_threads = num_worker_threads.unwrap_or_else(|| {
+        // If no number of worker threads is specified, bound the number
+        // (to avoid excessive OS thread spawns in tokio on large machines).
+        min(num_cpus::get(), MAX_UNSPECIFIED_WORKER_THREADS)
+    });
+    builder.worker_threads(num_worker_threads);
 
     // Spawn and return the runtime
     builder.build().unwrap_or_else(|error| {

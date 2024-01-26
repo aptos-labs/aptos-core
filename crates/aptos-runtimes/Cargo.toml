@@ -13,5 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+num_cpus = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true }
