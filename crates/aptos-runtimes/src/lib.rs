@@ -28,7 +28,7 @@ where
     F: Fn() + Send + Sync + 'static,
 {
     const MAX_BLOCKING_THREADS: usize = 64;
-    const MAX_UNSPECIFIED_WORKER_THREADS: usize = 16;
+    const MAX_UNSPECIFIED_WORKER_THREADS: usize = 32;
 
     // Verify the given name has an appropriate length
     if thread_name.len() > MAX_THREAD_NAME_LENGTH {
