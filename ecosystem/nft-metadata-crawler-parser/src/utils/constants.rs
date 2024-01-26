@@ -20,3 +20,12 @@ pub const URI_SKIP_LIST: [&str; 5] = [
     "aptosnames.com",
     "aptos.dev",
 ];
+
+/// Default maximum file size for files to be downloaded
+pub const DEFAULT_MAX_FILE_SIZE_BYTES: u32 = 5_000_000;
+
+/// Default image quality for image optimization
+pub const DEFAULT_IMAGE_QUALITY: u8 = 100;
+
+/// Default maximum image dimensions for image optimization
+pub const DEFAULT_MAX_IMAGE_DIMENSIONS: u32 = 4_096;
