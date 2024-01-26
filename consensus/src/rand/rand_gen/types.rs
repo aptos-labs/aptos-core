@@ -490,17 +490,6 @@ impl RandConfig {
             .unwrap()
     }
 
-    //
-    // pub fn get_signed_delta(&self, peer: &Author) -> Option<&Delta> {
-    //     let index = self.get_id(peer);
-    //     self.keys.signed_deltas[index].as_ref()
-    // }
-    //
-    // pub fn add_signed_delta(&mut self, peer: &Author, delta: Delta) -> anyhow::Result<()> {
-    //     let index = self.get_id(peer);
-    //     self.keys.add_signed_delta(index, delta)
-    // }
-
     pub fn get_certified_apk(&self, peer: &Author) -> Option<&APK> {
         let index = self.get_id(peer);
         self.keys.certified_apks[index].get()

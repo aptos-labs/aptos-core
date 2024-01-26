@@ -122,55 +122,6 @@ impl OnChainConfig for PerBlockRandomness {
     const TYPE_IDENTIFIER: &'static str = "PerBlockRandomness";
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct RandDecision {
-    randomness: Randomness,
-    eval: Evaluation,
-    proof: Proof,
-}
-
-impl RandDecision {
-    pub fn new(randomness: Randomness, eval: Evaluation, proof: Proof) -> Self {
-        Self {
-            randomness,
-            eval,
-            proof,
-        }
-    }
-
-    pub fn randomness(&self) -> &Randomness {
-        &self.randomness
-    }
-
-    pub fn evaluation(&self) -> &Evaluation {
-        &self.eval
-    }
-
-    pub fn metadata(&self) -> &RandMetadata {
-        &self.randomness.metadata
-    }
-
-    pub fn proof(&self) -> &Proof {
-        &self.proof
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.randomness.epoch()
-    }
-
-    pub fn round(&self) -> Round {
-        self.randomness.round()
-    }
-
-    pub fn block_id(&self) -> HashValue {
-        self.metadata().block_id
-    }
-
-    pub fn timestamp(&self) -> u64 {
-        self.metadata().timestamp
-    }
-}
-
 #[derive(Clone, SilentDebug)]
 pub struct RandKeys {
     // augmented secret / public key share of this validator, obtained from the DKG transcript of last epoch
