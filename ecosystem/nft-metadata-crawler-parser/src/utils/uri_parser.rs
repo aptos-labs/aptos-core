@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::utils::counters::{PARSE_URI_INVOCATION_COUNT, PARSE_URI_TYPE_COUNT};
+use crate::utils::{
+    constants::IPFS_AUTH_KEY,
+    counters::{PARSE_URI_INVOCATION_COUNT, PARSE_URI_TYPE_COUNT},
+};
 use regex::{Captures, Regex};
 use url::Url;
 
@@ -12,7 +15,7 @@ impl URIParser {
     pub fn parse(
         ipfs_prefix: String,
         uri: String,
-        ipfs_auth: Option<String>,
+        ipfs_auth_key: Option<String>,
     ) -> anyhow::Result<String> {
         PARSE_URI_INVOCATION_COUNT.inc();
         if uri.contains("arweave.net") {
@@ -24,6 +27,12 @@ impl URIParser {
             uri.replace("ipfs://", "https://ipfs.com/ipfs/")
         } else {
             uri
+        };
+
+        let ipfs_auth_param = if ipfs_auth_key.is_some() {
+            Some(format!("?{}={}", IPFS_AUTH_KEY, ipfs_auth_key.unwrap()))
+        } else {
+            None
         };
 
         // Expects the following format for provided URIs `ipfs/{CID}/{path}`
@@ -40,7 +49,7 @@ impl URIParser {
             .captures(&path.unwrap_or_default())
             .or_else(|| redir_re.captures(&modified_uri))
         {
-            return Self::format_capture(captures, ipfs_prefix, ipfs_auth);
+            return Self::format_capture(captures, ipfs_prefix, ipfs_auth_param);
         }
         Err(anyhow::anyhow!("Invalid IPFS URI"))
     }
@@ -49,7 +58,7 @@ impl URIParser {
     fn format_capture(
         captures: Captures<'_>,
         ipfs_prefix: String,
-        ipfs_auth: Option<String>,
+        ipfs_auth_param: Option<String>,
     ) -> anyhow::Result<String> {
         let cid = captures["cid"].to_string();
         let path = captures.name("path").map(|m| m.as_str().to_string());
@@ -60,7 +69,7 @@ impl URIParser {
             ipfs_prefix,
             cid,
             path.unwrap_or_default(),
-            ipfs_auth.unwrap_or_default()
+            ipfs_auth_param.unwrap_or_default()
         ))
     }
 }
@@ -70,7 +79,7 @@ mod tests {
     use super::*;
 
     const IPFS_PREFIX: &str = "https://testipfsprefix.com/ipfs/";
-    const IPFS_AUTH: &str = "?auth=token";
+    const IPFS_AUTH: &str = "token";
     const CID: &str = "testcid";
     const PATH: &str = "testpath";
 
@@ -83,7 +92,10 @@ mod tests {
             Some(IPFS_AUTH.to_string()),
         )
         .unwrap();
-        assert_eq!(parsed_uri, format!("{IPFS_PREFIX}{CID}/{PATH}{IPFS_AUTH}"));
+        assert_eq!(
+            parsed_uri,
+            format!("{IPFS_PREFIX}{CID}/{PATH}?{IPFS_AUTH_KEY}={IPFS_AUTH}")
+        );
 
         // Path is optional for IPFS URIs
         let test_ipfs_uri_no_path = format!("ipfs://{}/{}", CID, "");
@@ -106,7 +118,10 @@ mod tests {
             Some(IPFS_AUTH.to_string()),
         )
         .unwrap();
-        assert_eq!(parsed_uri, format!("{IPFS_PREFIX}{CID}/{PATH}{IPFS_AUTH}",));
+        assert_eq!(
+            parsed_uri,
+            format!("{IPFS_PREFIX}{CID}/{PATH}?{IPFS_AUTH_KEY}={IPFS_AUTH}")
+        );
 
         // Path is optional for public gateway URIs
         let test_public_gateway_uri_no_path = format!("https://ipfs.io/ipfs/{}/{}", CID, "");

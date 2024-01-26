@@ -49,7 +49,7 @@ pub struct ParserConfig {
     pub database_url: String,
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
-    pub ipfs_auth: Option<String>,
+    pub ipfs_auth_key: Option<String>,
     pub max_file_size_bytes: Option<u32>,
     pub image_quality: Option<u8>, // Quality up to 100
     pub max_image_dimensions: Option<u32>,
@@ -336,7 +336,7 @@ impl Worker {
         let json_uri = URIParser::parse(
             self.config.ipfs_prefix.clone(),
             self.model.get_asset_uri(),
-            self.config.ipfs_auth.clone(),
+            self.config.ipfs_auth_key.clone(),
         )
         .unwrap_or_else(|_| {
             self.log_warn("Failed to parse asset_uri", None);
@@ -422,7 +422,7 @@ impl Worker {
             let img_uri = URIParser::parse(
                 self.config.ipfs_prefix.clone(),
                 raw_image_uri.clone(),
-                self.config.ipfs_auth.clone(),
+                self.config.ipfs_auth_key.clone(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_image_uri", None);
@@ -514,7 +514,7 @@ impl Worker {
             let animation_uri = URIParser::parse(
                 self.config.ipfs_prefix.clone(),
                 raw_animation_uri.clone(),
-                self.config.ipfs_auth.clone(),
+                self.config.ipfs_auth_key.clone(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_animation_uri", None);
