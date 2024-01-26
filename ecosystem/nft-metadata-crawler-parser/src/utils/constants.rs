@@ -19,4 +19,4 @@ pub const DEFAULT_MAX_FILE_SIZE_BYTES: u32 = 5_000_000;
 pub const DEFAULT_IMAGE_QUALITY: u8 = 100;
 
 /// Default maximum image dimensions for image optimization
-pub const DEFAULT_MAX_IMAGE_DIMENSIONS: u32 = 4096;
+pub const DEFAULT_MAX_IMAGE_DIMENSIONS: u32 = 4_096;
