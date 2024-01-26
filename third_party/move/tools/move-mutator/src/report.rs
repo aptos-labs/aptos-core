@@ -203,6 +203,12 @@ impl MutationReport {
     pub fn original_file_path(&self) -> &PathBuf {
         &self.original_file
     }
+
+    /// Return the module name.
+    #[must_use]
+    pub fn get_module_name(&self) -> &str {
+        &self.module_name
+    }
 }
 
 #[cfg(test)]

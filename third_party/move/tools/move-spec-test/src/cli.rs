@@ -95,10 +95,7 @@ mod tests {
         let mutator_options = create_mutator_options(&options);
 
         assert_eq!(mutator_options.move_sources, options.move_sources);
-        assert_eq!(
-            mutator_options.mutate_modules,
-            options.include_modules
-        );
+        assert_eq!(mutator_options.mutate_modules, options.include_modules);
         assert_eq!(mutator_options.configuration_file, options.mutator_conf);
     }
 
