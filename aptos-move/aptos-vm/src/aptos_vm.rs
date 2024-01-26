@@ -1795,11 +1795,6 @@ impl AptosVM {
             ))
         });
 
-        debug!(
-            "[DKG] process_block_prologue_ext: BEGIN: block_metadata_ext={:?}",
-            block_metadata_ext
-        );
-
         let mut gas_meter = UnmeteredGasMeter;
         let mut session =
             self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
@@ -1852,7 +1847,6 @@ impl AptosVM {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
-        debug!("[DKG] process_block_prologue_ext: executed");
 
         let output = get_transaction_output(
             session,
@@ -1860,7 +1854,6 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
-        debug!("[DKG] process_block_prologue_ext: END");
 
         Ok((VMStatus::Executed, output))
     }
