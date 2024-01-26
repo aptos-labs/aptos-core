@@ -1,5 +1,5 @@
 use crate::cli;
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, IncludeFunctionsFilter};
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::parser::ast;
 use move_compiler::parser::ast::{
@@ -92,13 +92,11 @@ fn traverse_function(
 
     // Check if function is included in individual configuration.
     if let Some(ind) = conf.get_file_configuration(Path::new(filename.as_str())) {
-        if ind
-            .include_functions
-            .as_ref()
-            .is_some_and(|functions| !functions.contains(&function.name.to_string()))
-        {
-            trace!("Skipping function {}", function.name);
-            return Ok(vec![]);
+        if let IncludeFunctionsFilter::Selected(funcs) = &ind.include_functions {
+            if !funcs.contains(&function.name.to_string()) {
+                trace!("Skipping function {}", &function.name.to_string());
+                return Ok(vec![]);
+            }
         }
     }
 
