@@ -54,7 +54,7 @@ impl Default for CLIOptions {
 }
 
 /// Filter allowing to select modules to be mutated.
-#[derive(Default, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum ModuleFilter {
     #[default]
     All,

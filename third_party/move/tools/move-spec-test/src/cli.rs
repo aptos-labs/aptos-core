@@ -79,7 +79,7 @@ mod tests {
     fn cli_options_starts_empty() {
         let options = CLIOptions::default();
         assert!(options.move_sources.is_empty());
-        assert!(options.include_modules.is_none());
+        assert_eq!(ModuleFilter::All, options.include_modules);
         assert!(options.mutator_conf.is_none());
         assert!(options.prover_conf.is_none());
         assert!(options.output.is_none());
