@@ -1,4 +1,5 @@
 use crate::operators::binary::Binary;
+use crate::operators::break_continue::BreakContinue;
 use crate::operators::unary::Unary;
 use crate::report::Mutation;
 use move_command_line_common::files::FileHash;
@@ -49,6 +50,7 @@ pub trait MutationOperator {
 pub enum MutationOp {
     BinaryOp(Binary),
     UnaryOp(Unary),
+    BreakContinue(BreakContinue),
 }
 
 impl MutationOperator for MutationOp {
@@ -58,6 +60,7 @@ impl MutationOperator for MutationOp {
         match self {
             MutationOp::BinaryOp(bin_op) => bin_op.apply(source),
             MutationOp::UnaryOp(unary_op) => unary_op.apply(source),
+            MutationOp::BreakContinue(break_continue) => break_continue.apply(source),
         }
     }
 
@@ -65,6 +68,7 @@ impl MutationOperator for MutationOp {
         match self {
             MutationOp::BinaryOp(bin_op) => bin_op.get_file_hash(),
             MutationOp::UnaryOp(unary_op) => unary_op.get_file_hash(),
+            MutationOp::BreakContinue(break_continue) => break_continue.get_file_hash(),
         }
     }
 }
@@ -74,6 +78,7 @@ impl fmt::Display for MutationOp {
         match self {
             MutationOp::BinaryOp(bin_op) => write!(f, "{}", bin_op),
             MutationOp::UnaryOp(unary_op) => write!(f, "{}", unary_op),
+            MutationOp::BreakContinue(break_continue) => write!(f, "{}", break_continue),
         }
     }
 }
@@ -82,7 +87,8 @@ impl fmt::Display for MutationOp {
 mod tests {
     use super::*;
     use move_command_line_common::files::FileHash;
-    use move_compiler::parser::ast::{BinOp, BinOp_, UnaryOp, UnaryOp_};
+    use move_compiler::naming::ast::Exp_::Break;
+    use move_compiler::parser::ast::{BinOp, BinOp_, Exp, Exp_, UnaryOp, UnaryOp_};
     use move_ir_types::location::Loc;
 
     #[test]
@@ -112,6 +118,23 @@ mod tests {
         let operator = MutationOp::UnaryOp(Unary::new(unary_op));
         let source = "!";
         let expected = vec![" "];
+        let result = operator.apply(source);
+        assert_eq!(result.len(), expected.len());
+        for (i, r) in result.iter().enumerate() {
+            assert_eq!(r.mutated_source, expected[i]);
+        }
+    }
+
+    #[test]
+    fn test_apply_break_continue_operator() {
+        let loc = Loc::new(FileHash::new(""), 0, 5);
+        let exp = Exp {
+            value: Exp_::Break,
+            loc,
+        };
+        let operator = MutationOp::BreakContinue(BreakContinue::new(exp));
+        let source = "break";
+        let expected = vec!["continue", "{}"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
