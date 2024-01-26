@@ -1,6 +1,7 @@
 use crate::cli::CLIOptions;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// Configuration file type.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -96,7 +97,26 @@ pub struct FileConfiguration {
     /// Names of the mutation operators to use. If not provided, all operators will be used.
     pub mutation_operators: Option<MutationConfig>,
     /// Mutate only the functions with the given names (otherwise, mutate all).
-    pub include_functions: Option<Vec<String>>,
+    pub include_functions: IncludeFunctionsFilter,
+}
+
+/// Filter for the functions to mutate.
+#[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub enum IncludeFunctionsFilter {
+    #[default]
+    All,
+    Selected(Vec<String>),
+}
+
+impl FromStr for IncludeFunctionsFilter {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "all" => Ok(IncludeFunctionsFilter::All),
+            _ => Ok(IncludeFunctionsFilter::Selected(vec![s.to_string()])),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -117,7 +137,7 @@ mod tests {
             [[individual]]
             file = "/path/to/file"
             verify_mutants = true
-            include_functions = ["function1", "function2"]
+            include_functions = "All"
         "#;
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_toml_file(Path::new("test.toml")).unwrap();
@@ -176,7 +196,7 @@ mod tests {
                             "operators": ["operator3", "operator4"],
                             "categories": ["category3", "category4"]
                         },
-                        "include_functions": ["function1", "function2"]
+                        "include_functions": "All"
                     }
                 ]
             }
@@ -257,7 +277,7 @@ mod tests {
             file: file_path.clone(),
             verify_mutants: Some(true),
             mutation_operators: None,
-            include_functions: None,
+            include_functions: IncludeFunctionsFilter::All,
         };
         let config = Configuration {
             project: CLIOptions::default(),
