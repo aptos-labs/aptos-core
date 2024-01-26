@@ -22,7 +22,7 @@ type ShardId = usize;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub(crate) enum DbMetadataValue {
+pub enum DbMetadataValue {
     Version(Version),
     StateSnapshotProgress(StateSnapshotProgress),
 }

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub(crate) enum MetadataValue {
+pub enum MetadataValue {
     Version(Version),
 }
 
@@ -20,6 +20,6 @@ impl MetadataValue {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub(crate) enum MetadataKey {
+pub enum MetadataKey {
     LatestVersion,
 }
