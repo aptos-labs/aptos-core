@@ -156,7 +156,7 @@ mod tests {
             {
                 "project": {
                     "move_sources": ["/path/to/move/source"],
-                    "mutate_modules": "all",
+                    "mutate_modules": "All",
                     "out_mutant_dir": "/path/to/output",
                     "verify_mutants": true,
                     "no_overwrite": false,
@@ -188,7 +188,7 @@ mod tests {
             config.project.move_sources,
             vec![Path::new("/path/to/move/source")]
         );
-        assert_eq!(config.project.mutate_modules.unwrap(), ModuleFilter::All);
+        assert_eq!(config.project.mutate_modules, ModuleFilter::All);
         assert_eq!(
             config.project.out_mutant_dir,
             Some(PathBuf::from("/path/to/output"))
