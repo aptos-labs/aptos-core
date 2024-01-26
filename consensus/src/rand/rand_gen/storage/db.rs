@@ -5,9 +5,10 @@ use crate::{
     error::DbError,
     rand::rand_gen::{
         storage::{
-            interface::AugDataStorage,
+            interface::RandStorage,
             schema::{
-                AugDataSchema, CertifiedAugDataSchema, AUG_DATA_CF_NAME, CERTIFIED_AUG_DATA_CF_NAME,
+                AugDataSchema, CertifiedAugDataSchema, KeyPairSchema, AUG_DATA_CF_NAME,
+                CERTIFIED_AUG_DATA_CF_NAME,
             },
         },
         types::{AugData, AugDataId, CertifiedAugData, TAugmentedData},
@@ -77,34 +78,39 @@ impl RandDb {
     }
 }
 
-impl<D: TAugmentedData> AugDataStorage<D> for RandDb {
-    fn save_aug_data(&self, aug_data: &AugData<D>) -> anyhow::Result<()> {
+impl<D: TAugmentedData> RandStorage<D> for RandDb {
+    fn save_key_pair_bytes(&self, epoch: u64, key_pair: Vec<u8>) -> Result<()> {
+        Ok(self.put::<KeyPairSchema>(&(), &(epoch, key_pair))?)
+    }
+
+    fn save_aug_data(&self, aug_data: &AugData<D>) -> Result<()> {
         Ok(self.put::<AugDataSchema<D>>(&aug_data.id(), aug_data)?)
     }
 
-    fn save_certified_aug_data(
-        &self,
-        certified_aug_data: &CertifiedAugData<D>,
-    ) -> anyhow::Result<()> {
+    fn save_certified_aug_data(&self, certified_aug_data: &CertifiedAugData<D>) -> Result<()> {
         Ok(self.put::<CertifiedAugDataSchema<D>>(&certified_aug_data.id(), certified_aug_data)?)
     }
 
-    fn get_all_aug_data(&self) -> anyhow::Result<Vec<(AugDataId, AugData<D>)>> {
+    fn get_key_pair_bytes(&self) -> Result<Option<(u64, Vec<u8>)>> {
+        Ok(self.get_all::<KeyPairSchema>()?.pop().map(|(_, v)| v))
+    }
+
+    fn get_all_aug_data(&self) -> Result<Vec<(AugDataId, AugData<D>)>> {
         Ok(self.get_all::<AugDataSchema<D>>()?)
     }
 
-    fn get_all_certified_aug_data(&self) -> anyhow::Result<Vec<(AugDataId, CertifiedAugData<D>)>> {
+    fn get_all_certified_aug_data(&self) -> Result<Vec<(AugDataId, CertifiedAugData<D>)>> {
         Ok(self.get_all::<CertifiedAugDataSchema<D>>()?)
     }
 
-    fn remove_aug_data(&self, aug_data: impl Iterator<Item = AugData<D>>) -> anyhow::Result<()> {
+    fn remove_aug_data(&self, aug_data: impl Iterator<Item = AugData<D>>) -> Result<()> {
         Ok(self.delete::<AugDataSchema<D>>(aug_data.map(|d| d.id()))?)
     }
 
     fn remove_certified_aug_data(
         &self,
         certified_aug_data: impl Iterator<Item = CertifiedAugData<D>>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         Ok(self.delete::<CertifiedAugDataSchema<D>>(certified_aug_data.map(|d| d.id()))?)
     }
 }

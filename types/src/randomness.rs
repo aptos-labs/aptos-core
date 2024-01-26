@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub type WVUF = weighted_vuf::pinkas::PinkasWUF;
 pub type WvufPP = <WVUF as WeightedVUF>::PublicParameters;
 pub type PK = <WVUF as WeightedVUF>::PubKey;
+pub type SKShare = <WVUF as WeightedVUF>::SecretKeyShare;
 pub type PKShare = <WVUF as WeightedVUF>::PubKeyShare;
 pub type ASK = <WVUF as WeightedVUF>::AugmentedSecretKeyShare;
 pub type APK = <WVUF as WeightedVUF>::AugmentedPubKeyShare;
@@ -127,9 +128,6 @@ pub struct RandKeys {
     // augmented secret / public key share of this validator, obtained from the DKG transcript of last epoch
     pub ask: ASK,
     pub apk: APK,
-    // deltas of all validators which this validator signed,
-    // needs to be persisted for unequivocation
-    pub signed_deltas: Vec<Option<Delta>>,
     // certified augmented public key share of all validators,
     // obtained from all validators in the new epoch,
     // which necessary for verifying randomness shares
@@ -140,25 +138,14 @@ pub struct RandKeys {
 
 impl RandKeys {
     pub fn new(ask: ASK, apk: APK, pk_shares: Vec<PKShare>, num_validators: usize) -> Self {
-        let signed_deltas = vec![None; num_validators];
         let certified_apks = vec![OnceCell::new(); num_validators];
 
         Self {
             ask,
             apk,
-            signed_deltas,
             certified_apks,
             pk_shares,
         }
-    }
-
-    pub fn add_signed_delta(&mut self, index: usize, delta: Delta) -> anyhow::Result<()> {
-        assert!(index < self.signed_deltas.len());
-        if self.signed_deltas[index].is_some() {
-            anyhow::bail!("Delta already signed for validator {}!", index);
-        }
-        self.signed_deltas[index] = Some(delta);
-        Ok(())
     }
 
     pub fn add_certified_apk(&self, index: usize, apk: APK) -> anyhow::Result<()> {

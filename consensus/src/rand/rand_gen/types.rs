@@ -12,7 +12,7 @@ use aptos_dkg::{
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
-        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, PK, WVUF,
+        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, WVUF,
     },
     validator_verifier::ValidatorVerifier,
 };
@@ -50,7 +50,7 @@ impl TShare for Share {
             .unwrap();
         let maybe_apk = &rand_config.keys.certified_apks[index];
         if let Some(apk) = maybe_apk.get() {
-            <WVUF as WeightedVUF>::verify_share(
+            WVUF::verify_share(
                 &rand_config.vuf_pp,
                 apk,
                 rand_metadata.to_bytes().as_slice(),
@@ -71,10 +71,7 @@ impl TShare for Share {
         Self: Sized,
     {
         let share = Share {
-            share: <WVUF as WeightedVUF>::create_share(
-                &rand_config.keys.ask,
-                rand_metadata.to_bytes().as_slice(),
-            ),
+            share: WVUF::create_share(&rand_config.keys.ask, rand_metadata.to_bytes().as_slice()),
         };
         RandShare::new(rand_config.author(), rand_metadata, share)
     }
@@ -98,8 +95,8 @@ impl TShare for Share {
             apks_and_proofs.push((Player { id }, apk.clone(), share.share().share.clone()));
         }
 
-        let proof = <WVUF as WeightedVUF>::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
-        let eval = <WVUF as WeightedVUF>::derive_eval(
+        let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+        let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
             rand_metadata.to_bytes().as_slice(),
@@ -445,8 +442,6 @@ pub struct RandConfig {
     pub validator: ValidatorVerifier,
     // public parameters of the weighted VUF
     pub vuf_pp: WvufPP,
-    // public key for the weighted VUF
-    pub pk: PK,
     // key shares for weighted VUF
     pub keys: Arc<RandKeys>,
     // weighted config for weighted VUF
@@ -459,7 +454,6 @@ impl RandConfig {
         epoch: u64,
         validator: ValidatorVerifier,
         vuf_pp: WvufPP,
-        pk: PK,
         keys: RandKeys,
         wconfig: WeightedConfig,
     ) -> Self {
@@ -468,7 +462,6 @@ impl RandConfig {
             epoch,
             validator,
             vuf_pp,
-            pk,
             keys: Arc::new(keys),
             wconfig,
         }
@@ -509,11 +502,7 @@ impl RandConfig {
     }
 
     fn derive_apk(&self, peer: &Author, delta: Delta) -> anyhow::Result<APK> {
-        let apk = <WVUF as WeightedVUF>::augment_pubkey(
-            &self.vuf_pp,
-            self.get_pk_share(peer).clone(),
-            delta,
-        )?;
+        let apk = WVUF::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer).clone(), delta)?;
         Ok(apk)
     }
 
@@ -524,7 +513,7 @@ impl RandConfig {
     }
 
     pub fn get_my_delta(&self) -> &Delta {
-        <WVUF as WeightedVUF>::get_public_delta(&self.keys.apk)
+        WVUF::get_public_delta(&self.keys.apk)
     }
 
     pub fn get_pk_share(&self, peer: &Author) -> &PKShare {

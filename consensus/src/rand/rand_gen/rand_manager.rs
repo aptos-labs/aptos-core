@@ -12,7 +12,7 @@ use crate::{
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
-        storage::interface::AugDataStorage,
+        storage::interface::RandStorage,
         types::{RandConfig, RequestShare, TAugmentedData, TShare},
     },
 };
@@ -62,7 +62,7 @@ pub struct RandManager<S: TShare, D: TAugmentedData, Storage> {
     block_queue: BlockQueue,
 }
 
-impl<S: TShare, D: TAugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, Storage> {
+impl<S: TShare, D: TAugmentedData, Storage: RandStorage<D>> RandManager<S, D, Storage> {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,

@@ -1,23 +1,22 @@
 // Copyright © Aptos Foundation
 
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::Uniform;
+use aptos_crypto::{compat::Sha3_256, Uniform};
+use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_forge::LocalSwarm;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_types::{
     dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
     on_chain_config::OnChainConfig,
+    randomness::{PerBlockRandomness, RandMetadataToSign, WVUF},
     validator_verifier::ValidatorConsensusInfo,
 };
+use digest::Digest;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
-use aptos_crypto::compat::Sha3_256;
-use aptos_types::randomness::{PerBlockRandomness, RandMetadataToSign, WVUF};
-use digest::Digest;
-use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 
 mod dkg_basic;
 mod dkg_feature_flag_flips;
@@ -217,13 +216,16 @@ async fn verify_randomness(
         .ok_or_else(|| anyhow!("randomness verification failed with missing dkg result"))?;
     let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
     let transcript =
-        bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice()).map_err(|e| {
-            anyhow!(
+        bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice())
+            .map_err(|_| {
+                anyhow!(
                 "randomness verification failed with on-chain dkg transcript deserialization error"
             )
-        })?;
+            })?;
     let dealt_secret = dealt_secret_from_shares(
-        dkg_session.metadata.target_validator_consensus_infos_cloned(),
+        dkg_session
+            .metadata
+            .target_validator_consensus_infos_cloned(),
         &decrypt_key_map,
         &dkg_pub_params,
         &transcript,

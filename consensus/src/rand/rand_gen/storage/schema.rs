@@ -3,10 +3,35 @@
 
 use crate::rand::rand_gen::types::{AugData, AugDataId, CertifiedAugData, TAugmentedData};
 use aptos_schemadb::{
+    define_schema,
     schema::{KeyCodec, Schema, ValueCodec},
     ColumnFamilyName,
 };
 use std::marker::PhantomData;
+
+pub(crate) const KEY_PAIR_CF_NAME: ColumnFamilyName = "key_pair";
+
+define_schema!(KeyPairSchema, (), (u64, Vec<u8>), KEY_PAIR_CF_NAME);
+
+impl KeyCodec<KeyPairSchema> for () {
+    fn encode_key(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<KeyPairSchema> for (u64, Vec<u8>) {
+    fn encode_value(&self) -> anyhow::Result<Vec<u8>> {
+        Ok(bcs::to_bytes(self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> anyhow::Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
 
 pub(crate) const AUG_DATA_CF_NAME: ColumnFamilyName = "aug_data";
 #[derive(Debug)]

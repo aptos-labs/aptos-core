@@ -51,7 +51,7 @@ use crate::{
     },
     rand::rand_gen::{
         rand_manager::RandManager,
-        storage::db::RandDb,
+        storage::{db::RandDb, interface::RandStorage},
         types::{AugmentedData, RandConfig, Share},
     },
     recovery_manager::RecoveryManager,
@@ -108,13 +108,12 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
-use rand::{rngs::StdRng, thread_rng, SeedableRng};
+use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
     hash::Hash,
     mem::{discriminant, Discriminant},
-    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -146,7 +145,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
-    storage: Arc<dyn PersistentLivenessStorage>,
+    liveness_storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
@@ -179,7 +178,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
-    storage_path: PathBuf,
+    rand_storage: Arc<RandDb>,
     dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 }
 
@@ -206,7 +205,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
-        let storage_path = node_config.storage.dir();
+        let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
         Self {
             author,
             config,
@@ -219,7 +218,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_enabled: false,
             quorum_store_to_mempool_sender,
             commit_state_computer,
-            storage,
+            liveness_storage: storage,
             safety_rules_manager,
             vtxn_pool,
             reconfig_events,
@@ -243,7 +242,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aptos_time_service,
             dag_config,
             payload_manager: Arc::new(PayloadManager::DirectMempool),
-            storage_path,
+            rand_storage,
             dkg_decrypt_key,
         }
     }
@@ -338,7 +337,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let backend = Arc::new(AptosDBBackend::new(
                     window_size,
                     seek_len,
-                    self.storage.aptos_db(),
+                    self.liveness_storage.aptos_db(),
                 ));
                 let voting_powers: Vec<_> = if weight_by_voting_power {
                     proposers
@@ -414,7 +413,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         // If we are considering beyond the current epoch, we need to fetch validators for those epochs
         if epoch_state.epoch > first_epoch_to_consider {
-            self.storage
+            self.liveness_storage
                 .aptos_db()
                 .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
                 .map_err(Into::into)
@@ -449,7 +448,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "[EpochManager] receive {}", request,
         );
         let proof = self
-            .storage
+            .liveness_storage
             .aptos_db()
             .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch)
             .map_err(DbError::from)
@@ -619,7 +618,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
             let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
 
-            let db = Arc::new(RandDb::new(&self.storage_path));
             let rand_manager = RandManager::<Share, AugmentedData, RandDb>::new(
                 self.author,
                 Arc::new(self.epoch_state().clone()),
@@ -627,7 +625,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 rand_ready_block_tx,
                 Arc::new(network_sender.clone()),
-                db,
+                self.rand_storage.clone(),
                 self.bounded_executor.clone(),
             );
             tokio::spawn(rand_manager.start(
@@ -773,7 +771,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let recovery_manager = RecoveryManager::new(
             epoch_state,
             network_sender,
-            self.storage.clone(),
+            self.liveness_storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
             self.config
@@ -809,7 +807,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
-                self.storage.aptos_db().clone(),
+                self.liveness_storage.aptos_db().clone(),
                 network_sender.clone(),
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
@@ -923,8 +921,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, "Update SafetyRules");
 
-        let mut safety_rules =
-            MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
+        let mut safety_rules = MetricsSafetyRules::new(
+            self.safety_rules_manager.client(),
+            self.liveness_storage.clone(),
+        );
         if let Err(error) = safety_rules.perform_initialize() {
             error!(
                 epoch = epoch,
@@ -963,7 +963,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
         let block_store = Arc::new(BlockStore::new(
-            Arc::clone(&self.storage),
+            Arc::clone(&self.liveness_storage),
             recovery_data,
             state_computer,
             self.config.max_pruned_blocks_in_mem,
@@ -1016,7 +1016,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proposal_generator,
             safety_rules_container,
             network_sender,
-            self.storage.clone(),
+            self.liveness_storage.clone(),
             onchain_consensus_config,
             buffered_proposal_tx,
             self.config.clone(),
@@ -1063,6 +1063,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if !features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
             return Err(NoRandomnessReason::FeatureDisabled);
         }
+        let new_epoch = new_epoch_state.epoch;
 
         let dkg_state = maybe_dkg_state.map_err(NoRandomnessReason::DKGStateResourceMissing)?;
         let dkg_session = dkg_state
@@ -1088,10 +1089,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // No need to verify the transcript.
 
-        let dealt_pk = transcript.get_dealt_public_key();
-        let mut rng =
-            StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
-
         // keys for randomness generation
         let (sk, pk) = DefaultDKG::decrypt_secret_share_from_transcript(
             &dkg_pub_params,
@@ -1101,22 +1098,40 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
         .map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
 
-        let (ask, apk) = <WVUF as WeightedVUF>::augment_key_pair(&vuf_pp, sk, pk.clone(), &mut rng);
-
         let pk_shares = (0..new_epoch_state.verifier.len())
             .map(|id| {
                 transcript.get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
             })
             .collect::<Vec<_>>();
 
+        // Recover existing augmented key pair or generate a new one
+        let (ask, apk) = if let Some((_, key_pair)) =
+            <RandDb as RandStorage<AugmentedData>>::get_key_pair_bytes(&self.rand_storage)
+                .map_err(NoRandomnessReason::RandDbNotAvailable)?
+                .filter(|(epoch, _)| *epoch == new_epoch)
+        {
+            bcs::from_bytes(&key_pair).map_err(NoRandomnessReason::KeyPairDeserializationError)?
+        } else {
+            let mut rng =
+                StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
+            let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk, pk, &mut rng);
+            <RandDb as RandStorage<AugmentedData>>::save_key_pair_bytes(
+                &self.rand_storage,
+                new_epoch,
+                bcs::to_bytes(&augmented_key_pair)
+                    .map_err(NoRandomnessReason::KeyPairSerializationError)?,
+            )
+            .map_err(NoRandomnessReason::KeyPairPersistError)?;
+            augmented_key_pair
+        };
+
         let keys = RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
 
         let rand_config = RandConfig::new(
             self.author,
-            self.epoch(),
+            new_epoch,
             new_epoch_state.verifier.clone(),
             vuf_pp,
-            dealt_pk,
             keys,
             dkg_pub_params.pvss_config.wconfig.clone(),
         );
@@ -1233,7 +1248,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
     ) {
-        match self.storage.start() {
+        match self.liveness_storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
                 self.start_round_manager(
@@ -1296,8 +1311,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_storage = Arc::new(StorageAdapter::new(
             epoch,
             epoch_to_validators,
-            self.storage.consensus_db(),
-            self.storage.aptos_db(),
+            self.liveness_storage.consensus_db(),
+            self.liveness_storage.aptos_db(),
         ));
 
         let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
@@ -1691,4 +1706,8 @@ enum NoRandomnessReason {
     TranscriptDeserializationError(bcs::Error),
     SecretShareDecryptionFailed(anyhow::Error),
     RngCreationError(rand::Error),
+    RandDbNotAvailable(anyhow::Error),
+    KeyPairDeserializationError(bcs::Error),
+    KeyPairSerializationError(bcs::Error),
+    KeyPairPersistError(anyhow::Error),
 }

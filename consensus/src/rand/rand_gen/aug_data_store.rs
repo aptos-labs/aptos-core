@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::rand::rand_gen::{
-    storage::interface::AugDataStorage,
+    storage::interface::RandStorage,
     types::{
         AugData, AugDataId, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig,
         TAugmentedData,
@@ -23,7 +23,7 @@ pub struct AugDataStore<D, Storage> {
     db: Arc<Storage>,
 }
 
-impl<D: TAugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
+impl<D: TAugmentedData, Storage: RandStorage<D>> AugDataStore<D, Storage> {
     fn filter_by_epoch<T>(
         epoch: u64,
         all_data: impl Iterator<Item = (AugDataId, T)>,
