@@ -18,6 +18,8 @@ On-chain randomness utils.
 -  [Function `permutation`](#0x1_randomness_permutation)
 -  [Function `safe_add_mod`](#0x1_randomness_safe_add_mod)
 -  [Function `get_and_add_txn_local_state`](#0x1_randomness_get_and_add_txn_local_state)
+-  [Specification](#@Specification_1)
+    -  [Function `get_and_add_txn_local_state`](#@Specification_1_get_and_add_txn_local_state)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -403,6 +405,25 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_get_and_add_txn_local_state"></a>
+
+### Function `get_and_add_txn_local_state`
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_get_and_add_txn_local_state">get_and_add_txn_local_state</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
