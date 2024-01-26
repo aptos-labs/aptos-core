@@ -1428,9 +1428,16 @@ impl AptosVM {
                 }
             },
 
-            // Deprecated.
+            // Deprecated. This could have been unreachable!, but we return an
+            // error in order to avoid panics if something goes wrong.
             TransactionPayload::ModuleBundle(_) => {
-                unreachable!("Module bundle has been deprecated")
+                return (
+                    VMStatus::error(
+                        StatusCode::FEATURE_UNDER_GATING,
+                        Some("Module bundle has been deprecated".to_string()),
+                    ),
+                    discarded_output(StatusCode::FEATURE_UNDER_GATING),
+                )
             },
         };
 

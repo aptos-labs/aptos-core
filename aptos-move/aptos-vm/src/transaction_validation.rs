@@ -30,7 +30,6 @@ use move_core_types::{
 use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -38,20 +37,18 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         module_name: Identifier::new("transaction_validation").unwrap(),
         fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        module_prologue_name: Identifier::new("module_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub fee_payer_prologue_name: Identifier,
     pub script_prologue_name: Identifier,
-    pub module_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,

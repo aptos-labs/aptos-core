@@ -935,9 +935,13 @@ impl TransactionsApi {
                         }
                     },
 
-                    // Deprecated.
+                    // Deprecated. To avoid panics, return an error.
                     TransactionPayload::ModuleBundle(_) => {
-                        unreachable!("Module bundle payload has been removed")
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Module bundle payload has been removed",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ))
                     },
                 }
                 // TODO: Verify script args?

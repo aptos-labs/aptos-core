@@ -111,21 +111,6 @@ spec aptos_framework::transaction_validation {
         include PrologueCommonAbortsIf;
     }
 
-    spec module_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        include PrologueCommonAbortsIf {
-            gas_payer: signer::address_of(sender),
-            txn_authentication_key: txn_public_key
-        };
-    }
-
     spec script_prologue(
         sender: signer,
         txn_sequence_number: u64,
