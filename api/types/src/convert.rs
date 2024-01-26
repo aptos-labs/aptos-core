@@ -429,7 +429,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
                 );
-                return Ok(None); // if table item not found return None anyway to avoid crash
+                return Ok(None);
             },
         };
 
@@ -456,7 +456,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
                 );
-                return Ok(None); // if table item not found return None anyway to avoid crash
+                return Ok(None);
             },
         };
 
