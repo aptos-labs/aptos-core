@@ -80,10 +80,8 @@ struct LifetimeNode {
     #[no_join]
     location: MemoryLocation,
     /// Outgoing edges to children.
-    #[join]
     children: SetDomain<BorrowEdge>,
     /// Backlinks to parents.
-    #[join]
     parents: SetDomain<LifetimeLabel>,
 }
 
