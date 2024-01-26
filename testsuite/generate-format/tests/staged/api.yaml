@@ -191,6 +191,7 @@ DKGTranscriptMetadata:
 DepositEvent:
   STRUCT:
     - amount: U64
+DeprecatedPayload: UNITSTRUCT
 DummyValidatorTransaction:
   STRUCT:
     - valid: BOOL
@@ -282,14 +283,6 @@ IdCommitment:
       SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
-Module:
-  STRUCT:
-    - code: BYTES
-ModuleBundle:
-  STRUCT:
-    - codes:
-        SEQ:
-          TYPENAME: Module
 ModuleId:
   STRUCT:
     - address:
@@ -629,7 +622,7 @@ TransactionPayload:
     1:
       ModuleBundle:
         NEWTYPE:
-          TYPENAME: ModuleBundle
+          TYPENAME: DeprecatedPayload
     2:
       EntryFunction:
         NEWTYPE:
