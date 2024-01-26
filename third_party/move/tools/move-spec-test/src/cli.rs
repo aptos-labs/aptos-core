@@ -1,4 +1,5 @@
 use clap::Parser;
+use move_mutator::cli::ModuleFilter;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -10,8 +11,8 @@ pub struct CLIOptions {
     #[clap(long, short, value_parser)]
     pub move_sources: Vec<PathBuf>,
     /// Work only over specified modules.
-    #[clap(long, short)]
-    pub include_modules: Option<Vec<String>>,
+    #[clap(long, short, value_parser, default_value = "all")]
+    pub include_modules: ModuleFilter,
     /// Optional configuration file for mutator tool.
     #[clap(long, value_parser)]
     pub mutator_conf: Option<PathBuf>,
@@ -89,7 +90,8 @@ mod tests {
     fn create_mutator_options_copies_fields() {
         let mut options = CLIOptions::default();
         options.move_sources.push(PathBuf::from("path/to/file"));
-        options.include_modules = Some(vec!["test1".to_string(), "test2".to_string()]);
+        options.include_modules =
+            ModuleFilter::Selected(vec!["test1".to_string(), "test2".to_string()]);
         options.mutator_conf = Some(PathBuf::from("path/to/mutator/conf"));
 
         let mutator_options = create_mutator_options(&options);

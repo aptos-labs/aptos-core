@@ -1,3 +1,4 @@
+use crate::cli;
 use crate::configuration::Configuration;
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::parser::ast;
@@ -47,14 +48,11 @@ fn traverse_module(
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
-    if conf
-        .project
-        .mutate_modules
-        .as_ref()
-        .is_some_and(|modules| !modules.contains(&module.name.to_string()))
-    {
-        trace!("Skipping module {}", module.name);
-        return Ok(vec![]);
+    if let cli::ModuleFilter::Selected(mods) = &conf.project.mutate_modules {
+        if !mods.contains(&module.name.to_string()) {
+            trace!("Skipping module {}", module.name.to_string());
+            return Ok(vec![]);
+        }
     }
 
     trace!("Traversing module {}", module.name);
