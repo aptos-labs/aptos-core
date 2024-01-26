@@ -2,7 +2,7 @@
 //!
 //! Currently we can only derive for structs.
 //! For tuple structs, the derived join joins each field;
-//! for structs with named fields, the derived join joins each field with #[join] attribute.
+//! for structs with named fields, the derived `join` joins each field without a #[no_join] attribute.
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
@@ -16,12 +16,12 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     }
 }
 
-#[proc_macro_derive(AbstractDomain, attributes(join))]
+#[proc_macro_derive(AbstractDomain, attributes(no_join))]
 /// Derives `AbstractDomain` for structs. The derived `join` method joins selected fields of a struct, or all fields for structs with anonymous fields, and returns the combined join results.
 /// The joined fields must implement `AbstractDomain`.
 /// # Usage
 ///
-/// Add `#[derive(AbstractDomain)]` attribute on the struct definition, and `#[join]` on the fields to be.
+/// Add `#[derive(AbstractDomain)]` attribute on the struct definition, and `#[no_join]` on the fields not to be joined.
 /// For example,
 /// ```
 /// pub struct BorrowInfo {
@@ -45,15 +45,14 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 /// ```
 /// #[derive(AbstractDomain)]
 /// pub struct BorrowInfo {
-///     #[join]
 ///     live_nodes: SetDomain<BorrowNode>,
-///     #[join]
 ///     borrowed_by: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
 ///     // this field is not joined
+///     #[no-join]
 ///     borrows_from: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
 /// }
 /// ```
-/// For structs with unnamed fields, the derived `join` method joins *every* field, and no need to write `#[join]`. For example,
+/// For structs with unnamed fields, the derived `join` method joins *every* field. For example,
 /// ```
 /// #[derive(AbstractDomain)]
 /// struct LiveVars(SetDomain);
@@ -76,15 +75,13 @@ pub fn abstract_domain_derive(input: TokenStream) -> TokenStream {
                 .named
                 .iter()
                 .filter_map(|field| {
-                    field
-                        .attrs
-                        .iter()
-                        .find(|attr| attr.path().is_ident("join"))
-                        .map(|_| {
-                            let field_name =
-                                field.ident.as_ref().expect("field name").to_token_stream();
-                            gen_join_field(field_name)
-                        })
+                    if field.attrs.iter().any(|attr| attr.path().is_ident("no_join")) {
+                        None
+                    } else {
+                        let field_name =
+                            field.ident.as_ref().expect("field name").to_token_stream();
+                        Some(gen_join_field(field_name))
+                    }
                 })
                 .collect(),
             Fields::Unnamed(fields_unnamed) => fields_unnamed
