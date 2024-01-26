@@ -315,7 +315,10 @@ impl StateApi {
             AcceptType::Json => {
                 let resource = state_view
                     .as_move_resolver()
-                    .as_converter(self.context.db.clone())
+                    .as_converter(
+                        self.context.db.clone(),
+                        self.context.table_info_reader.clone(),
+                    )
                     .try_into_resource(&resource_type, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
                     .map_err(|err| {
@@ -421,7 +424,10 @@ impl StateApi {
             .state_view(ledger_version.map(|inner| inner.0))?;
 
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.context.db.clone());
+        let converter = resolver.as_converter(
+            self.context.db.clone(),
+            self.context.table_info_reader.clone(),
+        );
 
         // Convert key to lookup version for DB
         let vm_key = converter
