@@ -51,7 +51,7 @@ use crate::{
     },
     rand::rand_gen::{
         rand_manager::RandManager,
-        storage::{db::RandDb, interface::RandStorage},
+        storage::interface::RandStorage,
         types::{AugmentedData, RandConfig, Share},
     },
     recovery_manager::RecoveryManager,
@@ -183,6 +183,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,

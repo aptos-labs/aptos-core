@@ -252,7 +252,13 @@ async fn fetch_nexts(
         // Do not update block_height if first block is block metadata
         if ind > 0 {
             // Update the timestamp if the next block occurs
-            if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
+            if let Some(txn) = raw_txn.transaction.try_as_block_metadata_ext() {
+                timestamp = txn.timestamp_usecs();
+                epoch = txn.epoch();
+                epoch_bcs = aptos_api_types::U64::from(epoch);
+                block_height += 1;
+                block_height_bcs = aptos_api_types::U64::from(block_height);
+            } else if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                 timestamp = txn.timestamp_usecs();
                 epoch = txn.epoch();
                 epoch_bcs = aptos_api_types::U64::from(epoch);
