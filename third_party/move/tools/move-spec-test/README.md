@@ -35,17 +35,37 @@ There should be output generated similar to the following:
 Total mutants tested: 4
 Total mutants killed: 4
 
-╭─────────────────────────────────┬────────────────┬────────────────┬────────────╮
-│ File                            │ Mutants tested │ Mutants killed │ Percentage │
-├─────────────────────────────────┼────────────────┼────────────────┼────────────┤
-│ ./sources/m2/Negation.move      │ 1              │ 1              │ 100.00%    │
-├─────────────────────────────────┼────────────────┼────────────────┼────────────┤
-│ ./sources/m1/Negation.move      │ 1              │ 1              │ 100.00%    │
-├─────────────────────────────────┼────────────────┼────────────────┼────────────┤
-│ ./sources/Negation.move         │ 1              │ 1              │ 100.00%    │
-├─────────────────────────────────┼────────────────┼────────────────┼────────────┤
-│ ./sources/m1/m1_1/Negation.move │ 1              │ 1              │ 100.00%    │
-╰─────────────────────────────────┴────────────────┴────────────────┴────────────╯
+Statistics for file: ./sources/m1/Negation.move
+╭─────────────┬────────────────┬────────────────┬────────────╮
+│ Module      │ Mutants tested │ Mutants killed │ Percentage │
+├─────────────┼────────────────┼────────────────┼────────────┤
+│ Negation_m1 │ 1              │ 1              │ 100.00%    │
+╰─────────────┴────────────────┴────────────────┴────────────╯
+
+
+Statistics for file: ./sources/m2/Negation.move
+╭─────────────┬────────────────┬────────────────┬────────────╮
+│ Module      │ Mutants tested │ Mutants killed │ Percentage │
+├─────────────┼────────────────┼────────────────┼────────────┤
+│ Negation_m2 │ 1              │ 1              │ 100.00%    │
+╰─────────────┴────────────────┴────────────────┴────────────╯
+
+
+Statistics for file: ./sources/Negation.move
+╭───────────────┬────────────────┬────────────────┬────────────╮
+│ Module        │ Mutants tested │ Mutants killed │ Percentage │
+├───────────────┼────────────────┼────────────────┼────────────┤
+│ Negation_main │ 1              │ 1              │ 100.00%    │
+╰───────────────┴────────────────┴────────────────┴────────────╯
+
+
+Statistics for file: ./sources/m1/m1_1/Negation.move
+╭───────────────┬────────────────┬────────────────┬────────────╮
+│ Module        │ Mutants tested │ Mutants killed │ Percentage │
+├───────────────┼────────────────┼────────────────┼────────────┤
+│ Negation_m1_1 │ 1              │ 1              │ 100.00%    │
+╰───────────────┴────────────────┴────────────────┴────────────╯
+
 ```
 
 Specification testing tool respects `RUST_LOG` variable, and it will print out as much information as the variable allows. There is possibility to enable logging only for the specific modules. Please refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
