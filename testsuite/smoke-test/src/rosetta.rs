@@ -35,9 +35,13 @@ use aptos_rosetta::{
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
-    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    account_config::CORE_CODE_ADDRESS,
+    chain_id::ChainId,
+    on_chain_config::{FeatureFlag, GasScheduleV2},
+    transaction::SignedTransaction,
 };
+use aptos_vm_genesis::default_features_resource_for_genesis;
 use serde_json::json;
 use std::{
     collections::{BTreeMap, HashSet},
@@ -79,6 +83,9 @@ async fn setup_test(
     let (swarm, cli, faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = EPOCH_DURATION_S;
+            let mut features = default_features_resource_for_genesis();
+            features.disable(FeatureFlag::RECONFIGURE_WITH_DKG);
+            genesis_config.initial_features_override = Some(features);
         }))
         .with_init_config(config_fn)
         .with_aptos()
