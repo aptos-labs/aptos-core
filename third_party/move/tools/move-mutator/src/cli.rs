@@ -27,9 +27,9 @@ pub struct CLIOptions {
     /// Name of the filter to use for downsampling. Downsampling reduces the amount of mutants to the desired amount.
     #[clap(long, hide = true)]
     pub downsample_filter: Option<String>,
-    /// Remove averagely n-th mutant. 2 means 50% reduction, 3 means 33% reduction, etc. See the doc for more details.
+    /// Remove averagely given percentage of mutants. See the doc for more details.
     #[clap(long)]
-    pub downsample_ratio: Option<u64>,
+    pub downsampling_ratio_percentage: Option<u64>,
     /// Optional configuration file. If provided, it will override the default configuration.
     #[clap(long, short, value_parser)]
     pub configuration_file: Option<PathBuf>,
@@ -47,7 +47,7 @@ impl Default for CLIOptions {
             verify_mutants: true,
             no_overwrite: None,
             downsample_filter: None,
-            downsample_ratio: None,
+            downsampling_ratio_percentage: None,
             configuration_file: None,
         }
     }

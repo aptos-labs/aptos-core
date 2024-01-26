@@ -1,5 +1,5 @@
 use crate::cli;
-use crate::configuration::{Configuration, IncludeFunctionsFilter};
+use crate::configuration::{Configuration, IncludeFunctions};
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::parser::ast;
 use move_compiler::parser::ast::{
@@ -28,9 +28,9 @@ pub fn mutate(
             Address(addr) => addr
                 .modules
                 .into_iter()
-                .map(|m| traverse_module(m, conf, files))
+                .map(|m| traverse_module_with_check(m, conf, files))
                 .collect::<Vec<Result<Vec<_>, _>>>(),
-            Module(module) => vec![traverse_module(module, conf, files)],
+            Module(module) => vec![traverse_module_with_check(module, conf, files)],
             Script(script) => vec![traverse_function(script.function, conf, files)],
         })
         .collect::<Result<Vec<_>, _>>()?
@@ -41,9 +41,10 @@ pub fn mutate(
     Ok(mutants)
 }
 
-/// Traverses a single module and returns a list of mutants.
-/// Checks all the functions and constants defined in the module.
-fn traverse_module(
+/// Traverses a single module and returns a list of mutants - helper function which filter out modules
+/// that are not included in the configuration.
+#[inline]
+fn traverse_module_with_check(
     module: ast::ModuleDefinition,
     conf: &Configuration,
     files: &FilesSourceText,
@@ -55,6 +56,16 @@ fn traverse_module(
         }
     }
 
+    traverse_module(module, conf, files)
+}
+
+/// Traverses a single module and returns a list of mutants.
+/// Checks all the functions and constants defined in the module.
+fn traverse_module(
+    module: ast::ModuleDefinition,
+    conf: &Configuration,
+    files: &FilesSourceText,
+) -> anyhow::Result<Vec<Mutant>> {
     trace!("Traversing module {}", module.name);
     let mut mutants = module
         .members
@@ -92,7 +103,7 @@ fn traverse_function(
 
     // Check if function is included in individual configuration.
     if let Some(ind) = conf.get_file_configuration(Path::new(filename.as_str())) {
-        if let IncludeFunctionsFilter::Selected(funcs) = &ind.include_functions {
+        if let IncludeFunctions::Selected(funcs) = &ind.include_functions {
             if !funcs.contains(&function.name.to_string()) {
                 trace!("Skipping function {}", &function.name.to_string());
                 return Ok(vec![]);

@@ -96,25 +96,25 @@ pub struct FileConfiguration {
     pub verify_mutants: Option<bool>,
     /// Names of the mutation operators to use. If not provided, all operators will be used.
     pub mutation_operators: Option<MutationConfig>,
-    /// Mutate only the functions with the given names (otherwise, mutate all).
-    pub include_functions: IncludeFunctionsFilter,
+    /// Mutate only the functions with the given names.
+    pub include_functions: IncludeFunctions,
 }
 
 /// Filter for the functions to mutate.
 #[derive(Default, Debug, Clone, Deserialize, Serialize, PartialEq)]
-pub enum IncludeFunctionsFilter {
+pub enum IncludeFunctions {
     #[default]
     All,
     Selected(Vec<String>),
 }
 
-impl FromStr for IncludeFunctionsFilter {
+impl FromStr for IncludeFunctions {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "all" => Ok(IncludeFunctionsFilter::All),
-            _ => Ok(IncludeFunctionsFilter::Selected(vec![s.to_string()])),
+            "all" => Ok(IncludeFunctions::All),
+            _ => Ok(IncludeFunctions::Selected(vec![s.to_string()])),
         }
     }
 }
@@ -277,7 +277,7 @@ mod tests {
             file: file_path.clone(),
             verify_mutants: Some(true),
             mutation_operators: None,
-            include_functions: IncludeFunctionsFilter::All,
+            include_functions: IncludeFunctions::All,
         };
         let config = Configuration {
             project: CLIOptions::default(),

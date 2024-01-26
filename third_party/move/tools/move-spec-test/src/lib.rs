@@ -41,7 +41,7 @@ pub fn run_spec_test(
     // (e.g. spec-test). If we use init() instead, we will get an abort.
     let _ = pretty_env_logger::try_init();
 
-    info!("Running spec test {:?}", options);
+    info!("Running spec test {options:?}",);
 
     let mut mutator_conf = cli::create_mutator_options(options);
     let prover_conf = cli::generate_prover_options(options)?;
