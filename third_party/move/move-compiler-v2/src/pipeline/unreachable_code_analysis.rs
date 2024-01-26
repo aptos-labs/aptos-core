@@ -9,6 +9,18 @@
 //! This analysis a forward "may" analysis, it tracks whether an instruction is:
 //! - maybe reachable (there may be an execution path from the function entry to the instruction)
 //! - definitely not reachable (there is no execution path from the function entry to the instruction)
+//!
+//! This analysis is defined by the following (informal) dataflow equations, over which we obtain a fixpoint:
+//! - the after state of the entry instruction is "maybe reachable"
+//! - the before state of an instruction is the join of the after states of all its predecessors,
+//!     thus at least one of the predecessors must be "maybe reachable" for the before state of
+//!     an instruction to be "maybe reachable" (this is computed by running the forward analysis)
+//! - the after state of an instruction is same as the before state, except when the instruction is
+//!     known to definitely stop the execution path from continuing on (such as return or abort).
+//!
+//! The forward dataflow analysis does not reach any program point that is not a transitive successor
+//! of the function entry (and thus not attach any annotations to such program points). Such program
+//! points are considered to be "definitely not reachable".
 
 use move_binary_format::file_format::CodeOffset;
 use move_model::model::FunctionEnv;
@@ -29,24 +41,12 @@ pub enum ReachableState {
     No,    // Definitely not reachable from function entry
 }
 
-impl ReachableState {
-    /// Mark this state as maybe reachable from the function entry.
-    fn mark_as_maybe_reachable(&mut self) {
-        *self = ReachableState::Maybe;
-    }
-
-    /// Mark this state as definitely not reachable from the function entry.
-    fn mark_as_not_reachable(&mut self) {
-        *self = ReachableState::No;
-    }
-}
-
 impl AbstractDomain for ReachableState {
     fn join(&mut self, other: &Self) -> JoinResult {
         use ReachableState::*;
         match (self.clone(), other) {
             (No, Maybe) => {
-                self.mark_as_maybe_reachable();
+                *self = Maybe;
                 JoinResult::Changed
             },
             (Maybe, _) | (No, No) => JoinResult::Unchanged,
@@ -61,7 +61,10 @@ pub struct ReachableStateAnnotation(BTreeMap<CodeOffset, ReachableState>);
 
 impl ReachableStateAnnotation {
     /// Is the instruction at the given `offset` definitely not reachable?
-    pub fn is_not_reachable(&self, offset: CodeOffset) -> bool {
+    pub fn is_definitely_not_reachable(&self, offset: CodeOffset) -> bool {
+        // Note that if there is no annotation attached with the offset, it is because the forward
+        // analysis found that the offset was not a transitive successor of the function entry.
+        // Thus, such offsets are considered to be definitely not reachable.
         self.0
             .get(&offset)
             .map_or(true, |state| matches!(state, ReachableState::No))
@@ -77,8 +80,7 @@ impl UnreachableCodeAnalysis {
     fn analyze(&self, func_target: &FunctionTarget) -> ReachableStateAnnotation {
         let code = func_target.get_bytecode();
         let cfg = StacklessControlFlowGraph::new_forward(code);
-        // We assume the entry of a function is reachable, as we have implemented this analysis
-        // as an intra-procedural analysis.
+        // We assume the entry of a function is reachable, and run the forward analysis.
         let block_state_map = self.analyze_function(ReachableState::Maybe, code, &cfg);
         let per_bytecode_state =
             self.state_per_instruction(block_state_map, code, &cfg, |before, _| before.clone());
@@ -99,9 +101,11 @@ impl TransferFunctions for UnreachableCodeAnalysis {
         // For example:
         // - if a branch condition is a constant false, then the branch target is definitely not reachable.
         // - if addition of two constants overflows, then code after is definitely not reachable.
+        //
+        // Cases where the instruction stops the execution path from continuing on.
         if matches!(instr, Ret(..) | Abort(..)) {
-            state.mark_as_not_reachable();
-        }
+            *state = ReachableState::No;
+        } // else: the instruction may not stop the execution path from continuing on.
     }
 }
 
@@ -149,7 +153,7 @@ pub fn format_reachable_state_annotation(
     code_offset: CodeOffset,
 ) -> Option<String> {
     let annotation = target.get_annotations().get::<ReachableStateAnnotation>()?;
-    if annotation.is_not_reachable(code_offset) {
+    if annotation.is_definitely_not_reachable(code_offset) {
         Some("no".to_string())
     } else {
         Some("maybe".to_string())

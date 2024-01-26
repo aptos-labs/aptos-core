@@ -8,8 +8,7 @@
 //! side effect: all annotations will be removed from the function target annotations.
 //!
 //! Given reachable states information at each program point, this transformation removes
-//! any definitely unreachable code. We currently assume that each (non-inline) function's
-//! entry is reachable, to make this transformation depend only on intra-procedural analysis.
+//! any definitely unreachable code.
 //!
 //! Note that any warnings about user's unreachable code should be emitted before running
 //! this transformation.
@@ -37,7 +36,10 @@ impl UnreachableCodeRemover {
     ) -> Vec<Bytecode> {
         let mut new_code = vec![];
         for (offset, instr) in code.into_iter().enumerate() {
-            if reachable_state_annotation.is_not_reachable(offset as CodeOffset) {
+            // If a program point is definitely not reachable, it is safe to remove that instruction
+            // because no execution path starting at the beginning of the function can reach it
+            // (and we cannot start execution from an arbitrary point in the function).
+            if reachable_state_annotation.is_definitely_not_reachable(offset as CodeOffset) {
                 continue; // skip emitting definitely unreachable code
             }
             new_code.push(instr);
