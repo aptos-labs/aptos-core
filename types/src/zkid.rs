@@ -2,7 +2,7 @@
 
 use crate::{
     chain_id::ChainId,
-    circom::{DEV_VERIFYING_KEY, G1Projective, G2Projective},
+    circom::{G1Projective, G2Projective, DEV_VERIFYING_KEY},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -468,7 +468,8 @@ mod test {
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            Groth16Zkp, IdCommitment, Pepper, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, G1Projective, G2Projective,
+            G1Projective, G2Projective, Groth16Zkp, IdCommitment, Pepper, ZkIdPublicKey,
+            ZkIdSignature, ZkpOrOpenIdSig,
         },
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
