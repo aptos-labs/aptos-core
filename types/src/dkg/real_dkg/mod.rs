@@ -4,8 +4,8 @@ use crate::{
     dkg::{real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait},
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
-use anyhow::ensure;
-use aptos_crypto::bls12381;
+use anyhow::{anyhow, ensure};
+use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
@@ -250,4 +250,13 @@ impl DKGTrait for RealDKG {
             .map(|x| x.id as u64)
             .collect()
     }
+}
+
+pub fn maybe_dk_from_bls_sk(
+    sk: &PrivateKey,
+) -> anyhow::Result<<WTrx as Transcript>::DecryptPrivKey> {
+    let mut bytes = sk.to_bytes(); // in big-endian
+    bytes.reverse();
+    <WTrx as Transcript>::DecryptPrivKey::try_from(bytes.as_slice())
+        .map_err(|e| anyhow!("dk_from_bls_sk failed with dk deserialization error: {e}"))
 }

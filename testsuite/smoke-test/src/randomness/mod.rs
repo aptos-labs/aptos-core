@@ -1,15 +1,18 @@
 // Copyright © Aptos Foundation
 
 use anyhow::{anyhow, ensure, Result};
-use aptos_crypto::Uniform;
+use aptos_crypto::{compat::Sha3_256, Uniform};
+use aptos_dkg::weighted_vuf::traits::WeightedVUF;
 use aptos_forge::LocalSwarm;
 use aptos_logger::info;
 use aptos_rest_client::Client;
 use aptos_types::{
     dkg::{DKGSessionState, DKGState, DKGTrait, DefaultDKG},
     on_chain_config::OnChainConfig,
+    randomness::{PerBlockRandomness, RandMetadataToSign, WVUF},
     validator_verifier::ValidatorConsensusInfo,
 };
+use digest::Digest;
 use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
@@ -190,4 +193,62 @@ fn decrypt_key_map(
             (validator.peer_id(), dk)
         })
         .collect::<HashMap<_, _>>()
+}
+
+/// Fetch the DKG result and the block randomness (from aggregation) for a specific version.
+/// Derive the distributed secret from DKG result.
+/// Verify that the randomness from aggregation (the actual one store on chain) equals to
+/// the randomness from direct evaluation using the distributed secret (the expected one).
+async fn verify_randomness(
+    decrypt_key_map: &HashMap<AccountAddress, <DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
+    rest_client: &Client,
+    version: u64,
+) -> Result<()> {
+    // Fetch resources.
+    let (dkg_state, on_chain_block_randomness) = tokio::join!(
+        get_on_chain_resource_at_version::<DKGState>(rest_client, version),
+        get_on_chain_resource_at_version::<PerBlockRandomness>(rest_client, version)
+    );
+
+    ensure!(
+        on_chain_block_randomness.seed.is_some(),
+        "randomness verification failed with seed missing"
+    );
+
+    // Derive the shared secret.
+    let dkg_session = dkg_state
+        .last_completed
+        .ok_or_else(|| anyhow!("randomness verification failed with missing dkg result"))?;
+    let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
+    let transcript =
+        bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(dkg_session.transcript.as_slice())
+            .map_err(|_| {
+                anyhow!(
+                "randomness verification failed with on-chain dkg transcript deserialization error"
+            )
+            })?;
+    let dealt_secret = dealt_secret_from_shares(
+        dkg_session
+            .metadata
+            .target_validator_consensus_infos_cloned(),
+        decrypt_key_map,
+        &dkg_pub_params,
+        &transcript,
+    );
+
+    // Compare the outputs from 2 paths.
+    let rand_metadata = RandMetadataToSign {
+        epoch: on_chain_block_randomness.epoch,
+        round: on_chain_block_randomness.round,
+    };
+    let input = bcs::to_bytes(&rand_metadata).unwrap();
+    let output = WVUF::eval(&dealt_secret, input.as_slice());
+    let output_serialized = bcs::to_bytes(&output).unwrap();
+    let expected_randomness_seed = Sha3_256::digest(output_serialized.as_slice()).to_vec();
+
+    ensure!(
+        expected_randomness_seed == on_chain_block_randomness.seed.clone().unwrap(),
+        "randomness verification failed with final check failure"
+    );
+    Ok(())
 }

@@ -23,6 +23,7 @@ use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_storage_interface::DbReaderWriter;
+use aptos_types::dkg::{DKGTrait, DefaultDKG};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::AptosVM;
 use futures::channel::mpsc;
@@ -39,6 +40,7 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
+    dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -79,6 +81,7 @@ pub fn start_consensus(
         bounded_executor,
         aptos_time_service::TimeService::real(),
         vtxn_pool,
+        dkg_decrypt_key,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

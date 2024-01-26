@@ -20,7 +20,7 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{merge_node_config, IdentityBlob, NodeConfig, PersistableConfig};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -709,26 +709,38 @@ pub fn setup_environment_and_start_node(
         None
     };
 
-    // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
-        // Wait until state sync has been initialized
-        debug!("Waiting until state sync is initialized!");
-        state_sync_runtimes.block_until_initialized();
-        debug!("State sync initialization complete.");
+    let maybe_dkg_decrypt_key = node_config
+        .consensus
+        .safety_rules
+        .initial_safety_rules_config
+        .identity_blob()
+        .ok()
+        .and_then(IdentityBlob::try_into_dkg_new_validator_decrypt_key);
 
-        // Initialize and start consensus
-        let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
-            &mut node_config,
-            db_rw,
-            consensus_reconfig_subscription,
-            consensus_network_interfaces,
-            consensus_notifier,
-            consensus_to_mempool_sender,
-            vtxn_pool,
-        );
-        admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
-        runtime
-    });
+    // Create the consensus runtime (this blocks on state sync first)
+    let consensus_runtime = match (consensus_network_interfaces, maybe_dkg_decrypt_key) {
+        (Some(consensus_network_interfaces), Some(dkg_decrypt_key)) => {
+            // Wait until state sync has been initialized
+            debug!("Waiting until state sync is initialized!");
+            state_sync_runtimes.block_until_initialized();
+            debug!("State sync initialization complete.");
+
+            // Initialize and start consensus
+            let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
+                &mut node_config,
+                db_rw,
+                consensus_reconfig_subscription,
+                consensus_network_interfaces,
+                consensus_notifier,
+                consensus_to_mempool_sender,
+                vtxn_pool,
+                dkg_decrypt_key,
+            );
+            admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
+            Some(runtime)
+        },
+        _ => None,
+    };
 
     Ok(AptosHandle {
         _admin_service: admin_service,

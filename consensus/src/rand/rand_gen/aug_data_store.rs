@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::rand::rand_gen::{
-    storage::interface::AugDataStorage,
+    storage::interface::RandStorage,
     types::{
-        AugData, AugDataId, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck,
-        RandConfig,
+        AugData, AugDataId, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig,
+        TAugmentedData,
     },
 };
 use anyhow::ensure;
@@ -23,7 +23,7 @@ pub struct AugDataStore<D, Storage> {
     db: Arc<Storage>,
 }
 
-impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
+impl<D: TAugmentedData, Storage: RandStorage<D>> AugDataStore<D, Storage> {
     fn filter_by_epoch<T>(
         epoch: u64,
         all_data: impl Iterator<Item = (AugDataId, T)>,
@@ -62,6 +62,12 @@ impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
             );
         }
 
+        for (_, certified_data) in &certified_data {
+            certified_data
+                .data()
+                .augment(&config, certified_data.author());
+        }
+
         Self {
             epoch,
             signer,
@@ -79,11 +85,11 @@ impl<D: AugmentedData, Storage: AugDataStorage<D>> AugDataStore<D, Storage> {
     }
 
     pub fn get_my_aug_data(&self) -> Option<AugData<D>> {
-        self.data.get(self.config.author()).cloned()
+        self.data.get(&self.config.author()).cloned()
     }
 
     pub fn get_my_certified_aug_data(&self) -> Option<CertifiedAugData<D>> {
-        self.certified_data.get(self.config.author()).cloned()
+        self.certified_data.get(&self.config.author()).cloned()
     }
 
     pub fn add_aug_data(&mut self, data: AugData<D>) -> anyhow::Result<AugDataSignature> {
