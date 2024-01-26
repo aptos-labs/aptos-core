@@ -17,6 +17,7 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, warn};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -66,6 +67,7 @@ pub struct Context {
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
+    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -80,6 +82,7 @@ impl Context {
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         Self {
             chain_id,
@@ -101,6 +104,7 @@ impl Context {
                 block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
                     .block_executor_onchain_config(),
             })),
+            table_info_reader,
         }
     }
 
@@ -636,7 +640,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -667,7 +671,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
