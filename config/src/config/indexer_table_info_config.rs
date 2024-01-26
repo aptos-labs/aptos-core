@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 // Useful defaults
 pub const DEFAULT_PARSER_TASK_COUNT: u16 = 20;
 pub const DEFAULT_PARSER_BATCH_SIZE: u16 = 1000;
+pub const DEFAULT_BUCKET_NAME: &str = "table-info";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -20,6 +21,12 @@ pub struct IndexerTableInfoConfig {
     pub parser_batch_size: u16,
 
     pub enable_expensive_logging: bool,
+
+    /// Enable backup service
+    pub db_backup_enabled: bool,
+
+    /// Backup and restore service config
+    pub gcs_bucket_name: String,
 }
 
 // Reminder, #[serde(default)] on IndexerTableInfoConfig means that the default values for
@@ -32,6 +39,8 @@ impl Default for IndexerTableInfoConfig {
             parser_task_count: DEFAULT_PARSER_TASK_COUNT,
             parser_batch_size: DEFAULT_PARSER_BATCH_SIZE,
             enable_expensive_logging: false,
+            db_backup_enabled: false,
+            gcs_bucket_name: DEFAULT_BUCKET_NAME.to_owned(),
         }
     }
 }
