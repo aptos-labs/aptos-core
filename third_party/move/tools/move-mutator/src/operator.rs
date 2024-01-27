@@ -76,9 +76,9 @@ impl MutationOperator for MutationOp {
 impl fmt::Display for MutationOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MutationOp::BinaryOp(bin_op) => write!(f, "{}", bin_op),
-            MutationOp::UnaryOp(unary_op) => write!(f, "{}", unary_op),
-            MutationOp::BreakContinue(break_continue) => write!(f, "{}", break_continue),
+            MutationOp::BinaryOp(bin_op) => write!(f, "{bin_op}"),
+            MutationOp::UnaryOp(unary_op) => write!(f, "{unary_op}"),
+            MutationOp::BreakContinue(break_continue) => write!(f, "{break_continue}"),
         }
     }
 }

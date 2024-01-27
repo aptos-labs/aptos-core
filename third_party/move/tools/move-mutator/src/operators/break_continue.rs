@@ -14,6 +14,8 @@ pub struct BreakContinue {
 }
 
 impl BreakContinue {
+    /// Creates a new instance of the break/continue mutation operator.
+    #[must_use]
     pub fn new(operation: ast::Exp) -> Self {
         Self { operation }
     }
