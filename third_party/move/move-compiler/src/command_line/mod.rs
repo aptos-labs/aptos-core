@@ -40,6 +40,8 @@ pub const COMPILED_NAMED_ADDRESS_MAPPING: &str = "compiled-module-address-name";
 
 pub const MOVE_COMPILER_DEBUG_ENV_VAR: &str = "MOVE_COMPILER_DEBUG";
 
+pub const MOVE_COMPILER_DUMP_ENV_VAR: &str = "MOVE_COMPILER_DUMP";
+
 pub const DEBUG_FLAG: &str = "debug";
 
 pub const MOVE_COMPILER_WARN_OF_DEPRECATION_USE: &str = "MOVE_COMPILER_WARN_OF_DEPRECATION_USE";
