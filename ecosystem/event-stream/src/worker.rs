@@ -1,14 +1,13 @@
 // Copyright © Aptos Foundation
 
 use crate::utils::{
-    counters::EVENT_RECEIVED_COUNT,
     database::{check_or_update_chain_id, establish_connection_pool, run_migrations},
     event_message::StreamEventMessage,
     ingestor::Ingestor,
     stream::spawn_stream,
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
-use bytes::Bytes;
+use google_cloud_pubsub::client::{Client, ClientConfig};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -25,41 +24,8 @@ pub struct EventStreamConfig {
     pub chain_id: i64,
     pub num_sec_valid: Option<i64>,
     pub websocket_alive_duration: Option<u64>,
-}
-
-/// Context required for event ingesetion
-#[derive(Clone)]
-pub struct IngestionContext {
-    pub event_stream_config: EventStreamConfig,
-    pub ingestor: Ingestor,
-}
-
-/// Handles PubSub ingestion from root endpoint
-async fn handle_root(
-    msg: Bytes,
-    context: Arc<IngestionContext>,
-) -> Result<impl warp::Reply, warp::Rejection> {
-    EVENT_RECEIVED_COUNT.inc();
-    context.ingestor.run(msg).await.unwrap_or_else(|e| {
-        error!(
-            error = ?e,
-            "[Event Stream] Failed to run ingestor"
-        );
-        panic!();
-    });
-
-    let to_ack = context.event_stream_config.ack_parsed_uris.unwrap_or(false);
-    if !to_ack {
-        return Ok(warp::reply::with_status(
-            warp::reply(),
-            warp::http::StatusCode::BAD_REQUEST,
-        ));
-    }
-
-    Ok(warp::reply::with_status(
-        warp::reply(),
-        warp::http::StatusCode::OK,
-    ))
+    pub google_application_credentials: Option<String>,
+    pub subscription_name: String,
 }
 
 #[derive(Clone)]
@@ -91,12 +57,39 @@ impl RunnableConfig for EventStreamConfig {
         );
 
         info!("[Event Stream] Connecting to database");
-        let pool = establish_connection_pool(self.database_url.clone());
+        let pool = establish_connection_pool(&self.database_url);
         info!("[Event Stream] Database connection successful");
 
         info!("[Event Stream] Running migrations");
         run_migrations(&pool);
         info!("[Event Stream] Finished migrations");
+
+        if let Some(google_application_credentials) = &self.google_application_credentials {
+            std::env::set_var(
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                google_application_credentials,
+            );
+        }
+
+        // Establish PubSub client
+        let pubsub_config = ClientConfig::default()
+            .with_auth()
+            .await
+            .unwrap_or_else(|e| {
+                error!(
+                    error = ?e,
+                    "[Event Stream] Failed to create PubSub client config"
+                );
+                panic!();
+            });
+        let pubsub_client = Client::new(pubsub_config).await.unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[Event Stream] Failed to create PubSub client"
+            );
+            panic!();
+        });
+        let subscription = pubsub_client.subscription(&self.subscription_name);
 
         // Panic if chain id of config does not match chain id of database
         // Perform chain id check
@@ -120,29 +113,29 @@ impl RunnableConfig for EventStreamConfig {
         // Create Event broadcast channel
         let (tx, _rx) = broadcast::channel::<StreamEventMessage>(100);
 
-        // Create web server
-        let ingestion_context = Arc::new(IngestionContext {
-            event_stream_config: self.clone(),
-            ingestor: Ingestor::new(tx.clone(), self.chain_id, self.num_sec_valid.unwrap_or(30)),
+        // Create and start ingestor
+        let ingestor = Ingestor::new(
+            tx.clone(),
+            self.chain_id,
+            self.num_sec_valid.unwrap_or(30),
+            subscription,
+        );
+        tokio::spawn(async move {
+            ingestor.run().await;
         });
 
+        // Create web server
         let stream_context = Arc::new(StreamContext {
-            channel: tx.clone(),
+            channel: tx,
             websocket_alive_duration: self.websocket_alive_duration.unwrap_or(30),
         });
-
-        let route = warp::post()
-            .and(warp::path::end())
-            .and(warp::body::bytes())
-            .and(warp::any().map(move || ingestion_context.clone()))
-            .and_then(handle_root);
 
         let ws_route = warp::path("stream")
             .and(warp::ws())
             .and(warp::any().map(move || stream_context.clone()))
             .and_then(handle_websocket);
 
-        warp::serve(route.or(ws_route))
+        warp::serve(ws_route)
             .run(([0, 0, 0, 0], self.server_port))
             .await;
         Ok(())

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PubSubEventMessage {
     pub chain_id: i64,
-    pub data: Vec<String>,
+    pub events: Vec<String>,
     pub transaction_version: i64,
     pub timestamp: String,
 }
@@ -19,7 +19,7 @@ impl ToString for PubSubEventMessage {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct StreamEventMessage {
     pub chain_id: i64,
-    pub data: String,
+    pub event: String,
     pub transaction_version: i64,
     pub timestamp: String,
 }
@@ -31,13 +31,13 @@ impl ToString for StreamEventMessage {
 }
 
 impl StreamEventMessage {
-    pub fn list_from_pubsub(pubsub_event_message: PubSubEventMessage) -> Vec<Self> {
+    pub fn list_from_pubsub(pubsub_event_message: &PubSubEventMessage) -> Vec<Self> {
         pubsub_event_message
-            .data
+            .events
             .iter()
-            .map(|data| StreamEventMessage {
+            .map(|event| StreamEventMessage {
                 chain_id: pubsub_event_message.chain_id,
-                data: data.to_string(),
+                event: event.to_string(),
                 transaction_version: pubsub_event_message.transaction_version,
                 timestamp: pubsub_event_message.timestamp.to_string(),
             })

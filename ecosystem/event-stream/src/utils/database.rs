@@ -12,7 +12,7 @@ use tracing::{debug, info};
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 /// Establishes a connection pool to Postgres
-pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
+pub fn establish_connection_pool(database_url: &String) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::builder()
         .build(manager)

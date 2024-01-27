@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::event_message::StreamEventMessage;
+use crate::utils::event_message::StreamEventMessage;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
 use std::time::Duration;
 use tokio::{sync::broadcast, time};

@@ -31,6 +31,7 @@ diesel = { workspace = true, features = [
 diesel_migrations = { workspace = true }
 field_count = { workspace = true }
 futures = { workspace = true }
+google-cloud-pubsub = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
