@@ -80,7 +80,7 @@ async fn test_dkg_state_transition() {
 
     // In state `NotStarted`, DKGManager should accept `DKGStartEvent`:
     // it should record start time, compute its own node, and enter state `InProgress`.
-    let start_time_1 = duration_since_epoch();
+    let start_time_1 = Duration::from_secs(1700000000);
     let event = DKGStartEvent {
         session_metadata: DKGSessionMetadata {
             dealer_epoch: 999,
@@ -89,18 +89,14 @@ async fn test_dkg_state_transition() {
         },
         start_time_us: start_time_1.as_micros() as u64,
     };
-    let handle_result = dkg_manager
-        .process_dkg_start_event(event.clone())
-        .await;
+    let handle_result = dkg_manager.process_dkg_start_event(event.clone()).await;
     assert!(handle_result.is_ok());
     assert!(
         matches!(&dkg_manager.state, InnerState::InProgress { start_time, my_transcript, .. } if *start_time == start_time_1 && my_transcript.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
     );
 
     // 2nd `DKGStartEvent` should be rejected.
-    let handle_result = dkg_manager
-        .process_dkg_start_event(event)
-        .await;
+    let handle_result = dkg_manager.process_dkg_start_event(event).await;
     println!("{:?}", handle_result);
     assert!(handle_result.is_err());
 
@@ -113,7 +109,9 @@ async fn test_dkg_state_transition() {
         .map(anyhow::Result::unwrap)
         .collect::<Vec<_>>();
     assert_eq!(
-        vec![DKGMessage::TranscriptResponse(dkg_manager.state.my_node_cloned())],
+        vec![DKGMessage::TranscriptResponse(
+            dkg_manager.state.my_node_cloned()
+        )],
         last_responses
     );
     assert!(matches!(&dkg_manager.state, InnerState::InProgress { .. }));
@@ -152,7 +150,9 @@ async fn test_dkg_state_transition() {
         .map(anyhow::Result::unwrap)
         .collect::<Vec<_>>();
     assert_eq!(
-        vec![DKGMessage::TranscriptResponse(dkg_manager.state.my_node_cloned())],
+        vec![DKGMessage::TranscriptResponse(
+            dkg_manager.state.my_node_cloned()
+        )],
         last_responses
     );
     assert!(matches!(&dkg_manager.state, InnerState::Finished { .. }));

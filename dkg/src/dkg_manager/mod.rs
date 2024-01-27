@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
-use crate::{agg_trx_producer::TAggTranscriptProducer, network::IncomingRpcRequest, DKGMessage};
+use crate::{
+    agg_trx_producer::TAggTranscriptProducer, counters::DKG_STAGE_SECONDS,
+    network::IncomingRpcRequest, DKGMessage,
+};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::Uniform;
+use aptos_infallible::duration_since_epoch;
 use aptos_logger::{error, info};
 use aptos_types::{
     dkg::{
@@ -18,8 +22,6 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
-use aptos_infallible::duration_since_epoch;
-use crate::counters::DKG_STAGE_SECONDS;
 
 #[derive(Clone, Debug)]
 enum InnerState {
@@ -164,7 +166,6 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             if let Err(e) = handling_result {
                 self.log_error(e.to_string());
             }
-
         }
         self.log_info("Finished");
     }
@@ -178,10 +179,18 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             InnerState::InProgress { abort_handle, .. } => {
                 abort_handle.abort();
             },
-            InnerState::Finished { vtxn_guard, start_time, .. } => {
+            InnerState::Finished {
+                vtxn_guard,
+                start_time,
+                ..
+            } => {
                 let epoch_change_time = duration_since_epoch();
                 DKG_STAGE_SECONDS
-                    .with_label_values(&[self.epoch_state.epoch.to_string().as_str(), self.my_addr.to_hex().as_str(), "epoch_change"])
+                    .with_label_values(&[
+                        self.epoch_state.epoch.to_string().as_str(),
+                        self.my_addr.to_hex().as_str(),
+                        "epoch_change",
+                    ])
                     .observe(epoch_change_time.as_secs_f64() - start_time.as_secs_f64());
                 drop(vtxn_guard);
             },
@@ -200,20 +209,28 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         _txn: Arc<ValidatorTransaction>,
     ) -> Result<()> {
         match &mut self.state {
-            InnerState::Finished { start_time, proposed, .. } => {
+            InnerState::Finished {
+                start_time,
+                proposed,
+                ..
+            } => {
                 if !*proposed {
                     *proposed = true;
                     let proposed_time = duration_since_epoch();
                     DKG_STAGE_SECONDS
-                        .with_label_values(&[self.epoch_state.epoch.to_string().as_str(), self.my_addr.to_hex().as_str(), "proposed"])
+                        .with_label_values(&[
+                            self.epoch_state.epoch.to_string().as_str(),
+                            self.my_addr.to_hex().as_str(),
+                            "proposed",
+                        ])
                         .observe(proposed_time.as_secs_f64() - start_time.as_secs_f64());
                     self.log_info("DKG txn picked up by consensus.");
                 }
                 Ok(())
-            }
+            },
             _ => {
                 bail!("pull notification only expected in finished state");
-            }
+            },
         }
     }
 
@@ -227,11 +244,18 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         start_time_us: u64,
         dkg_session_metadata: &DKGSessionMetadata,
     ) -> Result<()> {
-        ensure!(matches!(&self.state, InnerState::NotStarted), "transcript already dealt");
+        ensure!(
+            matches!(&self.state, InnerState::NotStarted),
+            "transcript already dealt"
+        );
         let dkg_start_time = Duration::from_micros(start_time_us);
         let deal_start = duration_since_epoch();
         DKG_STAGE_SECONDS
-            .with_label_values(&[self.epoch_state.epoch.to_string().as_str(), self.my_addr.to_hex().as_str(), "deal_start"])
+            .with_label_values(&[
+                self.epoch_state.epoch.to_string().as_str(),
+                self.my_addr.to_hex().as_str(),
+                "deal_start",
+            ])
             .observe(deal_start.as_secs_f64() - dkg_start_time.as_secs_f64());
         self.log_info("Dealing.");
         let public_params = DKG::new_public_params(dkg_session_metadata);
@@ -253,14 +277,16 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         let my_transcript = DKGTranscript::new(
             self.epoch_state.epoch,
             self.my_addr,
-            bcs::to_bytes(&trx).map_err(|e| {
-                anyhow!("transcript serialization error: {e}")
-            })?,
+            bcs::to_bytes(&trx).map_err(|e| anyhow!("transcript serialization error: {e}"))?,
         );
 
         let deal_finish = duration_since_epoch();
         DKG_STAGE_SECONDS
-            .with_label_values(&[self.epoch_state.epoch.to_string().as_str(), self.my_addr.to_hex().as_str(), "deal_finish"])
+            .with_label_values(&[
+                self.epoch_state.epoch.to_string().as_str(),
+                self.my_addr.to_hex().as_str(),
+                "deal_finish",
+            ])
             .observe(deal_finish.as_secs_f64() - dkg_start_time.as_secs_f64());
         self.log_info("Local transcript ready.");
 
@@ -290,7 +316,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             } => {
                 let agg_transcript_ready_time = duration_since_epoch();
                 DKG_STAGE_SECONDS
-                    .with_label_values(&[self.epoch_state.epoch.to_string().as_str(), self.my_addr.to_hex().as_str(), "agg_transcript_ready"])
+                    .with_label_values(&[
+                        self.epoch_state.epoch.to_string().as_str(),
+                        self.my_addr.to_hex().as_str(),
+                        "agg_transcript_ready",
+                    ])
                     .observe(agg_transcript_ready_time.as_secs_f64() - start_time.as_secs_f64());
                 self.log_info("Agg transcript ready.");
 
@@ -299,7 +329,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                         epoch: self.epoch_state.epoch,
                         author: self.my_addr,
                     },
-                    transcript_bytes: bcs::to_bytes(&agg_trx).map_err(|e|anyhow!("transcript serialization error: {e}"))?,
+                    transcript_bytes: bcs::to_bytes(&agg_trx)
+                        .map_err(|e| anyhow!("transcript serialization error: {e}"))?,
                 });
                 let vtxn_guard = self.vtxn_pool.put(
                     Topic::DKG,
@@ -324,9 +355,16 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             session_metadata,
             start_time_us,
         } = event;
-        ensure!(matches!(&self.state, InnerState::NotStarted), "dkg already started");
-        ensure!(self.epoch_state.epoch == session_metadata.dealer_epoch, "event not for current epoch");
-        self.setup_deal_broadcast(start_time_us, &session_metadata).await
+        ensure!(
+            matches!(&self.state, InnerState::NotStarted),
+            "dkg already started"
+        );
+        ensure!(
+            self.epoch_state.epoch == session_metadata.dealer_epoch,
+            "event not for current epoch"
+        );
+        self.setup_deal_broadcast(start_time_us, &session_metadata)
+            .await
     }
 
     /// Process an RPC request from DKG peers.
@@ -336,22 +374,15 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             mut response_sender,
             ..
         } = req;
-        ensure!(msg.epoch() == self.epoch_state.epoch, "msg not for current epoch");
+        ensure!(
+            msg.epoch() == self.epoch_state.epoch,
+            "msg not for current epoch"
+        );
         let response = match (&self.state, &msg) {
-            (
-                InnerState::Finished {
-                    my_transcript,
-                    ..
-                },
-                DKGMessage::TranscriptRequest(_),
-            )
-            | (
-                InnerState::InProgress {
-                    my_transcript,
-                    ..
-                },
-                DKGMessage::TranscriptRequest(_),
-            ) => Ok(DKGMessage::TranscriptResponse(my_transcript.clone())),
+            (InnerState::Finished { my_transcript, .. }, DKGMessage::TranscriptRequest(_))
+            | (InnerState::InProgress { my_transcript, .. }, DKGMessage::TranscriptRequest(_)) => {
+                Ok(DKGMessage::TranscriptResponse(my_transcript.clone()))
+            },
             _ => Err(anyhow!(
                 "msg {:?} unexpected in state {:?}",
                 msg.name(),
@@ -364,11 +395,21 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     }
 
     fn log_info<S: AsRef<str>>(&self, msg: S) {
-        info!(epoch = self.epoch_state.epoch, my_addr = self.my_addr, "{}", msg.as_ref());
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr,
+            "{}",
+            msg.as_ref()
+        );
     }
 
     fn log_error<S: AsRef<str>>(&self, msg: S) {
-        error!(epoch = self.epoch_state.epoch, my_addr = self.my_addr, "{}", msg.as_ref());
+        error!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr,
+            "{}",
+            msg.as_ref()
+        );
     }
 }
 

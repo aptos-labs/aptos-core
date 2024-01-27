@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    logging::{LogEvent, LogSchema},
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::rand_gen::{
@@ -128,6 +129,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.clone());
+        info!(LogSchema::new(LogEvent::BroadcastRandShare)
+            .epoch(self.epoch_state.epoch)
+            .author(self.author)
+            .round(metadata.round()));
         let mut rand_store = self.rand_store.lock();
         rand_store
             .add_share(self_share.clone())
@@ -280,12 +285,18 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 return certified_data;
             }
             info!("[RandManager] Start broadcasting aug data");
+            info!(LogSchema::new(LogEvent::BroadcastAugData)
+                .author(*data.author())
+                .epoch(data.epoch()));
             let certified_data = rb.broadcast(data, aug_ack).await;
             info!("[RandManager] Finish broadcasting aug data");
             certified_data
         };
         let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
         let task = phase1.then(|certified_data| async move {
+            info!(LogSchema::new(LogEvent::BroadcastCertifiedAugData)
+                .author(*certified_data.author())
+                .epoch(certified_data.epoch()));
             info!("[RandManager] Start broadcasting certified aug data");
             rb2.broadcast(certified_data, ack_state).await;
             info!("[RandManager] Finish broadcasting certified aug data");
@@ -356,17 +367,31 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                             }
                         }
                         RandMessage::Share(share) => {
+                            info!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
+                                .author(self.author)
+                                .epoch(share.epoch())
+                                .round(share.metadata().round())
+                                .remote_peer(*share.author()));
+
                             if let Err(e) = self.rand_store.lock().add_share(share) {
                                 warn!("[RandManager] Failed to add share: {}", e);
                             }
                         }
                         RandMessage::AugData(aug_data) => {
+                            info!(LogSchema::new(LogEvent::ReceiveAugData)
+                                .author(self.author)
+                                .epoch(aug_data.epoch())
+                                .remote_peer(*aug_data.author()));
                             match self.aug_data_store.add_aug_data(aug_data) {
                                 Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
                                 Err(e) => error!("[RandManager] Failed to add aug data: {}", e),
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
+                            info!(LogSchema::new(LogEvent::ReceiveCertifiedAugData)
+                                .author(self.author)
+                                .epoch(certified_aug_data.epoch())
+                                .remote_peer(*certified_aug_data.author()));
                             match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
                                 Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
                                 Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),

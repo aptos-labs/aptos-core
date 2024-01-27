@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_metrics_core::{register_int_gauge, IntGauge, HistogramVec, register_histogram_vec};
+use aptos_metrics_core::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
 use once_cell::sync::Lazy;
 
 /// Count of the pending messages sent to itself in the channel
@@ -17,5 +17,6 @@ pub static DKG_STAGE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         "aptos_dkg_session_stage_seconds",
         "How long it takes to reach different DKG stages",
         &["epoch", "dealer", "stage"]
-    ).unwrap()
+    )
+    .unwrap()
 });
