@@ -15,12 +15,12 @@ use aptos_language_e2e_tests::{
 use criterion::{measurement::Measurement, BatchSize, Bencher};
 use once_cell::sync::Lazy;
 use proptest::strategy::Strategy;
-use std::{net::SocketAddr, sync::Arc};
+use std::{cmp::min, net::SocketAddr, sync::Arc};
 
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
+            .num_threads(min(num_cpus::get(), 32))
             .thread_name(|index| format!("par_exec_{}", index))
             .build()
             .unwrap(),

@@ -26,7 +26,7 @@ use proptest::{
     strategy::{Strategy, ValueTree},
     test_runner::TestRunner,
 };
-use std::{fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
+use std::{cmp::min, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc};
 
 pub struct Bencher<K, V, E> {
     transaction_size: usize,
@@ -123,7 +123,7 @@ where
 
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                .num_threads(num_cpus::get())
+                .num_threads(min(num_cpus::get(), 32))
                 .build()
                 .unwrap(),
         );

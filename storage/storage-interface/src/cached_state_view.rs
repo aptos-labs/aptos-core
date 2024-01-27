@@ -22,6 +22,7 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator};
 use std::{
+    cmp::min,
     collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
     sync::Arc,
@@ -29,7 +30,7 @@ use std::{
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
+        .num_threads(min(num_cpus::get(), 32))
         .thread_name(|index| format!("kv_reader_{}", index))
         .build()
         .unwrap()

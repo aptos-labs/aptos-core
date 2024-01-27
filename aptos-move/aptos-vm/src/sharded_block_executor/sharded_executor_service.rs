@@ -31,7 +31,7 @@ use aptos_types::{
 use aptos_vm_logging::disable_speculative_logging;
 use futures::{channel::oneshot, executor::block_on};
 use move_core_types::vm_status::VMStatus;
-use std::sync::Arc;
+use std::{cmp::min, sync::Arc};
 
 pub struct ShardedExecutorService<S: StateView + Sync + Send + 'static> {
     shard_id: ShardId,
@@ -45,16 +45,14 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
     pub fn new(
         shard_id: ShardId,
         num_shards: usize,
-        num_threads: usize,
+        _num_threads: usize,
         coordinator_client: Arc<dyn CoordinatorClient<S>>,
         cross_shard_client: Arc<dyn CrossShardClient>,
     ) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                // We need two extra threads for the cross-shard commit receiver and the thread
-                // that is blocked on waiting for execute block to finish.
                 .thread_name(move |i| format!("sharded-executor-shard-{}-{}", shard_id, i))
-                .num_threads(num_threads + 2)
+                .num_threads(min(num_cpus::get(), 32))
                 .build()
                 .unwrap(),
         );

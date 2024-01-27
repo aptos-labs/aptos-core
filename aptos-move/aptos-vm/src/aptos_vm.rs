@@ -114,7 +114,7 @@ static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
-            .num_threads(num_cpus::get())
+            .num_threads(min(num_cpus::get(), 32))
             .thread_name(|index| format!("par_exec-{}", index))
             .build()
             .unwrap(),

@@ -9,6 +9,7 @@ use aptos_types::{
     state_store::account_with_state_view::AsAccountWithStateView,
 };
 use aptos_vm::AptosVM;
+use std::cmp::min;
 
 /// Error message to display when non-production features are enabled
 pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
@@ -26,6 +27,7 @@ PLEASE RECOMPILE APTOS-NODE SEPARATELY using the following command:
 pub fn create_global_rayon_pool(create_global_rayon_pool: bool) {
     if create_global_rayon_pool {
         rayon::ThreadPoolBuilder::new()
+            .num_threads(min(num_cpus::get(), 32))
             .thread_name(|index| format!("rayon-global-{}", index))
             .build_global()
             .expect("Failed to build rayon global thread pool.");

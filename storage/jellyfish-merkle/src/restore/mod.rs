@@ -29,7 +29,7 @@ use aptos_types::{
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::{
-    cmp::Eq,
+    cmp::{min, Eq},
     collections::HashMap,
     sync::{
         mpsc::{channel, Receiver},
@@ -39,7 +39,7 @@ use std::{
 
 static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
-        .num_threads(32)
+        .num_threads(min(num_cpus::get(), 32))
         .thread_name(|index| format!("jmt_batch_{}", index))
         .build()
         .unwrap()

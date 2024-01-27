@@ -26,6 +26,7 @@ arr_macro = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 itertools = { workspace = true }
+num_cpus = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }

@@ -14,7 +14,7 @@ use aptos_types::{
     transaction::{analyzed_transaction::AnalyzedTransaction, TransactionOutput},
 };
 use move_core_types::vm_status::VMStatus;
-use std::sync::Arc;
+use std::{cmp::min, sync::Arc};
 
 pub struct GlobalExecutor<S: StateView + Sync + Send + 'static> {
     global_cross_shard_client: Arc<GlobalCrossShardClient>,
@@ -27,9 +27,7 @@ impl<S: StateView + Sync + Send + 'static> GlobalExecutor<S> {
     pub fn new(cross_shard_client: Arc<GlobalCrossShardClient>, num_threads: usize) -> Self {
         let executor_thread_pool = Arc::new(
             rayon::ThreadPoolBuilder::new()
-                // We need two extra threads for the cross-shard commit receiver and the thread
-                // that is blocked on waiting for execute block to finish.
-                .num_threads(num_threads + 2)
+                .num_threads(min(num_cpus::get(), 32))
                 .build()
                 .unwrap(),
         );
