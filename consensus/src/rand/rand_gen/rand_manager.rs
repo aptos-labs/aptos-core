@@ -41,6 +41,7 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use crate::pipeline::buffer_manager::LOOP_INTERVAL_MS;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -329,7 +330,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         );
 
         let _guard = self.broadcast_aug_data().await;
-
+        let mut interval = tokio::time::interval(Duration::from_millis(5000));
         while !self.stop {
             tokio::select! {
                 Some(blocks) = incoming_blocks.next() => {
@@ -400,6 +401,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
                     }
                 }
+                _ = interval.tick().fuse() => {
+                    self.log_queue_summary();
+                },
+
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {
@@ -407,5 +412,12 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             }
         }
         info!("RandManager stopped");
+    }
+
+    pub fn log_queue_summary(&self) {
+        let queue = &self.block_queue.queue;
+        let min_round = queue.keys().min().copied();
+        let max_round = queue.keys().max().copied();
+        info!("block_queue_summary, epoch={}, size={}, min_round={:?}, max_round={:?}", self.epoch_state.epoch, queue.len(), min_round, max_round);
     }
 }

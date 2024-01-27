@@ -9,6 +9,7 @@ use aptos_consensus_types::{common::Round, executed_block::ExecutedBlock};
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::randomness::{RandMetadata, Randomness};
 use std::collections::{BTreeMap, HashMap};
+use aptos_logger::info;
 
 /// Maintain the ordered blocks received from consensus and corresponding randomness
 pub struct QueueItem {
@@ -85,9 +86,15 @@ impl QueueItem {
 
 /// Maintain ordered blocks that have pending randomness
 pub struct BlockQueue {
-    queue: BTreeMap<Round, QueueItem>,
+    pub queue: BTreeMap<Round, QueueItem>,
 }
 impl BlockQueue {
+    pub fn log_summary(&self) {
+        let min_round = self.queue.keys().min().copied();
+        let max_round = self.queue.keys().max().copied();
+        info!("block_queue_summary, size={}, min_round={:?}, max_round={:?}", self.queue.len(), min_round, max_round);
+    }
+
     pub fn new() -> Self {
         Self {
             queue: BTreeMap::new(),
