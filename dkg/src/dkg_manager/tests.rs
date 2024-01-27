@@ -11,7 +11,7 @@ use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
     Uniform,
 };
-use aptos_infallible::RwLock;
+use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_types::{
     dkg::{
         dummy_dkg::DummyDKG, DKGSessionMetadata, DKGStartEvent, DKGTrait, DKGTranscript,
@@ -80,20 +80,29 @@ async fn test_dkg_state_transition() {
 
     // In state `NotStarted`, DKGManager should accept `DKGStartEvent`:
     // it should record start time, compute its own node, and enter state `InProgress`.
+    let start_time_1 = duration_since_epoch();
+    let event = DKGStartEvent {
+        session_metadata: DKGSessionMetadata {
+            dealer_epoch: 999,
+            dealer_validator_set: validator_consensus_info_move_structs.clone(),
+            target_validator_set: validator_consensus_info_move_structs.clone(),
+        },
+        start_time_us: start_time_1.as_micros() as u64,
+    };
     let handle_result = dkg_manager
-        .process_dkg_start_event(DKGStartEvent {
-            session_metadata: DKGSessionMetadata {
-                dealer_epoch: 999,
-                dealer_validator_set: validator_consensus_info_move_structs.clone(),
-                target_validator_set: validator_consensus_info_move_structs.clone(),
-            },
-            start_time_us: 1700000000000000,
-        })
+        .process_dkg_start_event(event.clone())
         .await;
     assert!(handle_result.is_ok());
     assert!(
-        matches!(&dkg_manager.state, InnerState::InProgress { start_time_us, my_transcript, .. } if *start_time_us == 1700000000000000 && my_transcript.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
+        matches!(&dkg_manager.state, InnerState::InProgress { start_time, my_transcript, .. } if *start_time == start_time_1 && my_transcript.metadata == DKGTranscriptMetadata{ epoch: 999, author: addrs[0]})
     );
+
+    // 2nd `DKGStartEvent` should be rejected.
+    let handle_result = dkg_manager
+        .process_dkg_start_event(event)
+        .await;
+    println!("{:?}", handle_result);
+    assert!(handle_result.is_err());
 
     // In state `InProgress`, DKGManager should respond to `DKGNodeRequest` with its own node.
     let rpc_node_request = new_rpc_node_request(999, addrs[3], rpc_response_collector.clone());
@@ -104,7 +113,7 @@ async fn test_dkg_state_transition() {
         .map(anyhow::Result::unwrap)
         .collect::<Vec<_>>();
     assert_eq!(
-        vec![DKGMessage::NodeResponse(dkg_manager.state.my_node_cloned())],
+        vec![DKGMessage::TranscriptResponse(dkg_manager.state.my_node_cloned())],
         last_responses
     );
     assert!(matches!(&dkg_manager.state, InnerState::InProgress { .. }));
@@ -143,7 +152,7 @@ async fn test_dkg_state_transition() {
         .map(anyhow::Result::unwrap)
         .collect::<Vec<_>>();
     assert_eq!(
-        vec![DKGMessage::NodeResponse(dkg_manager.state.my_node_cloned())],
+        vec![DKGMessage::TranscriptResponse(dkg_manager.state.my_node_cloned())],
         last_responses
     );
     assert!(matches!(&dkg_manager.state, InnerState::Finished { .. }));
@@ -156,7 +165,7 @@ fn new_rpc_node_request(
     response_collector: Arc<RwLock<Vec<anyhow::Result<DKGMessage>>>>,
 ) -> IncomingRpcRequest {
     IncomingRpcRequest {
-        msg: DKGMessage::NodeRequest(DKGTranscriptRequest::new(epoch)),
+        msg: DKGMessage::TranscriptRequest(DKGTranscriptRequest::new(epoch)),
         sender,
         response_sender: Box::new(DummyRpcResponseSender::new(response_collector)),
     }
