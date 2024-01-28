@@ -52,6 +52,7 @@ module aptos_framework::version {
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
         reconfiguration::reconfigure();
+        debug::print(&utf8(b"set_version/6"));
     }
 
     public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
