@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::types::{DagSnapshotBitmask, NodeMetadata};
+use super::{
+    types::{DagSnapshotBitmask, NodeMetadata},
+    Node, NodeId,
+};
 use crate::{
     dag::{
         storage::DAGStorage,
@@ -16,26 +19,29 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
 
 #[derive(Clone)]
 pub enum NodeStatus {
-    Unordered(Arc<CertifiedNode>),
+    Unordered {
+        node: Arc<CertifiedNode>,
+        accumulated_voting_power: u128,
+    },
     Ordered(Arc<CertifiedNode>),
 }
 
 impl NodeStatus {
     pub fn as_node(&self) -> &Arc<CertifiedNode> {
         match self {
-            NodeStatus::Unordered(node) | NodeStatus::Ordered(node) => node,
+            NodeStatus::Unordered { node, .. } | NodeStatus::Ordered(node) => node,
         }
     }
 
     pub fn mark_as_ordered(&mut self) {
-        assert!(matches!(self, NodeStatus::Unordered(_)));
+        assert!(matches!(self, NodeStatus::Unordered { .. }));
         *self = NodeStatus::Ordered(self.as_node().clone());
     }
 }
@@ -49,6 +55,7 @@ pub struct Dag {
     epoch_state: Arc<EpochState>,
     /// The window we maintain between highest committed round and initial round
     window_size: u64,
+    voted_nodes: BTreeMap<Round, BTreeSet<NodeId>>,
 }
 
 impl Dag {
@@ -61,6 +68,7 @@ impl Dag {
             start_round,
             epoch_state,
             window_size,
+            voted_nodes: BTreeMap::new(),
         }
     }
 
@@ -100,7 +108,11 @@ impl Dag {
             .get_node_ref_mut(node.round(), node.author())
             .expect("must be present");
         ensure!(round_ref.is_none(), "race during insertion");
-        *round_ref = Some(NodeStatus::Unordered(node.clone()));
+        *round_ref = Some(NodeStatus::Unordered {
+            node: node.clone(),
+            accumulated_voting_power: 0,
+        });
+        self.update_votes(&node);
         Ok(())
     }
 
@@ -140,6 +152,40 @@ impl Dag {
             .or_insert_with(|| vec![None; self.author_to_index.len()]);
         ensure!(round_ref[index].is_none(), "duplicate node");
         Ok(())
+    }
+
+    pub fn update_votes(&mut self, node: &Node) {
+        if !self
+            .voted_nodes
+            .entry(node.round())
+            .or_default()
+            .insert(node.id())
+        {
+            return;
+        }
+
+        if node.round() <= self.lowest_round() {
+            return;
+        }
+
+        for parent in node.parents_metadata() {
+            let voting_power = self
+                .epoch_state
+                .verifier
+                .get_voting_power(node.author())
+                .expect("must exist");
+            let node_status = self
+                .get_node_ref_mut(parent.round(), parent.author())
+                .expect("must exist");
+            match node_status {
+                Some(NodeStatus::Unordered {
+                    accumulated_voting_power,
+                    ..
+                }) => *accumulated_voting_power += voting_power as u128,
+                Some(NodeStatus::Ordered(_)) => {},
+                None => unreachable!("parents must exist before voting for a node"),
+            }
+        }
     }
 
     pub fn exists(&self, metadata: &NodeMetadata) -> bool {
@@ -204,24 +250,23 @@ impl Dag {
             .map(|node_status| node_status.as_node())
     }
 
-    // TODO: I think we can cache votes in the NodeStatus::Unordered
     pub fn check_votes_for_node(
         &self,
         metadata: &NodeMetadata,
         validator_verifier: &ValidatorVerifier,
     ) -> bool {
-        self.get_round_iter(metadata.round() + 1)
-            .map(|next_round_iter| {
-                let votes = next_round_iter
-                    .filter(|node_status| {
-                        node_status
-                            .as_node()
-                            .parents()
-                            .iter()
-                            .any(|cert| cert.metadata() == metadata)
-                    })
-                    .map(|node_status| node_status.as_node().author());
-                validator_verifier.check_voting_power(votes, false).is_ok()
+        self.get_node_ref_by_metadata(metadata)
+            .map(|node_status| match node_status {
+                NodeStatus::Unordered {
+                    accumulated_voting_power,
+                    ..
+                } => validator_verifier
+                    .check_aggregated_voting_power(*accumulated_voting_power, false)
+                    .is_ok(),
+                NodeStatus::Ordered(_) => {
+                    error!("checking voting power for Ordered node");
+                    true
+                },
             })
             .unwrap_or(false)
     }
@@ -253,7 +298,7 @@ impl Dag {
             .flat_map(|(_, round_ref)| round_ref.iter_mut())
             .flatten()
             .filter(move |node_status| {
-                matches!(node_status, NodeStatus::Unordered(_))
+                matches!(node_status, NodeStatus::Unordered { .. })
                     && reachable_filter(node_status.as_node())
             })
     }
@@ -335,6 +380,9 @@ impl Dag {
     }
 
     pub(super) fn prune(&mut self) -> BTreeMap<u64, Vec<Option<NodeStatus>>> {
+        let to_keep = self.voted_nodes.split_off(&self.start_round);
+        _ = std::mem::replace(&mut self.voted_nodes, to_keep);
+
         let to_keep = self.nodes_by_round.split_off(&self.start_round);
         let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);
         debug!(

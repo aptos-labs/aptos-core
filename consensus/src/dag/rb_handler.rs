@@ -96,6 +96,13 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
+        ensure!(
+            node.epoch() == self.epoch_state.epoch,
+            "different epoch {}, current {}",
+            node.epoch(),
+            self.epoch_state.epoch
+        );
+        
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         let vtxn_total_bytes = node
@@ -223,6 +230,8 @@ impl RpcHandler for NodeBroadcastHandler {
             .get_mut(&node.round())
             .expect("must exist")
             .insert(*node.author(), vote.clone());
+
+        self.dag.write().update_votes(&node);
 
         debug!(LogSchema::new(LogEvent::Vote)
             .remote_peer(*node.author())

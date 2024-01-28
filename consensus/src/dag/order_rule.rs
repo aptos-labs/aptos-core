@@ -136,7 +136,7 @@ impl OrderRule {
             .reachable(
                 Some(current_anchor.metadata().clone()).iter(),
                 Some(*self.lowest_unordered_anchor_round.read()),
-                |node_status| matches!(node_status, NodeStatus::Unordered(_)),
+                |node_status| matches!(node_status, NodeStatus::Unordered{ .. }),
             )
             // skip the current anchor itself
             .skip(1)
