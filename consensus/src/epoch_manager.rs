@@ -61,7 +61,7 @@ use crate::{
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{bail, ensure, Context, anyhow};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
@@ -117,6 +117,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_types::dkg::real_dkg::maybe_dk_from_bls_sk;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -179,7 +180,41 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-    dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
+    dkg_decrypt_key: Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
+}
+
+fn load_dkg_decrypt_key_from_identity_blob(node_config: &NodeConfig) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+    let identity_blob = node_config.consensus.safety_rules.initial_safety_rules_config.identity_blob()?;
+    identity_blob.try_into_dkg_new_validator_decrypt_key()
+}
+
+fn load_dkg_decrypt_key_from_secure_storage(node_config: &NodeConfig) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+    let storage: Storage = (&node_config.consensus.safety_rules.backend).try_into().map_err(|e|anyhow!("load_dkg_decrypt_key_from_storage failed with storage error"))?;
+    storage.available().map_err(|e|anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage unavailable"))?;
+    let sk = storage.get(CONSENSUS_KEY).map_err(|e|anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage read error: {e}"))?;
+    maybe_dk_from_bls_sk(&sk.value)
+}
+
+fn load_dkg_decrypt_key(node_config: &NodeConfig) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+    match load_dkg_decrypt_key_from_identity_blob(node_config) {
+        Ok(dk) => {
+            return Some(dk);
+        }
+        Err(e) => {
+            warn!("{e}");
+        }
+    }
+
+    match load_dkg_decrypt_key_from_secure_storage(node_config) {
+        Ok(dk) => {
+            return Some(dk);
+        }
+        Err(e) => {
+            warn!("{e}");
+        }
+    }
+
+    None
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -199,7 +234,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-        dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -207,6 +241,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
         let safety_rules_manager = SafetyRulesManager::new(sr_config);
+        let dkg_decrypt_key = load_dkg_decrypt_key(node_config);
         Self {
             author,
             config,
@@ -1081,6 +1116,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .copied()
             .ok_or_else(|| NoRandomnessReason::NotInValidatorSet)?;
 
+        let dkg_decrypt_key = self.dkg_decrypt_key.as_ref().ok_or_else(||NoRandomnessReason::DKGDecryptKeyUnavailable)?;
         let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
             dkg_session.transcript.as_slice(),
         )
@@ -1095,7 +1131,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             &dkg_pub_params,
             &transcript,
             my_index as u64,
-            &self.dkg_decrypt_key,
+            dkg_decrypt_key,
         )
         .map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
 
@@ -1705,6 +1741,7 @@ enum NoRandomnessReason {
     DKGCompletedSessionResourceMissing,
     CompletedSessionTooOld,
     NotInValidatorSet,
+    DKGDecryptKeyUnavailable,
     TranscriptDeserializationError(bcs::Error),
     SecretShareDecryptionFailed(anyhow::Error),
     RngCreationError(rand::Error),

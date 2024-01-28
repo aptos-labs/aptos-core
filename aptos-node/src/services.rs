@@ -108,7 +108,6 @@ pub fn start_consensus_runtime(
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
-    dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
@@ -121,7 +120,6 @@ pub fn start_consensus_runtime(
         consensus_reconfig_subscription
             .expect("Consensus requires a reconfiguration subscription!"),
         vtxn_pool,
-        dkg_decrypt_key,
     );
     debug!("Consensus started in {} ms", instant.elapsed().as_millis());
     consensus

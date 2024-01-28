@@ -14,6 +14,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
 };
+use anyhow::anyhow;
 
 /// A single struct for reading / writing to a file for identity across configs
 #[derive(Deserialize, Serialize)]
@@ -49,9 +50,11 @@ impl IdentityBlob {
 
     pub fn try_into_dkg_new_validator_decrypt_key(
         self,
-    ) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-        self.consensus_private_key
-            .and_then(|key| maybe_dk_from_bls_sk(&key).ok())
+    ) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+        let consensus_sk = self.consensus_private_key
+            .as_ref()
+            .ok_or_else(||anyhow!("try_into_dkg_new_validator_decrypt_key failed with missing consensus key"))?;
+        maybe_dk_from_bls_sk(consensus_sk)
     }
 }
 
