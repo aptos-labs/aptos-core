@@ -50,6 +50,7 @@ impl IdentityBlob {
     pub fn try_into_dkg_new_validator_decrypt_key(
         self,
     ) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+        println!("consensus_sk.is_some={}", self.consensus_private_key.is_some());
         self.consensus_private_key
             .and_then(|key| maybe_dk_from_bls_sk(&key).ok())
     }
