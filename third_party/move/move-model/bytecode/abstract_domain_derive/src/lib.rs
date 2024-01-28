@@ -4,8 +4,8 @@
 //! Derive macro for `AbstractDomain`
 //!
 //! Currently we can only derive for structs.
-//! For tuple structs, the derived join joins each field;
-//! for structs with named fields, the derived `join` joins each field without a #[no_join] attribute.
+//! For tuple structs, the derived join pair-wise joins each field;
+//! for structs with named fields, the derived join pair-wise joins each field without #[no_join] attribute.
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
@@ -20,11 +20,14 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 }
 
 #[proc_macro_derive(AbstractDomain, attributes(no_join))]
-/// Derives `AbstractDomain` for structs. The derived `join` method joins selected fields of a struct, or all fields for structs with anonymous fields, and returns the combined join results.
+/// Derives `AbstractDomain` for structs. The derived `join` method pair-wise joins selected fields of a struct,
+/// or all fields for structs with anonymous fields, and returns the combined join results.
 /// The joined fields must implement `AbstractDomain`.
 /// # Usage
 ///
-/// Add `#[derive(AbstractDomain)]` attribute on the struct definition, and `#[no_join]` on the fields not to be joined.
+/// Add `#[derive(AbstractDomain)]` attribute on the struct definition,
+/// and `#[no_join]` on the fields not to be pair-wise joined.
+/// All fields without `#[no_join]` will be pair-wise joined.
 /// For example,
 /// ```
 /// pub struct BorrowInfo {
