@@ -8,7 +8,7 @@ use crate::cli;
 use crate::configuration::Configuration;
 use move_compiler::diagnostics::FilesSourceText;
 use move_compiler::{
-    command_line::compiler::{Compiler, PASS_PARSER},
+    command_line::compiler::{Compiler, PASS_TYPING},
     diagnostics::unwrap_or_report_diagnostics,
     shared::Flags,
 };
@@ -37,12 +37,12 @@ use move_package::BuildConfig;
 ///
 /// # Returns
 ///
-/// * `Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error>` - tuple of `FilesSourceText` and Program if successful, or an error if any error occurs.
+/// * `Result<(FilesSourceText, move_compiler::typing::ast::Program), anyhow::Error>` - tuple of `FilesSourceText` and Program if successful, or an error if any error occurs.
 pub fn generate_ast(
     mutator_config: &Configuration,
     config: &BuildConfig,
     package_path: &Path,
-) -> Result<(FilesSourceText, move_compiler::parser::ast::Program), anyhow::Error> {
+) -> Result<(FilesSourceText, move_compiler::typing::ast::Program), anyhow::Error> {
     let mut source_files = mutator_config
         .project
         .move_sources
@@ -94,7 +94,7 @@ pub fn generate_ast(
             .expect("output path contains invalid characters")
             .to_string(),
     )
-    .run::<PASS_PARSER>()?;
+    .run::<PASS_TYPING>()?;
 
     let (_, stepped) = unwrap_or_report_diagnostics(&files, res);
     let (_, ast) = stepped.into_ast();
