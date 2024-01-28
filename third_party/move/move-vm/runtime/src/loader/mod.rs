@@ -1309,7 +1309,6 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn get_struct_type_generic(
         &self,
-        gas_meter: Option<&mut impl GasMeter>,
         idx: StructDefInstantiationIndex,
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
@@ -1317,13 +1316,6 @@ impl<'a> Resolver<'a> {
             BinaryType::Module(module) => module.struct_instantiation_at(idx.0),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-
-        if let Some(gas_meter) = gas_meter {
-            for ty in &struct_inst.instantiation {
-                gas_meter
-                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
-            }
-        }
 
         // Before instantiating the type, count the # of nodes of all type arguments plus
         // existing type instantiation.
@@ -1406,7 +1398,6 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn instantiate_generic_struct_fields(
         &self,
-        gas_meter: Option<&mut impl GasMeter>,
         idx: StructDefInstantiationIndex,
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
@@ -1421,14 +1412,6 @@ impl<'a> Resolver<'a> {
             .iter()
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-
-        if let Some(gas_meter) = gas_meter {
-            for ty in &struct_type.fields {
-                gas_meter.charge_create_ty(NumTypeNodes::new(
-                    ty.num_nodes_in_subst(&instantiation_types)? as u64,
-                ))?;
-            }
-        }
 
         struct_type
             .fields
@@ -1446,16 +1429,10 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn instantiate_single_type(
         &self,
-        gas_meter: Option<&mut impl GasMeter>,
         idx: SignatureIndex,
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
         let ty = self.single_type_at(idx);
-
-        if let Some(gas_meter) = gas_meter {
-            gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
-        }
 
         if !ty_args.is_empty() {
             self.subst(ty, ty_args)
