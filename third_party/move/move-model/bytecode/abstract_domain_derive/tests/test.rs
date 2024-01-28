@@ -16,11 +16,12 @@ impl<T: Eq + Clone> AbstractDomain for Plus2<T> {
     fn join(&mut self, other: &Self) -> JoinResult {
         match (&self, other) {
             (Plus2::Top, _) | (_, Plus2::Bot) => JoinResult::Unchanged,
-            (Plus2::Mid(_), _ /* Mid or Top */) => {
+            (Plus2::Mid(x), Plus2::Mid(y)) if x == y => JoinResult::Unchanged,
+            (Plus2::Mid(_), _mid_or_top) => {
                 *self = Plus2::Top;
                 JoinResult::Changed
             },
-            (Plus2::Bot, _ /* Mid or Tops */) => {
+            (Plus2::Bot, _mid_or_top) => {
                 *self = other.clone();
                 JoinResult::Changed
             },
