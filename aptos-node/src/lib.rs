@@ -747,7 +747,7 @@ pub fn setup_environment_and_start_node(
         .ok()
         .and_then(IdentityBlob::try_into_dkg_new_validator_decrypt_key);
     println!("setup_environment_and_start_node/19");
-
+    println!("consensus_network_interfaces={},maybe_dkg_decrypt_key={}",consensus_network_interfaces.is_some(), maybe_dkg_decrypt_key.is_some());
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = match (consensus_network_interfaces, maybe_dkg_decrypt_key) {
         (Some(consensus_network_interfaces), Some(dkg_decrypt_key)) => {
