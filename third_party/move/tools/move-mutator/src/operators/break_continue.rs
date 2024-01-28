@@ -1,8 +1,8 @@
 use crate::operator::{MutantInfo, MutationOperator};
 use crate::report::{Mutation, Range};
 use move_command_line_common::files::FileHash;
-use move_compiler::parser::ast;
-use move_compiler::parser::ast::Exp_;
+use move_compiler::typing::ast;
+use move_compiler::typing::ast::UnannotatedExp_;
 use std::fmt;
 use std::fmt::Debug;
 
@@ -23,17 +23,17 @@ impl BreakContinue {
 
 impl MutationOperator for BreakContinue {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
-        let start = self.operation.loc.start() as usize;
-        let end = self.operation.loc.end() as usize;
+        let start = self.operation.exp.loc.start() as usize;
+        let end = self.operation.exp.loc.end() as usize;
         let cur_op = &source[start..end];
 
         // Group of exchangeable binary operators - we only want to replace the operator with a different one
         // within the same group.
-        let ops: Vec<&str> = match self.operation.value {
-            Exp_::Break => {
+        let ops: Vec<&str> = match self.operation.exp.value {
+            UnannotatedExp_::Break => {
                 vec!["continue", "{}"]
             },
-            Exp_::Continue => {
+            UnannotatedExp_::Continue => {
                 vec!["break", "{}"]
             },
             _ => vec![],
@@ -57,7 +57,7 @@ impl MutationOperator for BreakContinue {
     }
 
     fn get_file_hash(&self) -> FileHash {
-        self.operation.loc.file_hash()
+        self.operation.exp.loc.file_hash()
     }
 }
 
@@ -66,10 +66,10 @@ impl fmt::Display for BreakContinue {
         write!(
             f,
             "BreakContinueOperator({:?}, location: file hash: {}, index start: {}, index stop: {})",
-            self.operation.value,
-            self.operation.loc.file_hash(),
-            self.operation.loc.start(),
-            self.operation.loc.end()
+            self.operation.exp.value,
+            self.operation.exp.loc.file_hash(),
+            self.operation.exp.loc.start(),
+            self.operation.exp.loc.end()
         )
     }
 }
@@ -78,15 +78,22 @@ impl fmt::Display for BreakContinue {
 mod tests {
     use super::*;
     use move_command_line_common::files::FileHash;
-    use move_compiler::parser::ast::Exp;
+    use move_compiler::naming::ast::{Type, Type_};
+    use move_compiler::typing::ast::{Exp, UnannotatedExp, UnannotatedExp_};
     use move_ir_types::location::Loc;
 
     #[test]
     fn test_apply_break() {
         let loc = Loc::new(FileHash::new(""), 0, 5);
         let exp = Exp {
-            value: Exp_::Break,
-            loc,
+            exp: UnannotatedExp {
+                value: UnannotatedExp_::Break,
+                loc,
+            },
+            ty: Type {
+                value: Type_::Anything,
+                loc,
+            }
         };
         let operator = BreakContinue::new(exp);
         let source = "break";
@@ -102,8 +109,14 @@ mod tests {
     fn test_apply_continue() {
         let loc = Loc::new(FileHash::new(""), 0, 8);
         let exp = Exp {
-            value: Exp_::Continue,
-            loc,
+            exp: UnannotatedExp {
+                value: UnannotatedExp_::Continue,
+                loc,
+            },
+            ty: Type {
+                value: Type_::Anything,
+                loc,
+            }
         };
         let operator = BreakContinue::new(exp);
         let source = "continue";
@@ -119,8 +132,14 @@ mod tests {
     fn test_get_file_hash() {
         let loc = Loc::new(FileHash::new(""), 0, 0);
         let exp = Exp {
-            value: Exp_::Break,
-            loc,
+            exp: UnannotatedExp {
+                value: UnannotatedExp_::Break,
+                loc,
+            },
+            ty: Type {
+                value: Type_::Anything,
+                loc,
+            }
         };
         let operator = BreakContinue::new(exp);
         assert_eq!(operator.get_file_hash(), FileHash::new(""));
