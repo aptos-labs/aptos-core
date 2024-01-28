@@ -207,17 +207,22 @@ pub fn start(
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
 ) -> anyhow::Result<()> {
+    println!("node_start/0");
     // Setup panic handler
     aptos_crash_handler::setup_panic_handler();
+    println!("node_start/1");
 
     // Create global rayon thread pool
     utils::create_global_rayon_pool(create_global_rayon_pool);
+    println!("node_start/2");
 
     // Initialize the global aptos-node-identity
     aptos_node_identity::init(config.get_peer_id())?;
 
+    println!("node_start/3");
     // Instantiate the global logger
     let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+    println!("node_start/");
 
     assert!(
         !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
@@ -242,14 +247,18 @@ pub fn start(
     } else if config.failpoints.is_some() {
         warn!("Failpoints is set in the node config, but the binary didn't compile with this feature!");
     }
+    println!("node_start/4");
 
     // Set up the node environment and start it
     let _node_handle =
         setup_environment_and_start_node(config, remote_log_receiver, Some(logger_filter_update))?;
+    println!("node_start/5");
     let term = Arc::new(AtomicBool::new(false));
+    println!("node_start/");
     while !term.load(Ordering::Acquire) {
         thread::park();
     }
+    println!("node_start/6");
 
     Ok(())
 }
@@ -558,26 +567,33 @@ pub fn setup_environment_and_start_node(
     remote_log_rx: Option<mpsc::Receiver<TelemetryLog>>,
     logger_filter_update_job: Option<LoggerFilterUpdater>,
 ) -> anyhow::Result<AptosHandle> {
+    println!("setup_environment_and_start_node/0");
     // Log the node config at node startup
     node_config.log_all_configs();
-
+    println!("setup_environment_and_start_node/1");
     // Starts the admin service
     let admin_service = services::start_admin_service(&node_config);
+    println!("setup_environment_and_start_node/2");
 
     // Set up the storage database and any RocksDB checkpoints
     let (db_rw, backup_service, genesis_waypoint) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
+    println!("setup_environment_and_start_node/3");
 
     admin_service.set_aptos_db(db_rw.clone().into());
+    println!("setup_environment_and_start_node/4");
 
     // Set the Aptos VM configurations
     utils::set_aptos_vm_configurations(&node_config);
+    println!("setup_environment_and_start_node/5");
 
     // Obtain the chain_id from the DB
     let chain_id = utils::fetch_chain_id(&db_rw)?;
+    println!("setup_environment_and_start_node/6");
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
+    println!("setup_environment_and_start_node/7");
 
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(
@@ -586,6 +602,7 @@ pub fn setup_environment_and_start_node(
         logger_filter_update_job,
         chain_id,
     );
+    println!("setup_environment_and_start_node/8");
 
     // Create an event subscription service (and reconfig subscriptions for consensus and mempool)
     let (
@@ -595,6 +612,7 @@ pub fn setup_environment_and_start_node(
         dkg_subscriptions,
         jwk_consensus_subscriptions,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
+    println!("setup_environment_and_start_node/9");
 
     // Set up the networks and gather the application network handles
     let peers_and_metadata = network::create_peers_and_metadata(&node_config);
@@ -612,6 +630,7 @@ pub fn setup_environment_and_start_node(
         peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
+    println!("setup_environment_and_start_node/10");
 
     // Start the peer monitoring service
     let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
@@ -619,6 +638,7 @@ pub fn setup_environment_and_start_node(
         peer_monitoring_service_network_interfaces,
         db_rw.reader.clone(),
     );
+    println!("setup_environment_and_start_node/11");
 
     // Start state sync and get the notification endpoints for mempool and consensus
     let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
@@ -629,6 +649,7 @@ pub fn setup_environment_and_start_node(
             event_subscription_service,
             db_rw.clone(),
         )?;
+    println!("setup_environment_and_start_node/12");
 
     // Start the node inspection service
     services::start_node_inspection_service(
@@ -636,6 +657,7 @@ pub fn setup_environment_and_start_node(
         aptos_data_client,
         peers_and_metadata.clone(),
     );
+    println!("setup_environment_and_start_node/13");
 
     // Bootstrap the API and indexer
     let (
@@ -645,6 +667,7 @@ pub fn setup_environment_and_start_node(
         indexer_runtime,
         indexer_grpc_runtime,
     ) = services::bootstrap_api_and_indexer(&node_config, db_rw.clone(), chain_id)?;
+    println!("setup_environment_and_start_node/14");
 
     // Create mempool and get the consensus to mempool sender
     let (mempool_runtime, consensus_to_mempool_sender) =
@@ -657,6 +680,9 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
+
+    println!("setup_environment_and_start_node/15");
+
     let vtxn_pool = VTxnPoolState::default();
     let maybe_dkg_dealer_sk = node_config
         .consensus
@@ -665,6 +691,7 @@ pub fn setup_environment_and_start_node(
         .identity_blob()
         .ok()
         .and_then(|blob| blob.try_into_dkg_dealer_private_key());
+    println!("setup_environment_and_start_node/16");
 
     let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
         (Some(interfaces), Some(dkg_dealer_sk)) => {
@@ -688,6 +715,7 @@ pub fn setup_environment_and_start_node(
         },
         _ => None,
     };
+    println!("setup_environment_and_start_node/17");
 
     let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {
         let ApplicationNetworkInterfaces {
@@ -708,6 +736,7 @@ pub fn setup_environment_and_start_node(
     } else {
         None
     };
+    println!("setup_environment_and_start_node/18");
 
     let maybe_dkg_decrypt_key = node_config
         .consensus
@@ -716,6 +745,7 @@ pub fn setup_environment_and_start_node(
         .identity_blob()
         .ok()
         .and_then(IdentityBlob::try_into_dkg_new_validator_decrypt_key);
+    println!("setup_environment_and_start_node/19");
 
     // Create the consensus runtime (this blocks on state sync first)
     let consensus_runtime = match (consensus_network_interfaces, maybe_dkg_decrypt_key) {
@@ -741,6 +771,7 @@ pub fn setup_environment_and_start_node(
         },
         _ => None,
     };
+    println!("setup_environment_and_start_node/20");
 
     Ok(AptosHandle {
         _admin_service: admin_service,
