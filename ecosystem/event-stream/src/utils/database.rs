@@ -41,14 +41,14 @@ pub fn check_or_update_chain_id(
             anyhow::ensure!(chain_id == pubsub_chain_id, "[Event Stream] Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", pubsub_chain_id, chain_id);
             info!(
                 chain_id = chain_id,
-                "[Event Stream] Chain id matches! Continue to index...",
+                "[Event Stream] Chain id matches! Continue to stream...",
             );
             Ok(chain_id as u64)
         },
         None => {
             info!(
                 chain_id = pubsub_chain_id,
-                "[Event Stream] Adding chain id to db, continue to index.."
+                "[Event Stream] Adding chain id to db, continue to stream.."
             );
             insert_chain_id(conn, pubsub_chain_id).map(|_| pubsub_chain_id as u64)
         },

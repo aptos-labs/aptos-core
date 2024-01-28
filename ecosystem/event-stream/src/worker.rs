@@ -94,7 +94,6 @@ impl RunnableConfig for EventStreamConfig {
         // Panic if chain id of config does not match chain id of database
         // Perform chain id check
         // If chain id is not set, set it
-        info!("[Event Stream] Checking if chain id is correct");
         let mut conn = pool.get().unwrap_or_else(|e| {
             error!(
                 error = ?e,
@@ -105,13 +104,22 @@ impl RunnableConfig for EventStreamConfig {
             error!(error = ?e, "[Event Stream] Chain id should match");
             panic!();
         });
-        info!(
-            chain_id = self.chain_id,
-            "[Event Stream] Chain id matches! Continue to stream...",
-        );
 
         // Create Event broadcast channel
-        let (tx, _rx) = broadcast::channel::<StreamEventMessage>(100);
+        let (tx, mut rx) = broadcast::channel::<StreamEventMessage>(100);
+
+        // Receive all messages with initial Receiver to keep channel open
+        tokio::spawn(async move {
+            loop {
+                rx.recv().await.unwrap_or_else(|e| {
+                    error!(
+                        error = ?e,
+                        "[Event Stream] Failed to receive message from channel"
+                    );
+                    panic!();
+                });
+            }
+        });
 
         // Create and start ingestor
         let ingestor = Ingestor::new(
