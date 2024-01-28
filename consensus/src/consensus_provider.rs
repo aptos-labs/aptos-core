@@ -43,14 +43,16 @@ pub fn start_consensus(
     vtxn_pool: VTxnPoolState,
     dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
+    debug!("Consensus starting 1");
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
-
+    debug!("Consensus starting 2");
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_sender.clone(),
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
+    debug!("Consensus starting 3");
 
     let state_computer = Arc::new(ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
@@ -59,16 +61,21 @@ pub fn start_consensus(
         runtime.handle(),
         TransactionFilter::new(node_config.execution.transaction_filter.clone()),
     ));
+    debug!("Consensus starting 4");
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
     let (timeout_sender, timeout_receiver) =
         aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+    debug!("Consensus starting 5");
 
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
+
+    debug!("Consensus starting 6");
+
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
@@ -86,10 +93,13 @@ pub fn start_consensus(
         rand_storage,
         dkg_decrypt_key,
     );
+    debug!("Consensus starting 7");
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
+    debug!("Consensus starting 8");
 
     runtime.spawn(network_task.start());
+    debug!("Consensus starting 9");
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 
     debug!("Consensus started.");
