@@ -13,7 +13,6 @@ use aptos_types::dkg::DKGState;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
-#[ignore]
 #[tokio::test]
 async fn validator_restart_during_dkg() {
     let epoch_duration_secs = 30;
