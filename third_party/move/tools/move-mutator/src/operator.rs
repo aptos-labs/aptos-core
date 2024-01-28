@@ -87,8 +87,9 @@ impl fmt::Display for MutationOp {
 mod tests {
     use super::*;
     use move_command_line_common::files::FileHash;
-    use move_compiler::naming::ast::Exp_::Break;
-    use move_compiler::parser::ast::{BinOp, BinOp_, Exp, Exp_, UnaryOp, UnaryOp_};
+    use move_compiler::naming::ast::{Type, Type_};
+    use move_compiler::parser::ast::{BinOp, BinOp_, UnaryOp, UnaryOp_};
+    use move_compiler::typing::ast::{UnannotatedExp, UnannotatedExp_};
     use move_ir_types::location::Loc;
 
     #[test]
@@ -128,9 +129,15 @@ mod tests {
     #[test]
     fn test_apply_break_continue_operator() {
         let loc = Loc::new(FileHash::new(""), 0, 5);
-        let exp = Exp {
-            value: Exp_::Break,
-            loc,
+        let exp = move_compiler::typing::ast::Exp {
+            exp: UnannotatedExp {
+                value: UnannotatedExp_::Break,
+                loc,
+            },
+            ty: Type {
+                value: Type_::Anything,
+                loc,
+            }
         };
         let operator = MutationOp::BreakContinue(BreakContinue::new(exp));
         let source = "break";
