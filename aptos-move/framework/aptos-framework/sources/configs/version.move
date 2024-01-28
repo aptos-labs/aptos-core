@@ -2,6 +2,8 @@
 module aptos_framework::version {
     use std::error;
     use std::signer;
+    use std::string::utf8;
+    use aptos_std::debug;
     use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
@@ -35,13 +37,18 @@ module aptos_framework::version {
     /// Updates the major version to a larger version.
     /// This can be called by on chain governance.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
+        debug::print(&utf8(b"set_version/0"));
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
-
+        debug::print(&utf8(b"set_version/1"));
         let old_major = borrow_global<Version>(@aptos_framework).major;
+        debug::print(&utf8(b"set_version/2"));
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
+        debug::print(&utf8(b"set_version/3"));
 
         let config = borrow_global_mut<Version>(@aptos_framework);
+        debug::print(&utf8(b"set_version/4"));
         config.major = major;
+        debug::print(&utf8(b"set_version/5"));
 
         // Need to trigger reconfiguration so validator nodes can sync on the updated version.
         reconfiguration::reconfigure();
