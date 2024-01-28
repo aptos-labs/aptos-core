@@ -41,7 +41,6 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use crate::pipeline::buffer_manager::LOOP_INTERVAL_MS;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -418,6 +417,12 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let queue = &self.block_queue.queue;
         let min_round = queue.keys().min().copied();
         let max_round = queue.keys().max().copied();
-        info!("block_queue_summary, epoch={}, size={}, min_round={:?}, max_round={:?}", self.epoch_state.epoch, queue.len(), min_round, max_round);
+        info!(
+            "block_queue_summary, epoch={}, size={}, min_round={:?}, max_round={:?}",
+            self.epoch_state.epoch,
+            queue.len(),
+            min_round,
+            max_round
+        );
     }
 }

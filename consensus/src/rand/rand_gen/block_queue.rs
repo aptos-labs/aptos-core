@@ -6,10 +6,10 @@ use crate::{
     pipeline::buffer_manager::OrderedBlocks,
 };
 use aptos_consensus_types::{common::Round, executed_block::ExecutedBlock};
+use aptos_logger::info;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::randomness::{RandMetadata, Randomness};
 use std::collections::{BTreeMap, HashMap};
-use aptos_logger::info;
 
 /// Maintain the ordered blocks received from consensus and corresponding randomness
 pub struct QueueItem {
@@ -92,7 +92,12 @@ impl BlockQueue {
     pub fn log_summary(&self) {
         let min_round = self.queue.keys().min().copied();
         let max_round = self.queue.keys().max().copied();
-        info!("block_queue_summary, size={}, min_round={:?}, max_round={:?}", self.queue.len(), min_round, max_round);
+        info!(
+            "block_queue_summary, size={}, min_round={:?}, max_round={:?}",
+            self.queue.len(),
+            min_round,
+            max_round
+        );
     }
 
     pub fn new() -> Self {

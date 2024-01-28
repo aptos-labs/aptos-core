@@ -121,14 +121,14 @@ impl StateComputer for OrderingStateComputer {
         if self.maybe_reset_rand_manager_channel_tx.is_some() {
             let (tx, rx) = oneshot::channel::<ResetAck>();
             self.maybe_reset_rand_manager_channel_tx
-            .clone()
-            .unwrap()
-            .send(ResetRequest {
-                tx,
-                signal: ResetSignal::TargetRound(target.commit_info().round()),
-            })
-            .await
-            .map_err(|_| Error::RandResetDropped)?;
+                .clone()
+                .unwrap()
+                .send(ResetRequest {
+                    tx,
+                    signal: ResetSignal::TargetRound(target.commit_info().round()),
+                })
+                .await
+                .map_err(|_| Error::RandResetDropped)?;
             rx.await.map_err(|_| Error::RandResetDropped)?;
         }
 

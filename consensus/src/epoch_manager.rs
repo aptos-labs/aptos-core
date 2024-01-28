@@ -61,7 +61,7 @@ use crate::{
     transaction_shuffler::create_transaction_shuffler,
     util::time_service::TimeService,
 };
-use anyhow::{bail, ensure, Context, anyhow};
+use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
@@ -87,7 +87,7 @@ use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DKGState, DKGTrait, DefaultDKG},
+    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
@@ -117,7 +117,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_types::dkg::real_dkg::maybe_dk_from_bls_sk;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -183,35 +182,51 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dkg_decrypt_key: Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey>,
 }
 
-fn load_dkg_decrypt_key_from_identity_blob(node_config: &NodeConfig) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-    let identity_blob = node_config.consensus.safety_rules.initial_safety_rules_config.identity_blob()?;
+fn load_dkg_decrypt_key_from_identity_blob(
+    node_config: &NodeConfig,
+) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+    let identity_blob = node_config
+        .consensus
+        .safety_rules
+        .initial_safety_rules_config
+        .identity_blob()?;
     identity_blob.try_into_dkg_new_validator_decrypt_key()
 }
 
-fn load_dkg_decrypt_key_from_secure_storage(node_config: &NodeConfig) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-    let storage: Storage = (&node_config.consensus.safety_rules.backend).try_into().map_err(|e|anyhow!("load_dkg_decrypt_key_from_storage failed with storage error"))?;
-    storage.available().map_err(|e|anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage unavailable"))?;
-    let sk = storage.get(CONSENSUS_KEY).map_err(|e|anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage read error: {e}"))?;
+fn load_dkg_decrypt_key_from_secure_storage(
+    node_config: &NodeConfig,
+) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+    let storage: Storage = (&node_config.consensus.safety_rules.backend)
+        .try_into()
+        .map_err(|e| anyhow!("load_dkg_decrypt_key_from_storage failed with storage error: {e}"))?;
+    storage.available().map_err(|e| {
+        anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage unavailable: {e}")
+    })?;
+    let sk = storage.get(CONSENSUS_KEY).map_err(|e| {
+        anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage read error: {e}")
+    })?;
     maybe_dk_from_bls_sk(&sk.value)
 }
 
-fn load_dkg_decrypt_key(node_config: &NodeConfig) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+fn load_dkg_decrypt_key(
+    node_config: &NodeConfig,
+) -> Option<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
     match load_dkg_decrypt_key_from_identity_blob(node_config) {
         Ok(dk) => {
             return Some(dk);
-        }
+        },
         Err(e) => {
             warn!("{e}");
-        }
+        },
     }
 
     match load_dkg_decrypt_key_from_secure_storage(node_config) {
         Ok(dk) => {
             return Some(dk);
-        }
+        },
         Err(e) => {
             warn!("{e}");
-        }
+        },
     }
 
     None
@@ -638,43 +653,48 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // reset channel between epoch_manager and buffer_manager
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
-        let ((ordered_block_tx, ordered_block_rx), maybe_reset_rand_manager_tx) = if let Some(rand_config) = rand_config {
-            // channel for sending ordered blocks to rand_manager
-            let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
-            // channel for sending rand ready blocks to buffer_manager
-            let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+        let ((ordered_block_tx, ordered_block_rx), maybe_reset_rand_manager_tx) =
+            if let Some(rand_config) = rand_config {
+                // channel for sending ordered blocks to rand_manager
+                let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+                // channel for sending rand ready blocks to buffer_manager
+                let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
-            let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<
-                AccountAddress,
-                IncomingRandGenRequest,
-            >(QueueStyle::FIFO, 100, None);
+                let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<
+                    AccountAddress,
+                    IncomingRandGenRequest,
+                >(QueueStyle::FIFO, 100, None);
 
-            self.rand_manager_msg_tx = Some(rand_msg_tx);
-            self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
+                self.rand_manager_msg_tx = Some(rand_msg_tx);
+                self.rand_manager_reset_tx = Some(reset_rand_manager_tx.clone());
 
-            let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
+                let signer =
+                    new_signer_from_storage(self.author, &self.config.safety_rules.backend);
 
-            let rand_manager = RandManager::<Share, AugmentedData>::new(
-                self.author,
-                Arc::new(self.epoch_state().clone()),
-                signer,
-                rand_config,
-                rand_ready_block_tx,
-                Arc::new(network_sender.clone()),
-                self.rand_storage.clone(),
-                self.bounded_executor.clone(),
-            );
-            tokio::spawn(rand_manager.start(
-                ordered_block_rx,
-                rand_msg_rx,
-                reset_rand_manager_rx,
-                self.bounded_executor.clone(),
-            ));
+                let rand_manager = RandManager::<Share, AugmentedData>::new(
+                    self.author,
+                    Arc::new(self.epoch_state().clone()),
+                    signer,
+                    rand_config,
+                    rand_ready_block_tx,
+                    Arc::new(network_sender.clone()),
+                    self.rand_storage.clone(),
+                    self.bounded_executor.clone(),
+                );
+                tokio::spawn(rand_manager.start(
+                    ordered_block_rx,
+                    rand_msg_rx,
+                    reset_rand_manager_rx,
+                    self.bounded_executor.clone(),
+                ));
 
-            ((ordered_block_tx, rand_ready_block_rx), Some(reset_rand_manager_tx))
-        } else {
-            (unbounded(), None)
-        };
+                (
+                    (ordered_block_tx, rand_ready_block_rx),
+                    Some(reset_rand_manager_tx),
+                )
+            } else {
+                (unbounded(), None)
+            };
 
         let (commit_msg_tx, commit_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
@@ -1116,7 +1136,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .copied()
             .ok_or_else(|| NoRandomnessReason::NotInValidatorSet)?;
 
-        let dkg_decrypt_key = self.dkg_decrypt_key.as_ref().ok_or_else(||NoRandomnessReason::DKGDecryptKeyUnavailable)?;
+        let dkg_decrypt_key = self
+            .dkg_decrypt_key
+            .as_ref()
+            .ok_or_else(|| NoRandomnessReason::DKGDecryptKeyUnavailable)?;
         let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
             dkg_session.transcript.as_slice(),
         )
