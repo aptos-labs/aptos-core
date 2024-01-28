@@ -244,6 +244,7 @@ pub fn setup_networks_and_get_interfaces(
     let mut storage_service_network_handles = vec![];
     let mut netbench_handles = Vec::<ApplicationNetworkHandle<NetbenchMessage>>::new();
     for network_config in network_configs.into_iter() {
+        println!("network_config={:?}", network_config);
         // Create a network runtime for the config
         let runtime = create_network_runtime(&network_config);
 
@@ -262,17 +263,20 @@ pub fn setup_networks_and_get_interfaces(
 
         // Register consensus (both client and server) with the network
         let network_id = network_config.network_id;
+        println!("network_id={:?}", network_id);
         if network_id.is_validator_network() {
             // A validator node must have only a single consensus network handle
             if consensus_network_handle.is_some() {
                 panic!("There can be at most one validator network!");
             } else {
+                println!("consensus network registering");
                 consensus_network_handle = Some(register_client_and_service_with_network(
                     &mut network_builder,
                     network_id,
                     &network_config,
                     consensus_network_configuration(node_config),
                 ));
+                println!("consensus network registered");
             }
 
             if dkg_network_handle.is_some() {

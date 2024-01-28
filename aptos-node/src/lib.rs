@@ -630,6 +630,7 @@ pub fn setup_environment_and_start_node(
         peers_and_metadata.clone(),
         &mut event_subscription_service,
     );
+    println!("consensus_network_interfaces.is_some={}", consensus_network_interfaces.is_some());
     println!("setup_environment_and_start_node/10");
 
     // Start the peer monitoring service
