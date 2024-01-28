@@ -343,7 +343,7 @@ impl Node {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug, Eq, Hash, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct NodeId {
     epoch: u64,
     round: Round,
