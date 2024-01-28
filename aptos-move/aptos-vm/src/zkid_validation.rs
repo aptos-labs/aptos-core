@@ -69,7 +69,7 @@ pub fn validate_zkid_authenticators(
     _session: &mut SessionExt,
     _log_context: &AdapterLogSchema,
     chain_id: ChainId,
-) -> anyhow::Result<(), VMStatus> {
+) -> Result<(), VMStatus> {
     let zkid_authenticators = aptos_types::zkid::get_zkid_authenticators(transaction)
         .map_err(|_| invalid_signature!("Failed to fetch zkid authenticators"))?;
 
