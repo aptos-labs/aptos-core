@@ -41,7 +41,6 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
-    dkg_decrypt_key: <DefaultDKG as DKGTrait>::NewValidatorDecryptKey,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -84,7 +83,6 @@ pub fn start_consensus(
         aptos_time_service::TimeService::real(),
         vtxn_pool,
         rand_storage,
-        dkg_decrypt_key,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
