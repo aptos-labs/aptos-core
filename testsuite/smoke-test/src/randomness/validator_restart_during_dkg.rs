@@ -54,7 +54,7 @@ async fn validator_restart_during_dkg() {
         .iter()
         .map(|client| {
             client.set_failpoint(
-                "dkg::process_start_dkg_event".to_string(),
+                "dkg::process_dkg_start_event".to_string(),
                 "panic".to_string(),
             )
         })
