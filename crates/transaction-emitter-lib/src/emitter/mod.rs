@@ -811,12 +811,15 @@ async fn wait_for_accounts_sequence(
                     let prev_sequence_number = latest_fetched_counts
                         .insert(address, sequence_number)
                         .unwrap_or(*start_seq_num);
-                    assert!(prev_sequence_number <= sequence_number);
-                    sum_of_completion_timestamps_millis +=
-                        millis_elapsed * (sequence_number - prev_sequence_number) as u128;
+                    // fetched sequence number that is older than one we already fetched.
+                    // client connection probably moved to a different server.
+                    if prev_sequence_number <= sequence_number {
+                        sum_of_completion_timestamps_millis +=
+                            millis_elapsed * (sequence_number - prev_sequence_number) as u128;
 
-                    if *end_seq_num == sequence_number {
-                        pending_addresses.remove(&address);
+                        if *end_seq_num == sequence_number {
+                            pending_addresses.remove(&address);
+                        }
                     }
                 }
 
