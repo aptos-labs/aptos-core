@@ -1227,7 +1227,10 @@ async fn test_owner_create_and_delegate_flow() {
             genesis_config.epoch_duration_secs = 5;
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
-            genesis_config.min_stake = 500000
+            genesis_config.min_stake = 500000;
+            let mut features = default_features_resource_for_genesis();
+            features.disable(FeatureFlag::RECONFIGURE_WITH_DKG);
+            genesis_config.initial_features_override = Some(features);
         }))
         .build_with_cli(0)
         .await;
