@@ -589,7 +589,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
     ) -> (
         UnboundedSender<OrderedBlocks>,
-        UnboundedSender<ResetRequest>,
+        Option<UnboundedSender<ResetRequest>>,
         UnboundedSender<ResetRequest>,
     ) {
         let network_sender = NetworkSender::new(
@@ -603,7 +603,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // reset channel between epoch_manager and buffer_manager
         let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
-        let (ordered_block_tx, ordered_block_rx) = if let Some(rand_config) = rand_config {
+        let ((ordered_block_tx, ordered_block_rx), maybe_reset_rand_manager_tx) = if let Some(rand_config) = rand_config {
             // channel for sending ordered blocks to rand_manager
             let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
             // channel for sending rand ready blocks to buffer_manager
@@ -636,9 +636,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.bounded_executor.clone(),
             ));
 
-            (ordered_block_tx, rand_ready_block_rx)
+            ((ordered_block_tx, rand_ready_block_rx), Some(reset_rand_manager_tx))
         } else {
-            unbounded()
+            (unbounded(), None)
         };
 
         let (commit_msg_tx, commit_msg_rx) =
@@ -678,7 +678,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         (
             ordered_block_tx,
-            reset_rand_manager_tx,
+            maybe_reset_rand_manager_tx,
             reset_buffer_manager_tx,
         )
     }
@@ -868,12 +868,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
     ) -> Arc<dyn StateComputer> {
         if onchain_consensus_config.decoupled_execution() {
-            let (block_tx, reset_rand_manager_tx, reset_buffer_manager_tx) =
+            let (block_tx, maybe_reset_rand_manager_tx, reset_buffer_manager_tx) =
                 self.spawn_decoupled_execution(commit_signer_provider, epoch_state, rand_config);
             Arc::new(OrderingStateComputer::new(
                 block_tx,
                 self.commit_state_computer.clone(),
-                reset_rand_manager_tx,
+                maybe_reset_rand_manager_tx,
                 reset_buffer_manager_tx,
             ))
         } else {

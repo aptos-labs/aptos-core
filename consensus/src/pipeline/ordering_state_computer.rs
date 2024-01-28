@@ -40,7 +40,7 @@ pub struct OrderingStateComputer {
     // the real execution phase (will be handled in ExecutionPhase).
     executor_channel: UnboundedSender<OrderedBlocks>,
     state_computer_for_sync: Arc<dyn StateComputer>,
-    reset_rand_manager_channel_tx: UnboundedSender<ResetRequest>,
+    maybe_reset_rand_manager_channel_tx: Option<UnboundedSender<ResetRequest>>,
     reset_buffer_manager_channel_tx: UnboundedSender<ResetRequest>,
 }
 
@@ -48,13 +48,13 @@ impl OrderingStateComputer {
     pub fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         state_computer_for_sync: Arc<dyn StateComputer>,
-        reset_rand_manager_channel_tx: UnboundedSender<ResetRequest>,
+        maybe_reset_rand_manager_channel_tx: Option<UnboundedSender<ResetRequest>>,
         reset_buffer_manager_channel_tx: UnboundedSender<ResetRequest>,
     ) -> Self {
         Self {
             executor_channel,
             state_computer_for_sync,
-            reset_rand_manager_channel_tx,
+            maybe_reset_rand_manager_channel_tx,
             reset_buffer_manager_channel_tx,
         }
     }
@@ -118,16 +118,19 @@ impl StateComputer for OrderingStateComputer {
         });
 
         // reset execution phase and commit phase
-        let (tx, rx) = oneshot::channel::<ResetAck>();
-        self.reset_rand_manager_channel_tx
+        if self.maybe_reset_rand_manager_channel_tx.is_some() {
+            let (tx, rx) = oneshot::channel::<ResetAck>();
+            self.maybe_reset_rand_manager_channel_tx
             .clone()
+            .unwrap()
             .send(ResetRequest {
                 tx,
                 signal: ResetSignal::TargetRound(target.commit_info().round()),
             })
             .await
-            .map_err(|_| Error::ResetDropped)?;
-        rx.await.map_err(|_| Error::ResetDropped)?;
+            .map_err(|_| Error::RandResetDropped)?;
+            rx.await.map_err(|_| Error::RandResetDropped)?;
+        }
 
         // reset buffer manager
         let (tx, rx) = oneshot::channel::<ResetAck>();
@@ -170,7 +173,7 @@ impl DagStateSyncComputer {
     #[allow(dead_code)]
     pub fn new(
         state_computer_for_sync: Arc<dyn StateComputer>,
-        reset_rand_manager_channel_tx: UnboundedSender<ResetRequest>,
+        maybe_reset_rand_manager_channel_tx: Option<UnboundedSender<ResetRequest>>,
         reset_buffer_manager_channel_tx: UnboundedSender<ResetRequest>,
     ) -> Self {
         // note: this channel is unused
@@ -179,7 +182,7 @@ impl DagStateSyncComputer {
             ordering_state_computer: OrderingStateComputer {
                 executor_channel: sender_tx,
                 state_computer_for_sync,
-                reset_rand_manager_channel_tx,
+                maybe_reset_rand_manager_channel_tx,
                 reset_buffer_manager_channel_tx,
             },
         }

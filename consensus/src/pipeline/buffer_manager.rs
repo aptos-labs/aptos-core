@@ -242,9 +242,10 @@ impl BufferManager {
         } = ordered_blocks;
 
         info!(
-            "Receive ordered block {}, the queue size is {}",
+            "[BufferManager] Receive ordered block {}, the queue size is {}, randomness seed is {:?}",
             ordered_proof.commit_info(),
             self.buffer.len() + 1,
+            ordered_blocks.last().unwrap().randomness(),
         );
 
         let request = self.create_new_request(ExecutionRequest {

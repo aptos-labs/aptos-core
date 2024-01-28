@@ -135,7 +135,7 @@ pub fn prepare_buffer_manager(
     let persisting_proxy = Arc::new(OrderingStateComputer::new(
         result_tx,
         Arc::new(EmptyStateComputer),
-        reset_rand_tx,
+        Some(reset_rand_tx),
         reset_bufmgr_tx,
     ));
 
