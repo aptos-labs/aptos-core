@@ -20,7 +20,7 @@ PACKAGES=(
 # between aptos-node and other binaries
 for PACKAGE in "${PACKAGES[@]}"; do
     # Build and overwrite the aptos-node binary with features if specified
-    if [ -n "$FEATURES" ]; then
+    if [ -n "$FEATURES" ] && [ "$PACKAGE" = "aptos-node" ]; then
         echo "Building aptos-node with features ${FEATURES}"
         cargo build --profile=$PROFILE --features=$FEATURES -p $PACKAGE "$@"
     else 

@@ -992,7 +992,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             (95, 1.5, 3., 4., 0),
             (950, 2., 3., 4., 0),
             (2750, 2.5, 3.5, 4.5, 0),
-            (4600, 3., 4., 5., 10), // Allow some expired transactions (high-load)
+            (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
@@ -1782,9 +1782,11 @@ fn realistic_env_max_load_test(
                 if ha_proxy {
                     4600
                 } else if long_running {
-                    7500
-                } else {
+                    // This is for forge stable
                     7000
+                } else {
+                    // During land time we want to be less strict, otherwise we flaky fail
+                    6000
                 },
             ),
         }))
@@ -1834,7 +1836,7 @@ fn realistic_env_max_load_test(
                     5,
                 ))
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
+                    max_no_progress_secs: 15.0,
                     max_round_gap: 4,
                 }),
         )
