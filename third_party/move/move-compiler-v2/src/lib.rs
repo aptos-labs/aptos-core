@@ -182,6 +182,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
+    pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
         pipeline.add_processor(Box::new(VisibilityChecker()));
@@ -190,7 +191,6 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
         with_copy_inference: true,
     }));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-    pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
     if safety_on {
