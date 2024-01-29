@@ -178,6 +178,13 @@ struct DiscoveredPeerSet {
 }
 
 impl DiscoveredPeerSet {
+    #[cfg(test)]
+    /// Creates a new discovered peer set from the
+    /// specified peer set. This is used for testing.
+    pub fn new_from_peer_set(peer_set: HashMap<PeerId, DiscoveredPeer>) -> Self {
+        Self { peer_set }
+    }
+
     /// Gets the eligible peers from the discovered peer set
     fn get_eligible_peers(&self) -> PeerSet {
         self.peer_set
