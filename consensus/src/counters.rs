@@ -894,3 +894,11 @@ pub static EPOCH_PROOF_WRONG_EPOCH: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_rand_queue_size",
+        "Number of randomness-pending blocks."
+    )
+    .unwrap()
+});

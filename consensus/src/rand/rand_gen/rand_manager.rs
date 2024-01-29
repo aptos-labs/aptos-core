@@ -21,7 +21,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info, spawn_named, warn};
+use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -41,6 +41,7 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use crate::counters::RAND_QUEUE_SIZE;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -113,9 +114,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
-        debug!(
-            "[RandManager] process_incoming_blocks: BEGIN: rounds={:?}",
-            rounds
+        info!(
+            rounds = rounds,
+            "Processing incoming blocks."
         );
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
@@ -148,9 +149,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .iter()
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
-        debug!(
-            "[RandManager] process_ready_blocks: BEGIN: rounds={:?}",
-            rounds
+        info!(
+            rounds = rounds,
+            "Processing rand-ready blocks."
         );
 
         for blocks in ready_blocks {
@@ -171,9 +172,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     }
 
     fn process_randomness(&mut self, randomness: Randomness) {
-        debug!(
-            "[RandManager] process_randomness: BEGIN: info={:?}",
-            &randomness.metadata().metadata_to_sign
+        info!(
+            metadata = randomness.metadata().metadata_to_sign,
+            "Processing decisioned randomness."
         );
         if let Some(block) = self.block_queue.item_mut(randomness.round()) {
             block.set_randomness(randomness.round(), randomness);
@@ -401,7 +402,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     }
                 }
                 _ = interval.tick().fuse() => {
-                    self.log_queue_summary();
+                    self.observe_queue();
                 },
 
             }
@@ -413,16 +414,15 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         info!("RandManager stopped");
     }
 
-    pub fn log_queue_summary(&self) {
+    pub fn observe_queue(&self) {
         let queue = &self.block_queue.queue;
-        let min_round = queue.keys().min().copied();
-        let max_round = queue.keys().max().copied();
+        RAND_QUEUE_SIZE.set(queue.len() as i64);
         info!(
-            "block_queue_summary, epoch={}, size={}, min_round={:?}, max_round={:?}",
-            self.epoch_state.epoch,
-            queue.len(),
-            min_round,
-            max_round
+            epoch = self.epoch_state.epoch,
+            queue_size = queue.len(),
+            min_round = queue.keys().min().copied(),
+            max_round = queue.keys().max().copied(),
+            "Rand queue summary.",
         );
     }
 }
