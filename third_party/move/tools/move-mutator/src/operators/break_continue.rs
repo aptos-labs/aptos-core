@@ -93,7 +93,7 @@ mod tests {
             ty: Type {
                 value: Type_::Anything,
                 loc,
-            }
+            },
         };
         let operator = BreakContinue::new(exp);
         let source = "break";
@@ -116,7 +116,7 @@ mod tests {
             ty: Type {
                 value: Type_::Anything,
                 loc,
-            }
+            },
         };
         let operator = BreakContinue::new(exp);
         let source = "continue";
@@ -139,7 +139,7 @@ mod tests {
             ty: Type {
                 value: Type_::Anything,
                 loc,
-            }
+            },
         };
         let operator = BreakContinue::new(exp);
         assert_eq!(operator.get_file_hash(), FileHash::new(""));

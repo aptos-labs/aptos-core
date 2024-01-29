@@ -137,7 +137,7 @@ mod tests {
             ty: Type {
                 value: Type_::Anything,
                 loc,
-            }
+            },
         };
         let operator = MutationOp::BreakContinue(BreakContinue::new(exp));
         let source = "break";
