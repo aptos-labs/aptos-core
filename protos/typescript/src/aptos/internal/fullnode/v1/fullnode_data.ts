@@ -201,13 +201,13 @@ export const StreamStatus = {
     }
     if (message.startVersion !== undefined && message.startVersion !== BigInt("0")) {
       if (BigInt.asUintN(64, message.startVersion) !== message.startVersion) {
-        throw new Error("value provided for field message.startVersion of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.startVersion of type uint64 too large");
       }
       writer.uint32(16).uint64(message.startVersion.toString());
     }
     if (message.endVersion !== undefined) {
       if (BigInt.asUintN(64, message.endVersion) !== message.endVersion) {
-        throw new Error("value provided for field message.endVersion of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.endVersion of type uint64 too large");
       }
       writer.uint32(24).uint64(message.endVersion.toString());
     }
@@ -325,13 +325,13 @@ export const GetTransactionsFromNodeRequest = {
   encode(message: GetTransactionsFromNodeRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.startingVersion !== undefined) {
       if (BigInt.asUintN(64, message.startingVersion) !== message.startingVersion) {
-        throw new Error("value provided for field message.startingVersion of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.startingVersion of type uint64 too large");
       }
       writer.uint32(8).uint64(message.startingVersion.toString());
     }
     if (message.transactionsCount !== undefined) {
       if (BigInt.asUintN(64, message.transactionsCount) !== message.transactionsCount) {
-        throw new Error("value provided for field message.transactionsCount of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.transactionsCount of type uint64 too large");
       }
       writer.uint32(16).uint64(message.transactionsCount.toString());
     }

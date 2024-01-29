@@ -2011,3 +2011,14 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
 }
+
+pub struct ViewFunctionOutput {
+    pub values: Result<Vec<Vec<u8>>>,
+    pub gas_used: u64,
+}
+
+impl ViewFunctionOutput {
+    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
+        Self { values, gas_used }
+    }
+}

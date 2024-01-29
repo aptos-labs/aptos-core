@@ -6,7 +6,7 @@ use crate::{
     accept_type::AcceptType,
     accounts::Account,
     bcs_payload::Bcs,
-    context::{api_spawn_blocking, Context},
+    context::{api_spawn_blocking, Context, FunctionStats},
     failpoint::fail_point_poem,
     generate_error_response, generate_success_response, metrics,
     page::Page,
@@ -1234,6 +1234,34 @@ impl TransactionsApi {
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
+        let stats_key = match txn.payload() {
+            TransactionPayload::Script(_) => {
+                format!("Script::{}", txn.clone().committed_hash()).to_string()
+            },
+            TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+            TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
+                entry_function.module(),
+                &entry_function.function().into(),
+            ),
+            TransactionPayload::Multisig(multisig) => {
+                if let Some(payload) = &multisig.transaction_payload {
+                    match payload {
+                        MultisigTransactionPayload::EntryFunction(entry_function) => {
+                            FunctionStats::function_to_key(
+                                entry_function.module(),
+                                &entry_function.function().into(),
+                            )
+                        },
+                    }
+                } else {
+                    "Multisig::unknown".to_string()
+                }
+            },
+        };
+        self.context
+            .simulate_txn_stats()
+            .increment(stats_key, output.gas_used());
 
         // Build up a transaction from the outputs
         // All state hashes are invalid, and will be filled with 0s

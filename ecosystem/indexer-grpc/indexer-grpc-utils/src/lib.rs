@@ -17,6 +17,7 @@ use aptos_protos::{
 };
 use prost::Message;
 use std::time::Duration;
+use tonic::codec::CompressionEncoding;
 use url::Url;
 
 pub type GrpcClientType = FullnodeDataClient<tonic::transport::Channel>;
@@ -38,7 +39,9 @@ pub async fn create_grpc_client(address: Url) -> GrpcClientType {
                 );
                 Ok(client
                     .max_decoding_message_size(usize::MAX)
-                    .max_encoding_message_size(usize::MAX))
+                    .max_encoding_message_size(usize::MAX)
+                    .send_compressed(CompressionEncoding::Gzip)
+                    .accept_compressed(CompressionEncoding::Gzip))
             },
             Err(e) => {
                 tracing::error!(
