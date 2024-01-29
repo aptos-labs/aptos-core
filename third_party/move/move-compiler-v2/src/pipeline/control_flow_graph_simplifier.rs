@@ -53,6 +53,7 @@ use std::collections::BTreeMap;
 pub struct ControlFlowGraphSimplifier {}
 
 impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
+    /// Does the first four transformations described in the module doc
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
@@ -73,6 +74,7 @@ impl FunctionTargetProcessor for ControlFlowGraphSimplifier {
     }
 }
 
+/// State of the transformation
 struct ControlFlowGraphSimplifierTransformation {
     data: FunctionData,
     cfg_code_generator: ControlFlowGraphCodeGenerator,
@@ -118,6 +120,7 @@ impl ControlFlowGraphSimplifierTransformation {
     }
 }
 
+/// Control flow graph based code transformation
 #[derive(Default)]
 struct ControlFlowGraphCodeGenerator {
     /// The control flow graph.
@@ -391,6 +394,7 @@ impl RemoveEmptyBlock {
     }
 }
 
+/// Transformation state
 struct RemoveRedundantJump(pub ControlFlowGraphCodeGenerator);
 
 impl RemoveRedundantJump {
