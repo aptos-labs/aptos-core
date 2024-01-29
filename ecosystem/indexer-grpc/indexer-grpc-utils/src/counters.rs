@@ -196,7 +196,7 @@ pub fn log_grpc_step(
     duration_in_secs: Option<f64>,
     size_in_bytes: Option<usize>,
     num_transactions: Option<i64>,
-    request_metadata: Option<IndexerGrpcRequestMetadata>,
+    request_metadata: Option<&IndexerGrpcRequestMetadata>,
 ) {
     if let Some(duration_in_secs) = duration_in_secs {
         DURATION_IN_SECS
