@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Simplifies the control flow graph by
+//! Simplifies the control flow graph in the following ways:
 //! (Implemented by `ControlFlowGraphSimplifier`)
-//! - eliminating branch/jump to jump
+//! - eliminates branch/jump to jump
 //!     L1: goto L2 (L1 != L2)
 //!     =>
 //!     (removed)
@@ -288,7 +288,18 @@ impl RemoveEmptyBlock {
         Self(generator)
     }
 
-    /// Eliminating branch/jump to jump
+    /// - Eliminates branch/jump to jump
+    ///     L1: goto L2 (L1 != L2)
+    ///     =>
+    ///     (removed)
+    ///
+    ///     goto L1
+    ///     =>
+    ///     goto L2
+    ///
+    ///     if ... goto L1 else ... / if ... goto ... else L1
+    ///     =>
+    ///     if ... goto L2 else ... / if ... goto ... else L2
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             if self.is_empty_block(block) {
@@ -379,7 +390,15 @@ impl RemoveRedundantJump {
         Self(cfg_generator)
     }
 
-    /// Removes edges where the source has only one successors and the target has only one predecessors
+    /// Removes edges where the source has only one successor and the target has only one predecessor
+    ///     BB1: xx
+    ///          goto L2
+    ///     // BB1 BB2 don't have to be consecutive
+    ///     BB2: L2 (no other goto L2)
+    ///          yy
+    ///     =>
+    ///     BB1: xx
+    ///          yy
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             // the later condition says that `block` is unreachable or has been removed
