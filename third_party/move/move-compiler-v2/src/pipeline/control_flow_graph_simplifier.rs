@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Prerequisites: none.
+//!
 //! Simplifies the control flow graph in the following ways:
 //! (Implemented by `ControlFlowGraphSimplifier`)
 //! - eliminates branch/jump to jump
@@ -36,6 +38,8 @@
 //! (Implemented by `UnreachableCodeElimination`)
 //! - removes unreachable codes
 //! (TODO: eliminate jump to branch)
+//!
+//! Side effects: remove all annotations.
 
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
