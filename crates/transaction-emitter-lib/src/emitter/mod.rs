@@ -124,6 +124,7 @@ pub struct EmitJobRequest {
 
     max_gas_per_txn: u64,
     gas_price: u64,
+    init_max_gas_per_txn: u64,
     init_gas_price_multiplier: u64,
 
     mint_to_root: bool,
@@ -157,6 +158,7 @@ impl Default for EmitJobRequest {
             transaction_mix_per_phase: vec![vec![(TransactionType::default(), 1)]],
             max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
+            init_max_gas_per_txn: aptos_global_constants::MAX_GAS_AMOUNT,
             init_gas_price_multiplier: 10,
             mint_to_root: false,
             txn_expiration_time_secs: 60,
@@ -191,6 +193,11 @@ impl EmitJobRequest {
 
     pub fn max_gas_per_txn(mut self, max_gas_per_txn: u64) -> Self {
         self.max_gas_per_txn = max_gas_per_txn;
+        self
+    }
+
+    pub fn init_max_gas_per_txn(mut self, init_max_gas_per_txn: u64) -> Self {
+        self.init_max_gas_per_txn = init_max_gas_per_txn;
         self
     }
 
@@ -534,7 +541,12 @@ impl EmitJob {
                     .map(|p| &p[cur_phase])
                     .unwrap_or(&default_stats);
             prev_stats = Some(stats);
-            info!("phase {}: {}", cur_phase, delta.rate());
+            info!(
+                "[{:?}s stat] phase {}: {}",
+                window.as_secs(),
+                cur_phase,
+                delta.rate()
+            );
         }
     }
 
@@ -594,6 +606,7 @@ impl TxnEmitter {
             (mode_params.txn_expiration_time_secs as f64 * req.init_expiration_multiplier) as u64;
         let init_txn_factory = txn_factory
             .clone()
+            .with_max_gas_amount(req.init_max_gas_per_txn)
             .with_gas_unit_price(req.gas_price * req.init_gas_price_multiplier)
             .with_transaction_expiration_time(init_expiration_time);
         let init_retries: usize =

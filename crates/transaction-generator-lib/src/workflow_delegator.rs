@@ -15,10 +15,10 @@ use aptos_sdk::{
 use std::{
     cmp,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 #[derive(Clone)]
@@ -26,14 +26,36 @@ enum StageTracking {
     // stage is externally modified
     ExternallySet(Arc<AtomicUsize>),
     // we move to a next stage when all accounts have finished with the current stage
-    WhenDone(Arc<AtomicUsize>),
+    WhenDone {
+        stage_counter: Arc<AtomicUsize>,
+        stage_start_time: Arc<AtomicU64>,
+        delay_between_stages: Duration,
+    },
 }
 
 impl StageTracking {
-    fn load_current_stage(&self) -> usize {
+    fn current_timestamp() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+    }
+
+    fn load_current_stage(&self) -> Option<usize> {
         match self {
-            StageTracking::ExternallySet(stage) | StageTracking::WhenDone(stage) => {
-                stage.load(Ordering::Relaxed)
+            StageTracking::ExternallySet(stage_counter) => {
+                Some(stage_counter.load(Ordering::Relaxed))
+            },
+            StageTracking::WhenDone {
+                stage_counter,
+                stage_start_time,
+                ..
+            } => {
+                if stage_start_time.load(Ordering::Relaxed) > Self::current_timestamp() {
+                    None
+                } else {
+                    Some(stage_counter.load(Ordering::Relaxed))
+                }
             },
         }
     }
@@ -94,7 +116,16 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
-        let mut stage = self.stage.load_current_stage();
+        let stage = match self.stage.load_current_stage() {
+            Some(stage) => stage,
+            None => {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(2)),
+                    info!("Waiting for delay before next stage");
+                );
+                return Vec::new();
+            },
+        };
 
         if stage == 0 {
             // We can treat completed_for_first_stage as a stream of indices [0, +inf),
@@ -110,29 +141,41 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         // acts as coordinator, as it will generate as many transactions as number of accounts it could grab from the pool.
 
         match &self.stage {
-            StageTracking::WhenDone(stage_counter) => {
+            StageTracking::WhenDone {
+                stage_counter,
+                stage_start_time,
+                delay_between_stages,
+            } => {
                 if stage == 0 {
                     if num_to_create == 0 {
                         info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.first().unwrap().len());
+                        stage_start_time.store(
+                            StageTracking::current_timestamp() + delay_between_stages.as_secs(),
+                            Ordering::Relaxed,
+                        );
                         let _ = stage_counter.compare_exchange(
                             0,
                             1,
                             Ordering::Relaxed,
                             Ordering::Relaxed,
                         );
-                        stage = 1;
+                        return Vec::new();
                     }
                 } else if stage < self.pool_per_stage.len()
                     && self.pool_per_stage.get(stage - 1).unwrap().len() == 0
                 {
                     info!("TransactionGenerator Workflow: Stage {} has consumed all accounts, moving to stage {}", stage, stage + 1);
+                    stage_start_time.store(
+                        StageTracking::current_timestamp() + delay_between_stages.as_secs(),
+                        Ordering::Relaxed,
+                    );
                     let _ = stage_counter.compare_exchange(
                         stage,
                         stage + 1,
                         Ordering::Relaxed,
                         Ordering::Relaxed,
                     );
-                    stage += 1;
+                    return Vec::new();
                 }
             },
             StageTracking::ExternallySet(_) => {
@@ -192,14 +235,18 @@ impl WorkflowTxnGeneratorCreator {
         cur_phase: Option<Arc<AtomicUsize>>,
     ) -> Self {
         let stage_tracking = cur_phase.map_or_else(
-            || StageTracking::WhenDone(Arc::new(AtomicUsize::new(0))),
+            || StageTracking::WhenDone {
+                stage_counter: Arc::new(AtomicUsize::new(0)),
+                stage_start_time: Arc::new(AtomicU64::new(0)),
+                delay_between_stages: Duration::from_secs(15),
+            },
             StageTracking::ExternallySet,
         );
         println!(
             "Creating workload with stage tracking: {:?}",
             match &stage_tracking {
                 StageTracking::ExternallySet(_) => "ExternallySet",
-                StageTracking::WhenDone(_) => "WhenDone",
+                StageTracking::WhenDone { .. } => "WhenDone",
             }
         );
         match workflow_kind {
