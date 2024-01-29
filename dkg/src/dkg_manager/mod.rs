@@ -22,6 +22,7 @@ use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
+use fail::fail_point;
 
 #[derive(Clone, Debug)]
 enum InnerState {
@@ -351,6 +352,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
     async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
         self.log_info("Processing DKGStart event.");
+        fail_point!("dkg::process_dkg_start_event");
         let DKGStartEvent {
             session_metadata,
             start_time_us,

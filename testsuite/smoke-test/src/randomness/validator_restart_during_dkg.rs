@@ -13,14 +13,14 @@ use aptos_types::dkg::DKGState;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
-#[ignore]
 #[tokio::test]
 async fn validator_restart_during_dkg() {
     let epoch_duration_secs = 30;
     let estimated_dkg_latency_secs = 30;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
-
-    let mut swarm = SwarmBuilder::new_local(4)
+    let num_validators = 4;
+    let num_validators_to_restart = 3;
+    let mut swarm = SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_config(Arc::new(|_, conf, _| {
@@ -52,9 +52,10 @@ async fn validator_restart_during_dkg() {
     info!("Inject fault to all validators so they get stuck upon the first DKG message received.");
     let tasks = validator_clients
         .iter()
+        .take(num_validators_to_restart)
         .map(|client| {
             client.set_failpoint(
-                "dkg::process_start_dkg_event".to_string(),
+                "dkg::process_dkg_start_event".to_string(),
                 "panic".to_string(),
             )
         })
@@ -63,7 +64,11 @@ async fn validator_restart_during_dkg() {
     debug!("aptos_results={:?}", aptos_results);
 
     info!("Restart nodes after they panic.");
-    for (node_idx, node) in swarm.validators_mut().enumerate() {
+    for (node_idx, node) in swarm
+        .validators_mut()
+        .enumerate()
+        .take(num_validators_to_restart)
+    {
         while node.health_check().await.is_ok() {
             tokio::time::sleep(Duration::from_secs(1)).await;
         }
@@ -74,7 +79,7 @@ async fn validator_restart_during_dkg() {
 
     info!(
         "DKG should be able to continue. Wait until we fully entered epoch {}.",
-        dkg_session_1.metadata.dealer_epoch + 2
+        dkg_session_1.target_epoch() + 1
     );
 
     swarm
