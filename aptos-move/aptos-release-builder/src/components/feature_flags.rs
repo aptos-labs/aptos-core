@@ -98,6 +98,7 @@ pub enum FeatureFlag {
     ReconfigureWithDKG,
     ZkIdSignature,
     OpenIdSignature,
+    RemoveDetailedError,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -254,6 +255,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
             FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURE,
             FeatureFlag::OpenIdSignature => AptosFeatureFlag::OPEN_ID_SIGNATURE,
+            FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
         }
     }
 }
@@ -333,6 +335,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
             AptosFeatureFlag::ZK_ID_SIGNATURE => FeatureFlag::ZkIdSignature,
             AptosFeatureFlag::OPEN_ID_SIGNATURE => FeatureFlag::OpenIdSignature,
+            AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
         }
     }
 }
