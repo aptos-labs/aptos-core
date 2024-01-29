@@ -23,10 +23,10 @@ use crate::{
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
-        ChangeSet, ExecutionStatus, Module, RawTransaction, Script, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
-        Version, WriteSetPayload,
+        ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
+        SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionPayload,
+        TransactionStatus, TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -811,6 +811,7 @@ impl TransactionToCommitGen {
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
             false, /* event_gen never generates reconfig events */
+            TransactionAuxiliaryData::default(),
         )
     }
 
@@ -1165,6 +1166,7 @@ impl BlockGen {
             WriteSet::default(),
             Vec::new(),
             false,
+            TransactionAuxiliaryData::default(),
         ));
 
         // materialize ledger info

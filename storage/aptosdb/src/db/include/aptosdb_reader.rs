@@ -250,6 +250,7 @@ impl DbReader for AptosDB {
                         events,
                         txn_info.gas_used(),
                         txn_info.status().clone().into(),
+                        TransactionAuxiliaryData::default(), //TODO(bowu): add read from auxiliary db
                     );
                     Ok((txn_info, (txn, txn_output)))
                 })
