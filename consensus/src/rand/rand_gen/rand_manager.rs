@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters::RAND_QUEUE_SIZE,
     logging::{LogEvent, LogSchema},
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
@@ -41,7 +42,6 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use crate::counters::RAND_QUEUE_SIZE;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -114,10 +114,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
-        info!(
-            rounds = rounds,
-            "Processing incoming blocks."
-        );
+        info!(rounds = rounds, "Processing incoming blocks.");
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -149,10 +146,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .iter()
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
-        info!(
-            rounds = rounds,
-            "Processing rand-ready blocks."
-        );
+        info!(rounds = rounds, "Processing rand-ready blocks.");
 
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.unbounded_send(blocks);
