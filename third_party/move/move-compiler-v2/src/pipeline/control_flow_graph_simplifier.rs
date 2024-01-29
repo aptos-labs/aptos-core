@@ -506,27 +506,3 @@ fn subst_label(label: &mut Label, from: Label, to: Label) {
         *label = to;
     }
 }
-
-/// Removes unreachable codes by only generates code blocks reachable from the entry block
-pub struct UnreachableCodeElimination {}
-
-impl FunctionTargetProcessor for UnreachableCodeElimination {
-    fn process(
-        &self,
-        _targets: &mut FunctionTargetsHolder,
-        fun_env: &FunctionEnv,
-        mut data: FunctionData,
-        _scc_opt: Option<&[FunctionEnv]>,
-    ) -> FunctionData {
-        if fun_env.is_native() {
-            return data;
-        }
-        let generator = ControlFlowGraphCodeGenerator::new(&data.code);
-        data.code = generator.gen_code(false);
-        data
-    }
-
-    fn name(&self) -> String {
-        "UnreachableCodeElimination".to_owned()
-    }
-}
