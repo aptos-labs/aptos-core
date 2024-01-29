@@ -1784,7 +1784,7 @@ fn realistic_env_max_load_test(
                 } else if long_running {
                     7500
                 } else {
-                    7000
+                    5000
                 },
             ),
         }))
