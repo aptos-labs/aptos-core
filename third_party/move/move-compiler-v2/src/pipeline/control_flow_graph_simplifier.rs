@@ -192,10 +192,7 @@ impl ControlFlowGraphCodeGenerator {
     /// i.e., the block is followed by the next in the original code
     fn falls_to_next_block(codes: &[Bytecode]) -> bool {
         let last_instr = codes.last().expect("last instr");
-        !matches!(
-            last_instr,
-            Bytecode::Jump(..) | Bytecode::Branch(..) | Bytecode::Ret(..) | Bytecode::Abort(..)
-        )
+        !last_instr.is_branch()
     }
 
     /// Gets the only successor of `block`; panics if this is not the case.
