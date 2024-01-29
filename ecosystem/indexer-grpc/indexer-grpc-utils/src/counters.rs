@@ -141,7 +141,7 @@ pub static LATEST_PROCESSED_VERSION: Lazy<IntGaugeVec> = Lazy::new(|| {
         "Latest processed transaction version",
         &["service_type", "step", "message"],
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Transactions' total size in bytes at each step
@@ -151,7 +151,7 @@ pub static TOTAL_SIZE_IN_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
         "Total size in bytes at this step",
         &["service_type", "step", "message"],
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Number of transactions at each step
@@ -161,7 +161,7 @@ pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "Total count of transactions at this step",
         &["service_type", "step", "message"],
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Generic duration metric
@@ -171,7 +171,7 @@ pub static DURATION_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
         "step",
         "message"
     ])
-        .unwrap()
+    .unwrap()
 });
 
 /// Transaction timestamp in unixtime
@@ -181,7 +181,7 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
         "Transaction timestamp in unixtime",
         &["service_type", "step", "message"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn log_grpc_step(
