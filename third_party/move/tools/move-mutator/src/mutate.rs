@@ -1,8 +1,12 @@
 use crate::cli;
 use crate::configuration::{Configuration, IncludeFunctions};
 use move_compiler::diagnostics::FilesSourceText;
+use move_compiler::parser::ast::{ConstantName, FunctionName, ModuleName};
+use move_compiler::shared::unique_map::UniqueMap;
 use move_compiler::typing::ast;
-use move_compiler::typing::ast::{Exp, ExpListItem, FunctionBody_, SequenceItem_};
+use move_compiler::typing::ast::{
+    Constant, Exp, ExpListItem, Function, FunctionBody_, ModuleDefinition, SequenceItem_,
+};
 use move_compiler::{expansion, parser};
 use std::path::Path;
 
@@ -31,7 +35,8 @@ pub fn mutate(
         ast.scripts
             .into_iter()
             .map(|script| {
-                traverse_function((script.1.function_name, script.1.function), conf, files)
+                let (_, script) = script;
+                traverse_function((script.function_name, script.function), conf, files)
             })
             .collect::<Result<Vec<_>, _>>()?
             .concat(),
@@ -50,14 +55,41 @@ fn traverse_module_with_check(
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
+    let module_name = extract_module_name(&module);
     if let cli::ModuleFilter::Selected(mods) = &conf.project.mutate_modules {
-        if !mods.contains(&module.0.value.module.to_string()) {
-            trace!("Skipping module {}", &module.0.value.module.to_string());
+        if !mods.contains(&module_name.to_string()) {
+            trace!("Skipping module {}", module_name.to_string());
             return Ok(vec![]);
         }
     }
 
     traverse_module(module, conf, files)
+}
+
+/// Internal helper function that returns a reference to the functions defined in the module.
+fn functions_of(
+    module: &(expansion::ast::ModuleIdent, ast::ModuleDefinition),
+) -> &UniqueMap<FunctionName, Function> {
+    let (_, module) = module;
+    let ModuleDefinition { functions, .. } = module;
+    return functions;
+}
+
+/// Internal helper function that returns a reference to the constants defined in the module.
+fn constants_of(
+    module: &(expansion::ast::ModuleIdent, ast::ModuleDefinition),
+) -> &UniqueMap<ConstantName, Constant> {
+    let (_, module) = module;
+    let ModuleDefinition { constants, .. } = module;
+    return constants;
+}
+
+/// Extracts the module name from the module declaration.
+fn extract_module_name(
+    module: &(expansion::ast::ModuleIdent, ast::ModuleDefinition),
+) -> ModuleName {
+    let (module_ident, _) = module;
+    module_ident.value.module
 }
 
 /// Traverses a single module and returns a list of mutants.
@@ -67,21 +99,23 @@ fn traverse_module(
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
-    trace!("Traversing module {}", module.0.value.module.to_string());
-    let mut mutants = module
-        .1
-        .functions
+    let module_name = extract_module_name(&module);
+    trace!("Traversing module {}", &module_name.to_string());
+    let mut mutants = functions_of(&module)
+        .to_owned()
         .into_iter()
         .map(|func| traverse_function(func, conf, files))
         .collect::<Result<Vec<_>, _>>()?
         .concat();
 
     mutants.extend(
-        module
-            .1
-            .constants
+        constants_of(&module)
+            .to_owned()
             .into_iter()
-            .map(|constant| parse_expression_and_find_mutants(constant.1.value))
+            .map(|constant| {
+                let (_, constant) = constant;
+                parse_expression_and_find_mutants(constant.value)
+            })
             .collect::<Result<Vec<_>, _>>()?
             .concat(),
     );
@@ -89,14 +123,21 @@ fn traverse_module(
     // Set the module name for all the mutants.
     mutants
         .iter_mut()
-        .for_each(|m| m.set_module_name(module.0.value.module.clone()));
+        .for_each(|m| m.set_module_name(module_name.clone()));
 
     trace!(
         "Found {} possible mutations in module {}",
         mutants.len(),
-        module.0.value.module.clone()
+        module_name
     );
     Ok(mutants)
+}
+
+/// Extracts the function name from the function declaration.
+fn extract_function_name(function: &(FunctionName, Function)) -> String {
+    let (function_name, _) = function;
+    let FunctionName(name) = function_name;
+    name.to_string()
 }
 
 /// Traverses a single function and returns a list of mutants.
@@ -106,20 +147,22 @@ fn traverse_function(
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
-    let (filename, _) = files.get(&function.1.body.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
+    let function_name = extract_function_name(&function);
+    let (_, function) = function;
+    let (filename, _) = files.get(&function.body.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
 
     // Check if function is included in individual configuration.
     if let Some(ind) = conf.get_file_configuration(Path::new(filename.as_str())) {
         if let IncludeFunctions::Selected(funcs) = &ind.include_functions {
-            if !funcs.contains(&function.0 .0.to_string()) {
-                trace!("Skipping function {}", &function.0 .0.to_string());
+            if !funcs.contains(&function_name) {
+                trace!("Skipping function {}", &function_name);
                 return Ok(vec![]);
             }
         }
     }
 
-    trace!("Traversing function {}", &function.0 .0.to_string());
-    match function.1.body.value {
+    trace!("Traversing function {}", &function_name);
+    match function.body.value {
         FunctionBody_::Defined(elem) => traverse_sequence(elem),
         FunctionBody_::Native => Ok(vec![]),
     }
