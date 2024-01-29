@@ -10,7 +10,6 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::config::IdentityBlob;
 use aptos_consensus_types::common::Author;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
@@ -31,6 +30,7 @@ use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_validator_transaction_pool::VTxnPoolState;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
@@ -39,7 +39,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     epoch_state: Option<Arc<EpochState>>,
 
     // credential
-    identity_blob: Arc<IdentityBlob>,
+    consensus_key: Arc<PrivateKey>,
 
     // events we subscribe
     reconfig_events: ReconfigNotificationListener<P>,
@@ -61,7 +61,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 impl<P: OnChainConfigProvider> EpochManager<P> {
     pub fn new(
         my_addr: AccountAddress,
-        identity_blob: Arc<IdentityBlob>,
+        consensus_key: PrivateKey,
         reconfig_events: ReconfigNotificationListener<P>,
         jwk_updated_events: EventNotificationListener,
         self_sender: aptos_channels::Sender<Event<JWKConsensusMsg>>,
@@ -70,7 +70,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Self {
         Self {
             my_addr,
-            identity_blob,
+            consensus_key: Arc::new(consensus_key),
             epoch_state: None,
             reconfig_events,
             jwk_updated_events,
@@ -177,7 +177,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let qc_update_producer = RealCertifiedUpdateProducer::new(rb);
 
             let jwk_consensus_manager = JWKManager::new(
-                self.identity_blob.clone(),
+                self.consensus_key.clone(),
                 self.my_addr,
                 epoch_state.clone(),
                 Arc::new(qc_update_producer),

@@ -43,6 +43,7 @@ use std::{
     thread,
 };
 use tokio::runtime::Runtime;
+use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
@@ -657,17 +658,16 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
-    let vtxn_pool = VTxnPoolState::default();
-    let maybe_dkg_dealer_sk = node_config
-        .consensus
-        .safety_rules
-        .initial_safety_rules_config
-        .identity_blob()
-        .ok()
-        .and_then(|blob| blob.try_into_dkg_dealer_private_key());
 
+    // Ensure consensus key in secure DB.
+    aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
+
+    let vtxn_pool = VTxnPoolState::default();
+    let maybe_dkg_dealer_sk = load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules)
+        .and_then(|consensus_key| consensus_key.try_into().map_err(|e|anyhow!("consensus key to dkg dealer key conversion failed: {e}")));
+    debug!("maybe_dkg_dealer_sk={:?}", maybe_dkg_dealer_sk);
     let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
-        (Some(interfaces), Some(dkg_dealer_sk)) => {
+        (Some(interfaces), Ok(dkg_dealer_sk)) => {
             let ApplicationNetworkInterfaces {
                 network_client,
                 network_service_events,
@@ -689,8 +689,11 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, identity_blob.clone()) {
-        (Some(interfaces), Some(identity_blob)) => {
+    let maybe_jwk_consensus_key = load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
+    debug!("maybe_jwk_consensus_key={:?}", maybe_jwk_consensus_key);
+
+    let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, maybe_jwk_consensus_key) {
+        (Some(interfaces), Ok(consensus_key)) => {
             let ApplicationNetworkInterfaces {
                 network_client,
                 network_service_events,
@@ -701,7 +704,7 @@ pub fn setup_environment_and_start_node(
             let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
             let jwk_consensus_runtime = start_jwk_consensus_runtime(
                 my_addr,
-                identity_blob,
+                consensus_key,
                 network_client,
                 network_service_events,
                 reconfig_events,

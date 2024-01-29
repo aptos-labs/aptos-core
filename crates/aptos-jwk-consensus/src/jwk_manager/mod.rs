@@ -27,18 +27,19 @@ use futures_util::{
 };
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::collections::HashSet;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_types::validator_txn::Topic;
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
-pub struct JWKManager<P: SigningKeyProvider> {
+pub struct JWKManager {
     /// Some useful metadata.
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
 
     /// Used to sign JWK observations before sharing them with peers.
-    signing_key_provider: P,
+    consensus_key: Arc<PrivateKey>,
 
     /// The sub-process that collects JWK updates from peers and aggregate them into a quorum-certified JWK update.
     certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
@@ -56,16 +57,16 @@ pub struct JWKManager<P: SigningKeyProvider> {
     jwk_observers: Vec<JWKObserver>,
 }
 
-impl<P: SigningKeyProvider> JWKManager<P> {
+impl JWKManager {
     pub fn new(
-        signing_key_provider: P,
+        consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
         certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
-            signing_key_provider,
+            consensus_key,
             my_addr,
             epoch_state,
             certified_update_producer,
@@ -166,8 +167,7 @@ impl<P: SigningKeyProvider> JWKManager<P> {
                 jwks,
             };
             let signature = self
-                .signing_key_provider
-                .signing_key()?
+                .consensus_key
                 .sign(&observed)
                 .map_err(|e| anyhow!("crypto material error occurred duing signing: {}", e))?;
             let abort_handle = self.certified_update_producer.start_produce(

@@ -3071,6 +3071,7 @@ dependencies = [
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-runtimes",
+ "aptos-safety-rules",
  "aptos-secure-storage",
  "aptos-state-sync-driver",
  "aptos-storage-interface",
@@ -3528,6 +3529,7 @@ dependencies = [
 name = "aptos-safety-rules"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",

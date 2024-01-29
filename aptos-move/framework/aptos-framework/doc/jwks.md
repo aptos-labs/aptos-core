@@ -620,6 +620,51 @@ This is what applications should consume.
 
 
 
+<a id="0x1_jwks_ENATIVE_INCORRECT_VERSION"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_INCORRECT_VERSION">ENATIVE_INCORRECT_VERSION</a>: u64 = 259;
+</code></pre>
+
+
+
+<a id="0x1_jwks_ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS">ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS</a>: u64 = 258;
+</code></pre>
+
+
+
+<a id="0x1_jwks_ENATIVE_MISSING_RESOURCE_VALIDATOR_SET"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_MISSING_RESOURCE_VALIDATOR_SET">ENATIVE_MISSING_RESOURCE_VALIDATOR_SET</a>: u64 = 257;
+</code></pre>
+
+
+
+<a id="0x1_jwks_ENATIVE_MULTISIG_VERIFICATION_FAILED"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_MULTISIG_VERIFICATION_FAILED">ENATIVE_MULTISIG_VERIFICATION_FAILED</a>: u64 = 260;
+</code></pre>
+
+
+
+<a id="0x1_jwks_ENATIVE_NOT_ENOUGH_VOTING_POWER"></a>
+
+
+
+<pre><code><b>const</b> <a href="jwks.md#0x1_jwks_ENATIVE_NOT_ENOUGH_VOTING_POWER">ENATIVE_NOT_ENOUGH_VOTING_POWER</a>: u64 = 261;
+</code></pre>
+
+
+
 <a id="0x1_jwks_EUNEXPECTED_EPOCH"></a>
 
 
