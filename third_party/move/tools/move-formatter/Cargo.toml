@@ -1,0 +1,49 @@
+[package]
+name = "movefmt"
+version = "0.0.1"
+repository = "https://github.com/movebit/movefmt"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+
+[lib]  
+path = "src/lib.rs"  
+  
+[[bin]]  
+name = "movefmt"  
+path = "src/bin/main.rs"  
+
+[dependencies]
+diff = "0.1"
+term = "0.7"
+lazy_static = "1.4.0"
+regex = "1.5.5"
+bisection = "0.1.0"
+anyhow = "1.0.52"
+codespan-reporting = "0.11.1"
+lsp-types = "0.94.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.64"
+url = "2.2.2"
+thiserror = "1.0.40"
+walkdir = "2"
+getopts = "0.2"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+commentfmt = { version = "1.6.0", path = "src/comment_fmt" }
+
+move-command-line-common = { path = "../../move-command-line-common" }
+move-compiler = { path = "../../move-compiler" }
+move-ir-types = { path = "../../move-ir/types" }
+move-package = { path = "../move-package" }
+move-symbol-pool = { path = "../../move-symbol-pool" }
+move-core-types = { path = "../../move-core/types" }
+
+[target.'cfg(not(target_os= "windows"))'.dependencies]
+pprof = { version = "0.11.0" , features = ["flamegraph" , "protobuf"]}
+
+[profile.release]
+debug = true
+
+[features]
+pprof = []

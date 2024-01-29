@@ -134,3 +134,7 @@ test_indexer_grpc/*
 *.dot
 *.bytecode
 !third_party/move/move-prover/tests/xsources/design/*.bytecode
+
+# test output files for movefmt
+third_party/move/tools/move-formatter/tests/formatter/*/*.out
+third_party/move/tools/move-formatter/tests/*/*.out
