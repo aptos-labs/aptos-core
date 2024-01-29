@@ -27,8 +27,9 @@ use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
 };
-use futures::Stream;
+use futures::{future::join_all, Stream};
 use prost::Message;
+use redis::Client;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -41,6 +42,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 use uuid::Uuid;
+
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
@@ -64,6 +66,11 @@ const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-clas
 const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
+
+// Max number of threads to reach out to TXN stores with
+const MAX_FETCH_THREADS_PER_REQUEST: u64 = 5;
+// THe number of transactions we store per txn block; this is used to determine max num of threads
+const TRANSACTIONS_PER_STORAGE_BLOCK: u64 = 1000;
 
 pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
@@ -124,9 +131,9 @@ impl RawData for RawDataServerWrapper {
         };
         CONNECTION_COUNT
             .with_label_values(&[
-                request_metadata.request_api_key_name.as_str(),
-                request_metadata.request_email.as_str(),
-                request_metadata.processor_name.as_str(),
+                &request_metadata.request_api_key_name,
+                &request_metadata.request_email,
+                &request_metadata.processor_name,
             ])
             .inc();
         let request = req.into_inner();
@@ -135,7 +142,7 @@ impl RawData for RawDataServerWrapper {
 
         // Response channel to stream the data to the client.
         let (tx, rx) = channel(self.data_service_response_channel_size);
-        let mut current_version = match &request.starting_version {
+        let current_version = match &request.starting_version {
             Some(version) => *version,
             None => {
                 return Result::Err(Status::aborted("Starting version is not set"));
@@ -143,6 +150,7 @@ impl RawData for RawDataServerWrapper {
         };
 
         let file_store_operator: Box<dyn FileStoreOperator> = self.file_store_config.create();
+        let file_store_operator = Arc::new(file_store_operator);
 
         // Adds tracing context for the request.
         log_grpc_step(
@@ -155,7 +163,7 @@ impl RawData for RawDataServerWrapper {
             None,
             None,
             None,
-            Some(request_metadata.clone()),
+            Some(&request_metadata),
         );
 
         let redis_client = self.redis_client.clone();
@@ -163,236 +171,16 @@ impl RawData for RawDataServerWrapper {
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
-                let mut connection_start_time = Some(std::time::Instant::now());
-                let mut transactions_count = transactions_count;
-
-                // Establish redis connection
-                let conn = match redis_client.get_tokio_connection_manager().await {
-                    Ok(conn) => conn,
-                    Err(e) => {
-                        ERROR_COUNT
-                            .with_label_values(&["redis_connection_failed"])
-                            .inc();
-                        // Connection will be dropped anyway, so we ignore the error here.
-                        let _result = tx
-                            .send_timeout(
-                                Err(Status::unavailable(
-                                    "[Data Service] Cannot connect to Redis; please retry.",
-                                )),
-                                RESPONSE_CHANNEL_SEND_TIMEOUT,
-                            )
-                            .await;
-                        error!(
-                            error = e.to_string(),
-                            "[Data Service] Failed to get redis connection."
-                        );
-                        return;
-                    },
-                };
-                let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
-
-                // Validate chain id
-                let mut metadata = file_store_operator.get_file_store_metadata().await;
-                while metadata.is_none() {
-                    metadata = file_store_operator.get_file_store_metadata().await;
-                    tracing::warn!(
-                        "[File worker] File store metadata not found. Waiting for {} ms.",
-                        FILE_STORE_METADATA_WAIT_MS
-                    );
-                    tokio::time::sleep(std::time::Duration::from_millis(
-                        FILE_STORE_METADATA_WAIT_MS,
-                    ))
-                    .await;
-                }
-
-                let metadata_chain_id = metadata.unwrap().chain_id;
-
-                // Validate redis chain id. Must be present by the time it gets here
-                let chain_id = match cache_operator.get_chain_id().await {
-                    Ok(chain_id) => chain_id.unwrap(),
-                    Err(e) => {
-                        ERROR_COUNT
-                            .with_label_values(&["redis_get_chain_id_failed"])
-                            .inc();
-                        // Connection will be dropped anyway, so we ignore the error here.
-                        let _result = tx
-                                            .send_timeout(
-                                                Err(Status::unavailable(
-                                                    "[Data Service] Cannot get the chain id from redis; please retry.",
-                                                )),
-                                                RESPONSE_CHANNEL_SEND_TIMEOUT,
-                                            )
-                                            .await;
-                        error!(
-                            error = e.to_string(),
-                            "[Data Service] Failed to get chain id from redis."
-                        );
-                        return;
-                    },
-                };
-
-                if metadata_chain_id != chain_id {
-                    let _result = tx
-                        .send_timeout(
-                            Err(Status::unavailable("[Data Service] Chain ID mismatch.")),
-                            RESPONSE_CHANNEL_SEND_TIMEOUT,
-                        )
-                        .await;
-                    error!("[Data Service] Chain ID mismatch.",);
-                    return;
-                }
-
-                // Data service metrics.
-                let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
-                loop {
-                    // 1. Fetch data from cache and file store.
-                    let mut transaction_data = match data_fetch(
-                        current_version,
-                        &mut cache_operator,
-                        file_store_operator.as_ref(),
-                        request_metadata.clone(),
-                        cache_storage_format,
-                    )
-                    .await
-                    {
-                        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
-                        Ok(TransactionsDataStatus::AheadOfCache) => {
-                            ahead_of_cache_data_handling().await;
-                            // Retry after a short sleep.
-                            continue;
-                        },
-                        Err(e) => {
-                            ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
-                            data_fetch_error_handling(e, current_version, chain_id).await;
-                            // Retry after a short sleep.
-                            continue;
-                        },
-                    };
-
-                    // TODO: Unify the truncation logic for start and end.
-                    if let Some(count) = transactions_count {
-                        if count == 0 {
-                            // End the data stream.
-                            // Since the client receives all the data it requested, we don't count it as a short conneciton.
-                            connection_start_time = None;
-                            break;
-                        } else if (count as usize) < transaction_data.len() {
-                            // Trim the data to the requested end version.
-                            transaction_data.truncate(count as usize);
-                            transactions_count = Some(0);
-                        } else {
-                            transactions_count = Some(count - transaction_data.len() as u64);
-                        }
-                    };
-                    // Note: this is the protobuf encoded transaction size.
-                    let bytes_ready_to_transfer = transaction_data
-                        .iter()
-                        .map(|t| t.encoded_len())
-                        .sum::<usize>();
-                    BYTES_READY_TO_TRANSFER_FROM_SERVER
-                        .with_label_values(&[
-                            request_metadata.request_api_key_name.as_str(),
-                            request_metadata.request_email.as_str(),
-                            request_metadata.processor_name.as_str(),
-                        ])
-                        .inc_by(bytes_ready_to_transfer as u64);
-                    // 2. Push the data to the response channel, i.e. stream the data to the client.
-                    let current_batch_size = transaction_data.as_slice().len();
-                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
-                    let resp_items =
-                        get_transactions_responses_builder(transaction_data, chain_id as u32);
-                    let data_latency_in_secs = resp_items
-                        .last()
-                        .unwrap()
-                        .transactions
-                        .last()
-                        .unwrap()
-                        .timestamp
-                        .as_ref()
-                        .map(time_diff_since_pb_timestamp_in_secs);
-
-                    match channel_send_multiple_with_timeout(
-                        resp_items,
-                        tx.clone(),
-                        request_metadata.clone(),
-                    )
-                    .await
-                    {
-                        Ok(_) => {
-                            PROCESSED_BATCH_SIZE
-                                .with_label_values(&[
-                                    request_metadata.request_api_key_name.as_str(),
-                                    request_metadata.request_email.as_str(),
-                                    request_metadata.processor_name.as_str(),
-                                ])
-                                .set(current_batch_size as i64);
-                            // TODO: Reasses whether this metric useful
-                            LATEST_PROCESSED_VERSION_OLD
-                                .with_label_values(&[
-                                    request_metadata.request_api_key_name.as_str(),
-                                    request_metadata.request_email.as_str(),
-                                    request_metadata.processor_name.as_str(),
-                                ])
-                                .set(end_of_batch_version as i64);
-                            PROCESSED_VERSIONS_COUNT
-                                .with_label_values(&[
-                                    request_metadata.request_api_key_name.as_str(),
-                                    request_metadata.request_email.as_str(),
-                                    request_metadata.processor_name.as_str(),
-                                ])
-                                .inc_by(current_batch_size as u64);
-                            if let Some(data_latency_in_secs) = data_latency_in_secs {
-                                PROCESSED_LATENCY_IN_SECS
-                                    .with_label_values(&[
-                                        request_metadata.request_api_key_name.as_str(),
-                                        request_metadata.request_email.as_str(),
-                                        request_metadata.processor_name.as_str(),
-                                    ])
-                                    .set(data_latency_in_secs);
-                                PROCESSED_LATENCY_IN_SECS_ALL
-                                    .with_label_values(&[request_metadata
-                                        .request_user_classification
-                                        .as_str()])
-                                    .observe(data_latency_in_secs);
-                            }
-                        },
-                        Err(SendTimeoutError::Timeout(_)) => {
-                            warn!("[Data Service] Receiver is full; exiting.");
-                            break;
-                        },
-                        Err(SendTimeoutError::Closed(_)) => {
-                            warn!("[Data Service] Receiver is closed; exiting.");
-                            break;
-                        },
-                    }
-                    // 3. Update the current version and record current tps.
-                    tps_calculator.tick_now(current_batch_size as u64);
-                    current_version = end_of_batch_version + 1;
-                }
-                info!(
-                    request_name = request_metadata.processor_name.as_str(),
-                    request_email = request_metadata.request_email.as_str(),
-                    request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                    processor_name = request_metadata.processor_name.as_str(),
-                    connection_id = request_metadata.request_connection_id.as_str(),
-                    request_user_classification =
-                        request_metadata.request_user_classification.as_str(),
-                    request_user_classification =
-                        request_metadata.request_user_classification.as_str(),
-                    service_type = SERVICE_TYPE,
-                    "[Data Service] Client disconnected."
-                );
-                if let Some(start_time) = connection_start_time {
-                    if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
-                        SHORT_CONNECTION_COUNT
-                            .with_label_values(&[
-                                request_metadata.request_api_key_name.as_str(),
-                                request_metadata.request_email.as_str(),
-                                request_metadata.processor_name.as_str(),
-                            ])
-                            .inc();
-                    }
-                }
+                data_fetcher_thread(
+                    redis_client,
+                    file_store_operator,
+                    cache_storage_format,
+                    request_metadata,
+                    transactions_count,
+                    tx,
+                    current_version,
+                )
+                .await;
             }
         });
 
@@ -407,6 +195,355 @@ impl RawData for RawDataServerWrapper {
             .unwrap(),
         );
         Ok(response)
+    }
+}
+
+enum DataFetchSubThreadResult {
+    // This is the first/last txn version returned by this
+    Success(Vec<Transaction>),
+    NoResults,
+}
+
+async fn get_data_with_threads(
+    start_version: u64,
+    transactions_count: Option<u64>,
+    chain_id: u64,
+    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
+    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
+    request_metadata: IndexerGrpcRequestMetadata,
+    cache_storage_format: StorageFormat,
+) -> DataFetchSubThreadResult {
+    // TODO: better logic here for when we're already caught up to head?
+    let num_threads_to_use = match transactions_count {
+        None => MAX_FETCH_THREADS_PER_REQUEST,
+        Some(transactions_count) => {
+            (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK).max(MAX_FETCH_THREADS_PER_REQUEST)
+        },
+    };
+
+    let mut threads = vec![];
+    let mut current_version = start_version;
+
+    for _ in 0..num_threads_to_use {
+        let thread = tokio::spawn({
+            // TODO: arc these instead of cloning
+            let mut cache_operator = cache_operator.clone();
+            let file_store_operator = file_store_operator.clone();
+            let request_metadata = request_metadata.clone();
+            async move {
+                get_data_in_thread(
+                    current_version,
+                    chain_id,
+                    &mut cache_operator,
+                    file_store_operator,
+                    request_metadata.clone(),
+                    cache_storage_format,
+                )
+                .await
+            }
+        });
+        threads.push(thread);
+        current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
+    }
+
+    let mut transactions = vec![];
+    join_all(threads)
+        .await
+        .into_iter()
+        .for_each(|result| match result {
+            Ok(DataFetchSubThreadResult::Success(mut txns)) => {
+                transactions.append(&mut txns);
+            },
+            Ok(DataFetchSubThreadResult::NoResults) => {},
+            Err(e) => {
+                error!(
+                    error = e.to_string(),
+                    "[Data Service] Failed to get data from cache and file store."
+                );
+                panic!("Failed to get data from cache and file store.");
+            },
+        });
+
+    if transactions.is_empty() {
+        DataFetchSubThreadResult::NoResults
+    } else {
+        DataFetchSubThreadResult::Success(transactions)
+    }
+}
+
+async fn get_data_in_thread(
+    start_version: u64,
+    chain_id: u64,
+    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
+    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
+    request_metadata: IndexerGrpcRequestMetadata,
+    cache_storage_format: StorageFormat,
+) -> DataFetchSubThreadResult {
+    let current_batch_start_time = std::time::Instant::now();
+    let transaction_data = match data_fetch(
+        start_version,
+        cache_operator,
+        file_store_operator,
+        request_metadata.clone(),
+        cache_storage_format,
+    )
+    .await
+    {
+        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
+        Ok(TransactionsDataStatus::AheadOfCache) => {
+            info!(
+                start_version = start_version,
+                request_name = request_metadata.processor_name.as_str(),
+                request_email = request_metadata.request_email.as_str(),
+                request_api_key_name = request_metadata.request_api_key_name.as_str(),
+                processor_name = request_metadata.processor_name.as_str(),
+                connection_id = request_metadata.request_connection_id.as_str(),
+                request_user_classification = request_metadata.request_user_classification.as_str(),
+                duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
+                service_type = SERVICE_TYPE,
+                "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
+                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
+            );
+            ahead_of_cache_data_handling().await;
+            // Retry after a short sleep.
+            return DataFetchSubThreadResult::NoResults;
+        },
+        Err(e) => {
+            ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
+            data_fetch_error_handling(e, start_version, chain_id).await;
+            // Retry after a short sleep.
+            return DataFetchSubThreadResult::NoResults;
+        },
+    };
+    DataFetchSubThreadResult::Success(transaction_data)
+}
+
+// This is a thread spawned off for servicing a users' request
+async fn data_fetcher_thread(
+    redis_client: Arc<Client>,
+    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
+    cache_storage_format: StorageFormat,
+    request_metadata: IndexerGrpcRequestMetadata,
+    transactions_count: Option<u64>,
+    tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+    mut current_version: u64,
+) {
+    let mut connection_start_time = Some(std::time::Instant::now());
+    let mut transactions_count = transactions_count;
+
+    // Establish redis connection
+    let conn = match redis_client.get_tokio_connection_manager().await {
+        Ok(conn) => conn,
+        Err(e) => {
+            ERROR_COUNT
+                .with_label_values(&["redis_connection_failed"])
+                .inc();
+            // Connection will be dropped anyway, so we ignore the error here.
+            let _result = tx
+                .send_timeout(
+                    Err(Status::unavailable(
+                        "[Data Service] Cannot connect to Redis; please retry.",
+                    )),
+                    RESPONSE_CHANNEL_SEND_TIMEOUT,
+                )
+                .await;
+            error!(
+                error = e.to_string(),
+                "[Data Service] Failed to get redis connection."
+            );
+            return;
+        },
+    };
+    let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
+
+    // Validate chain id
+    let mut metadata = file_store_operator.get_file_store_metadata().await;
+    while metadata.is_none() {
+        metadata = file_store_operator.get_file_store_metadata().await;
+        tracing::warn!(
+            "[File worker] File store metadata not found. Waiting for {} ms.",
+            FILE_STORE_METADATA_WAIT_MS
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(
+            FILE_STORE_METADATA_WAIT_MS,
+        ))
+        .await;
+    }
+
+    let metadata_chain_id = metadata.unwrap().chain_id;
+
+    // Validate redis chain id. Must be present by the time it gets here
+    let chain_id = match cache_operator.get_chain_id().await {
+        Ok(chain_id) => chain_id.unwrap(),
+        Err(e) => {
+            ERROR_COUNT
+                .with_label_values(&["redis_get_chain_id_failed"])
+                .inc();
+            // Connection will be dropped anyway, so we ignore the error here.
+            let _result = tx
+                .send_timeout(
+                    Err(Status::unavailable(
+                        "[Data Service] Cannot get the chain id from redis; please retry.",
+                    )),
+                    RESPONSE_CHANNEL_SEND_TIMEOUT,
+                )
+                .await;
+            error!(
+                error = e.to_string(),
+                "[Data Service] Failed to get chain id from redis."
+            );
+            return;
+        },
+    };
+
+    if metadata_chain_id != chain_id {
+        let _result = tx
+            .send_timeout(
+                Err(Status::unavailable("[Data Service] Chain ID mismatch.")),
+                RESPONSE_CHANNEL_SEND_TIMEOUT,
+            )
+            .await;
+        error!("[Data Service] Chain ID mismatch.",);
+        return;
+    }
+
+    // Data service metrics.
+    let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
+
+    loop {
+        // 1. Fetch data from cache and file store.
+
+        let mut transaction_data = match get_data_with_threads(
+            current_version,
+            transactions_count,
+            chain_id,
+            &mut cache_operator,
+            file_store_operator.clone(),
+            request_metadata.clone(),
+            cache_storage_format,
+        )
+        .await
+        {
+            DataFetchSubThreadResult::Success(txns) => txns,
+            DataFetchSubThreadResult::NoResults => {
+                continue;
+            },
+        };
+
+        // TODO: Unify the truncation logic for start and end.
+        if let Some(count) = transactions_count {
+            if count == 0 {
+                // End the data stream.
+                // Since the client receives all the data it requested, we don't count it as a short connection.
+                connection_start_time = None;
+                break;
+            } else if (count as usize) < transaction_data.len() {
+                // Trim the data to the requested end version.
+                transaction_data.truncate(count as usize);
+                transactions_count = Some(0);
+            } else {
+                transactions_count = Some(count - transaction_data.len() as u64);
+            }
+        };
+        // Note: this is the protobuf encoded transaction size.
+        let bytes_ready_to_transfer = transaction_data
+            .iter()
+            .map(|t| t.encoded_len())
+            .sum::<usize>();
+        BYTES_READY_TO_TRANSFER_FROM_SERVER
+            .with_label_values(&[
+                &request_metadata.request_api_key_name,
+                &request_metadata.request_email,
+                &request_metadata.processor_name,
+            ])
+            .inc_by(bytes_ready_to_transfer as u64);
+        // 2. Push the data to the response channel, i.e. stream the data to the client.
+        let current_batch_size = transaction_data.as_slice().len();
+        let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
+        let resp_items = get_transactions_responses_builder(transaction_data, chain_id as u32);
+        let data_latency_in_secs = resp_items
+            .last()
+            .unwrap()
+            .transactions
+            .last()
+            .unwrap()
+            .timestamp
+            .as_ref()
+            .map(time_diff_since_pb_timestamp_in_secs);
+
+        match channel_send_multiple_with_timeout(resp_items, tx.clone(), request_metadata.clone())
+            .await
+        {
+            Ok(_) => {
+                PROCESSED_BATCH_SIZE
+                    .with_label_values(&[
+                        request_metadata.request_api_key_name.as_str(),
+                        request_metadata.request_email.as_str(),
+                        request_metadata.processor_name.as_str(),
+                    ])
+                    .set(current_batch_size as i64);
+                // TODO: Reasses whether this metric useful
+                LATEST_PROCESSED_VERSION_OLD
+                    .with_label_values(&[
+                        request_metadata.request_api_key_name.as_str(),
+                        request_metadata.request_email.as_str(),
+                        request_metadata.processor_name.as_str(),
+                    ])
+                    .set(end_of_batch_version as i64);
+                PROCESSED_VERSIONS_COUNT
+                    .with_label_values(&[
+                        request_metadata.request_api_key_name.as_str(),
+                        request_metadata.request_email.as_str(),
+                        request_metadata.processor_name.as_str(),
+                    ])
+                    .inc_by(current_batch_size as u64);
+                if let Some(data_latency_in_secs) = data_latency_in_secs {
+                    PROCESSED_LATENCY_IN_SECS
+                        .with_label_values(&[
+                            request_metadata.request_api_key_name.as_str(),
+                            request_metadata.request_email.as_str(),
+                            request_metadata.processor_name.as_str(),
+                        ])
+                        .set(data_latency_in_secs);
+                    PROCESSED_LATENCY_IN_SECS_ALL
+                        .with_label_values(&[request_metadata.request_user_classification.as_str()])
+                        .observe(data_latency_in_secs);
+                }
+            },
+            Err(SendTimeoutError::Timeout(_)) => {
+                warn!("[Data Service] Receiver is full; exiting.");
+                break;
+            },
+            Err(SendTimeoutError::Closed(_)) => {
+                warn!("[Data Service] Receiver is closed; exiting.");
+                break;
+            },
+        }
+        // 3. Update the current version and record current tps.
+        tps_calculator.tick_now(current_batch_size as u64);
+        current_version = end_of_batch_version + 1;
+    }
+    info!(
+        request_name = request_metadata.processor_name.as_str(),
+        request_email = request_metadata.request_email.as_str(),
+        request_api_key_name = request_metadata.request_api_key_name.as_str(),
+        processor_name = request_metadata.processor_name.as_str(),
+        connection_id = request_metadata.request_connection_id.as_str(),
+        request_user_classification = request_metadata.request_user_classification.as_str(),
+        request_user_classification = request_metadata.request_user_classification.as_str(),
+        service_type = SERVICE_TYPE,
+        "[Data Service] Client disconnected."
+    );
+    if let Some(start_time) = connection_start_time {
+        if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
+            SHORT_CONNECTION_COUNT
+                .with_label_values(&[
+                    request_metadata.request_api_key_name.as_str(),
+                    request_metadata.request_email.as_str(),
+                    request_metadata.processor_name.as_str(),
+                ])
+                .inc();
+        }
     }
 }
 
@@ -430,7 +567,7 @@ fn get_transactions_responses_builder(
 async fn data_fetch(
     starting_version: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    file_store_operator: &dyn FileStoreOperator,
+    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: IndexerGrpcRequestMetadata,
     storage_format: StorageFormat,
 ) -> anyhow::Result<TransactionsDataStatus> {
@@ -470,7 +607,7 @@ async fn data_fetch(
                 Some(duration_in_secs),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
+                Some(&request_metadata),
             );
             log_grpc_step(
                 SERVICE_TYPE,
@@ -482,7 +619,7 @@ async fn data_fetch(
                 Some(decoding_start_time.elapsed().as_secs_f64()),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
+                Some(&request_metadata),
             );
 
             Ok(TransactionsDataStatus::Success(transactions))
@@ -509,7 +646,7 @@ async fn data_fetch(
                 Some(io_duration),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
+                Some(&request_metadata),
             );
             log_grpc_step(
                 SERVICE_TYPE,
@@ -521,7 +658,7 @@ async fn data_fetch(
                 Some(decoding_duration),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
-                Some(request_metadata.clone()),
+                Some(&request_metadata),
             );
             Ok(TransactionsDataStatus::Success(transactions))
         },
@@ -642,7 +779,7 @@ async fn channel_send_multiple_with_timeout(
             Some(send_start_time.elapsed().as_secs_f64()),
             Some(response_size),
             Some(num_of_transactions as i64),
-            Some(request_metadata.clone()),
+            Some(&request_metadata),
         );
     }
 
@@ -656,7 +793,7 @@ async fn channel_send_multiple_with_timeout(
         Some(overall_send_start_time.elapsed().as_secs_f64()),
         Some(overall_size_in_bytes),
         Some((overall_end_version - overall_start_version + 1) as i64),
-        Some(request_metadata.clone()),
+        Some(&request_metadata),
     );
 
     Ok(())
