@@ -30,11 +30,18 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::OnChainExecutionConfig,
+    randomness::Randomness,
     transaction::{SignedTransaction, Transaction},
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{boxed::Box, sync::Arc};
+use std::{
+    boxed::Box,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -91,6 +98,7 @@ pub struct ExecutionProxy {
     transaction_deduper: Mutex<Option<Arc<dyn TransactionDeduper>>>,
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
+    randomness_enabled: AtomicBool,
 }
 
 impl ExecutionProxy {
@@ -132,7 +140,36 @@ impl ExecutionProxy {
             transaction_deduper: Mutex::new(None),
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
+            randomness_enabled: AtomicBool::new(false),
         }
+    }
+
+    pub fn transactions_to_commit(&self, executed_block: &ExecutedBlock) -> Vec<Transaction> {
+        // reconfiguration suffix don't execute
+        if executed_block.is_reconfiguration_suffix() {
+            return vec![];
+        }
+
+        let user_txns = executed_block.input_transactions().clone();
+        let validator_txns = executed_block.validator_txns().cloned().unwrap_or_default();
+        let validators = self.validators.lock();
+        let metadata = if self.randomness_enabled.load(Ordering::SeqCst) {
+            executed_block
+                .block()
+                .new_metadata_with_randomness(&validators, executed_block.randomness().cloned())
+        } else {
+            executed_block
+                .block()
+                .new_block_metadata(&validators)
+                .into()
+        };
+
+        let input_txns = Block::combine_to_input_transactions(validator_txns, user_txns, metadata);
+
+        // Adds StateCheckpoint/BlockEpilogue transaction if needed.
+        executed_block
+            .compute_result()
+            .transactions_to_commit(input_txns, executed_block.id())
     }
 }
 
@@ -144,6 +181,7 @@ impl StateComputer for ExecutionProxy {
         block: &Block,
         // The parent block id.
         parent_block_id: HashValue,
+        randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         let block_id = block.id();
         debug!(
@@ -163,7 +201,12 @@ impl StateComputer for ExecutionProxy {
         let block_executor_onchain_config = self.block_executor_onchain_config.lock().clone();
 
         let timestamp = block.timestamp_usecs();
-        let metadata = block.new_block_metadata(&self.validators.lock());
+        let metadata = if self.randomness_enabled.load(Ordering::SeqCst) {
+            block.new_metadata_with_randomness(&self.validators.lock(), randomness)
+        } else {
+            block.new_block_metadata(&self.validators.lock()).into()
+        };
+
         let fut = self
             .execution_pipeline
             .queue(
@@ -222,12 +265,7 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            let input_txns = block.input_transactions().clone();
-            txns.extend(block.transactions_to_commit(
-                &self.validators.lock(),
-                block.validator_txns().cloned().unwrap_or_default(),
-                input_txns,
-            ));
+            txns.extend(self.transactions_to_commit(block));
             subscribable_txn_events.extend(block.subscribable_events());
         }
 
@@ -318,6 +356,7 @@ impl StateComputer for ExecutionProxy {
         transaction_shuffler: Arc<dyn TransactionShuffler>,
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
+        randomness_enabled: bool,
     ) {
         *self.validators.lock() = epoch_state
             .verifier
@@ -329,6 +368,8 @@ impl StateComputer for ExecutionProxy {
             .replace(transaction_shuffler);
         *self.block_executor_onchain_config.lock() = block_executor_onchain_config;
         self.transaction_deduper.lock().replace(transaction_deduper);
+        self.randomness_enabled
+            .store(randomness_enabled, Ordering::SeqCst);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
@@ -477,6 +518,7 @@ async fn test_commit_sync_race() {
         create_transaction_shuffler(TransactionShufflerType::NoShuffling),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         create_transaction_deduper(TransactionDeduperType::NoDedup),
+        false,
     );
     executor
         .commit(&[], generate_li(1, 1), callback.clone())

@@ -60,7 +60,7 @@ object "test_A2_M_test_drop" {
                 $MemoryStoreU256(add($mem, 0), $t2)
                 $t3 := $mem
             }
-            // destroy($t3)
+            // drop($t3)
             {
                 let $field_ptr_1770153451 := $LoadU256(add($t3, 0))
                 {
@@ -1828,8 +1828,8 @@ object "test_A2_M_test_unpack" {
             $t3 := $MemoryLoadU8(add(s, 40))
             $t4 := $MemoryLoadU256(add(s, 0))
             $Free(s, 41)
-            // destroy($t3)
-            // destroy($t2)
+            // drop($t3)
+            // drop($t2)
             // return $t4
             $result := $t4
         }

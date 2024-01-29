@@ -212,7 +212,7 @@ impl<'a> FunctionGenerator<'a> {
     fn pinned_temps(ctx: &FunctionContext) -> BTreeSet<TempIndex> {
         let mut result = BTreeSet::new();
         for bc in ctx.fun.get_bytecode() {
-            if let Bytecode::Call(_, _, Operation::BorrowLoc | Operation::Destroy, args, _) = bc {
+            if let Bytecode::Call(_, _, Operation::BorrowLoc | Operation::Drop, args, _) = bc {
                 result.insert(args[0]);
             }
         }
@@ -459,7 +459,11 @@ impl<'a> FunctionGenerator<'a> {
                 // order, perhaps we should fix this.
                 self.gen_builtin(ctx, dest, FF::Bytecode::WriteRef, &[source[1], source[0]])
             },
-            Operation::Destroy => {
+            Operation::Release => {
+                // Move bytecode does not process release, values are released indirectly
+                // when the borrowed head of the borrow chain is destroyed
+            },
+            Operation::Drop => {
                 // Currently Destroy is only translated for references. It may also make
                 // sense for other values, as we may figure later. Its known to be required
                 // for references to make the bytecode verifier happy.

@@ -246,7 +246,7 @@ impl<P: SigningKeyProvider> JWKManager<P> {
         match &state.consensus_state {
             ConsensusState::InProgress { my_proposal, .. } => {
                 //TODO: counters
-                let txn = ValidatorTransaction::ObservedJWKsUpdates { updates: vec![update.clone()] };
+                let txn = ValidatorTransaction::ObservedJWKUpdate(update.clone());
                 let vtxn_guard = self.vtxn_pool.put(Topic::JWK_CONSENSUS(issuer), Arc::new(txn), None);
                 state.consensus_state = ConsensusState::Finished {
                     vtxn_guard,

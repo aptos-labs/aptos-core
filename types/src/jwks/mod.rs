@@ -2,12 +2,9 @@
 
 use self::jwk::JWK;
 use anyhow::{bail, Context};
-use crate::{
-    aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig, validator_verifier::ValidatorVerifier,
+use crate::{move_utils::as_move_value::AsMoveValue,
+            on_chain_config::OnChainConfig,
 };
-use anyhow::ensure;
-use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
@@ -191,39 +188,6 @@ pub struct QuorumCertifiedUpdate {
     pub authors: BTreeSet<AccountAddress>,
     pub update: ProviderJWKs,
     pub multi_sig: bls12381::Signature,
-}
-
-/// Verify a quorum-certified JWK update by verifying its multi-sig and check the version is expected.
-/// Return the update payload if verification succeeded.
-///
-/// Used in VM to execute JWK validator transactions.
-pub fn verify_jwk_qc_update(
-    verifier: &ValidatorVerifier,
-    on_chain: &ProviderJWKs,
-    qc_update: QuorumCertifiedUpdate,
-) -> anyhow::Result<ProviderJWKs> {
-    let QuorumCertifiedUpdate {
-        authors,
-        update: observed,
-        multi_sig,
-    } = qc_update;
-    let signer_bit_vec = BitVec::from(
-        verifier
-            .get_ordered_account_addresses()
-            .into_iter()
-            .map(|addr| authors.contains(&addr))
-            .collect::<Vec<_>>(),
-    );
-    ensure!(
-        on_chain.version + 1 == observed.version,
-        "verify_jwk_qc_update failed with unexpected version"
-    );
-    verifier.verify_multi_signatures(
-        &observed,
-        &AggregateSignature::new(signer_bit_vec, Some(multi_sig)),
-    )?;
-    verifier.check_voting_power(authors.iter(), true)?;
-    Ok(observed)
 }
 
 /// Move event type `0x1::jwks::ObservedJWKsUpdated` in rust.

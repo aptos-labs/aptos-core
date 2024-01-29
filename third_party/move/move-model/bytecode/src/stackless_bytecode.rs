@@ -161,7 +161,11 @@ pub enum Operation {
     BorrowGlobal(ModuleId, StructId, Vec<Type>),
 
     // Builtins
-    Destroy,
+    /// Indicates that the value is dropped.
+    Drop,
+    /// Indicates that the value is no longer borrowed.
+    Release,
+
     ReadRef,
     WriteRef,
     FreezeRef,
@@ -253,7 +257,8 @@ impl Operation {
             Operation::GetField(_, _, _, _) => false,
             Operation::GetGlobal(_, _, _) => true,
             Operation::Uninit => false,
-            Operation::Destroy => false,
+            Operation::Drop => false,
+            Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
             Operation::FreezeRef => false,
@@ -409,6 +414,7 @@ pub enum Bytecode {
     Abort(AttrId, TempIndex),
     Nop(AttrId),
 
+    // Extended bytecode: spec-only.
     SaveMem(AttrId, MemoryLabel, QualifiedInstId<StructId>),
     SaveSpecVar(AttrId, MemoryLabel, QualifiedInstId<SpecVarId>),
     Prop(AttrId, PropKind, Exp),
@@ -482,6 +488,12 @@ impl Bytecode {
 
     pub fn is_branch(&self) -> bool {
         self.is_conditional_branch() || self.is_unconditional_branch()
+    }
+
+    /// Returns true if the bytecode is spec-only.
+    pub fn is_spec_only(&self) -> bool {
+        use Bytecode::*;
+        matches!(self, SaveMem(..) | SaveSpecVar(..) | Prop(..))
     }
 
     /// Return the sources of the instruction (for non-spec-only instructions).
@@ -1116,8 +1128,11 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             Uninit => {
                 write!(f, "uninit")?;
             },
-            Destroy => {
-                write!(f, "destroy")?;
+            Drop => {
+                write!(f, "drop")?;
+            },
+            Release => {
+                write!(f, "release")?;
             },
             ReadRef => {
                 write!(f, "read_ref")?;

@@ -3,7 +3,7 @@
 //! Implements the Poseidon hash function for BN-254, which hashes $\le$ 16 field elements and
 //! produces a single field element as output.
 use anyhow::bail;
-use num_bigint::BigUint;
+use ark_ff::PrimeField;
 // TODO(zkid): Figure out the right library for Poseidon.
 use poseidon_ark::Poseidon;
 
@@ -199,8 +199,7 @@ pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
             MAX_NUM_INPUT_BYTES,
         );
     }
-    let big_uint = BigUint::from_bytes_le(chunk);
-    let fr = ark_bn254::Fr::from(big_uint);
+    let fr = ark_bn254::Fr::from_le_bytes_mod_order(chunk);
     Ok(fr)
 }
 
@@ -218,7 +217,7 @@ mod test {
     use std::str::FromStr;
 
     #[test]
-    fn test_poseidon_ark_vectors() {
+    fn test_poseidon_bn254_poseidon_ark_vectors() {
         let mut inputs = vec!["1", "2"]
             .into_iter()
             .map(|hex| ark_bn254::Fr::from_str(hex).unwrap())
@@ -241,7 +240,7 @@ mod test {
     }
 
     #[test]
-    fn test_pad_and_hash_bytes() {
+    fn test_poseidon_bn254_pad_and_hash_bytes() {
         let aud = "google";
         const MAX_AUD_VAL_BYTES: usize = 248;
         let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES).unwrap();
@@ -252,7 +251,7 @@ mod test {
     }
 
     #[test]
-    fn test_pad_and_hash_bytes_no_collision() {
+    fn test_poseidon_bn254_pad_and_hash_bytes_no_collision() {
         let s1: [u8; 3] = [0, 0, 1];
         let s2: [u8; 4] = [0, 0, 1, 0];
         const MAX_BYTES: usize = 248;
@@ -263,7 +262,7 @@ mod test {
     }
 
     #[test]
-    fn test_pack_bytes() {
+    fn test_poseidon_bn254_pack_bytes() {
         // b"" -> vec![Fr(0)]
         let scalars = pack_bytes_to_scalars(b"").unwrap();
         assert_eq!(scalars.len(), 0);
@@ -277,7 +276,11 @@ mod test {
         let pow_2_to_247 = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x80";
         let scalars = pack_bytes_to_scalars(pow_2_to_247.as_slice()).unwrap();
         assert_eq!(scalars.len(), 1);
-        assert_eq!(scalars[0], ark_bn254::Fr::from(BigUint::from(2u8).pow(247)));
+        let pow_2_to_247_le_bytes = BigUint::from(2u8).pow(247).to_bytes_le();
+        assert_eq!(
+            scalars[0],
+            ark_bn254::Fr::from_le_bytes_mod_order(pow_2_to_247_le_bytes.as_slice())
+        );
 
         // (2^248).to_le_bytes() -> vec![Fr(32), Fr(2^248)]
         let pow_2_to_248 = b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01";

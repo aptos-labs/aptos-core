@@ -145,6 +145,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 (info, payload, events).into()
             },
             BlockMetadata(txn) => (&txn, info, events).into(),
+            BlockMetadataExt(txn) => (&txn, info, events).into(),
             StateCheckpoint(_) => {
                 Transaction::StateCheckpointTransaction(StateCheckpointTransaction {
                     info,

@@ -334,9 +334,7 @@ async fn test_jwk_manager_state_transition() {
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
-    let expected_vtxns = vec![ValidatorTransaction::ObservedJWKsUpdates {
-        updates: vec![qc_update_for_carl.clone()],
-    }];
+    let expected_vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(qc_update_for_carl.clone())];
     let actual_vtxns = vtxn_pool
         .pull(
             Instant::now() + Duration::from_secs(3600),
@@ -407,8 +405,8 @@ async fn test_jwk_manager_state_transition() {
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
     let expected_vtxn_hashes = vec![
-        ValidatorTransaction::ObservedJWKsUpdates { updates: vec![qc_update_for_alice], },
-        ValidatorTransaction::ObservedJWKsUpdates { updates: vec![qc_update_for_carl], },
+        ValidatorTransaction::ObservedJWKUpdate(qc_update_for_alice),
+        ValidatorTransaction::ObservedJWKUpdate(qc_update_for_carl),
     ].iter().map(CryptoHash::hash).collect::<HashSet<_>>();
 
     let actual_vtxn_hashes = vtxn_pool

@@ -14,7 +14,10 @@ use crate::pipeline::{
     ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
     explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
-    reference_safety_processor::ReferenceSafetyProcessor, visibility_checker::VisibilityChecker,
+    reference_safety_processor::ReferenceSafetyProcessor,
+    uninitialized_use_checker::UninitializedUseChecker,
+    unreachable_code_analysis::UnreachableCodeProcessor,
+    unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -90,6 +93,7 @@ pub fn run_move_compiler(
             &mut targets,
             &dump_base_name,
             options.debug && options.dump_bytecode,
+            &pipeline::register_formatters,
         )
     } else {
         pipeline.run(&env, &mut targets)
@@ -175,6 +179,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
     if safety_on {
+        pipeline.add_processor(Box::new(UninitializedUseChecker {}));
         pipeline.add_processor(Box::new(VisibilityChecker()));
     }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -211,6 +216,8 @@ fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
         with_copy_inference: false,
     }));
     pipeline.add_processor(Box::new(DeadStoreElimination {}));
+    pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+    pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

@@ -6,13 +6,19 @@ use aptos_infallible::Mutex;
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    fmt::{Debug, Formatter},
     sync::Arc,
     time::Instant,
 };
-use std::fmt::{Debug, Formatter};
 
 pub enum TransactionFilter {
     PendingTxnHashSet(HashSet<HashValue>),
+}
+
+impl TransactionFilter {
+    pub fn no_op() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
 }
 
 impl TransactionFilter {
@@ -115,7 +121,6 @@ pub struct PoolStateInner {
     /// Txns ordered by their sequence numbers (i.e. time they entered the pool).
     txn_queue: BTreeMap<u64, PoolItem>,
 }
-
 
 /// Returned for `txn` when you call `PoolState::put(txn, ...)`.
 /// If this is dropped, `txn` will be deleted from the pool (if it has not been).
