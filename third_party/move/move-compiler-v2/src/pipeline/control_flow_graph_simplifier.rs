@@ -119,7 +119,7 @@ struct ControlFlowGraphCodeGenerator {
     cfg: StacklessControlFlowGraph,
     code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
     // if `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
-    pred_map: BTreeMap<BlockId, Vec<BlockId>>,
+    predecessors: BTreeMap<BlockId, Vec<BlockId>>,
 }
 
 impl ControlFlowGraphCodeGenerator {
@@ -135,7 +135,7 @@ impl ControlFlowGraphCodeGenerator {
         Self {
             cfg,
             code_blocks,
-            pred_map,
+            predecessors: pred_map,
         }
     }
 
@@ -323,7 +323,7 @@ impl RemoveEmptyBlock {
             .cfg
             .successors(block_to_remove)
             .contains(&block_to_remove));
-        let maybe_preds = self.pred_map.remove(&block_to_remove);
+        let maybe_preds = self.predecessors.remove(&block_to_remove);
         if let Some(preds) = maybe_preds {
             for pred in preds {
                 if pred != self.cfg.entry_block() {
@@ -340,14 +340,14 @@ impl RemoveEmptyBlock {
                 }
                 // update predecessors of `redirect_to`
                 // add preds of `remove_block` to `redirect_to`
-                self.pred_map
+                self.predecessors
                     .get_mut(&redirect_to)
                     .expect("predecessors")
                     .push(pred);
             }
         }
         // remove `block_to_remove`
-        self.pred_map
+        self.predecessors
             .get_mut(&redirect_to)
             .expect("predecessors")
             .retain(|pred| *pred != block_to_remove);
@@ -386,7 +386,7 @@ impl RemoveRedundantJump {
     pub fn transform(&mut self) {
         for block in self.cfg.blocks() {
             // the later condition says that `block` is unreachable or has been removed
-            if self.is_trivial_block(block) || !self.pred_map.contains_key(&block) {
+            if self.is_trivial_block(block) || !self.predecessors.contains_key(&block) {
                 continue;
             }
             self.transform_edges_from(block)
@@ -415,7 +415,7 @@ impl RemoveRedundantJump {
         debug_assert!(!self.is_trivial_block(from));
         debug_assert!(!self.is_trivial_block(to));
         self.cfg.successors(from).len() == 1
-            && self.pred_map.get(&to).map_or(0, |preds| preds.len()) == 1
+            && self.predecessors.get(&to).map_or(0, |preds| preds.len()) == 1
     }
 
     /// If possible, append the code of block `to` to the back of block `from` and remove the `to` block
@@ -447,14 +447,14 @@ impl RemoveRedundantJump {
         for suc_of_to in self.cfg.successors(to).clone() {
             // successors of `from` becomes successors of `to`
             self.cfg.successors_mut(from).push(suc_of_to);
-            for pred in self.pred_map.get_mut(&to).expect("predecessors") {
+            for pred in self.predecessors.get_mut(&to).expect("predecessors") {
                 if *pred == to {
                     *pred = from;
                 }
             }
         }
         self.cfg.remove_block(to);
-        self.pred_map.remove(&to);
+        self.predecessors.remove(&to);
         true
     }
 }
