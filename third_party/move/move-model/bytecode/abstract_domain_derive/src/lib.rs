@@ -30,6 +30,11 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 /// All fields without `#[no_join]` will be pair-wise joined.
 /// For example,
 /// ```
+/// use move_stackless_bytecode::{
+///     dataflow_domains::{AbstractDomain, JoinResult, MapDomain, SetDomain},
+///     stackless_bytecode::{BorrowEdge, BorrowNode}
+/// };
+/// use abstract_domain_derive::AbstractDomain;
 /// pub struct BorrowInfo {
 ///     live_nodes: SetDomain<BorrowNode>,
 
@@ -49,24 +54,34 @@ fn gen_join_field(field: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
 /// ```
 /// Can be derived with
 /// ```
+/// use move_stackless_bytecode::{
+///     dataflow_domains::{AbstractDomain, JoinResult, MapDomain, SetDomain},
+///     stackless_bytecode::{BorrowEdge, BorrowNode}
+/// };
+/// use abstract_domain_derive::AbstractDomain;
 /// #[derive(AbstractDomain)]
 /// pub struct BorrowInfo {
 ///     live_nodes: SetDomain<BorrowNode>,
 ///     borrowed_by: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
 ///     // this field is not joined
-///     #[no-join]
+///     #[no_join]
 ///     borrows_from: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
 /// }
 /// ```
 /// For structs with unnamed fields, the derived `join` method joins *every* field. For example,
 /// ```
+/// use move_stackless_bytecode::dataflow_domains::{AbstractDomain, JoinResult, SetDomain};
+/// use abstract_domain_derive::AbstractDomain;
+/// type TempIndex = usize;
 /// #[derive(AbstractDomain)]
-/// struct LiveVars(SetDomain);
+/// struct LiveVars(SetDomain<TempIndex>);
 /// ```
 /// derives a `join` that joins the wrapped field.
 ///
 /// This also works for unit structs. For example,
 /// ```
+/// use abstract_domain_derive::AbstractDomain;
+/// use move_stackless_bytecode::dataflow_domains::{AbstractDomain, JoinResult};
 /// #[derive(AbstractDomain)]
 /// struct Unit;
 /// ```
