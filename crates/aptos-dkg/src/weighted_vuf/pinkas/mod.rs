@@ -220,7 +220,7 @@ impl WeightedVUF for PinkasWUF {
         Ok(multi_pairing(lhs.iter().map(|r| r), rhs.into_iter()))
     }
 
-    /// Verifies the proof shares one by one
+    /// Verifies the proof shares (using batch verification)
     fn verify_proof(
         pp: &Self::PublicParameters,
         _pk: &Self::PubKey,

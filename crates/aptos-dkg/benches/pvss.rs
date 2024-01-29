@@ -9,13 +9,14 @@ use aptos_dkg::{
     pvss::{
         test_utils,
         test_utils::{
-            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking, NoAux,
+            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+            DealingArgs, NoAux,
         },
         traits::{
             transcript::{MalleableTranscript, Transcript},
             SecretSharingConfig,
         },
-        GenericWeighting,
+        WeightedConfig,
     },
 };
 use criterion::{
@@ -34,26 +35,57 @@ pub fn all_groups(c: &mut Criterion) {
 
     // weighted PVSS
     for wc in get_weighted_configs_for_benchmarking() {
-        pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
-        pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
+        let d = pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
+        weighted_pvss_group(&wc, d, c);
+
+        // Note: Insecure, so not interested in benchmarks.
+        // let d = pvss_group::<GenericWeighting<pvss::das::Transcript>>(&wc, c);
+        // weighted_pvss_group(&wc, d, c);
     }
 }
 
-pub fn pvss_group<T: MalleableTranscript>(sc: &T::SecretSharingConfig, c: &mut Criterion) {
+pub fn pvss_group<T: MalleableTranscript>(
+    sc: &T::SecretSharingConfig,
+    c: &mut Criterion,
+) -> DealingArgs<T> {
     let name = T::scheme_name();
     let mut group = c.benchmark_group(format!("pvss/{}", name));
     let mut rng = thread_rng();
 
     // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
-    let (pp, ssks, spks, dks, eks, iss, s, _) =
-        test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
-    pvss_deal::<T, WallTime>(sc, &pp, &ssks, &eks, &mut group);
+    pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.eks, &mut group);
     pvss_aggregate::<T, WallTime>(sc, &mut group);
-    pvss_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &mut group);
-    pvss_aggregate_verify::<T, WallTime>(sc, &pp, &ssks, &spks, &eks, &iss[0], 100, &mut group);
-    pvss_decrypt_own_share::<T, WallTime>(sc, &pp, &ssks, &dks, &eks, &s, &mut group);
+    pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_decrypt_own_share::<T, WallTime>(sc, &d.pp, &d.ssks, &d.dks, &d.eks, &d.s, &mut group);
+
+    group.finish();
+
+    d
+}
+
+pub fn weighted_pvss_group<T: MalleableTranscript<SecretSharingConfig = WeightedConfig>>(
+    sc: &T::SecretSharingConfig,
+    d: DealingArgs<T>,
+    c: &mut Criterion,
+) {
+    let name = T::scheme_name();
+    let mut group = c.benchmark_group(format!("wpvss/{}", name));
+    let mut rng = thread_rng();
+
+    let average_aggregation_size = sc.get_average_size_of_eligible_subset(250, &mut rng);
+    pvss_aggregate_verify::<T, WallTime>(
+        sc,
+        &d.pp,
+        &d.ssks,
+        &d.spks,
+        &d.eks,
+        &d.iss[0],
+        average_aggregation_size,
+        &mut group,
+    );
 
     group.finish();
 }
@@ -160,6 +192,7 @@ fn pvss_aggregate_verify<T: MalleableTranscript, M: Measurement>(
     // players obtaining shares. (In other settings, there could be 1 million dealers, dealing a
     // secret to only 100 players such that, say, any 50 can reconstruct them.)
     assert_le!(num_aggr, sc.get_total_num_players());
+    assert_eq!(ssks.len(), spks.len());
 
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
 
@@ -184,13 +217,16 @@ fn pvss_aggregate_verify<T: MalleableTranscript, M: Measurement>(
                     &mut rng,
                 ));
 
-                for (i, ssk) in ssks.iter().enumerate().skip(1).take(num_aggr) {
+                for (i, ssk) in ssks.iter().enumerate().skip(1).take(num_aggr - 1) {
                     let mut trx = trxs[0].clone();
                     trx.maul_signature(ssk, &NoAux, &sc.get_player(i));
                     trxs.push(trx);
                 }
+                assert_eq!(spks.len(), trxs.len());
 
-                T::aggregate(sc, trxs).unwrap()
+                let trx = T::aggregate(sc, trxs).unwrap();
+                assert_eq!(trx.get_dealers().len(), num_aggr);
+                trx
             },
             |trx| {
                 trx.verify(&sc, &pp, &spks, &eks, &vec![NoAux; num_aggr])
