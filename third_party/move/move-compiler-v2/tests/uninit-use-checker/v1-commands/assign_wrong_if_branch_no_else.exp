@@ -31,7 +31,7 @@ fun <SELF>_0::main() {
 
 Diagnostics:
 error: use of possibly unassigned local `x`
-  ┌─ tests/uninit-use-checker/assign_wrong_if_branch_no_else.move:5:13
+  ┌─ tests/uninit-use-checker/v1-commands/assign_wrong_if_branch_no_else.move:5:13
   │
 5 │     assert!(x == 100, 42);
   │             ^^^^^^^^

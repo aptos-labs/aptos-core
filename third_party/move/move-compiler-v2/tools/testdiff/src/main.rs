@@ -71,6 +71,23 @@ static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
         "reference-safety/v1-tests".to_string(),
         "borrows".to_string(),
     );
+    map.insert("friends/v1-tests".to_string(), "naming".to_string());
+    map.insert(
+        "uninit-use-checker/v1-commands".to_string(),
+        "commands".to_string(),
+    );
+    map.insert(
+        "uninit-use-checker/v1-locals".to_string(),
+        "locals".to_string(),
+    );
+    map.insert(
+        "uninit-use-checker/v1-borrows".to_string(),
+        "borrows".to_string(),
+    );
+    map.insert(
+        "uninit-use-checker/v1-borrow-tests".to_string(),
+        "borrow_tests".to_string(),
+    );
     map
 });
 
