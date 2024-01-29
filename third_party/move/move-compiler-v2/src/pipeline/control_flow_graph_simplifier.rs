@@ -98,6 +98,7 @@ impl ControlFlowGraphSimplifierTransformation {
             RemoveEmptyBlock::new(ControlFlowGraphCodeGenerator::new(&self.data.code));
         elim_empty_blocks_transformer.transform();
         self.data.code = elim_empty_blocks_transformer.0.gen_code(true);
+        self.data.annotations.clear()
     }
 
     /// Transforms `if _ goto L else goto L` to `goto L`
