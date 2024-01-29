@@ -25,6 +25,7 @@ mod dkg_with_validator_join_leave;
 mod e2e_basic_consumption;
 mod e2e_correctness;
 mod validator_restart_during_dkg;
+mod foo_bar;
 
 #[allow(dead_code)]
 async fn get_current_version(rest_client: &Client) -> u64 {
