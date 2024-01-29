@@ -115,10 +115,14 @@ impl ControlFlowGraphSimplifierTransformation {
 
 #[derive(Default)]
 struct ControlFlowGraphCodeGenerator {
-    // `BlockContent` is invalidated during transformations
+    /// The control flow graph.
+    /// `BlockContent` is invalidated during transformations
     cfg: StacklessControlFlowGraph,
+    /// The code of each basic block under transformation.
+    /// Entry/exit block is mapped to a empty vector.
     code_blocks: BTreeMap<BlockId, Vec<Bytecode>>,
-    // if `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
+    /// Maps a basic block to its predecessors.
+    /// If `block_id` not in `pred_map`, the block either doesn't exist or doesn't have predecessors
     predecessors: BTreeMap<BlockId, Vec<BlockId>>,
 }
 
