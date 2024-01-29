@@ -5,8 +5,17 @@
 //! (Implemented by `ControlFlowGraphSimplifier`)
 //! - eliminating branch/jump to jump
 //!     L1: goto L2 (L1 != L2)
-//!     replacing all goto L1 by goto L2, and deleting L1: goto L2
-//! - removes edges where the source has only one successors and the target has only one predecessors
+//!     =>
+//!     (removed)
+//!
+//!     goto L1
+//!     =>
+//!     goto L2
+//!
+//!     if ... goto L1 else ... / if ... goto ... else L1
+//!     =>
+//!     if ... goto L2 else ... / if ... goto ... else L2
+//! - removes edges where the source has only one successor and the target has only one predecessor
 //!     BB1: xx
 //!          goto L2
 //!     // BB1 BB2 don't have to be consecutive
@@ -17,6 +26,8 @@
 //!          yy
 //! - removes all jumps to the next instruction:
 //!     goto L;
+//!     L;
+//!     =>
 //!     L;
 //! - replaces branch to same target by jump
 //!     if ... goto L else goto L
@@ -242,6 +253,8 @@ impl ControlFlowGraphCodeGenerator {
 
 struct RemoveEmptyBlock(ControlFlowGraphCodeGenerator);
 
+/// `impl_deref!(Wrapper, WrappedType);` implements `Deref` trait for a wrapper struct with one field
+/// `struct Wrapper(WrappedType);` where the `deref` method simply returns a reference to the wrapped value.
 macro_rules! impl_deref {
     ($struct_name:ident, $target_type:ty) => {
         impl std::ops::Deref for $struct_name {
@@ -254,6 +267,9 @@ macro_rules! impl_deref {
     };
 }
 
+/// `impl_deref!(Wrapper)` implements `DerefMut` trait for a wrapper struct with one field,
+/// where the `deref_mut` method simply returns a mutable reference to the wrapped value.
+/// Note that `Wrapper` should've implemented `Deref`, which is a supertrait of `DerefMut`.
 macro_rules! impl_deref_mut {
     ($struct_name:ident) => {
         impl std::ops::DerefMut for $struct_name {
