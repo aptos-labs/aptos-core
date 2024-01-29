@@ -891,6 +891,7 @@ impl From<KeptVMStatus> for ExecutionStatus {
                 location: loc,
                 function: func,
                 code_offset: offset,
+                message: _,
             } => ExecutionStatus::ExecutionFailure {
                 location: loc,
                 function: func,
@@ -904,6 +905,22 @@ impl From<KeptVMStatus> for ExecutionStatus {
 impl ExecutionStatus {
     pub fn is_success(&self) -> bool {
         matches!(self, ExecutionStatus::Success)
+    }
+
+    pub fn remove_error_detail(self) -> Self {
+        match self {
+            ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: _,
+            } => ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: None,
+            },
+            ExecutionStatus::MiscellaneousError(_) => ExecutionStatus::MiscellaneousError(None),
+            _ => self,
+        }
     }
 }
 
@@ -959,9 +976,11 @@ impl TransactionStatus {
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
         match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
+                // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
                 },
+                // TODO(bowu): execution failure' message is discarded here
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => {
@@ -973,6 +992,58 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
+        }
+    }
+
+    pub fn is_same_outcome(&self, transaction_status: &TransactionStatus) -> bool {
+        match (self, transaction_status) {
+            (TransactionStatus::Discard(_), TransactionStatus::Discard(_)) => true,
+            (TransactionStatus::Keep(status1), TransactionStatus::Keep(status2)) => {
+                match (status1, status2) {
+                    (ExecutionStatus::Success, ExecutionStatus::Success) => true,
+                    (ExecutionStatus::OutOfGas, ExecutionStatus::OutOfGas) => true,
+                    (
+                        ExecutionStatus::MoveAbort {
+                            location: loc1,
+                            code: code1,
+                            info: _,
+                        },
+                        ExecutionStatus::MoveAbort {
+                            location: loc2,
+                            code: code2,
+                            info: _,
+                        },
+                    ) => loc1 == loc2 && code1 == code2,
+                    (
+                        ExecutionStatus::ExecutionFailure {
+                            location: loc1,
+                            function: func1,
+                            code_offset: offset1,
+                        },
+                        ExecutionStatus::ExecutionFailure {
+                            location: loc2,
+                            function: func2,
+                            code_offset: offset2,
+                        },
+                    ) => loc1 == loc2 && func1 == func2 && offset1 == offset2,
+                    (
+                        ExecutionStatus::MiscellaneousError(_),
+                        ExecutionStatus::MiscellaneousError(_),
+                    ) => true,
+                    _ => false,
+                }
+            },
+            (TransactionStatus::Retry, TransactionStatus::Retry) => true,
+            _ => false,
+        }
+    }
+
+    pub fn remove_error_detail(self) -> Self {
+        match self {
+            TransactionStatus::Keep(status) => {
+                TransactionStatus::Keep(status.remove_error_detail())
+            },
+            _ => self,
         }
     }
 }
@@ -1036,6 +1107,57 @@ impl VMValidatorResult {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct VMErrorDetail {
+    status_code: StatusCode,
+    message: Option<String>,
+}
+
+impl VMErrorDetail {
+    pub fn new(status_code: StatusCode, message: Option<String>) -> Self {
+        Self {
+            status_code,
+            message,
+        }
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        self.status_code
+    }
+
+    pub fn message(&self) -> &Option<String> {
+        &self.message
+    }
+}
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransactionAuxiliaryData {
+    detail_error_message: Option<VMErrorDetail>,
+}
+
+impl TransactionAuxiliaryData {
+    pub fn from_vm_status(vm_status: &VMStatus) -> Self {
+        let detail_error_message = match vm_status.clone().keep_or_discard() {
+            Ok(KeptVMStatus::MiscellaneousError) => {
+                let status_code = vm_status.status_code();
+                Some(VMErrorDetail::new(status_code, None))
+            },
+            Ok(KeptVMStatus::ExecutionFailure {
+                location: _,
+                function: _,
+                code_offset: _,
+                message,
+            }) => {
+                let status_code = vm_status.status_code();
+                Some(VMErrorDetail::new(status_code, message))
+            },
+            _ => None,
+        };
+        Self {
+            detail_error_message,
+        }
+    }
+}
+
 /// The output of executing a transaction.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TransactionOutput {
@@ -1048,8 +1170,11 @@ pub struct TransactionOutput {
     /// The amount of gas used during execution.
     gas_used: u64,
 
-    /// The execution status.
+    /// The execution status. The detailed error info will not be stored here instead will be stored in the auxiliary data.
     status: TransactionStatus,
+
+    /// The transaction auxiliary data that includes detail error info that is not used for calculating the hash
+    auxiliary_data: TransactionAuxiliaryData,
 }
 
 impl TransactionOutput {
@@ -1058,12 +1183,15 @@ impl TransactionOutput {
         events: Vec<ContractEvent>,
         gas_used: u64,
         status: TransactionStatus,
+        auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
+        // TODO: add feature flag to enable
         TransactionOutput {
             write_set,
             events,
             gas_used,
-            status,
+            status: status.clone(),
+            auxiliary_data,
         }
     }
 
@@ -1096,14 +1224,27 @@ impl TransactionOutput {
         &self.status
     }
 
-    pub fn unpack(self) -> (WriteSet, Vec<ContractEvent>, u64, TransactionStatus) {
+    pub fn auxiliary_data(&self) -> &TransactionAuxiliaryData {
+        &self.auxiliary_data
+    }
+
+    pub fn unpack(
+        self,
+    ) -> (
+        WriteSet,
+        Vec<ContractEvent>,
+        u64,
+        TransactionStatus,
+        TransactionAuxiliaryData,
+    ) {
         let Self {
             write_set,
             events,
             gas_used,
             status,
+            auxiliary_data,
         } = self;
-        (write_set, events, gas_used, status)
+        (write_set, events, gas_used, status, auxiliary_data)
     }
 
     pub fn ensure_match_transaction_info(
@@ -1355,6 +1496,7 @@ pub struct TransactionToCommit {
     pub write_set: WriteSet,
     pub events: Vec<ContractEvent>,
     pub is_reconfig: bool,
+    pub transaction_auxiliary_data: TransactionAuxiliaryData,
 }
 
 impl TransactionToCommit {
@@ -1365,6 +1507,7 @@ impl TransactionToCommit {
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
+        transaction_auxiliary_data: TransactionAuxiliaryData,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1373,6 +1516,7 @@ impl TransactionToCommit {
             write_set,
             events,
             is_reconfig,
+            transaction_auxiliary_data,
         }
     }
 
@@ -1385,6 +1529,7 @@ impl TransactionToCommit {
             write_set: Default::default(),
             events: vec![],
             is_reconfig: false,
+            transaction_auxiliary_data: TransactionAuxiliaryData::default(),
         }
     }
 
@@ -1443,6 +1588,10 @@ impl TransactionToCommit {
 
     pub fn is_reconfig(&self) -> bool {
         self.is_reconfig
+    }
+
+    pub fn transaction_auxiliary_data(&self) -> &TransactionAuxiliaryData {
+        &self.transaction_auxiliary_data
     }
 }
 

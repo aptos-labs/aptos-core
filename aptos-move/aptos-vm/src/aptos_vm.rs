@@ -51,9 +51,9 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction,
-        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput, WriteSetPayload,
+        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -141,12 +141,14 @@ pub(crate) fn get_transaction_output(
     fee_statement: FeeStatement,
     status: ExecutionStatus,
     change_set_configs: &ChangeSetConfigs,
+    auxiliary_data: TransactionAuxiliaryData,
 ) -> Result<VMOutput, VMStatus> {
     let change_set = session.finish(change_set_configs)?;
     Ok(VMOutput::new(
         change_set,
         fee_statement,
         TransactionStatus::Keep(status),
+        auxiliary_data,
     ))
 }
 
@@ -440,9 +442,12 @@ impl AptosVM {
                     log_context,
                     change_set_configs,
                 ) {
-                    Ok((change_set, fee_statement, status)) => {
-                        VMOutput::new(change_set, fee_statement, TransactionStatus::Keep(status))
-                    },
+                    Ok((change_set, fee_statement, status)) => VMOutput::new(
+                        change_set,
+                        fee_statement,
+                        TransactionStatus::Keep(status),
+                        TransactionAuxiliaryData::from_vm_status(&error_code.clone()),
+                    ),
                     Err(err) => discarded_output(err.status_code()),
                 };
                 (error_vm_status, txn_output)
@@ -492,6 +497,7 @@ impl AptosVM {
 
         if is_account_init_for_sponsored_transaction {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
+            // abort_info is injected using the user defined error in the move
             let status = self.inject_abort_info_if_available(status);
 
             create_account_if_does_not_exist(&mut session, gas_meter, txn_data.sender())
@@ -638,6 +644,7 @@ impl AptosVM {
             change_set,
             fee_statement,
             TransactionStatus::Keep(ExecutionStatus::Success),
+            TransactionAuxiliaryData::default(),
         );
 
         Ok((VMStatus::Executed, output))
@@ -1640,7 +1647,12 @@ impl AptosVM {
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = VMOutput::new(change_set, FeeStatement::zero(), VMStatus::Executed.into());
+        let output = VMOutput::new(
+            change_set,
+            FeeStatement::zero(),
+            VMStatus::Executed.into(),
+            TransactionAuxiliaryData::default(),
+        );
         Ok((VMStatus::Executed, output))
     }
 
@@ -1682,6 +1694,7 @@ impl AptosVM {
             FeeStatement::zero(),
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+            TransactionAuxiliaryData::default(),
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -1757,6 +1770,7 @@ impl AptosVM {
             FeeStatement::zero(),
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+            TransactionAuxiliaryData::default(),
         )?;
         Ok((VMStatus::Executed, output))
     }

@@ -32,8 +32,9 @@ use aptos_types::{
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, ExecutionStatus,
-        RawTransaction, Script, SignedTransaction, Transaction, TransactionListWithProof,
-        TransactionOutput, TransactionPayload, TransactionStatus, Version,
+        RawTransaction, Script, SignedTransaction, Transaction, TransactionAuxiliaryData,
+        TransactionListWithProof, TransactionOutput, TransactionPayload, TransactionStatus,
+        Version,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -450,6 +451,7 @@ fn apply_transaction_by_writeset(
                     vec![],
                     0,
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None)),
+                    TransactionAuxiliaryData::default(),
                 ),
             )
         })
@@ -460,6 +462,7 @@ fn apply_transaction_by_writeset(
                 Vec::new(),
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
+                TransactionAuxiliaryData::default(),
             ),
         )))
         .collect();
