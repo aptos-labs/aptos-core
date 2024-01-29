@@ -16,7 +16,7 @@ pub static DKG_STAGE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_dkg_session_stage_seconds",
         "How long it takes to reach different DKG stages",
-        &["epoch", "dealer", "stage"]
+        &["dealer", "stage"]
     )
     .unwrap()
 });

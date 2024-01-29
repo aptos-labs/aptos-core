@@ -17,12 +17,12 @@ use aptos_types::{
     validator_txn::{Topic, ValidatorTransaction},
 };
 use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
+use fail::fail_point;
 use futures_channel::oneshot;
 use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{sync::Arc, time::Duration};
-use fail::fail_point;
 
 #[derive(Clone, Debug)]
 enum InnerState {
@@ -120,7 +120,12 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
-        self.log_info("Started");
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr.to_hex().as_str(),
+            "DKGManager started."
+        );
+
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
                 start_time_us,
@@ -135,7 +140,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
         let mut close_rx = close_rx.into_stream();
-        self.log_info("Entering msg loop.");
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr.to_hex().as_str(),
+            "DKGManager entering the main loop."
+        );
         while !self.stopped {
             let handling_result = tokio::select! {
                 dkg_start_event = dkg_start_event_rx.select_next_some() => {
@@ -165,10 +174,18 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             };
 
             if let Err(e) = handling_result {
-                self.log_error(e.to_string());
+                error!(
+                    epoch = self.epoch_state.epoch,
+                    my_addr = self.my_addr.to_hex().as_str(),
+                    "DKGManager handling error: {e}"
+                );
             }
         }
-        self.log_info("Finished");
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr.to_hex().as_str(),
+            "DKGManager finished."
+        );
     }
 
     /// On a CLOSE command from epoch manager, do clean-up.
@@ -186,13 +203,18 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 ..
             } => {
                 let epoch_change_time = duration_since_epoch();
+                let secs_since_dkg_start =
+                    epoch_change_time.as_secs_f64() - start_time.as_secs_f64();
                 DKG_STAGE_SECONDS
-                    .with_label_values(&[
-                        self.epoch_state.epoch.to_string().as_str(),
-                        self.my_addr.to_hex().as_str(),
-                        "epoch_change",
-                    ])
-                    .observe(epoch_change_time.as_secs_f64() - start_time.as_secs_f64());
+                    .with_label_values(&[self.my_addr.to_hex().as_str(), "epoch_change"])
+                    .observe(secs_since_dkg_start);
+                info!(
+                    epoch = self.epoch_state.epoch,
+                    my_addr = self.my_addr,
+                    secs_since_dkg_start = secs_since_dkg_start,
+                    "DKG txn executed and entering new epoch.",
+                );
+
                 drop(vtxn_guard);
             },
         }
@@ -218,14 +240,17 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 if !*proposed {
                     *proposed = true;
                     let proposed_time = duration_since_epoch();
+                    let secs_since_dkg_start =
+                        proposed_time.as_secs_f64() - start_time.as_secs_f64();
                     DKG_STAGE_SECONDS
-                        .with_label_values(&[
-                            self.epoch_state.epoch.to_string().as_str(),
-                            self.my_addr.to_hex().as_str(),
-                            "proposed",
-                        ])
-                        .observe(proposed_time.as_secs_f64() - start_time.as_secs_f64());
-                    self.log_info("DKG txn picked up by consensus.");
+                        .with_label_values(&[self.my_addr.to_hex().as_str(), "proposed"])
+                        .observe(secs_since_dkg_start);
+                    info!(
+                        epoch = self.epoch_state.epoch,
+                        my_addr = self.my_addr,
+                        secs_since_dkg_start = secs_since_dkg_start,
+                        "DKG txn picked up by consensus.",
+                    );
                 }
                 Ok(())
             },
@@ -251,14 +276,16 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
         let dkg_start_time = Duration::from_micros(start_time_us);
         let deal_start = duration_since_epoch();
+        let secs_since_dkg_start = deal_start.as_secs_f64() - dkg_start_time.as_secs_f64();
         DKG_STAGE_SECONDS
-            .with_label_values(&[
-                self.epoch_state.epoch.to_string().as_str(),
-                self.my_addr.to_hex().as_str(),
-                "deal_start",
-            ])
-            .observe(deal_start.as_secs_f64() - dkg_start_time.as_secs_f64());
-        self.log_info("Dealing.");
+            .with_label_values(&[self.my_addr.to_hex().as_str(), "deal_start"])
+            .observe(secs_since_dkg_start);
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr,
+            secs_since_dkg_start = secs_since_dkg_start,
+            "Start Dealing DKG transcript.",
+        );
         let public_params = DKG::new_public_params(dkg_session_metadata);
         let mut rng = if cfg!(feature = "smoke-test") {
             StdRng::from_seed(self.my_addr.into_bytes())
@@ -282,14 +309,16 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
 
         let deal_finish = duration_since_epoch();
+        let secs_since_dkg_start = deal_finish.as_secs_f64() - dkg_start_time.as_secs_f64();
         DKG_STAGE_SECONDS
-            .with_label_values(&[
-                self.epoch_state.epoch.to_string().as_str(),
-                self.my_addr.to_hex().as_str(),
-                "deal_finish",
-            ])
-            .observe(deal_finish.as_secs_f64() - dkg_start_time.as_secs_f64());
-        self.log_info("Local transcript ready.");
+            .with_label_values(&[self.my_addr.to_hex().as_str(), "deal_finish"])
+            .observe(secs_since_dkg_start);
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr,
+            secs_since_dkg_start = secs_since_dkg_start,
+            "Local transcript ready.",
+        );
 
         let abort_handle = self.agg_trx_producer.start_produce(
             self.epoch_state.clone(),
@@ -316,14 +345,17 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 ..
             } => {
                 let agg_transcript_ready_time = duration_since_epoch();
+                let secs_since_dkg_start =
+                    agg_transcript_ready_time.as_secs_f64() - start_time.as_secs_f64();
                 DKG_STAGE_SECONDS
-                    .with_label_values(&[
-                        self.epoch_state.epoch.to_string().as_str(),
-                        self.my_addr.to_hex().as_str(),
-                        "agg_transcript_ready",
-                    ])
-                    .observe(agg_transcript_ready_time.as_secs_f64() - start_time.as_secs_f64());
-                self.log_info("Agg transcript ready.");
+                    .with_label_values(&[self.my_addr.to_hex().as_str(), "agg_transcript_ready"])
+                    .observe(secs_since_dkg_start);
+                info!(
+                    epoch = self.epoch_state.epoch,
+                    my_addr = self.my_addr,
+                    secs_since_dkg_start = secs_since_dkg_start,
+                    "DKG agg transcript ready.",
+                );
 
                 let txn = ValidatorTransaction::DKGResult(DKGTranscript {
                     metadata: DKGTranscriptMetadata {
@@ -351,7 +383,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
     }
 
     async fn process_dkg_start_event(&mut self, event: DKGStartEvent) -> Result<()> {
-        self.log_info("Processing DKGStart event.");
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr,
+            "Processing DKGStart event."
+        );
         fail_point!("dkg::process_dkg_start_event");
         let DKGStartEvent {
             session_metadata,
@@ -394,24 +430,6 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
         response_sender.send(response);
         Ok(())
-    }
-
-    fn log_info<S: AsRef<str>>(&self, msg: S) {
-        info!(
-            epoch = self.epoch_state.epoch,
-            my_addr = self.my_addr,
-            "{}",
-            msg.as_ref()
-        );
-    }
-
-    fn log_error<S: AsRef<str>>(&self, msg: S) {
-        error!(
-            epoch = self.epoch_state.epoch,
-            my_addr = self.my_addr,
-            "{}",
-            msg.as_ref()
-        );
     }
 }
 
