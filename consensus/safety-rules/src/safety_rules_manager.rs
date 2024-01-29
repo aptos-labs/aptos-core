@@ -86,9 +86,10 @@ pub fn load_consensus_key_from_secure_storage(
     storage.available().map_err(|e| {
         anyhow!("load_consensus_key_from_secure_storage failed with storage unavailable: {e}")
     })?;
-    storage.get(CONSENSUS_KEY).map_err(|e| {
+    let response = storage.get(CONSENSUS_KEY).map_err(|e| {
         anyhow!("load_consensus_key_from_secure_storage failed with storage read error: {e}")
-    })
+    })?;
+    response.value
 }
 
 enum SafetyRulesWrapper {
