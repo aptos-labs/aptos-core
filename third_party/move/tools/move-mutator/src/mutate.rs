@@ -34,8 +34,7 @@ pub fn mutate(
     mutants.extend(
         ast.scripts
             .into_iter()
-            .map(|script| {
-                let (_, script) = script;
+            .map(|(_, script)| {
                 traverse_function((script.function_name, script.function), conf, files)
             })
             .collect::<Result<Vec<_>, _>>()?
@@ -72,7 +71,7 @@ fn functions_of(
 ) -> &UniqueMap<FunctionName, Function> {
     let (_, module) = module;
     let ModuleDefinition { functions, .. } = module;
-    return functions;
+    functions
 }
 
 /// Internal helper function that returns a reference to the constants defined in the module.
@@ -81,7 +80,7 @@ fn constants_of(
 ) -> &UniqueMap<ConstantName, Constant> {
     let (_, module) = module;
     let ModuleDefinition { constants, .. } = module;
-    return constants;
+    constants
 }
 
 /// Extracts the module name from the module declaration.
@@ -112,10 +111,7 @@ fn traverse_module(
         constants_of(&module)
             .to_owned()
             .into_iter()
-            .map(|constant| {
-                let (_, constant) = constant;
-                parse_expression_and_find_mutants(constant.value)
-            })
+            .map(|(_, constant)| parse_expression_and_find_mutants(constant.value))
             .collect::<Result<Vec<_>, _>>()?
             .concat(),
     );
