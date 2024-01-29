@@ -2,6 +2,7 @@
 
 use crate::transcript_aggregation::TranscriptAggregationState;
 use aptos_crypto::{bls12381::bls12381_keys, Uniform};
+use aptos_infallible::duration_since_epoch;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     dkg::{
@@ -47,6 +48,8 @@ fn test_transcript_aggregation_state() {
     });
     let epoch_state = Arc::new(EpochState { epoch, verifier });
     let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(
+        duration_since_epoch(),
+        addrs[0],
         pub_params,
         epoch_state,
     ));

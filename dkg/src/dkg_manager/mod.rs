@@ -321,6 +321,8 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
 
         let abort_handle = self.agg_trx_producer.start_produce(
+            dkg_start_time,
+            self.my_addr,
             self.epoch_state.clone(),
             public_params.clone(),
             self.agg_trx_tx.clone(),
