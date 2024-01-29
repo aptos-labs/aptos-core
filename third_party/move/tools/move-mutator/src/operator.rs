@@ -1,5 +1,6 @@
 use crate::operators::binary::Binary;
 use crate::operators::break_continue::BreakContinue;
+use crate::operators::literal::Literal;
 use crate::operators::unary::Unary;
 use crate::report::Mutation;
 use move_command_line_common::files::FileHash;
@@ -51,6 +52,7 @@ pub enum MutationOp {
     BinaryOp(Binary),
     UnaryOp(Unary),
     BreakContinue(BreakContinue),
+    Literal(Literal),
 }
 
 impl MutationOperator for MutationOp {
@@ -61,6 +63,7 @@ impl MutationOperator for MutationOp {
             MutationOp::BinaryOp(bin_op) => bin_op.apply(source),
             MutationOp::UnaryOp(unary_op) => unary_op.apply(source),
             MutationOp::BreakContinue(break_continue) => break_continue.apply(source),
+            MutationOp::Literal(literal) => literal.apply(source),
         }
     }
 
@@ -69,6 +72,7 @@ impl MutationOperator for MutationOp {
             MutationOp::BinaryOp(bin_op) => bin_op.get_file_hash(),
             MutationOp::UnaryOp(unary_op) => unary_op.get_file_hash(),
             MutationOp::BreakContinue(break_continue) => break_continue.get_file_hash(),
+            MutationOp::Literal(literal) => literal.get_file_hash(),
         }
     }
 }
@@ -79,6 +83,7 @@ impl fmt::Display for MutationOp {
             MutationOp::BinaryOp(bin_op) => write!(f, "{bin_op}"),
             MutationOp::UnaryOp(unary_op) => write!(f, "{unary_op}"),
             MutationOp::BreakContinue(break_continue) => write!(f, "{break_continue}"),
+            MutationOp::Literal(literal) => write!(f, "{literal}"),
         }
     }
 }
