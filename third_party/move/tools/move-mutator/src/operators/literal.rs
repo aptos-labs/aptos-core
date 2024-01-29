@@ -45,40 +45,40 @@ impl MutationOperator for Literal {
                 vec![
                     "0u8".to_owned(),
                     "255u8".to_owned(),
-                    (u8_val + 1).to_string(),
-                    (u8_val - 1).to_string(),
+                    u8_val.saturating_add(1).to_string(),
+                    u8_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U16(u16_val) => {
                 vec![
                     "0u16".to_owned(),
                     "65535u16".to_owned(),
-                    (u16_val + 1).to_string(),
-                    (u16_val - 1).to_string(),
+                    u16_val.saturating_add(1).to_string(),
+                    u16_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U32(u32_val) => {
                 vec![
                     "0u32".to_owned(),
                     "4294967295u32".to_owned(),
-                    (u32_val + 1).to_string(),
-                    (u32_val - 1).to_string(),
+                    u32_val.saturating_add(1).to_string(),
+                    u32_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U64(u64_val) => {
                 vec![
                     "0u64".to_owned(),
                     "18446744073709551615u64".to_owned(),
-                    (u64_val + 1).to_string(),
-                    (u64_val - 1).to_string(),
+                    u64_val.saturating_add(1).to_string(),
+                    u64_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U128(u128_val) => {
                 vec![
                     "0u128".to_owned(),
                     "340282366920938463463374607431768211455u128".to_owned(),
-                    (u128_val + 1).to_string(),
-                    (u128_val - 1).to_string(),
+                    u128_val.saturating_add(1).to_string(),
+                    u128_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U256(_u256_val) => {
