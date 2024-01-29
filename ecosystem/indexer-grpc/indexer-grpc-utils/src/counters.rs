@@ -174,7 +174,7 @@ pub fn log_grpc_step(
     duration_in_secs: Option<f64>,
     size_in_bytes: Option<usize>,
     num_transactions: Option<i64>,
-    request_metadata: Option<IndexerGrpcRequestMetadata>,
+    request_metadata: Option<&IndexerGrpcRequestMetadata>,
 ) {
     if let Some(duration_in_secs) = duration_in_secs {
         DURATION_IN_SECS
@@ -229,19 +229,11 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_name = request_metadata.clone().unwrap().processor_name.as_str(),
-            request_email = request_metadata.clone().unwrap().request_email.as_str(),
-            request_api_key_name = request_metadata
-                .clone()
-                .unwrap()
-                .request_api_key_name
-                .as_str(),
-            processor_name = request_metadata.clone().unwrap().processor_name.as_str(),
-            connection_id = request_metadata
-                .clone()
-                .unwrap()
-                .request_connection_id
-                .as_str(),
+            request_name = request_metadata.unwrap().processor_name.as_str(),
+            request_email = request_metadata.unwrap().request_email.as_str(),
+            request_api_key_name = request_metadata.unwrap().request_api_key_name.as_str(),
+            processor_name = request_metadata.unwrap().processor_name.as_str(),
+            connection_id = request_metadata.unwrap().request_connection_id.as_str(),
             request_user_classification = request_metadata
                 .unwrap()
                 .request_user_classification
