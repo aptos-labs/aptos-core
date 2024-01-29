@@ -14,6 +14,7 @@ use crate::mutant::Mutant;
 use crate::operator::MutationOp;
 use crate::operators::binary::Binary;
 use crate::operators::break_continue::BreakContinue;
+use crate::operators::literal::Literal;
 use crate::operators::unary::Unary;
 
 /// Traverses the AST, identifies places where mutation operators can be applied
@@ -275,6 +276,10 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             ));
             Ok(mutants)
         },
+        ast::UnannotatedExp_::Value(val) => {
+            let mutants = vec![Mutant::new(MutationOp::Literal(Literal::new(val)), None)];
+            Ok(mutants)
+        },
         ast::UnannotatedExp_::Abort(exp)
         | ast::UnannotatedExp_::Annotate(exp, _)
         | ast::UnannotatedExp_::Borrow(_, exp, _)
@@ -296,7 +301,6 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
         | ast::UnannotatedExp_::ModuleCall(_)
         | ast::UnannotatedExp_::BorrowLocal(_, _)
         | ast::UnannotatedExp_::Spec(_)
-        | ast::UnannotatedExp_::Value(_)
         | ast::UnannotatedExp_::UnresolvedError => Ok(vec![]),
     }
 }

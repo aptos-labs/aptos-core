@@ -27,8 +27,7 @@ impl MutationOperator for BreakContinue {
         let end = self.operation.exp.loc.end() as usize;
         let cur_op = &source[start..end];
 
-        // Group of exchangeable binary operators - we only want to replace the operator with a different one
-        // within the same group.
+        // Group of exchangeable break/continue statements.
         let ops: Vec<&str> = match self.operation.exp.value {
             UnannotatedExp_::Break => {
                 vec!["continue", "{}"]
