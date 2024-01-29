@@ -11,3 +11,15 @@ pub const MAX_JSON_REQUEST_RETRY_SECONDS: u64 = 30;
 
 /// Allocate 90 seconds for downloading large image files
 pub const MAX_IMAGE_REQUEST_RETRY_SECONDS: u64 = 90;
+
+/// Default 15 MB maximum file size for files to be downloaded
+pub const DEFAULT_MAX_FILE_SIZE_BYTES: u32 = 15_000_000;
+
+/// Default 100% image quality for image optimization
+pub const DEFAULT_IMAGE_QUALITY: u8 = 100;
+
+/// Default 4096 maximum image dimensions for image optimization
+pub const DEFAULT_MAX_IMAGE_DIMENSIONS: u32 = 4_096;
+
+/// Default IPFS gateway auth param key
+pub const IPFS_AUTH_KEY: &str = "pinataGatewayToken";

@@ -6,6 +6,9 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
+        constants::{
+            DEFAULT_IMAGE_QUALITY, DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MAX_IMAGE_DIMENSIONS,
+        },
         counters::{
             DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
             DUPLICATE_RAW_IMAGE_URI_COUNT, GOT_CONNECTION_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT,
@@ -46,8 +49,10 @@ pub struct ParserConfig {
     pub database_url: String,
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
-    pub max_file_size_bytes: u32,
-    pub image_quality: u8, // Quality up to 100
+    pub ipfs_auth_key: Option<String>,
+    pub max_file_size_bytes: Option<u32>,
+    pub image_quality: Option<u8>, // Quality up to 100
+    pub max_image_dimensions: Option<u32>,
     pub ack_parsed_uris: Option<bool>,
     pub uri_blacklist: Option<Vec<String>>,
     pub server_port: u16,
@@ -328,25 +333,32 @@ impl Worker {
 
         // Parse asset_uri
         self.log_info("Parsing asset_uri");
-        let json_uri =
-            URIParser::parse(self.config.ipfs_prefix.clone(), self.model.get_asset_uri())
-                .unwrap_or_else(|_| {
-                    self.log_warn("Failed to parse asset_uri", None);
-                    PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-                    self.model.get_asset_uri()
-                });
+        let json_uri = URIParser::parse(
+            self.config.ipfs_prefix.clone(),
+            self.model.get_asset_uri(),
+            self.config.ipfs_auth_key.clone(),
+        )
+        .unwrap_or_else(|_| {
+            self.log_warn("Failed to parse asset_uri", None);
+            PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
+            self.model.get_asset_uri()
+        });
 
         // Parse JSON for raw_image_uri and raw_animation_uri
         self.log_info("Starting JSON parsing");
-        let (raw_image_uri, raw_animation_uri, json) =
-            JSONParser::parse(json_uri, self.config.max_file_size_bytes)
-                .await
-                .unwrap_or_else(|e| {
-                    // Increment retry count if JSON parsing fails
-                    self.log_warn("JSON parsing failed", Some(&e));
-                    self.model.increment_json_parser_retry_count();
-                    (None, None, Value::Null)
-                });
+        let (raw_image_uri, raw_animation_uri, json) = JSONParser::parse(
+            json_uri,
+            self.config
+                .max_file_size_bytes
+                .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
+        )
+        .await
+        .unwrap_or_else(|e| {
+            // Increment retry count if JSON parsing fails
+            self.log_warn("JSON parsing failed", Some(&e));
+            self.model.increment_json_parser_retry_count();
+            (None, None, Value::Null)
+        });
 
         self.model.set_raw_image_uri(raw_image_uri);
         self.model.set_raw_animation_uri(raw_animation_uri);
@@ -407,12 +419,16 @@ impl Worker {
                 .model
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_asset_uri());
-            let img_uri = URIParser::parse(self.config.ipfs_prefix.clone(), raw_image_uri.clone())
-                .unwrap_or_else(|_| {
-                    self.log_warn("Failed to parse raw_image_uri", None);
-                    PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-                    raw_image_uri
-                });
+            let img_uri = URIParser::parse(
+                self.config.ipfs_prefix.clone(),
+                raw_image_uri.clone(),
+                self.config.ipfs_auth_key.clone(),
+            )
+            .unwrap_or_else(|_| {
+                self.log_warn("Failed to parse raw_image_uri", None);
+                PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
+                raw_image_uri
+            });
 
             // Resize and optimize image
             self.log_info("Starting image optimization");
@@ -421,8 +437,13 @@ impl Worker {
                 .inc();
             let (image, format) = ImageOptimizer::optimize(
                 img_uri,
-                self.config.max_file_size_bytes,
-                self.config.image_quality,
+                self.config
+                    .max_file_size_bytes
+                    .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
+                self.config.image_quality.unwrap_or(DEFAULT_IMAGE_QUALITY),
+                self.config
+                    .max_image_dimensions
+                    .unwrap_or(DEFAULT_MAX_IMAGE_DIMENSIONS),
             )
             .await
             .unwrap_or_else(|e| {
@@ -490,13 +511,16 @@ impl Worker {
         // If raw_animation_uri_option is None, skip
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             self.log_info("Starting animation optimization");
-            let animation_uri =
-                URIParser::parse(self.config.ipfs_prefix.clone(), raw_animation_uri.clone())
-                    .unwrap_or_else(|_| {
-                        self.log_warn("Failed to parse raw_animation_uri", None);
-                        PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-                        raw_animation_uri
-                    });
+            let animation_uri = URIParser::parse(
+                self.config.ipfs_prefix.clone(),
+                raw_animation_uri.clone(),
+                self.config.ipfs_auth_key.clone(),
+            )
+            .unwrap_or_else(|_| {
+                self.log_warn("Failed to parse raw_animation_uri", None);
+                PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
+                raw_animation_uri
+            });
 
             // Resize and optimize animation
             self.log_info("Starting animation optimization");
@@ -505,8 +529,13 @@ impl Worker {
                 .inc();
             let (animation, format) = ImageOptimizer::optimize(
                 animation_uri,
-                self.config.max_file_size_bytes,
-                self.config.image_quality,
+                self.config
+                    .max_file_size_bytes
+                    .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
+                self.config.image_quality.unwrap_or(DEFAULT_IMAGE_QUALITY),
+                self.config
+                    .max_image_dimensions
+                    .unwrap_or(DEFAULT_MAX_IMAGE_DIMENSIONS),
             )
             .await
             .unwrap_or_else(|e| {
