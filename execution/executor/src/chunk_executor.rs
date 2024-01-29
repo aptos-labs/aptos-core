@@ -37,9 +37,9 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::StateViewId,
     transaction::{
-        signature_verified_transaction::SignatureVerifiedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus, Version,
+        signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus, Version,
     },
     write_set::WriteSet,
 };
@@ -739,6 +739,7 @@ impl<V: VMExecutor> ChunkExecutorInner<V> {
                     events,
                     txn_info.gas_used(),
                     TransactionStatus::Keep(txn_info.status().clone()),
+                    TransactionAuxiliaryData::default(), // No auxiliary data if transaction is not executed through VM
                 ),
             )
         })

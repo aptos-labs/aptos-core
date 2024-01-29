@@ -65,9 +65,9 @@ use aptos_types::{
         ShardedStateUpdates,
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
-        TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
+        TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
