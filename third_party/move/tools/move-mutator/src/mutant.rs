@@ -13,6 +13,8 @@ pub struct Mutant {
 
 impl Mutant {
     /// Creates a new mutant.
+    /// `module_name` argument is optional as during the mutant creation the code may not know the module name uet.
+    /// It can be set later using `set_module_name` method.
     pub fn new(operator: MutationOp, module_name: Option<ModuleName>) -> Self {
         Self {
             operator,

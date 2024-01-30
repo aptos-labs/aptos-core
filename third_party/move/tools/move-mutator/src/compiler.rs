@@ -60,7 +60,7 @@ pub fn generate_ast(
         .map(|p| p.to_str().expect("source path contains invalid characters"))
         .collect::<Vec<_>>();
 
-    // If -m option is specified we should use only `move_sources`. Using Move source means we won't
+    // If the `-m` option is specified, we should use only `move_sources`. Using Move source means we won't
     // check for deps or resolve names as there might be no standard package layout. That means we can mutate
     // only quite simple files.
     let compiler = if source_files.is_empty() {
@@ -74,7 +74,7 @@ pub fn generate_ast(
     let (_, stepped) = unwrap_or_report_diagnostics(&files, res);
     let (_, ast) = stepped.into_ast();
 
-    trace!("Sources parsed successfully, AST generated.");
+    trace!("Sources parsed successfully, AST generated");
 
     Ok((files, ast))
 }
@@ -82,6 +82,8 @@ pub fn generate_ast(
 /// Prepare the compiler for the given package.
 /// This function prepares the compiler for the given package - it resolves all names and dependencies reading them
 /// from the manifest file present at the package root.
+///
+/// This function is mostly copy of the code present in the `move_package` crate (build_all).
 ///
 /// # Arguments
 ///
