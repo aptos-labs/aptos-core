@@ -1,3 +1,4 @@
+# NOOP
 chain:
   # -- Internal: name of the testnet to connect to
   name: testnet
