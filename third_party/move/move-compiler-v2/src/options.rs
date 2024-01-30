@@ -35,7 +35,7 @@ pub struct Options {
     #[clap(long = cli::DEBUG_FLAG, default_value=debug_compiler_env_var_str())]
     pub debug: bool,
     /// Whether to dump intermediate bytecode for debugging.
-    #[clap(long = "dump-bytecode")]
+    #[clap(long = "dump-bytecode", default_value=debug_compiler_dump_env_var_str())]
     pub dump_bytecode: bool,
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
@@ -102,6 +102,12 @@ fn debug_compiler_env_var() -> bool {
     *DEBUG_COMPILER
 }
 
+fn debug_compiler_dump_env_var() -> bool {
+    static DEBUG_COMPILER_DUMP: Lazy<bool> =
+        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DUMP_ENV_VAR));
+    *DEBUG_COMPILER_DUMP
+}
+
 fn compiler_exp_var() -> Vec<String> {
     static EXP_VAR: Lazy<Vec<String>> = Lazy::new(|| {
         let s = read_env_var("MOVE_COMPILER_EXP");
@@ -112,6 +118,14 @@ fn compiler_exp_var() -> Vec<String> {
 
 fn debug_compiler_env_var_str() -> &'static str {
     if debug_compiler_env_var() {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+fn debug_compiler_dump_env_var_str() -> &'static str {
+    if debug_compiler_dump_env_var() {
         "true"
     } else {
         "false"
