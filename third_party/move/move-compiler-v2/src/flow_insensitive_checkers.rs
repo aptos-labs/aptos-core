@@ -17,10 +17,12 @@ use std::{collections::BTreeSet, iter::Iterator};
 /// Warns about all parameters and local variables that are unused.
 pub fn check_for_unused_vars_and_params(env: &mut GlobalEnv) {
     for module in env.get_modules() {
-        for func in module.get_functions() {
-            if let Some(def) = &*func.get_def() {
-                let params = &func.get_parameters();
-                find_unused_params_and_vars(env, params, def)
+        if module.is_target() {
+            for func in module.get_functions() {
+                if let Some(def) = &*func.get_def() {
+                    let params = &func.get_parameters();
+                    find_unused_params_and_vars(env, params, def)
+                }
             }
         }
     }
@@ -49,13 +51,6 @@ where
             saved: Vec::new(),
             values: BTreeSet::new(),
         }
-    }
-
-    #[allow(unused)]
-    /// Clear everything for reuse on a new function.
-    pub fn clear(&mut self) {
-        self.saved.clear();
-        self.values.clear();
     }
 
     /// Save and clear the current set.
@@ -160,7 +155,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
         let symbol_pool = self.env.symbol_pool();
         if !symbol_pool.symbol_starts_with_underscore(*sym) && !self.seen_uses.contains(sym) {
             let msg = format!(
-                "Unused {} `{}`.  Consider removing or prefixing with an underscore: `_{}`",
+                "Unused {} `{}`. Consider removing or prefixing with an underscore: `_{}`",
                 kind,
                 sym.display(symbol_pool),
                 sym.display(symbol_pool)
