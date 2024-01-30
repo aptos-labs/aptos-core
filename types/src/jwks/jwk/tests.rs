@@ -19,20 +19,20 @@ fn convert_jwk_move_struct_to_jwk() {
     };
     assert_eq!(
         JWK::Unsupported(unsupported_jwk),
-        JWK::try_from(jwk_move_struct).unwrap()
+        JWK::try_from(&jwk_move_struct).unwrap()
     );
 
     let rsa_jwk = RSA_JWK::new_for_testing("kid1", "kty1", "alg1", "e1", "n1");
     let jwk_move_struct = JWKMoveStruct {
         variant: rsa_jwk.as_move_any(),
     };
-    assert_eq!(JWK::RSA(rsa_jwk), JWK::try_from(jwk_move_struct).unwrap());
+    assert_eq!(JWK::RSA(rsa_jwk), JWK::try_from(&jwk_move_struct).unwrap());
 
     let unknown_jwk_variant = MoveAny {
         type_name: "type1".to_string(),
         data: vec![],
     };
-    assert!(JWK::try_from(JWKMoveStruct {
+    assert!(JWK::try_from(&JWKMoveStruct {
         variant: unknown_jwk_variant
     })
     .is_err());
