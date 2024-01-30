@@ -3,6 +3,8 @@
 export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 
+CORPUS_ZIPS = ["https://docs.google.com/uc?export=download&id=1MDhzEP1YMaNZSIczSKCmUXzsJNMgn2gH"]
+
 function info() {
     echo "[info] $1"
 }
@@ -92,6 +94,11 @@ function build-oss-fuzz() {
         error "Build failed. Exiting."
     fi
     find ./target/*/release/ -maxdepth 1 -type f -perm /111 -exec cp {} $oss_fuzz_out \;
+
+    # Download corpus zip
+    for corpus_zip in "${CORPUS_ZIPS[@]}"; do
+        wget --content-disposition -P $oss_fuzz_out $corpus_zip
+    done
 }
 
 function run() {
