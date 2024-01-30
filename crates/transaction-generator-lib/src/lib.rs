@@ -88,6 +88,7 @@ pub enum TransactionType {
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateThenMint { count: usize, creation_balance: u64 },
+    Econia { num_users: usize },
 }
 
 impl Default for TransactionType {

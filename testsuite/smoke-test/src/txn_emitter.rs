@@ -4,8 +4,8 @@
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use anyhow::ensure;
 use aptos_forge::{
-    args::TransactionTypeArg, EmitJobMode, EmitJobRequest, EntryPoints, NodeExt, Result, Swarm,
-    TransactionType, TxnEmitter, TxnStats,
+    EmitJobMode, EmitJobRequest, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats,
+    WorkflowKind,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
@@ -57,6 +57,15 @@ async fn test_txn_emmitter() {
         Duration::from_secs(20),
         100,
         vec![
+            vec![(
+                TransactionType::Workflow {
+                    workflow_kind: WorkflowKind::Econia { num_users: 100 },
+                    num_modules: 1,
+                    move_stages_by_phase: true,
+                    use_account_pool: true,
+                },
+                1,
+            )],
             // vec![(
             //     TransactionType::AccountGeneration {
             //         add_created_accounts_to_pool: true,
@@ -76,20 +85,20 @@ async fn test_txn_emmitter() {
             //         20,
             //     ),
             // ],
-            vec![
-                (TransactionTypeArg::NoOp.materialize(100, false), 20),
-                (
-                    TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::MakeOrChangeTable {
-                            offset: 0,
-                            count: 60,
-                        },
-                        num_modules: 1,
-                        use_account_pool: false,
-                    },
-                    20,
-                ),
-            ],
+            // vec![
+            //     (TransactionTypeArg::NoOp.materialize(100, false), 20),
+            //     (
+            //         TransactionType::CallCustomModules {
+            //             entry_point: EntryPoints::MakeOrChangeTable {
+            //                 offset: 0,
+            //                 count: 60,
+            //             },
+            //             num_modules: 1,
+            //             use_account_pool: false,
+            //         },
+            //         20,
+            //     ),
+            // ],
             // vec![(
             //     TransactionType::CallCustomModules {
             //         entry_point: EntryPoints::TokenV1MintAndStoreNFTSequential,
