@@ -30,6 +30,7 @@ use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_types::on_chain_config::FeatureFlag::RECONFIGURE_WITH_DKG;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
     dkg_dealer_sk: Arc<<DefaultDKG as DKGTrait>::DealerPrivateKey>,
@@ -156,8 +157,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get(&self.my_addr)
             .copied();
 
-        let features = payload.get::<Features>().unwrap_or_default();
-
+        let mut features = payload.get::<Features>().unwrap_or_default();
+        features.disable(RECONFIGURE_WITH_DKG);
         if let (true, Some(my_index)) = (
             features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
             my_index,
