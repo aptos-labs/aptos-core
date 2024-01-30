@@ -1006,7 +1006,9 @@ impl AnySignature {
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
             (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key }) => {
                 match &signature.sig {
-                    ZkpOrOpenIdSig::Groth16Zkp(_) => {},
+                    ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+                        proof.verify(&signature.ephemeral_pubkey)?
+                    },
                     ZkpOrOpenIdSig::OpenIdSig(oidc_sig) => oidc_sig.verify_jwt_claims(
                         signature.exp_timestamp_secs,
                         &signature.ephemeral_pubkey,
@@ -1127,8 +1129,7 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{webauthn::AssertionSignature, SignedTransaction},
-        zkid::{IdCommitment, OpenIdSig, Pepper, EPK_BLINDER_NUM_BYTES},
+        circom::{G1Projective, G2Projective}, transaction::{webauthn::AssertionSignature, SignedTransaction}, zkid::{Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, EPK_BLINDER_NUM_BYTES}
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -2033,6 +2034,84 @@ mod tests {
         );
         let verification_result = signed_txn.verify_signature();
         assert!(verification_result.is_err());
+    }
+
+    #[test]
+    fn test_groth16_proof_verification() {
+        let a = G1Projective::new(
+            "1907126976448947356704944105344209113638990410557947012673208951620306955174",
+            "17097841389334484537002270117994572082468093744192028455285259782280121815827",
+        );
+
+        let b = G2Projective::new(
+            [
+                "14278925284257190513783990706425850880455091796981997205331609327118642516481",
+                "17097607407652600947387126931757770909307167892677374080172672352832759068745",
+            ],
+            [
+                "7687617115387785661307256452150283923250690531057496828650235733289385638174",
+                "3239034819556393279790911890493935486535645694372327998553930102845350873928",
+            ],
+        );
+
+        let c = G1Projective::new(
+            "9876071200350307730744340079355477868341654287378700221239624353906380175962",
+            "13133068658514075998179066471453323614948823643788895538568027023859471128512",
+        );
+        let proof = Groth16Zkp::new(a, b, c);
+
+        let sender = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender.public_key();
+        let sender_auth_key = AuthenticationKey::ed25519(&sender_pub);
+        let sender_addr = sender_auth_key.account_address();
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+            sender_addr,
+            0,
+            &sender,
+            sender.public_key(),
+            None,
+            0,
+            0,
+            None,
+        )
+        .into_raw_transaction();
+
+        let sender_sig = sender.sign(&raw_txn).unwrap();
+
+        let epk = EphemeralPublicKey::ed25519(sender.public_key());
+        let es = EphemeralSignature::ed25519(sender_sig);
+
+        let proof_sig = sender.sign(&proof).unwrap();
+        let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
+        ephem_proof_sig.verify(&proof, &epk).unwrap();
+        let zk_sig = ZkIdSignature {
+            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp { proof: proof.clone(), proof_signature: ephem_proof_sig }),
+            jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
+            exp_timestamp_secs: 1900255944,
+            ephemeral_pubkey: epk,
+            ephemeral_signature: es,
+        };
+
+        let pepper = Pepper::from_number(76);
+        let addr_seed = IdCommitment::new_from_preimage(
+            &pepper,
+            "407408718192.apps.googleusercontent.com",
+            "sub",
+            "113990307082899718775",
+        )
+        .unwrap();
+
+        let zk_pk = ZkIdPublicKey {
+            iss: "https://accounts.google.com".to_owned(),
+            idc: addr_seed,
+        };
+
+        let sk_auth =
+            SingleKeyAuthenticator::new(AnyPublicKey::zkid(zk_pk), AnySignature::zkid(zk_sig));
+        let account_auth = AccountAuthenticator::single_key(sk_auth);
+        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        let verification_result = signed_txn.verify_signature();
+        verification_result.unwrap();
     }
 
     fn zkid_test_setup(

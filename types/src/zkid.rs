@@ -12,8 +12,9 @@ use crate::{
         SignedTransaction,
     },
 };
-use anyhow::{anyhow, bail, ensure, Context, Ok, Result};
+use anyhow::{bail, ensure, Context, Result};
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254;
 use ark_groth16::{Groth16, Proof};
 use ark_serialize::CanonicalSerialize;
@@ -228,11 +229,43 @@ impl Claims {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash)]
 pub struct Groth16Zkp {
     a: G1Projective,
     b: G2Projective,
     c: G1Projective,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+pub struct SignedGroth16Zkp {
+    pub proof: Groth16Zkp,
+    /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
+    pub proof_signature: EphemeralSignature,
+}
+
+impl SignedGroth16Zkp {
+    pub fn verify(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
+        self.proof_signature.verify(&self.proof, pub_key)
+    }
+
+    pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
+        let vk = match chain_id.is_mainnet() {
+            true => {
+                bail!("verifying key for main net missing")
+            },
+            false => &DEV_VERIFYING_KEY,
+        };
+        let proof: Proof<ark_bn254::Bn254> = Proof {
+            a: self.proof.a.to_affine()?,
+            b: self.proof.b.to_affine()?,
+            c: self.proof.c.to_affine()?,
+        };
+        let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
+        if !result {
+            bail!("groth16 proof verification failed")
+        }
+        Ok(())
+    }
 }
 
 impl TryFrom<&[u8]> for Groth16Zkp {
@@ -272,7 +305,7 @@ impl Groth16Zkp {
 /// need to turn off ZK proofs due to a bug in the circuit.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub enum ZkpOrOpenIdSig {
-    Groth16Zkp(Groth16Zkp),
+    Groth16Zkp(SignedGroth16Zkp),
     OpenIdSig(OpenIdSig),
 }
 
@@ -331,7 +364,7 @@ impl ZkIdSignature {
         let expiry_time = seconds_from_epoch(self.exp_timestamp_secs);
 
         if block_time > expiry_time {
-            Err(anyhow!("zkID Signature is expired"))
+            bail!("zkID Signature is expired");
         } else {
             Ok(())
         }
@@ -469,7 +502,7 @@ mod test {
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
             G1Projective, G2Projective, Groth16Zkp, IdCommitment, Pepper, ZkIdPublicKey,
-            ZkIdSignature, ZkpOrOpenIdSig,
+            ZkIdSignature, ZkpOrOpenIdSig, SignedGroth16Zkp,
         },
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
@@ -519,18 +552,10 @@ mod test {
         let epk = EphemeralPublicKey::ed25519(sender.public_key());
         let es = EphemeralSignature::ed25519(sender_sig);
 
-        let _bit_string: String = epk
-            .to_bytes()
-            .iter()
-            .flat_map(|&byte| {
-                (0..8)
-                    .rev()
-                    .map(move |i| if (byte & (1 << i)) != 0 { '1' } else { '0' })
-            })
-            .collect();
-
+        let proof_sig = sender.sign(&proof).unwrap();
+        let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
         let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::Groth16Zkp(proof.clone()),
+            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp { proof: proof.clone(), proof_signature: ephem_proof_sig }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
             ephemeral_pubkey: epk,
