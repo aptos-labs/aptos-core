@@ -1,14 +1,22 @@
 // Copyright © Aptos Foundation
 
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicI64, Ordering},
+        Arc,
+    },
+};
+
 use crate::utils::{
-    counters::{EVENT_RECEIVED_COUNT, PUBSUB_STREAM_RESET_COUNT},
+    counters::{PUBSUB_STREAM_RESET_COUNT, TRANSACTION_RECEIVED_COUNT},
     event_message::{PubSubEventMessage, StreamEventMessage},
 };
 use chrono::Duration;
 use futures::StreamExt;
 use google_cloud_pubsub::subscription::{MessageStream, Subscription};
-use tokio::sync::broadcast;
-use tracing::{error, info, warn};
+use tokio::sync::{broadcast, Mutex, Notify};
+use tracing::{error, warn};
 
 #[derive(Clone)]
 pub struct Ingestor {
@@ -35,23 +43,22 @@ impl Ingestor {
 
     pub async fn run(&self) {
         let mut stream = self.get_new_subscription_stream().await;
+        let received_messages = Arc::new(Mutex::new(HashMap::new()));
+        let notify_arc = Arc::new(Notify::new());
+        let expected_version = Arc::new(AtomicI64::new(0));
+
         while let Some(msg) = stream.next().await {
-            let pubsub_message = String::from_utf8(msg.message.data.to_vec()).unwrap_or_else(|e| {
-                error!(
-                    error = ?e,
-                    "[Event Stream] Failed to decode PubSub message"
-                );
-                panic!();
-            });
+            TRANSACTION_RECEIVED_COUNT.inc();
+            let received = received_messages.clone();
+            let notify = notify_arc.clone();
 
-            info!(
-                pubsub_message = pubsub_message.to_string(),
-                "[Event Stream] Received message from PubSub"
-            );
-            EVENT_RECEIVED_COUNT.inc();
-
-            let pubsub_message = self
-                .parse_pubsub_message(&pubsub_message)
+            let decoded_message =
+                String::from_utf8(msg.message.data.to_vec()).unwrap_or_else(|e| {
+                    error!(error = ?e, "[Event Stream] Failed to decode PubSub message");
+                    panic!();
+                });
+            let parsed_message = self
+                .parse_pubsub_message(&decoded_message)
                 .unwrap_or_else(|e| {
                     error!(
                         error = ?e,
@@ -59,43 +66,52 @@ impl Ingestor {
                     );
                     panic!();
                 });
-
             if let Err(e) = msg.ack().await {
                 warn!(
-                    pubsub_message = pubsub_message.to_string(),
+                    pubsub_message = parsed_message.to_string(),
                     error = ?e,
                     "[Event Stream] Resetting stream"
                 );
                 stream = self.get_new_subscription_stream().await;
                 continue;
             }
+            let transaction_version = parsed_message.transaction_version;
 
-            if let Err(e) = self.validate_pubsub_message(&pubsub_message) {
-                warn!(
-                    pubsub_message = pubsub_message.to_string(),
-                    error = ?e,
-                    "[Event Stream] Failed to validate message"
-                );
-                continue;
-            }
+            tokio::spawn(async move {
+                let mut received = received.lock().await;
+                received.insert(transaction_version, parsed_message);
+                notify.notify_waiters();
+            });
 
-            let stream_messages = StreamEventMessage::list_from_pubsub(&pubsub_message);
-            for stream_message in stream_messages {
-                self.channel
-                    .send(stream_message.clone())
-                    .unwrap_or_else(|e| {
-                        error!(
-                            pubsub_message = pubsub_message.to_string(),
-                            stream_message = stream_message.to_string(),
-                            error = ?e,
-                            "[Event Stream] Failed to broadcast message"
-                        );
-                        panic!();
-                    });
-                info!(
-                    stream_message = stream_message.to_string(),
-                    "[Event Stream] Broadcasted message"
-                );
+            notify_arc.notified().await;
+            let mut received = received_messages.lock().await;
+            while let Some(pubsub_message) =
+                received.remove(&expected_version.load(Ordering::SeqCst))
+            {
+                if let Err(e) = self.validate_pubsub_message(&pubsub_message) {
+                    warn!(
+                        pubsub_message = pubsub_message.to_string(),
+                        error = ?e,
+                        "[Event Stream] Failed to validate message"
+                    );
+                    continue;
+                }
+
+                let stream_messages = StreamEventMessage::list_from_pubsub(&pubsub_message);
+                for stream_message in stream_messages {
+                    self.channel
+                        .send(stream_message.clone())
+                        .unwrap_or_else(|e| {
+                            error!(
+                                pubsub_message = pubsub_message.to_string(),
+                                stream_message = stream_message.to_string(),
+                                error = ?e,
+                                "[Event Stream] Failed to broadcast message"
+                            );
+                            panic!();
+                        });
+                }
+                expected_version.fetch_add(1, Ordering::SeqCst);
             }
         }
     }
