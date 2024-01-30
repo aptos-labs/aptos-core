@@ -269,7 +269,7 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
                 BorrowField(mod_id, struct_id, insts, _) => {
                     check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
                 },
-                Destroy => cond_check_drop_for_temp_with_msg(
+                Drop => cond_check_drop_for_temp_with_msg(
                     target,
                     code_offset,
                     srcs[0],
