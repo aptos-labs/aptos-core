@@ -22,9 +22,9 @@ use std::path::Path;
 
 use crate::configuration::Configuration;
 use crate::report::Report;
+use move_compiler::parser::ast::ModuleName;
 use move_package::BuildConfig;
 use std::path::PathBuf;
-use move_compiler::parser::ast::ModuleName;
 
 /// Runs the Move mutator tool.
 /// Entry point for the Move mutator tool both for the CLI and the Rust API.
@@ -121,7 +121,7 @@ pub fn run_move_mutator(
                     let ModuleName(name) = module;
                     name.value.to_string()
                 } else {
-                    "script".to_owned()     // if there is no module name, it is a script
+                    "script".to_owned() // if there is no module name, it is a script
                 };
 
                 let mut entry = report::MutationReport::new(
