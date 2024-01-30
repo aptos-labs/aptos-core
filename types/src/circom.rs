@@ -198,9 +198,9 @@ pub fn get_public_inputs_hash(
     )?);
 
     // Add the hash of the jwt_header with the "." separator appended
-    let jwt_header_with_seperator = format!("{}.", sig.jwt_header);
+    let jwt_header_with_separator = format!("{}.", sig.jwt_header);
     frs.push(poseidon_bn254::pad_and_hash_string(
-        &jwt_header_with_seperator,
+        &jwt_header_with_separator,
         MAX_JWT_HEADER_BYTES,
     )?);
 

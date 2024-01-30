@@ -367,7 +367,7 @@ async fn test_groth16_signature_transaction_submission() {
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
-            proof_signature: ephem_proof_sig,
+            non_malleability_signature: ephem_proof_sig,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -469,7 +469,7 @@ async fn test_groth16_signature_transaction_submission_proof_signature_check_fai
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
-            proof_signature: ephemeral_signature.clone(), // Wrong signature
+            non_malleability_signature: ephemeral_signature.clone(), // Wrong signature
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,

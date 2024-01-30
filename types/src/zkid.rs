@@ -242,12 +242,12 @@ pub struct Groth16Zkp {
 pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
     /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
-    pub proof_signature: EphemeralSignature,
+    pub non_malleability_signature: EphemeralSignature,
 }
 
 impl SignedGroth16Zkp {
-    pub fn verify(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
-        self.proof_signature.verify(&self.proof, pub_key)
+    pub fn verify_non_malleability(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
+        self.non_malleability_signature.verify(&self.proof, pub_key)
     }
 
     pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
@@ -559,7 +559,7 @@ mod test {
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
-                proof_signature: ephem_proof_sig,
+                non_malleability_signature: ephem_proof_sig,
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,

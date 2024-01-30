@@ -1007,7 +1007,7 @@ impl AnySignature {
             (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key }) => {
                 match &signature.sig {
                     ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                        proof.verify(&signature.ephemeral_pubkey)?
+                        proof.verify_non_malleability(&signature.ephemeral_pubkey)?
                     },
                     ZkpOrOpenIdSig::OpenIdSig(oidc_sig) => oidc_sig.verify_jwt_claims(
                         signature.exp_timestamp_secs,
@@ -2091,7 +2091,7 @@ mod tests {
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
-                proof_signature: ephem_proof_sig,
+                non_malleability_signature: ephem_proof_sig,
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
