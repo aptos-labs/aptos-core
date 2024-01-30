@@ -70,7 +70,7 @@ fn traverse_module_with_check(
     {
         trace!(
             "Skipping module {} as it does not come from source project",
-            filename_path.to_str().unwrap()
+            filename
         );
         return Ok(vec![]);
     }
