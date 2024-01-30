@@ -3,7 +3,7 @@
 export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 
-CORPUS_ZIPS = ["https://docs.google.com/uc?export=download&id=1MDhzEP1YMaNZSIczSKCmUXzsJNMgn2gH"]
+CORPUS_ZIPS=("https://docs.google.com/uc?export=download&id=1MDhzEP1YMaNZSIczSKCmUXzsJNMgn2gH")
 
 function info() {
     echo "[info] $1"
