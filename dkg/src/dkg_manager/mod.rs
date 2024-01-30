@@ -127,6 +127,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
         let mut interval = tokio::time::interval(Duration::from_millis(5000));
 
+        let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
+        self.agg_trx_tx = Some(agg_trx_tx);
+
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
                 start_time_us,
@@ -138,8 +141,6 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 .expect("setup_deal_broadcast() should be infallible");
         }
 
-        let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
-        self.agg_trx_tx = Some(agg_trx_tx);
         let mut close_rx = close_rx.into_stream();
         info!(
             epoch = self.epoch_state.epoch,
