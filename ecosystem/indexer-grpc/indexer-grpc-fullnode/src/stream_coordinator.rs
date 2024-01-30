@@ -187,7 +187,7 @@ impl IndexerStreamCoordinator {
         // Stage 3: send responses to stream
         let sending_start_time = std::time::Instant::now();
         for response in responses {
-            if let Err(_) = self.transactions_sender.send(Ok(response)).await {
+            if self.transactions_sender.send(Ok(response)).await.is_err() {
                 // Error from closed channel. This means the client has disconnected.
                 return vec![];
             }
