@@ -77,3 +77,13 @@ pub static GAS_ESTIMATE: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static GAS_USED: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_gas_used",
+        "Amount of gas used by each API operation",
+        &["operation_id"],
+        BYTE_BUCKETS.clone()
+    )
+    .unwrap()
+});

@@ -1501,7 +1501,7 @@ async fn parse_operations(
                     ) = txn.payload()
                     {
                         let actual_operator_address: AccountAddress =
-                            bcs::from_bytes(payload.args().get(0).unwrap()).unwrap();
+                            bcs::from_bytes(payload.args().first().unwrap()).unwrap();
                         let operator = operation.new_operator().unwrap();
                         assert_eq!(actual_operator_address, operator);
 
