@@ -3,7 +3,7 @@
 
 use crate::{
     convert::convert_transaction,
-    counters::{FETCHED_LATENCY_IN_SECS, FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
+    counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION},
     runtime::{DEFAULT_NUM_RETRIES, RETRY_TIME_MILLIS},
 };
 use aptos_api::context::Context;
@@ -19,18 +19,18 @@ use aptos_protos::{
         transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
     },
     transaction::v1::Transaction as TransactionPB,
+    util::timestamp::Timestamp,
 };
 use aptos_vm::data_cache::AsMoveResolver;
-use std::{
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use itertools::Itertools;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tonic::Status;
 
 type EndVersion = u64;
 
 const SERVICE_TYPE: &str = "indexer_fullnode";
+const MINIMUM_TASK_LOAD_SIZE_IN_BYTES: usize = 1_000_000;
 
 // Basically a handler for a single GRPC stream request
 pub struct IndexerStreamCoordinator {
@@ -80,69 +80,75 @@ impl IndexerStreamCoordinator {
     /// 2. Convert transactions to rust objects (for example stringifying move structs into json)
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
-    pub async fn process_next_batch(
-        &mut self,
-        enable_expensive_logging: bool,
-    ) -> Vec<Result<EndVersion, Status>> {
+    pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+        let fetching_start_time = std::time::Instant::now();
+        // Stage 1: fetch transactions from storage.
+        let sorted_transactions_from_storage_with_size =
+            self.fetch_transactions_from_storage().await;
+        let first_version = sorted_transactions_from_storage_with_size
+            .first()
+            .map(|(txn, _)| txn.version)
+            .unwrap() as i64;
+        let end_version = sorted_transactions_from_storage_with_size
+            .last()
+            .map(|(txn, _)| txn.version)
+            .unwrap() as i64;
+        let num_transactions = sorted_transactions_from_storage_with_size.len();
+        let highest_known_version = self.highest_known_version as i64;
+        let (_, _, block_event) = self
+            .context
+            .db
+            .get_block_info_by_version(end_version as u64)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "[Indexer Fullnode] Could not get block_info for version {}",
+                    end_version,
+                )
+            });
+        let last_transaction_timestamp_in_microseconds = block_event.proposed_time();
+        let last_transaction_timestamp = Some(Timestamp {
+            seconds: (last_transaction_timestamp_in_microseconds / 1_000_000) as i64,
+            nanos: ((last_transaction_timestamp_in_microseconds % 1_000_000) * 1000) as i32,
+        });
+
+        log_grpc_step_fullnode(
+            IndexerGrpcStep::FullnodeFetchedBatch,
+            Some(first_version),
+            Some(end_version),
+            last_transaction_timestamp.as_ref(),
+            Some(highest_known_version),
+            None,
+            Some(fetching_start_time.elapsed().as_secs_f64()),
+            Some(num_transactions as i64),
+        );
+        // Stage 2: convert transactions to rust objects. CPU-bound load.
+        let decoding_start_time = std::time::Instant::now();
+        let mut task_batches = vec![];
+        let mut current_batch = vec![];
+        let mut current_batch_size = 0;
+        for (txn, size) in sorted_transactions_from_storage_with_size {
+            current_batch.push(txn);
+            current_batch_size += size;
+            if current_batch_size > MINIMUM_TASK_LOAD_SIZE_IN_BYTES {
+                task_batches.push(current_batch);
+                current_batch = vec![];
+                current_batch_size = 0;
+            }
+        }
+        if !current_batch.is_empty() {
+            task_batches.push(current_batch);
+        }
+
+        let output_batch_size = self.output_batch_size;
         let ledger_chain_id = self.context.chain_id().id();
         let mut tasks = vec![];
-        let batches = self.get_batches().await;
-        let output_batch_size = self.output_batch_size;
-
-        for batch in batches {
+        for batch in task_batches {
             let context = self.context.clone();
-            let ledger_version = self.highest_known_version;
-            let transaction_sender = self.transactions_sender.clone();
-
-            let task = tokio::spawn(async move {
-                let fetch_start_time = std::time::Instant::now();
-                // Fetch and convert transactions from API
-                let raw_txns =
-                    Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
-                let first_raw_transaction = raw_txns.first().unwrap();
-                let last_raw_transaction = raw_txns.last().unwrap();
-                let mut last_transaction_timestamp = None;
-                if enable_expensive_logging {
-                    // Reusing the conversion methods which need a vec, so make a vec of size 1
-                    let api_txn = Self::convert_to_api_txns(context.clone(), vec![
-                        last_raw_transaction.clone(),
-                    ])
-                    .await;
-                    let pb_txn = Self::convert_to_pb_txns(api_txn);
-                    last_transaction_timestamp = pb_txn.first().unwrap().timestamp.clone();
-                }
-                log_grpc_step_fullnode(
-                    IndexerGrpcStep::FullnodeFetchedBatch,
-                    Some(first_raw_transaction.version as i64),
-                    Some(last_raw_transaction.version as i64),
-                    last_transaction_timestamp.as_ref(),
-                    Some(ledger_version as i64),
-                    None,
-                    Some(fetch_start_time.elapsed().as_secs_f64()),
-                    Some(raw_txns.len() as i64),
-                );
-
-                let convert_start_time = std::time::Instant::now();
-                let api_txns = Self::convert_to_api_txns(context, raw_txns).await;
-                api_txns.last().map(record_fetched_transaction_latency);
+            let task = tokio::task::spawn_blocking(move || {
+                let raw_txns = batch;
+                let api_txns = Self::convert_to_api_txns(context, raw_txns);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
-                let start_transaction = pb_txns.first().unwrap();
-                let end_transaction = pb_txns.last().unwrap();
-                let end_txn_timestamp = end_transaction.timestamp.clone();
-
-                log_grpc_step_fullnode(
-                    IndexerGrpcStep::FullnodeDecodedBatch,
-                    Some(start_transaction.version as i64),
-                    Some(end_transaction.version as i64),
-                    end_txn_timestamp.as_ref(),
-                    Some(ledger_version as i64),
-                    None,
-                    Some(convert_start_time.elapsed().as_secs_f64()),
-                    Some(pb_txns.len() as i64),
-                );
-
-                let send_start_time = std::time::Instant::now();
-
+                let mut responses = vec![];
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
                     for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
@@ -154,39 +160,85 @@ impl IndexerStreamCoordinator {
                             )),
                             chain_id: ledger_chain_id as u32,
                         };
-                        match transaction_sender.send(Result::<_, Status>::Ok(item)).await {
-                            Ok(_) => {},
-                            Err(_) => {
-                                // Client disconnects.
-                                return Err(Status::aborted(
-                                    "[Indexer Fullnode] Client disconnected",
-                                ));
-                            },
-                        }
+                        responses.push(item);
                     }
                 }
-
-                log_grpc_step_fullnode(
-                    IndexerGrpcStep::FullnodeSentBatch,
-                    Some(start_transaction.version as i64),
-                    Some(end_transaction.version as i64),
-                    end_txn_timestamp.as_ref(),
-                    Some(ledger_version as i64),
-                    None,
-                    Some(send_start_time.elapsed().as_secs_f64()),
-                    Some(pb_txns.len() as i64),
-                );
-                Ok(end_transaction.version)
+                responses
             });
             tasks.push(task);
         }
-        match futures::future::try_join_all(tasks).await {
-            Ok(res) => res,
+        let responses = match futures::future::try_join_all(tasks).await {
+            Ok(res) => res.into_iter().flatten().collect::<Vec<_>>(),
             Err(err) => panic!(
                 "[Indexer Fullnode] Error processing transaction batches: {:?}",
                 err
             ),
+        };
+        log_grpc_step_fullnode(
+            IndexerGrpcStep::FullnodeDecodedBatch,
+            Some(first_version),
+            Some(end_version),
+            last_transaction_timestamp.as_ref(),
+            Some(highest_known_version),
+            None,
+            Some(decoding_start_time.elapsed().as_secs_f64()),
+            Some(num_transactions as i64),
+        );
+        // Stage 3: send responses to stream
+        let sending_start_time = std::time::Instant::now();
+        for response in responses {
+            if let Err(err) = self.transactions_sender.send(Ok(response)).await {
+                panic!(
+                    "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
+                    err
+                );
+            }
         }
+        log_grpc_step_fullnode(
+            IndexerGrpcStep::FullnodeSentBatch,
+            Some(first_version),
+            Some(end_version),
+            last_transaction_timestamp.as_ref(),
+            Some(highest_known_version),
+            None,
+            Some(sending_start_time.elapsed().as_secs_f64()),
+            Some(num_transactions as i64),
+        );
+        vec![Ok(end_version as u64)]
+    }
+
+    /// Fetches transactions from storage with each transaction's size.
+    /// Results are transactions sorted by version.
+    async fn fetch_transactions_from_storage(&mut self) -> Vec<(TransactionOnChainData, usize)> {
+        let batches = self.get_batches().await;
+        let mut storage_fetch_tasks = vec![];
+        let ledger_version = self.highest_known_version;
+        for batch in batches {
+            let context = self.context.clone();
+            let task = tokio::spawn(async move {
+                Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await
+            });
+            storage_fetch_tasks.push(task);
+        }
+
+        let transactions_from_storage =
+            match futures::future::try_join_all(storage_fetch_tasks).await {
+                Ok(res) => res,
+                Err(err) => panic!(
+                    "[Indexer Fullnode] Error fetching transaction batches: {:?}",
+                    err
+                ),
+            };
+
+        transactions_from_storage
+            .into_iter()
+            .flatten()
+            .sorted_by(|a, b| a.version.cmp(&b.version))
+            .map(|txn| {
+                let size = bcs::serialized_size(&txn).expect("Unable to serialize txn");
+                (txn, size)
+            })
+            .collect::<Vec<_>>()
     }
 
     /// Gets the last version of the batch if the entire batch is successful, otherwise return error
@@ -276,7 +328,7 @@ impl IndexerStreamCoordinator {
         }
     }
 
-    async fn convert_to_api_txns(
+    fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
     ) -> Vec<APITransaction> {
@@ -433,19 +485,5 @@ impl IndexerStreamCoordinator {
                 );
             }
         }
-    }
-}
-
-/// Record the transaction fetched from the storage latency.
-fn record_fetched_transaction_latency(txn: &aptos_api_types::Transaction) {
-    let current_time_in_secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Current time is before UNIX_EPOCH")
-        .as_secs_f64();
-    let txn_timestamp = txn.timestamp();
-
-    if txn_timestamp > 0 {
-        let txn_timestemp_in_secs = txn_timestamp as f64 / 1_000_000.0;
-        FETCHED_LATENCY_IN_SECS.set(current_time_in_secs - txn_timestemp_in_secs);
     }
 }

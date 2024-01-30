@@ -14,7 +14,10 @@ use aptos_sdk::{
         account_address::AccountAddress,
         account_config::CORE_CODE_ADDRESS,
         chain_id::ChainId,
-        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        transaction::{
+            authenticator::{AnyPublicKey, AuthenticationKey},
+            SignedTransaction,
+        },
         LocalAccount,
     },
 };
@@ -163,6 +166,22 @@ impl<'t> AptosPublicInfo<'t> {
             .submit_and_wait(&create_account_txn)
             .await?;
         Ok(())
+    }
+
+    pub async fn create_user_account_with_any_key(
+        &mut self,
+        pubkey: &AnyPublicKey,
+    ) -> Result<AccountAddress> {
+        let auth_key = AuthenticationKey::any_key(pubkey.clone());
+        let create_account_txn =
+            self.root_account
+                .sign_with_transaction_builder(self.transaction_factory().payload(
+                    aptos_stdlib::aptos_account_create_account(auth_key.account_address()),
+                ));
+        self.rest_client
+            .submit_and_wait(&create_account_txn)
+            .await?;
+        Ok(auth_key.account_address())
     }
 
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {

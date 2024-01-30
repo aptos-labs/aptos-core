@@ -12,6 +12,7 @@ use crate::{
     aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -974,6 +975,46 @@ impl Arbitrary for BlockMetadata {
     }
 }
 
+impl Arbitrary for BlockMetadataExt {
+    type Parameters = SizeRange;
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(num_validators_range: Self::Parameters) -> Self::Strategy {
+        (
+            any::<HashValue>(),
+            any::<u64>(),
+            any::<u64>(),
+            any::<AccountAddress>(),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u32>(), num_validators_range),
+            any::<u64>(),
+        )
+            .prop_map(
+                |(
+                    id,
+                    epoch,
+                    round,
+                    proposer,
+                    previous_block_votes,
+                    failed_proposer_indices,
+                    timestamp,
+                )| {
+                    BlockMetadataExt::new_v1(
+                        id,
+                        epoch,
+                        round,
+                        proposer,
+                        previous_block_votes,
+                        failed_proposer_indices,
+                        timestamp,
+                        None,
+                    )
+                },
+            )
+            .boxed()
+    }
+}
+
 #[derive(Debug)]
 struct ValidatorSetGen {
     validators: Vec<Index>,
@@ -1221,11 +1262,9 @@ impl Arbitrary for ValidatorTransaction {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        Just(Value::Null)
-            .prop_map(|_| {
-                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction {
-                    payload: vec![0xFF; 16],
-                })
+        (any::<bool>(), any::<Vec<u8>>())
+            .prop_map(|(valid, payload)| {
+                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction { valid, payload })
             })
             .boxed()
     }

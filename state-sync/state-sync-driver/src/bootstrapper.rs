@@ -9,7 +9,7 @@ use crate::{
     metadata_storage::MetadataStorageInterface,
     metrics,
     metrics::ExecutingComponent,
-    storage_synchronizer::StorageSynchronizerInterface,
+    storage_synchronizer::{NotificationMetadata, StorageSynchronizerInterface},
     utils,
     utils::{OutputFallbackHandler, SpeculativeStreamState, PENDING_DATA_LOG_FREQ_SECS},
 };
@@ -621,8 +621,12 @@ impl<
                 },
                 DataPayload::TransactionsWithProof(transactions_with_proof) => {
                     let payload_start_version = transactions_with_proof.first_transaction_version;
-                    self.process_transaction_or_output_payload(
+                    let notification_metadata = NotificationMetadata::new(
+                        data_notification.creation_time,
                         data_notification.notification_id,
+                    );
+                    self.process_transaction_or_output_payload(
+                        notification_metadata,
                         Some(transactions_with_proof),
                         None,
                         payload_start_version,
@@ -632,8 +636,12 @@ impl<
                 DataPayload::TransactionOutputsWithProof(transaction_outputs_with_proof) => {
                     let payload_start_version =
                         transaction_outputs_with_proof.first_transaction_output_version;
-                    self.process_transaction_or_output_payload(
+                    let notification_metadata = NotificationMetadata::new(
+                        data_notification.creation_time,
                         data_notification.notification_id,
+                    );
+                    self.process_transaction_or_output_payload(
+                        notification_metadata,
                         None,
                         Some(transaction_outputs_with_proof),
                         payload_start_version,
@@ -1100,7 +1108,7 @@ impl<
     /// Process a single transaction or transaction output data payload
     async fn process_transaction_or_output_payload(
         &mut self,
-        notification_id: NotificationId,
+        notification_metadata: NotificationMetadata,
         transaction_list_with_proof: Option<TransactionListWithProof>,
         transaction_outputs_with_proof: Option<TransactionOutputListWithProof>,
         payload_start_version: Option<Version>,
@@ -1112,7 +1120,7 @@ impl<
                 && self.state_value_syncer.transaction_output_to_sync.is_some())
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
-                notification_id,
+                notification_metadata.notification_id,
                 NotificationFeedback::InvalidPayloadData,
             )))
             .await?;
@@ -1125,7 +1133,7 @@ impl<
         if bootstrapping_mode.is_fast_sync() {
             return self
                 .verify_transaction_info_to_sync(
-                    notification_id,
+                    notification_metadata.notification_id,
                     transaction_outputs_with_proof,
                     payload_start_version,
                 )
@@ -1138,7 +1146,7 @@ impl<
             .expected_next_version()?;
         let payload_start_version = self
             .verify_payload_start_version(
-                notification_id,
+                notification_metadata.notification_id,
                 payload_start_version,
                 expected_start_version,
             )
@@ -1152,7 +1160,7 @@ impl<
         // Get the end of epoch ledger info if the payload ends the epoch
         let end_of_epoch_ledger_info = self
             .get_end_of_epoch_ledger_info(
-                notification_id,
+                notification_metadata.notification_id,
                 payload_start_version,
                 transaction_list_with_proof.as_ref(),
                 transaction_outputs_with_proof.as_ref(),
@@ -1165,7 +1173,7 @@ impl<
                 if let Some(transaction_outputs_with_proof) = transaction_outputs_with_proof {
                     utils::apply_transaction_outputs(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_outputs_with_proof,
@@ -1173,7 +1181,7 @@ impl<
                     .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
-                        notification_id,
+                        notification_metadata.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
                     )))
                     .await?;
@@ -1186,7 +1194,7 @@ impl<
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_list_with_proof,
@@ -1194,7 +1202,7 @@ impl<
                     .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
-                        notification_id,
+                        notification_metadata.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
                     )))
                     .await?;
@@ -1207,7 +1215,7 @@ impl<
                 if let Some(transaction_list_with_proof) = transaction_list_with_proof {
                     utils::execute_transactions(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_list_with_proof,
@@ -1217,7 +1225,7 @@ impl<
                 {
                     utils::apply_transaction_outputs(
                         self.storage_synchronizer.clone(),
-                        notification_id,
+                        notification_metadata,
                         proof_ledger_info,
                         end_of_epoch_ledger_info,
                         transaction_outputs_with_proof,
@@ -1225,7 +1233,7 @@ impl<
                     .await?
                 } else {
                     self.reset_active_stream(Some(NotificationAndFeedback::new(
-                        notification_id,
+                        notification_metadata.notification_id,
                         NotificationFeedback::PayloadTypeIsIncorrect,
                     )))
                     .await?;

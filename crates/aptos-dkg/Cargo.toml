@@ -1,0 +1,50 @@
+[package]
+name = "aptos-dkg"
+version = "0.1.0"
+edition = "2021"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+bcs =  { workspace = true }
+bellman = { workspace = true }
+blstrs = { workspace = true }
+criterion = { workspace = true }
+ff = { workspace = true }
+group = { workspace = true }
+hex = { workspace = true }
+merlin = { workspace = true }
+more-asserts = { workspace = true }
+num-bigint = { workspace = true }
+num-integer = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+pairing = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+sha3 = { workspace = true }
+static_assertions = { workspace = true }
+
+[features]
+assert-private-keys-not-cloneable = []
+fuzzing = []
+
+[[bench]]
+name = "pvss"
+harness = false
+
+[[bench]]
+name = "crypto"
+harness = false
+
+[[bench]]
+name = "weighted_vuf"
+harness = false
+
+[[bench]]
+name = "lagrange"
+harness = false

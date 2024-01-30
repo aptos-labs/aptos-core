@@ -23,7 +23,6 @@ type TransactionResponseStream =
 
 pub struct LocalnetDataService {
     pub service_context: ServiceContext,
-    pub enable_expensive_logging: bool,
 }
 
 /// External service on the fullnode is for testing/local development only.
@@ -48,7 +47,6 @@ impl RawData for LocalnetDataService {
         // Creates a channel to send the stream to the client
         let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
-        let enable_expensive_logging = self.enable_expensive_logging;
 
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -64,9 +62,7 @@ impl RawData for LocalnetDataService {
             );
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator
-                    .process_next_batch(enable_expensive_logging)
-                    .await;
+                let results = coordinator.process_next_batch().await;
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {

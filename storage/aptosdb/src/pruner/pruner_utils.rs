@@ -6,37 +6,18 @@
 use crate::{
     ledger_db::LedgerDb,
     pruner::state_merkle_pruner::generics::StaleNodeIndexSchemaTrait,
-    schema::{
-        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        transaction_info::TransactionInfoSchema,
-    },
+    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     utils::get_progress,
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
-use aptos_schemadb::{schema::KeyCodec, ReadOptions, DB};
+use aptos_schemadb::{schema::KeyCodec, DB};
 use aptos_types::transaction::Version;
 
 pub(crate) fn get_ledger_pruner_progress(ledger_db: &LedgerDb) -> Result<Version> {
-    Ok(
-        if let Some(version) = get_progress(
-            ledger_db.metadata_db(),
-            &DbMetadataKey::LedgerPrunerProgress,
-        )? {
-            version
-        } else {
-            let mut iter = ledger_db
-                .transaction_info_db()
-                .iter::<TransactionInfoSchema>(ReadOptions::default())?;
-            iter.seek_to_first();
-            match iter.next().transpose()? {
-                Some((version, _)) => version,
-                None => 0,
-            }
-        },
-    )
+    Ok(ledger_db.metadata_db().get_pruner_progress().unwrap_or(0))
 }
 
 pub(crate) fn get_state_kv_pruner_progress(state_kv_db: &StateKvDb) -> Result<Version> {

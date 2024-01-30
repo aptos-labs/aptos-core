@@ -2062,8 +2062,10 @@ fn create_data_notification(
     target_ledger_info: Option<LedgerInfoWithSignatures>,
     stream_engine: StreamEngine,
 ) -> Result<DataNotification, Error> {
+    // Create a unique notification ID
     let notification_id = notification_id_generator.next();
 
+    // Get the data payload
     let client_response_type = client_response.get_label();
     let data_payload = match client_response {
         ResponsePayload::StateValuesWithProof(states_chunk) => {
@@ -2131,10 +2133,9 @@ fn create_data_notification(
         _ => invalid_response_type!(client_response_type),
     };
 
-    Ok(DataNotification {
-        notification_id,
-        data_payload,
-    })
+    // Create and return the data notification
+    let data_notification = DataNotification::new(notification_id, data_payload);
+    Ok(data_notification)
 }
 
 /// Extracts the number of new versions and target
@@ -2183,7 +2184,7 @@ fn update_response_chunk_size_metrics(
     client_request: &DataClientRequest,
     client_response_payload: &ResponsePayload,
 ) {
-    metrics::observe_value(
+    metrics::observe_values(
         &metrics::RECEIVED_DATA_RESPONSE_CHUNK_SIZE,
         client_request.get_label(),
         client_response_payload.get_label(),

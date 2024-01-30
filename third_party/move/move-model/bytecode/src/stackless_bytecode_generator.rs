@@ -262,7 +262,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             MoveBytecode::Pop => {
                 let temp_index = self.temp_stack.pop().unwrap();
                 self.code
-                    .push(mk_call(Operation::Destroy, vec![], vec![temp_index]));
+                    .push(mk_call(Operation::Drop, vec![], vec![temp_index]));
             },
             MoveBytecode::BrTrue(target) => {
                 let temp_index = self.temp_stack.pop().unwrap();

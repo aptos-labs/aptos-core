@@ -4,6 +4,7 @@
 
 use crate::{
     accept_type::AcceptType,
+    metrics,
     response::{
         bcs_api_disabled, block_not_found_by_height, block_not_found_by_version,
         block_pruned_by_height, json_api_disabled, version_not_found, version_pruned,
@@ -18,7 +19,7 @@ use aptos_api_types::{
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::{error, warn};
+use aptos_logger::{error, info, warn, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
@@ -45,14 +46,21 @@ use aptos_types::{
 use aptos_utils::aptos_try;
 use aptos_vm::{data_cache::AsMoveResolver, move_vm_ext::AptosMoveResolver};
 use futures::{channel::oneshot, SinkExt};
+use mini_moka::sync::Cache;
 use move_core_types::{
+    identifier::Identifier,
     language_storage::{ModuleId, StructTag},
     move_resource::MoveResource,
 };
+use serde::Serialize;
 use std::{
+    cmp::Reverse,
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
-    sync::{Arc, RwLock, RwLockWriteGuard},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, RwLock, RwLockWriteGuard,
+    },
     time::Instant,
 };
 
@@ -66,6 +74,8 @@ pub struct Context {
     gas_schedule_cache: Arc<RwLock<GasScheduleCache>>,
     gas_estimation_cache: Arc<RwLock<GasEstimationCache>>,
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
+    view_function_stats: Arc<FunctionStats>,
+    simulate_txn_stats: Arc<FunctionStats>,
 }
 
 impl std::fmt::Debug for Context {
@@ -81,6 +91,19 @@ impl Context {
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
     ) -> Self {
+        let (view_function_stats, simulate_txn_stats) = {
+            let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
+            (
+                Arc::new(FunctionStats::new(
+                    FunctionType::ViewFuntion,
+                    log_per_call_stats,
+                )),
+                Arc::new(FunctionStats::new(
+                    FunctionType::TxnSimulation,
+                    log_per_call_stats,
+                )),
+            )
+        };
         Self {
             chain_id,
             db,
@@ -101,6 +124,8 @@ impl Context {
                 block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
                     .block_executor_onchain_config(),
             })),
+            view_function_stats,
+            simulate_txn_stats,
         }
     }
 
@@ -121,7 +146,7 @@ impl Context {
     }
 
     pub fn latest_state_view(&self) -> Result<DbStateView> {
-        self.db.latest_state_checkpoint_view()
+        Ok(self.db.latest_state_checkpoint_view()?)
     }
 
     pub fn latest_state_view_poem<E: InternalError>(
@@ -151,7 +176,7 @@ impl Context {
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
-        self.db.state_view_at_version(Some(version))
+        Ok(self.db.state_view_at_version(Some(version))?)
     }
 
     pub fn chain_id(&self) -> ChainId {
@@ -270,7 +295,7 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
-        self.db.get_latest_ledger_info()
+        Ok(self.db.get_latest_ledger_info()?)
     }
 
     pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
@@ -348,9 +373,14 @@ impl Context {
             None,
             version,
         )?;
+
         let kvs = iter
             .by_ref()
             .take(MAX_REQUEST_LIMIT as usize)
+            .map(|res| match res {
+                Ok((k, v)) => Ok((k, v)),
+                Err(res) => Err(anyhow::Error::from(res)),
+            })
             .collect::<Result<_>>()?;
         if iter.next().transpose()?.is_some() {
             bail!("Too many state items under account ({:?}).", address);
@@ -396,7 +426,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e)),
+                Err(e) => Some(Err(e.into())),
             })
             .take(limit as usize + 1);
         let kvs = resource_iter
@@ -483,7 +513,7 @@ impl Context {
                         Some(Err(format_err!( "storage prefix scan return inconsistent key ({:?})", k )))
                     }
                 },
-                Err(e) => Some(Err(e)),
+                Err(e) => Some(Err(e.into())),
             })
             .take(limit as usize + 1);
         let kvs = module_iter
@@ -802,7 +832,7 @@ impl Context {
     }
 
     pub fn get_accumulator_root_hash(&self, version: u64) -> Result<HashValue> {
-        self.db.get_accumulator_root_hash(version)
+        Ok(self.db.get_accumulator_root_hash(version)?)
     }
 
     fn convert_into_transaction_on_chain_data(
@@ -826,15 +856,16 @@ impl Context {
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
         if let Some(start) = start {
-            self.db.get_events(
+            Ok(self.db.get_events(
                 event_key,
                 start,
                 Order::Ascending,
                 limit as u64,
                 ledger_version,
-            )
+            )?)
         } else {
-            self.db
+            Ok(self
+                .db
                 .get_events(
                     event_key,
                     u64::MAX,
@@ -845,7 +876,7 @@ impl Context {
                 .map(|mut result| {
                     result.reverse();
                     result
-                })
+                })?)
         }
     }
 
@@ -1291,6 +1322,14 @@ impl Context {
             .min_inclusion_prices
             .len()
     }
+
+    pub fn view_function_stats(&self) -> &FunctionStats {
+        &self.view_function_stats
+    }
+
+    pub fn simulate_txn_stats(&self) -> &FunctionStats {
+        &self.simulate_txn_stats
+    }
 }
 
 pub struct GasScheduleCache {
@@ -1322,4 +1361,119 @@ where
     tokio::task::spawn_blocking(func)
         .await
         .map_err(|err| E::internal_with_code_no_info(err, AptosErrorCode::InternalError))?
+}
+
+#[derive(Schema)]
+pub struct LogSchema {
+    event: LogEvent,
+}
+
+impl LogSchema {
+    pub fn new(event: LogEvent) -> Self {
+        Self { event }
+    }
+}
+
+#[derive(Serialize, Copy, Clone)]
+pub enum LogEvent {
+    ViewFunction,
+    TxnSimulation,
+}
+
+pub enum FunctionType {
+    ViewFuntion,
+    TxnSimulation,
+}
+
+impl FunctionType {
+    fn log_event(&self) -> LogEvent {
+        match self {
+            FunctionType::ViewFuntion => LogEvent::ViewFunction,
+            FunctionType::TxnSimulation => LogEvent::TxnSimulation,
+        }
+    }
+
+    fn operation_id(&self) -> &'static str {
+        match self {
+            FunctionType::ViewFuntion => "view_function",
+            FunctionType::TxnSimulation => "txn_simulation",
+        }
+    }
+}
+
+pub struct FunctionStats {
+    stats: Option<Cache<String, (Arc<AtomicU64>, Arc<AtomicU64>)>>,
+    log_event: LogEvent,
+    operation_id: String,
+}
+
+impl FunctionStats {
+    fn new(function_type: FunctionType, log_per_call_stats: bool) -> Self {
+        let stats = if log_per_call_stats {
+            Some(Cache::new(100))
+        } else {
+            None
+        };
+        FunctionStats {
+            stats,
+            log_event: function_type.log_event(),
+            operation_id: function_type.operation_id().to_string(),
+        }
+    }
+
+    pub fn function_to_key(module: &ModuleId, function: &Identifier) -> String {
+        format!("{}::{}", module, function)
+    }
+
+    pub fn increment(&self, key: String, gas: u64) {
+        metrics::GAS_USED
+            .with_label_values(&[&self.operation_id])
+            .observe(gas as f64);
+        if let Some(stats) = &self.stats {
+            let (prev_gas, prev_count) = stats.get(&key).unwrap_or_else(|| {
+                // Note, race can occur on inserting new entry, resulting in some lost data, but it should be fine
+                let new_gas = Arc::new(AtomicU64::new(0));
+                let new_count = Arc::new(AtomicU64::new(0));
+                stats.insert(key.clone(), (new_gas.clone(), new_count.clone()));
+                (new_gas, new_count)
+            });
+            prev_gas.fetch_add(gas, Ordering::Relaxed);
+            prev_count.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    pub fn log_and_clear(&self) {
+        if let Some(stats) = &self.stats {
+            if stats.iter().next().is_none() {
+                return;
+            }
+
+            let mut sorted: Vec<_> = stats
+                .iter()
+                .map(|entry| {
+                    let (gas_used, count) = entry.value();
+                    (
+                        gas_used.load(Ordering::Relaxed),
+                        count.load(Ordering::Relaxed),
+                        entry.key().clone(),
+                    )
+                })
+                .collect();
+            sorted.sort_by_key(|(gas_used, ..)| Reverse(*gas_used));
+
+            info!(
+                LogSchema::new(self.log_event),
+                top_1 = sorted.get(0),
+                top_2 = sorted.get(1),
+                top_3 = sorted.get(2),
+                top_4 = sorted.get(3),
+                top_5 = sorted.get(4),
+                top_6 = sorted.get(5),
+                top_7 = sorted.get(6),
+                top_8 = sorted.get(7),
+            );
+
+            stats.invalidate_all();
+        }
+    }
 }

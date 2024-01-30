@@ -6,7 +6,7 @@ use crate::{
     accept_type::AcceptType,
     accounts::Account,
     bcs_payload::Bcs,
-    context::{api_spawn_blocking, Context},
+    context::{api_spawn_blocking, Context, FunctionStats},
     failpoint::fail_point_poem,
     generate_error_response, generate_success_response, metrics,
     page::Page,
@@ -14,7 +14,7 @@ use crate::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
         transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
         BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-        InsufficientStorageError, InternalError,
+        ForbiddenError, InsufficientStorageError, InternalError,
     },
     ApiTags,
 };
@@ -442,6 +442,21 @@ impl TransactionsApi {
         api_spawn_blocking(move || {
             let ledger_info = context.get_latest_ledger_info()?;
             let mut signed_transaction = api.get_signed_transaction(&ledger_info, data)?;
+
+            // Confirm the simulation filter allows the transaction. We use HashValue::zero()
+            // here for the block ID because we don't allow filtering by block ID for the
+            // simulation filters. See the ConfigSanitizer for ApiConfig.
+            if !context.node_config.api.simulation_filter.allows(
+                aptos_crypto::HashValue::zero(),
+                ledger_info.timestamp(),
+                &signed_transaction,
+            ) {
+                return Err(SubmitTransactionError::forbidden_with_code(
+                    "Transaction not allowed by simulation filter",
+                    AptosErrorCode::InvalidInput,
+                    &ledger_info,
+                ));
+            }
 
             let estimated_gas_unit_price = match (
                 estimate_gas_unit_price.0.unwrap_or_default(),
@@ -1219,6 +1234,34 @@ impl TransactionsApi {
             TransactionStatus::Discard(status) => ExecutionStatus::MiscellaneousError(Some(status)),
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
+        let stats_key = match txn.payload() {
+            TransactionPayload::Script(_) => {
+                format!("Script::{}", txn.clone().committed_hash()).to_string()
+            },
+            TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
+            TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
+                entry_function.module(),
+                &entry_function.function().into(),
+            ),
+            TransactionPayload::Multisig(multisig) => {
+                if let Some(payload) = &multisig.transaction_payload {
+                    match payload {
+                        MultisigTransactionPayload::EntryFunction(entry_function) => {
+                            FunctionStats::function_to_key(
+                                entry_function.module(),
+                                &entry_function.function().into(),
+                            )
+                        },
+                    }
+                } else {
+                    "Multisig::unknown".to_string()
+                }
+            },
+        };
+        self.context
+            .simulate_txn_stats()
+            .increment(stats_key, output.gas_used());
 
         // Build up a transaction from the outputs
         // All state hashes are invalid, and will be filled with 0s

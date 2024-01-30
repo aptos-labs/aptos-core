@@ -13,14 +13,17 @@ use crate::{
         transaction_info_db_column_families, write_set_db_column_families,
     },
     event_store::EventStore,
-    ledger_db::{event_db::EventDb, transaction_db::TransactionDb},
-    schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    ledger_db::{
+        event_db::EventDb, ledger_metadata_db::LedgerMetadataDb,
+        transaction_accumulator_db::TransactionAccumulatorDb, transaction_db::TransactionDb,
+        transaction_info_db::TransactionInfoDb, write_set_db::WriteSetDb,
+    },
 };
-use anyhow::Result;
 use aptos_config::config::{RocksdbConfig, RocksdbConfigs};
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{ColumnFamilyDescriptor, ColumnFamilyName, SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{
     path::{Path, PathBuf},
@@ -30,9 +33,19 @@ use std::{
 mod event_db;
 #[cfg(test)]
 mod event_db_test;
+pub(crate) mod ledger_metadata_db;
+#[cfg(test)]
+mod ledger_metadata_db_test;
+pub(crate) mod transaction_accumulator_db;
 mod transaction_db;
 #[cfg(test)]
 pub(crate) mod transaction_db_test;
+pub(crate) mod transaction_info_db;
+#[cfg(test)]
+mod transaction_info_db_test;
+pub(crate) mod write_set_db;
+#[cfg(test)]
+mod write_set_db_test;
 
 pub const LEDGER_DB_FOLDER_NAME: &str = "ledger_db";
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -74,12 +87,12 @@ impl LedgerDbSchemaBatches {
 
 #[derive(Debug)]
 pub struct LedgerDb {
-    ledger_metadata_db: Arc<DB>,
+    ledger_metadata_db: LedgerMetadataDb,
     event_db: EventDb,
-    transaction_accumulator_db: Arc<DB>,
+    transaction_accumulator_db: TransactionAccumulatorDb,
     transaction_db: TransactionDb,
-    transaction_info_db: Arc<DB>,
-    write_set_db: Arc<DB>,
+    transaction_info_db: TransactionInfoDb,
+    write_set_db: WriteSetDb,
 }
 
 impl LedgerDb {
@@ -110,15 +123,17 @@ impl LedgerDb {
         if !sharding {
             info!("Individual ledger dbs are not enabled!");
             return Ok(Self {
-                ledger_metadata_db: Arc::clone(&ledger_metadata_db),
+                ledger_metadata_db: LedgerMetadataDb::new(Arc::clone(&ledger_metadata_db)),
                 event_db: EventDb::new(
                     Arc::clone(&ledger_metadata_db),
                     EventStore::new(Arc::clone(&ledger_metadata_db)),
                 ),
-                transaction_accumulator_db: Arc::clone(&ledger_metadata_db),
+                transaction_accumulator_db: TransactionAccumulatorDb::new(Arc::clone(
+                    &ledger_metadata_db,
+                )),
                 transaction_db: TransactionDb::new(Arc::clone(&ledger_metadata_db)),
-                transaction_info_db: Arc::clone(&ledger_metadata_db),
-                write_set_db: Arc::clone(&ledger_metadata_db),
+                transaction_info_db: TransactionInfoDb::new(Arc::clone(&ledger_metadata_db)),
+                write_set_db: WriteSetDb::new(Arc::clone(&ledger_metadata_db)),
             });
         }
 
@@ -132,12 +147,13 @@ impl LedgerDb {
         )?);
         let event_db = EventDb::new(event_db_raw.clone(), EventStore::new(event_db_raw));
 
-        let transaction_accumulator_db = Arc::new(Self::open_rocksdb(
-            ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
-            TRANSACTION_ACCUMULATOR_DB_NAME,
-            &rocksdb_configs.ledger_db_config,
-            readonly,
-        )?);
+        let transaction_accumulator_db =
+            TransactionAccumulatorDb::new(Arc::new(Self::open_rocksdb(
+                ledger_db_folder.join(TRANSACTION_ACCUMULATOR_DB_NAME),
+                TRANSACTION_ACCUMULATOR_DB_NAME,
+                &rocksdb_configs.ledger_db_config,
+                readonly,
+            )?));
 
         let transaction_db = TransactionDb::new(Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(TRANSACTION_DB_NAME),
@@ -146,24 +162,24 @@ impl LedgerDb {
             readonly,
         )?));
 
-        let transaction_info_db = Arc::new(Self::open_rocksdb(
+        let transaction_info_db = TransactionInfoDb::new(Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(TRANSACTION_INFO_DB_NAME),
             TRANSACTION_INFO_DB_NAME,
             &rocksdb_configs.ledger_db_config,
             readonly,
-        )?);
+        )?));
 
-        let write_set_db = Arc::new(Self::open_rocksdb(
+        let write_set_db = WriteSetDb::new(Arc::new(Self::open_rocksdb(
             ledger_db_folder.join(WRITE_SET_DB_NAME),
             WRITE_SET_DB_NAME,
             &rocksdb_configs.ledger_db_config,
             readonly,
-        )?);
+        )?));
 
         // TODO(grao): Handle data inconsistency.
 
         Ok(Self {
-            ledger_metadata_db,
+            ledger_metadata_db: LedgerMetadataDb::new(ledger_metadata_db),
             event_db,
             transaction_accumulator_db,
             transaction_db,
@@ -223,31 +239,23 @@ impl LedgerDb {
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
         info!("Fast sync is done, writing pruner progress {version} for all ledger sub pruners.");
         self.event_db.write_pruner_progress(version)?;
-        self.transaction_accumulator_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::TransactionAccumulatorPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )?;
+        self.transaction_accumulator_db
+            .write_pruner_progress(version)?;
         self.transaction_db.write_pruner_progress(version)?;
-        self.transaction_info_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::TransactionInfoPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )?;
-        self.write_set_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::WriteSetPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )?;
-        self.ledger_metadata_db.put::<DbMetadataSchema>(
-            &DbMetadataKey::LedgerPrunerProgress,
-            &DbMetadataValue::Version(version),
-        )
+        self.transaction_info_db.write_pruner_progress(version)?;
+        self.write_set_db.write_pruner_progress(version)?;
+        self.ledger_metadata_db.write_pruner_progress(version)?;
+
+        Ok(())
     }
 
-    pub fn metadata_db(&self) -> &DB {
+    pub(crate) fn metadata_db(&self) -> &LedgerMetadataDb {
         &self.ledger_metadata_db
     }
 
+    // TODO(grao): Remove this after sharding migration.
     pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.ledger_metadata_db)
+        self.ledger_metadata_db.db_arc()
     }
 
     pub(crate) fn event_db(&self) -> &EventDb {
@@ -259,12 +267,12 @@ impl LedgerDb {
         self.event_db.db()
     }
 
-    pub(crate) fn transaction_accumulator_db(&self) -> &DB {
+    pub(crate) fn transaction_accumulator_db(&self) -> &TransactionAccumulatorDb {
         &self.transaction_accumulator_db
     }
 
-    pub(crate) fn transaction_accumulator_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.transaction_accumulator_db)
+    pub(crate) fn transaction_accumulator_db_raw(&self) -> &DB {
+        self.transaction_accumulator_db.db()
     }
 
     pub(crate) fn transaction_db(&self) -> &TransactionDb {
@@ -276,20 +284,20 @@ impl LedgerDb {
         self.transaction_db.db()
     }
 
-    pub(crate) fn transaction_info_db(&self) -> &DB {
+    pub(crate) fn transaction_info_db(&self) -> &TransactionInfoDb {
         &self.transaction_info_db
     }
 
-    pub(crate) fn transaction_info_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.transaction_info_db)
+    pub(crate) fn transaction_info_db_raw(&self) -> &DB {
+        self.transaction_info_db.db()
     }
 
-    pub(crate) fn write_set_db(&self) -> &DB {
+    pub(crate) fn write_set_db(&self) -> &WriteSetDb {
         &self.write_set_db
     }
 
-    pub(crate) fn write_set_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.write_set_db)
+    pub(crate) fn write_set_db_raw(&self) -> &DB {
+        self.write_set_db.db()
     }
 
     fn open_rocksdb(

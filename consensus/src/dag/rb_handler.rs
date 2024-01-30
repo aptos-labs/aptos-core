@@ -20,7 +20,8 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_types::{
-    epoch_state::EpochState, validator_signer::ValidatorSigner, validator_txn::ValidatorTransaction,
+    epoch_state::EpochState, on_chain_config::ValidatorTxnConfig,
+    validator_signer::ValidatorSigner, validator_txn::ValidatorTransaction,
 };
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
@@ -33,7 +34,7 @@ pub(crate) struct NodeBroadcastHandler {
     storage: Arc<dyn DAGStorage>,
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
-    validator_txn_enabled: bool,
+    vtxn_config: ValidatorTxnConfig,
 }
 
 impl NodeBroadcastHandler {
@@ -44,7 +45,7 @@ impl NodeBroadcastHandler {
         storage: Arc<dyn DAGStorage>,
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
-        validator_txn_enabled: bool,
+        vtxn_config: ValidatorTxnConfig,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -57,7 +58,7 @@ impl NodeBroadcastHandler {
             storage,
             fetch_requester,
             payload_config,
-            validator_txn_enabled,
+            vtxn_config,
         }
     }
 
@@ -84,18 +85,19 @@ impl NodeBroadcastHandler {
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
-        if !self.validator_txn_enabled {
-            ensure!(node.validator_txns().len() == 0);
-        }
-        let num_txns = node.validator_txns().len() + node.payload().len();
-        let txn_bytes = node
+        let num_vtxns = node.validator_txns().len() as u64;
+        ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
+        let vtxn_total_bytes = node
             .validator_txns()
             .iter()
             .map(ValidatorTransaction::size_in_bytes)
-            .sum::<usize>()
-            + node.payload().size();
-        ensure!(num_txns as u64 <= self.payload_config.max_receiving_txns_per_round);
-        ensure!(txn_bytes as u64 <= self.payload_config.max_receiving_size_per_round_bytes);
+            .sum::<usize>() as u64;
+        ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
+
+        let num_txns = num_vtxns + node.payload().len() as u64;
+        let txn_bytes = vtxn_total_bytes + node.payload().size() as u64;
+        ensure!(num_txns <= self.payload_config.max_receiving_txns_per_round);
+        ensure!(txn_bytes <= self.payload_config.max_receiving_size_per_round_bytes);
 
         let current_round = node.metadata().round();
 

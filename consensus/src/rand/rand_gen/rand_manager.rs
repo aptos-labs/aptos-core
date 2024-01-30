@@ -17,16 +17,17 @@ use crate::{
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_consensus_types::{
-    common::Author,
-    randomness::{RandMetadata, Randomness},
-};
+use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
-use aptos_types::{epoch_state::EpochState, validator_signer::ValidatorSigner};
+use aptos_types::{
+    epoch_state::EpochState,
+    randomness::{RandMetadata, Randomness},
+    validator_signer::ValidatorSigner,
+};
 use bytes::Bytes;
 use futures::future::{AbortHandle, Abortable};
 use futures_channel::oneshot;

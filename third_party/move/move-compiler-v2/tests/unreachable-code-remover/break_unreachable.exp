@@ -1,0 +1,149 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t1 := 0
+  1: $t0 := infer($t1)
+  2: label L0
+  3: $t3 := 1
+  4: $t2 := +($t0, $t3)
+  5: $t0 := infer($t2)
+  6: $t5 := 10
+  7: $t4 := ==($t0, $t5)
+  8: if ($t4) goto 9 else goto 15
+  9: label L2
+ 10: goto 25
+ 11: $t7 := 1
+ 12: $t6 := +($t0, $t7)
+ 13: $t0 := infer($t6)
+ 14: goto 20
+ 15: label L3
+ 16: goto 2
+ 17: $t9 := 1
+ 18: $t8 := +($t0, $t9)
+ 19: $t0 := infer($t8)
+ 20: label L4
+ 21: $t11 := 1
+ 22: $t10 := +($t0, $t11)
+ 23: $t0 := infer($t10)
+ 24: goto 2
+ 25: label L1
+ 26: return ()
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     # maybe
+  0: $t1 := 0
+     # maybe
+  1: $t0 := infer($t1)
+     # maybe
+  2: label L0
+     # maybe
+  3: $t3 := 1
+     # maybe
+  4: $t2 := +($t0, $t3)
+     # maybe
+  5: $t0 := infer($t2)
+     # maybe
+  6: $t5 := 10
+     # maybe
+  7: $t4 := ==($t0, $t5)
+     # maybe
+  8: if ($t4) goto 9 else goto 15
+     # maybe
+  9: label L2
+     # maybe
+ 10: goto 25
+     # no
+ 11: $t7 := 1
+     # no
+ 12: $t6 := +($t0, $t7)
+     # no
+ 13: $t0 := infer($t6)
+     # no
+ 14: goto 20
+     # maybe
+ 15: label L3
+     # maybe
+ 16: goto 2
+     # no
+ 17: $t9 := 1
+     # no
+ 18: $t8 := +($t0, $t9)
+     # no
+ 19: $t0 := infer($t8)
+     # no
+ 20: label L4
+     # no
+ 21: $t11 := 1
+     # no
+ 22: $t10 := +($t0, $t11)
+     # no
+ 23: $t0 := infer($t10)
+     # no
+ 24: goto 2
+     # maybe
+ 25: label L1
+     # maybe
+ 26: return ()
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t1 := 0
+  1: $t0 := infer($t1)
+  2: label L0
+  3: $t3 := 1
+  4: $t2 := +($t0, $t3)
+  5: $t0 := infer($t2)
+  6: $t5 := 10
+  7: $t4 := ==($t0, $t5)
+  8: if ($t4) goto 9 else goto 11
+  9: label L2
+ 10: goto 13
+ 11: label L3
+ 12: goto 2
+ 13: label L1
+ 14: return ()
+}

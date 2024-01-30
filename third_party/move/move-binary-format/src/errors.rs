@@ -437,6 +437,10 @@ impl PartialVMError {
         self.0.major_status
     }
 
+    pub fn sub_status(&self) -> Option<u64> {
+        self.0.sub_status
+    }
+
     pub fn with_sub_status(mut self, sub_status: u64) -> Self {
         debug_assert!(self.0.sub_status.is_none());
         self.0.sub_status = Some(sub_status);
