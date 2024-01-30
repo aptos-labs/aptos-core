@@ -77,7 +77,6 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
-threadpool = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
 tokio-retry = { workspace = true }

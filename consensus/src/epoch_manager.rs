@@ -27,6 +27,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
+    msg_verifier::ConsensusMsgVerifier,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingCommitRequest,
         IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
@@ -50,7 +51,6 @@ use crate::{
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
-    msg_verifier::ConsensusMsgVerifier,
     state_replication::StateComputer,
     transaction_deduper::create_transaction_deduper,
     transaction_shuffler::create_transaction_shuffler,

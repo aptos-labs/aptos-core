@@ -921,7 +921,6 @@ dependencies = [
  "strum_macros 0.24.3",
  "tempfile",
  "thiserror",
- "threadpool",
  "tokio",
  "tokio-metrics",
  "tokio-retry",
