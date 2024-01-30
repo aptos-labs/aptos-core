@@ -18,7 +18,11 @@ use image::{
     DynamicImage, GenericImageView, ImageBuffer, ImageFormat, ImageOutputFormat,
 };
 use reqwest::Client;
-use std::{io::Cursor, time::Duration};
+use std::{
+    cmp::{max, min},
+    io::Cursor,
+    time::Duration,
+};
 use tracing::{info, warn};
 
 pub struct ImageOptimizer;
@@ -30,6 +34,7 @@ impl ImageOptimizer {
         uri: String,
         max_file_size_bytes: u32,
         image_quality: u8,
+        max_image_dimensions: u32,
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         OPTIMIZE_IMAGE_INVOCATION_COUNT.inc();
         let (_, size) = get_uri_metadata(uri.clone()).await?;
@@ -71,8 +76,11 @@ impl ImageOptimizer {
                     _ => {
                         let img = image::load_from_memory(&img_bytes)
                             .context(format!("Failed to load image from memory: {} bytes", size))?;
-                        let (nwidth, nheight) =
-                            Self::calculate_dimensions_with_ration(512, img.width(), img.height());
+                        let (nwidth, nheight) = Self::calculate_dimensions_with_ration(
+                            min(max(img.width(), img.height()), max_image_dimensions),
+                            img.width(),
+                            img.height(),
+                        );
                         let resized_image =
                             resize(&img.to_rgba8(), nwidth, nheight, FilterType::Gaussian);
                         Ok(Self::to_image_bytes(resized_image, image_quality)?)

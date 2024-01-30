@@ -12,7 +12,10 @@ use aptos_dkg::{
         das,
         das::unweighted_protocol,
         insecure_field, test_utils,
-        test_utils::{reconstruct_dealt_secret_key_randomly, NoAux},
+        test_utils::{
+            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+            reconstruct_dealt_secret_key_randomly, NoAux,
+        },
         traits::{transcript::Transcript, SecretSharingConfig},
         GenericWeighting, ThresholdConfig,
     },
@@ -76,19 +79,27 @@ fn test_pvss_all_weighted() {
 
 #[test]
 fn test_pvss_transcript_size() {
-    for (t, n) in [(333, 1_000), (666, 1_000), (3_333, 10_000), (6_666, 10_000)] {
+    for sc in get_threshold_configs_for_benchmarking() {
         println!();
-        print_transcript_size::<das::Transcript>(t, n);
+        let expected_size = expected_transcript_size::<das::Transcript>(&sc);
+        let actual_size = actual_transcript_size::<das::Transcript>(&sc);
+
+        print_transcript_size::<das::Transcript>("Expected", &sc, expected_size);
+        print_transcript_size::<das::Transcript>("Actual", &sc, actual_size);
+    }
+
+    for wc in get_weighted_configs_for_benchmarking() {
+        let actual_size = actual_transcript_size::<das::Transcript>(wc.get_threshold_config());
+        print_transcript_size::<das::Transcript>("Actual", wc.get_threshold_config(), actual_size);
+
+        let actual_size = actual_transcript_size::<das::WeightedTranscript>(&wc);
+        print_transcript_size::<das::WeightedTranscript>("Actual", &wc, actual_size);
     }
 }
 
-fn print_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(t: usize, n: usize) {
+fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingConfig, size: usize) {
     let name = T::scheme_name();
-    let expected_size = expected_transcript_size::<T>(t, n);
-    let actual_size = actual_transcript_size::<T>(t, n);
-
-    println!("Expected transcript size for {t}-out-of-{n} {name}: {expected_size} bytes");
-    println!("Actual   transcript size for {t}-out-of-{n} {name}: {actual_size} bytes");
+    println!("{size_type:8} transcript size for {sc} {name}: {size} bytes");
 }
 
 //
@@ -107,20 +118,20 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
     // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let (pp, ssks, spks, dks, eks, _, s, sk) = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
 
     // Test dealing
     let trx = T::deal(
         &sc,
-        &pp,
-        &ssks[0],
-        &eks,
-        &s,
+        &d.pp,
+        &d.ssks[0],
+        &d.eks,
+        &d.s,
         &NoAux,
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &pp, &vec![spks[0].clone()], &eks, &vec![NoAux])
+    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -128,16 +139,13 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
         .expect("serialized transcript should deserialize correctly");
 
     assert_eq!(trx, trx_deserialized);
-    if sk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &dks, trx) {
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx) {
         panic!("Reconstructed SK did not match");
     }
 }
 
-fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
-    t: usize,
-    n: usize,
-) -> usize {
-    let (sc, mut rng) = test_utils::get_threshold_config_and_rng(t, n);
+fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
+    let mut rng = thread_rng();
 
     let trx = T::generate(&sc, &mut rng);
     let actual_size = trx.to_bytes().len();
@@ -146,11 +154,11 @@ fn actual_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
 }
 
 fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
-    _t: usize,
-    n: usize,
+    sc: &ThresholdConfig,
 ) -> usize {
     if T::scheme_name() == unweighted_protocol::DAS_SK_IN_G1 {
-        G2_PROJ_NUM_BYTES + (n + 1) * (G2_PROJ_NUM_BYTES + G1_PROJ_NUM_BYTES)
+        G2_PROJ_NUM_BYTES
+            + (sc.get_total_num_players() + 1) * (G2_PROJ_NUM_BYTES + G1_PROJ_NUM_BYTES)
     } else {
         panic!("Did not implement support for '{}' yet", T::scheme_name())
     }

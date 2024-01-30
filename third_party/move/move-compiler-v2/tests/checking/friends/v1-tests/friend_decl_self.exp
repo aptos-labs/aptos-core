@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: cannot declare module `0x42::M` as a friend of itself
+  ┌─ tests/checking/friends/v1-tests/friend_decl_self.move:3:5
+  │
+3 │     friend Self;
+  │     ^^^^^^^^^^^^
+
+error: cannot declare module `0x43::M` as a friend of itself
+  ┌─ tests/checking/friends/v1-tests/friend_decl_self.move:9:5
+  │
+9 │     friend 0x43::M;
+  │     ^^^^^^^^^^^^^^^
