@@ -83,13 +83,11 @@ pub fn load_consensus_key_from_secure_storage(
     let storage: Storage = (&config.backend)
         .try_into()
         .map_err(|e| anyhow!("load_consensus_key_from_secure_storage failed with storage error: {e}"))?;
-    storage.available().map_err(|e| {
-        anyhow!("load_consensus_key_from_secure_storage failed with storage unavailable: {e}")
-    })?;
-    let response = storage.get(CONSENSUS_KEY).map_err(|e| {
+    let storage = Box::new(storage);
+    let response = storage.get::<PrivateKey>(CONSENSUS_KEY).map_err(|e| {
         anyhow!("load_consensus_key_from_secure_storage failed with storage read error: {e}")
     })?;
-    response.value
+    Ok(response.value)
 }
 
 enum SafetyRulesWrapper {
