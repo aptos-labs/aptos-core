@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType};
+use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -58,6 +58,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture30KWith200Change,
     SmartTablePicture1MWith1KChange,
     SmartTablePicture1BWith1KChange,
+    Econia,
 }
 
 impl TransactionTypeArg {
@@ -376,6 +377,12 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::Econia => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia { num_users: 100000 },
+                num_modules: module_working_set_size,
+                move_stages_by_phase: true,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }
