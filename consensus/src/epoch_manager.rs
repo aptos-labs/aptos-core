@@ -104,6 +104,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio::runtime::Handle;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -155,6 +156,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
     signature_verifier: Option<ConsensusMsgVerifier>,
     bounded_executor: BoundedExecutor,
+    sig_verify_executor: Handle,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
 
@@ -178,6 +180,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
+        sig_verify_executor: Handle,
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
@@ -215,6 +218,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_storage,
             batch_retrieval_tx: None,
             signature_verifier: None,
+            sig_verify_executor,
             bounded_executor,
             recovery_mode: false,
             dag_rpc_tx: None,
@@ -936,6 +940,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         self.signature_verifier = Some(ConsensusMsgVerifier::new(
             self.author,
+            self.sig_verify_executor.clone(),
             self.epoch_state.clone(),
             self.quorum_store_enabled,
             self.quorum_store_msg_tx.clone(),

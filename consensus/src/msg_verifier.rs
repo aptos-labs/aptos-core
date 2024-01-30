@@ -18,7 +18,7 @@ use std::{
     mem::{discriminant, Discriminant},
     sync::Arc,
 };
-use tokio::runtime::Runtime;
+use tokio::runtime::Handle;
 
 // Verifies the consensus messages and forwards them to the corresponding components - done by having a
 // dedicated thread pool for signature verification so that we don't block the consensus runtime.
@@ -33,13 +33,14 @@ pub struct ConsensusMsgVerifier {
     >,
     payload_manager: Arc<PayloadManager>,
     /// Dedicated async runtime used to verify signatures.
-    runtime: Runtime,
+    executor: Handle,
     max_qs_batch: usize,
 }
 
 impl ConsensusMsgVerifier {
     pub fn new(
         my_peer_id: Author,
+        executor: Handle,
         epoch_state: Option<Arc<EpochState>>,
         quorum_store_enabled: bool,
         quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
@@ -50,7 +51,6 @@ impl ConsensusMsgVerifier {
         payload_manager: Arc<PayloadManager>,
         max_qs_batch: usize,
     ) -> Self {
-        let runtime = aptos_runtimes::spawn_named_runtime("sig-verify".into(), None);
         Self {
             my_peer_id,
             epoch_state,
@@ -59,7 +59,7 @@ impl ConsensusMsgVerifier {
             buffered_proposal_tx,
             round_manager_tx,
             payload_manager,
-            runtime,
+            executor,
             max_qs_batch,
         }
     }
@@ -74,7 +74,7 @@ impl ConsensusMsgVerifier {
         let max_num_batches = self.max_qs_batch;
         let payload_manager = self.payload_manager.clone();
 
-        self.runtime.spawn(async move {
+        self.executor.spawn(async move {
             match monitor!(
                 "verify_message",
                 unverified_event.clone().verify(
