@@ -20,7 +20,8 @@ use aptos_types::{
         SignedTransaction,
     },
     zkid::{
-        Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig
+        Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
+        ZkIdSignature, ZkpOrOpenIdSig,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -360,12 +361,14 @@ async fn test_groth16_signature_transaction_submission() {
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
 
-
     let proof_sig = ephemeral_account.private_key().sign(&proof).unwrap();
     let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
 
     let zk_sig = ZkIdSignature {
-        sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp { proof: proof.clone(), proof_signature: ephem_proof_sig }),
+        sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+            proof: proof.clone(),
+            proof_signature: ephem_proof_sig,
+        }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
         ephemeral_pubkey: ephemeral_public_key,
@@ -464,12 +467,10 @@ async fn test_groth16_signature_transaction_submission_proof_signature_check_fai
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
 
     let zk_sig = ZkIdSignature {
-        sig: ZkpOrOpenIdSig::Groth16Zkp(
-            SignedGroth16Zkp {
-                proof: proof.clone(),
-                proof_signature: ephemeral_signature.clone() // Wrong signature
-            }
-        ),
+        sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+            proof: proof.clone(),
+            proof_signature: ephemeral_signature.clone(), // Wrong signature
+        }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
         ephemeral_pubkey: ephemeral_public_key,

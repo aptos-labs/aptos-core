@@ -229,7 +229,9 @@ impl Claims {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash)]
+#[derive(
+    Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
+)]
 pub struct Groth16Zkp {
     a: G1Projective,
     b: G2Projective,
@@ -501,8 +503,8 @@ mod test {
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            G1Projective, G2Projective, Groth16Zkp, IdCommitment, Pepper, ZkIdPublicKey,
-            ZkIdSignature, ZkpOrOpenIdSig, SignedGroth16Zkp,
+            G1Projective, G2Projective, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp,
+            ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
         },
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
@@ -555,7 +557,10 @@ mod test {
         let proof_sig = sender.sign(&proof).unwrap();
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
         let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp { proof: proof.clone(), proof_signature: ephem_proof_sig }),
+            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+                proof: proof.clone(),
+                proof_signature: ephem_proof_sig,
+            }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
             ephemeral_pubkey: epk,

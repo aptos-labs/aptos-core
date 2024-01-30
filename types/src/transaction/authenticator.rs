@@ -1129,7 +1129,11 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        circom::{G1Projective, G2Projective}, transaction::{webauthn::AssertionSignature, SignedTransaction}, zkid::{Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, EPK_BLINDER_NUM_BYTES}
+        circom::{G1Projective, G2Projective},
+        transaction::{webauthn::AssertionSignature, SignedTransaction},
+        zkid::{
+            Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, EPK_BLINDER_NUM_BYTES,
+        },
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -2085,7 +2089,10 @@ mod tests {
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
         ephem_proof_sig.verify(&proof, &epk).unwrap();
         let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp { proof: proof.clone(), proof_signature: ephem_proof_sig }),
+            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+                proof: proof.clone(),
+                proof_signature: ephem_proof_sig,
+            }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
             ephemeral_pubkey: epk,
