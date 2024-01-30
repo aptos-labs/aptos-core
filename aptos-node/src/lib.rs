@@ -192,6 +192,7 @@ pub struct AptosHandle {
     _api_runtime: Option<Runtime>,
     _backup_runtime: Option<Runtime>,
     _consensus_runtime: Option<Runtime>,
+    _sig_verify_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
     _indexer_runtime: Option<Runtime>,
@@ -727,32 +728,37 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
-        // Wait until state sync has been initialized
-        debug!("Waiting until state sync is initialized!");
-        state_sync_runtimes.block_until_initialized();
-        debug!("State sync initialization complete.");
+    // Create the consensus runtime, blocking on state sync if necessary
+    let (consensus_runtime, sig_verify_runtime) = match consensus_network_interfaces {
+        Some(interfaces) => {
+            // Wait for state sync initialization
+            debug!("Waiting until state sync is initialized!");
+            state_sync_runtimes.block_until_initialized();
+            debug!("State sync initialization complete.");
 
-        // Initialize and start consensus
-        let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
-            &mut node_config,
-            db_rw,
-            consensus_reconfig_subscription,
-            consensus_network_interfaces,
-            consensus_notifier,
-            consensus_to_mempool_sender,
-            vtxn_pool,
-        );
-        admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
-        runtime
-    });
+            // Start consensus
+            let (consensus_runtime, sig_verify_runtime, consensus_db, quorum_store_db) =
+                services::start_consensus_runtime(
+                    &mut node_config,
+                    db_rw,
+                    consensus_reconfig_subscription,
+                    interfaces,
+                    consensus_notifier,
+                    consensus_to_mempool_sender,
+                    vtxn_pool,
+                );
+            admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
+            (Some(consensus_runtime), Some(sig_verify_runtime))
+        },
+        None => (None, None),
+    };
 
     Ok(AptosHandle {
         _admin_service: admin_service,
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
         _consensus_runtime: consensus_runtime,
+        _sig_verify_runtime: sig_verify_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,

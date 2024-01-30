@@ -159,6 +159,7 @@ impl SMRNode {
             quorum_store_storage,
             reconfig_listener,
             bounded_executor,
+            playground.handle(),
             aptos_time_service::TimeService::real(),
             vtxn_pool,
         );

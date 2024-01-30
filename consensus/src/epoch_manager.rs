@@ -27,6 +27,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
+    msg_verifier::ConsensusMsgVerifier,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingCommitRequest,
         IncomingDAGRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
@@ -99,11 +100,11 @@ use itertools::Itertools;
 use std::{
     cmp::Ordering,
     collections::HashMap,
-    hash::Hash,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
 };
+use tokio::runtime::Handle;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -153,7 +154,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     batch_retrieval_tx:
         Option<aptos_channel::Sender<AccountAddress, IncomingBatchRetrievalRequest>>,
+    signature_verifier: Option<ConsensusMsgVerifier>,
     bounded_executor: BoundedExecutor,
+    sig_verify_executor: Handle,
     // recovery_mode is set to true when the recovery manager is spawned
     recovery_mode: bool,
 
@@ -177,6 +180,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener<P>,
         bounded_executor: BoundedExecutor,
+        sig_verify_executor: Handle,
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
@@ -213,6 +217,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_coordinator_tx: None,
             quorum_store_storage,
             batch_retrieval_tx: None,
+            signature_verifier: None,
+            sig_verify_executor,
             bounded_executor,
             recovery_mode: false,
             dag_rpc_tx: None,
@@ -939,6 +945,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             features,
         );
 
+        self.signature_verifier = Some(ConsensusMsgVerifier::new(
+            self.author,
+            self.sig_verify_executor.clone(),
+            self.epoch_state.clone(),
+            self.quorum_store_enabled,
+            self.quorum_store_msg_tx.clone(),
+            self.buffered_proposal_tx.clone(),
+            self.round_manager_tx.clone(),
+            self.payload_manager.clone(),
+            self.config.quorum_store.receiver_max_num_batches,
+            self.config.quorum_store.batch_expiry_gap_when_init_usecs,
+        ));
+
         round_manager.init(last_vote).await;
 
         let (close_tx, close_rx) = oneshot::channel();
@@ -1206,51 +1225,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Ok(false) => return Ok(()), // This occurs when the quorum store is not enabled, but the recovery mode is enabled. We filter out the messages, but don't raise any error.
                 Err(err) => return Err(err),
             }
-            // same epoch -> run well-formedness + signature check
-            let epoch_state = self.epoch_state.clone().unwrap();
-            let quorum_store_enabled = self.quorum_store_enabled;
-            let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
-            let buffered_proposal_tx = self.buffered_proposal_tx.clone();
-            let round_manager_tx = self.round_manager_tx.clone();
-            let my_peer_id = self.author;
-            let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
-            let max_batch_expiry_gap_usecs =
-                self.config.quorum_store.batch_expiry_gap_when_init_usecs;
-            let payload_manager = self.payload_manager.clone();
-            self.bounded_executor
-                .spawn(async move {
-                    match monitor!(
-                        "verify_message",
-                        unverified_event.clone().verify(
-                            peer_id,
-                            &epoch_state.verifier,
-                            quorum_store_enabled,
-                            peer_id == my_peer_id,
-                            max_num_batches,
-                            max_batch_expiry_gap_usecs,
-                        )
-                    ) {
-                        Ok(verified_event) => {
-                            Self::forward_event(
-                                quorum_store_msg_tx,
-                                round_manager_tx,
-                                buffered_proposal_tx,
-                                peer_id,
-                                verified_event,
-                                payload_manager,
-                            );
-                        },
-                        Err(e) => {
-                            error!(
-                                SecurityEvent::ConsensusInvalidMessage,
-                                remote_peer = peer_id,
-                                error = ?e,
-                                unverified_event = unverified_event
-                            );
-                        },
-                    }
-                })
-                .await;
+            self.signature_verifier
+                .as_ref()
+                .unwrap()
+                .verify_and_forward(unverified_event, peer_id);
         }
         Ok(())
     }
@@ -1340,62 +1318,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             },
             _ => Ok(true), // This states that we shouldn't filter out the event
-        }
-    }
-
-    fn forward_event_to<K: Eq + Hash + Clone, V>(
-        mut maybe_tx: Option<aptos_channel::Sender<K, V>>,
-        key: K,
-        value: V,
-    ) -> anyhow::Result<()> {
-        if let Some(tx) = &mut maybe_tx {
-            tx.push(key, value)
-        } else {
-            bail!("channel not initialized");
-        }
-    }
-
-    fn forward_event(
-        quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-        round_manager_tx: Option<
-            aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>,
-        >,
-        buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
-        peer_id: AccountAddress,
-        event: VerifiedEvent,
-        payload_manager: Arc<PayloadManager>,
-    ) {
-        if let VerifiedEvent::ProposalMsg(proposal) = &event {
-            observe_block(
-                proposal.proposal().timestamp_usecs(),
-                BlockStage::EPOCH_MANAGER_VERIFIED,
-            );
-        }
-        if let Err(e) = match event {
-            quorum_store_event @ (VerifiedEvent::SignedBatchInfo(_)
-            | VerifiedEvent::ProofOfStoreMsg(_)
-            | VerifiedEvent::BatchMsg(_)) => {
-                Self::forward_event_to(quorum_store_msg_tx, peer_id, quorum_store_event)
-                    .context("quorum store sender")
-            },
-            proposal_event @ VerifiedEvent::ProposalMsg(_) => {
-                if let VerifiedEvent::ProposalMsg(p) = &proposal_event {
-                    if let Some(payload) = p.proposal().payload() {
-                        payload_manager
-                            .prefetch_payload_data(payload, p.proposal().timestamp_usecs());
-                    }
-                }
-                Self::forward_event_to(buffered_proposal_tx, peer_id, proposal_event)
-                    .context("proposal precheck sender")
-            },
-            round_manager_event => Self::forward_event_to(
-                round_manager_tx,
-                (peer_id, discriminant(&round_manager_event)),
-                (peer_id, round_manager_event),
-            )
-            .context("round manager sender"),
-        } {
-            warn!("Failed to forward event: {}", e);
         }
     }
 

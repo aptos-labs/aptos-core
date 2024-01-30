@@ -115,7 +115,7 @@ pub fn start_consensus_runtime(
     consensus_notifier: ConsensusNotifier,
     consensus_to_mempool_sender: Sender<QuorumStoreRequest>,
     vtxn_pool: VTxnPoolState,
-) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
+) -> (Runtime, Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let instant = Instant::now();
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
