@@ -14,9 +14,9 @@ use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
-pub static DEV_VERIFYING_KEY: Lazy<PreparedVerifyingKey<ark_bn254::Bn254>> = Lazy::new(dev_pvk);
+pub static DEVNET_VERIFYING_KEY: Lazy<PreparedVerifyingKey<ark_bn254::Bn254>> = Lazy::new(devnet_pvk);
 
-fn dev_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
+fn devnet_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
     // Convert the projective points to affine.
     let alpha_g1 = G1Projective::new(
         "16672231080302629756836614130913173861541009360974119524782950408048375831661",

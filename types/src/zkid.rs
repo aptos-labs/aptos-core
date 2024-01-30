@@ -2,7 +2,7 @@
 
 use crate::{
     chain_id::ChainId,
-    circom::{G1Projective, G2Projective, DEV_VERIFYING_KEY},
+    circom::{G1Projective, G2Projective, DEVNET_VERIFYING_KEY},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -255,7 +255,7 @@ impl SignedGroth16Zkp {
             true => {
                 bail!("verifying key for main net missing")
             },
-            false => &DEV_VERIFYING_KEY,
+            false => &DEVNET_VERIFYING_KEY,
         };
         let proof: Proof<ark_bn254::Bn254> = Proof {
             a: self.proof.a.to_affine()?,
@@ -288,7 +288,7 @@ impl Groth16Zkp {
             true => {
                 bail!("verifying key for main net missing")
             },
-            false => &DEV_VERIFYING_KEY,
+            false => &DEVNET_VERIFYING_KEY,
         };
         let proof: Proof<ark_bn254::Bn254> = Proof {
             a: self.a.to_affine()?,

@@ -110,6 +110,8 @@ pub fn validate_zkid_authenticators(
             ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
                 match jwk {
                     JWK::RSA(rsa_jwk) => {
+                        // TODO(OpenIdSig): Implement batch verification for all RSA signatures in
+                        //  one TXN.
                         // Note: Individual OpenID RSA signature verification will be fast when the
                         // RSA public exponent is small (e.g., 65537). For the same TXN, batch
                         // verification of all RSA signatures will be even faster even when the
@@ -123,7 +125,7 @@ pub fn validate_zkid_authenticators(
                             .verify_jwt_signature(rsa_jwk, &zkid_sig.jwt_header)
                             .map_err(|_| {
                                 invalid_signature!(
-                                    "RSA Signature verification failed for OpenIdSig"
+                                    "RSA signature verification failed for OpenIdSig"
                                 )
                             })?;
                     },
