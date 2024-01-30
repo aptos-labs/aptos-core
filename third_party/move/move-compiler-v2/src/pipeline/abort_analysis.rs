@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 //! Computes if a given code offset
 //! - may lead to an abort, or
 //! - leads to an abort, or
