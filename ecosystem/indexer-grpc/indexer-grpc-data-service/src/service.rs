@@ -246,7 +246,6 @@ impl RawData for RawDataServerWrapper {
                 let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
                 loop {
                     // 1. Fetch data from cache and file store.
-                    let current_batch_start_time = std::time::Instant::now();
                     let mut transaction_data = match data_fetch(
                         current_version,
                         &mut cache_operator,
@@ -258,20 +257,6 @@ impl RawData for RawDataServerWrapper {
                     {
                         Ok(TransactionsDataStatus::Success(transactions)) => transactions,
                         Ok(TransactionsDataStatus::AheadOfCache) => {
-                            info!(
-                                start_version = current_version,
-                                request_name = request_metadata.processor_name.as_str(),
-                                request_email = request_metadata.request_email.as_str(),
-                                request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                                processor_name = request_metadata.processor_name.as_str(),
-                                connection_id = request_metadata.request_connection_id.as_str(),
-                    request_user_classification =
-                        request_metadata.request_user_classification.as_str(),
-                                duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-                                service_type = SERVICE_TYPE,
-                                "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
-                                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-                            );
                             ahead_of_cache_data_handling().await;
                             // Retry after a short sleep.
                             continue;
