@@ -168,8 +168,8 @@ impl RawData for RawDataServerWrapper {
 
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
+        let request_metadata = Arc::new(request_metadata);
         tokio::spawn({
-            let request_metadata = request_metadata.clone();
             async move {
                 data_fetcher_thread(
                     redis_client,
@@ -199,7 +199,7 @@ impl RawData for RawDataServerWrapper {
 }
 
 enum DataFetchSubThreadResult {
-    // This is the first/last txn version returned by this
+    BatchSuccess(Vec<Vec<Transaction>>),
     Success(Vec<Transaction>),
     NoResults,
 }
@@ -210,7 +210,7 @@ async fn get_data_with_threads(
     chain_id: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
-    request_metadata: IndexerGrpcRequestMetadata,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
 ) -> DataFetchSubThreadResult {
     // TODO: better logic here for when we're already caught up to head?
@@ -246,13 +246,13 @@ async fn get_data_with_threads(
         current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
     }
 
-    let mut transactions = vec![];
+    let mut transactions: Vec<Vec<Transaction>> = vec![];
     join_all(threads)
         .await
         .into_iter()
         .for_each(|result| match result {
-            Ok(DataFetchSubThreadResult::Success(mut txns)) => {
-                transactions.append(&mut txns);
+            Ok(DataFetchSubThreadResult::Success(txns)) => {
+                transactions.push(txns);
             },
             Ok(DataFetchSubThreadResult::NoResults) => {},
             Err(e) => {
@@ -262,12 +262,13 @@ async fn get_data_with_threads(
                 );
                 panic!("Failed to get data from cache and file store.");
             },
+            Ok(_) => unreachable!("Fetching from a single thread will never return a batch"),
         });
 
     if transactions.is_empty() {
         DataFetchSubThreadResult::NoResults
     } else {
-        DataFetchSubThreadResult::Success(transactions)
+        DataFetchSubThreadResult::BatchSuccess(transactions)
     }
 }
 
@@ -276,7 +277,7 @@ async fn get_data_in_thread(
     chain_id: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
-    request_metadata: IndexerGrpcRequestMetadata,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
 ) -> DataFetchSubThreadResult {
     let current_batch_start_time = std::time::Instant::now();
@@ -323,7 +324,7 @@ async fn data_fetcher_thread(
     redis_client: Arc<Client>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     cache_storage_format: StorageFormat,
-    request_metadata: IndexerGrpcRequestMetadata,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     mut current_version: u64,
@@ -412,7 +413,6 @@ async fn data_fetcher_thread(
 
     loop {
         // 1. Fetch data from cache and file store.
-
         let mut transaction_data = match get_data_with_threads(
             current_version,
             transactions_count,
@@ -424,11 +424,14 @@ async fn data_fetcher_thread(
         )
         .await
         {
-            DataFetchSubThreadResult::Success(txns) => txns,
-            DataFetchSubThreadResult::NoResults => {
-                continue;
+            DataFetchSubThreadResult::BatchSuccess(txns) => txns,
+            DataFetchSubThreadResult::Success(_) => {
+                unreachable!("Fetching from multiple threads will never return a single vector")
             },
+            DataFetchSubThreadResult::NoResults => continue,
         };
+
+        let mut transaction_data = ensure_sequential_transactions(transaction_data);
 
         // TODO: Unify the truncation logic for start and end.
         if let Some(count) = transactions_count {
@@ -547,6 +550,42 @@ async fn data_fetcher_thread(
     }
 }
 
+fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Transaction> {
+    batches.sort_by(|a, b| a.first().unwrap().version.cmp(&b.first().unwrap().version));
+    let first_version = batches.first().unwrap().first().unwrap().version;
+    let last_version = batches.last().unwrap().last().unwrap().version;
+    let mut transactions: Vec<Transaction> = vec![];
+
+    let mut prev_start = None;
+    let mut prev_end = None;
+    for batch in batches {
+        let start_version = batch.first().unwrap().version;
+        let end_version = batch.last().unwrap().version;
+        if prev_start.is_none() {
+            prev_start = Some(start_version);
+            prev_end = Some(end_version);
+        } else {
+            if prev_end.unwrap() + 1 != start_version {
+                tracing::error!(
+                    batch_first_version = first_version,
+                    batch_last_version = last_version
+                    start_version = start_version,
+                    end_version = end_version,
+                            prev_start = ?prev_start,
+                    prev_end = prev_end,
+                            "[Filestore] Gaps or dupes in processing version data"
+                );
+                panic!("[Filestore] Gaps in processing data");
+            }
+            prev_start = Some(start_version);
+            prev_end = Some(end_version);
+            transactions.extend(batch);
+        }
+    }
+
+    transactions
+}
+
 /// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
 fn get_transactions_responses_builder(
     transactions: Vec<Transaction>,
@@ -568,7 +607,7 @@ async fn data_fetch(
     starting_version: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
-    request_metadata: IndexerGrpcRequestMetadata,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
     storage_format: StorageFormat,
 ) -> anyhow::Result<TransactionsDataStatus> {
     let current_batch_start_time = std::time::Instant::now();
@@ -728,7 +767,7 @@ fn get_request_metadata(
 async fn channel_send_multiple_with_timeout(
     resp_items: Vec<TransactionsResponse>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
-    request_metadata: IndexerGrpcRequestMetadata,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
 ) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
     let overall_send_start_time = Instant::now();
     let overall_size_in_bytes = resp_items
