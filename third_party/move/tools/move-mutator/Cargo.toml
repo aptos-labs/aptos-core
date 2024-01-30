@@ -16,6 +16,8 @@ rust-version.workspace = true
 anyhow = "1.0"
 clap = { version = "4.3", features = ["derive"] }
 diffy = "0.3"
+either = "1.9"
+itertools = "0.12"
 log = "0.4"
 pretty_env_logger = "0.5"
 rand = "0.8"
@@ -28,3 +30,4 @@ move-command-line-common = { path = "../../move-command-line-common" }
 move-compiler = { path = "../../move-compiler" }
 move-ir-types = { path = "../../move-ir/types" }
 move-package = { path = "../move-package" }
+move-symbol-pool = { path = "../../move-symbol-pool" }

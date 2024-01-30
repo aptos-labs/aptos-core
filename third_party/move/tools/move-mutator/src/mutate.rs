@@ -34,10 +34,8 @@ pub fn mutate(
 
     mutants.extend(
         ast.scripts
-            .into_iter()
-            .map(|(_, script)| {
-                traverse_function((script.function_name, script.function), conf, files)
-            })
+            .into_values()
+            .map(|script| traverse_function((script.function_name, script.function), conf, files))
             .collect::<Result<Vec<_>, _>>()?
             .concat(),
     );
@@ -55,6 +53,29 @@ fn traverse_module_with_check(
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
+    // We need to check if module comes from our source tree or from the deps, as we don't want to traverse
+    // all the dependencies.
+    let (ident, _) = &module;
+    let (filename, _) = files.get(&ident.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
+    let filename_path = Path::new(filename.as_str());
+
+    let mut paths_to_check = conf.project.move_sources.clone();
+    if let Some(project_path) = &conf.project_path {
+        paths_to_check.push(project_path.clone());
+    }
+
+    if !paths_to_check
+        .iter()
+        .any(|path| filename_path.starts_with(path))
+    {
+        trace!(
+            "Skipping module {} as it does not come from source project",
+            filename_path.to_str().unwrap()
+        );
+        return Ok(vec![]);
+    }
+
+    // Now we need to check if the module is included in the configuration.
     let module_name = extract_module_name(&module);
     if let cli::ModuleFilter::Selected(mods) = &conf.project.mutate_modules {
         if !mods.contains(&module_name.to_string()) {
@@ -63,7 +84,7 @@ fn traverse_module_with_check(
         }
     }
 
-    traverse_module(module, conf, files)
+    traverse_module(&module, conf, files)
 }
 
 /// Internal helper function that returns a reference to the functions defined in the module.
@@ -95,7 +116,7 @@ fn extract_module_name(
 /// Traverses a single module and returns a list of mutants.
 /// Checks all the functions and constants defined in the module.
 fn traverse_module(
-    module: (expansion::ast::ModuleIdent, ast::ModuleDefinition),
+    module: &(expansion::ast::ModuleIdent, ast::ModuleDefinition),
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
@@ -120,7 +141,7 @@ fn traverse_module(
     // Set the module name for all the mutants.
     mutants
         .iter_mut()
-        .for_each(|m| m.set_module_name(module_name.clone()));
+        .for_each(|m| m.set_module_name(module_name));
 
     trace!(
         "Found {} possible mutations in module {}",
@@ -251,13 +272,11 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
                 .collect::<Vec<Exp>>();
             parse_expressions(exps)
         },
-        ast::UnannotatedExp_::Vector(_, _, _, exp) => parse_expression_and_find_mutants(*exp),
         ast::UnannotatedExp_::ExpList(exps) => {
             let exps = exps
                 .into_iter()
                 .map(|exp| match exp {
-                    ExpListItem::Single(exp, _) => exp,
-                    ExpListItem::Splat(_, exp, _) => exp,
+                    ExpListItem::Single(exp, _) | ExpListItem::Splat(_, exp, _) => exp,
                 })
                 .collect::<Vec<Exp>>();
             parse_expressions(exps)
@@ -268,14 +287,10 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             mutants.extend(parse_expression_and_find_mutants(*exp3)?);
             Ok(mutants)
         },
-        ast::UnannotatedExp_::Break | ast::UnannotatedExp_::Continue => {
-            let mut mutants = vec![];
-            mutants.push(Mutant::new(
-                MutationOp::BreakContinue(BreakContinue::new(exp)),
-                None,
-            ));
-            Ok(mutants)
-        },
+        ast::UnannotatedExp_::Break | ast::UnannotatedExp_::Continue => Ok(vec![Mutant::new(
+            MutationOp::BreakContinue(BreakContinue::new(exp)),
+            None,
+        )]),
         ast::UnannotatedExp_::Value(val) => {
             let mutants = vec![Mutant::new(MutationOp::Literal(Literal::new(val)), None)];
             Ok(mutants)
@@ -289,6 +304,7 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
         | ast::UnannotatedExp_::Return(exp)
         | ast::UnannotatedExp_::VarCall(_, exp)
         | ast::UnannotatedExp_::Builtin(_, exp)
+        | ast::UnannotatedExp_::Vector(_, _, _, exp)
         | ast::UnannotatedExp_::TempBorrow(_, exp) => parse_expression_and_find_mutants(*exp),
         ast::UnannotatedExp_::Loop { has_break: _, body } => {
             parse_expression_and_find_mutants(*body)
