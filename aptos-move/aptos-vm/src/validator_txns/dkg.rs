@@ -19,6 +19,7 @@ use aptos_types::{
     on_chain_config::OnChainConfig,
     transaction::{ExecutionStatus, TransactionStatus},
 };
+use aptos_types::on_chain_config::ConfigurationResource;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use move_core_types::{
@@ -38,6 +39,7 @@ enum ExpectedFailure {
     // Move equivalent: `errors::invalid_state(*)`
     MissingResourceDKGState = 0x30001,
     MissingResourceInprogressDKGSession = 0x30002,
+    MissingResourceConfiguration = 0x30003,
 }
 
 enum ExecutionFailure {
@@ -83,13 +85,14 @@ impl AptosVM {
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
         let dkg_state = OnChainConfig::fetch_config(resolver)
             .ok_or_else(|| Expected(MissingResourceDKGState))?;
-
+        let config_resource = ConfigurationResource::fetch_config(resolver)
+            .ok_or_else(|| Expected(MissingResourceConfiguration))?;
         let DKGState { in_progress, .. } = dkg_state;
         let in_progress_session_state =
             in_progress.ok_or_else(|| Expected(MissingResourceInprogressDKGSession))?;
 
         // Check epoch number.
-        if dkg_node.metadata.epoch != in_progress_session_state.metadata.dealer_epoch {
+        if dkg_node.metadata.epoch != config_resource.epoch() {
             return Err(Expected(EpochNotCurrent));
         }
 
