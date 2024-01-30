@@ -14,6 +14,7 @@ use crate::mutant::Mutant;
 use crate::operator::MutationOp;
 use crate::operators::binary::Binary;
 use crate::operators::break_continue::BreakContinue;
+use crate::operators::delete_stmt::DeleteStmt;
 use crate::operators::ifelse::IfElse;
 use crate::operators::literal::Literal;
 use crate::operators::unary::Unary;
@@ -297,6 +298,14 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             let mutants = vec![Mutant::new(MutationOp::Literal(Literal::new(val)), None)];
             Ok(mutants)
         },
+        ast::UnannotatedExp_::Builtin(_, expr) => {
+            let mut mutants = parse_expression_and_find_mutants(*expr)?;
+            mutants.push(Mutant::new(
+                MutationOp::DeleteStmt(DeleteStmt::new(exp.clone())),
+                None,
+            ));
+            Ok(mutants)
+        },
         ast::UnannotatedExp_::Abort(exp)
         | ast::UnannotatedExp_::Annotate(exp, _)
         | ast::UnannotatedExp_::Borrow(_, exp, _)
@@ -305,7 +314,6 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
         | ast::UnannotatedExp_::Lambda(_, exp)
         | ast::UnannotatedExp_::Return(exp)
         | ast::UnannotatedExp_::VarCall(_, exp)
-        | ast::UnannotatedExp_::Builtin(_, exp)
         | ast::UnannotatedExp_::Vector(_, _, _, exp)
         | ast::UnannotatedExp_::TempBorrow(_, exp) => parse_expression_and_find_mutants(*exp),
         ast::UnannotatedExp_::Loop { has_break: _, body } => {

@@ -1,4 +1,5 @@
 use crate::operator::{MutantInfo, MutationOperator};
+use crate::operators::{MOVE_BREAK, MOVE_CONTINUE, MOVE_EMPTY_STMT};
 use crate::report::{Mutation, Range};
 use move_command_line_common::files::FileHash;
 use move_compiler::typing::ast;
@@ -30,10 +31,10 @@ impl MutationOperator for BreakContinue {
         // Group of exchangeable break/continue statements.
         let ops: Vec<&str> = match self.operation.exp.value {
             UnannotatedExp_::Break => {
-                vec!["continue", "{}"]
+                vec![MOVE_CONTINUE, MOVE_EMPTY_STMT]
             },
             UnannotatedExp_::Continue => {
-                vec!["break", "{}"]
+                vec![MOVE_BREAK, MOVE_EMPTY_STMT]
             },
             _ => vec![],
         };
@@ -95,8 +96,8 @@ mod tests {
             },
         };
         let operator = BreakContinue::new(exp);
-        let source = "break";
-        let expected = vec!["continue", "{}"];
+        let source = MOVE_BREAK;
+        let expected = vec![MOVE_CONTINUE, MOVE_EMPTY_STMT];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -118,8 +119,8 @@ mod tests {
             },
         };
         let operator = BreakContinue::new(exp);
-        let source = "continue";
-        let expected = vec!["break", "{}"];
+        let source = MOVE_CONTINUE;
+        let expected = vec![MOVE_BREAK, MOVE_EMPTY_STMT];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

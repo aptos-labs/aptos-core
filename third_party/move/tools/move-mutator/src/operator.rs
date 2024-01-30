@@ -1,5 +1,6 @@
 use crate::operators::binary::Binary;
 use crate::operators::break_continue::BreakContinue;
+use crate::operators::delete_stmt::DeleteStmt;
 use crate::operators::ifelse::IfElse;
 use crate::operators::literal::Literal;
 use crate::operators::unary::Unary;
@@ -55,6 +56,7 @@ pub enum MutationOp {
     BreakContinue(BreakContinue),
     Literal(Literal),
     IfElse(IfElse),
+    DeleteStmt(DeleteStmt),
 }
 
 impl MutationOperator for MutationOp {
@@ -67,6 +69,7 @@ impl MutationOperator for MutationOp {
             MutationOp::BreakContinue(break_continue) => break_continue.apply(source),
             MutationOp::Literal(literal) => literal.apply(source),
             MutationOp::IfElse(if_else) => if_else.apply(source),
+            MutationOp::DeleteStmt(delete_stmt) => delete_stmt.apply(source),
         }
     }
 
@@ -77,6 +80,7 @@ impl MutationOperator for MutationOp {
             MutationOp::BreakContinue(break_continue) => break_continue.get_file_hash(),
             MutationOp::Literal(literal) => literal.get_file_hash(),
             MutationOp::IfElse(if_else) => if_else.get_file_hash(),
+            MutationOp::DeleteStmt(delete_stmt) => delete_stmt.get_file_hash(),
         }
     }
 }
@@ -89,6 +93,7 @@ impl fmt::Display for MutationOp {
             MutationOp::BreakContinue(break_continue) => write!(f, "{break_continue}"),
             MutationOp::Literal(literal) => write!(f, "{literal}"),
             MutationOp::IfElse(if_else) => write!(f, "{if_else}"),
+            MutationOp::DeleteStmt(delete_stmt) => write!(f, "{delete_stmt}"),
         }
     }
 }
@@ -97,9 +102,7 @@ impl fmt::Display for MutationOp {
 mod tests {
     use super::*;
     use move_command_line_common::files::FileHash;
-    use move_compiler::naming::ast::{Type, Type_};
-    use move_compiler::parser::ast::{BinOp, BinOp_, UnaryOp, UnaryOp_};
-    use move_compiler::typing::ast::{UnannotatedExp, UnannotatedExp_};
+    use move_compiler::parser::ast::{BinOp, BinOp_};
     use move_ir_types::location::Loc;
 
     #[test]
@@ -112,46 +115,6 @@ mod tests {
         let operator = MutationOp::BinaryOp(Binary::new(bin_op));
         let source = "*";
         let expected = vec!["+", "-", "/", "%"];
-        let result = operator.apply(source);
-        assert_eq!(result.len(), expected.len());
-        for (i, r) in result.iter().enumerate() {
-            assert_eq!(r.mutated_source, expected[i]);
-        }
-    }
-
-    #[test]
-    fn test_apply_unary_operator() {
-        let loc = Loc::new(FileHash::new(""), 0, 1);
-        let unary_op = UnaryOp {
-            value: UnaryOp_::Not,
-            loc,
-        };
-        let operator = MutationOp::UnaryOp(Unary::new(unary_op));
-        let source = "!";
-        let expected = vec![" "];
-        let result = operator.apply(source);
-        assert_eq!(result.len(), expected.len());
-        for (i, r) in result.iter().enumerate() {
-            assert_eq!(r.mutated_source, expected[i]);
-        }
-    }
-
-    #[test]
-    fn test_apply_break_continue_operator() {
-        let loc = Loc::new(FileHash::new(""), 0, 5);
-        let exp = move_compiler::typing::ast::Exp {
-            exp: UnannotatedExp {
-                value: UnannotatedExp_::Break,
-                loc,
-            },
-            ty: Type {
-                value: Type_::Anything,
-                loc,
-            },
-        };
-        let operator = MutationOp::BreakContinue(BreakContinue::new(exp));
-        let source = "break";
-        let expected = vec!["continue", "{}"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

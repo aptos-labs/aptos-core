@@ -1,4 +1,9 @@
 use crate::operator::{MutantInfo, MutationOperator};
+use crate::operators::{
+    MOVE_ADDR_MAX, MOVE_ADDR_ZERO, MOVE_FALSE, MOVE_MAX_INFERRED_NUM, MOVE_MAX_U128, MOVE_MAX_U16,
+    MOVE_MAX_U256, MOVE_MAX_U32, MOVE_MAX_U64, MOVE_MAX_U8, MOVE_TRUE, MOVE_ZERO, MOVE_ZERO_U128,
+    MOVE_ZERO_U16, MOVE_ZERO_U256, MOVE_ZERO_U32, MOVE_ZERO_U64, MOVE_ZERO_U8,
+};
 use crate::report::{Mutation, Range};
 use move_command_line_common::files::FileHash;
 use move_compiler::expansion::ast;
@@ -30,62 +35,59 @@ impl MutationOperator for Literal {
         // Group of literal statements for possible Value types.
         let ops: Vec<String> = match &self.operation.value {
             Value_::Address(_addr) => {
-                vec![
-                    "0x0".to_owned(),
-                    "0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF".to_owned(),
-                ]
+                vec![MOVE_ADDR_ZERO.to_owned(), MOVE_ADDR_MAX.to_owned()]
             },
             Value_::Bool(_bool_val) => {
-                vec!["true".to_owned(), "false".to_owned()]
+                vec![MOVE_TRUE.to_owned(), MOVE_FALSE.to_owned()]
             },
             Value_::Bytearray(_bytearray) => {
                 vec!["b\"121112\"".to_owned()]
             },
             Value_::U8(u8_val) => {
                 vec![
-                    "0u8".to_owned(),
-                    "255u8".to_owned(),
+                    MOVE_ZERO_U8.to_owned(),
+                    MOVE_MAX_U8.to_owned(),
                     u8_val.saturating_add(1).to_string(),
                     u8_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U16(u16_val) => {
                 vec![
-                    "0u16".to_owned(),
-                    "65535u16".to_owned(),
+                    MOVE_ZERO_U16.to_owned(),
+                    MOVE_MAX_U16.to_owned(),
                     u16_val.saturating_add(1).to_string(),
                     u16_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U32(u32_val) => {
                 vec![
-                    "0u32".to_owned(),
-                    "4294967295u32".to_owned(),
+                    MOVE_ZERO_U32.to_owned(),
+                    MOVE_MAX_U32.to_owned(),
                     u32_val.saturating_add(1).to_string(),
                     u32_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U64(u64_val) => {
                 vec![
-                    "0u64".to_owned(),
-                    "18446744073709551615u64".to_owned(),
+                    MOVE_ZERO_U64.to_owned(),
+                    MOVE_MAX_U64.to_owned(),
                     u64_val.saturating_add(1).to_string(),
                     u64_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U128(u128_val) => {
                 vec![
-                    "0u128".to_owned(),
-                    "340282366920938463463374607431768211455u128".to_owned(),
+                    MOVE_ZERO_U128.to_owned(),
+                    MOVE_MAX_U128.to_owned(),
                     u128_val.saturating_add(1).to_string(),
                     u128_val.saturating_sub(1).to_string(),
                 ]
             },
             Value_::U256(_u256_val) => {
-                vec!["0u256".to_owned(), "115792089237316195423570985008687907853269984665640564039457584007913129639935u256".to_owned()]
+                vec![MOVE_ZERO_U256.to_owned(), MOVE_MAX_U256.to_owned()]
             },
             Value_::InferredNum(_inferred_num) => {
-                vec!["0".to_owned(), "115792089237316195423570985008687907853269984665640564039457584007913129639935".to_owned()]
+                vec![MOVE_ZERO.to_owned(), MOVE_MAX_INFERRED_NUM.to_owned()]
             },
         };
 
@@ -141,7 +143,7 @@ mod tests {
         };
         let operator = Literal::new(val);
         let source = "51";
-        let expected = vec!["0u8", "255u8", "52", "50"];
+        let expected = vec![MOVE_ZERO_U8, MOVE_MAX_U8, "52", "50"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -158,7 +160,7 @@ mod tests {
         };
         let operator = Literal::new(val);
         let source = "963";
-        let expected = vec!["0u16", "65535u16", "964", "962"];
+        let expected = vec![MOVE_ZERO_U16, MOVE_MAX_U16, "964", "962"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -175,7 +177,7 @@ mod tests {
         };
         let operator = Literal::new(val);
         let source = "1000963";
-        let expected = vec!["0u32", "4294967295u32", "1000964", "1000962"];
+        let expected = vec![MOVE_ZERO_U32, MOVE_MAX_U32, "1000964", "1000962"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -192,12 +194,7 @@ mod tests {
         };
         let operator = Literal::new(val);
         let source = "963251000963";
-        let expected = vec![
-            "0u64",
-            "18446744073709551615u64",
-            "963251000964",
-            "963251000962",
-        ];
+        let expected = vec![MOVE_ZERO_U64, MOVE_MAX_U64, "963251000964", "963251000962"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -215,8 +212,8 @@ mod tests {
         let operator = Literal::new(val);
         let source = "123963251000963";
         let expected = vec![
-            "0u128",
-            "340282366920938463463374607431768211455u128",
+            MOVE_ZERO_U128,
+            MOVE_MAX_U128,
             "123963251000964",
             "123963251000962",
         ];
@@ -235,8 +232,8 @@ mod tests {
             loc,
         };
         let operator = Literal::new(val);
-        let source = "true";
-        let expected = vec!["false"];
+        let source = MOVE_TRUE;
+        let expected = vec![MOVE_FALSE];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
