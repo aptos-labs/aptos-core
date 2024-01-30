@@ -144,7 +144,7 @@ impl IndexerStreamCoordinator {
         let mut tasks = vec![];
         for batch in task_batches {
             let context = self.context.clone();
-            let task = tokio::spawn(async move {
+            let task = tokio::task::spawn_blocking(move || {
                 let raw_txns = batch;
                 let api_txns = Self::convert_to_api_txns(context, raw_txns);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);

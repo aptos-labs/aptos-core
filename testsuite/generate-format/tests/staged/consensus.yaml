@@ -299,6 +299,8 @@ CommitMessage:
     2:
       Ack:
         NEWTYPE: UNIT
+    3:
+      Nack: UNIT
 CommitVote:
   STRUCT:
     - author:

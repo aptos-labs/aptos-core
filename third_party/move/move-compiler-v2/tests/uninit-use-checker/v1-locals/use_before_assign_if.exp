@@ -59,19 +59,19 @@ fun M::tmove($t0: bool) {
 
 Diagnostics:
 error: use of possibly unassigned local `x`
-  ┌─ tests/uninit-use-checker/use_before_assign_if.move:5:17
+  ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_if.move:5:17
   │
 5 │         let _ = move x + 1;
   │                 ^^^^^^
 
 error: use of possibly unassigned local `x`
-   ┌─ tests/uninit-use-checker/use_before_assign_if.move:11:17
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_if.move:11:17
    │
 11 │         let _ = x + 1;
    │                 ^^^^^
 
 error: use of possibly unassigned local `x`
-   ┌─ tests/uninit-use-checker/use_before_assign_if.move:17:17
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_if.move:17:17
    │
 17 │         let _ = &x;
    │                 ^^

@@ -38,6 +38,7 @@ pub fn wvuf_benches<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
+        PubKey = WT::DealtPubKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
@@ -52,8 +53,7 @@ pub fn wvuf_benches<
     let mut bench_cases = vec![];
     for wc in get_weighted_configs_for_benchmarking() {
         // TODO: use a lazy pattern to avoid this expensive dealing when no benchmarks are run
-        let (pvss_pp, ssks, _spks, dks, eks, iss, _s, dsk) =
-            setup_dealing::<WT, ThreadRng>(&wc, &mut rng);
+        let d = setup_dealing::<WT, ThreadRng>(&wc, &mut rng);
 
         println!(
             "Best-case subset size: {}",
@@ -67,30 +67,30 @@ pub fn wvuf_benches<
         println!("Dealing a {} PVSS transcript", WT::scheme_name());
         let trx = WT::deal(
             &wc,
-            &pvss_pp,
-            &ssks[0],
-            &eks,
-            &iss[0],
+            &d.pp,
+            &d.ssks[0],
+            &d.eks,
+            &d.iss[0],
             &NoAux,
             &wc.get_player(0),
             &mut rng,
         );
 
-        let vuf_pp = WVUF::PublicParameters::from(&pvss_pp);
+        let vuf_pp = WVUF::PublicParameters::from(&d.pp);
 
         let mut sks = vec![];
         let mut pks = vec![];
+        let mut deltas = vec![];
         let mut asks = vec![];
         let mut apks = vec![];
-        let mut deltas = vec![];
         println!(
             "Decrypting shares from {} PVSS transcript",
             WT::scheme_name()
         );
         for i in 0..wc.get_total_num_players() {
-            let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(i), &dks[i]);
-
+            let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(i), &d.dks[i]);
             let (ask, apk) = WVUF::augment_key_pair(&vuf_pp, sk.clone(), pk.clone(), &mut rng);
+
             sks.push(sk);
             pks.push(pk);
             deltas.push(WVUF::get_public_delta(&apk).clone());
@@ -99,10 +99,10 @@ pub fn wvuf_benches<
         }
         println!();
 
-        bench_cases.push((wc, vuf_pp, dsk, sks, pks, asks, apks, deltas));
+        bench_cases.push((wc, vuf_pp, d.dsk, d.dpk, sks, pks, asks, apks, deltas));
     }
 
-    for (wc, vuf_pp, sk, sks, pks, asks, apks, deltas) in bench_cases {
+    for (wc, vuf_pp, sk, pk, sks, pks, asks, apks, deltas) in bench_cases {
         wvuf_augment_random_keypair::<WT, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &sks, &pks, group, &mut rng,
         );
@@ -117,44 +117,58 @@ pub fn wvuf_benches<
 
         wvuf_verify_share::<WT, WVUF, ThreadRng, M>(&wc, &vuf_pp, &asks, &apks, group, &mut rng);
 
-        // best-case aggregation times (pick players with largest weights)
-        wvuf_aggregate_shares::<WT, WVUF, ThreadRng, M>(
-            &wc,
-            &asks,
-            &apks,
-            group,
-            &mut rng,
-            WeightedConfig::get_worst_case_eligible_subset_of_players,
-            "best_case".to_string(),
-        );
+        let bc: Vec<(fn(&WeightedConfig, &mut ThreadRng) -> Vec<Player>, String)> = vec![
+            (
+                WeightedConfig::get_random_eligible_subset_of_players,
+                "random".to_string(),
+            ),
+            (
+                WeightedConfig::get_best_case_eligible_subset_of_players,
+                "best_case".to_string(),
+            ),
+            (
+                WeightedConfig::get_worst_case_eligible_subset_of_players,
+                "worst_case".to_string(),
+            ),
+        ];
 
-        // average/random case aggregation time
-        wvuf_aggregate_shares::<WT, WVUF, ThreadRng, M>(
-            &wc,
-            &asks,
-            &apks,
-            group,
-            &mut rng,
-            WeightedConfig::get_random_eligible_subset_of_players,
-            "random".to_string(),
-        );
+        for (pick_subset_fn, subset_type) in bc {
+            // best-case aggregation times (pick players with largest weights)
+            wvuf_aggregate_shares::<WT, WVUF, ThreadRng, M>(
+                &wc,
+                &asks,
+                &apks,
+                group,
+                &mut rng,
+                pick_subset_fn,
+                &subset_type,
+            );
 
-        // worst-case aggregation times (pick players with smallest weights)
-        wvuf_aggregate_shares::<WT, WVUF, ThreadRng, M>(
-            &wc,
-            &asks,
-            &apks,
-            group,
-            &mut rng,
-            WeightedConfig::get_worst_case_eligible_subset_of_players,
-            "worst_case".to_string(),
-        );
+            wvuf_verify_proof::<WT, WVUF, ThreadRng, M>(
+                &wc,
+                &vuf_pp,
+                &pk,
+                &asks,
+                &apks,
+                group,
+                &mut rng,
+                pick_subset_fn,
+                &subset_type,
+            );
+
+            wvuf_derive_eval::<WT, WVUF, ThreadRng, M>(
+                &wc,
+                &vuf_pp,
+                &asks,
+                &apks,
+                group,
+                &mut rng,
+                pick_subset_fn,
+                &subset_type,
+            );
+        }
 
         wvuf_eval::<WT, WVUF, M>(&wc, &sk, group);
-
-        // TODO: verify_proof (but needs efficient create_proof)
-
-        // TODO: derive_eval (but needs efficient create_proof)
     }
 }
 
@@ -320,6 +334,7 @@ fn wvuf_aggregate_shares<
     WT: Transcript<SecretSharingConfig = WeightedConfig>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
+        PubKey = WT::DealtPubKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
@@ -333,34 +348,141 @@ fn wvuf_aggregate_shares<
     group: &mut BenchmarkGroup<M>,
     rng: &mut R,
     pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
-    subset_type: String,
+    subset_type: &String,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     group.bench_function(
-        format!("aggregate_{}_shares/{}", subset_type, wc),
+        format!("aggregate_shares/{}-subset/{}", subset_type, wc),
         move |b| {
             b.iter_with_setup(
-                || {
-                    let players = pick_subset_fn(wc, rng);
-
-                    players
-                        .iter()
-                        .map(|p| {
-                            (
-                                *p,
-                                apks[p.id].clone(),
-                                WVUF::create_share(&asks[p.id], BENCH_MSG),
-                            )
-                        })
-                        .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>()
-                },
+                || get_apks_and_proofs::<WT, WVUF, R>(&wc, &asks, apks, rng, pick_subset_fn),
                 |apks_and_proofs| {
                     WVUF::aggregate_shares(&wc, apks_and_proofs.as_slice());
                 },
             )
         },
     );
+}
+
+fn wvuf_verify_proof<
+    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WVUF: WeightedVUF<
+        SecretKey = WT::DealtSecretKey,
+        PubKey = WT::DealtPubKey,
+        PubKeyShare = WT::DealtPubKeyShare,
+        SecretKeyShare = WT::DealtSecretKeyShare,
+    >,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+    M: Measurement,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    pp: &WVUF::PublicParameters,
+    pk: &WVUF::PubKey,
+    asks: &Vec<WVUF::AugmentedSecretKeyShare>,
+    apks: &Vec<WVUF::AugmentedPubKeyShare>,
+    group: &mut BenchmarkGroup<M>,
+    rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    subset_type: &String,
+) where
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+{
+    group.bench_function(
+        format!("verify_proof/{}-subset/{}", subset_type, wc),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let apks_and_proofs =
+                        get_apks_and_proofs::<WT, WVUF, R>(&wc, &asks, apks, rng, pick_subset_fn);
+                    WVUF::aggregate_shares(&wc, apks_and_proofs.as_slice())
+                },
+                |proof| {
+                    let apks = apks
+                        .iter()
+                        .map(|apk| Some(apk.clone()))
+                        .collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
+                    assert!(WVUF::verify_proof(pp, pk, apks.as_slice(), BENCH_MSG, &proof).is_ok())
+                },
+            )
+        },
+    );
+}
+
+fn wvuf_derive_eval<
+    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WVUF: WeightedVUF<
+        SecretKey = WT::DealtSecretKey,
+        PubKey = WT::DealtPubKey,
+        PubKeyShare = WT::DealtPubKeyShare,
+        SecretKeyShare = WT::DealtSecretKeyShare,
+    >,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+    M: Measurement,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    pp: &WVUF::PublicParameters,
+    asks: &Vec<WVUF::AugmentedSecretKeyShare>,
+    apks: &Vec<WVUF::AugmentedPubKeyShare>,
+    group: &mut BenchmarkGroup<M>,
+    rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    subset_type: &String,
+) where
+    WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
+{
+    group.bench_function(
+        format!("derive_eval/{}-subset/{}", subset_type, wc),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let apks_and_proofs =
+                        get_apks_and_proofs::<WT, WVUF, R>(&wc, &asks, apks, rng, pick_subset_fn);
+                    WVUF::aggregate_shares(&wc, apks_and_proofs.as_slice())
+                },
+                |proof| {
+                    let apks = apks
+                        .iter()
+                        .map(|apk| Some(apk.clone()))
+                        .collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
+                    assert!(WVUF::derive_eval(wc, pp, BENCH_MSG, apks.as_slice(), &proof).is_ok())
+                },
+            )
+        },
+    );
+}
+
+fn get_apks_and_proofs<
+    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WVUF: WeightedVUF<
+        SecretKey = WT::DealtSecretKey,
+        PubKey = WT::DealtPubKey,
+        PubKeyShare = WT::DealtPubKeyShare,
+        SecretKeyShare = WT::DealtSecretKeyShare,
+    >,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    asks: &Vec<WVUF::AugmentedSecretKeyShare>,
+    apks: &Vec<WVUF::AugmentedPubKeyShare>,
+    rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+) -> Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)> {
+    let players = pick_subset_fn(wc, rng);
+
+    players
+        .iter()
+        .map(|p| {
+            (
+                *p,
+                apks[p.id].clone(),
+                WVUF::create_share(&asks[p.id], BENCH_MSG),
+            )
+        })
+        .collect::<Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)>>()
 }
 
 fn wvuf_eval<
