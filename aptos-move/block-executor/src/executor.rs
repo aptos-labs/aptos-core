@@ -42,6 +42,7 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp},
 };
 use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
@@ -853,10 +854,13 @@ where
             for (key, layout) in reads_needing_delayed_field_exchange.into_iter() {
                 if let Ok(MVDataOutput::Versioned(
                     _,
-                    ValueWithLayout::Exchanged(value, _existing_layout),
+                    ValueWithLayout::Exchanged(value, existing_layout),
                 )) = versioned_cache.data().fetch_data(&key, txn_idx)
                 {
-                    // TODO[agg_v2](fix) add randomly_check_layout_matches(Some(_existing_layout), layout);
+                    randomly_check_layout_matches(
+                        existing_layout.as_deref(),
+                        Some(layout.as_ref()),
+                    )?;
                     patched_resource_write_set.insert(
                         key,
                         Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),

@@ -25,7 +25,6 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
-use rand::Rng;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -34,6 +33,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use rand::Rng;
 use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
