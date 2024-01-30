@@ -40,7 +40,6 @@ use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     fee_statement::FeeStatement,
-    move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,

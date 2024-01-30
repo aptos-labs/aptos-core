@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 
-use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
+use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
 use anyhow::{anyhow, ensure, Result};
+use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
-use crate::zkid::Claims;
-use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.

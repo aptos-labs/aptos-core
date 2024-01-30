@@ -4,12 +4,11 @@ use crate::{
     certified_update_producer::CertifiedUpdateProducer,
     jwk_observer::JWKObserver,
     network::IncomingRpcRequest,
-    signing_key_provider::SigningKeyProvider,
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse},
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::SigningKey;
+use aptos_crypto::{bls12381::PrivateKey, SigningKey};
 use aptos_logger::{debug, error, info};
 use aptos_types::{
     account_address::AccountAddress,
@@ -18,18 +17,19 @@ use aptos_types::{
         jwk::JWKMoveStruct, AllProvidersJWKs, Issuer, ObservedJWKs, ObservedJWKsUpdated,
         ProviderJWKs, QuorumCertifiedUpdate, SupportedOIDCProviders,
     },
-    validator_txn::ValidatorTransaction,
+    validator_txn::{Topic, ValidatorTransaction},
 };
+use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
 use futures_util::{
     future::{join_all, AbortHandle},
     FutureExt, StreamExt,
 };
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use std::collections::HashSet;
-use aptos_crypto::bls12381::PrivateKey;
-use aptos_types::validator_txn::Topic;
-use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 /// `JWKManager` executes per-issuer JWK consensus sessions
 /// and updates validator txn pool with quorum-certified JWK updates.
@@ -99,8 +99,7 @@ impl JWKManager {
             .into_provider_vec()
             .into_iter()
             .map(|provider| {
-                JWKObserver::
-                spawn(
+                JWKObserver::spawn(
                     self.my_addr,
                     provider.name.clone(),
                     provider.config_url.clone(),
@@ -191,13 +190,27 @@ impl JWKManager {
 
     /// Invoked on start, or on on-chain JWK updated event.
     pub fn reset_with_on_chain_state(&mut self, on_chain_state: AllProvidersJWKs) -> Result<()> {
-        debug!("[JWK] reset_with_on_chain_state: BEGIN: on_chain_state={:?}", on_chain_state);
-        let onchain_issuer_set: HashSet<Issuer> = on_chain_state.entries.iter().map(|entry|entry.issuer.clone()).collect();
-        self.states_by_issuer.retain(|issuer, _| onchain_issuer_set.contains(issuer));
+        debug!(
+            "[JWK] reset_with_on_chain_state: BEGIN: on_chain_state={:?}",
+            on_chain_state
+        );
+        let onchain_issuer_set: HashSet<Issuer> = on_chain_state
+            .entries
+            .iter()
+            .map(|entry| entry.issuer.clone())
+            .collect();
+        self.states_by_issuer
+            .retain(|issuer, _| onchain_issuer_set.contains(issuer));
         for provider_jwks in on_chain_state.entries {
-            let x = self.states_by_issuer.get(&provider_jwks.issuer).and_then(|s|s.on_chain.as_ref());
+            let x = self
+                .states_by_issuer
+                .get(&provider_jwks.issuer)
+                .and_then(|s| s.on_chain.as_ref());
             if x != Some(&provider_jwks) {
-                self.states_by_issuer.insert(provider_jwks.issuer.clone(), PerProviderState::new(provider_jwks));
+                self.states_by_issuer.insert(
+                    provider_jwks.issuer.clone(),
+                    PerProviderState::new(provider_jwks),
+                );
             }
         }
         Ok(())
@@ -239,15 +252,14 @@ impl JWKManager {
     /// Triggered once the `certified_update_producer` produced a quorum-certified update.
     pub fn process_quorum_certified_update(&mut self, update: QuorumCertifiedUpdate) -> Result<()> {
         let issuer = update.update.issuer.clone();
-        let state = self
-            .states_by_issuer
-            .entry(issuer.clone())
-            .or_default();
+        let state = self.states_by_issuer.entry(issuer.clone()).or_default();
         match &state.consensus_state {
             ConsensusState::InProgress { my_proposal, .. } => {
                 //TODO: counters
                 let txn = ValidatorTransaction::ObservedJWKUpdate(update.clone());
-                let vtxn_guard = self.vtxn_pool.put(Topic::JWK_CONSENSUS(issuer), Arc::new(txn), None);
+                let vtxn_guard =
+                    self.vtxn_pool
+                        .put(Topic::JWK_CONSENSUS(issuer), Arc::new(txn), None);
                 state.consensus_state = ConsensusState::Finished {
                     vtxn_guard,
                     my_proposal: my_proposal.clone(),

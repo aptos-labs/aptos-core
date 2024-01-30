@@ -3,6 +3,7 @@
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::JWKConsensusNetworkClient,
 };
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
@@ -10,7 +11,6 @@ use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents}
 use aptos_types::account_address::AccountAddress;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use tokio::runtime::Runtime;
-use aptos_crypto::bls12381::PrivateKey;
 use types::JWKConsensusMsg;
 
 pub fn start_jwk_consensus_runtime(

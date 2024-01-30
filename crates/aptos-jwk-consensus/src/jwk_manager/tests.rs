@@ -2,13 +2,14 @@
 
 use crate::{
     certified_update_producer::CertifiedUpdateProducer,
-    jwk_manager::{QuorumCertProcessGuard, ConsensusState, JWKManager, PerProviderState},
+    jwk_manager::{ConsensusState, JWKManager, PerProviderState, QuorumCertProcessGuard},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
 };
 use aptos_channels::aptos_channel;
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey, Signature},
+    hash::CryptoHash,
     SigningKey, Uniform,
 };
 use aptos_infallible::{Mutex, RwLock};
@@ -25,13 +26,10 @@ use aptos_types::{
 use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use futures_util::future::AbortHandle;
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeSet, HashMap, HashSet},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
-use std::collections::HashSet;
-use std::time::Instant;
-use aptos_crypto::hash::CryptoHash;
 
 #[tokio::test]
 async fn test_jwk_manager_state_transition() {
@@ -334,14 +332,15 @@ async fn test_jwk_manager_state_transition() {
         };
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
-    let expected_vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(qc_update_for_carl.clone())];
-    let actual_vtxns = vtxn_pool
-        .pull(
-            Instant::now() + Duration::from_secs(3600),
-            999,
-            2048,
-            TransactionFilter::empty(),
-        );
+    let expected_vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(
+        qc_update_for_carl.clone(),
+    )];
+    let actual_vtxns = vtxn_pool.pull(
+        Instant::now() + Duration::from_secs(3600),
+        999,
+        2048,
+        TransactionFilter::empty(),
+    );
     assert_eq!(expected_vtxns, actual_vtxns);
 
     // For issuer Carl, in state 'Finished`, JWKConsensusManager should still reply to observation requests with its own proposal.
@@ -407,7 +406,10 @@ async fn test_jwk_manager_state_transition() {
     let expected_vtxn_hashes = vec![
         ValidatorTransaction::ObservedJWKUpdate(qc_update_for_alice),
         ValidatorTransaction::ObservedJWKUpdate(qc_update_for_carl),
-    ].iter().map(CryptoHash::hash).collect::<HashSet<_>>();
+    ]
+    .iter()
+    .map(CryptoHash::hash)
+    .collect::<HashSet<_>>();
 
     let actual_vtxn_hashes = vtxn_pool
         .pull(
@@ -415,7 +417,10 @@ async fn test_jwk_manager_state_transition() {
             999,
             2048,
             TransactionFilter::empty(),
-        ).iter().map(CryptoHash::hash).collect::<HashSet<_>>();
+        )
+        .iter()
+        .map(CryptoHash::hash)
+        .collect::<HashSet<_>>();
     assert_eq!(expected_vtxn_hashes, actual_vtxn_hashes);
 
     // At any time, JWKConsensusManager should fully follow on-chain update notification and re-initialize.

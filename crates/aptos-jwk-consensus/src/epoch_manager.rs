@@ -11,6 +11,7 @@ use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::common::Author;
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_event_notifications::{
     EventNotification, EventNotificationListener, ReconfigNotification,
     ReconfigNotificationListener,
@@ -26,12 +27,11 @@ use aptos_types::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
     },
 };
+use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::StreamExt;
 use futures_channel::oneshot;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_crypto::bls12381::PrivateKey;
-use aptos_validator_transaction_pool::VTxnPoolState;
 
 pub struct EpochManager<P: OnChainConfigProvider> {
     // some useful metadata

@@ -25,6 +25,7 @@ use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -43,7 +44,6 @@ use std::{
     thread,
 };
 use tokio::runtime::Runtime;
-use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
@@ -663,8 +663,8 @@ pub fn setup_environment_and_start_node(
     aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
 
     let vtxn_pool = VTxnPoolState::default();
-    let maybe_dkg_dealer_sk = load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules)
-        .and_then(|consensus_key| consensus_key.try_into().map_err(|e|anyhow!("consensus key to dkg dealer key conversion failed: {e}")));
+    let maybe_dkg_dealer_sk =
+        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
     debug!("maybe_dkg_dealer_sk={:?}", maybe_dkg_dealer_sk);
     let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
         (Some(interfaces), Ok(dkg_dealer_sk)) => {
@@ -689,7 +689,8 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    let maybe_jwk_consensus_key = load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
+    let maybe_jwk_consensus_key =
+        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
     debug!("maybe_jwk_consensus_key={:?}", maybe_jwk_consensus_key);
 
     let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, maybe_jwk_consensus_key) {

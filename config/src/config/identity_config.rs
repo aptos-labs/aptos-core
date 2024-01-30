@@ -3,9 +3,7 @@
 
 use crate::{config::SecureBackend, keys::ConfigKey};
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
-use aptos_types::{
-    account_address::{AccountAddress, AccountAddress as PeerId},
-};
+use aptos_types::account_address::{AccountAddress, AccountAddress as PeerId};
 use serde::{Deserialize, Serialize};
 use std::{
     fs,

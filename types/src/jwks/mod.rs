@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 
 use self::jwk::JWK;
+use crate::{move_utils::as_move_value::AsMoveValue, on_chain_config::OnChainConfig};
 use anyhow::{bail, Context};
-use crate::{move_utils::as_move_value::AsMoveValue,
-            on_chain_config::OnChainConfig,
-};
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
-use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use move_core_types::{
     account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    move_resource::MoveStructType,
     value::{MoveStruct, MoveValue},
 };
 use serde::{Deserialize, Serialize};

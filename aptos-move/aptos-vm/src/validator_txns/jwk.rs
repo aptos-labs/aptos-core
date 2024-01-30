@@ -1,28 +1,39 @@
 // Copyright © Aptos Foundation
 
-use std::collections::HashMap;
+use crate::{
+    aptos_vm::get_or_vm_startup_failure,
+    errors::expect_only_successful_execution,
+    move_vm_ext::{AptosMoveResolver, SessionId},
+    system_module_names::{JWKS_MODULE, UPSERT_INTO_OBSERVED_JWKS},
+    validator_txns::jwk::{
+        ExecutionFailure::{Expected, Unexpected},
+        ExpectedFailure::{
+            IncorrectVersion, MissingResourceObservedJWKs, MissingResourceValidatorSet,
+            MultiSigVerificationFailed, NotEnoughVotingPower,
+        },
+    },
+    AptosVM,
+};
 use aptos_bitvec::BitVec;
-use aptos_types::aggregate_signature::AggregateSignature;
-use aptos_types::fee_statement::FeeStatement;
-use aptos_types::jwks;
-use aptos_types::jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate};
-use aptos_types::move_utils::as_move_value::AsMoveValue;
-use aptos_types::on_chain_config::{OnChainConfig, ValidatorSet};
-use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
-use aptos_types::validator_verifier::ValidatorVerifier;
+use aptos_types::{
+    aggregate_signature::AggregateSignature,
+    fee_statement::FeeStatement,
+    jwks,
+    jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::{OnChainConfig, ValidatorSet},
+    transaction::{ExecutionStatus, TransactionStatus},
+    validator_verifier::ValidatorVerifier,
+};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::value::{MoveValue, serialize_values};
-use move_core_types::vm_status::{AbortLocation, StatusCode, VMStatus};
+use move_core_types::{
+    account_address::AccountAddress,
+    value::{serialize_values, MoveValue},
+    vm_status::{AbortLocation, StatusCode, VMStatus},
+};
 use move_vm_types::gas::UnmeteredGasMeter;
-use crate::aptos_vm::get_or_vm_startup_failure;
-use crate::AptosVM;
-use crate::errors::expect_only_successful_execution;
-use crate::move_vm_ext::{AptosMoveResolver, SessionId};
-use crate::system_module_names::{JWKS_MODULE, UPSERT_INTO_OBSERVED_JWKS};
-use crate::validator_txns::jwk::ExecutionFailure::{Expected, Unexpected};
-use crate::validator_txns::jwk::ExpectedFailure::{IncorrectVersion, MissingResourceObservedJWKs, MissingResourceValidatorSet, MultiSigVerificationFailed, NotEnoughVotingPower};
+use std::collections::HashMap;
 
 enum ExpectedFailure {
     // Move equivalent: `errors::invalid_argument(*)`
@@ -69,10 +80,13 @@ impl AptosVM {
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
         // Load resources.
-        let validator_set = ValidatorSet::fetch_config(resolver).ok_or_else(||Expected(MissingResourceValidatorSet))?;
-        let observed_jwks = ObservedJWKs::fetch_config(resolver).ok_or_else(||Expected(MissingResourceObservedJWKs))?;
+        let validator_set = ValidatorSet::fetch_config(resolver)
+            .ok_or_else(|| Expected(MissingResourceValidatorSet))?;
+        let observed_jwks = ObservedJWKs::fetch_config(resolver)
+            .ok_or_else(|| Expected(MissingResourceObservedJWKs))?;
 
-        let mut jwks_by_issuer: HashMap<Issuer, ProviderJWKs> = observed_jwks.into_providers_jwks().into();
+        let mut jwks_by_issuer: HashMap<Issuer, ProviderJWKs> =
+            observed_jwks.into_providers_jwks().into();
         let issuer = update.update.issuer.clone();
         let on_chain = jwks_by_issuer
             .entry(issuer.clone())
@@ -99,13 +113,17 @@ impl AptosVM {
         );
 
         // Verify multi-sig.
-        verifier.verify_multi_signatures(
-            &observed,
-            &AggregateSignature::new(signer_bit_vec, Some(multi_sig)),
-        ).map_err(|_|Expected(MultiSigVerificationFailed))?;
+        verifier
+            .verify_multi_signatures(
+                &observed,
+                &AggregateSignature::new(signer_bit_vec, Some(multi_sig)),
+            )
+            .map_err(|_| Expected(MultiSigVerificationFailed))?;
 
         // Check voting power.
-        verifier.check_voting_power(authors.iter(), true).map_err(|_|Expected(NotEnoughVotingPower))?;
+        verifier
+            .check_voting_power(authors.iter(), true)
+            .map_err(|_| Expected(NotEnoughVotingPower))?;
 
         // All verification passed. Apply the `observed`.
         let mut gas_meter = UnmeteredGasMeter;
@@ -136,7 +154,7 @@ impl AptosVM {
                 .map_err(Unexpected)?
                 .change_set_configs,
         )
-            .map_err(Unexpected)?;
+        .map_err(Unexpected)?;
 
         Ok((VMStatus::Executed, output))
     }
