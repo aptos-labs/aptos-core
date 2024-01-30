@@ -44,7 +44,7 @@ impl Default for CLIOptions {
             move_sources: vec![],
             mutate_modules: ModuleFilter::All,
             out_mutant_dir: Some(PathBuf::from(DEFAULT_OUTPUT_DIR)),
-            verify_mutants: true,
+            verify_mutants: false,
             no_overwrite: None,
             downsample_filter: None,
             downsampling_ratio_percentage: None,
