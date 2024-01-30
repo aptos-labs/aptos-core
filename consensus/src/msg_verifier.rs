@@ -50,7 +50,7 @@ impl ConsensusMsgVerifier {
         payload_manager: Arc<PayloadManager>,
         max_qs_batch: usize,
     ) -> Self {
-        let runtime = aptos_runtimes::spawn_named_runtime("signature-verifier".into(), None);
+        let runtime = aptos_runtimes::spawn_named_runtime("sig-verify".into(), None);
         Self {
             my_peer_id,
             epoch_state,
