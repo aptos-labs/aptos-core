@@ -14,6 +14,7 @@ use crate::mutant::Mutant;
 use crate::operator::MutationOp;
 use crate::operators::binary::Binary;
 use crate::operators::break_continue::BreakContinue;
+use crate::operators::ifelse::IfElse;
 use crate::operators::literal::Literal;
 use crate::operators::unary::Unary;
 
@@ -230,7 +231,7 @@ fn parse_expressions(exp: Vec<Exp>) -> anyhow::Result<Vec<Mutant>> {
 /// When Move language is extended with new expressions, this function needs to be updated to support them.
 fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
     trace!("Parsing expression {exp:?}");
-    match exp.exp.value {
+    match exp.clone().exp.value {
         ast::UnannotatedExp_::BinopExp(left, binop, _type, right) => {
             // Parse left and right side of the operator as they are expressions and may contain
             // another things to mutate.
@@ -285,6 +286,7 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             let mut mutants = parse_expression_and_find_mutants(*exp1)?;
             mutants.extend(parse_expression_and_find_mutants(*exp2)?);
             mutants.extend(parse_expression_and_find_mutants(*exp3)?);
+            mutants.push(Mutant::new(MutationOp::IfElse(IfElse::new(exp)), None));
             Ok(mutants)
         },
         ast::UnannotatedExp_::Break | ast::UnannotatedExp_::Continue => Ok(vec![Mutant::new(
