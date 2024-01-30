@@ -30,12 +30,13 @@ use aptos_types::{
     validator_txn::ValidatorTransaction,
     validator_verifier::ValidatorVerifier,
 };
+use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
     collections::HashSet,
     fmt::{Display, Formatter},
-    ops::Deref,
+    ops::{Deref, DerefMut},
     sync::Arc,
 };
 
@@ -534,22 +535,26 @@ impl TryFrom<DAGRpcResult> for Vote {
 
 pub struct SignatureBuilder {
     metadata: NodeMetadata,
-    partial_signatures: Mutex<PartialSignatures>,
+    inner: Mutex<(PartialSignatures, Option<oneshot::Sender<NodeCertificate>>)>,
     epoch_state: Arc<EpochState>,
 }
 
 impl SignatureBuilder {
-    pub fn new(metadata: NodeMetadata, epoch_state: Arc<EpochState>) -> Arc<Self> {
+    pub fn new(
+        metadata: NodeMetadata,
+        epoch_state: Arc<EpochState>,
+        tx: oneshot::Sender<NodeCertificate>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             metadata,
-            partial_signatures: Mutex::new(PartialSignatures::empty()),
+            inner: Mutex::new((PartialSignatures::empty(), Some(tx))),
             epoch_state,
         })
     }
 }
 
 impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
-    type Aggregated = NodeCertificate;
+    type Aggregated = ();
     type Message = Node;
     type Response = Vote;
 
@@ -559,22 +564,33 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
         debug!(LogSchema::new(LogEvent::ReceiveVote)
             .remote_peer(peer)
             .round(self.metadata.round()));
-        let mut signatures_lock = self.partial_signatures.lock();
-        signatures_lock.add_signature(peer, ack.signature);
-        Ok(self
-            .epoch_state
-            .verifier
-            .check_voting_power(signatures_lock.signatures().keys(), true)
-            .ok()
-            .map(|_| {
-                let aggregated_signature = self
-                    .epoch_state
-                    .verifier
-                    .aggregate_signatures(&signatures_lock)
-                    .expect("Signature aggregation should succeed");
-                observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
-                NodeCertificate::new(self.metadata.clone(), aggregated_signature)
-            }))
+        let mut guard = self.inner.lock();
+        let (partial_signatures, tx) = guard.deref_mut();
+        partial_signatures.add_signature(peer, ack.signature);
+
+        if tx.is_some()
+            && self
+                .epoch_state
+                .verifier
+                .check_voting_power(partial_signatures.signatures().keys(), true)
+                .is_ok()
+        {
+            let aggregated_signature = self
+                .epoch_state
+                .verifier
+                .aggregate_signatures(&partial_signatures)
+                .expect("Signature aggregation should succeed");
+            observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
+            let certificate = NodeCertificate::new(self.metadata.clone(), aggregated_signature);
+
+            _ = tx.take().expect("must exist").send(certificate);
+        }
+
+        if partial_signatures.signatures().len() == self.epoch_state.verifier.len() {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
     }
 }
 
