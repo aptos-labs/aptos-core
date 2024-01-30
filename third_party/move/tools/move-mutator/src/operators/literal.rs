@@ -192,7 +192,12 @@ mod tests {
         };
         let operator = Literal::new(val);
         let source = "963251000963";
-        let expected = vec!["0u64", "18446744073709551615u64", "963251000964", "963251000962"];
+        let expected = vec![
+            "0u64",
+            "18446744073709551615u64",
+            "963251000964",
+            "963251000962",
+        ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -209,7 +214,12 @@ mod tests {
         };
         let operator = Literal::new(val);
         let source = "123963251000963";
-        let expected = vec!["0u128", "340282366920938463463374607431768211455u128", "123963251000964", "123963251000962"];
+        let expected = vec![
+            "0u128",
+            "340282366920938463463374607431768211455u128",
+            "123963251000964",
+            "123963251000962",
+        ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

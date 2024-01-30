@@ -24,6 +24,7 @@ use crate::configuration::Configuration;
 use crate::report::Report;
 use move_package::BuildConfig;
 use std::path::PathBuf;
+use move_compiler::parser::ast::ModuleName;
 
 /// Runs the Move mutator tool.
 /// Entry point for the Move mutator tool both for the CLI and the Rust API.
@@ -62,6 +63,9 @@ pub fn run_move_mutator(
     trace!("Mutator configuration: {mutator_configuration:?}");
 
     let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
+
+    trace!("Generated AST: {ast:?}");
+
     let mutants = mutate::mutate(ast, &mutator_configuration, &files)?;
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
@@ -113,10 +117,17 @@ pub fn run_move_mutator(
 
                 info!("{} written to {}", mutant, mutant_path.display());
 
+                let mod_name = if let Some(module) = mutant.get_module_name() {
+                    let ModuleName(name) = module;
+                    name.value.to_string()
+                } else {
+                    "script".to_owned()     // if there is no module name, it is a script
+                };
+
                 let mut entry = report::MutationReport::new(
                     mutant_path.as_path(),
                     path,
-                    mutant.get_module_name().unwrap().0.value.as_str(),
+                    mod_name.as_str(),
                     &mutated.mutated_source,
                     &source,
                 );
