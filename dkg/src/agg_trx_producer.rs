@@ -11,6 +11,7 @@ use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_logger::info;
 
 /// A sub-process of the whole DKG process.
 /// Once invoked by `DKGManager` to `start_produce`,
@@ -49,6 +50,7 @@ impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProdu
         params: DKG::PublicParams,
         agg_trx_tx: Option<Sender<(), DKG::Transcript>>,
     ) -> AbortHandle {
+        let epoch = epoch_state.epoch;
         let rb = self.reliable_broadcast.clone();
         let req = DKGTranscriptRequest::new(epoch_state.epoch);
         let agg_state = Arc::new(TranscriptAggregationState::<DKG>::new(
@@ -59,8 +61,15 @@ impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProdu
         ));
         let task = async move {
             let agg_trx = rb.broadcast(req, agg_state).await;
+            info!(
+                epoch = epoch,
+                my_addr = my_addr,
+                "DKG transcript request RB finished."
+            );
+            info!("has_agg_trx_tx={}", agg_trx_tx.is_some());
             if let Some(tx) = agg_trx_tx {
-                let _ = tx.push((), agg_trx); // If the `DKGManager` was dropped, this send will fail by design.
+                let push_result = tx.push((), agg_trx); // If the `DKGManager` was dropped, this send will fail by design.
+                info!("push_result={:?}", push_result);
             }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();

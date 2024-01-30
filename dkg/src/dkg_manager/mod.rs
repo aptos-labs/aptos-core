@@ -125,6 +125,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             my_addr = self.my_addr.to_hex().as_str(),
             "DKGManager started."
         );
+        let mut interval = tokio::time::interval(Duration::from_millis(5000));
 
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
@@ -170,7 +171,10 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 },
                 close_req = close_rx.select_next_some() => {
                     self.process_close_cmd(close_req.ok())
-                }
+                },
+                _ = interval.tick().fuse() => {
+                    self.observe()
+                },
             };
 
             if let Err(e) = handling_result {
@@ -186,6 +190,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             my_addr = self.my_addr.to_hex().as_str(),
             "DKGManager finished."
         );
+    }
+
+    fn observe(&self) -> Result<()> {
+        info!("dkg_manager_state={:?}", self.state);
+        Ok(())
     }
 
     /// On a CLOSE command from epoch manager, do clean-up.
@@ -340,6 +349,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
     /// On a locally aggregated transcript, put it into the validator txn pool and update inner states.
     async fn process_aggregated_transcript(&mut self, agg_trx: DKG::Transcript) -> Result<()> {
+        info!(
+            epoch = self.epoch_state.epoch,
+            my_addr = self.my_addr,
+            "Processing locally aggregated transcript."
+        );
         self.state = match std::mem::take(&mut self.state) {
             InnerState::InProgress {
                 start_time,
