@@ -39,9 +39,9 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
-) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
+) -> (Runtime, Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
-    let verification_runtime = aptos_runtimes::spawn_named_runtime("verification".into(), None);
+    let signature_verification_rt = aptos_runtimes::spawn_named_runtime("sig-verify".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let quorum_store_db = Arc::new(QuorumStoreDB::new(node_config.storage.dir()));
 
@@ -65,7 +65,7 @@ pub fn start_consensus(
     let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
 
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let bounded_executor = BoundedExecutor::new(60, verification_runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
@@ -78,6 +78,7 @@ pub fn start_consensus(
         quorum_store_db.clone(),
         reconfig_events,
         bounded_executor,
+        signature_verification_rt.handle().clone(),
         aptos_time_service::TimeService::real(),
         vtxn_pool,
     );
@@ -88,5 +89,5 @@ pub fn start_consensus(
     runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 
     debug!("Consensus started.");
-    (runtime, storage, quorum_store_db)
+    (runtime, signature_verification_rt, storage, quorum_store_db)
 }

@@ -908,6 +908,7 @@ dependencies = [
  "move-core-types",
  "num-derive",
  "num-traits",
+ "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.7.3",
