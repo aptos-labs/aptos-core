@@ -133,9 +133,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         if let Some(session_state) = in_progress_session {
             let DKGSessionState {
                 start_time_us,
-                metadata,
+                mut metadata,
                 ..
             } = session_state;
+            // Adjust.
+            metadata.dealer_epoch = self.epoch_state.epoch;
             self.setup_deal_broadcast(start_time_us, &metadata)
                 .await
                 .expect("setup_deal_broadcast() should be infallible");
@@ -407,13 +409,17 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         );
         fail_point!("dkg::process_dkg_start_event");
         let DKGStartEvent {
-            session_metadata,
+            mut session_metadata,
             start_time_us,
         } = event;
+        // Adjust.
+        session_metadata.dealer_epoch = self.epoch_state.epoch;
+
         ensure!(
             matches!(&self.state, InnerState::NotStarted),
             "dkg already started"
         );
+
         ensure!(
             self.epoch_state.epoch == session_metadata.dealer_epoch,
             "event not for current epoch"

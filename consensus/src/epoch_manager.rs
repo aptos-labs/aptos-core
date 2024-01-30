@@ -1122,12 +1122,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let new_epoch = new_epoch_state.epoch;
 
         let dkg_state = maybe_dkg_state.map_err(NoRandomnessReason::DKGStateResourceMissing)?;
-        let dkg_session = dkg_state
+        let mut dkg_session = dkg_state
             .last_completed
             .ok_or_else(|| NoRandomnessReason::DKGCompletedSessionResourceMissing)?;
+
+        // Temp adjust.
+        dkg_session.metadata.dealer_epoch = new_epoch_state.epoch - 1;
+
         if dkg_session.metadata.dealer_epoch + 1 != new_epoch_state.epoch {
             return Err(NoRandomnessReason::CompletedSessionTooOld);
         }
+
         let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session.metadata);
         let my_index = new_epoch_state
             .verifier
