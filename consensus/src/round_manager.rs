@@ -1080,6 +1080,7 @@ impl RoundManager {
                             unexpected_event => unreachable!("Unexpected event: {:?}", unexpected_event),
                         };
                         let round_state = self.round_state();
+                        debug!("proposal_process_result={:?}", result);
                         match result {
                             Ok(_) => trace!(RoundStateLogSchema::new(round_state)),
                             Err(e) => {

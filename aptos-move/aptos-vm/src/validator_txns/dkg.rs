@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use aptos_logger::debug;
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
     errors::expect_only_successful_execution,
@@ -27,6 +28,7 @@ use move_core_types::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 
+#[derive(Debug)]
 enum ExpectedFailure {
     // Move equivalent: `errors::invalid_argument(*)`
     EpochNotCurrent = 0x10001,
@@ -51,16 +53,24 @@ impl AptosVM {
         session_id: SessionId,
         dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        debug!("Processing dkg transaction");
         match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_transcript) {
-            Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
+            Ok((vm_status, vm_output)) => {
+                debug!("Processing dkg transaction ok");
+                Ok((vm_status, vm_output))
+            },
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
+                debug!("Processing dkg transaction expected failure: {:?}", failure);
                 Ok((
                     VMStatus::MoveAbort(AbortLocation::Script, failure as u64),
                     VMOutput::empty_with_status(TransactionStatus::Discard(StatusCode::ABORTED)),
                 ))
             },
-            Err(Unexpected(vm_status)) => Err(vm_status),
+            Err(Unexpected(vm_status)) => {
+                debug!("Processing dkg transaction unexpected failure: {:?}", vm_status);
+                Err(vm_status)
+            },
         }
     }
 

@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use aptos_logger::debug;
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionId},
     AptosVM,
@@ -16,6 +17,7 @@ impl AptosVM {
         txn: ValidatorTransaction,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        debug!("Processing validator transaction");
         let session_id = SessionId::validator_txn(&txn);
         match txn {
             ValidatorTransaction::DKGResult(dkg_node) => {
