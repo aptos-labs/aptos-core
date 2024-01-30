@@ -46,7 +46,7 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
     Ok(jwks)
 }
 
-fn get_jwk_for_zk_authenticator(
+fn get_jwk_for_zkid_authenticator(
     jwks: &PatchedJWKs,
     zkid_pub_key: &ZkIdPublicKey,
     zkid_sig: &ZkIdSignature,
@@ -92,7 +92,7 @@ pub fn validate_zkid_authenticators(
     let patched_jwks = get_jwks_onchain(resolver)?;
 
     for (zkid_pub_key, zkid_sig) in &zkid_authenticators {
-        let jwk = get_jwk_for_zk_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
+        let jwk = get_jwk_for_zkid_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
 
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
