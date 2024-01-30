@@ -170,6 +170,7 @@ impl RawData for RawDataServerWrapper {
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
         tokio::spawn({
+            let request_metadata = request_metadata.clone();
             async move {
                 data_fetcher_thread(
                     redis_client,
@@ -189,10 +190,8 @@ impl RawData for RawDataServerWrapper {
 
         response.metadata_mut().insert(
             RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER,
-            tonic::metadata::MetadataValue::from_str(
-                request_metadata.request_connection_id.as_str(),
-            )
-            .unwrap(),
+            tonic::metadata::MetadataValue::from_str(&request_metadata.request_connection_id)
+                .unwrap(),
         );
         Ok(response)
     }
@@ -413,7 +412,7 @@ async fn data_fetcher_thread(
 
     loop {
         // 1. Fetch data from cache and file store.
-        let mut transaction_data = match get_data_with_threads(
+        let transaction_data = match get_data_with_threads(
             current_version,
             transactions_count,
             chain_id,
@@ -568,12 +567,12 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             if prev_end.unwrap() + 1 != start_version {
                 tracing::error!(
                     batch_first_version = first_version,
-                    batch_last_version = last_version
+                    batch_last_version = last_version,
                     start_version = start_version,
                     end_version = end_version,
-                            prev_start = ?prev_start,
+                    prev_start = ?prev_start,
                     prev_end = prev_end,
-                            "[Filestore] Gaps or dupes in processing version data"
+                    "[Filestore] Gaps or dupes in processing version data"
                 );
                 panic!("[Filestore] Gaps in processing data");
             }
