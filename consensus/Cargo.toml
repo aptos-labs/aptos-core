@@ -66,6 +66,7 @@ mirai-annotations = { workspace = true }
 move-core-types = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
+num_cpus = "1.16.0"
 once_cell = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
@@ -76,6 +77,7 @@ serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
+threadpool = { workspace = true }
 tokio = { workspace = true }
 tokio-metrics = { workspace = true }
 tokio-retry = { workspace = true }
