@@ -37,10 +37,14 @@ use aptos_validator_transaction_pool as vtxn_pool;
 use async_trait::async_trait;
 use futures::{
     executor::block_on,
-    future::{AbortHandle, Abortable},
-    FutureExt,
+    future::{join, AbortHandle, Abortable},
 };
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use futures_channel::oneshot;
+use std::{
+    collections::{vec_deque, HashSet, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
@@ -284,8 +288,9 @@ impl DagDriver {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let (tx, rx) = oneshot::channel();
         let signature_builder =
-            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
+            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone(), tx);
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.clone();
 
@@ -298,7 +303,12 @@ impl DagDriver {
             defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
             rb.broadcast(node, signature_builder).await
         };
-        let core_task = node_broadcast.then(move |certificate| {
+        let certified_broadcast = async move {
+            let Ok(certificate) = rx.await else {
+                error!("channel closed before receiving ceritifcate");
+                return;
+            };
+
             debug!(
                 LogSchema::new(LogEvent::BroadcastCertifiedNode),
                 id = node_clone.id()
@@ -311,8 +321,9 @@ impl DagDriver {
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set)
-        });
+            rb2.broadcast(certified_node_msg, cert_ack_set).await
+        };
+        let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;
         let task = async move {
             debug!("{} Start reliable broadcast for round {}", author, round);
