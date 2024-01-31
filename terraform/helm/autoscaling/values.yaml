@@ -16,8 +16,8 @@ autoscaler:
   # How long after scale up that scale down evaluation resumes
   scaleDownDelayAfterAdd: 5m
   image:
-    repo: k8s.gcr.io/autoscaling/cluster-autoscaler
-    tag: v1.25.2
+    repo: registry.k8s.io/autoscaling/cluster-autoscaler
+    tag: v1.25.1
   resources:
     requests:
       cpu: 1
