@@ -322,28 +322,6 @@ impl AptosVM {
         get_or_vm_startup_failure(&self.gas_params, &log_context)
     }
 
-    /// Generates a transaction output for a transaction that encountered errors during the
-    /// execution process. This is public for now only for tests.
-    pub fn failed_transaction_cleanup(
-        &self,
-        error_code: VMStatus,
-        gas_meter: &mut impl AptosGasMeter,
-        txn_data: &TransactionMetadata,
-        resolver: &impl AptosMoveResolver,
-        log_context: &AdapterLogSchema,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> VMOutput {
-        self.failed_transaction_cleanup_and_keep_vm_status(
-            error_code,
-            gas_meter,
-            txn_data,
-            resolver,
-            log_context,
-            change_set_configs,
-        )
-        .1
-    }
-
     pub fn as_move_resolver<'r, R: ExecutorView>(
         &self,
         executor_view: &'r R,
@@ -426,7 +404,7 @@ impl AptosVM {
                 // The transaction should be kept. Run the appropriate post transaction workflows
                 // including epilogue. This runs a new session that ignores any side effects that
                 // might abort the execution (e.g., spending additional funds needed to pay for
-                // gas). Eeven if the previous failure occurred while running the epilogue, it
+                // gas). Even if the previous failure occurred while running the epilogue, it
                 // should not fail now. If it somehow fails here, there is no choice but to
                 // discard the transaction.
                 let txn_output = match self.finish_aborted_transaction(
@@ -1418,24 +1396,14 @@ impl AptosVM {
             self.move_vm.mark_loader_cache_as_invalid();
         };
 
-        let txn_status = TransactionStatus::from_vm_status(
-            err.clone(),
-            self.features
-                .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
-        );
-        if txn_status.is_discarded() {
-            let discarded_output = discarded_output(err.status_code());
-            (err, discarded_output)
-        } else {
-            self.failed_transaction_cleanup_and_keep_vm_status(
-                err,
-                gas_meter,
-                txn_data,
-                resolver,
-                log_context,
-                &storage_gas_params.change_set_configs,
-            )
-        }
+        self.failed_transaction_cleanup_and_keep_vm_status(
+            err,
+            gas_meter,
+            txn_data,
+            resolver,
+            log_context,
+            &storage_gas_params.change_set_configs,
+        )
     }
 
     fn execute_user_transaction_impl(
