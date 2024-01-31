@@ -13,7 +13,7 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_block_executor::{
-    errors::Error, executor::BlockExecutor,
+    errors::BlockExecutionError, executor::BlockExecutor,
     task::TransactionOutput as BlockExecutorTransactionOutput,
     txn_commit_hook::TransactionCommitHook, types::InputOutputKey,
 };
@@ -426,13 +426,13 @@ impl BlockAptosVM {
 
                 Ok(BlockOutput::new(output_vec))
             },
-            Err(Error::FallbackToSequential(e)) => {
+            Err(BlockExecutionError::FallbackToSequential(e)) => {
                 unreachable!(
                     "[Execution]: Must be handled by sequential fallback: {:?}",
                     e
                 )
             },
-            Err(Error::UserError(err)) => Err(err),
+            Err(BlockExecutionError::FatalVMError((err, _))) => Err(err),
         }
     }
 }
