@@ -4,6 +4,9 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  partition:
+    description: "The partition number for the tests"
+    required: true
 
 runs:
   using: composite
@@ -36,10 +39,16 @@ runs:
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       shell: bash
 
+    - uses: actions/cache/restore@v3
+      id: cache
+      with:
+        path: nextest-output
+        key: cache-${{ github.run_id }}-${{ github.run_attempt }}
+
     # Run the rust unit tests
-    - name: Run all unit tests
-      run: cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
+    - name: Run rust unit tests (partitioned)
       shell: bash
+      run: cargo nextest run --archive-file nextest-output/nextest-archive.tar.zst --partition count:${{ inputs.partition }}/3  --retries 3 --no-fail-fast
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: 4297152

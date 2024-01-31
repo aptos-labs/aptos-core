@@ -102,10 +102,36 @@ jobs:
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
+  build-test-artifacts:
+    runs-on: high-perf-docker
+    outputs:
+      test-artifacts-path: ${{ steps.build.outputs.artifacts-path }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      - name: Build and archive tests
+        id: build
+        run: |
+          mkdir -p nextest-output
+          cargo nextest archive --archive-file nextest-output/nextest-archive.tar.zst
+      - uses: actions/cache@v3
+        with:
+          path: nextest-output
+          key: cache-${{ github.run_id }}-${{ github.run_attempt }}
+
   # Run all rust unit tests. This is a PR required job.
-  rust-unit-tests:
+  rust-unit-tests-partitioned:
     needs: file_change_determinator
     runs-on: high-perf-docker
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3]
     steps:
       - uses: actions/checkout@v3
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -113,6 +139,7 @@ jobs:
         uses: ./.github/actions/rust-unit-tests
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
+          partition: ${{ matrix.partition }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - run: echo "Skipping rust unit tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
