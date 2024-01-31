@@ -22,8 +22,8 @@ pub struct CLIOptions {
     #[clap(long, default_value = "false")]
     pub verify_mutants: bool,
     /// Indicates if the output files should be overwritten.
-    #[clap(long, short)]
-    pub no_overwrite: Option<bool>,
+    #[clap(long, short, default_value = "false")]
+    pub no_overwrite: bool,
     /// Name of the filter to use for downsampling. Downsampling reduces the amount of mutants to the desired amount.
     #[clap(long, hide = true)]
     pub downsample_filter: Option<String>,
@@ -45,7 +45,7 @@ impl Default for CLIOptions {
             mutate_modules: ModuleFilter::All,
             out_mutant_dir: Some(PathBuf::from(DEFAULT_OUTPUT_DIR)),
             verify_mutants: false,
-            no_overwrite: None,
+            no_overwrite: false,
             downsample_filter: None,
             downsampling_ratio_percentage: None,
             configuration_file: None,
