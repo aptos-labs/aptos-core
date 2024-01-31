@@ -94,6 +94,9 @@ pub fn validate_zkid_authenticators(
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
+                    // Our circuit only supports a 2048-bit RSA modulus
+                    (rsa_jwk.alg == "RS256").then(|| ()).ok_or_else(|| invalid_signature!("Can only support 2048-bit RSA JWKs"))?;
+
                     let public_inputs_hash =
                         get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk).map_err(|_| {
                             invalid_signature!("Could not compute public inputs hash")
