@@ -2,7 +2,7 @@
 
 use crate::{
     chain_id::ChainId,
-    circom::{G1Projective, G2Projective, DEVNET_VERIFYING_KEY},
+    bn254_circom::{Bn254G1ProjectiveCompressed, Bn254G2ProjectiveCompressed, DEVNET_VERIFYING_KEY},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -233,9 +233,9 @@ impl Claims {
     Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
 )]
 pub struct Groth16Zkp {
-    a: G1Projective,
-    b: G2Projective,
-    c: G1Projective,
+    a: Bn254G1ProjectiveCompressed,
+    b: Bn254G2ProjectiveCompressed,
+    c: Bn254G1ProjectiveCompressed,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
@@ -279,7 +279,11 @@ impl TryFrom<&[u8]> for Groth16Zkp {
 }
 
 impl Groth16Zkp {
-    pub fn new(a: G1Projective, b: G2Projective, c: G1Projective) -> Self {
+    pub fn new(
+        a: Bn254G1ProjectiveCompressed,
+        b: Bn254G2ProjectiveCompressed,
+        c: Bn254G1ProjectiveCompressed,
+    ) -> Self {
         Groth16Zkp { a, b, c }
     }
 
@@ -499,24 +503,24 @@ fn seconds_from_epoch(secs: u64) -> SystemTime {
 mod test {
     use crate::{
         chain_id::ChainId,
-        circom::get_public_inputs_hash,
+        bn254_circom::get_public_inputs_hash,
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            G1Projective, G2Projective, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp,
-            ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
+            Bn254G1ProjectiveCompressed, Bn254G2ProjectiveCompressed, Groth16Zkp, IdCommitment,
+            Pepper, SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
         },
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
 
     #[test]
     fn test_groth16_proof_verification() {
-        let a = G1Projective::new(
+        let a = Bn254G1ProjectiveCompressed::new(
             "11685701338011120485255682535216931952523490513574344095859176729155974193429",
             "19570000702948951151001315672614758851000529478920585316943681012227747910337",
-        );
-
-        let b = G2Projective::new(
+        )
+        .unwrap();
+        let b = Bn254G2ProjectiveCompressed::new(
             [
                 "10039243553158378944380740968043887743081233734014916979736214569065002261361",
                 "4926621746570487391149084476602889692047252928870676314074045787488022393462",
@@ -525,13 +529,14 @@ mod test {
                 "8151326214925440719229499872086146990795191649649968979609056373308460653969",
                 "12483309147304635788397060225283577172417980480151834869358925058077916828359",
             ],
-        );
-
-        let c = G1Projective::new(
+        )
+        .unwrap();
+        let c = Bn254G1ProjectiveCompressed::new(
             "17509024307642709963307435885289611077932619305068428354097243520217914637634",
             "17824783754604065652634030354434350582834434348663254057492956883323214722668",
-        );
-        let proof = Groth16Zkp { a, b, c };
+        )
+        .unwrap();
+        let proof = Groth16Zkp::new(a, b, c);
 
         let sender = Ed25519PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();

@@ -9,7 +9,7 @@ use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::{
-    circom::{G1Projective, G2Projective},
+    bn254_circom::{Bn254G1ProjectiveCompressed, Bn254G2ProjectiveCompressed},
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         rsa::RSA_JWK,
@@ -29,7 +29,7 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn test_openid_signature_transaction_submission() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
@@ -281,7 +281,7 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
 
 #[tokio::test]
 async fn test_groth16_signature_transaction_submission() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
@@ -337,12 +337,12 @@ async fn test_groth16_signature_transaction_submission() {
     let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
-    let a = G1Projective::new(
+    let a = Bn254G1ProjectiveCompressed::new(
         "11685701338011120485255682535216931952523490513574344095859176729155974193429",
         "19570000702948951151001315672614758851000529478920585316943681012227747910337",
-    );
-
-    let b = G2Projective::new(
+    )
+    .unwrap();
+    let b = Bn254G2ProjectiveCompressed::new(
         [
             "10039243553158378944380740968043887743081233734014916979736214569065002261361",
             "4926621746570487391149084476602889692047252928870676314074045787488022393462",
@@ -351,12 +351,13 @@ async fn test_groth16_signature_transaction_submission() {
             "8151326214925440719229499872086146990795191649649968979609056373308460653969",
             "12483309147304635788397060225283577172417980480151834869358925058077916828359",
         ],
-    );
-
-    let c = G1Projective::new(
+    )
+    .unwrap();
+    let c = Bn254G1ProjectiveCompressed::new(
         "17509024307642709963307435885289611077932619305068428354097243520217914637634",
         "17824783754604065652634030354434350582834434348663254057492956883323214722668",
-    );
+    )
+    .unwrap();
     let proof = Groth16Zkp::new(a, b, c);
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
@@ -386,7 +387,7 @@ async fn test_groth16_signature_transaction_submission() {
 
 #[tokio::test]
 async fn test_groth16_signature_transaction_submission_proof_signature_check_fails() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
@@ -442,12 +443,12 @@ async fn test_groth16_signature_transaction_submission_proof_signature_check_fai
     let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
-    let a = G1Projective::new(
+    let a = Bn254G1ProjectiveCompressed::new(
         "11685701338011120485255682535216931952523490513574344095859176729155974193429",
         "19570000702948951151001315672614758851000529478920585316943681012227747910337",
-    );
-
-    let b = G2Projective::new(
+    )
+    .unwrap();
+    let b = Bn254G2ProjectiveCompressed::new(
         [
             "10039243553158378944380740968043887743081233734014916979736214569065002261361",
             "4926621746570487391149084476602889692047252928870676314074045787488022393462",
@@ -456,12 +457,13 @@ async fn test_groth16_signature_transaction_submission_proof_signature_check_fai
             "8151326214925440719229499872086146990795191649649968979609056373308460653969",
             "12483309147304635788397060225283577172417980480151834869358925058077916828359",
         ],
-    );
-
-    let c = G1Projective::new(
+    )
+    .unwrap();
+    let c = Bn254G1ProjectiveCompressed::new(
         "17509024307642709963307435885289611077932619305068428354097243520217914637634",
         "17824783754604065652634030354434350582834434348663254057492956883323214722668",
-    );
+    )
+    .unwrap();
     let proof = Groth16Zkp::new(a, b, c);
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
