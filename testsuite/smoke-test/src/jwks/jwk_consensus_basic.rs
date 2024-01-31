@@ -56,7 +56,7 @@ async fn jwk_consensus_basic() {
 {
     "keys": [
         {"kid":"kid1", "kty":"RSA", "e":"AQAB", "n":"n1", "alg":"RS384", "use":"sig"},
-        {"n":"n0", "kty":"RSA", "use":"sig", "alg":"RS256", "e":"AQAB", "kid":"kid0"},
+        {"n":"n0", "kty":"RSA", "use":"sig", "alg":"RS256", "e":"AQAB", "kid":"kid0"}
     ]
 }
 "#))));
