@@ -180,9 +180,9 @@ pub struct Bn254G2ProjectiveCompressed(
 impl Bn254G2ProjectiveCompressed {
     pub fn new(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
         let g2 = ark_bn254::G2Projective::new_unchecked(
-            Fq2::new(parse_field_element(&x[0])?, parse_field_element(&x[1])?),
-            Fq2::new(parse_field_element(&y[0])?, parse_field_element(&y[1])?),
-            Fq2::new(parse_field_element(&"1")?, parse_field_element(&"0")?),
+            Fq2::new(parse_field_element(x[0])?, parse_field_element(x[1])?),
+            Fq2::new(parse_field_element(y[0])?, parse_field_element(y[1])?),
+            Fq2::new(parse_field_element("1")?, parse_field_element("0")?),
         );
 
         let bytes: Vec<u8> = serialize!(g2, serialize_compressed);
