@@ -90,7 +90,7 @@
 /ecosystem/typescript/sdk @gregnazario @banool @0xmaayan @0xjinn
 
 # Owners for execution and storage.
-/execution/ @msmouse @lightmark
+/execution/ @msmouse @lightmark @grao1991
 
 # Owners for mempool.
 /mempool/ @bchocho
@@ -102,7 +102,7 @@
 /state-sync/ @joshlind
 
 # Owners for execution and storage.
-/storage/ @msmouse @lightmark
+/storage/ @msmouse @lightmark @grao1991
 
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng

@@ -217,7 +217,7 @@ impl InnerBuilder {
 
     fn create_batch_store(&mut self) -> Arc<BatchReaderImpl<NetworkSender>> {
         let backend = &self.backend;
-        let storage: Storage = backend.try_into().expect("Unable to initialize storage");
+        let storage: Storage = backend.into();
         if let Err(error) = storage.available() {
             panic!("Storage is not available: {:?}", error);
         }

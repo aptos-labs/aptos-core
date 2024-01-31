@@ -187,11 +187,9 @@ impl IndexerStreamCoordinator {
         // Stage 3: send responses to stream
         let sending_start_time = std::time::Instant::now();
         for response in responses {
-            if let Err(err) = self.transactions_sender.send(Ok(response)).await {
-                panic!(
-                    "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
-                    err
-                );
+            if self.transactions_sender.send(Ok(response)).await.is_err() {
+                // Error from closed channel. This means the client has disconnected.
+                return vec![];
             }
         }
         log_grpc_step_fullnode(

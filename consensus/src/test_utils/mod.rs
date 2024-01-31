@@ -31,10 +31,10 @@ use aptos_types::{
     transaction::{RawTransaction, Script, SignedTransaction, TransactionPayload},
 };
 pub use mock_payload_manager::MockPayloadManager;
-pub use mock_state_computer::{
-    EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
-};
-pub use mock_storage::{EmptyStorage, MockSharedStorage, MockStorage};
+pub use mock_state_computer::EmptyStateComputer;
+#[cfg(test)]
+pub use mock_state_computer::{MockStateComputer, RandomComputeResultStateComputer};
+pub use mock_storage::{EmptyStorage, MockStorage};
 use move_core_types::account_address::AccountAddress;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
