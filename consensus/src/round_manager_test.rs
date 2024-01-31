@@ -2078,30 +2078,27 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
 
 #[test]
 fn no_vote_on_proposal_with_unexpected_vtxns() {
-    let genesis_qc = certificate_for_genesis();
-    let block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::ObservedJWKUpdate(QuorumCertifiedUpdate::dummy())],
-        Payload::empty(false),
-        1,
-        1,
-        genesis_qc.clone(),
-        &node.signer,
-        Vec::new(),
-    )
-        .unwrap();
-
+    let vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(QuorumCertifiedUpdate::dummy())];
     let mut features = Features::default();
     features.disable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(Some(features.clone()), block.clone(), false);
+    assert_process_proposal_result(
+        Some(features.clone()),
+        vtxns.clone(),
+        false,
+    );
 
     features.enable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(Some(features), block, true);
+    assert_process_proposal_result(
+        Some(features),
+        vtxns,
+        true,
+    );
 }
 
 /// Setup a node with default configs and an optional `Features` override.
-/// Process a given block with the `RoundManager` from the setup.
+/// Create a block, fill it with the given vtxns, and process it with the `RoundManager` from the setup.
 /// Assert the processing result.
-fn assert_process_proposal_result(features: Option<Features>, block: Block, expected_result: bool) {
+fn assert_process_proposal_result(features: Option<Features>, vtxns: Vec<ValidatorTransaction>, expected_result: bool) {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let mut nodes = NodeSetup::create_nodes(
@@ -2115,12 +2112,23 @@ fn assert_process_proposal_result(features: Option<Features>, block: Block, expe
     );
 
     let node = &mut nodes[0];
+    let genesis_qc = certificate_for_genesis();
+    let block = Block::new_proposal_ext(
+        vtxns,
+        Payload::empty(false),
+        1,
+        1,
+        genesis_qc.clone(),
+        &node.signer,
+        Vec::new(),
+    )
+        .unwrap();
 
     timed_block_on(&runtime, async {
         // clear the message queue
         node.next_proposal().await;
 
-        assert_eq!(expect_result, node
+        assert_eq!(expected_result, node
             .round_manager
             .process_proposal(block.clone())
             .await
