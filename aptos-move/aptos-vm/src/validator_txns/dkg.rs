@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 
-use aptos_logger::debug;
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
     errors::expect_only_successful_execution,
@@ -12,14 +11,14 @@ use crate::{
     },
     AptosVM,
 };
+use aptos_logger::debug;
 use aptos_types::{
     dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
+    on_chain_config::{ConfigurationResource, OnChainConfig},
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use aptos_types::on_chain_config::ConfigurationResource;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use move_core_types::{
@@ -70,7 +69,10 @@ impl AptosVM {
                 ))
             },
             Err(Unexpected(vm_status)) => {
-                debug!("Processing dkg transaction unexpected failure: {:?}", vm_status);
+                debug!(
+                    "Processing dkg transaction unexpected failure: {:?}",
+                    vm_status
+                );
                 Err(vm_status)
             },
         }

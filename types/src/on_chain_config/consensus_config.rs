@@ -237,6 +237,10 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
         }
     }
+
+    pub fn is_vtxn_enabled(&self) -> bool {
+        self.effective_validator_txn_config().enabled()
+    }
 }
 
 /// This is used when on-chain config is not initialized.

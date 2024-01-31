@@ -356,7 +356,11 @@ impl ProposalGenerator {
             proposer_election,
         );
 
-        debug!("generating proposal, vtxn_enabled={}, num_vtxns={}", self.vtxn_config.enabled(), validator_txns.len());
+        debug!(
+            "generating proposal, vtxn_enabled={}, num_vtxns={}",
+            self.vtxn_config.enabled(),
+            validator_txns.len()
+        );
         let block = if self.vtxn_config.enabled() {
             BlockData::new_proposal_ext(
                 validator_txns,

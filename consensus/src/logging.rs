@@ -46,7 +46,6 @@ pub enum LogEvent {
     BroadcastRandShare,
     ReceiveProactiveRandShare,
     ReceiveReactiveRandShare,
-    AggregateRandDecision,
     BroadcastAugData,
     ReceiveAugData,
     BroadcastCertifiedAugData,

@@ -40,6 +40,14 @@ impl ValidatorTransaction {
     pub fn size_in_bytes(&self) -> usize {
         bcs::serialized_size(self).unwrap()
     }
+
+    pub fn topic(&self) -> Topic {
+        match self {
+            Self::DummyTopic1(_) => Topic::DUMMY1,
+            Self::DKGResult(_) => Topic::DKG,
+            Self::DummyTopic2(_) => Topic::DUMMY1,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

@@ -47,7 +47,8 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{OnChainConsensusConfig, ValidatorTxnConfig},
+    on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
+    validator_txn::Topic,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -187,6 +188,7 @@ pub struct RoundManager {
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
+    features: Features,
 }
 
 impl RoundManager {
@@ -202,6 +204,7 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
+        features: Features,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -226,6 +229,7 @@ impl RoundManager {
             vtxn_config,
             buffered_proposal_tx,
             local_config,
+            features,
         }
     }
 
@@ -650,6 +654,18 @@ impl RoundManager {
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
             bail!("ProposalExt unexpected while the feature is disabled.");
+        }
+
+        if let Some(vtxns) = proposal.validator_txns() {
+            for vtxn in vtxns {
+                if !self.features.is_reconfigure_with_dkg_enabled()
+                    && matches!(vtxn.topic(), Topic::DKG)
+                {
+                    counters::UNEXPECTED_DKG_VTXN_COUNT.inc();
+                    bail!("DKG vtxn unexpected while the feature is disabled.");
+                }
+                // todo: add checks for each future vtxn topic
+            }
         }
 
         let (num_validator_txns, validator_txns_total_bytes): (usize, usize) =
