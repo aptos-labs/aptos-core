@@ -14,7 +14,7 @@ fn convert_json_to_rsa_jwk() {
         r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
     let json = serde_json::Value::from_str(json_str).unwrap();
     let actual = RSA_JWK::try_from(&json);
-    let expected = RSA_JWK::new_for_testing("kid1", "RSA", "RS256", "AQAB", "13131");
+    let expected = RSA_JWK::new_from_strs("kid1", "RSA", "RS256", "AQAB", "13131");
     assert_eq!(expected, actual.unwrap());
 
     // JWK JSON without `kid` should be rejected.
@@ -75,7 +75,7 @@ fn convert_json_to_rsa_jwk() {
 
 #[test]
 fn rsa_jwk_as_move_value() {
-    let rsa_jwk = RSA_JWK::new_for_testing("kid1", "RSA", "RS256", "AQAB", "13131");
+    let rsa_jwk = RSA_JWK::new_from_strs("kid1", "RSA", "RS256", "AQAB", "13131");
     let move_value = rsa_jwk.as_move_value();
     assert_eq!(
         vec![
@@ -88,7 +88,7 @@ fn rsa_jwk_as_move_value() {
 
 #[test]
 fn rsa_jwk_as_move_any() {
-    let rsa_jwk = RSA_JWK::new_for_testing("kid1", "RSA", "RS256", "AQAB", "1313131313131");
+    let rsa_jwk = RSA_JWK::new_from_strs("kid1", "RSA", "RS256", "AQAB", "1313131313131");
     let actual = rsa_jwk.as_move_any();
     let expected = MoveAny {
         type_name: "0x1::jwks::RSA_JWK".to_string(),

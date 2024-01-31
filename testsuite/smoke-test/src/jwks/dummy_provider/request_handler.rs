@@ -19,6 +19,10 @@ impl StaticContentServer {
     pub fn new(content: Vec<u8>) -> Self {
         Self { content }
     }
+
+    pub fn new_str(content: &str) -> Self {
+        Self::new(content.as_bytes().to_vec())
+    }
 }
 
 impl RequestHandler for StaticContentServer {

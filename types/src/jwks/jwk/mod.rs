@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::cmp::Ordering;
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK},
     move_any::{Any as MoveAny, AsMoveAny},
@@ -37,10 +38,25 @@ impl AsMoveValue for JWKMoveStruct {
 }
 
 /// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Ord)]
 pub enum JWK {
     RSA(RSA_JWK),
     Unsupported(UnsupportedJWK),
+}
+
+impl JWK {
+    pub fn id(&self) -> Vec<u8> {
+        match self {
+            JWK::RSA(rsa) => rsa.id(),
+            JWK::Unsupported(unsupported) => unsupported.id(),
+        }
+    }
+}
+
+impl PartialOrd for JWK {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.id().partial_cmp(&other.id())
+    }
 }
 
 impl From<serde_json::Value> for JWK {

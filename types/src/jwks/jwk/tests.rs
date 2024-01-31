@@ -22,7 +22,7 @@ fn convert_jwk_move_struct_to_jwk() {
         JWK::try_from(&jwk_move_struct).unwrap()
     );
 
-    let rsa_jwk = RSA_JWK::new_for_testing("kid1", "kty1", "alg1", "e1", "n1");
+    let rsa_jwk = RSA_JWK::new_from_strs("kid1", "kty1", "alg1", "e1", "n1");
     let jwk_move_struct = JWKMoveStruct {
         variant: rsa_jwk.as_move_any(),
     };
@@ -47,7 +47,7 @@ fn convert_jwk_to_jwk_move_struct() {
     };
     assert_eq!(jwk_move_struct, JWKMoveStruct::from(jwk));
 
-    let rsa_jwk = RSA_JWK::new_for_testing("kid1", "kty1", "alg1", "e1", "n1");
+    let rsa_jwk = RSA_JWK::new_from_strs("kid1", "kty1", "alg1", "e1", "n1");
     let jwk = JWK::RSA(rsa_jwk.clone());
     let jwk_move_struct = JWKMoveStruct {
         variant: rsa_jwk.as_move_any(),
@@ -61,7 +61,7 @@ fn convert_json_value_to_jwk() {
         r#"{"alg": "RS256", "kid": "kid1", "e": "AQAB", "use": "sig", "kty": "RSA", "n": "13131"}"#;
     let json = serde_json::Value::from_str(json_str).unwrap();
     let actual = JWK::from(json);
-    let expected = JWK::RSA(RSA_JWK::new_for_testing(
+    let expected = JWK::RSA(RSA_JWK::new_from_strs(
         "kid1", "RSA", "RS256", "AQAB", "13131",
     ));
     assert_eq!(expected, actual);

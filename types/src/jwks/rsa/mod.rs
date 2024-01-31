@@ -19,8 +19,19 @@ pub struct RSA_JWK {
 }
 
 impl RSA_JWK {
-    #[cfg(test)]
-    pub fn new_for_testing(kid: &str, kty: &str, alg: &str, e: &str, n: &str) -> Self {
+    /// Make an `RSA_JWK` from `kty="RSA", alg="RS256", e="AQAB"` (a popular setting)
+    /// and caller-specified `kid` and `n`.
+    pub fn new_256_aqab(kid: &str, n: &str) -> Self {
+        Self {
+            kid: kid.to_string(),
+            kty: "RSA".to_string(),
+            alg: "RS256".to_string(),
+            e: "AQAB".to_string(),
+            n: n.to_string(),
+        }
+    }
+
+    pub fn new_from_strs(kid: &str, kty: &str, alg: &str, e: &str, n: &str) -> Self {
         Self {
             kid: kid.to_string(),
             kty: kty.to_string(),
@@ -36,6 +47,10 @@ impl RSA_JWK {
         let key = &DecodingKey::from_rsa_components(&self.n, &self.e)?;
         let claims = jsonwebtoken::decode::<Claims>(jwt_token, key, &validation)?;
         Ok(claims)
+    }
+
+    pub fn id(&self) -> Vec<u8> {
+        self.kid.as_bytes().to_vec()
     }
 }
 

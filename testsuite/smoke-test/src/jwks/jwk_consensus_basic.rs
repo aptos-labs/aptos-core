@@ -17,6 +17,7 @@ use aptos_types::jwks::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
+use aptos_types::jwks::rsa::RSA_JWK;
 
 /// The validators should agree on the JWK after provider set is changed/JWK is rotated.
 #[tokio::test]
@@ -48,23 +49,28 @@ async fn jwk_consensus_basic() {
     assert!(patched_jwks.jwks.entries.is_empty());
 
     info!("Adding some providers.");
-    let (provider_foogle, provider_gacebook) =
+    let (provider_alice, provider_bob) =
         tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
 
-    provider_foogle.update_request_handler(Some(Arc::new(StaticContentServer::new(
-        r#"{"keys": ["FOOGLE_JWK_V0"]}"#.as_bytes().to_vec(),
-    ))));
-    provider_gacebook.update_request_handler(Some(Arc::new(StaticContentServer::new(
-        r#"{"keys": ["GACEBOOK_JWK_V0"]}"#.as_bytes().to_vec(),
+    provider_alice.update_request_handler(Some(Arc::new(StaticContentServer::new_str(r#"
+{
+    "keys": [
+        {"kid":"kid1", "kty":"RSA", "e":"AQAB", "n":"n1", "alg":"RS384", "use":"sig"},
+        {"n":"n0", "kty":"RSA", "use":"sig", "alg":"RS256", "e":"AQAB", "kid":"kid0"},
+    ]
+}
+"#))));
+    provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
+        r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
     let providers = vec![
         OIDCProvider {
-            name: b"foogle.io".to_vec(),
-            config_url: provider_foogle.open_id_config_url().into_bytes(),
+            name: b"https://alice.io".to_vec(),
+            config_url: provider_alice.open_id_config_url().into_bytes(),
         },
         OIDCProvider {
-            name: b"gacebook.dev".to_vec(),
-            config_url: provider_gacebook.open_id_config_url().into_bytes(),
+            name: b"https://bob.dev".to_vec(),
+            config_url: provider_bob.open_id_config_url().into_bytes(),
         },
     ];
     let txn_summary = put_provider_on_chain(cli, root_idx, providers).await;
@@ -78,18 +84,18 @@ async fn jwk_consensus_basic() {
         AllProvidersJWKs {
             entries: vec![
                 ProviderJWKs {
-                    issuer: b"foogle.io".to_vec(),
+                    issuer: b"https://alice.io".to_vec(),
                     version: 1,
-                    jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                        "\"FOOGLE_JWK_V0\""
-                    ))
-                    .into()],
+                    jwks: vec![
+                        JWK::RSA(RSA_JWK::new_256_aqab("kid0", "n0")).into(),
+                        JWK::RSA(RSA_JWK::new_from_strs("kid1", "RSA", "RS384", "AQAB", "n1")).into(),
+                    ],
                 },
                 ProviderJWKs {
-                    issuer: b"gacebook.dev".to_vec(),
+                    issuer: b"https://bob.dev".to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                        "\"GACEBOOK_JWK_V0\""
+                        "\"BOB_JWK_V0\""
                     ))
                     .into()],
                 },
@@ -98,10 +104,10 @@ async fn jwk_consensus_basic() {
         patched_jwks.jwks
     );
 
-    info!("Rotating foogle keys. Also making foogle.io gently equivocate.");
-    provider_foogle.update_request_handler(Some(Arc::new(EquivocatingServer::new(
-        r#"{"keys": ["FOOGLE_JWK_V1A"]}"#.as_bytes().to_vec(),
-        r#"{"keys": ["FOOGLE_JWK_V1B"]}"#.as_bytes().to_vec(),
+    info!("Rotating Alice keys. Also making https://alice.io gently equivocate.");
+    provider_alice.update_request_handler(Some(Arc::new(EquivocatingServer::new(
+        r#"{"keys": ["ALICE_JWK_V1A"]}"#.as_bytes().to_vec(),
+        r#"{"keys": ["ALICE_JWK_V1B"]}"#.as_bytes().to_vec(),
         1,
     ))));
 
@@ -113,18 +119,18 @@ async fn jwk_consensus_basic() {
         AllProvidersJWKs {
             entries: vec![
                 ProviderJWKs {
-                    issuer: b"foogle.io".to_vec(),
+                    issuer: b"https://alice.io".to_vec(),
                     version: 2,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                        "\"FOOGLE_JWK_V1B\""
+                        "\"ALICE_JWK_V1B\""
                     ))
                     .into()],
                 },
                 ProviderJWKs {
-                    issuer: b"gacebook.dev".to_vec(),
+                    issuer: b"https://bob.dev".to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                        "\"GACEBOOK_JWK_V0\""
+                        "\"BOB_JWK_V0\""
                     ))
                     .into()],
                 },
@@ -134,5 +140,5 @@ async fn jwk_consensus_basic() {
     );
 
     info!("Tear down.");
-    provider_foogle.shutdown().await;
+    provider_alice.shutdown().await;
 }

@@ -40,6 +40,10 @@ impl UnsupportedJWK {
             payload: payload.as_bytes().to_vec(),
         }
     }
+
+    pub fn id(&self) -> Vec<u8> {
+        self.id.clone()
+    }
 }
 
 impl From<serde_json::Value> for UnsupportedJWK {
