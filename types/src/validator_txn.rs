@@ -58,6 +58,5 @@ pub enum Topic {
     DKG,
     JWK_CONSENSUS(jwks::Issuer),
     DUMMY1,
-    #[cfg(any(test, feature = "fuzzing"))]
     DUMMY2,
 }
