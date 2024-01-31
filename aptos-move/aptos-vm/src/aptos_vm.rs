@@ -1387,7 +1387,7 @@ impl AptosVM {
         }
 
         // zkID feature gating
-        let authenticators = aptos_types::zkid::get_zkid_authenticators(&transaction);
+        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction);
         match &authenticators {
             Ok(authenticators) => {
                 for (_, sig) in authenticators {
@@ -1402,16 +1402,21 @@ impl AptosVM {
                         return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
                     }
                 }
-            }
+            },
             Err(_) => {
                 return Err(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
-            }
+            },
         }
 
-        zkid_validation::validate_zkid_authenticators(&authenticators.unwrap(), resolver, self.move_vm.get_chain_id())?;
+        zkid_validation::validate_zkid_authenticators(
+            &authenticators.unwrap(),
+            resolver,
+            self.move_vm.get_chain_id(),
+        )?;
 
-        // The prologue must be run AFTER any validation.  Otherwise you may run prologue and hit SEQUENCE_NUMBER_TOO_NEW if there are more than one
-        // transaction from the same sender and end up skipping validation.
+        // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
+        // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
+        // end up skipping validation.
         self.run_prologue_with_payload(
             session,
             resolver,
