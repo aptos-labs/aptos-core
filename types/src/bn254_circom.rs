@@ -23,13 +23,15 @@ pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
 pub static DEVNET_VERIFYING_KEY: Lazy<PreparedVerifyingKey<ark_bn254::Bn254>> =
     Lazy::new(devnet_pvk);
 
+/// This will do the proper subgroup membership checks.
 fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<ark_bn254::G1Affine> {
-    let g1_affine = Bn254G1ProjectiveCompressed::new(x, y)?.to_affine()?;
+    let g1_affine = Bn254G1::new_unchecked(x, y)?.to_affine()?;
     Ok(g1_affine)
 }
 
+/// This will do the proper subgroup membership checks.
 fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<ark_bn254::G2Affine> {
-    let g2_affine = Bn254G2ProjectiveCompressed::new(x, y)?.to_affine()?;
+    let g2_affine = Bn254G2::new_unchecked(x, y)?.to_affine()?;
     Ok(g2_affine)
 }
 
@@ -118,10 +120,10 @@ macro_rules! serialize {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct Bn254G1ProjectiveCompressed(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+pub struct Bn254G1(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
-impl Bn254G1ProjectiveCompressed {
-    pub fn new(x: &str, y: &str) -> anyhow::Result<Self> {
+impl Bn254G1 {
+    pub fn new_unchecked(x: &str, y: &str) -> anyhow::Result<Self> {
         let g1 = ark_bn254::G1Projective::new_unchecked(
             parse_field_element(x)?,
             parse_field_element(y)?,
@@ -132,10 +134,6 @@ impl Bn254G1ProjectiveCompressed {
         Self::new_from_vec(bytes)
     }
 
-    pub fn new_from_slice(slice: &[u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]) -> Self {
-        Self(slice.to_owned())
-    }
-
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G1_PROJECTIVE_COMPRESSED_NUM_BYTES {
             let mut bytes = [0; G1_PROJECTIVE_COMPRESSED_NUM_BYTES];
@@ -143,7 +141,7 @@ impl Bn254G1ProjectiveCompressed {
             Ok(Self(bytes))
         } else {
             bail!(
-                "Input Vec<u8> must have exactly {} elements",
+                "Serialized BN254G1 must have exactly {} bytes",
                 G1_PROJECTIVE_COMPRESSED_NUM_BYTES
             )
         }
@@ -154,7 +152,7 @@ impl Bn254G1ProjectiveCompressed {
     }
 }
 
-impl TryInto<ark_bn254::G1Projective> for &Bn254G1ProjectiveCompressed {
+impl TryInto<ark_bn254::G1Projective> for &Bn254G1 {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G1Projective, CryptoMaterialError> {
@@ -163,7 +161,7 @@ impl TryInto<ark_bn254::G1Projective> for &Bn254G1ProjectiveCompressed {
     }
 }
 
-impl TryInto<ark_bn254::G1Affine> for &Bn254G1ProjectiveCompressed {
+impl TryInto<ark_bn254::G1Affine> for &Bn254G1 {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G1Affine, CryptoMaterialError> {
@@ -173,12 +171,12 @@ impl TryInto<ark_bn254::G1Affine> for &Bn254G1ProjectiveCompressed {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct Bn254G2ProjectiveCompressed(
+pub struct Bn254G2(
     #[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES],
 );
 
-impl Bn254G2ProjectiveCompressed {
-    pub fn new(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
+impl Bn254G2 {
+    pub fn new_unchecked(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
         let g2 = ark_bn254::G2Projective::new_unchecked(
             Fq2::new(parse_field_element(x[0])?, parse_field_element(x[1])?),
             Fq2::new(parse_field_element(y[0])?, parse_field_element(y[1])?),
@@ -187,10 +185,6 @@ impl Bn254G2ProjectiveCompressed {
 
         let bytes: Vec<u8> = serialize!(g2, serialize_compressed);
         Self::new_from_vec(bytes)
-    }
-
-    pub fn new_from_slice(slice: &[u8; 64]) -> Self {
-        Self(slice.to_owned())
     }
 
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
@@ -211,7 +205,7 @@ impl Bn254G2ProjectiveCompressed {
     }
 }
 
-impl TryInto<ark_bn254::G2Projective> for &Bn254G2ProjectiveCompressed {
+impl TryInto<ark_bn254::G2Projective> for &Bn254G2 {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G2Projective, CryptoMaterialError> {
@@ -220,7 +214,7 @@ impl TryInto<ark_bn254::G2Projective> for &Bn254G2ProjectiveCompressed {
     }
 }
 
-impl TryInto<ark_bn254::G2Affine> for &Bn254G2ProjectiveCompressed {
+impl TryInto<ark_bn254::G2Affine> for &Bn254G2 {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G2Affine, CryptoMaterialError> {
@@ -266,4 +260,34 @@ pub fn get_public_inputs_hash(
     frs.push(jwk.to_poseidon_scalar()?);
 
     poseidon_bn254::hash_scalars(frs)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::bn254_circom::{Bn254G1, Bn254G2, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES};
+
+    #[test]
+    pub fn test_bn254_serialized_sizes() {
+        let g1 = Bn254G1::new_unchecked(
+            "16672231080302629756836614130913173861541009360974119524782950408048375831661",
+            "1076145001163048025135533382088266750240489485046298539187659509488738517245"
+        ).unwrap();
+
+        let g2 = Bn254G2::new_unchecked(
+            [
+                "1125365732643211423779651913319958385653115422366520671538751860820509133538",
+                "10055196097002324305342942912758079446356594743098794928675544207400347950287",
+            ],
+            [
+                "10879716754714953827605171295191459580695363989155343984818520267224463075503",
+                "440220374146936557739765173414663598678359360031905981547938788314460390904",
+            ],
+        ).unwrap();
+
+        let g1_bytes = bcs::to_bytes(&g1).unwrap();
+        assert_eq!(g1_bytes.len(), G1_PROJECTIVE_COMPRESSED_NUM_BYTES);
+
+        let g2_bytes = bcs::to_bytes(&g2).unwrap();
+        assert_eq!(g2_bytes.len(), G2_PROJECTIVE_COMPRESSED_NUM_BYTES);
+    }
 }
