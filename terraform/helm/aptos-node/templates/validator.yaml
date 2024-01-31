@@ -23,6 +23,8 @@ spec:
     port: 6181
   - name: metrics
     port: 9101
+  - name: admin
+    port: 9102
   {{- if $.Values.service.validator.enableRestApi }}
   - name: api
     port: 8080
@@ -91,7 +93,18 @@ spec:
         {{- end }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
-        command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
+        command:
+          - /bin/bash
+          - -c
+          - |-
+            set -euxo pipefail
+            if [[ -f /opt/aptos/data/wipe-db ]]; then
+              # Wipe DB
+              rm -rf /opt/aptos/data/db
+              # Delete the command file so we only wipe the DB once
+              rm -vf /opt/aptos/data/wipe-db
+            fi
+            /usr/local/bin/aptos-node -f /opt/aptos/etc/validator.yaml
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:
@@ -123,6 +136,8 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
+        - containerPort: 9102
+          name: admin
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           runAsUser: 0
