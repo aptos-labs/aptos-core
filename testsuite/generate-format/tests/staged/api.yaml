@@ -138,12 +138,12 @@ BlockMetadataWithRandomness:
     - randomness:
         OPTION:
           TYPENAME: Randomness
-Bn254G1ProjectiveCompressed:
+Bn254G1:
   NEWTYPESTRUCT:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 32
-Bn254G2ProjectiveCompressed:
+Bn254G2:
   NEWTYPESTRUCT:
     TUPLEARRAY:
       CONTENT: U8
@@ -273,11 +273,11 @@ ExecutionStatus:
 Groth16Zkp:
   STRUCT:
     - a:
-        TYPENAME: Bn254G1ProjectiveCompressed
+        TYPENAME: Bn254G1
     - b:
-        TYPENAME: Bn254G2ProjectiveCompressed
+        TYPENAME: Bn254G2
     - c:
-        TYPENAME: Bn254G1ProjectiveCompressed
+        TYPENAME: Bn254G1
 HashValue:
   STRUCT:
     - hash:
