@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Configures the logging backend for the compiler and related code which uses
@@ -8,14 +7,14 @@
 //! # How to Run the Logger
 //!
 //! By default logging is turned off. The environment variable `MVC_LOG` is
-//! used to control logging. Usages:
+//! used to control logging (MVC stands for "Move Compiler"). Usages:
 //!
-//! ```
-//!     MVC_LOG = ""                # logs everything to console
+//! ```ignore
+//!     MVC_LOG = ""                # logs everything to console (stderr)
 //!     MVC_LOG = "info"            # logs only info or higher to console
 //!     MVC_LOG = "<module_path_prefix>=info" # logs only info+ in matching modules
 //!     MVC_LOG = ":<file>"         # logs everything to given file
-//!     MVC_LOG = "info:<file>      # as above
+//!     MVC_LOG = "info:<file>"     # as above
 //! ```
 //!
 //! The general format is `<spec>[:<file>]`, where `spec` is defined as described
