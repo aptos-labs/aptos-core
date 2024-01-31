@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+  ┌─ tests/uninit-use-checker/uses_before_assign.move:5:9
+  │
+5 │     let z = x + y;
+  │         ^
+
 ============ initial bytecode ================
 
 [variant baseline]

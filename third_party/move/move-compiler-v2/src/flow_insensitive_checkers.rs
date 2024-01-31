@@ -19,7 +19,7 @@ pub fn check_for_unused_vars_and_params(env: &mut GlobalEnv) {
     for module in env.get_modules() {
         if module.is_target() {
             for func in module.get_functions() {
-                if let Some(def) = &*func.get_def() {
+                if let Some(def) = func.get_def() {
                     let params = &func.get_parameters();
                     find_unused_params_and_vars(env, params, def)
                 }
