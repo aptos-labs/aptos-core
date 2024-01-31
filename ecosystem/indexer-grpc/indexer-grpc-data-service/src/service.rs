@@ -9,7 +9,7 @@ use crate::metrics::{
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
-    cache_operator::{CacheBatchGetStatus, CacheOperator},
+    cache_operator::{CacheBatchGetStatus, CacheCoverageStatus, CacheOperator},
     chunk_transactions,
     compression_util::{CacheEntry, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
@@ -212,11 +212,21 @@ async fn get_data_with_threads(
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
 ) -> DataFetchSubThreadResult {
-    // TODO: better logic here for when we're already caught up to head?
-    let num_threads_to_use = match transactions_count {
-        None => MAX_FETCH_THREADS_PER_REQUEST,
-        Some(transactions_count) => {
-            (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK).max(MAX_FETCH_THREADS_PER_REQUEST)
+    let cache_coverage_status = cache_operator
+        .check_cache_coverage_status(start_version)
+        .await;
+
+    let num_threads_to_use = match cache_coverage_status {
+        Ok(CacheCoverageStatus::DataNotReady) => return DataFetchSubThreadResult::NoResults,
+        Ok(CacheCoverageStatus::CacheHit(_)) => 1,
+        Ok(CacheCoverageStatus::CacheEvicted) => match transactions_count {
+            None => MAX_FETCH_THREADS_PER_REQUEST,
+            Some(transactions_count) => (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK)
+                .max(MAX_FETCH_THREADS_PER_REQUEST),
+        },
+        Err(_) => {
+            error!("[Data Service] Failed to get cache coverage status.");
+            panic!("Failed to get cache coverage status.");
         },
     };
 
@@ -242,9 +252,6 @@ async fn get_data_with_threads(
             }
         });
         threads.push(thread);
-        // requested vresion = 1
-        // next requested version = 1000
-
         current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
         current_version -= current_version % TRANSACTIONS_PER_STORAGE_BLOCK;
     }
