@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: Unused parameter `length`. Consider removing or prefixing with an underscore: `_length`
+  ┌─ tests/checking/specs/inline_spec_inference_vector.move:3:18
+  │
+3 │   public fun new(length: u64) {
+  │                  ^^^^^^
+
 // ---- Model Dump
 module 0x42::bit_vector {
     use std::vector;

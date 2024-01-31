@@ -7,7 +7,7 @@ use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    function_checker, inliner, pipeline,
+    flow_insensitive_checkers, function_checker, inliner, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -310,23 +310,28 @@ impl TestConfig {
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
         if ok {
+            if options.debug {
+                eprint!("After error check, GlobalEnv={}", env.dump_env());
+            }
+            // Flow-insensitive checks on AST
+            flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
             function_checker::check_for_function_typed_parameters(&mut env);
             function_checker::check_access_and_use(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
-
         if ok {
             if options.debug {
-                eprint!("After error check, GlobalEnv={}", env.dump_env());
+                eprint!(
+                    "After flow-insensitive checks, GlobalEnv={}",
+                    env.dump_env()
+                );
             }
-
             // Run inlining.
             inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
-
-            if ok && options.debug {
-                eprint!("After inlining, GlobalEnv={}", env.dump_env());
-            }
+        }
+        if ok && options.debug {
+            eprint!("After inlining, GlobalEnv={}", env.dump_env());
         }
 
         if ok && self.dump_ast {

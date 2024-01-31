@@ -382,9 +382,7 @@ impl<'env> Inliner<'env> {
     fn do_inlining_in(&mut self, func_id: QualifiedFunId) {
         assert!(!self.funexprs_after_inlining.contains_key(&func_id));
         let func_env = self.env.get_function(func_id);
-
-        let optional_def = func_env.get_def();
-        if let Some(def) = optional_def {
+        if let Some(def) = func_env.get_def() {
             let mut rewriter = OuterInlinerRewriter::new(self.env, self);
 
             let rewritten = rewriter.rewrite_exp(def.clone());
