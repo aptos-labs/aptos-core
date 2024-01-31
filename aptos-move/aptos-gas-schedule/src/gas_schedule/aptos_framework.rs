@@ -260,6 +260,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_get_script_hash_base: InternalGas, "transaction_context.get_script_hash.base", 735],
         // Based on SHA3-256's cost
         [transaction_context_generate_unique_address_base: InternalGas, { 10.. => "transaction_context.generate_unique_address.base" }, 14704],
+        [transaction_context_sender_base: InternalGas, "transaction_context.sender.base", 735],
+        [transaction_context_secondary_signers_base: InternalGas, "transaction_context.secondary_signers.base", 735],
+        [transaction_context_secondary_signers_per_signer: InternalGasPerArg, "transaction_context.secondary_signers.per_signer", 576], // 18 * 32
+        [transaction_context_fee_payer_base: InternalGas, "transaction_context.fee_payer.base", 735],
+        [transaction_context_max_gas_amount_base: InternalGas, "transaction_context.max_gas_amount.base", 735],
+        [transaction_context_gas_unit_price_base: InternalGas, "transaction_context.gas_unit_price.base", 735],
 
         [code_request_publish_base: InternalGas, "code.request_publish.base", 1838],
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 7],

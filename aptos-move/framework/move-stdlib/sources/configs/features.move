@@ -476,6 +476,17 @@ module std::features {
         is_enabled(MODULE_EVENT_MIGRATION)
     }
 
+    /// Whether the transaction context extension is enabled.
+    ///
+    /// Lifetime: transient
+    const TRANSACTION_CONTEXT_EXTENSION: u64 = 58;
+
+    public fun get_transaction_context_extension_feature(): u64 { TRANSACTION_CONTEXT_EXTENSION }
+
+    public fun transaction_context_extension_enabled(): bool acquires Features {
+        is_enabled(TRANSACTION_CONTEXT_EXTENSION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

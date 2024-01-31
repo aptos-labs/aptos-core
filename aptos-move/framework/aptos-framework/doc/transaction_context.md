@@ -6,6 +6,7 @@
 
 
 -  [Struct `AUID`](#0x1_transaction_context_AUID)
+-  [Constants](#@Constants_0)
 -  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
 -  [Function `get_transaction_hash`](#0x1_transaction_context_get_transaction_hash)
 -  [Function `generate_unique_address`](#0x1_transaction_context_generate_unique_address)
@@ -13,18 +14,32 @@
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Function `generate_auid`](#0x1_transaction_context_generate_auid)
 -  [Function `auid_address`](#0x1_transaction_context_auid_address)
--  [Specification](#@Specification_0)
-    -  [Function `get_txn_hash`](#@Specification_0_get_txn_hash)
-    -  [Function `get_transaction_hash`](#@Specification_0_get_transaction_hash)
-    -  [Function `generate_unique_address`](#@Specification_0_generate_unique_address)
-    -  [Function `generate_auid_address`](#@Specification_0_generate_auid_address)
-    -  [Function `get_script_hash`](#@Specification_0_get_script_hash)
+-  [Function `sender_internal`](#0x1_transaction_context_sender_internal)
+-  [Function `sender`](#0x1_transaction_context_sender)
+-  [Function `secondary_signers_internal`](#0x1_transaction_context_secondary_signers_internal)
+-  [Function `secondary_signers`](#0x1_transaction_context_secondary_signers)
+-  [Function `gas_payer_internal`](#0x1_transaction_context_gas_payer_internal)
+-  [Function `gas_payer`](#0x1_transaction_context_gas_payer)
+-  [Function `max_gas_amount_internal`](#0x1_transaction_context_max_gas_amount_internal)
+-  [Function `max_gas_amount`](#0x1_transaction_context_max_gas_amount)
+-  [Function `gas_unit_price_internal`](#0x1_transaction_context_gas_unit_price_internal)
+-  [Function `gas_unit_price`](#0x1_transaction_context_gas_unit_price)
+-  [Function `chain_id_internal`](#0x1_transaction_context_chain_id_internal)
+-  [Function `chain_id`](#0x1_transaction_context_chain_id)
+-  [Specification](#@Specification_1)
+    -  [Function `get_txn_hash`](#@Specification_1_get_txn_hash)
+    -  [Function `get_transaction_hash`](#@Specification_1_get_transaction_hash)
+    -  [Function `generate_unique_address`](#@Specification_1_generate_unique_address)
+    -  [Function `generate_auid_address`](#@Specification_1_generate_auid_address)
+    -  [Function `get_script_hash`](#@Specification_1_get_script_hash)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
-    -  [Function `auid_address`](#@Specification_0_auid_address)
+    -  [Function `auid_address`](#@Specification_1_auid_address)
 
 
-<pre><code></code></pre>
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+</code></pre>
 
 
 
@@ -56,6 +71,31 @@ for storing an address
 
 
 </details>
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED"></a>
+
+The transaction context extension feature is not enabled.
+
+
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_transaction_context_ETRANSACTION_CONTEXT_NOT_AVAILABLE"></a>
+
+Transaction context is not available outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_NOT_AVAILABLE">ETRANSACTION_CONTEXT_NOT_AVAILABLE</a>: u64 = 1;
+</code></pre>
+
+
 
 <a id="0x1_transaction_context_get_txn_hash"></a>
 
@@ -238,12 +278,309 @@ the generated unique address wrapped in the AUID class.
 
 </details>
 
-<a id="@Specification_0"></a>
+<a id="0x1_transaction_context_sender_internal"></a>
+
+## Function `sender_internal`
+
+Return the sender's address for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>(): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_sender"></a>
+
+## Function `sender`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender">sender</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_sender">sender</a>(): <b>address</b> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_sender_internal">sender_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_secondary_signers_internal"></a>
+
+## Function `secondary_signers_internal`
+
+Return the list of the secondary signers for the current transaction.
+If the current transaction has no secondary signers, this function returns an empty vector.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_secondary_signers"></a>
+
+## Function `secondary_signers`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_secondary_signers">secondary_signers</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt; {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_secondary_signers_internal">secondary_signers_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_gas_payer_internal"></a>
+
+## Function `gas_payer_internal`
+
+Return the gas payer address for the current transaction.
+It is either the sender's address if no separate gas fee payer is specified for the current transaction,
+or the address of the separate gas fee payer if one is specified.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>(): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_gas_payer"></a>
+
+## Function `gas_payer`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer">gas_payer</a>(): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_payer">gas_payer</a>(): <b>address</b> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_gas_payer_internal">gas_payer_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_max_gas_amount_internal"></a>
+
+## Function `max_gas_amount_internal`
+
+Return the max gas amount in units which is specified for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_max_gas_amount"></a>
+
+## Function `max_gas_amount`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount">max_gas_amount</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_max_gas_amount">max_gas_amount</a>(): u64 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_max_gas_amount_internal">max_gas_amount_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_gas_unit_price_internal"></a>
+
+## Function `gas_unit_price_internal`
+
+Return the gas unit price in Octas which is specified for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>(): u64;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_gas_unit_price"></a>
+
+## Function `gas_unit_price`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price">gas_unit_price</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_gas_unit_price">gas_unit_price</a>(): u64 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_gas_unit_price_internal">gas_unit_price_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_chain_id_internal"></a>
+
+## Function `chain_id_internal`
+
+Return the chain ID specified for the current transaction.
+This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+
+
+<pre><code><b>fun</b> <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>(): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>(): u8;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_chain_id"></a>
+
+## Function `chain_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id">chain_id</a>(): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chain_id.md#0x1_chain_id">chain_id</a>(): u8 {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_transaction_context_extension_enabled">features::transaction_context_extension_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED">ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED</a>));
+    <a href="transaction_context.md#0x1_transaction_context_chain_id_internal">chain_id_internal</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="@Specification_1"></a>
 
 ## Specification
 
 
-<a id="@Specification_0_get_txn_hash"></a>
+<a id="@Specification_1_get_txn_hash"></a>
 
 ### Function `get_txn_hash`
 
@@ -270,7 +607,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a id="@Specification_0_get_transaction_hash"></a>
+<a id="@Specification_1_get_transaction_hash"></a>
 
 ### Function `get_transaction_hash`
 
@@ -290,7 +627,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a id="@Specification_0_generate_unique_address"></a>
+<a id="@Specification_1_generate_unique_address"></a>
 
 ### Function `generate_unique_address`
 
@@ -316,7 +653,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a id="@Specification_0_generate_auid_address"></a>
+<a id="@Specification_1_generate_auid_address"></a>
 
 ### Function `generate_auid_address`
 
@@ -334,7 +671,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a id="@Specification_0_get_script_hash"></a>
+<a id="@Specification_1_get_script_hash"></a>
 
 ### Function `get_script_hash`
 
@@ -414,7 +751,7 @@ the generated unique address wrapped in the AUID class.
 
 
 
-<a id="@Specification_0_auid_address"></a>
+<a id="@Specification_1_auid_address"></a>
 
 ### Function `auid_address`
 

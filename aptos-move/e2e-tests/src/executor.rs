@@ -866,7 +866,7 @@ impl FakeExecutor {
         let mut i = 0;
         let mut times = Vec::new();
         while i < iterations {
-            let mut session = vm.new_session(&resolver, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             // load function name into cache to ensure cache is hot
             let _ = session.load_function(module, &Self::name(function_name), &type_params.clone());
@@ -979,7 +979,7 @@ impl FakeExecutor {
                 /*aggregator_v2_type_tagging=*/ false,
             )
             .unwrap();
-            let mut session = vm.new_session(&resolver, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void(), None);
 
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
@@ -1053,7 +1053,7 @@ impl FakeExecutor {
                 false,
             )
             .unwrap();
-            let mut session = vm.new_session(&resolver, SessionId::void());
+            let mut session = vm.new_session(&resolver, SessionId::void(), None);
             session
                 .execute_function_bypass_visibility(
                     module_id,
@@ -1133,7 +1133,7 @@ impl FakeExecutor {
             false,
         )
         .unwrap();
-        let mut session = vm.new_session(state_view, SessionId::void());
+        let mut session = vm.new_session(state_view, SessionId::void(), None);
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -1188,7 +1188,7 @@ impl FakeExecutor {
             false,
         )
         .unwrap();
-        let mut session = vm.new_session(&resolver, SessionId::void());
+        let mut session = vm.new_session(&resolver, SessionId::void(), None);
         session
             .execute_function_bypass_visibility(
                 &Self::module(module_name),

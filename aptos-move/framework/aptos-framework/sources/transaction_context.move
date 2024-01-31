@@ -1,4 +1,13 @@
 module aptos_framework::transaction_context {
+    use std::error;
+    use std::features;
+
+    /// Transaction context is not available outside of the transaction prologue, execution, or epilogue phases.
+    const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = 1;
+
+    /// The transaction context extension feature is not enabled.
+    const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 = 2;
+
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
     struct AUID has drop, store {
@@ -46,6 +55,57 @@ module aptos_framework::transaction_context {
         auid.unique_address
     }
 
+    /// Return the sender's address for the current transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun sender_internal(): address;
+    public fun sender(): address {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        sender_internal()
+    }
+
+    /// Return the list of the secondary signers for the current transaction.
+    /// If the current transaction has no secondary signers, this function returns an empty vector.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun secondary_signers_internal(): vector<address>;
+    public fun secondary_signers(): vector<address> {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        secondary_signers_internal()
+    }
+
+    /// Return the gas payer address for the current transaction.
+    /// It is either the sender's address if no separate gas fee payer is specified for the current transaction,
+    /// or the address of the separate gas fee payer if one is specified.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun gas_payer_internal(): address;
+    public fun gas_payer(): address {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        gas_payer_internal()
+    }
+
+    /// Return the max gas amount in units which is specified for the current transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun max_gas_amount_internal(): u64;
+    public fun max_gas_amount(): u64 {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        max_gas_amount_internal()
+    }
+
+    /// Return the gas unit price in Octas which is specified for the current transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun gas_unit_price_internal(): u64;
+    public fun gas_unit_price(): u64 {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        gas_unit_price_internal()
+    }
+
+    /// Return the chain ID specified for the current transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun chain_id_internal(): u8;
+    public fun chain_id(): u8 {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        chain_id_internal()
+    }
+
     #[test(fx = @std)]
     fun test_auid_uniquess(fx: signer) {
         use std::features;
@@ -70,5 +130,47 @@ module aptos_framework::transaction_context {
             };
             i = i + 1;
         };
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_sender() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _sender = sender();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_secondary_signers() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _secondary_signers = secondary_signers();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_gas_payer() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _gas_payer = gas_payer();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_max_gas_amount() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _max_gas_amount = max_gas_amount();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_gas_unit_price() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _gas_unit_price = gas_unit_price();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_chain_id() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _chain_id = chain_id();
     }
 }
