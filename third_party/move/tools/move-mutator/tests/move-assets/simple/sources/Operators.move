@@ -39,6 +39,42 @@ module TestAccount::Operators {
         x >> y
     }
 
+    fun logical_or(x: bool, y: bool): bool {
+        x || y
+    }
+
+    fun logical_and(x: bool, y: bool): bool {
+        x && y
+    }
+
+    fun logical_not(x: bool): bool {
+        !x
+    }
+
+    fun eq(x: bool, y: bool): bool {
+        x == y
+    }
+
+    fun neq(x: bool, y: bool): bool {
+        x != y
+    }
+
+    fun lt(x: u64, y: u64): bool {
+        x < y
+    }
+
+    fun lte(x: u64, y: u64): bool {
+        x <= y
+    }
+
+    fun gt(x: u64, y: u64): bool {
+        x > y
+    }
+
+    fun gte(x: u64, y: u64): bool {
+        x >= y
+    }
+
     spec sum {
         ensures result == x+y;
     }
@@ -82,4 +118,37 @@ module TestAccount::Operators {
         aborts_if y >= 64;
         ensures result == x>>y;
     }
+
+    spec logical_or {
+        ensures result == x || y;
+    }
+
+    spec logical_not {
+        ensures result == !x;
+    }
+
+    spec eq {
+        ensures result == (x == y);
+    }
+
+    spec neq {
+        ensures result == (x != y);
+    }
+
+    spec lt {
+        ensures result == (x < y);
+    }
+
+    spec lte {
+        ensures result == (x <= y);
+    }
+
+    spec gt {
+        ensures result == (x > y);
+    }
+
+    spec gte {
+        ensures result == (x >= y);
+    }
+
 }
