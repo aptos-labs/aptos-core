@@ -19,6 +19,7 @@ pub struct NFTMetadataCrawlerURIs {
     json_parser_retry_count: i32,
     image_optimizer_retry_count: i32,
     animation_optimizer_retry_count: i32,
+    do_not_parse: bool,
 }
 
 impl NFTMetadataCrawlerURIs {
@@ -33,6 +34,7 @@ impl NFTMetadataCrawlerURIs {
             json_parser_retry_count: 0,
             image_optimizer_retry_count: 0,
             animation_optimizer_retry_count: 0,
+            do_not_parse: false,
         }
     }
 
@@ -141,5 +143,13 @@ impl NFTMetadataCrawlerURIs {
 
     pub fn increment_animation_optimizer_retry_count(&mut self) {
         self.animation_optimizer_retry_count += 1;
+    }
+
+    pub fn get_do_not_parse(&self) -> bool {
+        self.do_not_parse
+    }
+
+    pub fn set_do_not_parse(&mut self, do_not_parse: bool) {
+        self.do_not_parse = do_not_parse;
     }
 }

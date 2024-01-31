@@ -26,6 +26,7 @@ pub struct NFTMetadataCrawlerURIsQuery {
     pub image_optimizer_retry_count: i32,
     pub animation_optimizer_retry_count: i32,
     pub inserted_at: chrono::NaiveDateTime,
+    pub do_not_parse: bool,
 }
 
 impl NFTMetadataCrawlerURIsQuery {
@@ -100,5 +101,23 @@ impl NFTMetadataCrawlerURIsQuery {
             error!(asset_uri = asset_uri, error=?e, "Failed to get_by_raw_animation_uri");
             None
         })
+    }
+}
+
+impl Default for NFTMetadataCrawlerURIsQuery {
+    fn default() -> Self {
+        Self {
+            asset_uri: "".to_string(),
+            raw_image_uri: None,
+            raw_animation_uri: None,
+            cdn_json_uri: None,
+            cdn_image_uri: None,
+            cdn_animation_uri: None,
+            json_parser_retry_count: 0,
+            image_optimizer_retry_count: 0,
+            animation_optimizer_retry_count: 0,
+            inserted_at: chrono::NaiveDateTime::default(),
+            do_not_parse: false,
+        }
     }
 }
