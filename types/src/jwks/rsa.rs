@@ -12,8 +12,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::str::FromStr;
 
-pub const RSA_MODULUS_BYTES: usize = 256;
-
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 #[allow(non_camel_case_types)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -37,6 +35,7 @@ impl RSA_JWK {
         }
     }
 
+    // TODO(zkid): Move this to aptos-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         modulus.reverse(); // This is done to match the circuit, which requires the modulus in a verify specific format due to how RSA verification is implemented
