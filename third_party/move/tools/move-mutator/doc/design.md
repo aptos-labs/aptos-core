@@ -225,19 +225,25 @@ Thanks to the fact that, the operator is replaced with space instead of just rem
 
 ### Literal replacement
 
-This mutation operator replaces literals with other literals. For example, the `0` literal can be replaced with the `1` literal or other random literal, `true` to `false`, etc.
+This mutation operator replaces literals with other literals. For example, the `0` literal can be replaced with the `1` literal or other random literal, `true` to `false`, etc. This mutation operator can replaces also addresses with other addresses.
 
 It's possible to choose the type of the literal to be replaced. For example, it's possible to replace only boolean literals.
 
 The operator tests the different conditions in the specifications (like invariants) and test suites.
 
-### Address replacement
-
-This mutation operator replaces addresses with other addresses. For example, the `0x1`/`@std` address can be replaced with the `0x000A` address or another random address.
-
 ### Break/continue replacement or deletion
 
 This mutation operator replaces or deletes break/continue statements with other break/continue statements.
+
+### If/else replacement
+
+This mutation operator replaces if/else expression with constant boolean values. For example, the `if (cond) { ... } else { ... }` expression can be replaced with the `if (false) { ... } else { ... }` expression.
+
+### Delete statement operator
+
+This mutation operator deletes statements. It can be used to delete any statement in the source code that wouldn't affect the compilation process.
+
+Currently, it's used to delete `move_to` expressions to check if moving resources is verified properly.
 
 ## Extending the Move mutator tool
 
