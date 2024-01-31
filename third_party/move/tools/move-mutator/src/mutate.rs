@@ -63,7 +63,7 @@ fn traverse_module_with_check(
     let (filename, _) = files.get(&ident.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
     let filename_path = Path::new(filename.as_str());
 
-    if conf.project.move_sources.len() > 0
+    if !conf.project.move_sources.is_empty()
         && !conf
             .project
             .move_sources
@@ -74,10 +74,11 @@ fn traverse_module_with_check(
             filename
         );
         return Ok(vec![]);
-    } else {
+    } else if conf.project.move_sources.is_empty() {
         let test_root = SourcePackageLayout::try_find_root(&filename_path.canonicalize()?)?;
         if let Some(project_path) = &conf.project_path {
-            if !test_root.ends_with(project_path) {
+            let project_path = project_path.canonicalize()?;
+            if test_root != project_path {
                 trace!(
                     "Skipping module: \n {} \n root: {} \n as it does not come from source project {}",
                     filename_path.to_string_lossy(), test_root.to_string_lossy(),

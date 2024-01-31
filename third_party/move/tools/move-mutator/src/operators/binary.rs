@@ -34,7 +34,15 @@ impl MutationOperator for Binary {
             BinOp_::Shl | BinOp_::Shr => {
                 vec!["<<", ">>"]
             },
-            _ => vec![],
+            BinOp_::Or | BinOp_::And => {
+                vec!["||", "&&"]
+            },
+            BinOp_::Eq | BinOp_::Neq | BinOp_::Lt | BinOp_::Gt | BinOp_::Le | BinOp_::Ge => {
+                vec!["==", "!=", "<", ">", "<=", ">="]
+            },
+            BinOp_::Range | BinOp_::Iff | BinOp_::Implies => {
+                vec![]
+            },
         };
 
         ops.into_iter()
