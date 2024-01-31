@@ -26,6 +26,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 use aptos_types::on_chain_config::{FeatureFlag, Features};
+use crate::util::is_vtxn_expected;
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
@@ -92,7 +93,7 @@ impl NodeBroadcastHandler {
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         for vtxn in node.validator_txns() {
-            ensure!(self.is_vtxn_expected(vtxn), "unexpected validator transaction: {:?}", vtxn.topic());
+            ensure!(is_vtxn_expected(&self.features, vtxn), "unexpected validator transaction: {:?}", vtxn.topic());
         }
 
         let vtxn_total_bytes = node
