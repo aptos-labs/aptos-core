@@ -780,7 +780,7 @@ codegen-units = 1
 
 [profile.ci]
 inherits = "release"
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
 
