@@ -4,8 +4,8 @@
 
 use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
 use aptos_types::{
-    chain_id::ChainId,
     bn254_circom::get_public_inputs_hash,
+    chain_id::ChainId,
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     transaction::SignedTransaction,

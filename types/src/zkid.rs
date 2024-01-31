@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    bn254_circom::{
+        Bn254G1ProjectiveCompressed, Bn254G2ProjectiveCompressed, DEVNET_VERIFYING_KEY,
+    },
     chain_id::ChainId,
-    bn254_circom::{Bn254G1ProjectiveCompressed, Bn254G2ProjectiveCompressed, DEVNET_VERIFYING_KEY},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -502,8 +504,8 @@ fn seconds_from_epoch(secs: u64) -> SystemTime {
 #[cfg(test)]
 mod test {
     use crate::{
-        chain_id::ChainId,
         bn254_circom::get_public_inputs_hash,
+        chain_id::ChainId,
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
