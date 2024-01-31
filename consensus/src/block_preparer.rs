@@ -33,7 +33,8 @@ impl BlockPreparer {
     }
 
     pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
-        let txns = self.payload_manager.get_transactions(block).await?;
+        let (txns, max_txns_to_include_in_block) =
+            self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
         let txn_shuffler = self.txn_shuffler.clone();
@@ -43,7 +44,9 @@ impl BlockPreparer {
         tokio::task::spawn_blocking(move || {
             let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
-            Ok(txn_shuffler.shuffle(deduped_txns))
+            let mut shuffled_txns = txn_shuffler.shuffle(deduped_txns);
+            shuffled_txns.truncate(max_txns_to_include_in_block);
+            Ok(shuffled_txns)
         })
         .await
         .expect("Failed to spawn blocking task for transaction generation")

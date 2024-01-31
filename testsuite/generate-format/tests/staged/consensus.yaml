@@ -500,6 +500,10 @@ Payload:
       InQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithData
+    2:
+      InQuorumStoreV2:
+        NEWTYPE:
+          TYPENAME: ProofWithDataV2
 ProofOfStore:
   STRUCT:
     - info:
@@ -516,6 +520,12 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+ProofWithDataV2:
+  STRUCT:
+    - proof_with_data:
+        TYPENAME: ProofWithData
+    - txns_to_include:
+        OPTION: U64
 ProposalExt:
   ENUM:
     0:

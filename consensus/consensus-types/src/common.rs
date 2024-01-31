@@ -12,7 +12,7 @@ use aptos_types::{
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
+use std::{cmp::min, collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -139,14 +139,61 @@ impl ProofWithData {
     }
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct ProofWithDataV2 {
+    pub proof_with_data: ProofWithData,
+    pub txns_to_include: Option<usize>,
+}
+
+impl PartialEq for ProofWithDataV2 {
+    fn eq(&self, other: &Self) -> bool {
+        self.proof_with_data == other.proof_with_data
+            && self.txns_to_include == other.txns_to_include
+    }
+}
+
+impl Eq for ProofWithDataV2 {}
+
+impl ProofWithDataV2 {
+    pub fn new(proof_with_data: ProofWithData, txns_to_include: Option<usize>) -> Self {
+        Self {
+            proof_with_data,
+            txns_to_include,
+        }
+    }
+
+    pub fn extend(&mut self, other: ProofWithDataV2) {
+        self.proof_with_data.extend(other.proof_with_data);
+        // InQuorumStoreV2 TODO: what is the right logic here ???
+        if self.txns_to_include.is_none() {
+            self.txns_to_include = other.txns_to_include;
+        }
+    }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
+    InQuorumStoreV2(ProofWithDataV2),
 }
 
 impl Payload {
+    pub fn transform_to_quorum_store_v2(self, txns_to_include: Option<usize>) -> Self {
+        match self {
+            Payload::InQuorumStore(proof_with_status) => {
+                Payload::InQuorumStoreV2(ProofWithDataV2::new(proof_with_status, txns_to_include))
+            },
+            Payload::InQuorumStoreV2(_) => {
+                panic!("Payload is already in quorumStoreV2 format");
+            },
+            Payload::DirectMempool(_) => {
+                panic!("Payload is in direct mempool format");
+            },
+        }
+    }
+
     pub fn empty(quorum_store_enabled: bool) -> Self {
         if quorum_store_enabled {
             Payload::InQuorumStore(ProofWithData::new(Vec::new()))
@@ -163,6 +210,19 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_txns() as usize)
                 .sum(),
+            Payload::InQuorumStoreV2(proof_with_status) => {
+                let num_txns = proof_with_status
+                    .proof_with_data
+                    .proofs
+                    .iter()
+                    .map(|proof| proof.num_txns() as usize)
+                    .sum();
+                if proof_with_status.txns_to_include.is_some() {
+                    min(proof_with_status.txns_to_include.unwrap(), num_txns)
+                } else {
+                    num_txns
+                }
+            },
         }
     }
 
@@ -170,6 +230,11 @@ impl Payload {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
+            Payload::InQuorumStoreV2(proof_with_status) => {
+                proof_with_status.proof_with_data.proofs.is_empty()
+                    || (proof_with_status.txns_to_include.is_some()
+                        && proof_with_status.txns_to_include.unwrap() == 0)
+            },
         }
     }
 
@@ -177,6 +242,7 @@ impl Payload {
         match (self, other) {
             (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2),
             (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
+            (Payload::InQuorumStoreV2(p1), Payload::InQuorumStoreV2(p2)) => p1.extend(p2),
             (_, _) => unreachable!(),
         }
     }
@@ -198,6 +264,14 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
+            // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'txns_to_include'.
+            // Hence, it makes sense to pass the full size of the payload here.
+            Payload::InQuorumStoreV2(proof_with_status) => proof_with_status
+                .proof_with_data
+                .proofs
+                .iter()
+                .map(|proof| proof.num_bytes() as usize)
+                .sum(),
         }
     }
 
@@ -210,6 +284,12 @@ impl Payload {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
                 for proof in proof_with_status.proofs.iter() {
+                    proof.verify(validator)?;
+                }
+                Ok(())
+            },
+            (true, Payload::InQuorumStoreV2(proof_with_status)) => {
+                for proof in proof_with_status.proof_with_data.proofs.iter() {
                     proof.verify(validator)?;
                 }
                 Ok(())
@@ -231,6 +311,13 @@ impl fmt::Display for Payload {
             },
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
+            },
+            Payload::InQuorumStoreV2(proof_with_status) => {
+                write!(
+                    f,
+                    "InMemory proofs: {}",
+                    proof_with_status.proof_with_data.proofs.len()
+                )
             },
         }
     }

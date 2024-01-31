@@ -128,6 +128,7 @@ pub struct PipelineBackpressureValues {
     // If we want to dynamically increase it beyond quorum_store_poll_time,
     // we need to adjust timeouts other nodes use for the backpressured round.
     pub backpressure_proposal_delay_ms: u64,
+    pub max_txns_to_include_in_block: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -193,36 +194,42 @@ impl Default for ConsensusConfig {
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
+                    max_txns_to_include_in_block: 10000,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1100,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
+                    max_txns_to_include_in_block: 10000,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1400,
                     max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 300,
+                    max_txns_to_include_in_block: 2000,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1700,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 400,
+                    max_txns_to_include_in_block: 1000,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
                     max_sending_block_txns_override: 600,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 500,
+                    max_txns_to_include_in_block: 600,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2300,
                     max_sending_block_txns_override: 400,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 500,
+                    max_txns_to_include_in_block: 400,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2600,
@@ -235,6 +242,7 @@ impl Default for ConsensusConfig {
                     // stop reducing size, so 1MB transactions can still go through
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 500,
+                    max_txns_to_include_in_block: 250,
                 },
             ],
             window_for_chain_health: 100,
@@ -638,6 +646,7 @@ mod test {
                     max_sending_block_txns_override: 350,
                     max_sending_block_bytes_override: 0,
                     backpressure_proposal_delay_ms: 0,
+                    max_txns_to_include_in_block: 350,
                 }],
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_txns: 250,
@@ -668,6 +677,7 @@ mod test {
                     max_sending_block_txns_override: 251,
                     max_sending_block_bytes_override: 100,
                     backpressure_proposal_delay_ms: 0,
+                    max_txns_to_include_in_block: 251,
                 }],
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_bytes: 2_000_000,
