@@ -118,7 +118,7 @@ module aptos_std::randomness {
         };
 
         // Shuffle.
-        let tail = n - 1;
+        let tail = n;
         while (tail > 0) {
             let pop_position = u64_range(0, tail);
             std::vector::swap(&mut values, pop_position, tail);
