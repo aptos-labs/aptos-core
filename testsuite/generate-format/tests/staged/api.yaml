@@ -191,7 +191,9 @@ DKGTranscriptMetadata:
 DepositEvent:
   STRUCT:
     - amount: U64
-DeprecatedPayload: UNITSTRUCT
+DeprecatedPayload:
+  STRUCT:
+    - dummy_value: U64
 DummyValidatorTransaction:
   STRUCT:
     - valid: BOOL
