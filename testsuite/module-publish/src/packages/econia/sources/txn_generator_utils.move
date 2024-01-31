@@ -1,4 +1,5 @@
 module econia::txn_generator_utils {
+    use aptos_framework::aptos_coin::AptosCoin;
     use econia::market;
     use econia::incentives;
     use econia::assets::{Self, BC, QC, UC};
@@ -30,23 +31,30 @@ module econia::txn_generator_utils {
 
 
     public entry fun register_market(publisher: &signer) {
-        market::init_setup(publisher);
+        // market::init_setup(publisher);
         // Get market registration fee.
         let fee = incentives::get_market_registration_fee();
         // // Register publisher coin store.
         // coin::register<APT>(publisher);
         // Register pure coin market.
-        market::register_market_base_coin<BC, QC, UC>(
+        // assert!(1 == 2, 57);
+        // assets::init_setup(publisher);
+        // incentives::init_setup(publisher);
+        // assert!(1 == 2, 131);
+        market::register_market_base_coin<BC, QC, AptosCoin>(
             LOT_SIZE_COIN, TICK_SIZE_COIN, MIN_SIZE_COIN,
-            assets::mint(publisher, fee));
+            assets::mint_setup(publisher, fee));
+        assert!(1 == 2, 175);
     }
 
     public entry fun register_market_accounts(user: &signer) {
         user::register_market_account<BC, QC>(user, MARKET_ID_COIN, NO_CUSTODIAN);
+        assert!(1 == 2, 37);
     }
 
     public entry fun deposit_coins(user: &signer) {
         user::deposit_coins<QC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<QC>(user, 1000));
+        assert!(1 == 2, 61);
         user::deposit_coins<BC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<BC>(user, 1000));
     }
     

@@ -5,7 +5,8 @@ upgrade_policy = "compatible"
 authors = ["Econia Labs (developers@econialabs.com)"]
 
 [addresses]
-econia = "0xABCD"
+econia = "0x12345"
+
 # Mock addresses for testing.
 user = "0x1234"
 user_0 = "0x2345"

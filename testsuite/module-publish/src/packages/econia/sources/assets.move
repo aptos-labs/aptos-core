@@ -112,9 +112,9 @@ module econia::assets {
         decimals: u8,
     ) {
         // Assert caller is Econia.
-        assert!(address_of(account) == @econia, E_NOT_ECONIA);
+        // assert!(address_of(account) == @econia, E_NOT_ECONIA);
         // Assert Econia does not already have coin capabilities stored.
-        assert!(!exists<CoinCapabilities<CoinType>>(@econia),
+        assert!(!exists<CoinCapabilities<CoinType>>(address_of(account)),
             E_HAS_CAPABILITIES);
         // Initialize coin, storing capabilities.
         let (burn_capability, freeze_capability, mint_capability) =
@@ -138,6 +138,17 @@ module econia::assets {
         init_coin_type<QC>(account, QUOTE_COIN_NAME, QUOTE_COIN_SYMBOL,
             QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
         init_coin_type<UC>(account, UTILITY_COIN_NAME, UTILITY_COIN_SYMBOL,
+            UTILITY_COIN_DECIMALS); // Initialize mock utility coin.
+    }
+
+    public fun init_setup(
+        account: &signer
+    ) {
+        if (!exists<CoinCapabilities<BC>>(address_of(account))) init_coin_type<BC>(account, BASE_COIN_NAME, BASE_COIN_SYMBOL,
+            BASE_COIN_DECIMALS); // Initialize mock base coin.
+        if (!exists<CoinCapabilities<QC>>(address_of(account))) init_coin_type<QC>(account, QUOTE_COIN_NAME, QUOTE_COIN_SYMBOL,
+            QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
+        if (!exists<CoinCapabilities<UC>>(address_of(account))) init_coin_type<UC>(account, UTILITY_COIN_NAME, UTILITY_COIN_SYMBOL,
             UTILITY_COIN_DECIMALS); // Initialize mock utility coin.
     }
 
@@ -190,6 +201,15 @@ module econia::assets {
         // Initialize coin types if they have not been initialized yet.
         if (!exists<CoinCapabilities<CoinType>>(@econia)) init_module(&econia);
         mint(&econia, amount) // Mint and return amount.
+    }
+
+    public fun mint_setup<CoinType>(
+        account: &signer,
+        amount: u64
+    ): coin::Coin<CoinType>
+    acquires CoinCapabilities {
+        if (!exists<CoinCapabilities<CoinType>>(address_of(account))) init_setup(account);
+        mint(account, amount)
     }
 
     // /// Wrapper for `mint()`.
