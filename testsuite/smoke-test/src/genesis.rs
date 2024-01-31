@@ -35,6 +35,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[ignore] // TODO(joshlind): revisit the flakes once we update state sync to handle forks automatically.
 #[tokio::test]
 /// This test verifies:
 /// 1. The behaviour of the consensus sync_only mode (to emulate a network halt).

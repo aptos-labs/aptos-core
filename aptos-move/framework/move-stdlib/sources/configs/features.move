@@ -336,7 +336,7 @@ module std::features {
     /// The JWK consensus feature.
     ///
     /// Lifetime: permanent
-    const JWK_CONSENSUS: u64 = 48;
+    const JWK_CONSENSUS: u64 = 49;
 
     public fun get_jwk_consensus_feature(): u64 { JWK_CONSENSUS }
 

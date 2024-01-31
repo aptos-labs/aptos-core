@@ -374,7 +374,7 @@ The JWK consensus feature.
 Lifetime: permanent
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>: u64 = 48;
+<pre><code><b>const</b> <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>: u64 = 49;
 </code></pre>
 
 

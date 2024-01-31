@@ -113,7 +113,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
             StageTracking::WhenDone(stage_counter) => {
                 if stage == 0 {
                     if num_to_create == 0 {
-                        info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.get(0).unwrap().len());
+                        info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.first().unwrap().len());
                         let _ = stage_counter.compare_exchange(
                             0,
                             1,
