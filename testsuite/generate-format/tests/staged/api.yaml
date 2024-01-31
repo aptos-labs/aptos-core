@@ -138,16 +138,6 @@ BlockMetadataWithRandomness:
     - randomness:
         OPTION:
           TYPENAME: Randomness
-Bn254G1:
-  NEWTYPESTRUCT:
-    TUPLEARRAY:
-      CONTENT: U8
-      SIZE: 32
-Bn254G2:
-  NEWTYPESTRUCT:
-    TUPLEARRAY:
-      CONTENT: U8
-      SIZE: 64
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -270,14 +260,24 @@ ExecutionStatus:
       MiscellaneousError:
         NEWTYPE:
           OPTION: U64
+G1Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
+G2Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 64
 Groth16Zkp:
   STRUCT:
     - a:
-        TYPENAME: Bn254G1
+        TYPENAME: G1Bytes
     - b:
-        TYPENAME: Bn254G2
+        TYPENAME: G2Bytes
     - c:
-        TYPENAME: Bn254G1
+        TYPENAME: G1Bytes
 HashValue:
   STRUCT:
     - hash:
