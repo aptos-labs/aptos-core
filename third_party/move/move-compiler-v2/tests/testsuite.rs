@@ -7,7 +7,7 @@ use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    flow_insensitive_checkers, function_checker, inliner, pipeline,
+    flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -60,6 +60,7 @@ fn path_from_crate_root(path: &str) -> String {
 }
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
+    logging::setup_logging_for_testing();
     let mut experiments = extract_test_directives(path, "// experiment:")?;
     if experiments.is_empty() {
         // If there is no experiment, use "" as the 'default' experiment.

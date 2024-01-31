@@ -40,6 +40,7 @@
 use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
 use itertools::chain;
+use log::{debug, info};
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
@@ -64,6 +65,7 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 /// Run inlining on current program's AST.  For each function which is target of the compilation,
 /// visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv) {
+    info!("Inlining");
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
     let mut todo = get_targets(env);
@@ -452,7 +454,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                         self.env, call_id, &func_loc, &expr, type_args, parameters, args,
                     );
                     if self.inliner.debug {
-                        eprintln!("After inlining, expr is `{}`", rewritten.display(self.env));
+                        debug!("After inlining, expr is `{}`", rewritten.display(self.env));
                     }
                     Some(rewritten)
                 } else {
