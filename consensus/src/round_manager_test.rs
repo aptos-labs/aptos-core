@@ -2078,6 +2078,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
 
 #[test]
 fn no_vote_on_proposal_with_unexpected_vtxns() {
+    let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal_ext(
         vec![ValidatorTransaction::ObservedJWKUpdate(QuorumCertifiedUpdate::dummy())],
         Payload::empty(false),
