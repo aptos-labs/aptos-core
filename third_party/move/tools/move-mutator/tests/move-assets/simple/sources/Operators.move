@@ -51,11 +51,11 @@ module TestAccount::Operators {
         !x
     }
 
-    fun eq(x: bool, y: bool): bool {
+    fun eq(x: u8, y: u8): bool {
         x == y
     }
 
-    fun neq(x: bool, y: bool): bool {
+    fun neq(x: u8, y: u8): bool {
         x != y
     }
 

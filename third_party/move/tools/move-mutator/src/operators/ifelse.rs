@@ -37,12 +37,16 @@ impl MutationOperator for IfElse {
         };
 
         // Change if/else expression to true/false.
-        let ops: Vec<&str> = vec!["true", "false"];
+        let ops: Vec<String> = vec![
+            "true".to_owned(),
+            "false".to_owned(),
+            format!("!({})", cur_op),
+        ];
 
         ops.into_iter()
             .map(|op| {
                 let mut mutated_source = source.to_string();
-                mutated_source.replace_range(start..end, op);
+                mutated_source.replace_range(start..end, op.as_str());
                 MutantInfo::new(
                     mutated_source,
                     Mutation::new(
