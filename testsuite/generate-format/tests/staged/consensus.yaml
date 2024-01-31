@@ -273,6 +273,16 @@ BlockType:
       ProposalExt:
         NEWTYPE:
           TYPENAME: ProposalExt
+Bn254G1ProjectiveCompressed:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
+Bn254G2ProjectiveCompressed:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 64
 ChainId:
   NEWTYPESTRUCT: U8
 ChangeSet:
@@ -473,33 +483,14 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
-G1Projective:
-  STRUCT:
-    - x: STR
-    - y: STR
-    - z: STR
-G2Projective:
-  STRUCT:
-    - x:
-        TUPLEARRAY:
-          CONTENT: STR
-          SIZE: 2
-    - y:
-        TUPLEARRAY:
-          CONTENT: STR
-          SIZE: 2
-    - z:
-        TUPLEARRAY:
-          CONTENT: STR
-          SIZE: 2
 Groth16Zkp:
   STRUCT:
     - a:
-        TYPENAME: G1Projective
+        TYPENAME: Bn254G1ProjectiveCompressed
     - b:
-        TYPENAME: G2Projective
+        TYPENAME: Bn254G2ProjectiveCompressed
     - c:
-        TYPENAME: G1Projective
+        TYPENAME: Bn254G1ProjectiveCompressed
 HashValue:
   STRUCT:
     - hash:
@@ -725,6 +716,12 @@ SignedBatchInfoMsg:
     - signed_infos:
         SEQ:
           TYPENAME: SignedBatchInfo
+SignedGroth16Zkp:
+  STRUCT:
+    - proof:
+        TYPENAME: Groth16Zkp
+    - non_malleability_signature:
+        TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -1085,7 +1082,7 @@ ZkpOrOpenIdSig:
     0:
       Groth16Zkp:
         NEWTYPE:
-          TYPENAME: Groth16Zkp
+          TYPENAME: SignedGroth16Zkp
     1:
       OpenIdSig:
         NEWTYPE:
