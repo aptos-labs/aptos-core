@@ -77,6 +77,10 @@ pub struct AptosNodeArgs {
     #[clap(long)]
     test: bool,
 
+    /// Optimize the single validator node testnet for higher performance
+    #[clap(long, requires("test"))]
+    performance: bool,
+
     /// Random number generator seed for starting a single validator testnet.
     #[clap(long, value_parser = load_seed, requires("test"))]
     seed: Option<[u8; 32]>,
@@ -132,6 +136,9 @@ impl AptosNodeArgs {
 
         if self.test {
             println!("WARNING: Entering test mode! This should never be used in production!");
+            if self.performance {
+                println!("WARNING: Entering performance mode! System utilization may be high!");
+            }
 
             // Set the genesis framework
             let genesis_framework = if let Some(path) = self.genesis_framework {
@@ -152,6 +159,7 @@ impl AptosNodeArgs {
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
+                self.performance,
                 &genesis_framework,
                 rng,
             )
@@ -266,6 +274,7 @@ pub fn load_node_config<R>(
     test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<NodeConfig>
@@ -286,6 +295,7 @@ where
             test_dir,
             random_ports,
             enable_lazy_mode,
+            enable_performance_mode,
             framework,
             rng,
         )?;
@@ -366,6 +376,7 @@ pub fn setup_test_environment_and_start_node<R>(
     test_dir: Option<PathBuf>,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<()>
@@ -388,6 +399,7 @@ where
             &test_dir,
             random_ports,
             enable_lazy_mode,
+            enable_performance_mode,
             framework,
             rng,
         )?,
@@ -405,6 +417,7 @@ pub fn create_single_node_test_config<R>(
     test_dir: &Path,
     random_ports: bool,
     enable_lazy_mode: bool,
+    enable_performance_mode: bool,
     framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<NodeConfig>
@@ -435,14 +448,17 @@ where
 
     // Adjust some fields in the default template to lower the overhead of
     // running on a local machine.
+    // Some are further overridden to give us higher performance when enable_performance_mode is true
     node_config
         .consensus
         .quorum_store
         .num_workers_for_remote_batches = 1;
     node_config.consensus.quorum_store_poll_time_ms = 1000;
 
-    node_config.execution.concurrency_level = 1;
-    node_config.execution.num_proof_reading_threads = 1;
+    if !enable_performance_mode {
+        node_config.execution.concurrency_level = 1;
+        node_config.execution.num_proof_reading_threads = 1;
+    }
     node_config.execution.paranoid_hot_potato_verification = false;
     node_config.execution.paranoid_type_verification = false;
     node_config
@@ -454,11 +470,19 @@ where
         .peer_monitoring_service
         .enable_peer_monitoring_client = false;
 
-    node_config
-        .mempool
-        .shared_mempool_max_concurrent_inbound_syncs = 1;
-    node_config.mempool.default_failovers = 1;
-    node_config.mempool.max_broadcasts_per_peer = 1;
+    if enable_performance_mode {
+        node_config
+            .mempool
+            .shared_mempool_max_concurrent_inbound_syncs = 16;
+        node_config.mempool.shared_mempool_tick_interval_ms = 10;
+        node_config.mempool.default_failovers = 0;
+    } else {
+        node_config
+            .mempool
+            .shared_mempool_max_concurrent_inbound_syncs = 1;
+        node_config.mempool.default_failovers = 1;
+        node_config.mempool.max_broadcasts_per_peer = 1;
+    }
 
     node_config
         .state_sync
