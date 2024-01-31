@@ -17,6 +17,8 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
+// TODO(zkid): Some of this stuff, if not all, belongs to the aptos-crypto crate
+
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
 
@@ -25,13 +27,13 @@ pub static DEVNET_VERIFYING_KEY: Lazy<PreparedVerifyingKey<ark_bn254::Bn254>> =
 
 /// This will do the proper subgroup membership checks.
 fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<ark_bn254::G1Affine> {
-    let g1_affine = Bn254G1::new_unchecked(x, y)?.to_affine()?;
+    let g1_affine = G1Bytes::new_unchecked(x, y)?.deserialize_into_affine()?;
     Ok(g1_affine)
 }
 
 /// This will do the proper subgroup membership checks.
 fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<ark_bn254::G2Affine> {
-    let g2_affine = Bn254G2::new_unchecked(x, y)?.to_affine()?;
+    let g2_affine = G2Bytes::new_unchecked(x, y)?.to_affine()?;
     Ok(g2_affine)
 }
 
@@ -120,9 +122,9 @@ macro_rules! serialize {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct Bn254G1(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+pub struct G1Bytes(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
-impl Bn254G1 {
+impl G1Bytes {
     pub fn new_unchecked(x: &str, y: &str) -> anyhow::Result<Self> {
         let g1 = ark_bn254::G1Projective::new_unchecked(
             parse_field_element(x)?,
@@ -141,18 +143,18 @@ impl Bn254G1 {
             Ok(Self(bytes))
         } else {
             bail!(
-                "Serialized BN254G1 must have exactly {} bytes",
+                "Serialized BN254 G1 must have exactly {} bytes",
                 G1_PROJECTIVE_COMPRESSED_NUM_BYTES
             )
         }
     }
 
-    pub fn to_affine(&self) -> Result<ark_bn254::G1Affine, CryptoMaterialError> {
+    pub fn deserialize_into_affine(&self) -> Result<ark_bn254::G1Affine, CryptoMaterialError> {
         self.try_into()
     }
 }
 
-impl TryInto<ark_bn254::G1Projective> for &Bn254G1 {
+impl TryInto<ark_bn254::G1Projective> for &G1Bytes {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G1Projective, CryptoMaterialError> {
@@ -161,7 +163,7 @@ impl TryInto<ark_bn254::G1Projective> for &Bn254G1 {
     }
 }
 
-impl TryInto<ark_bn254::G1Affine> for &Bn254G1 {
+impl TryInto<ark_bn254::G1Affine> for &G1Bytes {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G1Affine, CryptoMaterialError> {
@@ -171,9 +173,9 @@ impl TryInto<ark_bn254::G1Affine> for &Bn254G1 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct Bn254G2(#[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+pub struct G2Bytes(#[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
-impl Bn254G2 {
+impl G2Bytes {
     pub fn new_unchecked(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
         let g2 = ark_bn254::G2Projective::new_unchecked(
             Fq2::new(parse_field_element(x[0])?, parse_field_element(x[1])?),
@@ -192,7 +194,7 @@ impl Bn254G2 {
             Ok(Self(bytes))
         } else {
             bail!(
-                "Input Vec<u8> must have exactly {} elements",
+                "Serialized BN254 G2 must have exactly {} bytes",
                 G2_PROJECTIVE_COMPRESSED_NUM_BYTES
             )
         }
@@ -203,7 +205,7 @@ impl Bn254G2 {
     }
 }
 
-impl TryInto<ark_bn254::G2Projective> for &Bn254G2 {
+impl TryInto<ark_bn254::G2Projective> for &G2Bytes {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G2Projective, CryptoMaterialError> {
@@ -212,7 +214,7 @@ impl TryInto<ark_bn254::G2Projective> for &Bn254G2 {
     }
 }
 
-impl TryInto<ark_bn254::G2Affine> for &Bn254G2 {
+impl TryInto<ark_bn254::G2Affine> for &G2Bytes {
     type Error = CryptoMaterialError;
 
     fn try_into(self) -> Result<ark_bn254::G2Affine, CryptoMaterialError> {
@@ -263,18 +265,18 @@ pub fn get_public_inputs_hash(
 #[cfg(test)]
 mod test {
     use crate::bn254_circom::{
-        Bn254G1, Bn254G2, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
+        G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
     };
 
     #[test]
     pub fn test_bn254_serialized_sizes() {
-        let g1 = Bn254G1::new_unchecked(
+        let g1 = G1Bytes::new_unchecked(
             "16672231080302629756836614130913173861541009360974119524782950408048375831661",
             "1076145001163048025135533382088266750240489485046298539187659509488738517245",
         )
         .unwrap();
 
-        let g2 = Bn254G2::new_unchecked(
+        let g2 = G2Bytes::new_unchecked(
             [
                 "1125365732643211423779651913319958385653115422366520671538751860820509133538",
                 "10055196097002324305342942912758079446356594743098794928675544207400347950287",

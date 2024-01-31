@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    bn254_circom::{Bn254G1, Bn254G2, DEVNET_VERIFYING_KEY},
+    bn254_circom::{G1Bytes, G2Bytes, DEVNET_VERIFYING_KEY},
     chain_id::ChainId,
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
@@ -237,9 +237,9 @@ impl Claims {
     Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
 )]
 pub struct Groth16Zkp {
-    a: Bn254G1,
-    b: Bn254G2,
-    c: Bn254G1,
+    a: G1Bytes,
+    b: G2Bytes,
+    c: G1Bytes,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
@@ -263,9 +263,9 @@ impl SignedGroth16Zkp {
             false => &DEVNET_VERIFYING_KEY,
         };
         let proof: Proof<ark_bn254::Bn254> = Proof {
-            a: self.proof.a.to_affine()?,
+            a: self.proof.a.deserialize_into_affine()?,
             b: self.proof.b.to_affine()?,
-            c: self.proof.c.to_affine()?,
+            c: self.proof.c.deserialize_into_affine()?,
         };
         let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
         if !result {
@@ -284,7 +284,7 @@ impl TryFrom<&[u8]> for Groth16Zkp {
 }
 
 impl Groth16Zkp {
-    pub fn new(a: Bn254G1, b: Bn254G2, c: Bn254G1) -> Self {
+    pub fn new(a: G1Bytes, b: G2Bytes, c: G1Bytes) -> Self {
         Groth16Zkp { a, b, c }
     }
 
@@ -296,9 +296,9 @@ impl Groth16Zkp {
             false => &DEVNET_VERIFYING_KEY,
         };
         let proof: Proof<ark_bn254::Bn254> = Proof {
-            a: self.a.to_affine()?,
+            a: self.a.deserialize_into_affine()?,
             b: self.b.to_affine()?,
-            c: self.c.to_affine()?,
+            c: self.c.deserialize_into_affine()?,
         };
         let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
         if !result {
@@ -508,7 +508,7 @@ mod test {
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            Bn254G1, Bn254G2, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
+            G1Bytes, G2Bytes, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
             ZkIdSignature, ZkpOrOpenIdSig,
         },
     };
@@ -516,12 +516,12 @@ mod test {
 
     #[test]
     fn test_groth16_proof_verification() {
-        let a = Bn254G1::new_unchecked(
+        let a = G1Bytes::new_unchecked(
             "11685701338011120485255682535216931952523490513574344095859176729155974193429",
             "19570000702948951151001315672614758851000529478920585316943681012227747910337",
         )
         .unwrap();
-        let b = Bn254G2::new_unchecked(
+        let b = G2Bytes::new_unchecked(
             [
                 "10039243553158378944380740968043887743081233734014916979736214569065002261361",
                 "4926621746570487391149084476602889692047252928870676314074045787488022393462",
@@ -532,7 +532,7 @@ mod test {
             ],
         )
         .unwrap();
-        let c = Bn254G1::new_unchecked(
+        let c = G1Bytes::new_unchecked(
             "17509024307642709963307435885289611077932619305068428354097243520217914637634",
             "17824783754604065652634030354434350582834434348663254057492956883323214722668",
         )

@@ -1129,7 +1129,7 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        bn254_circom::{Bn254G1, Bn254G2},
+        bn254_circom::{G1Bytes, G2Bytes},
         transaction::{webauthn::AssertionSignature, SignedTransaction},
         zkid::{
             Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, EPK_BLINDER_NUM_BYTES,
@@ -2042,12 +2042,12 @@ mod tests {
 
     #[test]
     fn test_groth16_proof_verification() {
-        let a = Bn254G1::new_unchecked(
+        let a = G1Bytes::new_unchecked(
             "11685701338011120485255682535216931952523490513574344095859176729155974193429",
             "19570000702948951151001315672614758851000529478920585316943681012227747910337",
         )
         .unwrap();
-        let b = Bn254G2::new_unchecked(
+        let b = G2Bytes::new_unchecked(
             [
                 "10039243553158378944380740968043887743081233734014916979736214569065002261361",
                 "4926621746570487391149084476602889692047252928870676314074045787488022393462",
@@ -2058,7 +2058,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let c = Bn254G1::new_unchecked(
+        let c = G1Bytes::new_unchecked(
             "17509024307642709963307435885289611077932619305068428354097243520217914637634",
             "17824783754604065652634030354434350582834434348663254057492956883323214722668",
         )
