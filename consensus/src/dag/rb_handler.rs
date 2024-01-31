@@ -231,7 +231,7 @@ impl RpcHandler for NodeBroadcastHandler {
             .expect("must exist")
             .insert(*node.author(), vote.clone());
 
-        self.dag.write().update_votes(&node);
+        self.dag.write().update_votes(&node, false);
 
         debug!(LogSchema::new(LogEvent::Vote)
             .remote_peer(*node.author())

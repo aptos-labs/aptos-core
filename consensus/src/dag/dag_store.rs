@@ -28,7 +28,8 @@ use std::{
 pub enum NodeStatus {
     Unordered {
         node: Arc<CertifiedNode>,
-        accumulated_voting_power: u128,
+        votes_culumative_voting_power: u128,
+        links_cumulative_voting_power: u128,
     },
     Ordered(Arc<CertifiedNode>),
 }
@@ -55,7 +56,6 @@ pub struct Dag {
     epoch_state: Arc<EpochState>,
     /// The window we maintain between highest committed round and initial round
     window_size: u64,
-    voted_nodes: BTreeMap<Round, BTreeSet<NodeId>>,
 }
 
 impl Dag {
@@ -68,7 +68,6 @@ impl Dag {
             start_round,
             epoch_state,
             window_size,
-            voted_nodes: BTreeMap::new(),
         }
     }
 
@@ -110,9 +109,10 @@ impl Dag {
         ensure!(round_ref.is_none(), "race during insertion");
         *round_ref = Some(NodeStatus::Unordered {
             node: node.clone(),
-            accumulated_voting_power: 0,
+            votes_culumative_voting_power: 0,
+            links_cumulative_voting_power: 0,
         });
-        self.update_votes(&node);
+        self.update_votes(&node, true);
         Ok(())
     }
 
@@ -154,16 +154,7 @@ impl Dag {
         Ok(())
     }
 
-    pub fn update_votes(&mut self, node: &Node) {
-        if !self
-            .voted_nodes
-            .entry(node.round())
-            .or_default()
-            .insert(node.id())
-        {
-            return;
-        }
-
+    pub fn update_votes(&mut self, node: &Node, update_link_power: bool) {
         if node.round() <= self.lowest_round() {
             return;
         }
@@ -179,9 +170,16 @@ impl Dag {
                 .expect("must exist");
             match node_status {
                 Some(NodeStatus::Unordered {
-                    accumulated_voting_power,
+                    votes_culumative_voting_power,
+                    links_cumulative_voting_power,
                     ..
-                }) => *accumulated_voting_power += voting_power as u128,
+                }) => {
+                    if update_link_power {
+                        *links_cumulative_voting_power += voting_power as u128;
+                    } else {
+                        *votes_culumative_voting_power += voting_power as u128;
+                    }
+                },
                 Some(NodeStatus::Ordered(_)) => {},
                 None => unreachable!("parents must exist before voting for a node"),
             }
@@ -258,11 +256,17 @@ impl Dag {
         self.get_node_ref_by_metadata(metadata)
             .map(|node_status| match node_status {
                 NodeStatus::Unordered {
-                    accumulated_voting_power,
+                    votes_culumative_voting_power,
+                    links_cumulative_voting_power,
                     ..
-                } => validator_verifier
-                    .check_aggregated_voting_power(*accumulated_voting_power, false)
-                    .is_ok(),
+                } => {
+                    validator_verifier
+                        .check_aggregated_voting_power(*votes_culumative_voting_power, true)
+                        .is_ok()
+                        || validator_verifier
+                            .check_aggregated_voting_power(*links_cumulative_voting_power, false)
+                            .is_ok()
+                },
                 NodeStatus::Ordered(_) => {
                     error!("checking voting power for Ordered node");
                     true
@@ -380,9 +384,6 @@ impl Dag {
     }
 
     pub(super) fn prune(&mut self) -> BTreeMap<u64, Vec<Option<NodeStatus>>> {
-        let to_keep = self.voted_nodes.split_off(&self.start_round);
-        _ = std::mem::replace(&mut self.voted_nodes, to_keep);
-
         let to_keep = self.nodes_by_round.split_off(&self.start_round);
         let to_prune = std::mem::replace(&mut self.nodes_by_round, to_keep);
         debug!(
