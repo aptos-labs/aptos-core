@@ -1821,15 +1821,16 @@ module econia::incentives {
             // Borrow a mutable reference to the incentive parameters
             // resource at the Econia account.
             let incentive_parameters_ref_mut =
-                borrow_global_mut<IncentiveParameters>(@econia);
+                borrow_global_mut<IncentiveParameters>(address_of(econia));
             // Set integrator fee stores to empty vector before
             // moving from.
             incentive_parameters_ref_mut.integrator_fee_store_tiers =
                 vector::empty();
             // Move from and drop the existing incentive parameters
             // resource at the Econia account.
-            move_from<IncentiveParameters>(@econia);
+            move_from<IncentiveParameters>(address_of(econia));
         };
+        // assert!(1 == 2, 67);
         // Get utility coin type info.
         let utility_coin_type_info = type_info::type_of<UtilityCoinType>();
         // Declare integrator fee store tiers vector as empty.
@@ -1840,6 +1841,7 @@ module econia::incentives {
             utility_coin_type_info, market_registration_fee,
             underwriter_registration_fee, custodian_registration_fee,
             taker_fee_divisor, integrator_fee_store_tiers});
+        // assert!(1 == 2, 89);
         // Borrow a mutable reference to the incentive parameters
         // resource at the Econia account.
         let incentive_parameters_ref_mut =
@@ -1848,6 +1850,7 @@ module econia::incentives {
         set_incentive_parameters_parse_tiers_vector(
             taker_fee_divisor, integrator_fee_store_tiers_ref,
             &mut incentive_parameters_ref_mut.integrator_fee_store_tiers);
+        // assert!(1 == 2, 91);
     }
 
     /// Parse vectorized fee store tier parameters passed to
@@ -1966,6 +1969,7 @@ module econia::incentives {
             withdrawal_fee_last = *withdrawal_fee_ref;
             i = i + 1; // Increment loop counter
         };
+        // assert!(1 == 2, 200);
     }
 
     /// Range check inputs for `set_incentive_parameters()`.
@@ -2273,7 +2277,7 @@ module econia::incentives {
     acquires
         IncentiveParameters
     {
-        assets::init_coin_types_setup(publisher); // Initialize coin types.
+        assets::init_setup(publisher); // Initialize coin types.
         // Vectorize fee store tier parameters.
         let integrator_fee_store_tiers = vector[
             vector[
@@ -2291,6 +2295,7 @@ module econia::incentives {
         set_incentive_parameters<UC>(publisher, MARKET_REGISTRATION_FEE,
             UNDERWRITER_REGISTRATION_FEE, CUSTODIAN_REGISTRATION_FEE,
             TAKER_FEE_DIVISOR, &integrator_fee_store_tiers, false);
+        assert!(1 == 2, 58);
     }
 
     #[test_only]

@@ -598,9 +598,11 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
-            EntryPoints::EconiaRegisterMarket => {
-                get_payload(module_id, ident_str!("register_market").to_owned(), vec![])
-            },
+            EntryPoints::EconiaRegisterMarket => get_payload(
+                module_id,
+                ident_str!("register_market").to_owned(),
+                vec![]
+            ),
             EntryPoints::EconiaRegisterMarketUser => get_payload(
                 module_id,
                 ident_str!("register_market_accounts").to_owned(),
