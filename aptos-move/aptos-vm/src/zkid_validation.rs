@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
+use crate::move_vm_ext::AptosMoveResolver;
 use aptos_types::{
     bn254_circom::get_public_inputs_hash,
     chain_id::ChainId,
@@ -12,7 +12,6 @@ use aptos_types::{
     vm_status::{StatusCode, VMStatus},
     zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_ZK_ID_AUTHENTICATORS_ALLOWED},
 };
-use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 
@@ -50,7 +49,7 @@ fn get_jwk_for_zkid_authenticator(
     jwks: &PatchedJWKs,
     zkid_pub_key: &ZkIdPublicKey,
     zkid_sig: &ZkIdSignature,
-) -> anyhow::Result<JWK, VMStatus> {
+) -> Result<JWK, VMStatus> {
     let jwt_header_parsed = zkid_sig
         .parse_jwt_header()
         .map_err(|_| invalid_signature!("Failed to get JWT header"))?;
@@ -66,8 +65,6 @@ fn get_jwk_for_zkid_authenticator(
 pub fn validate_zkid_authenticators(
     transaction: &SignedTransaction,
     resolver: &impl AptosMoveResolver,
-    _session: &mut SessionExt,
-    _log_context: &AdapterLogSchema,
     chain_id: ChainId,
 ) -> Result<(), VMStatus> {
     let zkid_authenticators = aptos_types::zkid::get_zkid_authenticators(transaction)

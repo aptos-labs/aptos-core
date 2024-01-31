@@ -1385,15 +1385,6 @@ impl AptosVM {
                 None,
             ));
         }
-        let chain_id = self.move_vm.get_chain_id();
-
-        zkid_validation::validate_zkid_authenticators(
-            transaction,
-            resolver,
-            session,
-            log_context,
-            chain_id,
-        )?;
 
         self.run_prologue_with_payload(
             session,
@@ -1401,7 +1392,13 @@ impl AptosVM {
             transaction.payload(),
             transaction_data,
             log_context,
-        )
+        )?;
+
+        let chain_id = self.move_vm.get_chain_id();
+
+        zkid_validation::validate_zkid_authenticators(transaction, resolver, chain_id)?;
+
+        Ok(())
     }
 
     // Called when the execution of the user transaction fails, in order to discard the
