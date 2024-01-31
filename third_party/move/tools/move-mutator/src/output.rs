@@ -101,9 +101,9 @@ pub(crate) fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow:
     trace!("Trying to set up output directory to: {output_dir:?}");
 
     // Check if output directory exists and if it should be overwritten.
-    if output_dir.exists() && mutator_configuration.project.no_overwrite.unwrap_or(false) {
+    if output_dir.exists() && mutator_configuration.project.no_overwrite {
         return Err(anyhow::anyhow!(
-            "Output directory already exists. Use --no-overwrite=false to overwrite."
+            "Output directory already exists and --no-overwrite flag was used."
         ));
     }
 
@@ -196,7 +196,7 @@ mod tests {
         let output_dir = temp_dir.path().join("output");
         let options = cli::CLIOptions {
             out_mutant_dir: Some(output_dir.clone()),
-            no_overwrite: Some(false),
+            no_overwrite: false,
             ..Default::default()
         };
         let config = Configuration::new(options, None);
@@ -211,7 +211,7 @@ mod tests {
         fs::create_dir(&output_dir).unwrap();
         let options = cli::CLIOptions {
             out_mutant_dir: Some(output_dir.clone()),
-            no_overwrite: Some(false),
+            no_overwrite: false,
             ..Default::default()
         };
         let config = Configuration::new(options, None);
@@ -226,7 +226,7 @@ mod tests {
         fs::create_dir(&output_dir).unwrap();
         let options = cli::CLIOptions {
             out_mutant_dir: Some(output_dir.clone()),
-            no_overwrite: Some(true),
+            no_overwrite: true,
             ..Default::default()
         };
         let config = Configuration::new(options, None);
