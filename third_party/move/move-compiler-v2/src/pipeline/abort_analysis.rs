@@ -11,7 +11,7 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
-    dataflow_domains::{AbstractDomain, SetDomain},
+    dataflow_domains::{AbstractDomain, JoinResult, SetDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::Bytecode,

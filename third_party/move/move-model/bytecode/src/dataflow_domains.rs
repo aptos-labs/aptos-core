@@ -142,6 +142,11 @@ impl<E: Ord + Clone> From<BTreeSet<E>> for SetDomain<E> {
 }
 
 impl<E: Ord + Clone> SetDomain<E> {
+    /// Checks whether the set is empty
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn singleton(e: E) -> Self {
         ordset!(e).into()
     }
