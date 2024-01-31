@@ -120,18 +120,11 @@ impl TransferFunctions for AbortAnalysis {
                 *state = ExitState::singleton(ExitStatus::Return);
             },
             Bytecode::Call(_, _, op, _, _) => {
-                if state.0.is_empty() {
-                    *state = ExitState::singleton(ExitStatus::NoMoreInstruction);
-                }
                 if op.can_abort() {
                     state.join(&ExitState::singleton(ExitStatus::Abort));
                 }
             },
-            _ => {
-                if state.0.is_empty() {
-                    *state = ExitState::singleton(ExitStatus::NoMoreInstruction);
-                }
-            },
+            _ => {},
         }
     }
 }
