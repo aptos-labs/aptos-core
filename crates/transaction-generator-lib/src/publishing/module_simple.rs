@@ -598,20 +598,17 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
-            EntryPoints::EconiaRegisterMarket => get_payload(
-                module_id,
-                ident_str!("register_market").to_owned(),
-                vec![]
-            ),
+            EntryPoints::EconiaRegisterMarket => {
+                get_payload(module_id, ident_str!("register_market").to_owned(), vec![])
+            },
             EntryPoints::EconiaRegisterMarketUser => get_payload(
                 module_id,
                 ident_str!("register_market_accounts").to_owned(),
-                vec![bcs::to_bytes(&other.expect("Must provide other")).unwrap()],
+                vec![],
             ),
             EntryPoints::EconiaDepositCoins => {
-                let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(module_id, ident_str!("deposit_coins").to_owned(), vec![
-                    bcs::to_bytes(&rng.gen_range(0u64, 1000u64)).unwrap(), // amount
+                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
                 ])
             },
             EntryPoints::EconiaPlaceBidLimitOrder => {
@@ -683,7 +680,9 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            EntryPoints::TokenV2AmbassadorMint | EntryPoints::EconiaDepositCoins => {
+                MultiSigConfig::Publisher
+            },
             _ => MultiSigConfig::None,
         }
     }

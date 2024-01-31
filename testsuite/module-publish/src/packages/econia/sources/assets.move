@@ -203,15 +203,6 @@ module econia::assets {
         mint(&econia, amount) // Mint and return amount.
     }
 
-    public fun mint_setup<CoinType>(
-        account: &signer,
-        amount: u64
-    ): coin::Coin<CoinType>
-    acquires CoinCapabilities {
-        if (!exists<CoinCapabilities<CoinType>>(address_of(account))) init_setup(account);
-        mint(account, amount)
-    }
-
     // /// Wrapper for `mint()`.
     // public fun mint_test<CoinType>(
     //     user: &signer,

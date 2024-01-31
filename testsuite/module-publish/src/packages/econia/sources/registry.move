@@ -1496,13 +1496,11 @@ module econia::registry {
             n_underwriters: 0,
             market_registration_events:
                 account::new_event_handle<MarketRegistrationEvent>(econia)});
-        // assert!(1 == 2, 63);
         // Initialize recognized markets list.
         move_to(econia, RecognizedMarkets{
             map: tablist::new(),
             recognized_market_events:
                 account::new_event_handle<RecognizedMarketEvent>(econia)});
-        // assert!(1 == 2, 121);
     }
 
     /// Register a market in the global registry.
@@ -1722,7 +1720,6 @@ module econia::registry {
     /// Initialize registry for testing.
     public fun init_setup(publisher: &signer) {
         init_module(publisher); // Init registry.
-        // assert!(1 == 2, 154); // Assert false.
         incentives::init_setup(publisher); // Init incentives.
     }
 
