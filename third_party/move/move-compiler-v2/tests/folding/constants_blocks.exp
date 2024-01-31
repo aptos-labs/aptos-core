@@ -32,18 +32,6 @@ error: Not a valid constant expression.
   │                                        │
   │                                        Invalid call or operation in constant
 
-error: Invalid type for constant
-   ┌─ tests/folding/constants_blocks.move:11:20
-   │
-11 │   ╭     const C7: () = {
-   │ ╭──────────────────────^
-12 │ │ │         let x = 0;
-13 │ │ │         let y = 1;
-14 │ │ │         x + y;
-15 │ │ │     };
-   │ ╰─│─────^
-   │   ╰──────' Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
-
 error: Not a valid constant expression.
    ┌─ tests/folding/constants_blocks.move:11:20
    │
@@ -61,6 +49,18 @@ error: Not a valid constant expression.
    │ ╰─│─│─────^
    │   ╰─│─────' Invalid statement or expression in constant
    │     ╰─────' Invalid statement or expression in constant
+
+error: Invalid type for constant
+   ┌─ tests/folding/constants_blocks.move:11:20
+   │
+11 │   ╭     const C7: () = {
+   │ ╭──────────────────────^
+12 │ │ │         let x = 0;
+13 │ │ │         let y = 1;
+14 │ │ │         x + y;
+15 │ │ │     };
+   │ ╰─│─────^
+   │   ╰──────' Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
 error: Not a valid constant expression.
    ┌─ tests/folding/constants_blocks.move:16:25
