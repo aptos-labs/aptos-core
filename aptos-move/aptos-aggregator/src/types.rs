@@ -211,8 +211,20 @@ impl DelayedFieldValue {
         use MoveTypeLayout::*;
 
         Ok(match (self, layout) {
-            (Aggregator(v) | Snapshot(v), U64) => Value::u64(v as u64),
-            (Aggregator(v) | Snapshot(v), U128) => Value::u128(v),
+            (Aggregator(v) | Snapshot(v), U64) => {
+                if width != 8 {
+                    return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                        .with_message(format!("Expected width 8 for U64, got {}", width)));
+                }
+                Value::u64(v as u64)
+            },
+            (Aggregator(v) | Snapshot(v), U128) => {
+                if width != 16 {
+                    return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                        .with_message(format!("Expected width 16 for U128, got {}", width)));
+                }
+                Value::u128(v)
+            },
             (Derived(bytes), layout) if is_derived_string_struct_layout(layout) => {
                 bytes_and_width_to_derived_string_struct(bytes, width)?
             },
@@ -263,27 +275,6 @@ impl TryFromMoveValue for DelayedFieldValue {
                 )
             },
         })
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SnapshotToStringFormula {
-    Concat { prefix: Vec<u8>, suffix: Vec<u8> },
-}
-
-impl SnapshotToStringFormula {
-    pub fn apply_to(&self, base: u128) -> Vec<u8> {
-        match self {
-            SnapshotToStringFormula::Concat { prefix, suffix } => {
-                let middle_string = base.to_string();
-                let middle = middle_string.as_bytes();
-                let mut result = Vec::with_capacity(prefix.len() + middle.len() + suffix.len());
-                result.extend(prefix);
-                result.extend(middle);
-                result.extend(suffix);
-                result
-            },
-        }
     }
 }
 

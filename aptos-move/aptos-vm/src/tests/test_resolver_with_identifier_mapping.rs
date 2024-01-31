@@ -6,8 +6,7 @@ use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     aggregator::{
-        bytes_and_width_to_derived_string_struct, bytes_to_string, from_utf8_bytes, to_utf8_bytes,
-        DelayedFieldID,
+        bytes_and_width_to_derived_string_struct, bytes_to_string, to_utf8_bytes, DelayedFieldID,
     },
     state_store::state_key::StateKey,
 };
@@ -36,6 +35,20 @@ macro_rules! test_struct {
         ]))
     };
 }
+
+macro_rules! test_struct_with_id {
+    ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr) => {
+        Value::struct_(Struct::pack(vec![
+            Value::u64($a),
+            Value::u64($b),
+            Value::u128($c),
+            Value::u128($d),
+            bytes_to_string(to_utf8_bytes($e)),
+            $f.into_derived_string_struct().unwrap(),
+        ]))
+    };
+}
+
 static TEST_LAYOUT: Lazy<MoveTypeLayout> = Lazy::new(|| {
     MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![
         MoveTypeLayout::U64,
@@ -103,18 +116,13 @@ fn test_resource_in_storage() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(
+    let expected_value = test_struct_with_id!(
         100,
         DelayedFieldID::new_with_width(0, 8).as_u64(),
         300,
         DelayedFieldID::new_with_width(1, 16).as_u64() as u128,
         "foo",
-        from_utf8_bytes::<String>(
-            DelayedFieldID::new_with_width(2, DERIVED_STRING_TEST_WIDTH)
-                .as_utf8_fixed_size()
-                .unwrap()
-        )
-        .unwrap()
+        DelayedFieldID::new_with_width(2, DERIVED_STRING_TEST_WIDTH)
     );
     assert!(
         actual_value.equals(&expected_value).unwrap(),
@@ -157,18 +165,13 @@ fn test_table_item_in_storage() {
         )
         .unwrap();
     let actual_value = Value::simple_deserialize(&blob.unwrap(), &TEST_LAYOUT).unwrap();
-    let expected_value = test_struct!(
+    let expected_value = test_struct_with_id!(
         100,
         DelayedFieldID::new_with_width(0, 8).as_u64(),
         300,
         DelayedFieldID::new_with_width(1, 16).as_u64() as u128,
         "foo",
-        from_utf8_bytes::<String>(
-            DelayedFieldID::new_with_width(2, DERIVED_STRING_TEST_WIDTH)
-                .as_utf8_fixed_size()
-                .unwrap()
-        )
-        .unwrap()
+        DelayedFieldID::new_with_width(2, DERIVED_STRING_TEST_WIDTH)
     );
     assert!(
         actual_value.equals(&expected_value).unwrap(),

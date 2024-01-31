@@ -2062,7 +2062,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
         let txn_idx = 1;
@@ -2201,7 +2201,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
         let txn_idx = 1;
@@ -2340,7 +2340,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
         let txn_idx = 1;
@@ -2479,7 +2479,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let txn_idx = 1;
         let storage_value = 200;
@@ -3235,8 +3235,8 @@ mod test {
 
         // When we throw exception, it is not required read summaries to match, as they will not be used
         // assert_err_eq!(
-        //     views.get_delayed_field_value(&DelayedFieldID::new(1005)),
-        //     PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(DelayedFieldID::new(1005))),
+        //     views.get_delayed_field_value(&DelayedFieldID::new_for_test_for_u64(1005)),
+        //     PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(DelayedFieldID::new_for_test_for_u64(1005))),
         // );
 
         assert_ok_eq!(

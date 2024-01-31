@@ -19,7 +19,6 @@ use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_field_extension::DelayedFieldData,
     resolver::DelayedFieldResolver,
-    types::SnapshotToStringFormula,
 };
 use aptos_gas_algebra::NumBytes;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -27,7 +26,11 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use aptos_types::aggregator::{string_to_bytes, to_utf8_bytes, u128_to_u64};
+use aptos_types::aggregator::{
+    bytes_and_width_to_derived_string_struct, calculate_width_for_constant_string,
+    calculate_width_for_integer_embeded_string, string_to_bytes, u128_to_u64, DelayedFieldID,
+    SnapshotToStringFormula,
+};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
@@ -96,7 +99,7 @@ pub fn get_snapshot_field_by_type(
             Ok(value as u128)
         },
         _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
+            abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
         }),
     }
 }
@@ -486,13 +489,14 @@ fn native_read_snapshot(
 /***************************************************************************************************
  * native fun string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): AggregatorSnapshot<String>;
  **************************************************************************************************/
-
 fn native_string_concat(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     abort_if_not_enabled!(context);
+
+    // Deprecated function in favor of `derive_string_concat`.
 
     Err(SafeNativeError::Abort {
         abort_code: EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
@@ -556,10 +560,8 @@ fn native_create_derived_string(
             .into_derived_string_struct()
             .map_err(PartialVMError::from)?
     } else {
-        Value::struct_(Struct::pack(vec![
-            create_string_value(input),
-            create_string_value(to_utf8_bytes("")),
-        ]))
+        let width = calculate_width_for_constant_string(input.len());
+        bytes_and_width_to_derived_string_struct(input, width).map_err(PartialVMError::from)?
     };
     Ok(smallvec![result_value])
 }
@@ -606,12 +608,14 @@ fn native_derive_string_concat(
             .into_derived_string_struct()
             .map_err(PartialVMError::from)?
     } else {
-        Value::struct_(Struct::pack(vec![
-            create_string_value(
-                SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value),
-            ),
-            create_string_value(to_utf8_bytes("")),
-        ]))
+        let snapshot_width = aggregator_width_by_type(&ty_args[0])?;
+        let width = calculate_width_for_integer_embeded_string(
+            prefix.len() + suffix.len(),
+            DelayedFieldID::new_with_width(0, snapshot_width),
+        )
+        .map_err(PartialVMError::from)?;
+        let output = SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value);
+        bytes_and_width_to_derived_string_struct(output, width).map_err(PartialVMError::from)?
     };
 
     Ok(smallvec![result_value])

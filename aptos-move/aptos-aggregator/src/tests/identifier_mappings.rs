@@ -40,7 +40,7 @@ fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: usize) {
 #[test_case(&Address)]
 #[test_case(&Vector(Box::new(U8)))]
 fn test_aggregator_id_to_value_err(layout: &MoveTypeLayout) {
-    assert_err!(DelayedFieldID::new(100).try_into_move_value(layout));
+    assert_err!(DelayedFieldID::new_with_width(100, 8).try_into_move_value(layout));
 }
 
 #[test_case(&U64, Value::u8(1))]

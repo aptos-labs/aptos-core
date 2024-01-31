@@ -75,6 +75,7 @@ module aptos_token_objects::token {
     }
 
     // DEPRECATED, NEVER USED
+    #[deprecated]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct ConcurrentTokenIdentifiers has key {
         _1: AggregatorSnapshot<u64>,

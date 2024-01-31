@@ -8,10 +8,13 @@ use crate::{
     resolver::DelayedFieldResolver,
     types::{
         code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr, ReadPosition, SnapshotToStringFormula,
+        DelayedFieldsSpeculativeError, PanicOr, ReadPosition,
     },
 };
-use aptos_types::aggregator::{bcs_size_of_byte_array, U128_MAX_DIGITS, U64_MAX_DIGITS};
+use aptos_types::aggregator::{
+    calculate_width_for_constant_string, calculate_width_for_integer_embeded_string,
+    SnapshotToStringFormula,
+};
 use move_binary_format::errors::PartialVMResult;
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -223,7 +226,7 @@ impl DelayedFieldData {
         value: Vec<u8>,
         resolver: &dyn DelayedFieldResolver,
     ) -> DelayedFieldID {
-        let width = (bcs_size_of_byte_array(value.len()) + 1).max(*U64_MAX_DIGITS + 2);
+        let width = calculate_width_for_constant_string(value.len());
         let change = DelayedChange::Create(DelayedFieldValue::Derived(value));
         let snapshot_id = resolver.generate_delayed_field_id(width);
 
@@ -259,14 +262,8 @@ impl DelayedFieldData {
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let snapshot = self.delayed_fields.get(&snapshot_id);
-        let max_snapshot_string_width = match snapshot_id.extract_width() {
-            8 => *U64_MAX_DIGITS,
-            16 => *U128_MAX_DIGITS,
-            x => unreachable!("unexpected width ({x}) for integer snapshot id: {snapshot_id:?}"),
-        };
         let width =
-            bcs_size_of_byte_array(prefix.len() + suffix.len()) + max_snapshot_string_width + 2;
-        println!("Width : {width}");
+            calculate_width_for_integer_embeded_string(prefix.len() + suffix.len(), snapshot_id)?;
         let formula = SnapshotToStringFormula::Concat { prefix, suffix };
 
         let change = match snapshot {
@@ -311,7 +308,7 @@ mod test {
     fn test_aggregator_not_in_storage() {
         let resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(200);
+        let id = DelayedFieldID::new_for_test_for_u64(200);
         let max_value = 700;
 
         assert_err!(data.read_aggregator(id, &resolver));
@@ -330,7 +327,7 @@ mod test {
     fn test_operations_on_new_aggregator() {
         let resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(200);
+        let id = DelayedFieldID::new_for_test_for_u64(200);
         let max_value = 200;
 
         data.create_new_aggregator(id);
@@ -385,7 +382,7 @@ mod test {
     fn test_successful_operations_in_delta_mode() {
         let mut resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(200);
+        let id = DelayedFieldID::new_for_test_for_u64(200);
         let max_value = 600;
 
         resolver.set_from_aggregator_id(id, 100);
@@ -414,7 +411,7 @@ mod test {
     fn test_aggregator_overflows() {
         let mut resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
 
         resolver.set_from_aggregator_id(id, 100);
@@ -449,7 +446,7 @@ mod test {
     fn test_aggregator_underflows() {
         let mut resolver = FakeAggregatorView::default();
         let mut data = DelayedFieldData::default();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
 
         resolver.set_from_aggregator_id(id, 200);

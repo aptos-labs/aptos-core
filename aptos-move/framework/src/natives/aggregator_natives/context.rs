@@ -152,16 +152,14 @@ impl<'a> NativeAggregatorContext<'a> {
 mod test {
     use super::*;
     use aptos_aggregator::{
-        aggregator_v1_id_for_test, aggregator_v1_state_key_for_test,
-        bounded_math::SignedU128,
-        delayed_change::DelayedApplyChange,
-        delta_change_set::DeltaWithMax,
-        delta_math::DeltaHistory,
-        tests::types::FAKE_AGGREGATOR_VIEW_GEN_ID_START,
-        types::{DelayedFieldValue, SnapshotToStringFormula},
-        FakeAggregatorView,
+        aggregator_v1_id_for_test, aggregator_v1_state_key_for_test, bounded_math::SignedU128,
+        delayed_change::DelayedApplyChange, delta_change_set::DeltaWithMax,
+        delta_math::DeltaHistory, tests::types::FAKE_AGGREGATOR_VIEW_GEN_ID_START,
+        types::DelayedFieldValue, FakeAggregatorView,
     };
-    use aptos_types::aggregator::U64_MAX_DIGITS;
+    use aptos_types::aggregator::{
+        calculate_width_for_integer_embeded_string, SnapshotToStringFormula,
+    };
     use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
     fn get_test_resolver_v1() -> FakeAggregatorView {
@@ -169,8 +167,8 @@ mod test {
         state_view.set_from_state_key(aggregator_v1_state_key_for_test(500), 150);
         state_view.set_from_state_key(aggregator_v1_state_key_for_test(600), 100);
         state_view.set_from_state_key(aggregator_v1_state_key_for_test(700), 200);
-        state_view.set_from_aggregator_id(DelayedFieldID::new(900), 300);
-        state_view.set_from_aggregator_id(DelayedFieldID::new(1000), 400);
+        state_view.set_from_aggregator_id(DelayedFieldID::new_with_width(900, 8), 300);
+        state_view.set_from_aggregator_id(DelayedFieldID::new_with_width(1000, 8), 400);
         state_view
     }
 
@@ -283,8 +281,8 @@ mod test {
 
     fn get_test_resolver_v2() -> FakeAggregatorView {
         let mut state_view = FakeAggregatorView::default();
-        state_view.set_from_aggregator_id(DelayedFieldID::new(900), 300);
-        state_view.set_from_aggregator_id(DelayedFieldID::new(1000), 400);
+        state_view.set_from_aggregator_id(DelayedFieldID::new_with_width(900, 8), 300);
+        state_view.set_from_aggregator_id(DelayedFieldID::new_with_width(1000, 8), 400);
         state_view
     }
 
@@ -312,7 +310,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 SignedU128::Positive(200),
                 context.delayed_field_resolver
@@ -323,7 +321,7 @@ mod test {
         // failed because of wrong max_value
         assert!(delayed_field_data
             .snapshot(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 800,
                 8,
                 context.delayed_field_resolver,
@@ -332,7 +330,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.snapshot(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 8,
                 context.delayed_field_resolver
@@ -342,7 +340,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 SignedU128::Negative(501),
                 context.delayed_field_resolver
@@ -352,7 +350,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 SignedU128::Positive(300),
                 context.delayed_field_resolver
@@ -362,7 +360,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.snapshot(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 8,
                 context.delayed_field_resolver
@@ -372,7 +370,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 SignedU128::Positive(100),
                 context.delayed_field_resolver
@@ -382,7 +380,7 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(900),
+                DelayedFieldID::new_with_width(900, 8),
                 900,
                 SignedU128::Positive(51),
                 context.delayed_field_resolver
@@ -390,10 +388,10 @@ mod test {
             false
         );
 
-        delayed_field_data.create_new_aggregator(DelayedFieldID::new(2000));
+        delayed_field_data.create_new_aggregator(DelayedFieldID::new_with_width(2000, 8));
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(2000),
+                DelayedFieldID::new_with_width(2000, 8),
                 2000,
                 SignedU128::Positive(500),
                 context.delayed_field_resolver
@@ -403,13 +401,18 @@ mod test {
 
         assert_ok_eq!(
             delayed_field_data.snapshot(
-                DelayedFieldID::new(2000),
+                DelayedFieldID::new_with_width(2000, 8),
                 2000,
                 8,
                 context.delayed_field_resolver
             ),
             id_from_fake_idx(2, 8)
         );
+
+        let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
+            "prefixsuffix".as_bytes().len(),
+            id_from_fake_idx(0, 8)
+        ));
 
         assert_ok_eq!(
             delayed_field_data.derive_string_concat(
@@ -418,7 +421,7 @@ mod test {
                 "suffix".as_bytes().to_vec(),
                 context.delayed_field_resolver,
             ),
-            id_from_fake_idx(3, 15 + *U64_MAX_DIGITS)
+            id_from_fake_idx(3, derived_width),
         );
 
         assert_ok_eq!(
@@ -428,12 +431,12 @@ mod test {
                 "suffix".as_bytes().to_vec(),
                 context.delayed_field_resolver,
             ),
-            id_from_fake_idx(4, 15 + *U64_MAX_DIGITS)
+            id_from_fake_idx(4, derived_width),
         );
 
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(2000),
+                DelayedFieldID::new_with_width(2000, 8),
                 2000,
                 SignedU128::Positive(1700),
                 context.delayed_field_resolver
@@ -442,7 +445,7 @@ mod test {
         );
         assert_ok_eq!(
             delayed_field_data.try_add_delta(
-                DelayedFieldID::new(2000),
+                DelayedFieldID::new_with_width(2000, 8),
                 2000,
                 SignedU128::Negative(501),
                 context.delayed_field_resolver
@@ -457,9 +460,9 @@ mod test {
         let context = NativeAggregatorContext::new([0; 32], &resolver, &resolver);
         test_set_up_v2(&context);
         let delayed_field_changes = context.into_delayed_fields();
-        assert!(!delayed_field_changes.contains_key(&DelayedFieldID::new(1000)));
+        assert!(!delayed_field_changes.contains_key(&DelayedFieldID::new_with_width(1000, 8)));
         assert_some_eq!(
-            delayed_field_changes.get(&DelayedFieldID::new(900)),
+            delayed_field_changes.get(&DelayedFieldID::new_with_width(900, 8)),
             &DelayedChange::Apply(DelayedApplyChange::AggregatorDelta {
                 delta: DeltaWithMax::new(SignedU128::Positive(600), 900)
             }),
@@ -470,20 +473,20 @@ mod test {
         assert_some_eq!(
             delayed_field_changes.get(&id_from_fake_idx(0, 8)),
             &DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
-                base_aggregator: DelayedFieldID::new(900),
+                base_aggregator: DelayedFieldID::new_with_width(900, 8),
                 delta: DeltaWithMax::new(SignedU128::Positive(200), 900)
             }),
         );
         assert_some_eq!(
             delayed_field_changes.get(&id_from_fake_idx(1, 8)),
             &DelayedChange::Apply(DelayedApplyChange::SnapshotDelta {
-                base_aggregator: DelayedFieldID::new(900),
+                base_aggregator: DelayedFieldID::new_with_width(900, 8),
                 delta: DeltaWithMax::new(SignedU128::Positive(500), 900)
             }),
         );
 
         assert_some_eq!(
-            delayed_field_changes.get(&DelayedFieldID::new(2000)),
+            delayed_field_changes.get(&DelayedFieldID::new_with_width(2000, 8)),
             &DelayedChange::Create(DelayedFieldValue::Aggregator(500)),
         );
 
@@ -491,14 +494,20 @@ mod test {
             delayed_field_changes.get(&id_from_fake_idx(2, 8)),
             &DelayedChange::Create(DelayedFieldValue::Snapshot(500)),
         );
+
+        let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
+            "prefixsuffix".as_bytes().len(),
+            id_from_fake_idx(0, 8)
+        ));
+
         assert_some_eq!(
-            delayed_field_changes.get(&id_from_fake_idx(3, 15 + *U64_MAX_DIGITS)),
+            delayed_field_changes.get(&id_from_fake_idx(3, derived_width)),
             &DelayedChange::Create(DelayedFieldValue::Derived(
                 "prefix500suffix".as_bytes().to_vec()
             )),
         );
         assert_some_eq!(
-            delayed_field_changes.get(&id_from_fake_idx(4, 15 + *U64_MAX_DIGITS)),
+            delayed_field_changes.get(&id_from_fake_idx(4, derived_width)),
             &DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {
                 base_snapshot: id_from_fake_idx(0, 8),
                 formula: SnapshotToStringFormula::Concat {

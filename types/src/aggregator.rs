@@ -8,50 +8,75 @@ use move_vm_types::values::{Struct, Value};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
+const BITS_FOR_SIZE: usize = 10;
+
 /// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
 /// during execution.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DelayedFieldID(u64);
+pub struct DelayedFieldID {
+    unique_index: u32,
+    // Exact number of bytes serialized delayed field will take.
+    width: usize,
+}
 
 impl DelayedFieldID {
-    pub fn new(value: u64) -> Self {
-        Self(value)
+    pub fn new_with_width(unique_index: u32, width: usize) -> Self {
+        assert!(
+            width < (1usize << BITS_FOR_SIZE),
+            "Delayed field width must be <= {BITS_FOR_SIZE}, but is {width}"
+        );
+        Self {
+            unique_index,
+            width,
+        }
     }
 
-    pub fn new_with_width(unique_index: u32, width: usize) -> Self {
-        assert!(width < 1usize << 10, "Delayed field width must be <= 10");
-        Self(((unique_index as u64) << 10) | width as u64)
+    pub fn new_for_test_for_u64(unique_index: u32) -> Self {
+        Self::new_with_width(unique_index, 8)
     }
 
     pub fn as_u64(&self) -> u64 {
-        self.0
-    }
-
-    pub fn as_utf8_fixed_size(&self) -> Result<Vec<u8>, PanicError> {
-        let width = self.extract_width();
-        let approx_width = size_u32_as_uleb128(width);
-        if width <= approx_width + 2 {
-            return Err(code_invariant_error(format!("aggregators_v2::DerivedString size issue for id {self:?}: width: {width}, approx_width: {approx_width}")));
-        }
-        Ok(u64_to_fixed_size_utf8_bytes(
-            self.as_u64(),
-            width - approx_width - 2,
-        ))
+        ((self.unique_index as u64) << 10) | self.width as u64
     }
 
     pub fn extract_width(&self) -> usize {
-        (self.0 & ((1 << 10) - 1)) as usize
+        self.width
     }
 
     pub fn into_derived_string_struct(self) -> Result<Value, PanicError> {
-        bytes_and_width_to_derived_string_struct(self.as_utf8_fixed_size()?, self.extract_width())
+        let width = self.extract_width();
+
+        // we need to create DerivedString struct that serializes to exactly match given `width`.
+        // I.e: size_u32_as_uleb128(value.len()) + value.len() + size_u32_as_uleb128(padding.len()) + padding.len() == width
+        // As padding has a fixed allowed max width, it is easiest to expand value to have the padding be minimal.
+        // We cannot always make padding to be 0 byte vector (serialized into 1 byte) - as not all sizes are possible
+        // for string due to variable encoding of string length.
+
+        // So we will over-estimate the serialized length of the value a bit.
+        let value_len_width_upper_bound = size_u32_as_uleb128(width - 2); // we subtract 2 because uleb sizes (for both value and padding fields) are at least 1 byte.
+
+        // If we don't even have enough space to store the length of the value, we cannot proceed
+        if width <= value_len_width_upper_bound + 1 {
+            return Err(code_invariant_error(format!("DerivedString size issue for id {self:?}: width: {width}, value_width_upper_bound: {value_len_width_upper_bound}")));
+        }
+
+        let id_as_string = u64_to_fixed_size_utf8_bytes(
+            self.as_u64(),
+            // fill the string representation to leave 1 byte for padding and upper bound for it's own length serialization.
+            width - value_len_width_upper_bound - 1,
+        )?;
+
+        bytes_and_width_to_derived_string_struct(id_as_string, width)
     }
 }
 
-// Used for ID generation from u32/u64 counters.
+// Used for ID generation from exchanged value/exchanges serialized value.
 impl From<u64> for DelayedFieldID {
     fn from(value: u64) -> Self {
-        Self::new(value)
+        Self {
+            unique_index: (value >> BITS_FOR_SIZE) as u32,
+            width: (value & ((1 << BITS_FOR_SIZE) - 1)) as usize,
+        }
     }
 }
 
@@ -116,7 +141,7 @@ pub trait TryFromMoveValue: Sized {
 
 impl ExtractUniqueIndex for DelayedFieldID {
     fn extract_unique_index(&self) -> u32 {
-        (self.0 >> 10).try_into().unwrap()
+        self.unique_index
     }
 }
 
@@ -156,9 +181,9 @@ impl TryFromMoveValue for DelayedFieldID {
         // Since we put the value there, we should be able to read it back,
         // unless there is a bug in the code - so we expect_ok() throughout.
         let (id, width) = match layout {
-            MoveTypeLayout::U64 => (Self::new(expect_ok(value.value_as::<u64>())?), 8),
+            MoveTypeLayout::U64 => (Self::from(expect_ok(value.value_as::<u64>())?), 8),
             MoveTypeLayout::U128 => (
-                Self::new(expect_ok(value.value_as::<u128>()).and_then(u128_to_u64)?),
+                Self::from(expect_ok(value.value_as::<u128>()).and_then(u128_to_u64)?),
                 16,
             ),
             layout if is_derived_string_struct_layout(layout) => {
@@ -171,7 +196,7 @@ impl TryFromMoveValue for DelayedFieldID {
                             e
                         ))
                     })?;
-                let id = Self::new(from_utf8_bytes(bytes)?);
+                let id = Self::from(from_utf8_bytes::<u64>(bytes)?);
                 (id, width)
             },
             // We use value to ID conversion in serialization.
@@ -254,16 +279,24 @@ pub fn bytes_and_width_to_derived_string_struct(
     bytes: Vec<u8>,
     width: usize,
 ) -> Result<Value, PanicError> {
+    // We need to create DerivedString struct that serializes to exactly match given `width`.
+
     let value_width = bcs_size_of_byte_array(bytes.len());
+    // padding field takes at list 1 byte (empty vector)
     if value_width + 1 > width {
         return Err(code_invariant_error(format!(
-            "aggregators_v2::DerivedString size issue: value_width: {value_width}, width: {width}"
+            "DerivedString size issue: no space left for padding: value_width: {value_width}, width: {width}"
         )));
     }
 
+    // We assume/assert that padding never exceeds length that requires more than 1 byte for size:
+    // (otherwise it complicates the logic to fill until the exact width, as padding can never be serialized into 129 bytes
+    // (vec[0; 127] serializes into 128 bytes, and vec[0; 128] serializes into 130 bytes))
     let padding_len = width - value_width - 1;
     if size_u32_as_uleb128(padding_len) > 1 {
-        return Err(code_invariant_error(format!("aggregators_v2::DerivedString size issue: value_width: {value_width}, width: {width}, padding_len: {padding_len}")));
+        return Err(code_invariant_error(format!(
+            "DerivedString size issue: padding expected to be too large: value_width: {value_width}, width: {width}, padding_len: {padding_len}"
+        )));
     }
 
     Ok(Value::struct_(Struct::pack(vec![
@@ -272,17 +305,20 @@ pub fn bytes_and_width_to_derived_string_struct(
     ])))
 }
 
-pub fn u64_to_fixed_size_utf8_bytes(value: u64, width: usize) -> Vec<u8> {
-    // Maximum u64 identifier size is 20 characters. We need a fixed size to
-    // ensure identifiers have the same size all the time for all validators,
-    // to ensure consistent and deterministic gas charging.
-    format!("{:0>width$}", value, width = width)
+pub fn u64_to_fixed_size_utf8_bytes(value: u64, length: usize) -> Result<Vec<u8>, PanicError> {
+    let result = format!("{:0>width$}", value, width = length)
         .to_string()
-        .into_bytes()
+        .into_bytes();
+    if result.len() != length {
+        return Err(code_invariant_error(format!(
+            "u64_to_fixed_size_utf8_bytes: width mismatch: value: {value}, length: {length}, result: {result:?}"
+        )));
+    }
+    Ok(result)
 }
 
-pub static U64_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u64::MAX.to_string().len());
-pub static U128_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u128::MAX.to_string().len());
+static U64_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u64::MAX.to_string().len());
+static U128_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u128::MAX.to_string().len());
 
 pub fn to_utf8_bytes(value: impl ToString) -> Vec<u8> {
     value.to_string().into_bytes()
@@ -337,14 +373,122 @@ pub fn bcs_size_of_byte_array(length: usize) -> usize {
     size_u32_as_uleb128(length) + length
 }
 
+pub fn calculate_width_for_constant_string(byte_len: usize) -> usize {
+    // we need to be able to store it both raw, as well as when it is exchanged with u64 DelayedFieldID.
+    // so the width needs to be larger of the two options
+    (bcs_size_of_byte_array(byte_len) + 1) // 1 is for empty padding serialized length
+        .max(*U64_MAX_DIGITS + 2) // largest exchanged u64 DelayedFieldID is u64 max digits, plus 1 for each of the value and padding serialized length
+}
+
+pub fn calculate_width_for_integer_embeded_string(
+    rest_byte_len: usize,
+    snapshot_id: DelayedFieldID,
+) -> Result<usize, PanicError> {
+    // we need to translate byte width into string character width.
+    let max_snapshot_string_width = match snapshot_id.extract_width() {
+        8 => *U64_MAX_DIGITS,
+        16 => *U128_MAX_DIGITS,
+        x => {
+            return Err(code_invariant_error(format!(
+                "unexpected width ({x}) for integer snapshot id: {snapshot_id:?}"
+            )))
+        },
+    };
+
+    Ok(bcs_size_of_byte_array(rest_byte_len + max_snapshot_string_width) + 1) // 1 for padding length
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SnapshotToStringFormula {
+    Concat { prefix: Vec<u8>, suffix: Vec<u8> },
+}
+
+impl SnapshotToStringFormula {
+    pub fn apply_to(&self, base: u128) -> Vec<u8> {
+        match self {
+            SnapshotToStringFormula::Concat { prefix, suffix } => {
+                let middle_string = base.to_string();
+                let middle = middle_string.as_bytes();
+                let mut result = Vec::with_capacity(prefix.len() + middle.len() + suffix.len());
+                result.extend(prefix);
+                result.extend(middle);
+                result.extend(suffix);
+                result
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use claims::{assert_ok, assert_ok_eq};
+    use claims::{assert_err, assert_ok, assert_ok_eq};
+
+    #[test]
+    fn test_int_to_string_fails_on_small_width() {
+        assert_err!(u64_to_fixed_size_utf8_bytes(1000, 1));
+    }
+
+    #[test]
+    fn test_width_calculation() {
+        for data in [
+            vec![],
+            vec![60; 1],
+            vec![60; 5],
+            vec![60; 127],
+            vec![60; 128],
+            vec![60; 129],
+        ] {
+            {
+                let width = calculate_width_for_constant_string(data.len());
+                assert_ok!(bytes_and_width_to_derived_string_struct(
+                    data.clone(),
+                    width
+                ));
+                assert_ok!(
+                    DelayedFieldID::new_with_width(u32::MAX, width).into_derived_string_struct()
+                );
+            }
+            {
+                let width = assert_ok!(calculate_width_for_integer_embeded_string(
+                    data.len(),
+                    DelayedFieldID::new_with_width(u32::MAX, 8)
+                ));
+                assert_ok!(bytes_and_width_to_derived_string_struct(
+                    SnapshotToStringFormula::Concat {
+                        prefix: data.clone(),
+                        suffix: vec![]
+                    }
+                    .apply_to(u64::MAX as u128),
+                    width
+                ));
+                assert_ok!(
+                    DelayedFieldID::new_with_width(u32::MAX, width).into_derived_string_struct()
+                );
+            }
+            {
+                let width = assert_ok!(calculate_width_for_integer_embeded_string(
+                    data.len(),
+                    DelayedFieldID::new_with_width(u32::MAX, 16)
+                ));
+                assert_ok!(bytes_and_width_to_derived_string_struct(
+                    SnapshotToStringFormula::Concat {
+                        prefix: data.clone(),
+                        suffix: vec![]
+                    }
+                    .apply_to(u128::MAX),
+                    width
+                ));
+                assert_ok!(
+                    DelayedFieldID::new_with_width(u32::MAX, width).into_derived_string_struct()
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_fixed_string_id_1() {
-        let encoded = u64_to_fixed_size_utf8_bytes(7, 30);
+        let encoded = assert_ok!(u64_to_fixed_size_utf8_bytes(7, 30));
         assert_eq!(encoded.len(), 30);
 
         let decoded_string = assert_ok!(String::from_utf8(encoded.clone()));
@@ -357,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_fixed_string_id_2() {
-        let encoded = u64_to_fixed_size_utf8_bytes(u64::MAX, 20);
+        let encoded = assert_ok!(u64_to_fixed_size_utf8_bytes(u64::MAX, 20));
         assert_eq!(encoded.len(), 20);
 
         let decoded_string = assert_ok!(String::from_utf8(encoded.clone()));
@@ -370,7 +514,7 @@ mod tests {
 
     #[test]
     fn test_fixed_string_id_3() {
-        let encoded = u64_to_fixed_size_utf8_bytes(0, 20);
+        let encoded = assert_ok!(u64_to_fixed_size_utf8_bytes(0, 20));
         assert_eq!(encoded.len(), 20);
 
         let decoded_string = assert_ok!(String::from_utf8(encoded.clone()));

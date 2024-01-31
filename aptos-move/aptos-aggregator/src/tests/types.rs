@@ -138,7 +138,7 @@ impl TDelayedFieldView for FakeAggregatorView {
             )));
         }
 
-        Ok(Self::Identifier::new(id))
+        Ok(Self::Identifier::from(id))
     }
 
     fn get_reads_needing_exchange(
