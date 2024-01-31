@@ -132,6 +132,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .author(self.author)
             .round(metadata.round()));
         let mut rand_store = self.rand_store.lock();
+        rand_store.update_highest_known_round(metadata.round());
         rand_store
             .add_share(self_share.clone())
             .expect("Add self share should succeed");
@@ -160,7 +161,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             ResetSignal::TargetRound(round) => round,
         };
         self.block_queue = BlockQueue::new();
-        self.rand_store.lock().reset(target_round);
+        self.rand_store
+            .lock()
+            .update_highest_known_round(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }

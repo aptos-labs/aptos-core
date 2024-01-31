@@ -341,7 +341,7 @@ Generate a permutation of <code>[0, 1, ..., n-1]</code> uniformly at random.
     // Shuffle.
     <b>let</b> tail = n - 1;
     <b>while</b> (tail &gt; 0) {
-        <b>let</b> pop_position = <a href="randomness.md#0x1_randomness_u64_range">u64_range</a>(0, tail);
+        <b>let</b> pop_position = <a href="randomness.md#0x1_randomness_u64_range">u64_range</a>(0, tail + 1);
         std::vector::swap(&<b>mut</b> values, pop_position, tail);
         tail = tail - 1;
     };
