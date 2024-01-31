@@ -4,7 +4,9 @@
 use crate::{
     logging::{LogEvent, LogSchema},
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
-    pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
+    pipeline::buffer_manager::{
+        OrderedBlocks, ResetAck, ResetRequest, ResetSignal, LOOP_INTERVAL_MS,
+    },
     rand::rand_gen::{
         aug_data_store::AugDataStore,
         block_queue::{BlockQueue, QueueItem},
@@ -41,7 +43,6 @@ use futures_channel::{
 };
 use std::{sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
-use crate::pipeline::buffer_manager::LOOP_INTERVAL_MS;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
@@ -135,6 +136,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .author(self.author)
             .round(metadata.round()));
         let mut rand_store = self.rand_store.lock();
+        rand_store.update_highest_known_round(metadata.round());
         rand_store
             .add_share(self_share.clone())
             .expect("Add self share should succeed");
@@ -166,7 +168,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             ResetSignal::TargetRound(round) => round,
         };
         self.block_queue = BlockQueue::new();
-        self.rand_store.lock().reset(target_round);
+        self.rand_store
+            .lock()
+            .update_highest_known_round(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -418,6 +422,12 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let queue = &self.block_queue.queue;
         let min_round = queue.keys().min().copied();
         let max_round = queue.keys().max().copied();
-        info!("block_queue_summary, epoch={}, size={}, min_round={:?}, max_round={:?}", self.epoch_state.epoch, queue.len(), min_round, max_round);
+        info!(
+            "block_queue_summary, epoch={}, size={}, min_round={:?}, max_round={:?}",
+            self.epoch_state.epoch,
+            queue.len(),
+            min_round,
+            max_round
+        );
     }
 }

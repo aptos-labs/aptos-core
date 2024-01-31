@@ -215,12 +215,11 @@ impl<S: TShare> RandStore<S> {
         }
     }
 
-    pub fn reset(&mut self, target_round: u64) {
-        self.highest_known_round = std::cmp::max(self.highest_known_round, target_round);
+    pub fn update_highest_known_round(&mut self, round: u64) {
+        self.highest_known_round = std::cmp::max(self.highest_known_round, round);
     }
 
     pub fn add_rand_metadata(&mut self, rand_metadata: RandMetadata) {
-        self.highest_known_round = std::cmp::max(self.highest_known_round, rand_metadata.round());
         let rand_item = self
             .rand_map
             .entry(rand_metadata.round())
