@@ -117,8 +117,7 @@ pub fn run_move_mutator(
 
                 info!("{} written to {}", mutant, mutant_path.display());
 
-                let mod_name = if let Some(module) = mutant.get_module_name() {
-                    let ModuleName(name) = module;
+                let mod_name = if let Some(ModuleName(name)) = mutant.get_module_name() {
                     name.value.to_string()
                 } else {
                     "script".to_owned() // if there is no module name, it is a script
