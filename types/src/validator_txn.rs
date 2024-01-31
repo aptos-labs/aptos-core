@@ -40,6 +40,10 @@ impl ValidatorTransaction {
     pub fn size_in_bytes(&self) -> usize {
         bcs::serialized_size(self).unwrap()
     }
+
+    pub fn is_dkg(&self) -> bool {
+        matches!(self, Self::DKGResult(_))
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

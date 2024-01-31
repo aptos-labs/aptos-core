@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
-use aptos_logger::debug;
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionId},
     AptosVM,
 };
+use aptos_logger::debug;
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;

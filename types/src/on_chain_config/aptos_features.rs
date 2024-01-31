@@ -178,6 +178,10 @@ impl Features {
     pub fn is_open_id_signature_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::OPEN_ID_SIGNATURE)
     }
+
+    pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
+    }
 }
 
 #[test]

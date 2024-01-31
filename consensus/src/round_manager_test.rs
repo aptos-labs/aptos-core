@@ -64,7 +64,8 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, Features, OnChainConsensusConfig,
+        ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -110,6 +111,7 @@ pub struct NodeSetup {
     id: usize,
     onchain_consensus_config: OnChainConsensusConfig,
     local_consensus_config: ConsensusConfig,
+    features: Features,
 }
 
 impl NodeSetup {
@@ -190,6 +192,7 @@ impl NodeSetup {
                 id,
                 onchain_consensus_config.clone(),
                 local_consensus_config.clone(),
+                Features::default(),
             ));
         }
         nodes
@@ -206,6 +209,7 @@ impl NodeSetup {
         id: usize,
         onchain_consensus_config: OnChainConsensusConfig,
         local_consensus_config: ConsensusConfig,
+        features: Features,
     ) -> Self {
         let _entered_runtime = executor.enter();
         let epoch_state = Arc::new(EpochState {
@@ -296,6 +300,7 @@ impl NodeSetup {
             onchain_consensus_config.clone(),
             round_manager_tx,
             local_consensus_config.clone(),
+            features.clone(),
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -313,6 +318,7 @@ impl NodeSetup {
             id,
             onchain_consensus_config,
             local_consensus_config,
+            features,
         }
     }
 
@@ -332,6 +338,7 @@ impl NodeSetup {
             self.id,
             self.onchain_consensus_config.clone(),
             self.local_consensus_config.clone(),
+            self.features,
         )
     }
 
