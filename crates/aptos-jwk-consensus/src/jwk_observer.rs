@@ -9,6 +9,7 @@ use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::{sync::oneshot, task::JoinHandle, time::MissedTickBehavior};
+use aptos_logger::debug;
 
 #[derive(Serialize, Deserialize)]
 struct OpenIDConfiguration {
