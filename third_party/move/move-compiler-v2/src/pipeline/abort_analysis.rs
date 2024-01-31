@@ -20,7 +20,7 @@ use move_stackless_bytecode::{
 use std::{collections::BTreeMap, fmt::Display};
 
 /// The power set lattice of `ExitStatus`, where
-/// - the top element is {Return, Abort, SilentExit}
+/// - the top element is { Return, Abort, NoMoreInstruction }
 /// - the bot element is {}
 /// - the join operation is set union
 ///
