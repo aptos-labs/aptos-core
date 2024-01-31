@@ -4,22 +4,6 @@
 
 The Move mutator is a tool that mutates Move source code. It can be used to help test the robustness of Move specifications and unit tests by generating different code versions (mutants).
 
-## Prototype
-This chapter will be deleted upon implementing the Move mutator tool.
-
-The Prototype implements only binary operator replacement (arithmetic, bitwise and shifts) and unary operator replacement. Command line options mainly handle source file paths (single or package).
-
-Mutants are currently stored in the `mutants_output` directory, and there is no way to change it. Mutants are just saved in a flat structure (no subdirectories). Each mutant filename consists of the original source filename with the next index appended.
-
-The report is generated on screen and lists all generated mutants (which mutation operator was used, location in the original source file, and mutant output). It's not possible to create the report in a file.
-
-Not supported:
-- configuration file,
-- generating reports,
-- nicely formatted output,
-- mutant files output structure,
-- other mutation operators than binary and unary operator replacement.
-
 ### What's missing in the Move ecosystem
 
 To create a prototype, we've used existing Move tools and libraries. We've produced a working prototype, so generally, there are no significant gaps in the Move ecosystem. It's sufficient for the mutant generation.
@@ -239,10 +223,6 @@ The operator tests the conditions in the specifications and test suites.
 
 Thanks to the fact that, the operator is replaced with space instead of just removing.
 
-### Type replacement
-
-This mutation operator replaces types with other types. For example, the `u8` type can be replaced with the `u64` type.
-
 ### Literal replacement
 
 This mutation operator replaces literals with other literals. For example, the `0` literal can be replaced with the `1` literal or other random literal, `true` to `false`, etc.
@@ -254,12 +234,6 @@ The operator tests the different conditions in the specifications (like invarian
 ### Address replacement
 
 This mutation operator replaces addresses with other addresses. For example, the `0x1`/`@std` address can be replaced with the `0x000A` address or another random address.
-
-### Return value replacement
-
-This mutation operator replaces return values with other return values. For example, the concrete expressions can be replaced with concrete literals or other random literals.
-
-The operator tests the conditions in the test suites and, e.g. the `ensures` statement in specifications.
 
 ### Break/continue replacement or deletion
 
