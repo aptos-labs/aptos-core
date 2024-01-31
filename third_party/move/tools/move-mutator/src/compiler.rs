@@ -17,6 +17,7 @@ use move_compiler::{
 use move_package::compilation::compiled_package::make_source_and_deps_for_compiler;
 use move_package::resolution::resolution_graph::ResolvedTable;
 use move_package::source_package::layout::SourcePackageLayout;
+use move_package::source_package::manifest_parser;
 use move_package::BuildConfig;
 use move_symbol_pool::Symbol;
 
@@ -279,6 +280,9 @@ pub fn verify_mutant(
     // Write the mutated source to the tempdir in place of the original file.
     std::fs::write(tempdir.path().join(relative_path), mutated_source)?;
 
+    // Rewrite the manifest file to use absolute paths
+    rewrite_manifest_for_mutant(&root, tempdir.path())?;
+
     debug!(
         "Mutated source written to {:?}",
         tempdir.path().join(relative_path)
@@ -303,6 +307,51 @@ pub fn verify_mutant(
             .unwrap_or("Internal error: can't convert compilation error to UTF8".to_string())
     );
 
+    Ok(())
+}
+
+/// Rewrite the manifest file to use absolute paths.
+///
+/// # Arguments
+///
+/// * `root` - the path to the package root.
+/// * `tempdir` - the path to the temporary directory.
+///
+/// # Errors
+///
+/// * If any error occurs during the rewrite, the appropriate error is returned using anyhow.
+///
+/// # Returns
+///
+/// * `Result<(), anyhow::Error>` - Ok if the rewrite is successful, or an error if any error occurs.
+fn rewrite_manifest_for_mutant(root: &Path, tempdir: &Path) -> Result<(), anyhow::Error> {
+    let mut manifest_string = fs::read_to_string(root.join(SourcePackageLayout::Manifest.path()))?;
+    let manifest = manifest_parser::parse_move_manifest_string(manifest_string.clone())?;
+    let manifest = manifest_parser::parse_source_manifest(manifest)?;
+    let curdir = std::env::current_dir()?;
+
+    // We need to switch to package dir as paths in manifest are relative to package dir.
+    std::env::set_current_dir(root)?;
+
+    manifest
+        .dependencies
+        .values()
+        .into_iter()
+        .chain(manifest.dev_dependencies.values())
+        .for_each(|dep| {
+            let dep_canon = dep.local.canonicalize();
+            if let Ok(dep_canon) = dep_canon {
+                manifest_string = manifest_string
+                    .replace(dep.local.to_str().unwrap(), dep_canon.to_str().unwrap());
+            }
+        });
+
+    // Switch back to the original dir.
+    std::env::set_current_dir(curdir)?;
+    fs::write(
+        tempdir.join(SourcePackageLayout::Manifest.path()),
+        manifest_string,
+    )?;
     Ok(())
 }
 

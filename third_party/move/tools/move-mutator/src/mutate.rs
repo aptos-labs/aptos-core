@@ -8,6 +8,7 @@ use move_compiler::typing::ast::{
     Constant, Exp, ExpListItem, Function, FunctionBody_, ModuleDefinition, SequenceItem_,
 };
 use move_compiler::{expansion, parser};
+use move_package::source_package::layout::SourcePackageLayout;
 use std::path::Path;
 
 use crate::mutant::Mutant;
@@ -56,25 +57,35 @@ fn traverse_module_with_check(
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
     // We need to check if module comes from our source tree or from the deps, as we don't want to traverse
-    // all the dependencies.
+    // all the dependencies. That's a bit tricky as global deps are easy to identify but local deps can be
+    // anywhere near the project tree.
     let (ident, _) = &module;
     let (filename, _) = files.get(&ident.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
     let filename_path = Path::new(filename.as_str());
 
-    let mut paths_to_check = conf.project.move_sources.clone();
-    if let Some(project_path) = &conf.project_path {
-        paths_to_check.push(project_path.clone());
-    }
-
-    if !paths_to_check
-        .iter()
-        .any(|path| filename_path.starts_with(path))
+    if conf.project.move_sources.len() > 0
+        && !conf
+            .project
+            .move_sources
+            .contains(&filename_path.to_path_buf())
     {
         trace!(
             "Skipping module {} as it does not come from source project",
             filename
         );
         return Ok(vec![]);
+    } else {
+        let test_root = SourcePackageLayout::try_find_root(&filename_path.canonicalize()?)?;
+        if let Some(project_path) = &conf.project_path {
+            if !test_root.ends_with(project_path) {
+                trace!(
+                    "Skipping module: \n {} \n root: {} \n as it does not come from source project {}",
+                    filename_path.to_string_lossy(), test_root.to_string_lossy(),
+                    project_path.to_string_lossy()
+                );
+                return Ok(vec![]);
+            }
+        }
     }
 
     // Now we need to check if the module is included in the configuration.
