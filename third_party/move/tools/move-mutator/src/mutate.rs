@@ -74,7 +74,9 @@ fn traverse_module_with_check(
             filename
         );
         return Ok(vec![]);
-    } else if conf.project.move_sources.is_empty() {
+    }
+
+    if conf.project.move_sources.is_empty() {
         let test_root = SourcePackageLayout::try_find_root(&filename_path.canonicalize()?)?;
         if let Some(project_path) = &conf.project_path {
             let project_path = project_path.canonicalize()?;
