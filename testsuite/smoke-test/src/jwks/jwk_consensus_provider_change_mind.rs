@@ -51,24 +51,24 @@ async fn jwk_consensus_provider_change_mind() {
     assert!(patched_jwks.jwks.entries.is_empty());
 
     info!("Adding some providers.");
-    let (provider_foogle, provider_gacebook) =
+    let (provider_alice, provider_bob) =
         tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
-    provider_foogle.update_request_handler(Some(Arc::new(StaticContentServer::new(
-        r#"{"keys": ["FOOGLE_JWK_V0"]}"#.as_bytes().to_vec(),
+    provider_alice.update_request_handler(Some(Arc::new(StaticContentServer::new(
+        r#"{"keys": ["ALICE_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
-    provider_gacebook.update_request_handler(Some(Arc::new(MindChangingServer::new(
-        r#"{"keys": ["GACEBOOK_JWK_V0"]}"#.as_bytes().to_vec(),
-        r#"{"keys": ["GACEBOOK_JWK_V0_1"]}"#.as_bytes().to_vec(),
+    provider_bob.update_request_handler(Some(Arc::new(MindChangingServer::new(
+        r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
+        r#"{"keys": ["BOB_JWK_V0_1"]}"#.as_bytes().to_vec(),
         2,
     ))));
     let providers = vec![
         OIDCProvider {
-            name: b"foogle.io".to_vec(),
-            config_url: provider_foogle.open_id_config_url().into_bytes(),
+            name: b"https://alice.io".to_vec(),
+            config_url: provider_alice.open_id_config_url().into_bytes(),
         },
         OIDCProvider {
-            name: b"gacebook.dev".to_vec(),
-            config_url: provider_gacebook.open_id_config_url().into_bytes(),
+            name: b"https://bob.dev".to_vec(),
+            config_url: provider_bob.open_id_config_url().into_bytes(),
         },
     ];
     let txn_summary = put_provider_on_chain(cli, root_idx, providers).await;
@@ -82,18 +82,18 @@ async fn jwk_consensus_provider_change_mind() {
         AllProvidersJWKs {
             entries: vec![
                 ProviderJWKs {
-                    issuer: b"foogle.io".to_vec(),
+                    issuer: b"https://alice.io".to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                        "\"FOOGLE_JWK_V0\""
+                        "\"ALICE_JWK_V0\""
                     ))
                     .into()],
                 },
                 ProviderJWKs {
-                    issuer: b"gacebook.dev".to_vec(),
+                    issuer: b"https://bob.dev".to_vec(),
                     version: 1,
                     jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                        "\"GACEBOOK_JWK_V0_1\""
+                        "\"BOB_JWK_V0_1\""
                     ))
                     .into()],
                 },

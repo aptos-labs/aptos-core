@@ -49,40 +49,40 @@ async fn jwk_consensus_per_issuer() {
     assert!(patched_jwks.jwks.entries.is_empty());
 
     info!("Adding some providers, one seriously equivocating, the other well behaving.");
-    let (provider_foogle, provider_gacebook) =
+    let (provider_alice, provider_bob) =
         tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
-    provider_foogle.update_request_handler(Some(Arc::new(EquivocatingServer::new(
-        r#"{"keys": ["FOOGLE_JWK_V1A"]}"#.as_bytes().to_vec(),
-        r#"{"keys": ["FOOGLE_JWK_V1B"]}"#.as_bytes().to_vec(),
+    provider_alice.update_request_handler(Some(Arc::new(EquivocatingServer::new(
+        r#"{"keys": ["ALICE_JWK_V1A"]}"#.as_bytes().to_vec(),
+        r#"{"keys": ["ALICE_JWK_V1B"]}"#.as_bytes().to_vec(),
         2,
     ))));
-    provider_gacebook.update_request_handler(Some(Arc::new(StaticContentServer::new(
-        r#"{"keys": ["GACEBOOK_JWK_V0"]}"#.as_bytes().to_vec(),
+    provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
+        r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
     let providers = vec![
         OIDCProvider {
-            name: b"foogle.io".to_vec(),
-            config_url: provider_foogle.open_id_config_url().into_bytes(),
+            name: b"https://alice.io".to_vec(),
+            config_url: provider_alice.open_id_config_url().into_bytes(),
         },
         OIDCProvider {
-            name: b"gacebook.dev".to_vec(),
-            config_url: provider_gacebook.open_id_config_url().into_bytes(),
+            name: b"https://bob.dev".to_vec(),
+            config_url: provider_bob.open_id_config_url().into_bytes(),
         },
     ];
     let txn_summary = put_provider_on_chain(cli, root_idx, providers).await;
     debug!("txn_summary={:?}", txn_summary);
 
-    info!("Wait for 60 secs and there should only update for gacebook, not foogle");
+    info!("Wait for 60 secs and there should only update for Bob, not Alice.");
     sleep(Duration::from_secs(60)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
     assert_eq!(
         AllProvidersJWKs {
             entries: vec![ProviderJWKs {
-                issuer: b"gacebook.dev".to_vec(),
+                issuer: b"https://bob.dev".to_vec(),
                 version: 1,
                 jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                    "\"GACEBOOK_JWK_V0\""
+                    "\"BOB_JWK_V0\""
                 ))
                 .into()],
             }]
@@ -91,5 +91,5 @@ async fn jwk_consensus_per_issuer() {
     );
 
     info!("Tear down.");
-    provider_foogle.shutdown().await;
+    provider_alice.shutdown().await;
 }
