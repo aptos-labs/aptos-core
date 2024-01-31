@@ -1378,7 +1378,6 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn get_field_type_generic(
         &self,
-        gas_meter: Option<&mut impl GasMeter>,
         idx: FieldInstantiationIndex,
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
@@ -1392,13 +1391,6 @@ impl<'a> Resolver<'a> {
             .iter()
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-
-        if let Some(gas_meter) = gas_meter {
-            gas_meter.charge_create_ty(NumTypeNodes::new(
-                field_instantiation.definition_struct_type.fields[field_instantiation.offset]
-                    .num_nodes_in_subst(&instantiation_types)? as u64,
-            ))?;
-        }
 
         // TODO: Is this type substitution unbounded?
         field_instantiation.definition_struct_type.fields[field_instantiation.offset]
@@ -1511,7 +1503,6 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn field_instantiation_to_struct(
         &self,
-        gas_meter: Option<&mut impl GasMeter>,
         idx: FieldInstantiationIndex,
         args: &[Type],
     ) -> PartialVMResult<Type> {
@@ -1520,14 +1511,6 @@ impl<'a> Resolver<'a> {
                 let field_inst = &module.field_instantiations[idx.0 as usize];
 
                 let struct_ = &field_inst.definition_struct_type;
-
-                if let Some(gas_meter) = gas_meter {
-                    for ty in &field_inst.instantiation {
-                        gas_meter.charge_create_ty(NumTypeNodes::new(
-                            ty.num_nodes_in_subst(args)? as u64,
-                        ))?;
-                    }
-                }
 
                 Ok(Type::StructInstantiation {
                     idx: struct_.idx,
