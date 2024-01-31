@@ -38,7 +38,7 @@ impl AsMoveValue for JWKMoveStruct {
 }
 
 /// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
-#[derive(Debug, PartialEq, Ord)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum JWK {
     RSA(RSA_JWK),
     Unsupported(UnsupportedJWK),
@@ -56,6 +56,12 @@ impl JWK {
 impl PartialOrd for JWK {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.id().partial_cmp(&other.id())
+    }
+}
+
+impl Ord for JWK {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id().cmp(&other.id())
     }
 }
 
