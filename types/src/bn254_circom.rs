@@ -171,9 +171,7 @@ impl TryInto<ark_bn254::G1Affine> for &Bn254G1 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct Bn254G2(
-    #[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES],
-);
+pub struct Bn254G2(#[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
 impl Bn254G2 {
     pub fn new_unchecked(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
@@ -264,14 +262,17 @@ pub fn get_public_inputs_hash(
 
 #[cfg(test)]
 mod test {
-    use crate::bn254_circom::{Bn254G1, Bn254G2, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES};
+    use crate::bn254_circom::{
+        Bn254G1, Bn254G2, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
+    };
 
     #[test]
     pub fn test_bn254_serialized_sizes() {
         let g1 = Bn254G1::new_unchecked(
             "16672231080302629756836614130913173861541009360974119524782950408048375831661",
-            "1076145001163048025135533382088266750240489485046298539187659509488738517245"
-        ).unwrap();
+            "1076145001163048025135533382088266750240489485046298539187659509488738517245",
+        )
+        .unwrap();
 
         let g2 = Bn254G2::new_unchecked(
             [
@@ -282,7 +283,8 @@ mod test {
                 "10879716754714953827605171295191459580695363989155343984818520267224463075503",
                 "440220374146936557739765173414663598678359360031905981547938788314460390904",
             ],
-        ).unwrap();
+        )
+        .unwrap();
 
         let g1_bytes = bcs::to_bytes(&g1).unwrap();
         assert_eq!(g1_bytes.len(), G1_PROJECTIVE_COMPRESSED_NUM_BYTES);

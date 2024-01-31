@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    bn254_circom::{
-        Bn254G1, Bn254G2, DEVNET_VERIFYING_KEY,
-    },
+    bn254_circom::{Bn254G1, Bn254G2, DEVNET_VERIFYING_KEY},
     chain_id::ChainId,
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
@@ -281,11 +279,7 @@ impl TryFrom<&[u8]> for Groth16Zkp {
 }
 
 impl Groth16Zkp {
-    pub fn new(
-        a: Bn254G1,
-        b: Bn254G2,
-        c: Bn254G1,
-    ) -> Self {
+    pub fn new(a: Bn254G1, b: Bn254G2, c: Bn254G1) -> Self {
         Groth16Zkp { a, b, c }
     }
 
@@ -509,8 +503,8 @@ mod test {
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            Bn254G1, Bn254G2, Groth16Zkp, IdCommitment,
-            Pepper, SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
+            Bn254G1, Bn254G2, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
+            ZkIdSignature, ZkpOrOpenIdSig,
         },
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
