@@ -45,7 +45,7 @@ impl ValidatorTransaction {
         match self {
             Self::DummyTopic1(_) => Topic::DUMMY1,
             Self::DKGResult(_) => Topic::DKG,
-            Self::DummyTopic2(_) => Topic::DUMMY1,
+            Self::DummyTopic2(_) => Topic::DUMMY2,
         }
     }
 }
