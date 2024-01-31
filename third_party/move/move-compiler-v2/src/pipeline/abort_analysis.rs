@@ -41,6 +41,11 @@ impl ExitState {
     pub fn singleton(e: ExitStatus) -> Self {
         Self(SetDomain::singleton(e))
     }
+
+    /// Checks whether the state is the singleton { Abort }
+    pub fn definitely_aborts(&self) -> bool {
+        self.0 == SetDomain::singleton(ExitStatus::Abort)
+    }
 }
 
 /// The exit state of a function

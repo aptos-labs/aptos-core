@@ -6,7 +6,7 @@
 //! - liveness analysis and lifetime analysis have been performed
 //! - Copies and moves have been made explicit in assignment instructions
 
-use super::abort_analysis::{AbortStateAnnotation, AbortStateAtCodeOffset};
+use super::abort_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
 use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
@@ -89,7 +89,7 @@ fn cond_check_drop_for_temp_with_msg(
     err_msg: &str,
 ) {
     let abort_state = get_abort_state_at(func_target, code_offset);
-    if !abort_state.before.is_definitely_abort() {
+    if !abort_state.before.definitely_aborts() {
         check_drop_for_temp_with_msg(func_target, t, loc, err_msg)
     }
 }
@@ -98,7 +98,7 @@ fn cond_check_drop_for_temp_with_msg(
 fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         let abort_state = get_abort_state_at(target, code_offset);
-        if !abort_state.before.is_definitely_abort() {
+        if !abort_state.before.definitely_aborts() {
             check_drop(target, ty, loc, "write_ref: cannot drop")
         }
     } else {
@@ -285,17 +285,17 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
     }
 }
 
-fn get_abort_state<'a>(target: &'a FunctionTarget<'a>) -> &'a AbortStateAnnotation {
+fn get_abort_state<'a>(target: &'a FunctionTarget<'a>) -> &'a ExitStateAnnotation {
     target
         .get_annotations()
-        .get::<AbortStateAnnotation>()
+        .get::<ExitStateAnnotation>()
         .expect("abort state annotation")
 }
 
 fn get_abort_state_at<'a>(
     target: &'a FunctionTarget<'a>,
     code_offset: CodeOffset,
-) -> &'a AbortStateAtCodeOffset {
+) -> &'a ExitStateAtCodeOffset {
     get_abort_state(target)
         .get_annotation_at(code_offset)
         .expect("abort state")
