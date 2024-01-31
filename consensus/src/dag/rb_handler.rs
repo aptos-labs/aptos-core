@@ -25,6 +25,7 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
@@ -35,6 +36,7 @@ pub(crate) struct NodeBroadcastHandler {
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
     vtxn_config: ValidatorTxnConfig,
+    features: Features,
 }
 
 impl NodeBroadcastHandler {
@@ -46,6 +48,7 @@ impl NodeBroadcastHandler {
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
         vtxn_config: ValidatorTxnConfig,
+        features: Features,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -59,6 +62,7 @@ impl NodeBroadcastHandler {
             fetch_requester,
             payload_config,
             vtxn_config,
+            features,
         }
     }
 
@@ -87,12 +91,17 @@ impl NodeBroadcastHandler {
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
+        for vtxn in node.validator_txns() {
+            ensure!(self.is_vtxn_expected(vtxn), "unexpected validator transaction: {:?}", vtxn.topic());
+        }
+
         let vtxn_total_bytes = node
             .validator_txns()
             .iter()
             .map(ValidatorTransaction::size_in_bytes)
             .sum::<usize>() as u64;
         ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
+
 
         let num_txns = num_vtxns + node.payload().len() as u64;
         let txn_bytes = vtxn_total_bytes + node.payload().size() as u64;

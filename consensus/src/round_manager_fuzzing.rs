@@ -49,6 +49,7 @@ use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
+use aptos_types::on_chain_config::Features;
 
 // This generates a proposal for round 1
 pub fn generate_corpus_proposal() -> Vec<u8> {
@@ -209,6 +210,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainConsensusConfig::default(),
         round_manager_tx,
         ConsensusConfig::default(),
+        Features::default(),
     )
 }
 

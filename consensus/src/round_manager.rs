@@ -60,6 +60,9 @@ use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
 };
+use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::validator_txn::ValidatorTransaction;
+use crate::util::is_vtxn_expected;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -187,6 +190,7 @@ pub struct RoundManager {
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
+    features: Features,
 }
 
 impl RoundManager {
@@ -202,6 +206,7 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
+        features: Features,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -226,6 +231,7 @@ impl RoundManager {
             vtxn_config,
             buffered_proposal_tx,
             local_config,
+            features,
         }
     }
 
@@ -650,6 +656,12 @@ impl RoundManager {
         {
             counters::UNEXPECTED_PROPOSAL_EXT_COUNT.inc();
             bail!("ProposalExt unexpected while the feature is disabled.");
+        }
+
+        if let Some(vtxns) = proposal.validator_txns() {
+            for vtxn in vtxns {
+                ensure!(is_vtxn_expected(&self.features, vtxn), "unexpected validator txn: {:?}", vtxn.topic());
+            }
         }
 
         let (num_validator_txns, validator_txns_total_bytes): (usize, usize) =

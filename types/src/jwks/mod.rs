@@ -190,6 +190,17 @@ pub struct QuorumCertifiedUpdate {
     pub multi_sig: bls12381::Signature,
 }
 
+impl QuorumCertifiedUpdate {
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy() -> Self {
+        Self {
+            authors: Default::default(),
+            update: Default::default(),
+            multi_sig: bls12381::Signature::dummy_signature(),
+        }
+    }
+}
+
 /// Move event type `0x1::jwks::ObservedJWKsUpdated` in rust.
 /// See its doc in Move for more details.
 #[derive(Serialize, Deserialize)]
