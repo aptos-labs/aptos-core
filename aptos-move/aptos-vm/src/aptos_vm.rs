@@ -1390,15 +1390,15 @@ impl AptosVM {
 
         zkid_validation::validate_zkid_authenticators(transaction, resolver, chain_id)?;
 
+        // The prologue must be run AFTER any validation.  Otherwise you may run prologue and hit SEQUENCE_NUMBER_TOO_NEW if there are more than one
+        // transaction from the same sender and end up skipping validation.
         self.run_prologue_with_payload(
             session,
             resolver,
             transaction.payload(),
             transaction_data,
             log_context,
-        )?;
-
-        Ok(())
+        )
     }
 
     // Called when the execution of the user transaction fails, in order to discard the
@@ -2242,6 +2242,7 @@ impl VMValidator for AptosVM {
         }
 
         if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
+            // TODO(zkid):get_zkid_authenticators is also called in zk_validation.rs.  Refactor to call once.
             if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
                 for (_, sig) in authenticators {
                     if !self.features.is_zkid_enabled()
