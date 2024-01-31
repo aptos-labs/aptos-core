@@ -2,20 +2,24 @@
 
 variable "region" {
   description = "AWS region"
+  type        = string
 }
 
 variable "maximize_single_az_capacity" {
   description = "TEST ONLY: Whether to maximize the capacity of the cluster by allocating a large CIDR block to the first AZ"
+  type        = bool
   default     = false
 }
 
 variable "zone_id" {
   description = "Route53 Zone ID to create records in"
+  type        = string
   default     = ""
 }
 
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  type        = string
   default     = ""
 }
 
@@ -27,17 +31,19 @@ variable "tls_sans" {
 
 variable "workspace_dns" {
   description = "Include Terraform workspace name in DNS records"
+  type        = bool
   default     = true
 }
 
 variable "iam_path" {
-  default     = "/"
   description = "Path to use when naming IAM objects"
+  type        = string
+  default     = "/"
 }
 
 variable "permissions_boundary_policy" {
-  default     = ""
   description = "ARN of IAM policy to set as permissions boundary on created roles"
+  type        = string
 }
 
 variable "admin_sources_ipv4" {
@@ -68,26 +74,31 @@ variable "k8s_admins" {
 
 variable "chain_id" {
   description = "Aptos chain ID. If var.enable_forge set, defaults to 4"
+  type        = number
   default     = 4
 }
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
+  type        = number
   default     = 15
 }
 
 variable "chain_name" {
   description = "Aptos chain name. If unset, defaults to using the workspace name"
+  type        = string
   default     = ""
 }
 
 variable "image_tag" {
   description = "Docker image tag for all Aptos workloads, including validators, fullnodes, backup, restore, genesis, and other tooling"
+  type        = string
   default     = "devnet"
 }
 
 variable "validator_image_tag" {
   description = "Docker image tag for validators and fullnodes. If set, overrides var.image_tag for those nodes"
+  type        = string
   default     = ""
 }
 
@@ -105,31 +116,10 @@ variable "genesis_helm_values" {
   default     = {}
 }
 
-variable "logger_helm_values" {
-  description = "Map of values to pass to logger helm chart"
-  type        = any
-  default     = {}
-}
-
-variable "enable_monitoring" {
-  description = "Enable monitoring helm chart"
-  default     = false
-}
-
-variable "monitoring_helm_values" {
-  description = "Map of values to pass to monitoring helm chart"
-  type        = any
-  default     = {}
-}
-
-variable "enable_prometheus_node_exporter" {
-  description = "Enable prometheus-node-exporter within monitoring helm chart"
-  default     = false
-}
-
-variable "enable_kube_state_metrics" {
-  description = "Enable kube-state-metrics within monitoring helm chart"
-  default     = false
+variable "enable_genesis" {
+  description = "Perform genesis automatically"
+  type        = bool
+  default     = true
 }
 
 variable "testnet_addons_helm_values" {
@@ -138,68 +128,67 @@ variable "testnet_addons_helm_values" {
   default     = {}
 }
 
-variable "enable_node_health_checker" {
-  description = "Enable node-health-checker"
-  default     = false
-}
-
-variable "node_health_checker_helm_values" {
-  description = "Map of values to pass to node-health-checker helm chart"
-  type        = any
-  default     = {}
-}
-
 ### EKS nodegroups
 
 variable "num_validators" {
   description = "The number of validator nodes to create"
+  type        = number
   default     = 4
 }
 
 variable "num_fullnode_groups" {
   description = "The number of fullnode groups to create"
+  type        = number
   default     = 1
 }
 
 variable "num_utility_instance" {
   description = "Number of instances for utilities node pool, when it's 0, it will be set to var.num_validators"
+  type        = number
   default     = 0
 }
 
 variable "num_validator_instance" {
   description = "Number of instances for validator node pool, when it's 0, it will be set to 2 * var.num_validators"
+  type        = number
   default     = 0
 }
 
 variable "utility_instance_max_num" {
   description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.num_validators"
+  type        = number
   default     = 0
 }
 
 variable "validator_instance_max_num" {
   description = "Maximum number of instances for utilities. If left 0, defaults to 2 * var.num_validators"
+  type        = number
   default     = 0
 }
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
+  type        = string
   default     = "t3.2xlarge"
 }
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c6i.4xlarge"
+  type        = string
+  default     = "c6i.8xlarge"
 }
 
 ### Forge
 
 variable "enable_forge" {
   description = "Enable Forge test framework, also creating an internal helm repo"
+  type        = bool
   default     = false
 }
 
 variable "forge_config_s3_bucket" {
   description = "S3 bucket in which Forge config is stored"
+  type        = string
   default     = "forge-wrapper-config"
 }
 
@@ -211,6 +200,7 @@ variable "forge_helm_values" {
 
 variable "validator_storage_class" {
   description = "Which storage class to use for the validator and fullnode"
+  type        = string
   default     = "io1"
   validation {
     condition     = contains(["gp3", "io1", "io2"], var.validator_storage_class)
@@ -220,6 +210,7 @@ variable "validator_storage_class" {
 
 variable "fullnode_storage_class" {
   description = "Which storage class to use for the validator and fullnode"
+  type        = string
   default     = "io1"
   validation {
     condition     = contains(["gp3", "io1", "io2"], var.fullnode_storage_class)
@@ -229,5 +220,6 @@ variable "fullnode_storage_class" {
 
 variable "manage_via_tf" {
   description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  type        = bool
   default     = true
 }
