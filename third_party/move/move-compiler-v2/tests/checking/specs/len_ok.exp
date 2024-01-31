@@ -1,3 +1,11 @@
+
+Diagnostics:
+warning: Unused local variable `len`. Consider removing or prefixing with an underscore: `_len`
+  ┌─ tests/checking/specs/len_ok.move:4:13
+  │
+4 │         let len = 5;
+  │             ^^^
+
 // ---- Model Dump
 module 0x42::m {
     private fun f(gallery: &vector<u64>) {

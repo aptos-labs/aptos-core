@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid call of `vector::fold`: expected `integer` but found `vector<u8>` for argument 3
+  ┌─ tests/checking/inlining/lambda_cast_err.move:7:53
+  │
+7 │         vector::fold(gas_schedule_blob, (0 as u64), |sum, addend| sum + (addend as u64))
+  │                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
