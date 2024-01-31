@@ -98,6 +98,7 @@ impl JWKObserver {
             tokio::select! {
                 _ = interval.tick().fuse() => {
                     let result = fetch_jwks(my_addr, open_id_config_url.clone()).await;
+                    debug!("observe_result={:?}", result);
                     if let Ok(mut jwks) = result {
                         jwks.sort();
                         let _ = observation_tx.push((), (issuer.clone(), jwks));
