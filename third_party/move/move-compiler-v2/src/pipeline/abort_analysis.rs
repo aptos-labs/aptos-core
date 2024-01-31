@@ -11,7 +11,7 @@ use move_binary_format::file_format::CodeOffset;
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
-    dataflow_domains::{AbstractDomain, JoinResult, Plus2},
+    dataflow_domains::{AbstractDomain, SetDomain},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::Bytecode,
@@ -19,76 +19,70 @@ use move_stackless_bytecode::{
 };
 use std::{collections::BTreeMap, fmt::Display};
 
-/// top: maybe abort later or not
-/// true: definitely aborting later
-/// false: definitely not aborting later
-/// bot: neither aborting nor returning later
+/// The power set lattice of `ExitStatus`, where
+/// - the top element is {Return, Abort, SilentExit}
+/// - the bot element is {}
+/// - the join operation is set union
+///
+/// The interpretation of the lattice is as follows:
+/// if a program point has state `s : ExitState`, then all
+/// execution paths containing the program point can only
+/// ends in one of the exit state in `s`.
 #[derive(AbstractDomain, Clone)]
-pub struct AbortState(Plus2<bool>);
+pub struct ExitState(SetDomain<ExitStatus>);
 
-impl AbortState {
-    /// Set state from booleans
-    fn set_bool(&mut self, b: bool) {
-        self.0 = Plus2::Mid(b);
+impl ExitState {
+    /// Returns a empty set, which is the bottom element
+    pub fn bot() -> Self {
+        Self(SetDomain::default())
     }
 
-    /// Set state to definitely abort
-    fn set_abort(&mut self) {
-        self.set_bool(true)
-    }
-
-    /// Set state to definitely not abort
-    fn set_not_abort(&mut self) {
-        self.set_bool(false)
-    }
-
-    /// Returns the top element
-    fn top() -> Self {
-        Self(Plus2::Top)
-    }
-
-    /// Returns the bottom element
-    fn bot() -> Self {
-        Self(Plus2::Bot)
-    }
-
-    /// Checks whether `self` is definitely abort
-    pub fn is_definitely_abort(&self) -> bool {
-        matches!(self.0, Plus2::Mid(true))
+    /// Returns a singleton
+    pub fn singleton(e: ExitStatus) -> Self {
+        Self(SetDomain::singleton(e))
     }
 }
 
-impl Display for AbortState {
+/// The exit state of a function
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum ExitStatus {
+    /// The program returns
+    Return,
+    /// The program aborts
+    Abort,
+    /// The program runs out of instructions, and neither returns or aborts
+    NoMoreInstruction,
+}
+
+impl Display for ExitStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match &self.0 {
-            Plus2::Top => "maybe",
-            Plus2::Mid(true) => "definitely abort",
-            Plus2::Mid(false) => "definitely not abort",
-            Plus2::Bot => "not aborting or returning",
+        f.write_str(match self {
+            ExitStatus::Return => "returns",
+            ExitStatus::Abort => "aborts",
+            ExitStatus::NoMoreInstruction => "runs out of instruction",
         })
     }
 }
 
 /// Before and after abort state at a program point
 #[derive(Clone)]
-pub struct AbortStateAtCodeOffset {
-    pub before: AbortState,
-    #[allow(dead_code)]
-    after: AbortState,
+pub struct ExitStateAtCodeOffset {
+    pub before: ExitState,
+    after: ExitState,
 }
 
-impl AbortStateAtCodeOffset {
-    pub fn new(before: AbortState, after: AbortState) -> Self {
+impl ExitStateAtCodeOffset {
+    pub fn new(before: ExitState, after: ExitState) -> Self {
         Self { before, after }
     }
 }
 
 #[derive(Clone)]
-pub struct AbortStateAnnotation(BTreeMap<CodeOffset, AbortStateAtCodeOffset>);
+pub struct ExitStateAnnotation(BTreeMap<CodeOffset, ExitStateAtCodeOffset>);
 
-impl AbortStateAnnotation {
+impl ExitStateAnnotation {
     /// Get the abort state at the given code offset
-    pub fn get_annotation_at(&self, code_offset: CodeOffset) -> Option<&AbortStateAtCodeOffset> {
+    pub fn get_annotation_at(&self, code_offset: CodeOffset) -> Option<&ExitStateAtCodeOffset> {
         self.0.get(&code_offset)
     }
 }
@@ -97,39 +91,42 @@ pub struct AbortAnalysis {}
 
 impl AbortAnalysis {
     /// Returns the state per instruction of the given function
-    fn analyze(&self, target: &FunctionTarget) -> BTreeMap<CodeOffset, AbortStateAtCodeOffset> {
+    fn analyze(&self, target: &FunctionTarget) -> BTreeMap<CodeOffset, ExitStateAtCodeOffset> {
         let code = target.get_bytecode();
         let cfg = StacklessControlFlowGraph::new_backward(code, true);
-        let state_map = self.analyze_function(AbortState::bot(), code, &cfg);
+        let state_map = self.analyze_function(ExitState::bot(), code, &cfg);
         self.state_per_instruction(state_map, code, &cfg, |before, after| {
-            AbortStateAtCodeOffset::new(before.clone(), after.clone())
+            ExitStateAtCodeOffset::new(before.clone(), after.clone())
         })
     }
 }
 
 impl TransferFunctions for AbortAnalysis {
-    type State = AbortState;
+    type State = ExitState;
 
     const BACKWARD: bool = true;
 
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
         match instr {
-            Bytecode::Abort(..) => state.set_abort(),
-            Bytecode::Ret(..) => state.set_not_abort(),
-            Bytecode::Call(..) => {
-                // we consider any call may abort
-                match &state.0 {
-                    // after state: definitely abort
-                    // before state: definitely abort
-                    Plus2::Mid(true) => {},
-                    // after state: may abort, definitely abort, or neither abort nor return
-                    // before state: may abort
-                    _ => {
-                        *state = AbortState::top();
-                    },
+            Bytecode::Abort(..) => {
+                *state = ExitState::singleton(ExitStatus::Abort);
+            },
+            Bytecode::Ret(..) => {
+                *state = ExitState::singleton(ExitStatus::Return);
+            },
+            Bytecode::Call(_, _, op, _, _) => {
+                if state.0.is_empty() {
+                    *state = ExitState::singleton(ExitStatus::NoMoreInstruction);
+                }
+                if op.can_abort() {
+                    state.join(&ExitState::singleton(ExitStatus::Abort));
                 }
             },
-            _ => {},
+            _ => {
+                if state.0.is_empty() {
+                    *state = ExitState::singleton(ExitStatus::NoMoreInstruction);
+                }
+            },
         }
     }
 }
@@ -151,7 +148,7 @@ impl FunctionTargetProcessor for AbortAnalysisProcessor {
         }
         let target = FunctionTarget::new(fun_env, &data);
         let analysis = AbortAnalysis {};
-        let annotations = AbortStateAnnotation(analysis.analyze(&target));
+        let annotations = ExitStateAnnotation(analysis.analyze(&target));
         data.annotations.set(annotations, true);
         data
     }
@@ -172,8 +169,11 @@ pub fn format_abort_state_annotation(
     target: &FunctionTarget,
     code_offset: CodeOffset,
 ) -> Option<String> {
-    let AbortStateAnnotation(state_per_instr) =
-        target.get_annotations().get::<AbortStateAnnotation>()?;
-    let AbortStateAtCodeOffset { before, .. } = state_per_instr.get(&code_offset)?;
-    Some(format!("abort state: {}", before))
+    let ExitStateAnnotation(state_per_instr) =
+        target.get_annotations().get::<ExitStateAnnotation>()?;
+    let ExitStateAtCodeOffset { before, .. } = state_per_instr.get(&code_offset)?;
+    Some(format!(
+        "abort state: {}",
+        before.0.to_string(|e| format!("{}", e))
+    ))
 }
