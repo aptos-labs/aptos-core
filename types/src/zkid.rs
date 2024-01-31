@@ -36,7 +36,11 @@ pub const IDC_NUM_BYTES: usize = 32;
 // TODO(ZkIdGroth16Zkp): add some static asserts here that these don't exceed the MAX poseidon input sizes
 // TODO(ZkIdGroth16Zkp): determine what our circuit will accept
 
-pub const MAX_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR; // Supports public key lengths of up to 93 bytes.
+/// We support ephemeral public key lengths of up to 93 bytes.
+pub const MAX_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+// The values here are consistent with our public inputs hashing scheme.
+// Everything is a multiple of `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to maximize the input
+// sizes that can be hashed.
 pub const MAX_ISS_BYTES: usize = 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
@@ -243,6 +247,7 @@ pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
     /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
     pub non_malleability_signature: EphemeralSignature,
+    // TODO: add training_wheels_signature: EphemeralSignature,
 }
 
 impl SignedGroth16Zkp {

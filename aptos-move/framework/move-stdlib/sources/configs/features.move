@@ -333,6 +333,29 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
+    /// Whether the zkID feature is enabled, possibly with the ZK-less verification mode.
+    ///
+    /// Lifetime: transient
+    const ZK_ID_SIGNATURES: u64 = 46;
+
+    public fun get_zkid_feature(): u64 { ZK_ID_SIGNATURES }
+
+    public fun zkid_feature_enabled(): bool acquires Features {
+        is_enabled(ZK_ID_SIGNATURES)
+    }
+
+    /// Whether the ZK-less mode of the zkID feature is enabled.
+    ///
+    /// Lifetime: transient
+    const ZK_ID_ZKLESS_SIGNATURE: u64 = 47;
+
+    public fun get_zkid_zkless_feature(): u64 { ZK_ID_ZKLESS_SIGNATURE }
+
+    public fun zkid_zkless_feature_enabled(): bool acquires Features {
+        is_enabled(ZK_ID_ZKLESS_SIGNATURE)
+    }
+
+
     // ============================================================================================
     // Feature Flag Implementation
 

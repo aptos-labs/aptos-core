@@ -8,7 +8,6 @@ use aptos_types::{
     chain_id::ChainId,
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
-    transaction::SignedTransaction,
     vm_status::{StatusCode, VMStatus},
     zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_ZK_ID_AUTHENTICATORS_ALLOWED},
 };
@@ -63,24 +62,21 @@ fn get_jwk_for_zkid_authenticator(
 }
 
 pub fn validate_zkid_authenticators(
-    transaction: &SignedTransaction,
+    authenticators: &Vec<(ZkIdPublicKey, ZkIdSignature)>,
     resolver: &impl AptosMoveResolver,
     chain_id: ChainId,
 ) -> Result<(), VMStatus> {
-    let zkid_authenticators = aptos_types::zkid::get_zkid_authenticators(transaction)
-        .map_err(|_| invalid_signature!("Failed to fetch zkid authenticators"))?;
-
-    if zkid_authenticators.is_empty() {
+    if authenticators.is_empty() {
         return Ok(());
     }
 
-    if zkid_authenticators.len() > MAX_ZK_ID_AUTHENTICATORS_ALLOWED {
-        return Err(invalid_signature!("Too many zkid authenticators"));
+    if authenticators.len() > MAX_ZK_ID_AUTHENTICATORS_ALLOWED {
+        return Err(invalid_signature!("Too many zkID authenticators"));
     }
 
     let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
-    for (_, zkid_sig) in &zkid_authenticators {
+    for (_, zkid_sig) in authenticators {
         zkid_sig
             .verify_expiry(&onchain_timestamp_obj)
             .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
@@ -88,7 +84,7 @@ pub fn validate_zkid_authenticators(
 
     let patched_jwks = get_jwks_onchain(resolver)?;
 
-    for (zkid_pub_key, zkid_sig) in &zkid_authenticators {
+    for (zkid_pub_key, zkid_sig) in authenticators {
         let jwk = get_jwk_for_zkid_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
 
         match &zkid_sig.sig {
