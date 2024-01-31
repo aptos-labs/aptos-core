@@ -106,10 +106,42 @@ jobs:
       - run: echo "Skipping rust smoke tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
-  # Run all rust unit tests. This is a PR required job.
-  rust-unit-tests:
-    needs: file_change_determinator
+  build-test-artifacts:
     runs-on: high-perf-docker
+    outputs:
+      test-artifacts-path: ${{ steps.build.outputs.artifacts-path }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - name: Check VM features
+        run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
+        shell: bash
+      - name: Run rust doc tests
+        run: cargo test --profile ci --locked --doc --workspace --exclude aptos-node-checker
+        shell: bash
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      - name: Build and archive tests
+        id: build
+        run: |
+          cargo nextest archive --cargo-profile ci --locked --workspace --exclude aptos-testcases --exclude smoke-test --exclude move-cli --archive-file nextest-archive.tar.zst
+          echo "::set-output name=artifacts-path::$(pwd)/nextest-archive.tar.zst"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nextest-archive
+          path: ${{ steps.build.outputs.artifacts-path }}
+
+  # Run all rust unit tests. This is a PR required job.
+  rust-unit-tests-partitioned:
+    needs: [file_change_determinator, build-test-artifacts]
+    runs-on: high-perf-docker
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
@@ -117,6 +149,7 @@ jobs:
         uses: ./.github/actions/rust-unit-tests
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
+          partition: ${{ matrix.partition }}
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
           BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
       - run: echo "Skipping rust unit tests! Unrelated changes detected."

@@ -7,6 +7,8 @@ inputs:
   BUILDKITE_ANALYTICS_TOKEN:
     description: "The Buildkite API token"
     required: true
+  partition:
+    description: "The partition number for the tests"
 
 runs:
   using: composite
@@ -16,16 +18,6 @@ runs:
     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
-
-    # Check the VM features
-    - name: Check VM features
-      run: cargo test --profile ci --locked --features check-vm-features -p aptos-node
-      shell: bash
-
-    # Run the rust doc tests
-    - name: Run rust doc tests
-      run: cargo test --profile ci --locked --doc --workspace --exclude aptos-node-checker
-      shell: bash
 
     # Install nextest
     - uses: taiki-e/install-action@v1.5.6
@@ -42,13 +34,15 @@ runs:
       run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       shell: bash
 
+    - name: Download test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: nextest-archive
+
     # Run the rust unit tests
-    - name: Run all unit tests
-      run: |
-        NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast --message-format libtest-json > nextest_output.json
-        buildkite-test-collector < nextest_output.json || echo "Warning: buildkite-test-collector encountered an error"
-        rm nextest_output.json
+    - name: Run rust unit tests (partitioned)
       shell: bash
+      run: cargo nextest run --archive-file /runner/_work/aptos-core/aptos-core/nextest-archive.tar.zst --partition hash:${{ inputs.partition }}/3  --retries 3 --no-fail-fast
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
         RUST_MIN_STACK: "4297152"
@@ -59,3 +53,7 @@ runs:
         DOTNET_ROOT: /home/runner/.dotnet
         BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
         BUILDKITE_ANALYTICS_TOKEN: ${{ inputs.BUILDKITE_ANALYTICS_TOKEN }}
+
+    - name: Print size of targets directory and archive file
+      run: du -sh /runner/_work/aptos-core/aptos-core/target /runner/_work/aptos-core/aptos-core/nextest-archive.tar.zst
+      shell: bash
