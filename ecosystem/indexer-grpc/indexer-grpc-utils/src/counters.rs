@@ -164,6 +164,16 @@ pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Number of versions that were overlapped in a multi thread fetch pull
+pub static NUM_MULTI_FETCH_OVERLAPPED_VERSIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_multi_thread_fetch_overlapped_versions",
+        "Number of versions that were overlapped in a multi thread fetch pull",
+        &["service_type"],
+    )
+    .unwrap()
+});
+
 /// Generic duration metric
 pub static DURATION_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!("indexer_grpc_duration_in_secs", "Duration in seconds", &[

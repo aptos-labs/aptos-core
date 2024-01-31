@@ -17,7 +17,7 @@ use aptos_indexer_grpc_utils::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
         MESSAGE_SIZE_LIMIT,
     },
-    counters::{log_grpc_step, IndexerGrpcStep},
+    counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
@@ -549,7 +549,16 @@ async fn data_fetcher_thread(
     }
 }
 
+/// Takes in multiple batches of transactions, and:
+/// 1. De-dupes in the case of overlap (but log to prom metric)
+/// 2. Panics in cases of gaps
 fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Transaction> {
+    // If there's only one, no sorting required
+    if batches.len() == 1 {
+        return batches.pop().unwrap();
+    }
+
+    // Sort by the first version per batch, ascending
     batches.sort_by(|a, b| a.first().unwrap().version.cmp(&b.first().unwrap().version));
     let first_version = batches.first().unwrap().first().unwrap().version;
     let last_version = batches.last().unwrap().last().unwrap().version;
@@ -557,14 +566,39 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
 
     let mut prev_start = None;
     let mut prev_end = None;
-    for batch in batches {
-        let start_version = batch.first().unwrap().version;
+    for mut batch in batches {
+        let mut start_version = batch.first().unwrap().version;
         let end_version = batch.last().unwrap().version;
-        if prev_start.is_none() {
-            prev_start = Some(start_version);
-            prev_end = Some(end_version);
-        } else {
-            if prev_end.unwrap() + 1 != start_version {
+        if prev_start.is_some() {
+            let prev_start = prev_start.unwrap();
+            let prev_end = prev_end.unwrap();
+            // If this batch is fully contained within the previous batch, skip it
+            if prev_start <= start_version && prev_end >= end_version {
+                NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
+                    .with_label_values(&[SERVICE_TYPE])
+                    .inc_by(end_version - start_version);
+                continue;
+            }
+            // If this batch overlaps with the previous batch, combine them
+            if prev_end >= start_version {
+                NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
+                    .with_label_values(&[SERVICE_TYPE])
+                    .inc_by(prev_end - start_version + 1);
+                tracing::debug!(
+                    batch_first_version = first_version,
+                    batch_last_version = last_version,
+                    start_version = start_version,
+                    end_version = end_version,
+                    prev_start = ?prev_start,
+                    prev_end = prev_end,
+                    "[Filestore] Overlapping version data"
+                );
+                batch.drain(0..(prev_end - start_version + 1) as usize);
+                start_version = batch.first().unwrap().version;
+            }
+
+            // Otherwise there is a gap
+            if prev_end + 1 != start_version {
                 tracing::error!(
                     batch_first_version = first_version,
                     batch_last_version = last_version,
@@ -574,12 +608,20 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
                     prev_end = prev_end,
                     "[Filestore] Gaps or dupes in processing version data"
                 );
-                panic!("[Filestore] Gaps in processing data");
+                panic!("[Filestore] Gaps in processing data batch_first_version: {}, batch_last_version: {}, start_version: {}, end_version: {}, prev_start: {:?}, prev_end: {:?}",
+                       first_version,
+                       last_version,
+                       start_version,
+                       end_version,
+                       prev_start,
+                       prev_end,
+                );
             }
-            prev_start = Some(start_version);
-            prev_end = Some(end_version);
-            transactions.extend(batch);
         }
+
+        prev_start = Some(start_version);
+        prev_end = Some(end_version);
+        transactions.extend(batch);
     }
 
     transactions
@@ -835,4 +877,49 @@ async fn channel_send_multiple_with_timeout(
     );
 
     Ok(())
+}
+
+#[test]
+fn test_ensure_sequential_transactions_merges_and_sorts() {
+    let transactions1 = (1..5)
+        .map(|i| Transaction {
+            version: i,
+            ..Default::default()
+        })
+        .collect();
+    let transactions2 = (5..10)
+        .map(|i| Transaction {
+            version: i,
+            ..Default::default()
+        })
+        .collect();
+    // No overlap, just normal fetching flow
+    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+    assert_eq!(transactions1.len(), 9);
+    assert_eq!(transactions1.first().unwrap().version, 1);
+    assert_eq!(transactions1.last().unwrap().version, 9);
+
+    // This is a full overlap
+    let transactions2 = (5..7)
+        .map(|i| Transaction {
+            version: i,
+            ..Default::default()
+        })
+        .collect();
+    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+    assert_eq!(transactions1.len(), 9);
+    assert_eq!(transactions1.first().unwrap().version, 1);
+    assert_eq!(transactions1.last().unwrap().version, 9);
+
+    // Partial overlap
+    let transactions2 = (5..12)
+        .map(|i| Transaction {
+            version: i,
+            ..Default::default()
+        })
+        .collect();
+    let transactions1 = ensure_sequential_transactions(vec![transactions1, transactions2]);
+    assert_eq!(transactions1.len(), 11);
+    assert_eq!(transactions1.first().unwrap().version, 1);
+    assert_eq!(transactions1.last().unwrap().version, 11);
 }
