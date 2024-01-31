@@ -61,6 +61,7 @@ pub mod account_view;
 pub mod aggregate_signature;
 pub mod aggregator;
 pub mod block_executor;
+pub mod bn254_circom;
 pub mod bytes;
 pub mod state_store;
 #[cfg(test)]

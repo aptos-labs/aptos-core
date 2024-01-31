@@ -3,12 +3,16 @@
 #[cfg(test)]
 use crate::move_any::Any as MoveAny;
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
+use aptos_crypto::poseidon_bn254;
+use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use std::str::FromStr;
+
+pub const RSA_MODULUS_BYTES: usize = 256;
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 #[allow(non_camel_case_types)]
@@ -31,6 +35,25 @@ impl RSA_JWK {
             e: e.to_string(),
             n: n.to_string(),
         }
+    }
+
+    // TODO(zkid): Move this to aptos-crypto so other services can use this
+    pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
+        let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
+        // The circuit only supports RSA256
+        if modulus.len() != RSA_MODULUS_BYTES {
+            bail!("Wrong modulus size, must be {} bytes", RSA_MODULUS_BYTES);
+        }
+        modulus.reverse(); // This is done to match the circuit, which requires the modulus in a verify specific format due to how RSA verification is implemented
+                           // TODO(zkid): finalize the jwk hashing scheme.
+        let mut scalars = modulus
+            .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
+            .map(|chunk| {
+                poseidon_bn254::pack_bytes_to_one_scalar(chunk).expect("chunk converts to scalar")
+            })
+            .collect::<Vec<ark_bn254::Fr>>();
+        scalars.push(ark_bn254::Fr::from(RSA_MODULUS_BYTES as i32));
+        poseidon_bn254::hash_scalars(scalars)
     }
 
     pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
