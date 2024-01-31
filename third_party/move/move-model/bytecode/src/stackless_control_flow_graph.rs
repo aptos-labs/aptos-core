@@ -297,9 +297,13 @@ impl std::fmt::Display for DotCFGEdge {
 }
 
 /// Generate the dot representation of the CFG (which can be rendered by the Dot program)
-pub fn generate_cfg_in_dot_format<'env>(func_target: &'env FunctionTarget<'env>) -> String {
+pub fn generate_cfg_in_dot_format<'env>(func_target: &'env FunctionTarget<'env>, forward: bool) -> String {
     let code = &func_target.data.code;
-    let cfg = StacklessControlFlowGraph::new_forward(code);
+    let cfg = if forward {
+        StacklessControlFlowGraph::new_forward(code)
+    } else {
+        StacklessControlFlowGraph::new_backward(code, true)
+    };
     let label_offsets = Bytecode::label_offsets(code);
     let mut graph = Graph::new();
 

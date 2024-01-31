@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{
+    abort_analysis::AbortAnalysisProcessor,
     avail_copies_analysis::AvailCopiesAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
@@ -28,6 +29,7 @@ pub mod visibility_checker;
 /// to visualize the result of an analysis as annotations on the bytecode, for
 /// debugging.
 pub fn register_formatters(target: &FunctionTarget) {
+    AbortAnalysisProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
     ReferenceSafetyProcessor::register_formatters(target);
     AvailCopiesAnalysisProcessor::register_formatters(target);

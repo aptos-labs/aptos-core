@@ -9,13 +9,13 @@ use move_compiler_v2::{
     inliner, logging, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, abort_analysis::AbortAnalysisProcessor,
-        avail_copies_analysis::AvailCopiesAnalysisProcessor,
-        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-        explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
+        avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
+        dead_store_elimination::DeadStoreElimination, explicit_drop::ExplicitDrop,
+        livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
-        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,abort_analysis::AbortAnalysisProcessor,
+        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
     },
     run_bytecode_verifier, run_file_format_gen, Options,
 };
@@ -223,6 +223,16 @@ impl TestConfig {
             Self {
                 type_check_only: false,
                 dump_ast: verbose,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/abort-analysis/") {
+            pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
