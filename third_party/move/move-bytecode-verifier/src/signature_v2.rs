@@ -855,7 +855,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
             .map(|idx| (idx as TypeParameterIndex, AbilitySet::ALL))
             .collect::<BitsetTypeParameterConstraints<N>>();
 
-        for (_field_offset, field_def) in fields.iter().enumerate() {
+        for field_def in fields.iter() {
             let field_ty = &field_def.signature.0;
 
             // Check if the field type itself is well-formed.

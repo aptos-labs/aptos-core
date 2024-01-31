@@ -252,7 +252,7 @@ pub(crate) fn define_emit_fun_for_send(
         // #message[sig=b"xfer(address indexed, address indexed, uint128 indexed)]
         for (i, (_, solidity_ty, move_ty, indexed_flag, _)) in signature_types.iter().enumerate() {
             let mut var = if i == 0 {
-                params_vec.get(0).unwrap().to_string()
+                params_vec.first().unwrap().to_string()
             } else if i == 1 {
                 message_hash_var.clone()
             } else {

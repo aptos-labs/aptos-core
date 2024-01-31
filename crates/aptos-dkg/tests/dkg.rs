@@ -44,8 +44,7 @@ fn test_dkg_all_weighted() {
 fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, seed_bytes: [u8; 32]) {
     let mut rng = StdRng::from_seed(seed_bytes);
 
-    let (pp, ssks, spks, dks, eks, iss, _, sk) =
-        test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
 
     let mut trxs = vec![];
 
@@ -53,10 +52,10 @@ fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, see
     for i in 0..sc.get_total_num_players() {
         trxs.push(T::deal(
             sc,
-            &pp,
-            &ssks[i],
-            &eks,
-            &iss[i],
+            &d.pp,
+            &d.ssks[i],
+            &d.eks,
+            &d.iss[i],
             &NoAux,
             &sc.get_player(i),
             &mut rng,
@@ -69,16 +68,16 @@ fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, see
     // Verify the aggregated transcript
     trx.verify(
         sc,
-        &pp,
-        &spks,
-        &eks,
+        &d.pp,
+        &d.spks,
+        &d.eks,
         &(0..sc.get_total_num_players())
             .map(|_| NoAux)
             .collect::<Vec<NoAux>>(),
     )
     .expect("aggregated PVSS transcript failed verification");
 
-    if sk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &dks, trx) {
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx) {
         panic!("Reconstructed SK did not match");
     }
 }

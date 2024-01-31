@@ -13,7 +13,9 @@ use move_compiler_v2::{
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        uninitialized_use_checker::UninitializedUseChecker, visibility_checker::VisibilityChecker,
+        uninitialized_use_checker::UninitializedUseChecker,
+        unreachable_code_analysis::UnreachableCodeProcessor,
+        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
     },
     run_file_format_gen, Options,
 };
@@ -263,6 +265,17 @@ impl TestConfig {
             }
         } else if path.contains("/uninit-use-checker/") {
             pipeline.add_processor(Box::new(UninitializedUseChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/unreachable-code-remover/") {
+            pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+            pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
             Self {
                 type_check_only: false,
                 dump_ast: false,

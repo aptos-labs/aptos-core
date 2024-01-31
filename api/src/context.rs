@@ -1465,7 +1465,7 @@ impl FunctionStats {
 
             info!(
                 LogSchema::new(self.log_event),
-                top_1 = sorted.get(0),
+                top_1 = sorted.first(),
                 top_2 = sorted.get(1),
                 top_3 = sorted.get(2),
                 top_4 = sorted.get(3),

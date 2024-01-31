@@ -25,12 +25,14 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
     account_address::AccountAddress, epoch_change::EpochChangeProof, epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
 };
+use bytes::Bytes;
 use futures::{
     channel::{
         mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
@@ -579,13 +581,18 @@ impl BufferManager {
                                 commit_info = commit_info,
                                 "Failed to add commit vote",
                             );
+                            reply_nack(protocol, response_sender);
                             item
                         },
                     };
                     self.buffer.set(&current_cursor, new_item);
                     if self.buffer.get(&current_cursor).is_aggregated() {
                         return Some(target_block_id);
+                    } else {
+                        return None;
                     }
+                } else {
+                    reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                 }
             },
             CommitMessage::Decision(commit_proof) => {
@@ -613,10 +620,14 @@ impl BufferManager {
                         return Some(target_block_id);
                     }
                 }
+                reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
             },
             CommitMessage::Ack(_) => {
                 // It should be filtered out by verify, so we log errors here
                 error!("Unexpected ack message");
+            },
+            CommitMessage::Nack => {
+                error!("Unexpected NACK message");
             },
         }
         None
@@ -781,5 +792,12 @@ impl BufferManager {
             }
         }
         info!("Buffer manager stops.");
+    }
+}
+
+fn reply_nack(protocol: ProtocolId, response_sender: oneshot::Sender<Result<Bytes, RpcError>>) {
+    let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Nack));
+    if let Ok(bytes) = protocol.to_bytes(&response) {
+        let _ = response_sender.send(Ok(bytes.into()));
     }
 }

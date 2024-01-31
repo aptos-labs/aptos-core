@@ -39,7 +39,7 @@ fun <SELF>_0::main() {
 
 Diagnostics:
 error: use of possibly unassigned local `ref`
-  ┌─ tests/uninit-use-checker/borrow_if.move:8:14
+  ┌─ tests/uninit-use-checker/v1-borrow-tests/borrow_if.move:8:14
   │
 8 │     assert!(*move ref == 5, 42);
   │              ^^^^^^^^

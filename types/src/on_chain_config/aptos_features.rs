@@ -55,6 +55,7 @@ pub enum FeatureFlag {
     RECONFIGURE_WITH_DKG = 45,
     ZK_ID_SIGNATURE = 46,
     OPEN_ID_SIGNATURE = 47,
+    REMOVE_DETAILED_ERROR_FROM_HASH = 48,
 }
 
 /// Representation of features on chain as a bitset.
@@ -181,6 +182,10 @@ impl Features {
 
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
+    }
+  
+    pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
 }
 
