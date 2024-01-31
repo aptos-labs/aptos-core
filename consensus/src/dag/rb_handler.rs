@@ -26,7 +26,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{Features, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
-    validator_txn::{Topic, ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
 };
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
@@ -103,9 +103,7 @@ impl NodeBroadcastHandler {
         ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
 
         for vtxn in node.validator_txns() {
-            if !self.features.is_reconfigure_with_dkg_enabled()
-                && matches!(vtxn.topic(), Topic::DKG)
-            {
+            if !self.features.is_reconfigure_with_dkg_enabled() && vtxn.is_dkg() {
                 counters::UNEXPECTED_DKG_VTXN_COUNT.inc();
                 bail!("DKG vtxn unexpected while the feature is disabled.");
             }

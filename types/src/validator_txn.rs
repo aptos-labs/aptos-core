@@ -41,12 +41,8 @@ impl ValidatorTransaction {
         bcs::serialized_size(self).unwrap()
     }
 
-    pub fn topic(&self) -> Topic {
-        match self {
-            Self::DummyTopic1(_) => Topic::DUMMY1,
-            Self::DKGResult(_) => Topic::DKG,
-            Self::DummyTopic2(_) => Topic::DUMMY2,
-        }
+    pub fn is_dkg(&self) -> bool {
+        matches!(self, Self::DKGResult(_))
     }
 }
 
