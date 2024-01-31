@@ -242,7 +242,11 @@ async fn get_data_with_threads(
             }
         });
         threads.push(thread);
+        // requested vresion = 1
+        // next requested version = 1000
+
         current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
+        current_version -= current_version % TRANSACTIONS_PER_STORAGE_BLOCK;
     }
 
     let mut transactions: Vec<Vec<Transaction>> = vec![];
