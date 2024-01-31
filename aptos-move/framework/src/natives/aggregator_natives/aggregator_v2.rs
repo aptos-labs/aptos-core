@@ -537,7 +537,7 @@ fn native_create_derived_string(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     abort_if_not_enabled!(context);
 
-    debug_assert_eq!(ty_args.len(), 1);
+    debug_assert_eq!(ty_args.len(), 0);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 

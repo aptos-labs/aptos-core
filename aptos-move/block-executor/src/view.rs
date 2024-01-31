@@ -1975,7 +1975,7 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        aggregator::DelayedFieldID,
+        aggregator::{bytes_and_width_to_derived_string_struct, to_utf8_bytes, DelayedFieldID},
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
@@ -2551,6 +2551,16 @@ mod test {
         )]))
     }
 
+    fn create_derived_string_layout() -> MoveTypeLayout {
+        MoveTypeLayout::Tagged(
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
+            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                create_string_layout(),
+                create_vector_layout(MoveTypeLayout::U8),
+            ]))),
+        )
+    }
+
     fn create_string_layout() -> MoveTypeLayout {
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![MoveTypeLayout::Vector(
             Box::new(MoveTypeLayout::U8),
@@ -2565,18 +2575,16 @@ mod test {
         Value::struct_(Struct::pack(vec![value]))
     }
 
+    fn create_derived_value(value: impl ToString, width: usize) -> Value {
+        bytes_and_width_to_derived_string_struct(to_utf8_bytes(value), width).unwrap()
+    }
+
     fn create_struct_value(inner: Value) -> Value {
         Value::struct_(Struct::pack(vec![inner]))
     }
 
     fn create_vector_value(inner: Vec<Value>) -> Value {
         Value::vector_for_testing_only(inner)
-    }
-
-    fn create_string_value(value: &str) -> Value {
-        Value::struct_(Struct::pack(vec![Value::vector_u8(
-            bcs::to_bytes(value).unwrap().to_vec(),
-        )]))
     }
 
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
@@ -2627,9 +2635,15 @@ mod test {
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
+        let start_counter = 5;
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            ViewState::Unsync(SequentialState::new(&unsync_map, 5, &counter, true)),
+            ViewState::Unsync(SequentialState::new(
+                &unsync_map,
+                start_counter,
+                &counter,
+                true,
+            )),
             1,
         );
 
@@ -2678,7 +2692,7 @@ mod test {
             "One identifier should have been replaced in this case"
         );
         assert!(
-            identifiers.contains(&DelayedFieldID::new(5)),
+            identifiers.contains(&DelayedFieldID::new_with_width(5, 8)),
             "The value 25 should have been replaced in the identifier 5"
         );
         let (final_state_value, identifiers) = latest_view
@@ -2715,9 +2729,18 @@ mod test {
         );
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![Value::u64(6), Value::u64(50)])),
-                Value::struct_(Struct::pack(vec![Value::u64(7), Value::u64(65)])),
-                Value::struct_(Struct::pack(vec![Value::u64(8), Value::u64(20)])),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(DelayedFieldID::new_with_width(6, 8).as_u64()),
+                    Value::u64(50),
+                ])),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(DelayedFieldID::new_with_width(7, 8).as_u64()),
+                    Value::u64(65),
+                ])),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(DelayedFieldID::new_with_width(8, 8).as_u64()),
+                    Value::u64(20),
+                ])),
             ])]));
         assert_eq!(
             patched_state_value,
@@ -2759,9 +2782,15 @@ mod test {
         );
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                create_snapshot_value(Value::u128(9)),
-                create_snapshot_value(Value::u128(10)),
-                create_snapshot_value(Value::u128(11)),
+                create_snapshot_value(Value::u128(
+                    DelayedFieldID::new_with_width(9, 16).as_u64() as u128
+                )),
+                create_snapshot_value(Value::u128(
+                    DelayedFieldID::new_with_width(10, 16).as_u64() as u128
+                )),
+                create_snapshot_value(Value::u128(
+                    DelayedFieldID::new_with_width(11, 16).as_u64() as u128
+                )),
             ])]));
         assert_eq!(
             patched_state_value,
@@ -2779,16 +2808,14 @@ mod test {
 
         /*
             layout = Struct {
-                snap: vec![AggregatorSnapshot<string>]
+                snap: vec![DerivedString]
             }
         */
-        let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
-            create_string_layout(),
-        )));
+        let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));
         let value = create_struct_value(create_vector_value(vec![
-            create_snapshot_value(create_string_value("hello")),
-            create_snapshot_value(create_string_value("ab")),
-            create_snapshot_value(create_string_value("c")),
+            create_derived_value("hello", 60),
+            create_derived_value("ab", 55),
+            create_derived_value("c", 50),
         ]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
@@ -2802,17 +2829,23 @@ mod test {
             counter == RefCell::new(15),
             "The counter should have been updated to 15"
         );
-        // TODO: This assertion is failing. The replaced identifier is not BCS encoded.
-        // let patched_value = Value::struct_(Struct::pack(vec![
-        //     Value::vector_for_testing_only(vec![
-        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("12").unwrap().to_vec())]))])),
-        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("13").unwrap().to_vec())]))])),
-        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("14").unwrap().to_vec())]))])),
-        // ])]));
-        // assert_eq!(
-        //     patched_state_value,
-        //     StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
-        // );
+
+        let patched_value =
+            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+                DelayedFieldID::new_with_width(12, 60)
+                    .into_derived_string_struct()
+                    .unwrap(),
+                DelayedFieldID::new_with_width(13, 55)
+                    .into_derived_string_struct()
+                    .unwrap(),
+                DelayedFieldID::new_with_width(14, 50)
+                    .into_derived_string_struct()
+                    .unwrap(),
+            ])]));
+        assert_eq!(
+            patched_state_value,
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+        );
         let (final_state_value, identifiers2) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
@@ -3101,10 +3134,13 @@ mod test {
         let state_value = create_state_value(&value, &layout);
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
 
-        let holder = ComparisonHolder::new(data, 1000);
+        let start_counter = 1000;
+        let id = DelayedFieldID::new_with_width(start_counter, 8);
+
+        let holder = ComparisonHolder::new(data, start_counter);
         let views = holder.new_view();
 
-        let patched_value = create_struct_value(create_aggregator_value_u64(1000, 30));
+        let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
         let patched_state_value = create_state_value(&patched_value, &layout);
 
         match check_metadata {
@@ -3124,10 +3160,7 @@ mod test {
             Some(patched_state_value.clone())
         );
         assert!(views
-            .get_reads_needing_exchange(
-                &HashSet::from([DelayedFieldID::new(1000)]),
-                &HashSet::new()
-            )
+            .get_reads_needing_exchange(&HashSet::from([id]), &HashSet::new())
             .unwrap()
             .contains_key(&KeyType(1, false)));
         assert_fetch_eq(
@@ -3156,7 +3189,9 @@ mod test {
         let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         data.insert(KeyType::<u32>(4, false), state_value_4);
 
-        let holder = ComparisonHolder::new(data, 1000);
+        let start_counter = 1000;
+        let id = DelayedFieldID::new_with_width(start_counter, 8);
+        let holder = ComparisonHolder::new(data, start_counter);
         let views = holder.new_view();
 
         assert_eq!(
@@ -3178,7 +3213,7 @@ mod test {
             Some(state_value_3.clone())
         );
 
-        //TODO: This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
+        // TODO[agg_v2](fix): This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
         // Is Err(StorageVersion) expected here?
         println!(
             "data: {:?}",
@@ -3188,7 +3223,7 @@ mod test {
                 .fetch_data(&KeyType::<u32>(3, false), 1)
         );
 
-        let patched_value = create_struct_value(create_aggregator_value_u64(1000, 30));
+        let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
         let state_value_4 =
             StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into());
         assert_eq!(
@@ -3205,7 +3240,7 @@ mod test {
         // );
 
         assert_ok_eq!(
-            views.get_delayed_field_value(&DelayedFieldID::new(1000)),
+            views.get_delayed_field_value(&id),
             DelayedFieldValue::Aggregator(25),
         );
 
@@ -3213,14 +3248,14 @@ mod test {
         assert!(captured_reads.validate_data_reads(holder.versioned_map.data(), 1));
         let read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields();
 
-        // TODO: This prints
+        // TODO[agg_v2](fix): This prints
         // read: (KeyType(4, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         // read: (KeyType(2, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         for read in read_set_with_delayed_fields {
             println!("read: {:?}", read);
         }
 
-        // TODO: This assertion fails.
+        // TODO[agg_v2](fix): This assertion fails.
         // let data_read = DataRead::Versioned(Ok((1,0)), Arc::new(TransactionWrite::from_state_value(Some(state_value_4))), Some(Arc::new(layout)));
         // assert!(read_set_with_delayed_fields.any(|x| x == (&KeyType::<u32>(4, false), &data_read)));
     }

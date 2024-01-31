@@ -175,7 +175,7 @@ module aptos_framework::aggregator_v2 {
     #[test]
     fun test_string_concat1() {
         let snapshot = create_snapshot(42);
-        let snapshot2 = string_concat_derived(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        let snapshot2 = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
         assert!(read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
     }
 
@@ -183,7 +183,7 @@ module aptos_framework::aggregator_v2 {
     #[expected_failure(abort_code = 0x030005, location = Self)]
     fun test_string_concat_from_string_not_supported() {
         let snapshot = create_snapshot<String>(std::string::utf8(b"42"));
-        string_concat_derived(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
     }
 
     // Tests commented out, as flag used in rust cannot be disabled.
