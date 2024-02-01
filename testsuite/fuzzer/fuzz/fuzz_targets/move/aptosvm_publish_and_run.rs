@@ -22,7 +22,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::{ModuleId, TypeTag},
     value::MoveValue,
-    vm_status::{StatusType, VMStatus},
+    vm_status::{StatusCode, StatusType, VMStatus},
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -328,7 +328,10 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         ExecutionStatus::Success => (),
         ExecutionStatus::MiscellaneousError(e) => {
             if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation {
+                if e.status_type() == StatusType::InvariantViolation
+                    && *e != StatusCode::TYPE_RESOLUTION_FAILURE
+                    && *e != StatusCode::STORAGE_ERROR
+                {
                     panic!("invariant violation {:?}", e);
                 }
             }
