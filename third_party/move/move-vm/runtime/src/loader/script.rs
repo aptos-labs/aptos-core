@@ -159,7 +159,7 @@ impl Script {
                 | Bytecode::VecUnpack(si, _)
                 | Bytecode::VecSwap(si) => {
                     if !single_signature_token_map.contains_key(si) {
-                        let ty = match script.signature_at(*si).0.get(0) {
+                        let ty = match script.signature_at(*si).0.first() {
                             None => {
                                 return Err(PartialVMError::new(
                                     StatusCode::VERIFIER_INVARIANT_VIOLATION,

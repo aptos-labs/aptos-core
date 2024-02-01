@@ -140,34 +140,6 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
     assert_eq!(on_chain_balance.get(), balance);
 }
 
-/// This module provides useful functions for operating, handling and managing
-/// AptosSwarm instances. It is particularly useful for working with tests that
-/// require a SmokeTestEnvironment, as it provides a generic interface across
-/// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
-/// node swarm, or a public full node swarm.
-#[cfg(test)]
-pub mod swarm_utils {
-    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
-    use aptos_secure_storage::{KVStorage, Storage};
-    use aptos_types::waypoint::Waypoint;
-
-    pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
-        node_config.base.waypoint = WaypointConfig::FromConfig(waypoint);
-
-        let f = |backend: &SecureBackend| {
-            let mut storage: Storage = backend.into();
-            storage
-                .set(aptos_global_constants::WAYPOINT, waypoint)
-                .expect("Unable to write waypoint");
-            storage
-                .set(aptos_global_constants::GENESIS_WAYPOINT, waypoint)
-                .expect("Unable to write waypoint");
-        };
-        let backend = &node_config.consensus.safety_rules.backend;
-        f(backend);
-    }
-}
-
 /// This helper function creates 3 new accounts, mints funds, transfers funds
 /// between the accounts and verifies that these operations succeed.
 pub async fn check_create_mint_transfer(swarm: &mut LocalSwarm) {
@@ -203,4 +175,32 @@ pub async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
         .wait_for_all_nodes_to_catchup(Duration::from_secs(MAX_CATCH_UP_WAIT_SECS))
         .await
         .unwrap();
+}
+
+/// This module provides useful functions for operating, handling and managing
+/// AptosSwarm instances. It is particularly useful for working with tests that
+/// require a SmokeTestEnvironment, as it provides a generic interface across
+/// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
+/// node swarm, or a public full node swarm.
+#[cfg(test)]
+pub mod swarm_utils {
+    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
+    use aptos_secure_storage::{KVStorage, Storage};
+    use aptos_types::waypoint::Waypoint;
+
+    pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
+        node_config.base.waypoint = WaypointConfig::FromConfig(waypoint);
+
+        let f = |backend: &SecureBackend| {
+            let mut storage: Storage = backend.into();
+            storage
+                .set(aptos_global_constants::WAYPOINT, waypoint)
+                .expect("Unable to write waypoint");
+            storage
+                .set(aptos_global_constants::GENESIS_WAYPOINT, waypoint)
+                .expect("Unable to write waypoint");
+        };
+        let backend = &node_config.consensus.safety_rules.backend;
+        f(backend);
+    }
 }

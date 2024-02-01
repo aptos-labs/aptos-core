@@ -36,7 +36,7 @@ impl<T: std::fmt::Debug> PanicOr<T> {
 
 pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
-        "Delayed logic code invariant broken (there is a bug in the code), {:?}",
+        "Delayed field / resource group code invariant broken (a bug in the code), {:?}",
         message
     );
     error!("{}", msg);

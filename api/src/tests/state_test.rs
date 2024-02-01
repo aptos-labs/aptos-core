@@ -9,7 +9,7 @@ use move_core_types::account_address::AccountAddress;
 use move_package::BuildConfig;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::{convert::TryInto, path::PathBuf};
+use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resource() {
@@ -320,8 +320,7 @@ fn get_table_item(handle: AccountAddress) -> String {
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     let module = build_test_module(account.address()).await;
 
-    ctx.api_publish_module(account, module.try_into().unwrap())
-        .await;
+    ctx.api_publish_module(account, module.into()).await;
     ctx.api_execute_entry_function(account, "make_test_tables", json!([]), json!([]))
         .await
 }

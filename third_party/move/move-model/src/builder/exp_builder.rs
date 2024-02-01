@@ -1599,7 +1599,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // Shortcut for single element case
         if list.value.len() == 1 {
             return self.translate_lvalue(
-                list.value.get(0).unwrap(),
+                list.value.first().unwrap(),
                 expected_type,
                 expected_order,
                 match_locals,

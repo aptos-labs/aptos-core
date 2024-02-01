@@ -112,7 +112,7 @@ impl KnownAttribute {
 
     pub fn get_resource_group(&self) -> Option<ResourceGroupScope> {
         if self.kind == KnownAttributeKind::ResourceGroup as u8 {
-            self.args.get(0).and_then(|scope| str::parse(scope).ok())
+            self.args.first().and_then(|scope| str::parse(scope).ok())
         } else {
             None
         }
@@ -127,7 +127,7 @@ impl KnownAttribute {
 
     pub fn get_resource_group_member(&self) -> Option<StructTag> {
         if self.kind == KnownAttributeKind::ResourceGroupMember as u8 {
-            self.args.get(0)?.parse().ok()
+            self.args.first()?.parse().ok()
         } else {
             None
         }

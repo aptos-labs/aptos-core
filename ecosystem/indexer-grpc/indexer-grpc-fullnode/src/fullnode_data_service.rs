@@ -92,6 +92,14 @@ impl FullnodeData for FullnodeDataService {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
+                if results.is_empty() {
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        "[Indexer Fullnode] Client disconnected."
+                    );
+                    break;
+                }
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {

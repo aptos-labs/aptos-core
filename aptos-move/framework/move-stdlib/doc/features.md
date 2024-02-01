@@ -84,6 +84,10 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
+-  [Function `get_zkid_feature`](#0x1_features_get_zkid_feature)
+-  [Function `zkid_feature_enabled`](#0x1_features_zkid_feature_enabled)
+-  [Function `get_zkid_zkless_feature`](#0x1_features_get_zkid_zkless_feature)
+-  [Function `zkid_zkless_feature_enabled`](#0x1_features_zkid_zkless_feature_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -573,6 +577,30 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
+</code></pre>
+
+
+
+<a id="0x1_features_ZK_ID_SIGNATURES"></a>
+
+Whether the zkID feature is enabled, possibly with the ZK-less verification mode.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a>: u64 = 46;
+</code></pre>
+
+
+
+<a id="0x1_features_ZK_ID_ZKLESS_SIGNATURE"></a>
+
+Whether the ZK-less mode of the zkID feature is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>: u64 = 47;
 </code></pre>
 
 
@@ -1793,6 +1821,98 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bn254_structures_enabled">bn254_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_zkid_feature"></a>
+
+## Function `get_zkid_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_feature">get_zkid_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_feature">get_zkid_feature</a>(): u64 { <a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_zkid_feature_enabled"></a>
+
+## Function `zkid_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_feature_enabled">zkid_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_feature_enabled">zkid_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_zkid_zkless_feature"></a>
+
+## Function `get_zkid_zkless_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_zkless_feature">get_zkid_zkless_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_zkless_feature">get_zkid_zkless_feature</a>(): u64 { <a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_zkid_zkless_feature_enabled"></a>
+
+## Function `zkid_zkless_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>)
 }
 </code></pre>
 

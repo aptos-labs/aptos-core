@@ -1015,7 +1015,7 @@ fn parse_failed_operations_from_txn_payload(
             (AccountAddress::ONE, ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                 if let Some(Ok(address)) = inner
                     .args()
-                    .get(0)
+                    .first()
                     .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
                 {
                     operations.push(Operation::create_account(
@@ -1162,7 +1162,7 @@ fn parse_transfer_from_txn_payload(
 
     let args = payload.args();
     let maybe_receiver = args
-        .get(0)
+        .first()
         .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded));
     let maybe_amount = args.get(1).map(|encoded| bcs::from_bytes::<u64>(encoded));
 

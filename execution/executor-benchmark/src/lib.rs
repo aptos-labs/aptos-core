@@ -673,6 +673,12 @@ impl OverallMeasuring {
     }
 }
 
+fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
+    let total_supply =
+        DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
+    info!("total supply is {:?} octas", total_supply)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
@@ -750,10 +756,4 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
     }
-}
-
-fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
-    let total_supply =
-        DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
-    info!("total supply is {:?} octas", total_supply)
 }

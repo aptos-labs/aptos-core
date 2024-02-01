@@ -1386,8 +1386,37 @@ impl AptosVM {
             ));
         }
 
-        zkid_validation::validate_zkid_authenticators(transaction, resolver, session, log_context)?;
+        // zkID feature gating
+        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction);
+        match &authenticators {
+            Ok(authenticators) => {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                    }
+                    if (!self.features.is_zkid_enabled() || !self.features.is_zkid_zkless_enabled())
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                    }
+                }
+            },
+            Err(_) => {
+                return Err(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
+            },
+        }
 
+        zkid_validation::validate_zkid_authenticators(
+            &authenticators.unwrap(),
+            resolver,
+            self.move_vm.get_chain_id(),
+        )?;
+
+        // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
+        // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
+        // end up skipping validation.
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -2236,25 +2265,6 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
-
-        if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
-            if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
-                for (_, sig) in authenticators {
-                    if !self.features.is_zkid_enabled()
-                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
-                    {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                    if !self.features.is_open_id_signature_enabled()
-                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
-                    {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                }
-            } else {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            };
-        };
 
         let txn = match transaction.check_signature() {
             Ok(t) => t,

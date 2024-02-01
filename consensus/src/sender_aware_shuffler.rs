@@ -286,7 +286,7 @@ mod tests {
             let mut senders = Vec::new();
             for _ in 0..num_senders {
                 let mut sender_txns = create_signed_transaction(1);
-                senders.push(sender_txns.get(0).unwrap().sender());
+                senders.push(sender_txns.first().unwrap().sender());
                 txns.append(&mut sender_txns);
             }
             let txn_shuffer = SenderAwareShuffler::new(10);
@@ -304,7 +304,7 @@ mod tests {
         let mut senders = Vec::new();
         for _ in 0..num_senders {
             let mut sender_txns = create_signed_transaction(10);
-            senders.push(sender_txns.get(0).unwrap().sender());
+            senders.push(sender_txns.first().unwrap().sender());
             txns.append(&mut sender_txns);
         }
 
@@ -325,7 +325,7 @@ mod tests {
         let mut senders = Vec::new();
         for _ in 0..num_senders {
             let mut sender_txns = create_signed_transaction(10);
-            senders.push(sender_txns.get(0).unwrap().sender());
+            senders.push(sender_txns.first().unwrap().sender());
             txns.append(&mut sender_txns);
         }
 
@@ -345,7 +345,7 @@ mod tests {
         let mut orig_txns_by_sender = HashMap::new();
         for _ in 0..num_senders {
             let mut sender_txns = create_signed_transaction(rng.gen_range(1, max_txn_per_sender));
-            orig_txns_by_sender.insert(sender_txns.get(0).unwrap().sender(), sender_txns.clone());
+            orig_txns_by_sender.insert(sender_txns.first().unwrap().sender(), sender_txns.clone());
             orig_txns.append(&mut sender_txns);
         }
         let txn_shuffler = SenderAwareShuffler::new(num_senders - 1);
@@ -377,9 +377,18 @@ mod tests {
         orig_txns.extend(sender3_txns.clone());
         let txn_shuffler = SenderAwareShuffler::new(3);
         let optimized_txns = txn_shuffler.shuffle(orig_txns);
-        assert_eq!(optimized_txns.get(0).unwrap(), sender1_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(1).unwrap(), sender2_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(2).unwrap(), sender3_txns.get(0).unwrap());
+        assert_eq!(
+            optimized_txns.first().unwrap(),
+            sender1_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(1).unwrap(),
+            sender2_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(2).unwrap(),
+            sender3_txns.first().unwrap()
+        );
         assert_eq!(optimized_txns.get(3).unwrap(), sender3_txns.get(1).unwrap());
     }
 
@@ -402,12 +411,27 @@ mod tests {
         orig_txns.extend(sender5_txns.clone());
         let txn_shuffler = SenderAwareShuffler::new(3);
         let optimized_txns = txn_shuffler.shuffle(orig_txns);
-        assert_eq!(optimized_txns.get(0).unwrap(), sender1_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(1).unwrap(), sender2_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(2).unwrap(), sender3_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(3).unwrap(), sender4_txns.get(0).unwrap());
+        assert_eq!(
+            optimized_txns.first().unwrap(),
+            sender1_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(1).unwrap(),
+            sender2_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(2).unwrap(),
+            sender3_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(3).unwrap(),
+            sender4_txns.first().unwrap()
+        );
         assert_eq!(optimized_txns.get(4).unwrap(), sender1_txns.get(1).unwrap());
-        assert_eq!(optimized_txns.get(5).unwrap(), sender5_txns.get(0).unwrap());
+        assert_eq!(
+            optimized_txns.get(5).unwrap(),
+            sender5_txns.first().unwrap()
+        );
     }
 
     #[test]
@@ -430,14 +454,32 @@ mod tests {
         orig_txns.extend(sender6_txns.clone());
         let txn_shuffler = SenderAwareShuffler::new(3);
         let optimized_txns = txn_shuffler.shuffle(orig_txns);
-        assert_eq!(optimized_txns.get(0).unwrap(), sender1_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(1).unwrap(), sender2_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(2).unwrap(), sender3_txns.get(0).unwrap());
-        assert_eq!(optimized_txns.get(3).unwrap(), sender4_txns.get(0).unwrap());
+        assert_eq!(
+            optimized_txns.first().unwrap(),
+            sender1_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(1).unwrap(),
+            sender2_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(2).unwrap(),
+            sender3_txns.first().unwrap()
+        );
+        assert_eq!(
+            optimized_txns.get(3).unwrap(),
+            sender4_txns.first().unwrap()
+        );
         assert_eq!(optimized_txns.get(4).unwrap(), sender1_txns.get(1).unwrap());
-        assert_eq!(optimized_txns.get(5).unwrap(), sender5_txns.get(0).unwrap());
+        assert_eq!(
+            optimized_txns.get(5).unwrap(),
+            sender5_txns.first().unwrap()
+        );
         assert_eq!(optimized_txns.get(6).unwrap(), sender3_txns.get(1).unwrap());
-        assert_eq!(optimized_txns.get(7).unwrap(), sender6_txns.get(0).unwrap());
+        assert_eq!(
+            optimized_txns.get(7).unwrap(),
+            sender6_txns.first().unwrap()
+        );
     }
 
     #[test]
@@ -451,7 +493,7 @@ mod tests {
         let mut orig_txn_set = HashSet::new();
         for _ in 0..num_senders {
             let mut sender_txns = create_signed_transaction(rng.gen_range(1, max_txn_per_sender));
-            senders.push(sender_txns.get(0).unwrap().sender());
+            senders.push(sender_txns.first().unwrap().sender());
             orig_txns.append(&mut sender_txns);
         }
         for txn in orig_txns.clone() {
@@ -483,7 +525,7 @@ mod tests {
         let mut senders = Vec::new();
         for _ in 0..num_senders {
             let mut sender_txns = create_signed_transaction(rng.gen_range(1, max_txn_per_sender));
-            senders.push(sender_txns.get(0).unwrap().sender());
+            senders.push(sender_txns.first().unwrap().sender());
             orig_txns.append(&mut sender_txns);
         }
 
