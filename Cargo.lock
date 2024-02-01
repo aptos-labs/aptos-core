@@ -9,6 +9,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
+name = "abstract-domain-derive"
+version = "0.1.0"
+dependencies = [
+ "move-stackless-bytecode",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "syn 2.0.47",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10606,6 +10616,7 @@ dependencies = [
 name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "bcs 0.1.4",
  "clap 4.4.12",
@@ -10976,6 +10987,7 @@ dependencies = [
 name = "move-prover-bytecode-pipeline"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "async-trait",
  "atty",
@@ -11034,6 +11046,7 @@ dependencies = [
 name = "move-stackless-bytecode"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "codespan",
  "codespan-reporting",
