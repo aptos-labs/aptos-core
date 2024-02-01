@@ -44,7 +44,7 @@ pub fn generate_gas_upgrade_proposal(
         &writer,
         is_testnet,
         next_execution_hash.clone(),
-        &["aptos_framework::gas_schedule", "aptos_framework::aptos_governance"],
+        &["aptos_framework::gas_schedule"],
         |writer| {
             let gas_schedule_blob = bcs::to_bytes(gas_schedule).unwrap();
             assert!(gas_schedule_blob.len() < 65536);
@@ -67,7 +67,7 @@ pub fn generate_gas_upgrade_proposal(
             } else {
                 emitln!(
                     writer,
-                    "gas_schedule::set_gas_schedule_for_next_epoch(&framework_signer, gas_schedule_blob);"
+                    "gas_schedule::set_for_next_epoch(&framework_signer, gas_schedule_blob);"
                 );
                 emitln!(
                     writer,
