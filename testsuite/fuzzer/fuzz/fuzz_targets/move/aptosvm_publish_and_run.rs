@@ -316,6 +316,12 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // if error exit gracefully
     let status = match tdbg!(res.status()) {
         TransactionStatus::Keep(status) => status,
+        TransactionStatus::Discard(e) => {
+            if e.status_type() == StatusType::InvariantViolation {
+                panic!("invariant violation {:?}", e);
+            }
+            return Err(Corpus::Keep);
+        },
         _ => return Err(Corpus::Keep),
     };
     match tdbg!(status) {
