@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sender_aware_shuffler::SenderAwareShuffler;
 use aptos_logger::info;
 use aptos_types::{
     on_chain_config::{
@@ -10,7 +9,10 @@ use aptos_types::{
     },
     transaction::SignedTransaction,
 };
+use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
+
+mod sender_aware;
 
 /// Interface to shuffle transactions
 pub trait TransactionShuffler: Send + Sync {
