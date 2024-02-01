@@ -1,0 +1,15 @@
+[package]
+name = "tests"
+version = "0.0.0"
+
+
+[addresses]
+NamedAddr = "0xbad2"
+aptos_framework = "0x1"
+admin_addr = "0xbeef"
+mint_nft = "0x1234"
+source_addr = "0x2345"
+
+[dependencies]
+AptosFramework = { local = "../../../../../aptos-move/framework/aptos-framework" }
+AptosToken = { local = "../../../../../aptos-move/framework/aptos-token" }

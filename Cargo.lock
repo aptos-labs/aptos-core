@@ -10719,6 +10719,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-decompiler"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "clap 3.2.25",
+ "datatest-stable",
+ "move-binary-format",
+ "move-bytecode-source-map",
+ "move-command-line-common",
+ "move-compiler",
+ "move-core-types",
+ "move-ir-types",
+ "move-model",
+ "move-stackless-bytecode",
+ "move-symbol-pool",
+ "uuid",
+]
+
+[[package]]
 name = "move-disassembler"
 version = "0.1.0"
 dependencies = [

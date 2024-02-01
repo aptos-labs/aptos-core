@@ -25,6 +25,9 @@ pub mod stackless_bytecode_generator;
 pub mod stackless_control_flow_graph;
 pub mod usage_analysis;
 
+pub mod demove_peephole_analysis;
+pub mod demove_livevar_analysis;
+
 /// An error message used for cases where a compiled module is expected to be attached
 pub const COMPILED_MODULE_AVAILABLE: &str = "compiled module missing";
 
