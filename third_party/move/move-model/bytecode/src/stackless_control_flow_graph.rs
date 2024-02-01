@@ -61,12 +61,12 @@ impl StacklessControlFlowGraph {
                 if from_all_blocks && *succ_block_id == DUMMY_EXIT {
                     continue;
                 }
-                let predecessors = &mut block_id_to_predecessors.get_mut(succ_block_id).unwrap();
+                let predecessors = block_id_to_predecessors.get_mut(succ_block_id).unwrap();
                 predecessors.push(*block_id);
             }
         }
         if from_all_blocks {
-            let predecessors = &mut block_id_to_predecessors.get_mut(&DUMMY_EXIT).unwrap();
+            let predecessors = block_id_to_predecessors.get_mut(&DUMMY_EXIT).unwrap();
             blocks.keys().for_each(|block_id| {
                 if *block_id != DUMMY_ENTRANCE && *block_id != DUMMY_EXIT {
                     predecessors.push(*block_id);
