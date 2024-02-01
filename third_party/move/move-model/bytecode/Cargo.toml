@@ -10,6 +10,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
+abstract-domain-derive = { path = "./abstract_domain_derive" }
 move-binary-format = { path = "../../move-binary-format" }
 move-borrow-graph = { path = "../../move-borrow-graph" }
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }

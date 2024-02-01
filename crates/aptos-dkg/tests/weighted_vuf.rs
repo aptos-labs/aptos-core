@@ -7,8 +7,8 @@ use aptos_dkg::{
     pvss,
     pvss::{
         test_utils,
-        test_utils::NoAux,
-        traits::{Convert, SecretSharingConfig, Transcript},
+        test_utils::{DealingArgs, NoAux},
+        traits::{SecretSharingConfig, Transcript},
         Player, WeightedConfig,
     },
     utils::random::random_scalar,
@@ -41,48 +41,38 @@ where
     // Do a weighted PVSS
     let mut rng = StdRng::from_seed(seed.to_bytes_le());
 
-    let (wc, pvss_pp, dks, sk, pk, trx) = weighted_pvss::<T>(&mut rng);
+    let (wc, d, trx) = weighted_pvss::<T>(&mut rng);
 
     // Test decrypting SK shares, creating VUF proof shares, and aggregating those shares into a VUF
     // proof, verifying that proof and finally deriving the VUF evaluation.
     wvuf_randomly_aggregate_verify_and_derive_eval::<T, WVUF, StdRng>(
-        &wc, &sk, &pk, &dks, &pvss_pp, &trx, &mut rng,
+        &wc, &d.dsk, &d.dpk, &d.dks, &d.pp, &trx, &mut rng,
     );
 }
 
 fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
-    mut rng: &mut StdRng,
-) -> (
-    WeightedConfig,
-    T::PublicParameters,
-    Vec<T::DecryptPrivKey>,
-    T::DealtSecretKey,
-    T::DealtPubKey,
-    T,
-) {
+    rng: &mut StdRng,
+) -> (WeightedConfig, DealingArgs<T>, T) {
     let wc = WeightedConfig::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 
-    let (pvss_pp, ssks, spks, dks, eks, _, s, sk) =
-        test_utils::setup_dealing::<T, StdRng>(&wc, rng);
+    let d = test_utils::setup_dealing::<T, StdRng>(&wc, rng);
 
     let trx = T::deal(
         &wc,
-        &pvss_pp,
-        &ssks[0],
-        &eks,
-        &s,
+        &d.pp,
+        &d.ssks[0],
+        &d.eks,
+        &d.s,
         &NoAux,
         &wc.get_player(0),
-        &mut rng,
+        rng,
     );
 
-    let pk: <T as Transcript>::DealtPubKey = s.to(&pvss_pp);
-
     // Make sure the PVSS dealt correctly
-    trx.verify(&wc, &pvss_pp, &vec![spks[0].clone()], &eks, &vec![NoAux])
+    trx.verify(&wc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
         .expect("PVSS transcript failed verification");
 
-    (wc, pvss_pp, dks, sk, pk, trx)
+    (wc, d, trx)
 }
 
 /// 1. Evaluates the VUF using the `sk` directly.

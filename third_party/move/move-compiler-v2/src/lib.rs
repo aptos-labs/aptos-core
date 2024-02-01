@@ -5,6 +5,7 @@
 mod bytecode_generator;
 mod experiments;
 mod file_format_generator;
+pub mod flow_insensitive_checkers;
 pub mod function_checker;
 pub mod inliner;
 mod options;
@@ -15,7 +16,9 @@ use crate::pipeline::{
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
     explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
-    uninitialized_use_checker::UninitializedUseChecker, visibility_checker::VisibilityChecker,
+    uninitialized_use_checker::UninitializedUseChecker,
+    unreachable_code_analysis::UnreachableCodeProcessor,
+    unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -53,12 +56,21 @@ pub fn run_move_compiler(
     let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
+    if options.debug {
+        eprintln!("After error check, GlobalEnv={}", env.dump_env());
+    }
+
+    // Flow-insensitive checks on AST
+    flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
     function_checker::check_for_function_typed_parameters(&mut env);
     function_checker::check_access_and_use(&mut env);
     check_errors(&env, error_writer, "checking errors")?;
 
     if options.debug {
-        eprintln!("After error check, GlobalEnv={}", env.dump_env());
+        eprintln!(
+            "After flow-insensitive checks, GlobalEnv={}",
+            env.dump_env()
+        );
     }
 
     // Run inlining.
@@ -79,7 +91,7 @@ pub fn run_move_compiler(
         // from the first input file.
         let dump_base_name = options
             .sources
-            .get(0)
+            .first()
             .and_then(|f| {
                 Path::new(f)
                     .file_name()
@@ -214,6 +226,8 @@ fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
         with_copy_inference: false,
     }));
     pipeline.add_processor(Box::new(DeadStoreElimination {}));
+    pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+    pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.

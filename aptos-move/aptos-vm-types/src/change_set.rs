@@ -33,6 +33,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use rand::Rng;
 use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
@@ -41,6 +42,34 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+
+/// Sporadically checks if the given two input type layouts match.
+pub fn randomly_check_layout_matches(
+    layout_1: Option<&MoveTypeLayout>,
+    layout_2: Option<&MoveTypeLayout>,
+) -> Result<(), PanicError> {
+    if layout_1.is_some() != layout_2.is_some() {
+        return Err(code_invariant_error(format!(
+            "Layouts don't match when they are expected to: {:?} and {:?}",
+            layout_1, layout_2
+        )));
+    }
+    if layout_1.is_some() {
+        // Checking if 2 layouts are equal is a recursive operation and is expensive.
+        // We generally call this `randomly_check_layout_matches` function when we know
+        // that the layouts are supposed to match. As an optimization, we only randomly
+        // check if the layouts are matching.
+        let mut rng = rand::thread_rng();
+        let random_number: u32 = rng.gen_range(0, 100);
+        if random_number == 1 && layout_1 != layout_2 {
+            return Err(code_invariant_error(format!(
+                "Layouts don't match when they are expected to: {:?} and {:?}",
+                layout_1, layout_2
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// A change set produced by the VM.
 ///
@@ -634,13 +663,10 @@ impl VMChangeSet {
                     // Squash entry and additional entries if type layouts match.
                     let (additional_write_op, additional_type_layout) = additional_entry;
                     let (write_op, type_layout) = entry.get_mut();
-                    if *type_layout != additional_type_layout {
-                        return Err(code_invariant_error(format!(
-                            "Cannot squash two writes with different type layouts.
-                            key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                            key, type_layout, additional_type_layout
-                        )));
-                    }
+                    randomly_check_layout_matches(
+                        type_layout.as_deref(),
+                        additional_type_layout.as_deref(),
+                    )?;
                     let noop = !WriteOp::squash(write_op, additional_write_op).map_err(|e| {
                         code_invariant_error(format!("Error while squashing two write ops: {}.", e))
                     })?;
@@ -691,13 +717,7 @@ impl VMChangeSet {
                                 materialized_size: additional_materialized_size,
                             }),
                         ) => {
-                            if layout != additional_layout {
-                                return Err(code_invariant_error(format!(
-                                    "Cannot squash two writes with different type layouts.
-                                    key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                                    key, layout, additional_layout
-                                )));
-                            }
+                            randomly_check_layout_matches(Some(layout), Some(additional_layout))?;
                             let to_delete = !WriteOp::squash(write_op, additional_write_op.clone())
                                 .map_err(|e| {
                                     code_invariant_error(format!(

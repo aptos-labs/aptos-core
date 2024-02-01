@@ -100,7 +100,7 @@ module ExperimentalFramework::MultiTokenBalance {
         let len = vector::length(gallery);
         while ({spec {
             invariant i >= 0;
-            invariant i <= len(gallery);
+            invariant i <= ::len(gallery);
             invariant forall k in 0..i: gallery[k].id != id;
         };(i < len)}) {
             if (MultiToken::id<TokenType>(vector::borrow(gallery, i)) == *id) {

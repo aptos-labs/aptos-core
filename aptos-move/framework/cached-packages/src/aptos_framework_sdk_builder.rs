@@ -14,6 +14,7 @@
 #![allow(unused_imports)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::arc_with_non_send_sync)]
+#![allow(clippy::get_first)]
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{EntryFunction, TransactionPayload},
@@ -569,8 +570,10 @@ pub enum EntryFunctionCall {
         to: AccountAddress,
     },
 
-    /// Create a new object to host the code, and `PublisherRef` if the code is upgradeable,
-    /// Send `PublisherRef` to object signer.
+    /// Creates a new object with a unique address derived from the publisher address and the object seed.
+    /// Publishes the code passed in the function to the newly created object.
+    /// The caller must provide package metadata describing the package via `metadata_serialized` and
+    /// the code to be published via `code`. This contains a vector of modules to be deployed on-chain.
     ObjectCodeDeploymentPublish {
         metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
@@ -2947,8 +2950,10 @@ pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> Trans
     ))
 }
 
-/// Create a new object to host the code, and `PublisherRef` if the code is upgradeable,
-/// Send `PublisherRef` to object signer.
+/// Creates a new object with a unique address derived from the publisher address and the object seed.
+/// Publishes the code passed in the function to the newly created object.
+/// The caller must provide package metadata describing the package via `metadata_serialized` and
+/// the code to be published via `code`. This contains a vector of modules to be deployed on-chain.
 pub fn object_code_deployment_publish(
     metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,

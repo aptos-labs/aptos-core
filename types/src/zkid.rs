@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::{
+    bn254_circom::{G1Bytes, G2Bytes, DEVNET_VERIFYING_KEY},
+    chain_id::ChainId,
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -10,9 +12,11 @@ use crate::{
         SignedTransaction,
     },
 };
-use anyhow::{anyhow, ensure, Context, Ok, Result};
+use anyhow::{bail, ensure, Context, Result};
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254;
+use ark_groth16::{Groth16, Proof};
 use ark_serialize::CanonicalSerialize;
 use base64::{URL_SAFE, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -32,12 +36,16 @@ pub const IDC_NUM_BYTES: usize = 32;
 // TODO(ZkIdGroth16Zkp): add some static asserts here that these don't exceed the MAX poseidon input sizes
 // TODO(ZkIdGroth16Zkp): determine what our circuit will accept
 
-pub const MAX_EPK_BYTES: usize = 93; // Supports public key lengths of up to 93 bytes.
-pub const MAX_ISS_BYTES: usize = 248;
-pub const MAX_AUD_VAL_BYTES: usize = 248;
-pub const MAX_UID_KEY_BYTES: usize = 248;
-pub const MAX_UID_VAL_BYTES: usize = 248;
-pub const MAX_JWT_HEADER_BYTES: usize = 248;
+/// We support ephemeral public key lengths of up to 93 bytes.
+pub const MAX_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+// The values here are consistent with our public inputs hashing scheme.
+// Everything is a multiple of `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to maximize the input
+// sizes that can be hashed.
+pub const MAX_ISS_BYTES: usize = 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_JWT_HEADER_BYTES: usize = 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
 pub const MAX_ZK_PUBLIC_KEY_BYTES: usize = MAX_ISS_BYTES + MAX_EPK_BYTES;
 
@@ -49,7 +57,7 @@ pub const MAX_ZK_SIGNATURE_BYTES: usize = 2048;
 pub const MAX_ZK_ID_AUTHENTICATORS_ALLOWED: usize = 10;
 
 // How far in the future from the JWT issued at time the EPK expiry can be set.
-pub const MAX_EXPIRY_HORIZON_SECS: u64 = 1728000000; // 20000 days TODO(zkid): finalize this value
+pub const MAX_EXPIRY_HORIZON_SECS: u64 = 100255944; // 1159.55 days TODO(zkid): finalize this value
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct JwkId {
@@ -113,10 +121,10 @@ impl OpenIdSig {
 
         ensure!(
             IdCommitment::new_from_preimage(
+                &self.pepper,
                 &claims.oidc_claims.aud,
                 &self.uid_key,
-                &uid_val,
-                &self.pepper
+                &uid_val
             )?
             .eq(&pk.idc),
             "Address IDC verification failed"
@@ -225,13 +233,46 @@ impl Claims {
     }
 }
 
-pub type G1 = Vec<String>;
-pub type G2 = Vec<Vec<String>>;
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[derive(
+    Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
+)]
 pub struct Groth16Zkp {
-    a: G1,
-    b: G2,
-    c: G1,
+    a: G1Bytes,
+    b: G2Bytes,
+    c: G1Bytes,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+pub struct SignedGroth16Zkp {
+    pub proof: Groth16Zkp,
+    /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
+    pub non_malleability_signature: EphemeralSignature,
+    // TODO: add training_wheels_signature: EphemeralSignature,
+}
+
+impl SignedGroth16Zkp {
+    pub fn verify_non_malleability(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
+        self.non_malleability_signature.verify(&self.proof, pub_key)
+    }
+
+    pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
+        let vk = match chain_id.is_mainnet() {
+            true => {
+                bail!("verifying key for main net missing")
+            },
+            false => &DEVNET_VERIFYING_KEY,
+        };
+        let proof: Proof<ark_bn254::Bn254> = Proof {
+            a: self.proof.a.deserialize_into_affine()?,
+            b: self.proof.b.to_affine()?,
+            c: self.proof.c.deserialize_into_affine()?,
+        };
+        let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
+        if !result {
+            bail!("groth16 proof verification failed")
+        }
+        Ok(())
+    }
 }
 
 impl TryFrom<&[u8]> for Groth16Zkp {
@@ -242,11 +283,36 @@ impl TryFrom<&[u8]> for Groth16Zkp {
     }
 }
 
+impl Groth16Zkp {
+    pub fn new(a: G1Bytes, b: G2Bytes, c: G1Bytes) -> Self {
+        Groth16Zkp { a, b, c }
+    }
+
+    pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
+        let vk = match chain_id.is_mainnet() {
+            true => {
+                bail!("verifying key for main net missing")
+            },
+            false => &DEVNET_VERIFYING_KEY,
+        };
+        let proof: Proof<ark_bn254::Bn254> = Proof {
+            a: self.a.deserialize_into_affine()?,
+            b: self.b.to_affine()?,
+            c: self.c.deserialize_into_affine()?,
+        };
+        let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
+        if !result {
+            bail!("groth16 proof verification failed")
+        }
+        Ok(())
+    }
+}
+
 /// Allows us to support direct verification of OpenID signatures, in the rare case that we would
 /// need to turn off ZK proofs due to a bug in the circuit.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub enum ZkpOrOpenIdSig {
-    Groth16Zkp(Groth16Zkp),
+    Groth16Zkp(SignedGroth16Zkp),
     OpenIdSig(OpenIdSig),
 }
 
@@ -305,7 +371,7 @@ impl ZkIdSignature {
         let expiry_time = seconds_from_epoch(self.exp_timestamp_secs);
 
         if block_time > expiry_time {
-            Err(anyhow!("zkID Signature is expired"))
+            bail!("zkID Signature is expired");
         } else {
             Ok(())
         }
@@ -324,7 +390,7 @@ impl Pepper {
         &self.0
     }
 
-    #[cfg(test)]
+    // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
     pub fn from_number(num: u128) -> Self {
         let big_int = num_bigint::BigUint::from(num);
         let bytes: Vec<u8> = big_int.to_bytes_le();
@@ -339,10 +405,10 @@ pub struct IdCommitment(pub(crate) [u8; IDC_NUM_BYTES]);
 
 impl IdCommitment {
     pub fn new_from_preimage(
+        pepper: &Pepper,
         aud: &str,
         uid_key: &str,
         uid_val: &str,
-        pepper: &Pepper,
     ) -> Result<Self> {
         let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES)?;
         let uid_key_hash = poseidon_bn254::pad_and_hash_string(uid_key, MAX_UID_KEY_BYTES)?;
@@ -350,10 +416,10 @@ impl IdCommitment {
         let pepper_scalar = poseidon_bn254::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
 
         let fr = poseidon_bn254::hash_scalars(vec![
-            aud_val_hash,
-            uid_key_hash,
-            uid_val_hash,
             pepper_scalar,
+            aud_val_hash,
+            uid_val_hash,
+            uid_key_hash,
         ])?;
 
         let mut idc_bytes = [0u8; IDC_NUM_BYTES];
@@ -432,4 +498,106 @@ fn base64url_to_str(b64: &str) -> Result<String> {
 
 fn seconds_from_epoch(secs: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_secs(secs)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        bn254_circom::get_public_inputs_hash,
+        chain_id::ChainId,
+        jwks::rsa::RSA_JWK,
+        transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
+        zkid::{
+            G1Bytes, G2Bytes, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
+            ZkIdSignature, ZkpOrOpenIdSig,
+        },
+    };
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+
+    #[test]
+    fn test_groth16_proof_verification() {
+        let a = G1Bytes::new_unchecked(
+            "11685701338011120485255682535216931952523490513574344095859176729155974193429",
+            "19570000702948951151001315672614758851000529478920585316943681012227747910337",
+        )
+        .unwrap();
+        let b = G2Bytes::new_unchecked(
+            [
+                "10039243553158378944380740968043887743081233734014916979736214569065002261361",
+                "4926621746570487391149084476602889692047252928870676314074045787488022393462",
+            ],
+            [
+                "8151326214925440719229499872086146990795191649649968979609056373308460653969",
+                "12483309147304635788397060225283577172417980480151834869358925058077916828359",
+            ],
+        )
+        .unwrap();
+        let c = G1Bytes::new_unchecked(
+            "17509024307642709963307435885289611077932619305068428354097243520217914637634",
+            "17824783754604065652634030354434350582834434348663254057492956883323214722668",
+        )
+        .unwrap();
+        let proof = Groth16Zkp::new(a, b, c);
+
+        let sender = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender.public_key();
+        let sender_auth_key = AuthenticationKey::ed25519(&sender_pub);
+        let sender_addr = sender_auth_key.account_address();
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+            sender_addr,
+            0,
+            &sender,
+            sender.public_key(),
+            None,
+            0,
+            0,
+            None,
+        )
+        .into_raw_transaction();
+
+        let sender_sig = sender.sign(&raw_txn).unwrap();
+
+        let epk = EphemeralPublicKey::ed25519(sender.public_key());
+        let es = EphemeralSignature::ed25519(sender_sig);
+
+        let proof_sig = sender.sign(&proof).unwrap();
+        let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
+        let zk_sig = ZkIdSignature {
+            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+                proof: proof.clone(),
+                non_malleability_signature: ephem_proof_sig,
+            }),
+            jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
+            exp_timestamp_secs: 1900255944,
+            ephemeral_pubkey: epk,
+            ephemeral_signature: es,
+        };
+
+        let pepper = Pepper::from_number(76);
+        let addr_seed = IdCommitment::new_from_preimage(
+            &pepper,
+            "407408718192.apps.googleusercontent.com",
+            "sub",
+            "113990307082899718775",
+        )
+        .unwrap();
+
+        let zk_pk = ZkIdPublicKey {
+            iss: "https://accounts.google.com".to_owned(),
+            idc: addr_seed,
+        };
+        let jwk = RSA_JWK {
+            kid:"1".to_owned(),
+            kty:"RSA".to_owned(),
+            alg:"RS256".to_owned(),
+            e:"AQAB".to_owned(),
+            n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
+        };
+
+        let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &jwk).unwrap();
+
+        proof
+            .verify_proof(public_inputs_hash, ChainId::test())
+            .unwrap();
+    }
 }

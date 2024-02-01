@@ -15,6 +15,19 @@ use std::ops::AddAssign;
 #[derive(Clone, Serialize)]
 pub struct NoAux;
 
+/// Useful for gathering all the necessary args to deal inside tests & benchmarks.
+pub struct DealingArgs<T: Transcript> {
+    pub pp: T::PublicParameters,
+    pub ssks: Vec<T::SigningSecretKey>,
+    pub spks: Vec<T::SigningPubKey>,
+    pub dks: Vec<T::DecryptPrivKey>,
+    pub eks: Vec<T::EncryptPubKey>,
+    pub iss: Vec<T::InputSecret>,
+    pub s: T::InputSecret,
+    pub dsk: T::DealtSecretKey,
+    pub dpk: T::DealtPubKey,
+}
+
 /// Helper function that, given a sharing configuration for `n` players, returns an a tuple of:
 ///  - public parameters
 ///  - a vector of `n` signing SKs
@@ -27,16 +40,7 @@ pub struct NoAux;
 pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
     sc: &T::SecretSharingConfig,
     mut rng: &mut R,
-) -> (
-    T::PublicParameters,
-    Vec<T::SigningSecretKey>,
-    Vec<T::SigningPubKey>,
-    Vec<T::DecryptPrivKey>,
-    Vec<T::EncryptPubKey>,
-    Vec<T::InputSecret>,
-    T::InputSecret,
-    T::DealtSecretKey,
-) {
+) -> DealingArgs<T> {
     println!(
         "Setting up dealing for {} PVSS, with {}",
         T::scheme_name(),
@@ -73,10 +77,24 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     for is in &iss {
         s.add_assign(is)
     }
-    let sk: <T as Transcript>::DealtSecretKey = s.to(&pp);
+
+    let dpk: <T as Transcript>::DealtPubKey = s.to(&pp);
+    let dsk: <T as Transcript>::DealtSecretKey = s.to(&pp);
     // println!("Dealt SK: {:?}", sk);
 
-    (pp, ssks, spks, dks, eks, iss, s, sk)
+    assert_eq!(ssks.len(), spks.len());
+
+    DealingArgs {
+        pp,
+        ssks,
+        spks,
+        dks,
+        eks,
+        iss,
+        s,
+        dsk,
+        dpk,
+    }
 }
 
 /// Useful for printing types of variables without too much hassle.
@@ -161,27 +179,38 @@ pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfig> {
 pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     let mut wcs = vec![];
 
-    // Total weight is 9230
     let weights = vec![
-        17, 17, 11, 11, 11, 74, 40, 11, 11, 11, 11, 11, 218, 218, 218, 218, 218, 218, 218, 170, 11,
-        11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 18, 11, 11, 11, 192, 218, 11, 11, 52, 11,
-        161, 24, 11, 11, 11, 11, 218, 218, 161, 175, 80, 13, 103, 11, 11, 11, 11, 40, 40, 40, 14,
-        218, 218, 11, 218, 11, 11, 218, 11, 218, 71, 55, 218, 184, 170, 11, 218, 218, 164, 177,
-        171, 18, 209, 11, 20, 12, 147, 18, 169, 13, 35, 208, 13, 218, 218, 218, 218, 218, 218, 163,
-        73, 26,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 4, 4, 4,
+        4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 9, 10, 14, 14, 15, 15, 15, 15, 15, 15, 16, 16, 16, 17,
+        17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 20,
+        20, 20, 20,
     ];
-    wcs.push(WeightedConfig::new(3087, weights.clone()).unwrap());
-    wcs.push(WeightedConfig::new(6162, weights).unwrap());
+    let total_weight: usize = weights.iter().sum();
+    let threshold = total_weight * 2 / 3 + 1;
+    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
 
-    // Total weight is 850
     let weights = vec![
-        2, 2, 1, 1, 1, 7, 4, 1, 1, 1, 1, 1, 20, 20, 20, 20, 20, 20, 20, 16, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 2, 1, 1, 1, 18, 20, 1, 1, 5, 1, 15, 2, 1, 1, 1, 1, 20, 20, 15, 16, 7, 1, 9,
-        1, 1, 1, 1, 4, 4, 4, 1, 20, 20, 1, 20, 1, 1, 20, 1, 20, 7, 5, 20, 17, 16, 1, 20, 20, 15,
-        16, 16, 2, 19, 1, 2, 1, 13, 2, 16, 1, 3, 19, 1, 20, 20, 20, 20, 20, 20, 15, 7, 2,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 5, 5, 6, 7, 7, 10, 11, 11,
+        11, 11, 11, 13, 14, 14, 15, 18, 18, 20, 20, 20, 22, 28, 31, 42, 44, 44, 44, 45, 46, 46, 46,
+        47, 47, 48, 50, 51, 51, 51, 51, 52, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54, 54,
+        54, 57, 57, 60, 60, 60, 60,
     ];
-    wcs.push(WeightedConfig::new(290, weights.clone()).unwrap());
-    wcs.push(WeightedConfig::new(573, weights).unwrap());
+    let total_weight: usize = weights.iter().sum();
+    let threshold = total_weight * 2 / 3 + 1;
+    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+
+    let weights = vec![
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
+        5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 8, 8, 8, 8, 8, 9, 11, 11, 12, 16, 18,
+        18, 18, 18, 19, 22, 23, 23, 25, 29, 30, 32, 33, 34, 36, 46, 51, 69, 72, 72, 73, 73, 76, 76,
+        76, 77, 78, 79, 82, 84, 84, 84, 84, 86, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89, 89,
+        89, 89, 93, 94, 98, 98, 98, 98,
+    ];
+    let total_weight: usize = weights.iter().sum();
+    let threshold = total_weight * 2 / 3 + 1;
+    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
 
     wcs
 }

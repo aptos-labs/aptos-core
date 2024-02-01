@@ -1,3 +1,12 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-29:
++ warning: Unused parameter `elem`. Consider removing or prefixing with an underscore: `_elem`
++    ┌─ TEMPFILE:17:30
++    │
++ 17 │         for_each_ref_mut(v, |elem| {
++    │                              ^^^^
++ 
++ 
++ 

@@ -7,13 +7,15 @@ use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    function_checker, inliner, pipeline,
+    flow_insensitive_checkers, function_checker, inliner, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        uninitialized_use_checker::UninitializedUseChecker, visibility_checker::VisibilityChecker,
+        uninitialized_use_checker::UninitializedUseChecker,
+        unreachable_code_analysis::UnreachableCodeProcessor,
+        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
     },
     run_file_format_gen, Options,
 };
@@ -271,6 +273,17 @@ impl TestConfig {
                 dump_annotated_targets: true,
                 dump_for_only_some_stages: None,
             }
+        } else if path.contains("/unreachable-code-remover/") {
+            pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+            pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
         } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
@@ -297,23 +310,28 @@ impl TestConfig {
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
         if ok {
+            if options.debug {
+                eprint!("After error check, GlobalEnv={}", env.dump_env());
+            }
+            // Flow-insensitive checks on AST
+            flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
             function_checker::check_for_function_typed_parameters(&mut env);
             function_checker::check_access_and_use(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
-
         if ok {
             if options.debug {
-                eprint!("After error check, GlobalEnv={}", env.dump_env());
+                eprint!(
+                    "After flow-insensitive checks, GlobalEnv={}",
+                    env.dump_env()
+                );
             }
-
             // Run inlining.
             inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
-
-            if ok && options.debug {
-                eprint!("After inlining, GlobalEnv={}", env.dump_env());
-            }
+        }
+        if ok && options.debug {
+            eprint!("After inlining, GlobalEnv={}", env.dump_env());
         }
 
         if ok && self.dump_ast {
