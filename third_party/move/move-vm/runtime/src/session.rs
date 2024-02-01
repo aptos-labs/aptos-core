@@ -354,7 +354,8 @@ impl<'r, 'l> Session<'r, 'l> {
         &self,
         module_id: &ModuleId,
         function_name: &IdentStr,
-        type_arguments: &[TypeTag]) -> VMResult<bool> {
+        type_arguments: &[TypeTag],
+    ) -> VMResult<bool> {
         let (_, func, _) = self.move_vm.runtime.loader().load_function(
             module_id,
             function_name,

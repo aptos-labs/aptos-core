@@ -183,7 +183,7 @@ impl Features {
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
     }
-  
+
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }

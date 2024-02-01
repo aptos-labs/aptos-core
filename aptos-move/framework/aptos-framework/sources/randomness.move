@@ -61,7 +61,6 @@ module aptos_std::randomness {
     /// Generates an u8 uniformly at random.
     public fun u8_integer(): u8 acquires PerBlockRandomness {
         let raw = next_blob();
-        let i = 0;
         let ret: u8 = vector::pop_back(&mut raw);
         ret
     }

@@ -14,6 +14,7 @@ use aptos_aggregator::{
     resolver::TDelayedFieldView,
     types::{DelayedFieldID, DelayedFieldValue},
 };
+use aptos_framework::natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
@@ -53,7 +54,6 @@ use {
     move_vm_runtime::native_extensions::NativeContextExtensions,
     once_cell::sync::Lazy,
 };
-use aptos_framework::natives::randomness::RandomnessContext;
 
 #[cfg(feature = "testing")]
 struct AptosBlankStorage;
@@ -227,11 +227,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
     exts.add(NativeCodeContext::default());
-    let mut txn_context = NativeTransactionContext::new(
-        vec![1],
-        vec![1],
-        ChainId::test().id(),
-    );
+    let mut txn_context = NativeTransactionContext::new(vec![1], vec![1], ChainId::test().id());
     txn_context.set_is_friend_or_private_entry_func();
     exts.add(txn_context); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new(

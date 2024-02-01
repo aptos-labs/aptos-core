@@ -193,6 +193,7 @@ fn load_dkg_decrypt_key_from_identity_blob(
     identity_blob.try_into_dkg_new_validator_decrypt_key()
 }
 
+#[allow(clippy::unnecessary_fallible_conversions)]
 fn load_dkg_decrypt_key_from_secure_storage(
     node_config: &NodeConfig,
 ) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {

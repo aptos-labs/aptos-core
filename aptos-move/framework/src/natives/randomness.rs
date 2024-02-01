@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 
-use aptos_native_interface::{RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult};
+use crate::natives::transaction_context::NativeTransactionContext;
+use aptos_native_interface::{
+    RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+};
 use better_any::{Tid, TidAble};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-use crate::natives::transaction_context::NativeTransactionContext;
 
 /// A txn-local counter that increments each time a random 32-byte blob is requested.
 #[derive(Tid, Default)]
@@ -52,15 +54,20 @@ pub fn is_safe_call(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let ctx = context.extensions().get::<NativeTransactionContext>();
     // TODO: charge gas?
-    Ok(smallvec![Value::bool(ctx.get_is_friend_or_private_entry_func())])
+    Ok(smallvec![Value::bool(
+        ctx.get_is_friend_or_private_entry_func()
+    )])
 }
 
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
     let natives = vec![
-        ("fetch_and_increment_txn_counter", fetch_and_increment_txn_counter as RawSafeNative),
-        ("is_safe_call", is_safe_call)
+        (
+            "fetch_and_increment_txn_counter",
+            fetch_and_increment_txn_counter as RawSafeNative,
+        ),
+        ("is_safe_call", is_safe_call),
     ];
 
     builder.make_named_natives(natives)
