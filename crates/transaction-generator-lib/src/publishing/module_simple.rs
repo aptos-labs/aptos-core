@@ -608,7 +608,6 @@ impl EntryPoints {
             ),
             EntryPoints::EconiaDepositCoins => {
                 get_payload(module_id, ident_str!("deposit_coins").to_owned(), vec![
-                    bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
                 ])
             },
             EntryPoints::EconiaPlaceBidLimitOrder => {

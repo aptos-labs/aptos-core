@@ -42,11 +42,9 @@ module econia::txn_generator_utils {
         user::register_market_account<BC, QC>(user, MARKET_ID_COIN, NO_CUSTODIAN);
     }
 
-    public entry fun deposit_coins(_fee_payer: &signer, publisher: &signer, user: address) {
-        user::deposit_coins<QC>(user, MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<QC>(publisher, 1000));
-        assert!(1 == 2, 61);
-        user::deposit_coins<BC>(user, MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<BC>(publisher, 1000));
-        assert!(1 == 2, 62);
+    public entry fun deposit_coins(user: &signer, publisher: &signer) {
+        user::deposit_coins<QC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<QC>(publisher, 1000));
+        user::deposit_coins<BC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<BC>(publisher, 1000));
     }
     
     public entry fun place_bid_limit_order(user: &signer, price: u64) {
