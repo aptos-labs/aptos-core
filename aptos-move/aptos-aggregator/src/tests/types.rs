@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use aptos_types::{
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     state_store::{state_key::StateKey, state_value::StateValue},
     write_set::WriteOp,
 };
@@ -112,11 +112,11 @@ impl TDelayedFieldView for FakeAggregatorView {
         Ok(math.unsigned_add_delta(base, delta).is_ok())
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
         let mut counter = self.counter.borrow_mut();
-        let id = Self::Identifier::new(*counter as u64);
+        let id = *counter;
         *counter += 1;
-        id
+        DelayedFieldID::new_with_width(id, width)
     }
 
     fn validate_and_convert_delayed_field_id(
@@ -138,7 +138,7 @@ impl TDelayedFieldView for FakeAggregatorView {
             )));
         }
 
-        Ok(Self::Identifier::new(id))
+        Ok(Self::Identifier::from(id))
     }
 
     fn get_reads_needing_exchange(

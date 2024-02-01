@@ -4,8 +4,8 @@
 use crate::change_set::VMChangeSet;
 use aptos_aggregator::{resolver::AggregatorV1Resolver, types::code_invariant_error};
 use aptos_types::{
-    aggregator::PanicError,
     contract_event::ContractEvent, //contract_event::ContractEvent,
+    delayed_fields::PanicError,
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},

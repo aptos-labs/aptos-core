@@ -15,8 +15,9 @@ use crate::{
         types::{
             load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
             ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, OverrideSizeCheckOption
+            MoveManifestAccountWrapper, MovePackageDir, OverrideSizeCheckOption, ProfileOptions,
+            PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments, TransactionOptions,
+            TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -911,7 +912,8 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
-            bcs::to_bytes(&package.extract_metadata()?).expect("Failed to serialize PackageMetadata"),
+            bcs::to_bytes(&package.extract_metadata()?)
+                .expect("Failed to serialize PackageMetadata"),
             package.extract_code(),
         );
         let size = bcs::serialized_size(&payload)?;
@@ -925,13 +927,17 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        let result = self.txn_options
+        let result = self
+            .txn_options
             .submit_transaction(payload)
             .await
             .map(TransactionSummary::from);
 
-        if let Ok(_) = result {
-            println!("Code was successfully deployed to object address {}.", object_address);
+        if result.is_ok() {
+            println!(
+                "Code was successfully deployed to object address {}.",
+                object_address
+            );
         }
         result
     }
@@ -975,7 +981,10 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.check_test_code,
             );
         let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
-        let url = self.txn_options.rest_options.url(&self.txn_options.profile_options)?;
+        let url = self
+            .txn_options
+            .rest_options
+            .url(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given object address.
         let registry = CachedPackageRegistry::create(url, self.object_address).await?;
@@ -992,12 +1001,14 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
 
         let message = format!(
             "Do you want to upgrade the package '{}' at object address {}",
-            package.name() ,self.object_address
+            package.name(),
+            self.object_address
         );
         prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
 
         let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
-            bcs::to_bytes(&built_package.extract_metadata()?).expect("Failed to serialize PackageMetadata"),
+            bcs::to_bytes(&built_package.extract_metadata()?)
+                .expect("Failed to serialize PackageMetadata"),
             built_package.extract_code(),
             self.object_address,
         );
@@ -1012,13 +1023,17 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 MAX_PUBLISH_PACKAGE_SIZE, size
             )));
         }
-        let result = self.txn_options
+        let result = self
+            .txn_options
             .submit_transaction(payload)
             .await
             .map(TransactionSummary::from);
 
-        if let Ok(_) = result {
-            println!("Code was successfully upgraded at object address {}.", self.object_address);
+        if result.is_ok() {
+            println!(
+                "Code was successfully upgraded at object address {}.",
+                self.object_address
+            );
         }
         result
     }

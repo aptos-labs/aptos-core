@@ -369,7 +369,6 @@ fn freeze_package_registry_fail_when_package_registry_does_not_exist() {
 
     // We should not be able to `freeze_package_registry` as `PackageRegistry` does not exist.
     // `PackageRegistry` is only created when calling `publish` first, i.e. deploying a package.
-    let status =
-        context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
+    let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
     assert_abort!(status, _);
 }
