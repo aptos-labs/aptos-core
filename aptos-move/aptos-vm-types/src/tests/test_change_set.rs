@@ -19,7 +19,7 @@ use aptos_aggregator::{
 };
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::{PanicError, SnapshotToStringFormula},
+    delayed_fields::{PanicError, SnapshotToStringFormula},
     state_store::state_key::StateKey,
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::resolver::{ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView};
-use aptos_types::{aggregator::bcs_size_of_byte_array, state_store::state_key::StateKey};
+use aptos_types::{
+    serde_helper::bcs_utils::bcs_size_of_byte_array, state_store::state_key::StateKey,
+};
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};

@@ -2,13 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::serde_helper::bcs_utils::{bcs_size_of_byte_array, size_u32_as_uleb128};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::values::{Struct, Value};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
-const BITS_FOR_SIZE: usize = 12;
+const BITS_FOR_SIZE: usize = 32;
 
 /// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
 /// during execution.
@@ -16,15 +17,11 @@ const BITS_FOR_SIZE: usize = 12;
 pub struct DelayedFieldID {
     unique_index: u32,
     // Exact number of bytes serialized delayed field will take.
-    width: usize,
+    width: u32,
 }
 
 impl DelayedFieldID {
-    pub fn new_with_width(unique_index: u32, width: usize) -> Self {
-        assert!(
-            width < (1usize << BITS_FOR_SIZE),
-            "Delayed field width must be <= {BITS_FOR_SIZE}, but is {width}"
-        );
+    pub fn new_with_width(unique_index: u32, width: u32) -> Self {
         Self {
             unique_index,
             width,
@@ -39,12 +36,12 @@ impl DelayedFieldID {
         ((self.unique_index as u64) << BITS_FOR_SIZE) | self.width as u64
     }
 
-    pub fn extract_width(&self) -> usize {
+    pub fn extract_width(&self) -> u32 {
         self.width
     }
 
     pub fn into_derived_string_struct(self) -> Result<Value, PanicError> {
-        let width = self.extract_width();
+        let width = self.extract_width() as usize;
 
         // we need to create DerivedString struct that serializes to exactly match given `width`.
         // I.e: size_u32_as_uleb128(value.len()) + value.len() + size_u32_as_uleb128(padding.len()) + padding.len() == width
@@ -76,15 +73,15 @@ impl DelayedFieldID {
 impl From<u64> for DelayedFieldID {
     fn from(value: u64) -> Self {
         Self {
-            unique_index: (value >> BITS_FOR_SIZE) as u32,
-            width: (value & ((1 << BITS_FOR_SIZE) - 1)) as usize,
+            unique_index: u32::try_from(value >> BITS_FOR_SIZE).unwrap(),
+            width: u32::try_from(value & ((1u64 << BITS_FOR_SIZE) - 1)).unwrap(),
         }
     }
 }
 
-// Used for ID generation from u32/u64 counters with width.
-impl From<(u32, usize)> for DelayedFieldID {
-    fn from(value: (u32, usize)) -> Self {
+// Used for ID generation from u32 counter with width.
+impl From<(u32, u32)> for DelayedFieldID {
+    fn from(value: (u32, u32)) -> Self {
         let (index, width) = value;
         Self::new_with_width(index, width)
     }
@@ -138,7 +135,7 @@ pub trait TryFromMoveValue: Sized {
         layout: &MoveTypeLayout,
         value: Value,
         hint: &Self::Hint,
-    ) -> Result<(Self, usize), Self::Error>;
+    ) -> Result<(Self, u32), Self::Error>;
 }
 
 impl ExtractUniqueIndex for DelayedFieldID {
@@ -179,13 +176,13 @@ impl TryFromMoveValue for DelayedFieldID {
         layout: &MoveTypeLayout,
         value: Value,
         hint: &Self::Hint,
-    ) -> Result<(Self, usize), Self::Error> {
+    ) -> Result<(Self, u32), Self::Error> {
         // Since we put the value there, we should be able to read it back,
         // unless there is a bug in the code - so we expect_ok() throughout.
         let (id, width) = match layout {
-            MoveTypeLayout::U64 => (Self::from(expect_ok(value.value_as::<u64>())?), 8),
+            MoveTypeLayout::U64 => (expect_ok(value.value_as::<u64>()).map(Self::from)?, 8),
             MoveTypeLayout::U128 => (
-                Self::from(expect_ok(value.value_as::<u128>()).and_then(u128_to_u64)?),
+                expect_ok(value.value_as::<u128>()).and_then(u128_to_u64).map(Self::from)?,
                 16,
             ),
             layout if is_derived_string_struct_layout(layout) => {
@@ -198,7 +195,7 @@ impl TryFromMoveValue for DelayedFieldID {
                             e
                         ))
                     })?;
-                let id = Self::from(from_utf8_bytes::<u64>(bytes)?);
+                let id = from_utf8_bytes::<u64>(bytes).map(Self::from)?;
                 (id, width)
             },
             // We use value to ID conversion in serialization.
@@ -332,9 +329,7 @@ pub fn from_utf8_bytes<T: FromStr>(bytes: Vec<u8>) -> Result<T, PanicError> {
         .map_err(|_| code_invariant_error("Unable to parse string".to_string()))
 }
 
-pub fn derived_string_struct_to_bytes_and_length(
-    value: Struct,
-) -> PartialVMResult<(Vec<u8>, usize)> {
+pub fn derived_string_struct_to_bytes_and_length(value: Struct) -> PartialVMResult<(Vec<u8>, u32)> {
     let mut fields = value.unpack()?.collect::<Vec<Value>>();
     if fields.len() != 2 {
         return Err(
@@ -352,26 +347,20 @@ pub fn derived_string_struct_to_bytes_and_length(
     let string_len = string_bytes.len();
     Ok((
         string_bytes,
-        bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len()),
+        u32::try_from(bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len()))
+            .map_err(|_| {
+            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
+                format!(
+                "DerivedStringSnapshot size exceeds u32: string_len: {string_len}, padding_len: {}",
+                padding.len()
+            ),
+            )
+        })?,
     ))
 }
 
 pub fn u128_to_u64(value: u128) -> Result<u64, PanicError> {
     u64::try_from(value).map_err(|_| code_invariant_error("Cannot cast u128 into u64".to_string()))
-}
-
-pub fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
-}
-
-pub fn bcs_size_of_byte_array(length: usize) -> usize {
-    size_u32_as_uleb128(length) + length
 }
 
 pub fn calculate_width_for_constant_string(byte_len: usize) -> usize {
@@ -446,9 +435,8 @@ mod tests {
                     data.clone(),
                     width
                 ));
-                assert_ok!(
-                    DelayedFieldID::new_with_width(u32::MAX, width).into_derived_string_struct()
-                );
+                assert_ok!(DelayedFieldID::new_with_width(u32::MAX, width as u32)
+                    .into_derived_string_struct());
             }
             {
                 let width = assert_ok!(calculate_width_for_integer_embeded_string(
@@ -463,9 +451,8 @@ mod tests {
                     .apply_to(u64::MAX as u128),
                     width
                 ));
-                assert_ok!(
-                    DelayedFieldID::new_with_width(u32::MAX, width).into_derived_string_struct()
-                );
+                assert_ok!(DelayedFieldID::new_with_width(u32::MAX, width as u32)
+                    .into_derived_string_struct());
             }
             {
                 let width = assert_ok!(calculate_width_for_integer_embeded_string(
@@ -480,9 +467,8 @@ mod tests {
                     .apply_to(u128::MAX),
                     width
                 ));
-                assert_ok!(
-                    DelayedFieldID::new_with_width(u32::MAX, width).into_derived_string_struct()
-                );
+                assert_ok!(DelayedFieldID::new_with_width(u32::MAX, width as u32)
+                    .into_derived_string_struct());
             }
         }
     }

@@ -713,7 +713,7 @@ mod test {
         bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
         types::DelayedFieldID,
     };
-    use aptos_types::aggregator::SnapshotToStringFormula;
+    use aptos_types::delayed_fields::SnapshotToStringFormula;
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use test_case::test_case;
 

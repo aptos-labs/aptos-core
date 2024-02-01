@@ -10,7 +10,9 @@ use aptos_aggregator::{
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
     types::DelayedFieldID,
 };
-use aptos_types::{aggregator::PanicError, state_store::state_key::StateKey, write_set::WriteOp};
+use aptos_types::{
+    delayed_fields::PanicError, state_store::state_key::StateKey, write_set::WriteOp,
+};
 use better_any::{Tid, TidAble};
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -157,7 +159,7 @@ mod test {
         delta_math::DeltaHistory, tests::types::FAKE_AGGREGATOR_VIEW_GEN_ID_START,
         types::DelayedFieldValue, FakeAggregatorView,
     };
-    use aptos_types::aggregator::{
+    use aptos_types::delayed_fields::{
         calculate_width_for_integer_embeded_string, SnapshotToStringFormula,
     };
     use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
@@ -286,7 +288,7 @@ mod test {
         state_view
     }
 
-    fn id_from_fake_idx(idx: u32, width: usize) -> DelayedFieldID {
+    fn id_from_fake_idx(idx: u32, width: u32) -> DelayedFieldID {
         DelayedFieldID::new_with_width(FAKE_AGGREGATOR_VIEW_GEN_ID_START + idx, width)
     }
 
@@ -412,7 +414,7 @@ mod test {
         let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
             "prefixsuffix".as_bytes().len(),
             id_from_fake_idx(0, 8)
-        ));
+        )) as u32;
 
         assert_ok_eq!(
             delayed_field_data.derive_string_concat(
@@ -498,7 +500,7 @@ mod test {
         let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
             "prefixsuffix".as_bytes().len(),
             id_from_fake_idx(0, 8)
-        ));
+        )) as u32;
 
         assert_some_eq!(
             delayed_field_changes.get(&id_from_fake_idx(3, derived_width)),

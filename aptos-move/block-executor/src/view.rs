@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    aggregator::{ExtractUniqueIndex, PanicError},
+    delayed_fields::{ExtractUniqueIndex, PanicError},
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -1721,7 +1721,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         }
     }
 
-    fn generate_delayed_field_id(&self, width: usize) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
         let index = match &self.latest_view {
             ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
@@ -1850,7 +1850,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
         }
     }
 
-    fn generate_delayed_field_id(&self, width: usize) -> T::Identifier {
+    fn generate_delayed_field_id(&self, width: u32) -> T::Identifier {
         self.latest_view.generate_delayed_field_id(width)
     }
 
@@ -1975,7 +1975,7 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        aggregator::{bytes_and_width_to_derived_string_struct, to_utf8_bytes, DelayedFieldID},
+        delayed_fields::{bytes_and_width_to_derived_string_struct, to_utf8_bytes, DelayedFieldID},
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,

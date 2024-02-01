@@ -32,9 +32,9 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    aggregator::PanicError,
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
+    delayed_fields::PanicError,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::TStateView,

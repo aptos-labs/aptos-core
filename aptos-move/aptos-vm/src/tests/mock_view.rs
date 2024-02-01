@@ -61,7 +61,7 @@ impl MockStateView {
         self.db.store_bytes(state_key, blob.into());
     }
 
-    pub(crate) fn add_mapping(&self, unique_index: u32, width: usize, v: Value) {
+    pub(crate) fn add_mapping(&self, unique_index: u32, width: u32, v: Value) {
         let mut mapping = self.mapping.borrow_mut();
         mapping.insert(DelayedFieldID::new_with_width(unique_index, width), v);
     }
@@ -83,7 +83,7 @@ impl MockStateView {
     pub(crate) fn assert_mapping_equal_at(
         &self,
         unique_index: u32,
-        width: usize,
+        width: u32,
         expected_value: Value,
     ) {
         let mapping = self.mapping.borrow();

@@ -261,7 +261,7 @@ mod test {
         proptest_types::types::{KeyType, MockEvent, MockTransaction},
         types::InputOutputKey,
     };
-    use aptos_types::aggregator::DelayedFieldID;
+    use aptos_types::delayed_fields::DelayedFieldID;
     use std::collections::HashSet;
 
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs

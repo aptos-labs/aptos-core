@@ -5,7 +5,7 @@ use crate::tests::mock_view::MockStateView;
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::{
+    delayed_fields::{
         bytes_and_width_to_derived_string_struct, bytes_to_string, to_utf8_bytes, DelayedFieldID,
     },
     state_store::state_key::StateKey,
@@ -20,7 +20,7 @@ use move_vm_types::values::{Struct, Value};
 use once_cell::sync::Lazy;
 use std::{clone::Clone, str::FromStr};
 
-const DERIVED_STRING_TEST_WIDTH: usize = 40;
+const DERIVED_STRING_TEST_WIDTH: u32 = 40;
 
 macro_rules! test_struct {
     ($a:expr, $b:expr, $c:expr, $d:expr, $e:expr, $f:expr) => {
@@ -30,7 +30,7 @@ macro_rules! test_struct {
             Value::u128($c),
             Value::u128($d),
             bytes_to_string(to_utf8_bytes($e)),
-            bytes_and_width_to_derived_string_struct(to_utf8_bytes($f), DERIVED_STRING_TEST_WIDTH)
+            bytes_and_width_to_derived_string_struct(to_utf8_bytes($f), DERIVED_STRING_TEST_WIDTH as usize)
                 .unwrap(),
         ]))
     };
@@ -135,8 +135,11 @@ fn test_resource_in_storage() {
     view.assert_mapping_equal_at(
         2,
         DERIVED_STRING_TEST_WIDTH,
-        bytes_and_width_to_derived_string_struct(to_utf8_bytes("bar"), DERIVED_STRING_TEST_WIDTH)
-            .unwrap(),
+        bytes_and_width_to_derived_string_struct(
+            to_utf8_bytes("bar"),
+            DERIVED_STRING_TEST_WIDTH as usize,
+        )
+        .unwrap(),
     );
 }
 
@@ -184,8 +187,11 @@ fn test_table_item_in_storage() {
     view.assert_mapping_equal_at(
         2,
         DERIVED_STRING_TEST_WIDTH,
-        bytes_and_width_to_derived_string_struct(to_utf8_bytes("bar"), DERIVED_STRING_TEST_WIDTH)
-            .unwrap(),
+        bytes_and_width_to_derived_string_struct(
+            to_utf8_bytes("bar"),
+            DERIVED_STRING_TEST_WIDTH as usize,
+        )
+        .unwrap(),
     );
 }
 

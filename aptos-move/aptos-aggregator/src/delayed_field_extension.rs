@@ -11,7 +11,7 @@ use crate::{
         DelayedFieldsSpeculativeError, PanicOr, ReadPosition,
     },
 };
-use aptos_types::aggregator::{
+use aptos_types::delayed_fields::{
     calculate_width_for_constant_string, calculate_width_for_integer_embeded_string,
     SnapshotToStringFormula,
 };
@@ -166,7 +166,7 @@ impl DelayedFieldData {
         &mut self,
         aggregator_id: DelayedFieldID,
         max_value: u128,
-        width: usize,
+        width: u32,
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let aggregator = self.delayed_fields.get(&aggregator_id);
@@ -211,7 +211,7 @@ impl DelayedFieldData {
     pub fn create_new_snapshot(
         &mut self,
         value: u128,
-        width: usize,
+        width: u32,
         resolver: &dyn DelayedFieldResolver,
     ) -> DelayedFieldID {
         let change = DelayedChange::Create(DelayedFieldValue::Snapshot(value));
@@ -225,13 +225,17 @@ impl DelayedFieldData {
         &mut self,
         value: Vec<u8>,
         resolver: &dyn DelayedFieldResolver,
-    ) -> DelayedFieldID {
-        let width = calculate_width_for_constant_string(value.len());
+    ) -> PartialVMResult<DelayedFieldID> {
+        // cast shouldn't fail because we assert on low limit for value before this call.
+        let width =
+            u32::try_from(calculate_width_for_constant_string(value.len())).map_err(|_| {
+                code_invariant_error("Calculated DerivedStringSnapshot width exceeds u32")
+            })?;
         let change = DelayedChange::Create(DelayedFieldValue::Derived(value));
         let snapshot_id = resolver.generate_delayed_field_id(width);
 
         self.delayed_fields.insert(snapshot_id, change);
-        snapshot_id
+        Ok(snapshot_id)
     }
 
     pub fn read_snapshot(
@@ -262,8 +266,12 @@ impl DelayedFieldData {
         resolver: &dyn DelayedFieldResolver,
     ) -> PartialVMResult<DelayedFieldID> {
         let snapshot = self.delayed_fields.get(&snapshot_id);
-        let width =
-            calculate_width_for_integer_embeded_string(prefix.len() + suffix.len(), snapshot_id)?;
+        // cast shouldn't fail because we assert on low limit for prefix and suffix before this call.
+        let width = u32::try_from(calculate_width_for_integer_embeded_string(
+            prefix.len() + suffix.len(),
+            snapshot_id,
+        )?)
+        .map_err(|_| code_invariant_error("Calculated DerivedStringSnapshot width exceeds u32"))?;
         let formula = SnapshotToStringFormula::Concat { prefix, suffix };
 
         let change = match snapshot {

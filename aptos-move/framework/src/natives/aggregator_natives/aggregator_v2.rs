@@ -26,7 +26,7 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
-use aptos_types::aggregator::{
+use aptos_types::delayed_fields::{
     bytes_and_width_to_derived_string_struct, calculate_width_for_constant_string,
     calculate_width_for_integer_embeded_string, string_to_bytes, u128_to_u64, DelayedFieldID,
     SnapshotToStringFormula,
@@ -58,6 +58,8 @@ pub const EINPUT_STRING_LENGTH_TOO_LARGE: u64 = 0x03_0008;
 /// and any calls will raise this error.
 pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 
+/// The maximum length of the input string for derived string snapshot.
+/// If we want to increase this, we need to modify BITS_FOR_SIZE in types/src/delayed_fields.rs.
 pub const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 1024;
 
 /// Given the native function argument and a type, returns a tuple of its
@@ -111,7 +113,7 @@ pub fn get_derived_string_field(derived_string: &StructRef) -> SafeNativeResult<
     .map_err(PartialVMError::from)?)
 }
 
-pub fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeResult<usize> {
+pub fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeResult<u32> {
     match ty_arg {
         Type::U128 => Ok(16),
         Type::U64 => Ok(8),
@@ -589,7 +591,7 @@ fn native_create_derived_string(
     }
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let snapshot_id = delayed_field_data.create_new_derived(input, resolver);
+        let snapshot_id = delayed_field_data.create_new_derived(input, resolver)?;
         snapshot_id
             .into_derived_string_struct()
             .map_err(PartialVMError::from)?
@@ -659,10 +661,13 @@ fn native_derive_string_concat(
 fn test_max_size_fits() {
     DelayedFieldID::new_with_width(
         0,
-        (calculate_width_for_integer_embeded_string(
-            DERIVED_STRING_INPUT_MAX_LENGTH,
-            DelayedFieldID::new_with_width(0, 16),
-        ))
+        u32::try_from(
+            (calculate_width_for_integer_embeded_string(
+                DERIVED_STRING_INPUT_MAX_LENGTH,
+                DelayedFieldID::new_with_width(0, 16),
+            ))
+            .unwrap(),
+        )
         .unwrap(),
     );
 }

@@ -6,10 +6,10 @@
 
 use crate::{
     account_address::AccountAddress,
-    aggregator::{ExtractUniqueIndex, TryFromMoveValue, TryIntoMoveValue},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
+    delayed_fields::{ExtractUniqueIndex, TryFromMoveValue, TryIntoMoveValue},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
@@ -1996,7 +1996,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + Copy
         + From<u64>
-        + From<(u32, usize)>
+        + From<(u32, u32)>
         + ExtractUniqueIndex
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;

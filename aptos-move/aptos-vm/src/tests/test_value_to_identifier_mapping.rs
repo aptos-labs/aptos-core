@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::mock_view::MockStateView;
-use aptos_types::aggregator::DelayedFieldID;
+use aptos_types::delayed_fields::DelayedFieldID;
 use claims::assert_none;
 use move_core_types::value::{
     IdentifierMappingKind, LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout,

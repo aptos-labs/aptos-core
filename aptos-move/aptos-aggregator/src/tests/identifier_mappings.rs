@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::types::{DelayedFieldID, DelayedFieldValue, TryFromMoveValue, TryIntoMoveValue};
-use aptos_types::aggregator::bytes_and_width_to_derived_string_struct;
+use aptos_types::delayed_fields::bytes_and_width_to_derived_string_struct;
 use claims::{assert_err, assert_ok};
 use move_core_types::value::{
     IdentifierMappingKind,
@@ -28,7 +28,7 @@ static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
 #[test_case(&U64, 8)]
 #[test_case(&U128, 16)]
 #[test_case(&*DERIVED_STRING, 20)]
-fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: usize) {
+fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: u32) {
     let input = DelayedFieldID::new_with_width(100, width);
     let value = assert_ok!(input.try_into_move_value(layout));
     let (id, _) = assert_ok!(DelayedFieldID::try_from_move_value(layout, value, &()));
@@ -60,7 +60,7 @@ fn test_aggregator_value_roundtrip_ok(
     aggregator_value: DelayedFieldValue,
     layout: &MoveTypeLayout,
     kind: IdentifierMappingKind,
-    width: usize,
+    width: u32,
 ) {
     let value = assert_ok!(aggregator_value.clone().try_into_move_value(layout, width));
     let (a, _) = assert_ok!(DelayedFieldValue::try_from_move_value(layout, value, &kind));
@@ -71,7 +71,7 @@ fn test_aggregator_value_roundtrip_ok(
 #[test_case(&Bool, 1)]
 #[test_case(&Address, 20)]
 #[test_case(&Vector(Box::new(U8)), 5)]
-fn test_aggregator_value_to_value_err(layout: &MoveTypeLayout, width: usize) {
+fn test_aggregator_value_to_value_err(layout: &MoveTypeLayout, width: u32) {
     assert_err!(DelayedFieldValue::Aggregator(0).try_into_move_value(layout, width));
     assert_err!(DelayedFieldValue::Snapshot(1).try_into_move_value(layout, width));
     assert_err!(DelayedFieldValue::Derived(vec![3]).try_into_move_value(layout, width));

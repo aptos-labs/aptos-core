@@ -6,7 +6,7 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_types::{
-    aggregator::size_u32_as_uleb128,
+    serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -323,13 +323,4 @@ impl ResourceGroupSize {
             },
         }
     }
-}
-
-#[test]
-fn test_size_u32_as_uleb128() {
-    assert_eq!(size_u32_as_uleb128(0), 1);
-    assert_eq!(size_u32_as_uleb128(127), 1);
-    assert_eq!(size_u32_as_uleb128(128), 2);
-    assert_eq!(size_u32_as_uleb128(128 * 128 - 1), 2);
-    assert_eq!(size_u32_as_uleb128(128 * 128), 3);
 }

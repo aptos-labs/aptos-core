@@ -5,7 +5,7 @@ use crate::{
     delta_change_set::{DeltaOp, DeltaWithMax},
     types::{code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
-use aptos_types::aggregator::SnapshotToStringFormula;
+use aptos_types::delayed_fields::SnapshotToStringFormula;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DelayedApplyChange<I: Clone> {

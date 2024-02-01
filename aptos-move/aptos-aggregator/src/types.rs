@@ -3,12 +3,14 @@
 
 use crate::bounded_math::SignedU128;
 use aptos_logger::error;
-use aptos_types::aggregator::{
+use aptos_types::delayed_fields::{
     bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
     is_derived_string_struct_layout,
 };
 // TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
-pub use aptos_types::aggregator::{DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue};
+pub use aptos_types::delayed_fields::{
+    DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue,
+};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
@@ -205,7 +207,7 @@ impl DelayedFieldValue {
     pub fn try_into_move_value(
         self,
         layout: &MoveTypeLayout,
-        width: usize,
+        width: u32,
     ) -> Result<Value, PartialVMError> {
         use DelayedFieldValue::*;
         use MoveTypeLayout::*;
@@ -226,7 +228,7 @@ impl DelayedFieldValue {
                 Value::u128(v)
             },
             (Derived(bytes), layout) if is_derived_string_struct_layout(layout) => {
-                bytes_and_width_to_derived_string_struct(bytes, width)?
+                bytes_and_width_to_derived_string_struct(bytes, width as usize)?
             },
             (value, layout) => {
                 return Err(
@@ -251,7 +253,7 @@ impl TryFromMoveValue for DelayedFieldValue {
         layout: &MoveTypeLayout,
         value: Value,
         hint: &Self::Hint,
-    ) -> Result<(Self, usize), Self::Error> {
+    ) -> Result<(Self, u32), Self::Error> {
         use DelayedFieldValue::*;
         use IdentifierMappingKind as K;
         use MoveTypeLayout as L;
