@@ -4,12 +4,12 @@
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
 
-struct ReducedBatchWrapperTransactionGenerator {
+struct BoundedBatchWrapperTransactionGenerator {
     batch_size: usize,
     generator: Box<dyn TransactionGenerator>,
 }
 
-impl TransactionGenerator for ReducedBatchWrapperTransactionGenerator {
+impl TransactionGenerator for BoundedBatchWrapperTransactionGenerator {
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
@@ -20,12 +20,12 @@ impl TransactionGenerator for ReducedBatchWrapperTransactionGenerator {
     }
 }
 
-pub struct ReducedBatchWrapperTransactionGeneratorCreator {
+pub struct BoundedBatchWrapperTransactionGeneratorCreator {
     batch_size: usize,
     generator_creator: Box<dyn TransactionGeneratorCreator>,
 }
 
-impl ReducedBatchWrapperTransactionGeneratorCreator {
+impl BoundedBatchWrapperTransactionGeneratorCreator {
     #[allow(unused)]
     pub fn new(batch_size: usize, generator_creator: Box<dyn TransactionGeneratorCreator>) -> Self {
         Self {
@@ -35,9 +35,9 @@ impl ReducedBatchWrapperTransactionGeneratorCreator {
     }
 }
 
-impl TransactionGeneratorCreator for ReducedBatchWrapperTransactionGeneratorCreator {
+impl TransactionGeneratorCreator for BoundedBatchWrapperTransactionGeneratorCreator {
     fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
-        Box::new(ReducedBatchWrapperTransactionGenerator {
+        Box::new(BoundedBatchWrapperTransactionGenerator {
             batch_size: self.batch_size,
             generator: self.generator_creator.create_transaction_generator(),
         })

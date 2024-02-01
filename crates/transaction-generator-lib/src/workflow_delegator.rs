@@ -6,6 +6,7 @@ use crate::{
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
     entry_points::EntryPointTransactionGenerator, EntryPoints, ObjectPool,
     ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind,
+    WorkflowProgress,
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -232,16 +233,19 @@ impl WorkflowTxnGeneratorCreator {
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
-        cur_phase: Option<Arc<AtomicUsize>>,
+        cur_phase: Arc<AtomicUsize>,
+        progress_type: WorkflowProgress,
     ) -> Self {
-        let stage_tracking = cur_phase.map_or_else(
-            || StageTracking::WhenDone {
+        let stage_tracking = match progress_type {
+            WorkflowProgress::MoveByPhases => StageTracking::ExternallySet(cur_phase),
+            WorkflowProgress::WhenDone {
+                delay_between_stages_s,
+            } => StageTracking::WhenDone {
                 stage_counter: Arc::new(AtomicUsize::new(0)),
                 stage_start_time: Arc::new(AtomicU64::new(0)),
-                delay_between_stages: Duration::from_secs(15),
+                delay_between_stages: Duration::from_secs(delay_between_stages_s),
             },
-            StageTracking::ExternallySet,
-        );
+        };
         println!(
             "Creating workload with stage tracking: {:?}",
             match &stage_tracking {

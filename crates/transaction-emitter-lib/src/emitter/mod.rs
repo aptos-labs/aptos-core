@@ -930,11 +930,18 @@ fn update_seq_num_and_get_num_expired(
             |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
                 Some(count) => {
                     assert!(*count <= *end_seq_num);
-                    assert!(*count >= *start_seq_num);
-                    (
-                        (*count - *start_seq_num) as usize,
-                        (*end_seq_num - *count) as usize,
-                    )
+                    if *count >= *start_seq_num {
+                        (
+                            (*count - *start_seq_num) as usize,
+                            (*end_seq_num - *count) as usize,
+                        )
+                    } else {
+                        debug!(
+                            "Stale sequence_number fetched for {}, start_seq_num {}, fetched {}",
+                            address, start_seq_num, *count
+                        );
+                        (0, (*end_seq_num - *start_seq_num) as usize)
+                    }
                 },
                 None => (0, (end_seq_num - start_seq_num) as usize),
             },

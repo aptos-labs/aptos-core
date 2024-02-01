@@ -27,12 +27,12 @@ mod account_generator;
 mod accounts_pool_wrapper;
 pub mod args;
 mod batch_transfer;
+mod bounded_batch_wrapper;
 mod call_custom_modules;
 mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
-mod reduced_batch_wrapper;
 mod transaction_mix_generator;
 mod workflow_delegator;
 use self::{
@@ -82,13 +82,19 @@ pub enum TransactionType {
         workflow_kind: WorkflowKind,
         num_modules: usize,
         use_account_pool: bool,
-        move_stages_by_phase: bool,
+        progress_type: WorkflowProgress,
     },
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateThenMint { count: usize, creation_balance: u64 },
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum WorkflowProgress {
+    MoveByPhases,
+    WhenDone { delay_between_stages_s: u64 },
 }
 
 impl Default for TransactionType {
@@ -319,7 +325,7 @@ pub async fn create_txn_generator_creator(
                     num_modules,
                     use_account_pool,
                     workflow_kind,
-                    move_stages_by_phase,
+                    progress_type,
                 } => Box::new(
                     WorkflowTxnGeneratorCreator::create_workload(
                         *workflow_kind,
@@ -329,7 +335,8 @@ pub async fn create_txn_generator_creator(
                         txn_executor,
                         *num_modules,
                         use_account_pool.then(|| accounts_pool.clone()),
-                        move_stages_by_phase.then(|| cur_phase.clone()),
+                        cur_phase.clone(),
+                        *progress_type,
                     )
                     .await,
                 ),
