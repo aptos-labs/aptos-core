@@ -4254,6 +4254,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-bitvec",
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
