@@ -117,8 +117,26 @@ fn test_hello_blockchain() {
 }
 
 #[test]
-fn test_drand_lottery() {
+fn test_drand() {
     test_common("drand");
+}
+
+#[test]
+fn test_lottery() {
+    let developer_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let resource_acc_addr = create_resource_address(developer_addr, &[]);
+    let named_address = BTreeMap::from([(String::from("lottery"), resource_acc_addr)]);
+
+    run_tests_for_pkg("lottery", named_address);
+}
+
+#[test]
+fn test_raffle() {
+    let developer_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();
+    let resource_acc_addr = create_resource_address(developer_addr, &[]);
+    let named_address = BTreeMap::from([(String::from("raffle"), resource_acc_addr)]);
+
+    run_tests_for_pkg("raffle", named_address);
 }
 
 #[test]

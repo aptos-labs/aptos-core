@@ -196,9 +196,7 @@ fn load_dkg_decrypt_key_from_identity_blob(
 fn load_dkg_decrypt_key_from_secure_storage(
     node_config: &NodeConfig,
 ) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
-    let storage: Storage = (&node_config.consensus.safety_rules.backend)
-        .try_into()
-        .map_err(|e| anyhow!("load_dkg_decrypt_key_from_storage failed with storage error: {e}"))?;
+    let storage: Storage = (&node_config.consensus.safety_rules.backend).into();
     storage.available().map_err(|e| {
         anyhow!("load_dkg_decrypt_key_from_secure_storage failed with storage unavailable: {e}")
     })?;
