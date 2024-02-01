@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 
+use crate::types::JWKConsensusMsg;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
-use aptos_network::application::{
-    interface::{NetworkClient, NetworkServiceEvents},
-};
+use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures_util::StreamExt;
 use tokio::runtime::Runtime;
-use crate::types::JWKConsensusMsg;
 
 #[allow(clippy::let_and_return)]
 pub fn start_jwk_consensus_runtime(
