@@ -14906,6 +14906,7 @@ dependencies = [
  "diesel",
  "futures",
  "hex",
+ "hyper",
  "move-core-types",
  "num_cpus",
  "once_cell",
