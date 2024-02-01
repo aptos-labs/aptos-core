@@ -46,7 +46,7 @@ use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{DagConsensusConfigV1, ValidatorTxnConfig},
+    on_chain_config::{DagConsensusConfigV1, Features, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
 };
 use async_trait::async_trait;
@@ -330,6 +330,7 @@ pub struct DagBootstrapper {
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
     executor: BoundedExecutor,
+    features: Features,
 }
 
 impl DagBootstrapper {
@@ -352,6 +353,7 @@ impl DagBootstrapper {
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
         executor: BoundedExecutor,
+        features: Features,
     ) -> Self {
         Self {
             self_peer,
@@ -371,6 +373,7 @@ impl DagBootstrapper {
             quorum_store_enabled,
             vtxn_config,
             executor,
+            features,
         }
     }
 
@@ -557,6 +560,7 @@ impl DagBootstrapper {
             fetch_requester,
             self.config.node_payload_config.clone(),
             self.vtxn_config.clone(),
+            self.features.clone(),
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
@@ -665,6 +669,7 @@ pub(super) fn bootstrap_dag_for_test(
         false,
         ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
+        Features::default(),
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
