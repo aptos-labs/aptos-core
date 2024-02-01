@@ -13,11 +13,11 @@ use crate::{
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::jwks::{
-    jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, OIDCProvider, ProviderJWKs,
+    jwk::JWK, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, OIDCProvider,
+    ProviderJWKs,
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
-use aptos_types::jwks::rsa::RSA_JWK;
 
 /// The validators should agree on the JWK after provider set is changed/JWK is rotated.
 #[tokio::test]
@@ -52,14 +52,16 @@ async fn jwk_consensus_basic() {
     let (provider_alice, provider_bob) =
         tokio::join!(DummyProvider::spawn(), DummyProvider::spawn());
 
-    provider_alice.update_request_handler(Some(Arc::new(StaticContentServer::new_str(r#"
+    provider_alice.update_request_handler(Some(Arc::new(StaticContentServer::new_str(
+        r#"
 {
     "keys": [
         {"kid":"kid1", "kty":"RSA", "e":"AQAB", "n":"n1", "alg":"RS384", "use":"sig"},
         {"n":"n0", "kty":"RSA", "use":"sig", "alg":"RS256", "e":"AQAB", "kid":"kid0"}
     ]
 }
-"#))));
+"#,
+    ))));
     provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
         r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
@@ -88,7 +90,8 @@ async fn jwk_consensus_basic() {
                     version: 1,
                     jwks: vec![
                         JWK::RSA(RSA_JWK::new_256_aqab("kid0", "n0")).into(),
-                        JWK::RSA(RSA_JWK::new_from_strs("kid1", "RSA", "RS384", "AQAB", "n1")).into(),
+                        JWK::RSA(RSA_JWK::new_from_strs("kid1", "RSA", "RS384", "AQAB", "n1"))
+                            .into(),
                     ],
                 },
                 ProviderJWKs {

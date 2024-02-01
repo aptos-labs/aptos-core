@@ -97,7 +97,7 @@ pub enum FeatureFlag {
     WebAuthnSignature,
     ReconfigureWithDKG,
     ZkIdSignature,
-    OpenIdSignature,
+    ZkIdZkLessSignature,
     RemoveDetailedError,
     JWKConsensus,
 }
@@ -254,8 +254,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::BN254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
             FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
-            FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURE,
-            FeatureFlag::OpenIdSignature => AptosFeatureFlag::OPEN_ID_SIGNATURE,
+            FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURES,
+            FeatureFlag::ZkIdZkLessSignature => AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::JWKConsensus => AptosFeatureFlag::JWK_CONSENSUS,
         }
@@ -335,8 +335,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::BN254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
-            AptosFeatureFlag::ZK_ID_SIGNATURE => FeatureFlag::ZkIdSignature,
-            AptosFeatureFlag::OPEN_ID_SIGNATURE => FeatureFlag::OpenIdSignature,
+            AptosFeatureFlag::ZK_ID_SIGNATURES => FeatureFlag::ZkIdSignature,
+            AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE => FeatureFlag::ZkIdZkLessSignature,
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JWKConsensus,
         }

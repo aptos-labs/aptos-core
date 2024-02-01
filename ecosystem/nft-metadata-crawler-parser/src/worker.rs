@@ -306,12 +306,16 @@ impl Worker {
     pub async fn parse(&mut self) -> anyhow::Result<()> {
         // Deduplicate asset_uri
         // Exit if not force or if asset_uri has already been parsed
-        if !self.force
-            && NFTMetadataCrawlerURIsQuery::get_by_asset_uri(self.asset_uri.clone(), &mut self.conn)
-                .is_some()
-        {
+        let prev_model =
+            NFTMetadataCrawlerURIsQuery::get_by_asset_uri(self.asset_uri.clone(), &mut self.conn);
+        if !self.force && prev_model.is_some() {
             self.log_info("Duplicate asset_uri found, skipping parse");
             DUPLICATE_ASSET_URI_COUNT.inc();
+            return Ok(());
+        }
+
+        if prev_model.unwrap_or_default().do_not_parse {
+            self.log_info("do_not_parse is true, skipping parse");
             return Ok(());
         }
 
@@ -326,8 +330,12 @@ impl Worker {
 
         // Skip if asset_uri is not a valid URI
         if Url::parse(&self.asset_uri).is_err() {
-            self.log_info("URI is invalid, skipping parse");
+            self.log_info("URI is invalid, skipping parse, marking as do_not_parse");
+            self.model.set_do_not_parse(true);
             SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
+            if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                self.log_error("Commit to Postgres failed", &e);
+            }
             return Ok(());
         }
 
@@ -369,7 +377,7 @@ impl Worker {
             let cdn_json_uri_result = write_json_to_gcs(
                 self.config.bucket.clone(),
                 self.asset_data_id.clone(),
-                json,
+                &json,
                 &self.gcs_client,
             )
             .await;
@@ -389,7 +397,7 @@ impl Worker {
 
         // Commit model to Postgres
         self.log_info("Committing JSON to Postgres");
-        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+        if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
             self.log_error("Commit to Postgres failed", &e);
         }
 
@@ -453,6 +461,16 @@ impl Worker {
                 (vec![], ImageFormat::Png)
             });
 
+            if image.is_empty() && json == Value::Null {
+                self.log_info("Image and JSON are empty, skipping parse, marking as do_not_parse");
+                self.model.set_do_not_parse(true);
+                SKIP_URI_COUNT.with_label_values(&["empty"]).inc();
+                if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                    self.log_error("Commit to Postgres failed", &e);
+                }
+                return Ok(());
+            }
+
             // Save resized and optimized image to GCS
             if !image.is_empty() {
                 self.log_info("Writing image to GCS");
@@ -481,7 +499,7 @@ impl Worker {
 
         // Commit model to Postgres
         self.log_info("Committing image to Postgres");
-        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+        if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
             self.log_error("Commit to Postgres failed", &e);
         }
 
@@ -570,7 +588,7 @@ impl Worker {
 
         // Commit model to Postgres
         self.log_info("Committing animation to Postgres");
-        if let Err(e) = upsert_uris(&mut self.conn, self.model.clone()) {
+        if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
             self.log_error("Commit to Postgres failed", &e);
         }
 

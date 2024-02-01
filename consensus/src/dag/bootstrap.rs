@@ -46,7 +46,7 @@ use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{DagConsensusConfigV1, ValidatorTxnConfig},
+    on_chain_config::{DagConsensusConfigV1, Features, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
 };
 use async_trait::async_trait;
@@ -62,7 +62,6 @@ use tokio::{
     task::{block_in_place, JoinHandle},
 };
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_types::on_chain_config::Features;
 
 #[derive(Clone)]
 struct BootstrapBaseState {

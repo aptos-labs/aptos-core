@@ -477,15 +477,24 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+G1Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
+G2Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 64
 Groth16Zkp:
   STRUCT:
     - a:
-        SEQ: STR
+        TYPENAME: G1Bytes
     - b:
-        SEQ:
-          SEQ: STR
+        TYPENAME: G2Bytes
     - c:
-        SEQ: STR
+        TYPENAME: G1Bytes
 HashValue:
   STRUCT:
     - hash:
@@ -732,6 +741,12 @@ SignedBatchInfoMsg:
     - signed_infos:
         SEQ:
           TYPENAME: SignedBatchInfo
+SignedGroth16Zkp:
+  STRUCT:
+    - proof:
+        TYPENAME: Groth16Zkp
+    - non_malleability_signature:
+        TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -1101,7 +1116,7 @@ ZkpOrOpenIdSig:
     0:
       Groth16Zkp:
         NEWTYPE:
-          TYPENAME: Groth16Zkp
+          TYPENAME: SignedGroth16Zkp
     1:
       OpenIdSig:
         NEWTYPE:

@@ -1130,48 +1130,30 @@ impl GlobalEnv {
         }
     }
 
+    // Label comparison within a list of labels for a given diagnostic, which orders by priority
+    // first, then files and line numbers.
+    fn cmp_label_priority(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
+        use LabelStyle::*;
+        match (label1.style, label2.style) {
+            (Primary, Secondary) => Ordering::Less,
+            (Secondary, Primary) => Ordering::Greater,
+            (_, _) => GlobalEnv::cmp_label(label1, label2),
+        }
+    }
+
     // Comparison for sets of labels that orders them based on program ordering, using
     // the earliest label found.  If a `Primary` label is found then `Secondary` labels
     // are ignored, but if all are `Secondary` then the earliest of those is used in
     // the ordering.
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
-        let primary1 = labels1
-            .iter()
-            .filter(|l| l.style == LabelStyle::Primary)
-            .min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
-        let primary2 = labels2
-            .iter()
-            .filter(|l| l.style == LabelStyle::Primary)
-            .min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
-        match (primary1, primary2) {
-            (Some(prim1), Some(prim2)) => GlobalEnv::cmp_label(prim1, prim2),
-            (Some(prim1), None) => {
-                let second2 = labels2.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
-                if let Some(sec2) = second2 {
-                    GlobalEnv::cmp_label(prim1, sec2)
-                } else {
-                    Ordering::Less // Label beats none
-                }
-            },
-            (None, Some(prim2)) => {
-                let second1 = labels1.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
-                if let Some(sec1) = second1 {
-                    GlobalEnv::cmp_label(sec1, prim2)
-                } else {
-                    Ordering::Greater // None is beaten by Label
-                }
-            },
-            (None, None) => {
-                let second1 = labels1.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
-                let second2 = labels2.iter().min_by(|l1, l2| GlobalEnv::cmp_label(l1, l2));
-                match (second1, second2) {
-                    (Some(sec1), Some(sec2)) => GlobalEnv::cmp_label(sec1, sec2),
-                    (Some(_), None) => Ordering::Less, // Label beats None
-                    (None, Some(_)) => Ordering::Greater, // None is beaten by Label
-                    (None, None) => Ordering::Equal,
-                }
-            },
-        }
+        let mut sorted_labels1 = labels1.iter().collect_vec();
+        sorted_labels1.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let mut sorted_labels2 = labels2.iter().collect_vec();
+        sorted_labels2.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        std::iter::zip(sorted_labels1, sorted_labels2)
+            .map(|(l1, l2)| GlobalEnv::cmp_label(l1, l2))
+            .find(|r| Ordering::Equal != *r)
+            .unwrap_or(Ordering::Equal)
     }
 
     /// Writes accumulated diagnostics that pass through `filter`

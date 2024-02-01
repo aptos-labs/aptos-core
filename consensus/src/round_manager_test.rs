@@ -62,9 +62,11 @@ use aptos_safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use aptos_secure_storage::Storage;
 use aptos_types::{
     epoch_state::EpochState,
+    jwks::QuorumCertifiedUpdate,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, FeatureFlag, Features, OnChainConsensusConfig,
+        ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -93,8 +95,6 @@ use tokio::{
     task::JoinHandle,
     time::timeout,
 };
-use aptos_types::jwks::QuorumCertifiedUpdate;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
@@ -194,7 +194,7 @@ impl NodeSetup {
                 id,
                 onchain_consensus_config.clone(),
                 local_consensus_config.clone(),
-                features.unwrap_or_default(),
+                features.clone().unwrap_or_default(),
             ));
         }
         nodes
@@ -2078,27 +2078,25 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
 
 #[test]
 fn no_vote_on_proposal_with_unexpected_vtxns() {
-    let vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(QuorumCertifiedUpdate::dummy())];
+    let vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(
+        QuorumCertifiedUpdate::dummy(),
+    )];
     let mut features = Features::default();
     features.disable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(
-        Some(features.clone()),
-        vtxns.clone(),
-        false,
-    );
+    assert_process_proposal_result(Some(features.clone()), vtxns.clone(), false);
 
     features.enable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(
-        Some(features),
-        vtxns,
-        true,
-    );
+    assert_process_proposal_result(Some(features), vtxns, true);
 }
 
 /// Setup a node with default configs and an optional `Features` override.
 /// Create a block, fill it with the given vtxns, and process it with the `RoundManager` from the setup.
 /// Assert the processing result.
-fn assert_process_proposal_result(features: Option<Features>, vtxns: Vec<ValidatorTransaction>, expected_result: bool) {
+fn assert_process_proposal_result(
+    features: Option<Features>,
+    vtxns: Vec<ValidatorTransaction>,
+    expected_result: bool,
+) {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let mut nodes = NodeSetup::create_nodes(
@@ -2106,7 +2104,7 @@ fn assert_process_proposal_result(features: Option<Features>, vtxns: Vec<Validat
         runtime.handle().clone(),
         1,
         None,
-        None,
+        Some(OnChainConsensusConfig::default_for_genesis()),
         None,
         features,
     );
@@ -2122,19 +2120,20 @@ fn assert_process_proposal_result(features: Option<Features>, vtxns: Vec<Validat
         &node.signer,
         Vec::new(),
     )
-        .unwrap();
+    .unwrap();
 
     timed_block_on(&runtime, async {
         // clear the message queue
         node.next_proposal().await;
 
-        assert_eq!(expected_result, node
-            .round_manager
-            .process_proposal(block.clone())
-            .await
-            .is_ok());
+        assert_eq!(
+            expected_result,
+            node.round_manager
+                .process_proposal(block.clone())
+                .await
+                .is_ok()
+        );
     });
-
 }
 
 #[test]

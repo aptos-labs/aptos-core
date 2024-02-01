@@ -23,6 +23,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
+    util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
@@ -47,7 +48,7 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{OnChainConsensusConfig, ValidatorTxnConfig},
+    on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -60,9 +61,6 @@ use tokio::{
     sync::oneshot as TokioOneshot,
     time::{sleep, Instant},
 };
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use aptos_types::validator_txn::ValidatorTransaction;
-use crate::util::is_vtxn_expected;
 
 #[derive(Serialize, Clone)]
 pub enum UnverifiedEvent {
@@ -660,7 +658,11 @@ impl RoundManager {
 
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
-                ensure!(is_vtxn_expected(&self.features, vtxn), "unexpected validator txn: {:?}", vtxn.topic());
+                ensure!(
+                    is_vtxn_expected(&self.features, vtxn),
+                    "unexpected validator txn: {:?}",
+                    vtxn.topic()
+                );
             }
         }
 

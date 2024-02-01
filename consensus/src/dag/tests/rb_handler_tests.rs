@@ -17,13 +17,14 @@ use crate::dag::{
 use aptos_config::config::DagPayloadConfig;
 use aptos_infallible::RwLock;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, epoch_state::EpochState,
-    on_chain_config::ValidatorTxnConfig, validator_verifier::random_validator_verifier,
+    aggregate_signature::PartialSignatures,
+    epoch_state::EpochState,
+    on_chain_config::{Features, ValidatorTxnConfig},
+    validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
 use futures::executor::block_on;
 use std::{collections::BTreeMap, sync::Arc};
-use aptos_types::on_chain_config::Features;
 
 struct MockFetchRequester {}
 

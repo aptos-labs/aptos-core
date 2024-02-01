@@ -81,10 +81,9 @@ async fn jwk_consensus_per_issuer() {
             entries: vec![ProviderJWKs {
                 issuer: b"https://bob.dev".to_vec(),
                 version: 1,
-                jwks: vec![JWK::Unsupported(UnsupportedJWK::new_with_payload(
-                    "\"BOB_JWK_V0\""
-                ))
-                .into()],
+                jwks: vec![
+                    JWK::Unsupported(UnsupportedJWK::new_with_payload("\"BOB_JWK_V0\"")).into()
+                ],
             }]
         },
         patched_jwks.jwks

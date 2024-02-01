@@ -47,7 +47,9 @@ impl ValidatorTransaction {
             ValidatorTransaction::DummyTopic1(_) => Topic::DUMMY1,
             ValidatorTransaction::DKGResult(_) => Topic::DKG,
             ValidatorTransaction::DummyTopic2(_) => Topic::DUMMY2,
-            ValidatorTransaction::ObservedJWKUpdate(update) => Topic::JWK_CONSENSUS(update.update.issuer.clone()),
+            ValidatorTransaction::ObservedJWKUpdate(update) => {
+                Topic::JWK_CONSENSUS(update.update.issuer.clone())
+            },
         }
     }
 }

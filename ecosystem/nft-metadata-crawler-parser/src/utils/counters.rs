@@ -34,6 +34,15 @@ pub static PARSER_FAIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Number of times the NFT Metadata Crawler Parser has received a URI marked as not to parse
+pub static DO_NOT_PARSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_do_not_parse_count",
+        "Number of times the parser received a URI marked as not to parse",
+    )
+    .unwrap()
+});
+
 // PUBSUB METRICS
 
 /// Number of times a PubSub message has successfully been ACK'd

@@ -38,7 +38,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::{OnChainConsensusConfig, ValidatorSet, ValidatorTxnConfig},
+    on_chain_config::{Features, OnChainConsensusConfig, ValidatorSet, ValidatorTxnConfig},
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
     validator_verifier::ValidatorVerifier,
@@ -49,7 +49,6 @@ use maplit::hashmap;
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 use tokio::runtime::Runtime;
-use aptos_types::on_chain_config::Features;
 
 // This generates a proposal for round 1
 pub fn generate_corpus_proposal() -> Vec<u8> {

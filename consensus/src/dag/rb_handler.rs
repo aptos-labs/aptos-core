@@ -1,18 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::{
-    dag_fetcher::TFetchRequester,
-    dag_network::RpcHandler,
-    dag_store::Dag,
-    errors::NodeBroadcastHandleError,
-    observability::{
-        logging::{LogEvent, LogSchema},
-        tracing::{observe_node, NodeStage},
+use crate::{
+    dag::{
+        dag_fetcher::TFetchRequester,
+        dag_network::RpcHandler,
+        dag_store::Dag,
+        errors::NodeBroadcastHandleError,
+        observability::{
+            logging::{LogEvent, LogSchema},
+            tracing::{observe_node, NodeStage},
+        },
+        storage::DAGStorage,
+        types::{Node, NodeCertificate, Vote},
+        NodeId,
     },
-    storage::DAGStorage,
-    types::{Node, NodeCertificate, Vote},
-    NodeId,
+    util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
@@ -20,13 +23,13 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_types::{
-    epoch_state::EpochState, on_chain_config::ValidatorTxnConfig,
-    validator_signer::ValidatorSigner, validator_txn::ValidatorTransaction,
+    epoch_state::EpochState,
+    on_chain_config::{Features, ValidatorTxnConfig},
+    validator_signer::ValidatorSigner,
+    validator_txn::ValidatorTransaction,
 };
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
-use crate::util::is_vtxn_expected;
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,
@@ -93,7 +96,11 @@ impl NodeBroadcastHandler {
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         for vtxn in node.validator_txns() {
-            ensure!(is_vtxn_expected(&self.features, vtxn), "unexpected validator transaction: {:?}", vtxn.topic());
+            ensure!(
+                is_vtxn_expected(&self.features, vtxn),
+                "unexpected validator transaction: {:?}",
+                vtxn.topic()
+            );
         }
 
         let vtxn_total_bytes = node
@@ -102,7 +109,6 @@ impl NodeBroadcastHandler {
             .map(ValidatorTransaction::size_in_bytes)
             .sum::<usize>() as u64;
         ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
-
 
         let num_txns = num_vtxns + node.payload().len() as u64;
         let txn_bytes = vtxn_total_bytes + node.payload().size() as u64;
