@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid call of `m::len`: argument count mismatch (expected 0 but found 1)
+   ┌─ tests/checking/specs/len_same_fun_name_err.move:10:20
+   │
+10 │             assert len(gallery) >= 0; // err is raised here because the built-in one is shadowed.
+   │                    ^^^^^^^^^^^^

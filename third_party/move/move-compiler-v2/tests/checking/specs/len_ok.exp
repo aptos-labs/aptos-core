@@ -1,0 +1,19 @@
+// ---- Model Dump
+module 0x42::m {
+    private fun f(gallery: &vector<u64>) {
+        {
+          let len: u64 = 5;
+          spec {
+            assert Ge(Len<u64>($t0), 0);
+          }
+          ;
+          Tuple()
+        }
+    }
+    spec fun $f(gallery: vector<u64>) {
+        {
+          let len: u256 = 5;
+          Tuple()
+        }
+    }
+} // end 0x42::m
