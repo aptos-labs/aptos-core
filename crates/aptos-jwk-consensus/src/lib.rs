@@ -1,19 +1,15 @@
 // Copyright © Aptos Foundation
 
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::{
-    error::Error,
-    interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
+    interface::{NetworkClient, NetworkServiceEvents},
 };
-use aptos_types::PeerId;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use tokio::runtime::Runtime;
+use crate::types::JWKConsensusMsg;
 
 #[allow(clippy::let_and_return)]
 pub fn start_jwk_consensus_runtime(
