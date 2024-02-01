@@ -18,7 +18,7 @@ use aptos_aggregator::{
 };
 use aptos_gas_algebra::Fee;
 use aptos_types::{
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -263,8 +263,8 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.base_executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        self.base_executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(

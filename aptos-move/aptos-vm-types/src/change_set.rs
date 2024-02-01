@@ -15,8 +15,8 @@ use aptos_aggregator::{
     types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
-    aggregator::PanicError,
     contract_event::ContractEvent,
+    delayed_fields::PanicError,
     state_store::{
         state_key::{StateKey, StateKeyInner},
         state_value::StateValueMetadata,
