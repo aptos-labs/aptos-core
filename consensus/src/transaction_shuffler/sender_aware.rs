@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+
 use crate::{
     counters::{NUM_SENDERS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
     transaction_shuffler::TransactionShuffler,
@@ -223,9 +224,7 @@ impl SlidingWindowState {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        sender_aware_shuffler::SenderAwareShuffler, transaction_shuffler::TransactionShuffler,
-    };
+    use crate::transaction_shuffler::{sender_aware::SenderAwareShuffler, TransactionShuffler};
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
     use aptos_types::{
         chain_id::ChainId,
