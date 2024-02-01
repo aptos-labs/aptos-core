@@ -53,6 +53,7 @@ use futures::{
 };
 use futures_util::future::join_all;
 use itertools::Itertools;
+use ordered_float::OrderedFloat;
 use rand_latest::Rng;
 use serde::Serialize;
 use std::{
@@ -211,18 +212,18 @@ impl DiscoveredPeerSet {
     }
 
     /// Returns the ping latency for the specified peer (if one was found)
-    fn get_ping_latency_ms(&self, peer_id: &PeerId) -> Option<u64> {
+    fn get_ping_latency_secs(&self, peer_id: &PeerId) -> Option<f64> {
         if let Some(discovered_peer) = self.peer_set.get(peer_id) {
-            discovered_peer.ping_latency_ms
+            discovered_peer.ping_latency_secs
         } else {
             None
         }
     }
 
     /// Updates the ping latency for the specified peer (if one was found)
-    fn update_ping_latency_ms(&mut self, peer_id: &PeerId, latency: u64) {
+    fn update_ping_latency_secs(&mut self, peer_id: &PeerId, latency_secs: f64) {
         if let Some(discovered_peer) = self.peer_set.get_mut(peer_id) {
-            discovered_peer.set_ping_latency_ms(latency)
+            discovered_peer.set_ping_latency_secs(latency_secs)
         }
     }
 }
@@ -235,8 +236,8 @@ struct DiscoveredPeer {
     keys: PublicKeys,
     /// The last time the node was dialed
     last_dial_time: SystemTime,
-    /// The calculated peer ping latency (ms)
-    ping_latency_ms: Option<u64>,
+    /// The calculated peer ping latency (secs)
+    ping_latency_secs: Option<f64>,
 }
 
 impl DiscoveredPeer {
@@ -246,7 +247,7 @@ impl DiscoveredPeer {
             addrs: Addresses::default(),
             keys: PublicKeys::default(),
             last_dial_time: SystemTime::UNIX_EPOCH,
-            ping_latency_ms: None,
+            ping_latency_secs: None,
         }
     }
 
@@ -271,8 +272,8 @@ impl DiscoveredPeer {
     }
 
     /// Updates the ping latency for this peer
-    pub fn set_ping_latency_ms(&mut self, latency: u64) {
-        self.ping_latency_ms = Some(latency);
+    pub fn set_ping_latency_secs(&mut self, latency_secs: f64) {
+        self.ping_latency_secs = Some(latency_secs);
     }
 
     /// Based on input, backoff on amount of time to dial a peer again
@@ -648,7 +649,7 @@ where
         // Identify the eligible peers that don't already have latency information
         let peers_to_ping = eligible_peers
             .into_iter()
-            .filter(|(_, peer)| peer.ping_latency_ms.is_none())
+            .filter(|(_, peer)| peer.ping_latency_secs.is_none())
             .collect::<Vec<_>>();
 
         // If there are no peers to ping, return early
@@ -828,16 +829,25 @@ where
         // future.
         self.dial_eligible_peers(pending_dials).await;
 
-        // Update the metrics for any connected peer ping latencies
-        self.update_connected_ping_latency_metrics();
+        // Update the metrics for any peer ping latencies
+        self.update_ping_latency_metrics();
     }
 
-    /// Updates the metrics for tracking connected peer ping latencies
-    fn update_connected_ping_latency_metrics(&self) {
+    /// Updates the metrics for tracking pre-dial and connected peer ping latencies
+    fn update_ping_latency_metrics(&self) {
+        // Update the pre-dial peer ping latencies
+        for (_, peer) in self.discovered_peers.read().peer_set.iter() {
+            if let Some(ping_latency_secs) = peer.ping_latency_secs {
+                counters::observe_pre_dial_ping_time(&self.network_context, ping_latency_secs);
+            }
+        }
+
+        // Update the connected peer ping latencies
         for peer_id in self.connected.keys() {
-            if let Some(ping_latency_ms) = self.discovered_peers.read().get_ping_latency_ms(peer_id)
+            if let Some(ping_latency_secs) =
+                self.discovered_peers.read().get_ping_latency_secs(peer_id)
             {
-                counters::observe_connected_ping_time(&self.network_context, ping_latency_ms);
+                counters::observe_connected_ping_time(&self.network_context, ping_latency_secs);
             }
         }
     }
@@ -1113,21 +1123,21 @@ fn log_peer_ping_latencies(
     let ping_latency_duration = Instant::now().duration_since(ping_start_time);
     info!(
         NetworkSchema::new(&network_context),
-        "Finished pinging eligible peers! Total peers to ping: {}, num peers pinged: {}, time: {}ms",
+        "Finished pinging eligible peers! Total peers to ping: {}, num peers pinged: {}, time: {} secs",
         total_peers_to_ping,
         num_peers_pinged,
-        ping_latency_duration.as_millis()
+        ping_latency_duration.as_secs_f64()
     );
 
     // Log the ping latencies for the eligible peers (sorted by latency)
     let eligible_peers = discovered_peers.read().peer_set.clone();
     let eligible_peers_and_latencies = eligible_peers
         .into_iter()
-        .map(|(peer_id, peer)| (peer_id, peer.ping_latency_ms))
+        .map(|(peer_id, peer)| (peer_id, peer.ping_latency_secs))
         .collect::<Vec<_>>();
     let sorted_eligible_peers_and_latencies = eligible_peers_and_latencies
         .iter()
-        .sorted_by_key(|(_, ping_latency_ms)| ping_latency_ms)
+        .sorted_by_key(|(_, ping_latency_secs)| ping_latency_secs.map(OrderedFloat))
         .collect::<Vec<_>>();
     info!(
         NetworkSchema::new(&network_context),
@@ -1185,13 +1195,10 @@ fn spawn_latency_ping_task(
                 Duration::from_secs(MAX_CONNECTION_TIMEOUT_SECS),
             ) {
                 // We connected successfully, update the peer's ping latency
-                let ping_latency_ms = start_time.elapsed().as_millis() as u64;
+                let ping_latency_secs = start_time.elapsed().as_secs_f64();
                 discovered_peers
                     .write()
-                    .update_ping_latency_ms(&peer_id, ping_latency_ms);
-
-                // Update the ping latency metrics
-                counters::observe_pre_dial_ping_time(&network_context, ping_latency_ms);
+                    .update_ping_latency_secs(&peer_id, ping_latency_secs);
 
                 // Attempt to terminate the TCP stream cleanly
                 if let Err(error) = tcp_stream.shutdown(Shutdown::Both) {
@@ -1204,6 +1211,14 @@ fn spawn_latency_ping_task(
                 }
 
                 return;
+            } else {
+                // Log an error if we failed to connect to the socket address
+                info!(
+                    NetworkSchema::new(&network_context),
+                    "Failed to ping peer {} at socket address {:?} after pinging",
+                    peer_id.short_str(),
+                    socket_address
+                );
             }
         }
     })
