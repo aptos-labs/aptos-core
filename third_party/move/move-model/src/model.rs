@@ -2260,10 +2260,10 @@ pub struct ModuleData {
     pub(crate) id: ModuleId,
 
     /// Attributes attached to this module.
-    attributes: Vec<Attribute>,
+    pub(crate) attributes: Vec<Attribute>,
 
     /// Use declarations
-    use_decls: Vec<UseDecl>,
+    pub(crate) use_decls: Vec<UseDecl>,
 
     /// Friend declarations
     pub(crate) friend_decls: Vec<FriendDecl>,
@@ -2315,6 +2315,7 @@ pub struct ModuleData {
     /// Holds the set of modules declared as friend.
     pub(crate) friend_modules: BTreeSet<ModuleId>,
 }
+
 
 /// Represents a module environment.
 #[derive(Debug, Clone)]
@@ -2634,7 +2635,7 @@ impl<'env> ModuleEnv<'env> {
         let module_name = env.to_module_name(&view.module_id());
         let module_env = env
             .find_module(&module_name)
-            .expect("unexpected reference to module not found in global env");
+            .expect(format!("unexpected reference to module '{}' not found in global env", module_name.display(&env)).as_str());
         module_env.into_function(FunId::new(env.symbol_pool.make(view.name().as_str())))
     }
 
