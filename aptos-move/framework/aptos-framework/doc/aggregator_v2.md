@@ -17,7 +17,7 @@ operation that also reduced parallelism, and should be avoided as much as possib
 
 -  [Struct `Aggregator`](#0x1_aggregator_v2_Aggregator)
 -  [Struct `AggregatorSnapshot`](#0x1_aggregator_v2_AggregatorSnapshot)
--  [Struct `DerivedString`](#0x1_aggregator_v2_DerivedString)
+-  [Struct `DerivedStringSnapshot`](#0x1_aggregator_v2_DerivedStringSnapshot)
 -  [Constants](#@Constants_0)
 -  [Function `max_value`](#0x1_aggregator_v2_max_value)
 -  [Function `create_aggregator`](#0x1_aggregator_v2_create_aggregator)
@@ -120,13 +120,13 @@ while storing snapshot of aggregator state elsewhere.
 
 </details>
 
-<a id="0x1_aggregator_v2_DerivedString"></a>
+<a id="0x1_aggregator_v2_DerivedStringSnapshot"></a>
 
-## Struct `DerivedString`
+## Struct `DerivedStringSnapshot`
 
 
 
-<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">DerivedString</a> <b>has</b> drop, store
+<pre><code><b>struct</b> <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -507,13 +507,13 @@ or has other read/write conflicts)
 
 ## Function `read_derived_string`
 
-Returns a value stored in this DerivedString.
+Returns a value stored in this DerivedStringSnapshot.
 Note: This operation is resource-intensive, and reduces parallelism.
 (Especially if called in a transaction that also modifies the aggregator,
 or has other read/write conflicts)
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">aggregator_v2::DerivedString</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>
 </code></pre>
 
 
@@ -522,7 +522,7 @@ or has other read/write conflicts)
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">DerivedString</a>): String;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_read_derived_string">read_derived_string</a>(snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>): String;
 </code></pre>
 
 
@@ -533,11 +533,11 @@ or has other read/write conflicts)
 
 ## Function `create_derived_string`
 
-Creates a DerivedString of a given value.
+Creates a DerivedStringSnapshot of a given value.
 Useful for when object is sometimes created via string_concat(), and sometimes directly.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(value: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">aggregator_v2::DerivedString</a>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(value: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a>
 </code></pre>
 
 
@@ -546,7 +546,7 @@ Useful for when object is sometimes created via string_concat(), and sometimes d
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(value: String): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">DerivedString</a>;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_create_derived_string">create_derived_string</a>(value: String): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>;
 </code></pre>
 
 
@@ -563,7 +563,7 @@ Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
 If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">aggregator_v2::DerivedString</a>
+<pre><code><b>public</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;IntElement&gt;, after: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a>
 </code></pre>
 
 
@@ -572,7 +572,7 @@ If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: String, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;, after: String): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedString">DerivedString</a>;
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="aggregator_v2.md#0x1_aggregator_v2_derive_string_concat">derive_string_concat</a>&lt;IntElement&gt;(before: String, snapshot: &<a href="aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">AggregatorSnapshot</a>&lt;IntElement&gt;, after: String): <a href="aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">DerivedStringSnapshot</a>;
 </code></pre>
 
 

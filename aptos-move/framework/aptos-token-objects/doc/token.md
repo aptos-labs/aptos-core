@@ -152,7 +152,7 @@ Starts being populated once aggregator_v2_api_enabled is enabled.
  Unique identifier within the collection, optional, 0 means unassigned
 </dd>
 <dt>
-<code>name: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_DerivedString">aggregator_v2::DerivedString</a></code>
+<code>name: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_DerivedStringSnapshot">aggregator_v2::DerivedStringSnapshot</a></code>
 </dt>
 <dd>
  The name of the token, which should be unique within the collection; the length of name

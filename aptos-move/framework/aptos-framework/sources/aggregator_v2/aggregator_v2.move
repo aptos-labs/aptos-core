@@ -50,7 +50,7 @@ module aptos_framework::aggregator_v2 {
         value: IntElement,
     }
 
-    struct DerivedString has store, drop {
+    struct DerivedStringSnapshot has store, drop {
         value: String,
         padding: vector<u8>,
     }
@@ -113,21 +113,21 @@ module aptos_framework::aggregator_v2 {
     /// or has other read/write conflicts)
     public native fun read_snapshot<IntElement>(snapshot: &AggregatorSnapshot<IntElement>): IntElement;
 
-    /// Returns a value stored in this DerivedString.
+    /// Returns a value stored in this DerivedStringSnapshot.
     /// Note: This operation is resource-intensive, and reduces parallelism.
     /// (Especially if called in a transaction that also modifies the aggregator,
     /// or has other read/write conflicts)
-    public native fun read_derived_string(snapshot: &DerivedString): String;
+    public native fun read_derived_string(snapshot: &DerivedStringSnapshot): String;
 
-    /// Creates a DerivedString of a given value.
+    /// Creates a DerivedStringSnapshot of a given value.
     /// Useful for when object is sometimes created via string_concat(), and sometimes directly.
-    public native fun create_derived_string(value: String): DerivedString;
+    public native fun create_derived_string(value: String): DerivedStringSnapshot;
 
     /// Concatenates `before`, `snapshot` and `after` into a single string.
     /// snapshot passed needs to have integer type - currently supported types are u64 and u128.
     /// Raises EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE if called with another type.
     /// If length of prefix and suffix together exceed 256 bytes, ECONCAT_STRING_LENGTH_TOO_LARGE is raised.
-    public native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): DerivedString;
+    public native fun derive_string_concat<IntElement>(before: String, snapshot: &AggregatorSnapshot<IntElement>, after: String): DerivedStringSnapshot;
 
     // ===== DEPRECATE/NOT YET IMPLEMENTED ====
 
@@ -163,8 +163,8 @@ module aptos_framework::aggregator_v2 {
         let snapshot = create_snapshot(42);
         assert!(read_snapshot(&snapshot) == 42, 0);
 
-        let snapshot = create_snapshot(std::string::utf8(b"42"));
-        assert!(read_snapshot(&snapshot) == std::string::utf8(b"42"), 0);
+        let derived = create_derived_string(std::string::utf8(b"42"));
+        assert!(read_derived_string(&derived) == std::string::utf8(b"42"), 0);
     }
 
     #[test]
@@ -177,15 +177,8 @@ module aptos_framework::aggregator_v2 {
     #[test]
     fun test_string_concat1() {
         let snapshot = create_snapshot(42);
-        let snapshot2 = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 0);
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 0x030005, location = Self)]
-    fun test_string_concat_from_string_not_supported() {
-        let snapshot = create_snapshot<String>(std::string::utf8(b"42"));
-        derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        let derived = derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        assert!(read_derived_string(&derived) == std::string::utf8(b"before42after"), 0);
     }
 
     // Tests commented out, as flag used in rust cannot be disabled.

@@ -2808,7 +2808,7 @@ mod test {
 
         /*
             layout = Struct {
-                snap: vec![DerivedString]
+                snap: vec![DerivedStringSnapshot]
             }
         */
         let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));

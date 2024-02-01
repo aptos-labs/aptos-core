@@ -637,7 +637,9 @@ where
                                 {
                                     Ok((bytes, _)) => bytes,
                                     Err(_) => {
-                                        unreachable!("Failed to replace identifiers with values")
+                                        unreachable!(
+                                            "Failed to replace identifiers with values, {layout:?}"
+                                        )
                                     },
                                 };
                                 let mut patched_write_op = write_op;

@@ -8,7 +8,7 @@ use move_vm_types::values::{Struct, Value};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
-const BITS_FOR_SIZE: usize = 10;
+const BITS_FOR_SIZE: usize = 12;
 
 /// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
 /// during execution.
@@ -36,7 +36,7 @@ impl DelayedFieldID {
     }
 
     pub fn as_u64(&self) -> u64 {
-        ((self.unique_index as u64) << 10) | self.width as u64
+        ((self.unique_index as u64) << BITS_FOR_SIZE) | self.width as u64
     }
 
     pub fn extract_width(&self) -> usize {
@@ -57,7 +57,9 @@ impl DelayedFieldID {
 
         // If we don't even have enough space to store the length of the value, we cannot proceed
         if width <= value_len_width_upper_bound + 1 {
-            return Err(code_invariant_error(format!("DerivedString size issue for id {self:?}: width: {width}, value_width_upper_bound: {value_len_width_upper_bound}")));
+            return Err(code_invariant_error(format!(
+                "DerivedStringSnapshot size issue for id {self:?}: width: {width}, value_width_upper_bound: {value_len_width_upper_bound}"
+            )));
         }
 
         let id_as_string = u64_to_fixed_size_utf8_bytes(
@@ -176,7 +178,7 @@ impl TryFromMoveValue for DelayedFieldID {
     fn try_from_move_value(
         layout: &MoveTypeLayout,
         value: Value,
-        _hint: &Self::Hint,
+        hint: &Self::Hint,
     ) -> Result<(Self, usize), Self::Error> {
         // Since we put the value there, we should be able to read it back,
         // unless there is a bug in the code - so we expect_ok() throughout.
@@ -202,8 +204,7 @@ impl TryFromMoveValue for DelayedFieldID {
             // We use value to ID conversion in serialization.
             _ => {
                 return Err(code_invariant_error(format!(
-                    "Failed to convert a Move value with {} layout into an identifier",
-                    layout
+                    "Failed to convert a Move value with {layout} layout into an identifier, tagged with {hint:?}, with value {value:?}",
                 )))
             },
         };
@@ -279,13 +280,13 @@ pub fn bytes_and_width_to_derived_string_struct(
     bytes: Vec<u8>,
     width: usize,
 ) -> Result<Value, PanicError> {
-    // We need to create DerivedString struct that serializes to exactly match given `width`.
+    // We need to create DerivedStringSnapshot struct that serializes to exactly match given `width`.
 
     let value_width = bcs_size_of_byte_array(bytes.len());
     // padding field takes at list 1 byte (empty vector)
     if value_width + 1 > width {
         return Err(code_invariant_error(format!(
-            "DerivedString size issue: no space left for padding: value_width: {value_width}, width: {width}"
+            "DerivedStringSnapshot size issue: no space left for padding: value_width: {value_width}, width: {width}"
         )));
     }
 
@@ -295,7 +296,7 @@ pub fn bytes_and_width_to_derived_string_struct(
     let padding_len = width - value_width - 1;
     if size_u32_as_uleb128(padding_len) > 1 {
         return Err(code_invariant_error(format!(
-            "DerivedString size issue: padding expected to be too large: value_width: {value_width}, width: {width}, padding_len: {padding_len}"
+            "DerivedStringSnapshot size issue: padding expected to be too large: value_width: {value_width}, width: {width}, padding_len: {padding_len}"
         )));
     }
 
@@ -339,7 +340,7 @@ pub fn derived_string_struct_to_bytes_and_length(
         return Err(
             PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
                 format!(
-                    "aggregators_v2::DerivedString has wrong number of fields: {:?}",
+                    "DerivedStringSnapshot has wrong number of fields: {:?}",
                     fields.len()
                 ),
             ),

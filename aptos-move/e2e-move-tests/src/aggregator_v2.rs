@@ -163,6 +163,12 @@ impl AggregatorLocation {
     }
 }
 
+pub enum StructType {
+    Aggregator,
+    Snapshot,
+    DerivedString,
+}
+
 impl AggV2TestHarness {
     pub fn run_block_in_parts_and_check(
         &mut self,
@@ -210,17 +216,15 @@ impl AggV2TestHarness {
         account: Option<&Account>,
         use_type: UseType,
         element_type: ElementType,
-        aggregator: bool,
+        struct_type: StructType,
     ) -> SignedTransaction {
         self.harness.create_entry_function(
             account.unwrap_or(&self.account),
-            str::parse(
-                if aggregator {
-                    "0x1::aggregator_v2_test::init_aggregator"
-                } else {
-                    "0x1::aggregator_v2_test::init_snapshot"
-                },
-            )
+            str::parse(match struct_type {
+                StructType::Aggregator => "0x1::aggregator_v2_test::init_aggregator",
+                StructType::Snapshot => "0x1::aggregator_v2_test::init_snapshot",
+                StructType::DerivedString => "0x1::aggregator_v2_test::init_derived_string",
+            })
             .unwrap(),
             vec![element_type.get_type_tag()],
             vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
@@ -265,6 +269,16 @@ impl AggV2TestHarness {
             snap_loc,
             &[expected],
         )
+    }
+
+    pub fn check_derived(
+        &mut self,
+        snap_loc: &AggregatorLocation,
+        expected: u128,
+    ) -> SignedTransaction {
+        self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::check_derived", snap_loc, &[
+            expected,
+        ])
     }
 
     #[allow(clippy::new_ret_no_self)]

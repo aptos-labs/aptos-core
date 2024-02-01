@@ -11,7 +11,7 @@ module aptos_token_objects::token {
     use std::string::{Self, String};
     use std::signer;
     use std::vector;
-    use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot, DerivedString};
+    use aptos_framework::aggregator_v2::{Self, AggregatorSnapshot, DerivedStringSnapshot};
     use aptos_framework::event;
     use aptos_framework::object::{Self, ConstructorRef, Object};
     use aptos_std::string_utils::{to_string};
@@ -71,7 +71,7 @@ module aptos_token_objects::token {
         index: AggregatorSnapshot<u64>,
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
-        name: DerivedString,
+        name: DerivedStringSnapshot,
     }
 
     // DEPRECATED, NEVER USED
