@@ -1,0 +1,74 @@
+// ---- Model Dump
+module 0x12391283::M {
+    use std::vector;
+    private fun test_1(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          {
+            let (v: vector<u8>, init: u64) = Tuple(gas_schedule_blob, Cast(0));
+            {
+              let accu: u64 = init;
+              {
+                let (v: vector<u8>) = Tuple(v);
+                vector::reverse<u8>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
+                    {
+                      let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
+                      {
+                        let (elem: u8) = Tuple(e);
+                        accu: u64 = {
+                          let (sum: u64, addend: u8) = Tuple(accu, elem);
+                          Add<u64>(sum, Cast(addend))
+                        }
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              accu
+            }
+          }
+        }
+    }
+    private fun test_2(): u64 {
+        {
+          let gas_schedule_blob: vector<u8> = Vector<u8>(115, 115, 95, 112, 97, 99, 107, 101, 100, 32, 0, 0, 0, 0, 0, 0, 0);
+          {
+            let (v: vector<u8>, init: u64) = Tuple(gas_schedule_blob, Cast(0));
+            {
+              let accu: u64 = init;
+              {
+                let (v: vector<u8>) = Tuple(v);
+                vector::reverse<u8>(Borrow(Mutable)(v));
+                loop {
+                  if Not(vector::is_empty<u8>(Borrow(Immutable)(v))) {
+                    {
+                      let e: u8 = vector::pop_back<u8>(Borrow(Mutable)(v));
+                      {
+                        let (elem: u8) = Tuple(e);
+                        accu: u64 = {
+                          let (sum: u64, addend: u8) = Tuple(accu, elem);
+                          Add<u64>(sum, Cast(addend))
+                        }
+                      };
+                      Tuple()
+                    }
+                  } else {
+                    break
+                  }
+                };
+                Tuple()
+              };
+              accu
+            }
+          }
+        }
+    }
+    spec fun $test_1(): u64;
+    spec fun $test_2(): u64;
+} // end 0x12391283::M
