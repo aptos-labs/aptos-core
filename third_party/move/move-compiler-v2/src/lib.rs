@@ -37,6 +37,10 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
+use pipeline::{
+    control_flow_graph_simplifier::ControlFlowGraphSimplifier,
+    split_critical_edges_processor::SplitCriticalEdgesProcessor,
+};
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.
@@ -188,6 +192,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
+    pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
         pipeline.add_processor(Box::new(VisibilityChecker()));
@@ -197,6 +202,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     }));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
+    pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
     if safety_on {
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
@@ -204,7 +210,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // The default optimization pipeline is currently always run by the compiler.
     add_default_optimization_pipeline(&mut pipeline);
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
-    // but it is needed by file format generator.
+    // and EliminateEmptyBlocksProcessor but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
         with_copy_inference: false,
     }));

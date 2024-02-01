@@ -10,6 +10,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
+abstract-domain-derive = { path = "../move-model/bytecode/abstract_domain_derive" }
 anyhow = "1.0.62"
 move-binary-format = { path = "../move-binary-format" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }

@@ -10,9 +10,11 @@ use move_compiler_v2::{
     flow_insensitive_checkers, function_checker, inliner, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
+        split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
@@ -230,11 +232,13 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/ability-checker/") {
+            pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(ControlFlowGraphSimplifier {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,

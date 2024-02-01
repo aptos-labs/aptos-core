@@ -14,7 +14,11 @@ use move_model::{
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
     ty::{Type, TypeDisplayContext},
 };
-use std::{collections::BTreeMap, fmt, fmt::Formatter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    fmt::Formatter,
+};
 
 /// A label for a branch destination.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -574,6 +578,19 @@ impl Bytecode {
             }
         }
         res
+    }
+
+    /// Returns the set of labels in `code`.
+    pub fn labels(code: &[Bytecode]) -> BTreeSet<Label> {
+        code.iter()
+            .filter_map(|code| {
+                if let Bytecode::Label(_, label) = code {
+                    Some(*label)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Return the successor offsets of this instruction. In addition to the code, a map

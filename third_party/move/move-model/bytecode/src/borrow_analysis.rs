@@ -13,6 +13,7 @@ use crate::{
     stackless_bytecode::{AssignKind, BorrowEdge, BorrowNode, Bytecode, IndexEdgeKind, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
+use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
@@ -24,7 +25,7 @@ use move_model::{
 };
 use std::{borrow::BorrowMut, collections::BTreeMap, fmt};
 
-#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd, Default)]
+#[derive(AbstractDomain, Debug, Clone, Eq, Ord, PartialEq, PartialOrd, Default)]
 pub struct BorrowInfo {
     /// Contains the nodes which are alive. This excludes nodes which are alive because
     /// other nodes which are alive borrow from them.
@@ -35,6 +36,7 @@ pub struct BorrowInfo {
 
     /// Backward borrow information. This field is not used during analysis, but computed once
     /// analysis is done.
+    #[no_join]
     borrows_from: MapDomain<BorrowNode, SetDomain<(BorrowNode, BorrowEdge)>>,
 }
 
@@ -741,14 +743,6 @@ impl<'a> TransferFunctions for BorrowAnalysis<'a> {
 }
 
 impl<'a> DataflowAnalysis for BorrowAnalysis<'a> {}
-
-impl AbstractDomain for BorrowInfo {
-    fn join(&mut self, other: &Self) -> JoinResult {
-        let live_changed = self.live_nodes.join(&other.live_nodes);
-        let borrowed_changed = self.borrowed_by.join(&other.borrowed_by);
-        borrowed_changed.combine(live_changed)
-    }
-}
 
 // =================================================================================================
 // Formatting
