@@ -28,12 +28,12 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
 
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    features: Arc<Features>,
+    features: Features,
 }
 
 pub fn get_max_binary_format_version(
@@ -137,7 +137,7 @@ impl MoveVmExt {
                 resolver,
             )?,
             chain_id,
-            features: Arc::new(features),
+            features,
         })
     }
 
@@ -240,12 +240,16 @@ impl MoveVmExt {
         SessionExt::new(
             self.inner.new_session_with_extensions(resolver, extensions),
             resolver,
-            self.features.clone(),
+            self.features.is_storage_slot_metadata_enabled(),
         )
     }
 
-    pub fn get_chain_id(&self) -> ChainId {
+    pub(crate) fn chain_id(&self) -> ChainId {
         ChainId::new(self.chain_id)
+    }
+
+    pub(crate) fn features(&self) -> &Features {
+        &self.features
     }
 }
 

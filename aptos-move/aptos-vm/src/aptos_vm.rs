@@ -9,15 +9,15 @@ use crate::{
     errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, get_gas_parameters},
     move_vm_ext::{
-        get_max_binary_format_version, AptosMoveResolver, MoveVmExt, RespawnedSession, SessionExt,
-        SessionId,
+        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, MoveVmExt,
+        RespawnedSession, SessionExt, SessionId,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
 };
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
@@ -76,7 +76,6 @@ use move_binary_format::{
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMError, VMResult},
-    file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
     CompiledModule, IndexKind,
 };
 use move_core_types::{
@@ -170,7 +169,6 @@ pub struct AptosVM {
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
-    features: Features,
     timed_features: TimedFeatures,
 }
 
@@ -205,7 +203,7 @@ impl AptosVM {
             misc_gas_params,
             gas_feature_version,
             chain_id.id(),
-            features.clone(),
+            features,
             timed_features.clone(),
             resolver,
         )
@@ -217,7 +215,6 @@ impl AptosVM {
             gas_feature_version,
             gas_params,
             storage_gas_params,
-            features,
             timed_features,
         }
     }
@@ -228,6 +225,11 @@ impl AptosVM {
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         self.move_vm.new_session(resolver, session_id)
+    }
+
+    #[inline(always)]
+    fn features(&self) -> &Features {
+        self.move_vm.features()
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -351,7 +353,7 @@ impl AptosVM {
         StorageAdapter::new_with_config(
             executor_view,
             self.gas_feature_version,
-            &self.features,
+            self.features(),
             None,
         )
     }
@@ -363,7 +365,7 @@ impl AptosVM {
         StorageAdapter::new_with_config(
             executor_view,
             self.gas_feature_version,
-            &self.features,
+            self.features(),
             Some(executor_view),
         )
     }
@@ -419,7 +421,7 @@ impl AptosVM {
 
         match TransactionStatus::from_vm_status(
             error_code.clone(),
-            self.features
+            self.features()
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
         ) {
             TransactionStatus::Keep(status) => {
@@ -485,7 +487,7 @@ impl AptosVM {
         const ZERO_STORAGE_REFUND: u64 = 0;
 
         let is_account_init_for_sponsored_transaction =
-            is_account_init_for_sponsored_transaction(txn_data, &self.features, resolver)?;
+            is_account_init_for_sponsored_transaction(txn_data, self.features(), resolver)?;
 
         if is_account_init_for_sponsored_transaction {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
@@ -558,7 +560,7 @@ impl AptosVM {
                     session,
                     gas_meter.balance(),
                     fee_statement,
-                    &self.features,
+                    self.features(),
                     txn_data,
                     log_context,
                 )
@@ -576,7 +578,7 @@ impl AptosVM {
                 &mut session,
                 gas_meter.balance(),
                 fee_statement,
-                &self.features,
+                self.features(),
                 txn_data,
                 log_context,
             )?;
@@ -620,7 +622,7 @@ impl AptosVM {
                 session,
                 gas_meter.balance(),
                 fee_statement,
-                &self.features,
+                self.features(),
                 txn_data,
                 log_context,
             )
@@ -647,7 +649,7 @@ impl AptosVM {
             script_fn.function(),
             script_fn.ty_args(),
         )?;
-        let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let struct_constructors = self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,
@@ -703,7 +705,7 @@ impl AptosVM {
                             txn_data.senders(),
                             convert_txn_args(script.args()),
                             &loaded_func,
-                            self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+                            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
                         )?;
                     session.execute_script(
                         script.code(),
@@ -767,7 +769,7 @@ impl AptosVM {
             txn_data.transaction_size,
             txn_data.gas_unit_price,
         )?;
-        if !self.features.is_storage_deletion_refund_enabled() {
+        if !self.features().is_storage_deletion_refund_enabled() {
             storage_refund = 0.into();
         }
 
@@ -1144,15 +1146,8 @@ impl AptosVM {
 
     /// Deserialize a module bundle.
     fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
-        let max_version = get_max_binary_format_version(&self.features, None);
-        let max_identifier_size = if self
-            .features
-            .is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH)
-        {
-            IDENTIFIER_SIZE_MAX
-        } else {
-            LEGACY_IDENTIFIER_SIZE_MAX
-        };
+        let max_version = get_max_binary_format_version(self.features(), None);
+        let max_identifier_size = get_max_identifier_size(self.features());
         let config = DeserializerConfig::new(max_version, max_identifier_size);
         let mut result = vec![];
         for module_blob in modules.iter() {
@@ -1204,7 +1199,7 @@ impl AptosVM {
                 true,
                 true,
                 !self
-                    .features
+                    .features()
                     .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
             ),
         )?;
@@ -1280,7 +1275,7 @@ impl AptosVM {
                     true,
                     true,
                     !self
-                        .features
+                        .features()
                         .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE),
                 ),
             ));
@@ -1329,13 +1324,14 @@ impl AptosVM {
                     }
                 }
             }
-            aptos_framework::verify_module_metadata(m, &self.features, &self.timed_features)
+            aptos_framework::verify_module_metadata(m, self.features(), &self.timed_features)
                 .map_err(|err| Self::metadata_validation_error(&err.to_string()))?;
         }
         verifier::resource_groups::validate_resource_groups(
             session,
             modules,
-            self.features.is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
+            self.features()
+                .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
         )?;
         verifier::event_validation::validate_module_events(session, modules)?;
 
@@ -1391,12 +1387,13 @@ impl AptosVM {
         match &authenticators {
             Ok(authenticators) => {
                 for (_, sig) in authenticators {
-                    if !self.features.is_zkid_enabled()
+                    if !self.features().is_zkid_enabled()
                         && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
                     {
                         return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
                     }
-                    if (!self.features.is_zkid_enabled() || !self.features.is_zkid_zkless_enabled())
+                    if (!self.features().is_zkid_enabled()
+                        || !self.features().is_zkid_zkless_enabled())
                         && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
                     {
                         return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
@@ -1411,7 +1408,7 @@ impl AptosVM {
         zkid_validation::validate_zkid_authenticators(
             &authenticators.unwrap(),
             resolver,
-            self.move_vm.get_chain_id(),
+            self.move_vm.chain_id(),
         )?;
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
@@ -1449,7 +1446,7 @@ impl AptosVM {
 
         let txn_status = TransactionStatus::from_vm_status(
             err.clone(),
-            self.features
+            self.features()
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
         );
         if txn_status.is_discarded() {
@@ -1497,7 +1494,7 @@ impl AptosVM {
         }
 
         let is_account_init_for_sponsored_transaction =
-            match is_account_init_for_sponsored_transaction(&txn_data, &self.features, resolver) {
+            match is_account_init_for_sponsored_transaction(&txn_data, self.features(), resolver) {
                 Ok(result) => result,
                 Err(err) => {
                     let vm_status = err.into_vm_status();
@@ -1669,7 +1666,7 @@ impl AptosVM {
                         senders,
                         convert_txn_args(script.args()),
                         &loaded_func,
-                        self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+                        self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
                     )?;
 
                 return_on_failure!(tmp_session.execute_script(
@@ -1851,7 +1848,7 @@ impl AptosVM {
     }
 
     fn extract_module_metadata(&self, module: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
-        if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
+        if self.features().is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module)
         } else {
             aptos_framework::get_vm_metadata_v0(&self.move_vm, module)
@@ -1895,7 +1892,7 @@ impl AptosVM {
         vm: &AptosVM,
         log_context: &AdapterLogSchema,
         gas_budget: u64,
-    ) -> Result<MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>> {
+    ) -> anyhow::Result<MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>> {
         let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
             vm.gas_feature_version,
             get_or_vm_startup_failure(&vm.gas_params, log_context)?
@@ -1925,7 +1922,7 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_meter: &mut MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>,
-    ) -> Result<Vec<Vec<u8>>> {
+    ) -> anyhow::Result<Vec<Vec<u8>>> {
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
@@ -1934,7 +1931,7 @@ impl AptosVM {
             func_name.as_ident_str(),
             &func_inst,
             metadata.as_ref().map(Arc::as_ref),
-            vm.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            vm.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
         Ok(session
@@ -1972,7 +1969,7 @@ impl AptosVM {
             self.gas_feature_version,
             resolver,
             txn_data,
-            &self.features,
+            self.features(),
             log_context,
         )?;
 
@@ -2242,7 +2239,7 @@ impl VMValidator for AptosVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         if !self
-            .features
+            .features()
             .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
         {
             if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
@@ -2250,7 +2247,7 @@ impl VMValidator for AptosVM {
             }
         }
 
-        if !self.features.is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
+        if !self.features().is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
             if let Ok(sk_authenticators) = transaction
                 .authenticator_ref()
                 .to_single_key_authenticators()

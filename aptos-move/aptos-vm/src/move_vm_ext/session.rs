@@ -16,7 +16,7 @@ use aptos_framework::natives::{
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     access_path::AccessPath, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
-    contract_event::ContractEvent, on_chain_config::Features, state_store::state_key::StateKey,
+    contract_event::ContractEvent, state_store::state_key::StateKey,
     validator_txn::ValidatorTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
@@ -156,19 +156,19 @@ impl SessionId {
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
     remote: &'r dyn AptosMoveResolver,
-    features: Arc<Features>,
+    is_storage_slot_metadata_enabled: bool,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
         inner: Session<'r, 'l>,
         remote: &'r dyn AptosMoveResolver,
-        features: Arc<Features>,
+        is_storage_slot_metadata_enabled: bool,
     ) -> Self {
         Self {
             inner,
             remote,
-            features,
+            is_storage_slot_metadata_enabled,
         }
     }
 
@@ -209,10 +209,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
 
-        let woc = WriteOpConverter::new(
-            self.remote,
-            self.features.is_storage_slot_metadata_enabled(),
-        );
+        let woc = WriteOpConverter::new(self.remote, self.is_storage_slot_metadata_enabled);
 
         let change_set = Self::convert_change_set(
             &woc,
