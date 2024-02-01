@@ -67,6 +67,9 @@ const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
+// Number of times to retry fetching a given txn block from the stores
+pub const NUM_DATA_FETCH_RETRIES: u8 = 5;
+
 // Max number of threads to reach out to TXN stores with
 const MAX_FETCH_THREADS_PER_REQUEST: u64 = 5;
 // THe number of transactions we store per txn block; this is used to determine max num of threads
@@ -235,7 +238,7 @@ async fn get_data_with_threads(
 
     for _ in 0..num_threads_to_use {
         let thread = tokio::spawn({
-            // TODO: arc these instead of cloning
+            // TODO: arc this instead of cloning
             let mut cache_operator = cache_operator.clone();
             let file_store_operator = file_store_operator.clone();
             let request_metadata = request_metadata.clone();
@@ -291,15 +294,16 @@ async fn get_data_in_thread(
     cache_storage_format: StorageFormat,
 ) -> DataFetchSubThreadResult {
     let current_batch_start_time = std::time::Instant::now();
-    let transaction_data = match data_fetch(
+
+    let fetched = data_fetch(
         start_version,
         cache_operator,
         file_store_operator,
         request_metadata.clone(),
         cache_storage_format,
-    )
-    .await
-    {
+    );
+
+    let transaction_data = match fetched.await {
         Ok(TransactionsDataStatus::Success(transactions)) => transactions,
         Ok(TransactionsDataStatus::AheadOfCache) => {
             info!(
@@ -586,14 +590,14 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
             // If this batch is fully contained within the previous batch, skip it
             if prev_start <= start_version && prev_end >= end_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE])
+                    .with_label_values(&[SERVICE_TYPE, &"full"])
                     .inc_by(end_version - start_version);
                 continue;
             }
             // If this batch overlaps with the previous batch, combine them
             if prev_end >= start_version {
                 NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
-                    .with_label_values(&[SERVICE_TYPE])
+                    .with_label_values(&[SERVICE_TYPE, &"partial"])
                     .inc_by(prev_end - start_version + 1);
                 tracing::debug!(
                     batch_first_version = first_version,
@@ -610,6 +614,10 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
 
             // Otherwise there is a gap
             if prev_end + 1 != start_version {
+                NUM_MULTI_FETCH_OVERLAPPED_VERSIONS
+                    .with_label_values(&[SERVICE_TYPE, &"gap"])
+                    .inc_by(prev_end - start_version + 1);
+
                 tracing::error!(
                     batch_first_version = first_version,
                     batch_last_version = last_version,
@@ -653,6 +661,24 @@ fn get_transactions_responses_builder(
         .collect()
 }
 
+// This is a CPU bound operation, so we spawn_blocking
+async fn deserialize_cached_transactions(
+    transactions: Vec<Vec<u8>>,
+    storage_format: StorageFormat,
+) -> anyhow::Result<Vec<Transaction>> {
+    let task = tokio::task::spawn_blocking( move || {
+        transactions
+            .into_iter()
+            .map(|transaction| {
+                let cache_entry = CacheEntry::new(transaction, storage_format);
+                cache_entry.into_transaction()
+            })
+            .collect::<Vec<Transaction>>()
+    })
+    .await;
+    task.context("Transaction bytes to CacheEntry deserialization thread failed")
+}
+
 /// Fetches data from cache or the file store. It returns the data if it is ready in the cache or file store.
 /// Otherwise, it returns the status of the data fetching.
 async fn data_fetch(
@@ -678,13 +704,9 @@ async fn data_fetch(
                 .sum::<usize>();
             let num_of_transactions = transactions.len();
             let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
-            let transactions = transactions
-                .into_iter()
-                .map(|transaction| {
-                    let cache_entry = CacheEntry::new(transaction, storage_format);
-                    cache_entry.into_transaction()
-                })
-                .collect::<Vec<Transaction>>();
+
+            let transactions =
+                deserialize_cached_transactions(transactions, storage_format).await?;
             let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
             let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
 
@@ -716,45 +738,55 @@ async fn data_fetch(
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            // Data is evicted from the cache. Fetch from file store.
-            let (transactions, io_duration, decoding_duration) = file_store_operator
-                .get_transactions_with_durations(starting_version)
-                .await?;
-            let size_in_bytes = transactions
-                .iter()
-                .map(|transaction| transaction.encoded_len())
-                .sum::<usize>();
-            let num_of_transactions = transactions.len();
-            let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
-            let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
-            log_grpc_step(
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceDataFetchedFilestore,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                start_version_timestamp,
-                end_version_timestamp,
-                Some(io_duration),
-                Some(size_in_bytes),
-                Some(num_of_transactions as i64),
-                Some(&request_metadata),
-            );
-            log_grpc_step(
-                SERVICE_TYPE,
-                IndexerGrpcStep::DataServiceTxnsDecoded,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
-                start_version_timestamp,
-                end_version_timestamp,
-                Some(decoding_duration),
-                Some(size_in_bytes),
-                Some(num_of_transactions as i64),
-                Some(&request_metadata),
-            );
+            let transactions = data_fetch_from_filestore(starting_version, file_store_operator, request_metadata).await?;
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Err(e) => Err(e),
     }
+}
+
+async fn data_fetch_from_filestore(
+    starting_version: u64,
+    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
+) -> anyhow::Result<Vec<Transaction>> {
+
+    // Data is evicted from the cache. Fetch from file store.
+    let (transactions, io_duration, decoding_duration) = file_store_operator
+        .get_transactions_with_durations(starting_version, NUM_DATA_FETCH_RETRIES)
+        .await?;
+    let size_in_bytes = transactions
+        .iter()
+        .map(|transaction| transaction.encoded_len())
+        .sum::<usize>();
+    let num_of_transactions = transactions.len();
+    let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
+    let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
+    log_grpc_step(
+        SERVICE_TYPE,
+        IndexerGrpcStep::DataServiceDataFetchedFilestore,
+        Some(starting_version as i64),
+        Some(starting_version as i64 + num_of_transactions as i64 - 1),
+        start_version_timestamp,
+        end_version_timestamp,
+        Some(io_duration),
+        Some(size_in_bytes),
+        Some(num_of_transactions as i64),
+        Some(&request_metadata),
+    );
+    log_grpc_step(
+        SERVICE_TYPE,
+        IndexerGrpcStep::DataServiceTxnsDecoded,
+        Some(starting_version as i64),
+        Some(starting_version as i64 + num_of_transactions as i64 - 1),
+        start_version_timestamp,
+        end_version_timestamp,
+        Some(decoding_duration),
+        Some(size_in_bytes),
+        Some(num_of_transactions as i64),
+        Some(&request_metadata),
+    );
+    Ok(transactions)
 }
 
 /// Handles the case when the data is not ready in the cache, i.e., beyond the current head.

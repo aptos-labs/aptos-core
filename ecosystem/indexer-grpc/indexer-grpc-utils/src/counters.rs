@@ -169,7 +169,17 @@ pub static NUM_MULTI_FETCH_OVERLAPPED_VERSIONS: Lazy<IntCounterVec> = Lazy::new(
     register_int_counter_vec!(
         "indexer_grpc_num_multi_thread_fetch_overlapped_versions",
         "Number of versions that were overlapped in a multi thread fetch pull",
-        &["service_type"],
+        &["service_type", "overlap_type"],
+    )
+    .unwrap()
+});
+
+/// Number of times we internally retry fetching a transaction/block
+pub static TRANSACTION_STORE_FETCH_RETRIES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_transaction_store_fetch_retries",
+        "Number of times we internally retry fetching a transaction/block",
+        &["store"],
     )
     .unwrap()
 });
