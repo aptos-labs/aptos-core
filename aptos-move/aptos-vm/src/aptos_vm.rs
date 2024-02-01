@@ -1767,7 +1767,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    pub(crate) fn process_block_prologue(
+    fn process_block_prologue(
         &self,
         resolver: &impl AptosMoveResolver,
         block_metadata: BlockMetadata,
@@ -1809,7 +1809,7 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    pub(crate) fn process_block_prologue_ext(
+    fn process_block_prologue_ext(
         &self,
         resolver: &impl AptosMoveResolver,
         block_metadata_ext: BlockMetadataExt,
@@ -2023,13 +2023,13 @@ impl AptosVM {
         txn: &SignatureVerifiedTransaction,
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
 
         if let SignatureVerifiedTransaction::Invalid(_) = txn {
             let vm_status = VMStatus::error(StatusCode::INVALID_SIGNATURE, None);
             let discarded_output = discarded_output(vm_status.status_code());
-            return Ok((vm_status, discarded_output, None));
+            return Ok((vm_status, discarded_output));
         }
 
         Ok(match txn.expect_valid() {
@@ -2037,7 +2037,7 @@ impl AptosVM {
                 fail_point!("aptos_vm::execution::block_metadata");
                 let (vm_status, output) =
                     self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
-                (vm_status, output, Some("block_prologue".to_string()))
+                (vm_status, output)
             },
             Transaction::BlockMetadataExt(block_metadata_ext) => {
                 fail_point!("aptos_vm::execution::block_metadata_ext");
@@ -2046,7 +2046,7 @@ impl AptosVM {
                     block_metadata_ext.clone(),
                     log_context,
                 )?;
-                (vm_status, output, Some("block_prologue_ext".to_string()))
+                (vm_status, output)
             },
             GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
@@ -2054,11 +2054,10 @@ impl AptosVM {
                     write_set_payload.clone(),
                     log_context,
                 )?;
-                (vm_status, output, Some("waypoint_write_set".to_string()))
+                (vm_status, output)
             },
             UserTransaction(txn) => {
                 fail_point!("aptos_vm::execution::user_transaction");
-                let sender = txn.sender().to_hex();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
                 let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
 
@@ -2129,17 +2128,17 @@ impl AptosVM {
                 if let Some(label) = counter_label {
                     USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
                 }
-                (vm_status, output, Some(sender))
+                (vm_status, output)
             },
             StateCheckpoint(_) => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
-                (VMStatus::Executed, output, Some("state_checkpoint".into()))
+                (VMStatus::Executed, output)
             },
             Transaction::ValidatorTransaction(txn) => {
                 let (vm_status, output) =
                     self.process_validator_transaction(resolver, txn.clone(), log_context)?;
-                (vm_status, output, Some("validator_transaction".to_string()))
+                (vm_status, output)
             },
         })
     }
