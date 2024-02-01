@@ -1357,6 +1357,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-event-stream-data-service"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-data-access",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-moving-average",
+ "aptos-protos 1.1.2",
+ "aptos-runtimes",
+ "async-trait",
+ "base64 0.13.1",
+ "clap 4.4.12",
+ "cloud-storage",
+ "futures",
+ "once_cell",
+ "prost 0.12.3",
+ "redis",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.10.2",
+ "tonic-reflection",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "aptos-executable-store"
 version = "0.1.0"
 dependencies = [
