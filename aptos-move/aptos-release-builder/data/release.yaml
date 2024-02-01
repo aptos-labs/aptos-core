@@ -1,14 +1,23 @@
 ---
 remote_endpoint: ~
-name: "20240201-randomnet-framework-upgrade"
+name: "randomnet1"
 proposals:
-  - name: step_1_upgrade_framework
+  - name: step_1_increase_max_txn_gas
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework"
-      description: "n/a"
-    execution_mode: MultiStep
+      title: "Increase max txn gas temporarily for framework upgrade"
+      description: "Increase max txn gas temporarily for framework upgrade"
+    execution_mode: RootSigner
+    update_sequence:
+      - DefaultGasWithOverride:
+          - name: "txn.max_execution_gas"
+            value: 3676000000
+  - name: step_2_upgrade_framework
+    metadata:
+      title: "Upgrade mainnet framework to dd9692f"
+      description: "Upgrade mainnet framework to dd9692f"
+    execution_mode: RootSigner
     update_sequence:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-
+      - DefaultGas

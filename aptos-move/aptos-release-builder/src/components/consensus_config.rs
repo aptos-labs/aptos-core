@@ -23,7 +23,7 @@ pub fn generate_consensus_upgrade_proposal(
         &writer,
         is_testnet,
         next_execution_hash.clone(),
-        &["aptos_framework::consensus_config"],
+        &["aptos_framework::consensus_config", "aptos_framework::aptos_governance"],
         |writer| {
             let consensus_config_blob = bcs::to_bytes(consensus_config).unwrap();
             assert!(consensus_config_blob.len() < 65536);
@@ -35,12 +35,20 @@ pub fn generate_consensus_upgrade_proposal(
             if is_testnet && next_execution_hash.is_empty() {
                 emitln!(
                     writer,
-                    "consensus_config::set(framework_signer, consensus_blob);"
+                    "consensus_config::set_for_next_epoch(framework_signer, consensus_blob);"
+                );
+                emitln!(
+                    writer,
+                    "aptos_governance::reconfigure(framework_signer);"
                 );
             } else {
                 emitln!(
                     writer,
-                    "consensus_config::set(&framework_signer, consensus_blob);"
+                    "consensus_config::set_for_next_epoch(&framework_signer, consensus_blob);"
+                );
+                emitln!(
+                    writer,
+                    "aptos_governance::reconfigure(&framework_signer);"
                 );
             }
         },
