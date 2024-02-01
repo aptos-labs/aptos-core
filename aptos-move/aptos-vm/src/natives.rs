@@ -53,6 +53,7 @@ use {
     move_vm_runtime::native_extensions::NativeContextExtensions,
     once_cell::sync::Lazy,
 };
+use aptos_framework::natives::randomness::RandomnessContext;
 
 #[cfg(feature = "testing")]
 struct AptosBlankStorage;
@@ -226,11 +227,13 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
     exts.add(NativeCodeContext::default());
-    exts.add(NativeTransactionContext::new(
+    let mut txn_context = NativeTransactionContext::new(
         vec![1],
         vec![1],
         ChainId::test().id(),
-    )); // We use the testing environment chain ID here
+    );
+    txn_context.set_is_friend_or_private_entry_func();
+    exts.add(txn_context); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
@@ -239,4 +242,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
+    exts.add(RandomnessContext::new());
 }

@@ -1,5 +1,5 @@
 spec aptos_std::randomness {
-    spec get_and_add_txn_local_state(): vector<u8> {
+    spec fetch_and_increment_txn_counter(): vector<u8> {
         pragma opaque;
     }
 }

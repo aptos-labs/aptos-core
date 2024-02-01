@@ -104,6 +104,7 @@ use std::{
         Arc,
     },
 };
+use aptos_framework::natives::transaction_context::NativeTransactionContext;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -644,6 +645,16 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         script_fn: &EntryFunction,
     ) -> Result<SerializedReturnValues, VMStatus> {
+        let is_friend_or_private = session.load_function_def_is_friend_or_private(
+            script_fn.module(),
+            script_fn.function(),
+            script_fn.ty_args()
+        )?;
+        if is_friend_or_private {
+            let txn_context = session.get_native_extensions().get_mut::<NativeTransactionContext>();
+            txn_context.set_is_friend_or_private_entry_func();
+        }
+
         let function = session.load_function(
             script_fn.module(),
             script_fn.function(),
