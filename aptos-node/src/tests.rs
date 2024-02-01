@@ -43,6 +43,11 @@ fn test_mutual_authentication_validators() {
     );
 }
 
+#[test]
+fn test_always_fails() {
+    assert!(false);
+}
+
 #[cfg(feature = "check-vm-features")]
 #[test]
 fn test_aptos_vm_does_not_have_test_natives() {
