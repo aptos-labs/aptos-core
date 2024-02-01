@@ -24,7 +24,7 @@ use crate::pipeline::{
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
-use log::{debug, info};
+use log::{debug, info, log_enabled, trace, Level};
 use move_compiler::{
     compiled_unit::{
         AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit, CompiledUnit,
@@ -60,9 +60,7 @@ pub fn run_move_compiler(
     let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
-    if options.debug {
-        debug!("After error check, GlobalEnv={}", env.dump_env());
-    }
+    trace!("After context check, GlobalEnv={}", env.dump_env());
 
     // Flow-insensitive checks on AST
     flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
@@ -70,20 +68,16 @@ pub fn run_move_compiler(
     function_checker::check_access_and_use(&mut env);
     check_errors(&env, error_writer, "checking errors")?;
 
-    if options.debug {
-        debug!(
-            "After flow-insensitive checks, GlobalEnv={}",
-            env.dump_env()
-        );
-    }
+    trace!(
+        "After flow-insensitive checks, GlobalEnv={}",
+        env.dump_env()
+    );
 
     // Run inlining.
     inliner::run_inlining(&mut env);
     check_errors(&env, error_writer, "inlining")?;
 
-    if options.debug {
-        debug!("After inlining, GlobalEnv={}", env.dump_env());
-    }
+    debug!("After inlining, GlobalEnv={}", env.dump_env());
 
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
@@ -91,9 +85,8 @@ pub fn run_move_compiler(
 
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
-    if options.debug || options.dump_bytecode {
-        // Dump bytecode to files, using a basename for the individual sources derived
-        // from the first input file.
+    if log_enabled!(Level::Debug) {
+        // Dump bytecode, providing a name for the target derived from the first input file.
         let dump_base_name = options
             .sources
             .first()
@@ -107,7 +100,7 @@ pub fn run_move_compiler(
             &env,
             &mut targets,
             &dump_base_name,
-            options.debug && options.dump_bytecode,
+            false,
             &pipeline::register_formatters,
         )
     } else {

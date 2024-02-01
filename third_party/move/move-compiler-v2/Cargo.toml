@@ -47,9 +47,6 @@ move-ir-types = { path = "../move-ir/types" }
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 move-stdlib = { path = "../move-stdlib" }
 
-[features]
-verbose-debug-print = ["move-stackless-bytecode/verbose-debug-print"]
-
 [lib]
 doctest = false
 
