@@ -30,6 +30,7 @@ pub fn start_jwk_consensus_runtime(
 }
 
 pub mod certified_update_producer;
+pub mod jwk_manager;
 pub mod jwk_observer;
 pub mod network;
 pub mod network_interface;
