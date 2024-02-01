@@ -666,7 +666,7 @@ async fn deserialize_cached_transactions(
     transactions: Vec<Vec<u8>>,
     storage_format: StorageFormat,
 ) -> anyhow::Result<Vec<Transaction>> {
-    let task = tokio::task::spawn_blocking( move || {
+    let task = tokio::task::spawn_blocking(move || {
         transactions
             .into_iter()
             .map(|transaction| {
@@ -738,7 +738,9 @@ async fn data_fetch(
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            let transactions = data_fetch_from_filestore(starting_version, file_store_operator, request_metadata).await?;
+            let transactions =
+                data_fetch_from_filestore(starting_version, file_store_operator, request_metadata)
+                    .await?;
             Ok(TransactionsDataStatus::Success(transactions))
         },
         Err(e) => Err(e),
@@ -750,7 +752,6 @@ async fn data_fetch_from_filestore(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
 ) -> anyhow::Result<Vec<Transaction>> {
-
     // Data is evicted from the cache. Fetch from file store.
     let (transactions, io_duration, decoding_duration) = file_store_operator
         .get_transactions_with_durations(starting_version, NUM_DATA_FETCH_RETRIES)

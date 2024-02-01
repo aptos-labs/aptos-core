@@ -262,7 +262,7 @@ pub fn log_grpc_step(
             step.get_label(),
         );
     } else {
-        let request_metadata = request_metadata.clone().unwrap();
+        let request_metadata = request_metadata.unwrap();
         tracing::info!(
             start_version,
             end_version,
@@ -272,12 +272,12 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_name = request_metadata.processor_name.as_str(),
-            request_email = request_metadata.request_email.as_str(),
-            request_api_key_name = request_metadata.request_api_key_name.as_str(),
-            processor_name = request_metadata.processor_name.as_str(),
-            connection_id = request_metadata.request_connection_id.as_str(),
-            request_user_classification = request_metadata.request_user_classification.as_str(),
+            request_name = &request_metadata.processor_name,
+            request_email = &request_metadata.request_email,
+            request_api_key_name = &request_metadata.request_api_key_name,
+            processor_name = &request_metadata.processor_name,
+            connection_id = &request_metadata.request_connection_id,
+            request_user_classification = &request_metadata.request_user_classification,
             service_type,
             step = step.get_step(),
             "{}",
