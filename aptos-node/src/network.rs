@@ -10,7 +10,6 @@ use aptos_config::{
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_dkg_runtime::DKGMessage;
 use aptos_event_notifications::EventSubscriptionService;
-use aptos_jwk_consensus::JWKConsensusMsg;
 use aptos_logger::debug;
 use aptos_mempool::network::MempoolSyncMsg;
 use aptos_network::{
@@ -33,6 +32,7 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
+use aptos_jwk_consensus::types::JWKConsensusMsg;
 
 /// A simple struct that holds both the network client
 /// and receiving interfaces for an application.
