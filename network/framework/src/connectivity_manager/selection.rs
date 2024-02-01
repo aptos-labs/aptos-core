@@ -114,8 +114,8 @@ fn choose_peers_by_ping_latency(
     // Gather the latency weights for all peers
     let mut peer_ids_and_latency_weights = vec![];
     for peer_id in peer_ids {
-        if let Some(ping_latency_ms) = discovered_peers.read().get_ping_latency_ms(peer_id) {
-            let latency_weight = convert_latency_to_weight(ping_latency_ms);
+        if let Some(ping_latency_secs) = discovered_peers.read().get_ping_latency_secs(peer_id) {
+            let latency_weight = convert_latency_to_weight(ping_latency_secs);
             peer_ids_and_latency_weights.push((peer_id, OrderedFloat(latency_weight)));
         }
     }
@@ -148,19 +148,18 @@ fn choose_peers_by_ping_latency(
 /// Converts the given latency measurement to a weight. The weight
 /// is calculated as the inverse of the latency, with a scaling
 /// factor to ensure that low latency peers are highly weighted.
-fn convert_latency_to_weight(latency_ms: u64) -> f64 {
+fn convert_latency_to_weight(latency_secs: f64) -> f64 {
     // If the latency is <= 0, something has gone wrong, so return 0.
-    let latency_ms = latency_ms as f64;
-    if latency_ms <= 0.0 {
+    if latency_secs <= 0.0 {
         return 0.0;
     }
 
     // Invert the latency to get the weight
-    let mut weight = 1000.0 / latency_ms;
+    let mut weight = 1.0 / latency_secs;
 
     // For every 25ms of latency, reduce the weight by 1/2 (to
     // ensure that low latency peers are highly weighted)
-    let num_reductions = (latency_ms / 25.0) as usize;
+    let num_reductions = (latency_secs / 0.025) as usize;
     for _ in 0..num_reductions {
         weight /= 2.0;
     }
@@ -584,17 +583,17 @@ mod test {
     #[test]
     fn test_latency_to_weights() {
         // Verify that a latency of 0 has a weight of 0
-        assert_eq!(convert_latency_to_weight(0), 0.0);
+        assert_eq!(convert_latency_to_weight(0.0), 0.0);
 
         // Verify that latencies are scaled exponentially
-        assert_eq!(convert_latency_to_weight(1), 1000.0);
-        assert_eq!(convert_latency_to_weight(5), 200.0);
-        assert_eq!(convert_latency_to_weight(10), 100.0);
-        assert_eq!(convert_latency_to_weight(20), 50.0);
-        assert_eq!(convert_latency_to_weight(25), 20.0);
-        assert_eq!(convert_latency_to_weight(50), 5.0);
-        assert_eq!(convert_latency_to_weight(100), 0.625);
-        assert_eq!(convert_latency_to_weight(200), 0.01953125);
+        assert_eq!(convert_latency_to_weight(0.001), 1000.0);
+        assert_eq!(convert_latency_to_weight(0.005), 200.0);
+        assert_eq!(convert_latency_to_weight(0.01), 100.0);
+        assert_eq!(convert_latency_to_weight(0.02), 50.0);
+        assert_eq!(convert_latency_to_weight(0.025), 20.0);
+        assert_eq!(convert_latency_to_weight(0.05), 5.0);
+        assert_eq!(convert_latency_to_weight(0.1), 0.625);
+        assert_eq!(convert_latency_to_weight(0.2), 0.01953125);
     }
 
     #[test]
@@ -653,7 +652,8 @@ mod test {
             // Set a random ping latency between 1 and 1000 ms (if required)
             if set_ping_latencies {
                 let ping_latency_ms = rand::thread_rng().gen_range(1, 1000);
-                peer.set_ping_latency_ms(ping_latency_ms);
+                let ping_latency_secs = ping_latency_ms as f64 / 1000.0;
+                peer.set_ping_latency_secs(ping_latency_secs);
             }
 
             // Insert the peer into the set
@@ -737,7 +737,7 @@ mod test {
             // Get the peer's ping latency
             let discovered_peers = discovered_peers.read();
             let discovered_peer = discovered_peers.peer_set.get(&peer).unwrap();
-            let ping_latency = discovered_peer.ping_latency_ms.unwrap() as f64;
+            let ping_latency = discovered_peer.ping_latency_secs.unwrap();
 
             // Verify that the ping latencies are increasing
             if ping_latency <= highest_seen_latency {
