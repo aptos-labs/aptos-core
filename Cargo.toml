@@ -110,7 +110,8 @@ members = [
     "crates/validator-transaction-pool",
     "devtools/aptos-cargo-cli",
     "dkg",
-    "ecosystem/event-stream-data-service",
+    "ecosystem/event-stream/event-stream-data-service",
+    "ecosystem/event-stream/event-stream-utils",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
@@ -314,7 +315,8 @@ aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-block-partitioner = { path = "execution/block-partitioner" }
 aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
-aptos-event-stream-data-service = { path = "ecosystem/event-stream-data-service" }
+aptos-event-stream-data-service = { path = "ecosystem/event-stream/event-stream-data-service" }
+aptos-event-stream-utils = { path = "ecosystem/event-stream/event-stream-utils" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }

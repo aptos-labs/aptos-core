@@ -8,7 +8,7 @@ use crate::metrics::{
     SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
-use aptos_indexer_grpc_utils::{
+use aptos_event_stream_utils::{
     cache_operator::{CacheBatchGetStatus, CacheOperator},
     chunk_transactions,
     compression_util::{CacheEntry, StorageFormat},
@@ -23,9 +23,8 @@ use aptos_indexer_grpc_utils::{
     types::RedisUrl,
 };
 use aptos_moving_average::MovingAverage;
-use aptos_protos::{
-    indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
-    transaction::v1::Transaction,
+use aptos_protos::event_stream::v1::{
+    raw_events_server::RawEvents, Event, EventsResponse, GetEventsRequest,
 };
 use futures::Stream;
 use prost::Message;
@@ -41,7 +40,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 use uuid::Uuid;
-type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
+type ResponseStream = Pin<Box<dyn Stream<Item = Result<EventsResponse, Status>> + Send>>;
 
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
 // When trying to fetch beyond the current head of cache, the server will retry after this duration.
@@ -65,14 +64,14 @@ const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
-pub struct RawDataServerWrapper {
+pub struct RawEventsServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
     pub cache_storage_format: StorageFormat,
 }
 
-impl RawDataServerWrapper {
+impl RawEventsServerWrapper {
     pub fn new(
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
@@ -93,19 +92,19 @@ impl RawDataServerWrapper {
 }
 
 /// Enum to represent the status of the data fetching overall.
-enum TransactionsDataStatus {
+enum EventDataStatus {
     // Data fetching is successful.
-    Success(Vec<Transaction>),
+    Success(Vec<Event>),
     // Ahead of current head of cache.
     AheadOfCache,
 }
 
-/// RawDataServerWrapper handles the get transactions requests from cache and file store.
+/// RawEventsServerWrapper handles the get transactions requests from cache and file store.
 #[tonic::async_trait]
-impl RawData for RawDataServerWrapper {
-    type GetTransactionsStream = ResponseStream;
+impl RawEvents for RawEventsServerWrapper {
+    type GetEventsStream = ResponseStream;
 
-    /// GetTransactionsStream is a streaming GRPC endpoint:
+    /// GetEventsStream is a streaming GRPC endpoint:
     /// 1. Fetches data from cache and file store.
     ///    1.1. If the data is beyond the current head of cache, retry after a short sleep.
     ///    1.2. If the data is not in cache, fetch the data from file store.
@@ -113,10 +112,10 @@ impl RawData for RawDataServerWrapper {
     ///    1.4  If error happens, retry after a short sleep.
     /// 2. Push data into channel to stream to the client.
     ///    2.1. If the channel is full, do not fetch and retry after a short sleep.
-    async fn get_transactions(
+    async fn get_events(
         &self,
-        req: Request<GetTransactionsRequest>,
-    ) -> Result<Response<Self::GetTransactionsStream>, Status> {
+        req: Request<GetEventsRequest>,
+    ) -> Result<Response<Self::GetEventsStream>, Status> {
         // Get request identity. The request is already authenticated by the interceptor.
         let request_metadata = match get_request_metadata(&req) {
             Ok(request_metadata) => request_metadata,
@@ -255,8 +254,8 @@ impl RawData for RawDataServerWrapper {
                     )
                     .await
                     {
-                        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
-                        Ok(TransactionsDataStatus::AheadOfCache) => {
+                        Ok(EventDataStatus::Success(transactions)) => transactions,
+                        Ok(EventDataStatus::AheadOfCache) => {
                             ahead_of_cache_data_handling().await;
                             // Retry after a short sleep.
                             continue;
@@ -298,16 +297,20 @@ impl RawData for RawDataServerWrapper {
                         .inc_by(bytes_ready_to_transfer as u64);
                     // 2. Push the data to the response channel, i.e. stream the data to the client.
                     let current_batch_size = transaction_data.as_slice().len();
-                    let end_of_batch_version = transaction_data.as_slice().last().unwrap().version;
+                    let end_of_batch_version = transaction_data
+                        .as_slice()
+                        .last()
+                        .unwrap()
+                        .transaction_version;
                     let resp_items =
                         get_transactions_responses_builder(transaction_data, chain_id as u32);
                     let data_latency_in_secs = resp_items
                         .last()
                         .unwrap()
-                        .transactions
+                        .events
                         .last()
                         .unwrap()
-                        .timestamp
+                        .transaction_timestamp
                         .as_ref()
                         .map(time_diff_since_pb_timestamp_in_secs);
 
@@ -397,7 +400,7 @@ impl RawData for RawDataServerWrapper {
         });
 
         let output_stream = ReceiverStream::new(rx);
-        let mut response = Response::new(Box::pin(output_stream) as Self::GetTransactionsStream);
+        let mut response = Response::new(Box::pin(output_stream) as Self::GetEventsStream);
 
         response.metadata_mut().insert(
             RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER,
@@ -412,15 +415,15 @@ impl RawData for RawDataServerWrapper {
 
 /// Builds the response for the get transactions request. Partial batch is ok, i.e., a batch with transactions < 1000.
 fn get_transactions_responses_builder(
-    transactions: Vec<Transaction>,
+    transactions: Vec<Event>,
     chain_id: u32,
-) -> Vec<TransactionsResponse> {
+) -> Vec<EventsResponse> {
     let chunks = chunk_transactions(transactions, MESSAGE_SIZE_LIMIT);
     chunks
         .into_iter()
-        .map(|chunk| TransactionsResponse {
+        .map(|chunk| EventsResponse {
             chain_id: Some(chain_id as u64),
-            transactions: chunk,
+            events: chunk,
         })
         .collect()
 }
@@ -433,7 +436,7 @@ async fn data_fetch(
     file_store_operator: &dyn FileStoreOperator,
     request_metadata: IndexerGrpcRequestMetadata,
     storage_format: StorageFormat,
-) -> anyhow::Result<TransactionsDataStatus> {
+) -> anyhow::Result<EventDataStatus> {
     let current_batch_start_time = std::time::Instant::now();
     let batch_get_result = cache_operator
         .batch_get_encoded_proto_data(starting_version)
@@ -441,7 +444,7 @@ async fn data_fetch(
 
     match batch_get_result {
         // Data is not ready yet in the cache.
-        Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
+        Ok(CacheBatchGetStatus::NotReady) => Ok(EventDataStatus::AheadOfCache),
         Ok(CacheBatchGetStatus::Ok(transactions)) => {
             let decoding_start_time = std::time::Instant::now();
             let size_in_bytes = transactions
@@ -454,11 +457,12 @@ async fn data_fetch(
                 .into_iter()
                 .map(|transaction| {
                     let cache_entry = CacheEntry::new(transaction, storage_format);
-                    cache_entry.into_transaction()
+                    cache_entry.into_event()
                 })
-                .collect::<Vec<Transaction>>();
-            let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
-            let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
+                .collect::<Vec<Event>>();
+            let start_version_timestamp =
+                transactions.first().unwrap().transaction_timestamp.as_ref();
+            let end_version_timestamp = transactions.last().unwrap().transaction_timestamp.as_ref();
 
             log_grpc_step(
                 SERVICE_TYPE,
@@ -485,7 +489,7 @@ async fn data_fetch(
                 Some(request_metadata.clone()),
             );
 
-            Ok(TransactionsDataStatus::Success(transactions))
+            Ok(EventDataStatus::Success(transactions))
         },
         Ok(CacheBatchGetStatus::EvictedFromCache) => {
             // Data is evicted from the cache. Fetch from file store.
@@ -523,7 +527,7 @@ async fn data_fetch(
                 Some(num_of_transactions as i64),
                 Some(request_metadata.clone()),
             );
-            Ok(TransactionsDataStatus::Success(transactions))
+            Ok(EventDataStatus::Success(transactions))
         },
         Err(e) => Err(e),
     }
@@ -554,7 +558,7 @@ async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, cha
 
 /// Gets the request metadata. Useful for logging.
 fn get_request_metadata(
-    req: &Request<GetTransactionsRequest>,
+    req: &Request<GetEventsRequest>,
 ) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
         ("request_api_key_name", REQUEST_HEADER_APTOS_API_KEY_NAME),
@@ -589,45 +593,45 @@ fn get_request_metadata(
 }
 
 async fn channel_send_multiple_with_timeout(
-    resp_items: Vec<TransactionsResponse>,
-    tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
+    resp_items: Vec<EventsResponse>,
+    tx: tokio::sync::mpsc::Sender<Result<EventsResponse, Status>>,
     request_metadata: IndexerGrpcRequestMetadata,
-) -> Result<(), SendTimeoutError<Result<TransactionsResponse, Status>>> {
+) -> Result<(), SendTimeoutError<Result<EventsResponse, Status>>> {
     let overall_send_start_time = Instant::now();
     let overall_size_in_bytes = resp_items
         .iter()
         .map(|resp_item| resp_item.encoded_len())
         .sum::<usize>();
-    let overall_start_txn = resp_items.first().unwrap().transactions.first().unwrap();
-    let overall_end_txn = resp_items.last().unwrap().transactions.last().unwrap();
-    let overall_start_version = overall_start_txn.version;
-    let overall_end_version = overall_end_txn.version;
-    let overall_start_txn_timestamp = overall_start_txn.clone().timestamp;
-    let overall_end_txn_timestamp = overall_end_txn.clone().timestamp;
+    let overall_start_txn = resp_items.first().unwrap().events.first().unwrap();
+    let overall_end_txn = resp_items.last().unwrap().events.last().unwrap();
+    let overall_start_version = overall_start_txn.transaction_version;
+    let overall_end_version = overall_end_txn.transaction_version;
+    let overall_start_txn_timestamp = overall_start_txn.clone().transaction_timestamp;
+    let overall_end_txn_timestamp = overall_end_txn.clone().transaction_timestamp;
 
     for resp_item in resp_items {
         let send_start_time = Instant::now();
         let response_size = resp_item.encoded_len();
-        let num_of_transactions = resp_item.transactions.len();
-        let start_version = resp_item.transactions.first().unwrap().version;
-        let end_version = resp_item.transactions.last().unwrap().version;
+        let num_of_transactions = resp_item.events.len();
+        let start_version = resp_item.events.first().unwrap().transaction_version;
+        let end_version = resp_item.events.last().unwrap().transaction_version;
         let start_version_txn_timestamp = resp_item
-            .transactions
+            .events
             .first()
             .unwrap()
-            .timestamp
+            .transaction_timestamp
             .as_ref()
             .unwrap();
         let end_version_txn_timestamp = resp_item
-            .transactions
+            .events
             .last()
             .unwrap()
-            .timestamp
+            .transaction_timestamp
             .as_ref()
             .unwrap();
 
         tx.send_timeout(
-            Result::<TransactionsResponse, Status>::Ok(resp_item.clone()),
+            Result::<EventsResponse, Status>::Ok(resp_item.clone()),
             RESPONSE_CHANNEL_SEND_TIMEOUT,
         )
         .await?;

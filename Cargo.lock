@@ -1361,9 +1361,9 @@ name = "aptos-event-stream-data-service"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-event-stream-utils",
  "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
- "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average",
@@ -1385,6 +1385,43 @@ dependencies = [
  "tonic-reflection",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "aptos-event-stream-utils"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-metrics-core",
+ "aptos-protos 1.1.2",
+ "async-trait",
+ "backoff",
+ "backtrace",
+ "base64 0.13.1",
+ "chrono",
+ "clap 4.4.12",
+ "cloud-storage",
+ "flate2",
+ "futures",
+ "futures-core",
+ "futures-util",
+ "itertools 0.10.5",
+ "once_cell",
+ "prometheus",
+ "prost 0.12.3",
+ "redis",
+ "redis-test",
+ "ripemd",
+ "serde",
+ "serde_json",
+ "serde_yaml 0.8.26",
+ "tokio",
+ "toml 0.7.8",
+ "tonic 0.10.2",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+ "url",
+ "warp",
 ]
 
 [[package]]

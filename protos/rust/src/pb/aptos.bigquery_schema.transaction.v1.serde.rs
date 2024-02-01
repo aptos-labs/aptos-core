@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 impl serde::Serialize for Transaction {
     #[allow(deprecated)]
@@ -170,7 +168,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("version"));
                             }
-                            version__ =
+                            version__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -178,7 +176,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if block_height__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("blockHeight"));
                             }
-                            block_height__ =
+                            block_height__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -222,7 +220,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if gas_used__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("gasUsed"));
                             }
-                            gas_used__ =
+                            gas_used__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -248,7 +246,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if num_events__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("numEvents"));
                             }
-                            num_events__ =
+                            num_events__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -256,7 +254,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if num_write_set_changes__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("numWriteSetChanges"));
                             }
-                            num_write_set_changes__ =
+                            num_write_set_changes__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -264,7 +262,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if epoch__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("epoch"));
                             }
-                            epoch__ =
+                            epoch__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -272,7 +270,7 @@ impl<'de> serde::Deserialize<'de> for Transaction {
                             if inserted_at__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("insertedAt"));
                             }
-                            inserted_at__ =
+                            inserted_at__ = 
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
