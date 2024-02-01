@@ -22,7 +22,7 @@ use std::time::Duration;
 pub async fn write_json_to_gcs(
     bucket: String,
     id: String,
-    json: Value,
+    json: &Value,
     client: &Client,
 ) -> anyhow::Result<String> {
     GCS_UPLOAD_INVOCATION_COUNT.inc();
