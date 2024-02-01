@@ -11,6 +11,7 @@ pub enum ValidatorTransaction {
     DummyTopic1(DummyValidatorTransaction),
     DKGResult(DKGTranscript),
     DummyTopic2(DummyValidatorTransaction),
+    ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
@@ -40,14 +41,24 @@ impl ValidatorTransaction {
     pub fn size_in_bytes(&self) -> usize {
         bcs::serialized_size(self).unwrap()
     }
+
+    pub fn topic(&self) -> Topic {
+        match self {
+            ValidatorTransaction::DummyTopic1(_) => Topic::DUMMY1,
+            ValidatorTransaction::DKGResult(_) => Topic::DKG,
+            ValidatorTransaction::DummyTopic2(_) => Topic::DUMMY2,
+            ValidatorTransaction::ObservedJWKUpdate(update) => {
+                Topic::JWK_CONSENSUS(update.update.issuer.clone())
+            },
+        }
+    }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 #[allow(non_camel_case_types)]
 pub enum Topic {
     DKG,
     JWK_CONSENSUS(jwks::Issuer),
     DUMMY1,
-    #[cfg(any(test, feature = "fuzzing"))]
     DUMMY2,
 }

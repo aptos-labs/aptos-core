@@ -446,6 +446,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
         FeatureFlag::ZK_ID_SIGNATURES,
         FeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
+        FeatureFlag::JWK_CONSENSUS,
     ]
 }
 
