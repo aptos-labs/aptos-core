@@ -313,10 +313,6 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         }
     }
 
-    // Fetching from cache
-    // Requested version x
-    // Cache hit x +
-
     // TODO: Remove this
     pub async fn batch_get_encoded_proto_data(
         &mut self,
@@ -381,18 +377,35 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             .context("Failed to mget from Redis")?;
         let io_duration = start_time.elapsed().as_secs_f64();
         let start_time = std::time::Instant::now();
-        let mut transactions = vec![];
-        for encoded_transaction in encoded_transactions {
-            let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
-            let transaction = cache_entry.into_transaction();
-            transactions.push(transaction);
-        }
+        let transactions = self
+            .deserialize_cached_transactions(encoded_transactions, self.storage_format)
+            .await
+            .context("Failed to deserialize transactions from cache.")?;
         ensure!(
             transactions.len() == transaction_count as usize,
             "Failed to get all transactions from cache."
         );
         let decoding_duration = start_time.elapsed().as_secs_f64();
         Ok((transactions, io_duration, decoding_duration))
+    }
+
+    // This is a CPU bound operation, so we spawn_blocking
+    async fn deserialize_cached_transactions(
+        &mut self,
+        transactions: Vec<Vec<u8>>,
+        storage_format: StorageFormat,
+    ) -> anyhow::Result<Vec<Transaction>> {
+        let task = tokio::task::spawn_blocking(move || {
+            transactions
+                .into_iter()
+                .map(|transaction| {
+                    let cache_entry = CacheEntry::new(transaction, storage_format);
+                    cache_entry.into_transaction()
+                })
+                .collect::<Vec<Transaction>>()
+        })
+        .await;
+        task.context("Transaction bytes to CacheEntry deserialization thread failed")
     }
 
     /// Fail if not all transactions requested are returned

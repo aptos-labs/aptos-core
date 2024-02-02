@@ -9,9 +9,9 @@ use crate::metrics::{
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
-    cache_operator::{CacheBatchGetStatus, CacheCoverageStatus, CacheOperator},
+    cache_operator::{CacheCoverageStatus, CacheOperator},
     chunk_transactions,
-    compression_util::{CacheEntry, StorageFormat},
+    compression_util::StorageFormat,
     config::IndexerGrpcFileStoreConfig,
     constants::{
         IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
@@ -102,14 +102,6 @@ impl RawDataServerWrapper {
     }
 }
 
-/// Enum to represent the status of the data fetching overall.
-enum TransactionsDataStatus {
-    // Data fetching is successful.
-    Success(Vec<Transaction>),
-    // Ahead of current head of cache.
-    AheadOfCache,
-}
-
 /// RawDataServerWrapper handles the get transactions requests from cache and file store.
 #[tonic::async_trait]
 impl RawData for RawDataServerWrapper {
@@ -175,16 +167,12 @@ impl RawData for RawDataServerWrapper {
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
-                data_fetcher_task(
-                    redis_client,
-                    file_store_operator,
-                    cache_storage_format,
-                    request_metadata,
-                    transactions_count,
-                    tx,
+                get_filestore_data(
                     current_version,
+                    file_store_operator,
+                    request_metadata.clone(),
                 )
-                .await;
+                .await
             }
         });
 
@@ -209,23 +197,53 @@ enum DataFetchSubTaskResult {
 async fn get_data_with_tasks(
     start_version: u64,
     transactions_count: Option<u64>,
-    chain_id: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
-    cache_storage_format: StorageFormat,
-) -> DataFetchSubTaskResult {
+) -> anyhow::Result<DataFetchSubTaskResult> {
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
         .await;
 
-    let num_tasks_to_use = match cache_coverage_status {
-        Ok(CacheCoverageStatus::DataNotReady) => return DataFetchSubTaskResult::NoResults,
-        Ok(CacheCoverageStatus::CacheHit(_)) => 1,
-        Ok(CacheCoverageStatus::CacheEvicted) => match transactions_count {
-            None => MAX_FETCH_TASKS_PER_REQUEST,
-            Some(transactions_count) => (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK)
-                .max(MAX_FETCH_TASKS_PER_REQUEST),
+    let mut should_fetch_filestore = false;
+
+    let mut transactions = match cache_coverage_status {
+        Ok(CacheCoverageStatus::DataNotReady) => {
+            // Handles the case when the data is not ready in the cache, i.e., beyond the current head.
+            // TODO: add exponential backoff.
+            tokio::time::sleep(Duration::from_millis(
+                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
+            ))
+            .await;
+
+            return Ok(DataFetchSubTaskResult::NoResults);
+        },
+        Ok(CacheCoverageStatus::CacheHit(num_transactions_to_fetch)) => {
+            let cache_fetch_result = data_fetch_from_cache(
+                start_version,
+                num_transactions_to_fetch,
+                cache_operator,
+                request_metadata.clone(),
+            )
+            .await;
+            match cache_fetch_result {
+                Ok(DataFetchSubTaskResult::Success(transactions)) => vec![transactions],
+                Ok(DataFetchSubTaskResult::NoResults) => {
+                    return Ok(DataFetchSubTaskResult::NoResults)
+                },
+                Ok(DataFetchSubTaskResult::BatchSuccess(_)) => {
+                    unreachable!("Fetching from a single task will never return a batch")
+                },
+                Err(_) => {
+                    // TODO: If data is estimated to be in cache, but fetch fails, try to fetch from filestore instead.
+                    should_fetch_filestore = true;
+                    vec![]
+                },
+            }
+        },
+        Ok(CacheCoverageStatus::CacheEvicted) => {
+            should_fetch_filestore = true;
+            vec![]
         },
         Err(_) => {
             error!("[Data Service] Failed to get cache coverage status.");
@@ -233,107 +251,32 @@ async fn get_data_with_tasks(
         },
     };
 
-    let mut tasks = tokio::task::JoinSet::new();
-    let mut current_version = start_version;
-
-    for _ in 0..num_tasks_to_use {
-        tasks.spawn({
-            // TODO: arc this instead of cloning
-            let mut cache_operator = cache_operator.clone();
-            let file_store_operator = file_store_operator.clone();
-            let request_metadata = request_metadata.clone();
-            async move {
-                get_data_in_task(
-                    current_version,
-                    chain_id,
-                    &mut cache_operator,
-                    file_store_operator,
-                    request_metadata.clone(),
-                    cache_storage_format,
-                )
-                .await
-            }
-        });
-        // Storage is in block of 1000: we align our current version fetch to the nearest block
-        current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
-        current_version -= current_version % TRANSACTIONS_PER_STORAGE_BLOCK;
-    }
-
-    let mut transactions: Vec<Vec<Transaction>> = vec![];
-    while let Some(result) = tasks.join_next().await {
-        match result {
-            Ok(DataFetchSubTaskResult::Success(txns)) => {
-                transactions.push(txns);
+    if should_fetch_filestore {
+        let filestore_fetch_result: DataFetchSubTaskResult = data_fetch_from_filestore_in_tasks(
+            start_version,
+            transactions_count,
+            file_store_operator,
+            request_metadata.clone(),
+        )
+        .await;
+        transactions = match filestore_fetch_result {
+            DataFetchSubTaskResult::NoResults => return Ok(DataFetchSubTaskResult::NoResults),
+            DataFetchSubTaskResult::BatchSuccess(transactions) => transactions,
+            DataFetchSubTaskResult::Success(_) => {
+                unreachable!("Fetching from multiple tasks will never return a single vector")
             },
-            Ok(DataFetchSubTaskResult::NoResults) => {},
-            Err(e) => {
-                error!(
-                    error = e.to_string(),
-                    "[Data Service] Failed to get data from cache and file store."
-                );
-                panic!("Failed to get data from cache and file store.");
-            },
-            Ok(_) => unreachable!("Fetching from a single task will never return a batch"),
         }
     }
 
     if transactions.is_empty() {
-        DataFetchSubTaskResult::NoResults
+        Ok(DataFetchSubTaskResult::NoResults)
     } else {
-        DataFetchSubTaskResult::BatchSuccess(transactions)
+        Ok(DataFetchSubTaskResult::BatchSuccess(transactions))
     }
 }
 
-async fn get_data_in_task(
-    start_version: u64,
-    chain_id: u64,
-    cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
-    request_metadata: Arc<IndexerGrpcRequestMetadata>,
-    cache_storage_format: StorageFormat,
-) -> DataFetchSubTaskResult {
-    let current_batch_start_time = std::time::Instant::now();
-
-    let fetched = data_fetch(
-        start_version,
-        cache_operator,
-        file_store_operator,
-        request_metadata.clone(),
-        cache_storage_format,
-    );
-
-    let transaction_data = match fetched.await {
-        Ok(TransactionsDataStatus::Success(transactions)) => transactions,
-        Ok(TransactionsDataStatus::AheadOfCache) => {
-            info!(
-                start_version = start_version,
-                request_name = request_metadata.processor_name.as_str(),
-                request_email = request_metadata.request_email.as_str(),
-                request_api_key_name = request_metadata.request_api_key_name.as_str(),
-                processor_name = request_metadata.processor_name.as_str(),
-                connection_id = request_metadata.request_connection_id.as_str(),
-                request_user_classification = request_metadata.request_user_classification.as_str(),
-                duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
-                service_type = SERVICE_TYPE,
-                "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
-                AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-            );
-            ahead_of_cache_data_handling().await;
-            // Retry after a short sleep.
-            return DataFetchSubTaskResult::NoResults;
-        },
-        Err(e) => {
-            ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
-            data_fetch_error_handling(e, start_version, chain_id).await;
-            // Retry after a short sleep.
-            return DataFetchSubTaskResult::NoResults;
-        },
-    };
-    DataFetchSubTaskResult::Success(transaction_data)
-}
-
-// This is a task spawned off for servicing a users' request
-async fn data_fetcher_task(
+// This is a thread spawned off for servicing a users' request
+async fn data_fetcher_thread(
     redis_client: Arc<Client>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     cache_storage_format: StorageFormat,
@@ -429,19 +372,25 @@ async fn data_fetcher_task(
         let transaction_data = match get_data_with_tasks(
             current_version,
             transactions_count,
-            chain_id,
             &mut cache_operator,
             file_store_operator.clone(),
             request_metadata.clone(),
-            cache_storage_format,
         )
         .await
         {
-            DataFetchSubTaskResult::BatchSuccess(txns) => txns,
-            DataFetchSubTaskResult::Success(_) => {
+            Ok(DataFetchSubTaskResult::BatchSuccess(txns)) => txns,
+            Ok(DataFetchSubTaskResult::Success(_)) => {
                 unreachable!("Fetching from multiple tasks will never return a single vector")
             },
-            DataFetchSubTaskResult::NoResults => continue,
+            Ok(DataFetchSubTaskResult::NoResults) => continue,
+            Err(_) => {
+                error!("[Data Service] Failed to get data from cache and file store.");
+                tokio::time::sleep(Duration::from_millis(
+                    TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS,
+                ))
+                .await;
+                continue;
+            },
         };
 
         let mut transaction_data = ensure_sequential_transactions(transaction_data);
@@ -660,63 +609,33 @@ fn get_transactions_responses_builder(
         .collect()
 }
 
-// This is a CPU bound operation, so we spawn_blocking
-async fn deserialize_cached_transactions(
-    transactions: Vec<Vec<u8>>,
-    storage_format: StorageFormat,
-) -> anyhow::Result<Vec<Transaction>> {
-    let task = tokio::task::spawn_blocking(move || {
-        transactions
-            .into_iter()
-            .map(|transaction| {
-                let cache_entry = CacheEntry::new(transaction, storage_format);
-                cache_entry.into_transaction()
-            })
-            .collect::<Vec<Transaction>>()
-    })
-    .await;
-    task.context("Transaction bytes to CacheEntry deserialization task failed")
-}
-
-/// Fetches data from cache or the file store. It returns the data if it is ready in the cache or file store.
-/// Otherwise, it returns the status of the data fetching.
-async fn data_fetch(
-    starting_version: u64,
+async fn data_fetch_from_cache(
+    start_version: u64,
+    transaction_count: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
-    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
-    storage_format: StorageFormat,
-) -> anyhow::Result<TransactionsDataStatus> {
-    let current_batch_start_time = std::time::Instant::now();
-    let batch_get_result = cache_operator
-        .batch_get_encoded_proto_data(starting_version)
+) -> anyhow::Result<DataFetchSubTaskResult> {
+    let cache_get_result = cache_operator
+        .get_transactions_with_durations(start_version, transaction_count)
         .await;
 
-    match batch_get_result {
-        // Data is not ready yet in the cache.
-        Ok(CacheBatchGetStatus::NotReady) => Ok(TransactionsDataStatus::AheadOfCache),
-        Ok(CacheBatchGetStatus::Ok(transactions)) => {
-            let decoding_start_time = std::time::Instant::now();
+    match cache_get_result {
+        Ok((transactions, io_duration, decoding_duration)) => {
             let size_in_bytes = transactions
                 .iter()
-                .map(|transaction| transaction.len())
+                .map(|transaction| transaction.encoded_len())
                 .sum::<usize>();
             let num_of_transactions = transactions.len();
-            let duration_in_secs = current_batch_start_time.elapsed().as_secs_f64();
-
-            let transactions =
-                deserialize_cached_transactions(transactions, storage_format).await?;
             let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
             let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
-
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::DataServiceDataFetchedCache,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                Some(start_version as i64),
+                Some(start_version as i64 + num_of_transactions as i64 - 1),
                 start_version_timestamp,
                 end_version_timestamp,
-                Some(duration_in_secs),
+                Some(io_duration),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
                 Some(&request_metadata),
@@ -724,92 +643,160 @@ async fn data_fetch(
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::DataServiceTxnsDecoded,
-                Some(starting_version as i64),
-                Some(starting_version as i64 + num_of_transactions as i64 - 1),
+                Some(start_version as i64),
+                Some(start_version as i64 + num_of_transactions as i64 - 1),
                 start_version_timestamp,
                 end_version_timestamp,
-                Some(decoding_start_time.elapsed().as_secs_f64()),
+                Some(decoding_duration),
                 Some(size_in_bytes),
                 Some(num_of_transactions as i64),
                 Some(&request_metadata),
             );
-
-            Ok(TransactionsDataStatus::Success(transactions))
+            Ok(DataFetchSubTaskResult::Success(transactions))
         },
-        Ok(CacheBatchGetStatus::EvictedFromCache) => {
-            let transactions =
-                data_fetch_from_filestore(starting_version, file_store_operator, request_metadata)
-                    .await?;
-            Ok(TransactionsDataStatus::Success(transactions))
+        Err(e) => {
+            ERROR_COUNT
+                .with_label_values(&["data_fetch_cache_failed"])
+                .inc();
+            error!(
+                start_version = start_version,
+                end_version = start_version + transaction_count - 1,
+                // Request metadata variables
+                request_name = &request_metadata.processor_name.as_str(),
+                request_email = request_metadata.request_email.as_str(),
+                request_api_key_name = request_metadata.request_api_key_name.as_str(),
+                processor_name = request_metadata.processor_name.as_str(),
+                connection_id = request_metadata.request_connection_id.as_str(),
+                request_user_classification = request_metadata.request_user_classification.as_str(),
+                error = e.to_string(),
+                "[Data Service] Failed to get transactions from cache.",
+            );
+            panic!("Failed to get data from cache.");
         },
-        Err(e) => Err(e),
     }
 }
 
-async fn data_fetch_from_filestore(
-    starting_version: u64,
+async fn data_fetch_from_filestore_in_tasks(
+    start_version: u64,
+    transactions_count: Option<u64>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
-) -> anyhow::Result<Vec<Transaction>> {
-    // Data is evicted from the cache. Fetch from file store.
-    let (transactions, io_duration, decoding_duration) = file_store_operator
-        .get_transactions_with_durations(starting_version, NUM_DATA_FETCH_RETRIES)
-        .await?;
-    let size_in_bytes = transactions
-        .iter()
-        .map(|transaction| transaction.encoded_len())
-        .sum::<usize>();
-    let num_of_transactions = transactions.len();
-    let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
-    let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
-    log_grpc_step(
-        SERVICE_TYPE,
-        IndexerGrpcStep::DataServiceDataFetchedFilestore,
-        Some(starting_version as i64),
-        Some(starting_version as i64 + num_of_transactions as i64 - 1),
-        start_version_timestamp,
-        end_version_timestamp,
-        Some(io_duration),
-        Some(size_in_bytes),
-        Some(num_of_transactions as i64),
-        Some(&request_metadata),
-    );
-    log_grpc_step(
-        SERVICE_TYPE,
-        IndexerGrpcStep::DataServiceTxnsDecoded,
-        Some(starting_version as i64),
-        Some(starting_version as i64 + num_of_transactions as i64 - 1),
-        start_version_timestamp,
-        end_version_timestamp,
-        Some(decoding_duration),
-        Some(size_in_bytes),
-        Some(num_of_transactions as i64),
-        Some(&request_metadata),
-    );
-    Ok(transactions)
+) -> DataFetchSubTaskResult {
+    let num_tasks_to_use = match transactions_count {
+        None => MAX_FETCH_TASKS_PER_REQUEST,
+        Some(transactions_count) => {
+            (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK).max(MAX_FETCH_TASKS_PER_REQUEST)
+        },
+    };
+
+    let mut tasks = tokio::task::JoinSet::new();
+    let mut current_version = start_version;
+
+    for _ in 0..num_tasks_to_use {
+        tasks.spawn({
+            // TODO: arc this instead of cloning
+            let file_store_operator = file_store_operator.clone();
+            let request_metadata = request_metadata.clone();
+            async move {
+                get_filestore_data(
+                    current_version,
+                    file_store_operator,
+                    request_metadata.clone(),
+                )
+                .await
+            }
+        });
+        current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
+        current_version -= current_version % TRANSACTIONS_PER_STORAGE_BLOCK;
+    }
+
+    let mut transactions: Vec<Vec<Transaction>> = vec![];
+    while let Some(result) = tasks.join_next().await {
+        match result {
+            Ok(DataFetchSubTaskResult::Success(txns)) => {
+                transactions.push(txns);
+            },
+            Ok(DataFetchSubTaskResult::NoResults) => {},
+            Err(e) => {
+                error!(
+                    error = e.to_string(),
+                    "[Data Service] Failed to get data from cache and file store."
+                );
+                panic!("Failed to get data from cache and file store.");
+            },
+            Ok(_) => unreachable!("Fetching from a single task will never return a batch"),
+        }
+    }
+
+    if transactions.is_empty() {
+        DataFetchSubTaskResult::NoResults
+    } else {
+        DataFetchSubTaskResult::BatchSuccess(transactions)
+    }
 }
 
-/// Handles the case when the data is not ready in the cache, i.e., beyond the current head.
-async fn ahead_of_cache_data_handling() {
-    // TODO: add exponential backoff.
-    tokio::time::sleep(Duration::from_millis(
-        AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS,
-    ))
-    .await;
-}
-
-/// Handles data fetch errors, including cache and file store related errors.
-async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, chain_id: u64) {
-    error!(
-        chain_id = chain_id,
-        current_version = current_version,
-        "[Data Service] Failed to fetch data from cache and file store. {:?}",
-        err
-    );
-    tokio::time::sleep(Duration::from_millis(
-        TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS,
-    ))
-    .await;
+async fn get_filestore_data(
+    start_version: u64,
+    file_store_operator: Arc<Box<dyn FileStoreOperator>>,
+    request_metadata: Arc<IndexerGrpcRequestMetadata>,
+) -> DataFetchSubTaskResult {
+    match file_store_operator
+        .get_transactions_with_durations(start_version, NUM_DATA_FETCH_RETRIES)
+        .await
+    {
+        Ok((transactions, io_duration, decoding_duration)) => {
+            let size_in_bytes = transactions
+                .iter()
+                .map(|transaction| transaction.encoded_len())
+                .sum::<usize>();
+            let num_of_transactions = transactions.len();
+            let start_version_timestamp = transactions.first().unwrap().timestamp.as_ref();
+            let end_version_timestamp = transactions.last().unwrap().timestamp.as_ref();
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceDataFetchedFilestore,
+                Some(start_version as i64),
+                Some(start_version as i64 + num_of_transactions as i64 - 1),
+                start_version_timestamp,
+                end_version_timestamp,
+                Some(io_duration),
+                Some(size_in_bytes),
+                Some(num_of_transactions as i64),
+                Some(&request_metadata),
+            );
+            log_grpc_step(
+                SERVICE_TYPE,
+                IndexerGrpcStep::DataServiceTxnsDecoded,
+                Some(start_version as i64),
+                Some(start_version as i64 + num_of_transactions as i64 - 1),
+                start_version_timestamp,
+                end_version_timestamp,
+                Some(decoding_duration),
+                Some(size_in_bytes),
+                Some(num_of_transactions as i64),
+                Some(&request_metadata),
+            );
+            DataFetchSubTaskResult::Success(transactions)
+        },
+        Err(e) => {
+            ERROR_COUNT
+                .with_label_values(&["data_fetch_filestore_failed"])
+                .inc();
+            error!(
+                start_version,
+                // Request metadata variables
+                request_name = &request_metadata.processor_name.as_str(),
+                request_email = request_metadata.request_email.as_str(),
+                request_api_key_name = request_metadata.request_api_key_name.as_str(),
+                processor_name = request_metadata.processor_name.as_str(),
+                connection_id = request_metadata.request_connection_id.as_str(),
+                request_user_classification = request_metadata.request_user_classification.as_str(),
+                error = e.to_string(),
+                "[Data Service] Failed to get transactions from file store."
+            );
+            DataFetchSubTaskResult::NoResults
+        },
+    }
 }
 
 /// Gets the request metadata. Useful for logging.
