@@ -3,7 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{counters::TIMER, move_vm_ext::AptosMoveResolver, natives::aptos_natives_with_builder};
+use crate::{
+    counters::TIMER,
+    move_vm_ext::AptosMoveResolver,
+    natives::{aptos_native_types, aptos_natives_with_builder},
+};
 use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
@@ -64,8 +68,9 @@ impl WarmVmCache {
                 return Ok(vm.clone());
             }
 
-            let vm = MoveVM::new_with_config(
+            let vm = MoveVM::new_with_native_types_and_config(
                 aptos_natives_with_builder(&mut native_builder),
+                aptos_native_types(&vm_config),
                 vm_config,
             )?;
             Self::warm_vm_up(&vm, resolver);

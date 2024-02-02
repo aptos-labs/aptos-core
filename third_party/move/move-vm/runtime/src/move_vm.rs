@@ -8,6 +8,7 @@ use crate::{
     loader::{ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
+    native_types::NativeTypeID,
     runtime::VMRuntime,
     session::Session,
 };
@@ -19,6 +20,7 @@ use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
     metadata::Metadata, resolver::MoveResolver,
 };
+use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -39,6 +41,17 @@ impl MoveVM {
     ) -> VMResult<Self> {
         Ok(Self {
             runtime: VMRuntime::new(natives, vm_config)
+                .map_err(|err| err.finish(Location::Undefined))?,
+        })
+    }
+
+    pub fn new_with_native_types_and_config(
+        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        native_types: impl IntoIterator<Item = (StructIdentifier, NativeTypeID)>,
+        vm_config: VMConfig,
+    ) -> VMResult<Self> {
+        Ok(Self {
+            runtime: VMRuntime::new_with_native_types(natives, native_types, vm_config)
                 .map_err(|err| err.finish(Location::Undefined))?,
         })
     }

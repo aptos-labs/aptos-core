@@ -42,6 +42,7 @@ mod modules;
 mod script;
 mod type_loader;
 
+use crate::native_types::NativeTypes;
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
 pub(crate) use script::{Script, ScriptCache};
@@ -171,6 +172,8 @@ pub(crate) struct Loader {
     module_cache_hits: RwLock<BTreeSet<ModuleId>>,
 
     vm_config: VMConfig,
+
+    native_types: NativeTypes,
 }
 
 impl Clone for Loader {
@@ -183,12 +186,17 @@ impl Clone for Loader {
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
+            native_types: self.native_types.clone(),
         }
     }
 }
 
 impl Loader {
-    pub(crate) fn new(natives: NativeFunctions, vm_config: VMConfig) -> Self {
+    pub(crate) fn new(
+        natives: NativeFunctions,
+        native_types: NativeTypes,
+        vm_config: VMConfig,
+    ) -> Self {
         Self {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
@@ -197,6 +205,7 @@ impl Loader {
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
             vm_config,
+            native_types,
         }
     }
 

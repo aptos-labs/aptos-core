@@ -35,9 +35,13 @@ use aptos_types::{
 use bytes::Bytes;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
+use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-use move_vm_runtime::native_functions::NativeFunctionTable;
+use move_vm_runtime::{
+    config::VMConfig, native_functions::NativeFunctionTable, native_types::NativeTypeID,
+};
+use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 #[cfg(feature = "testing")]
 use std::{
     collections::{BTreeMap, HashSet},
@@ -181,6 +185,44 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
             builder,
         ))
         .collect()
+}
+
+pub enum NativeType {
+    Aggregator = 0,
+    AggregatorSnapshot = 1,
+    DerivedAggregatorString = 2,
+}
+
+pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, NativeTypeID)> {
+    let mut native_types = vec![];
+
+    if vm_config.aggregator_v2_type_tagging {
+        let aggregator = StructIdentifier {
+            module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
+            name: ident_str!("Aggregator").to_owned(),
+        };
+        native_types.push((aggregator, NativeTypeID::new(NativeType::Aggregator as u64)));
+
+        let snapshot = StructIdentifier {
+            module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
+            name: ident_str!("AggregatorSnapshot").to_owned(),
+        };
+        native_types.push((
+            snapshot,
+            NativeTypeID::new(NativeType::AggregatorSnapshot as u64),
+        ));
+
+        let derived = StructIdentifier {
+            module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
+            name: ident_str!("DerivedStringSnapshot").to_owned(),
+        };
+        native_types.push((
+            derived,
+            NativeTypeID::new(NativeType::DerivedAggregatorString as u64),
+        ));
+    }
+
+    native_types
 }
 
 pub fn assert_no_test_natives(err_msg: &str) {
