@@ -10810,6 +10810,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-examples"
+version = "0.1.1"
+dependencies = [
+ "move-cli",
+]
+
+[[package]]
 name = "move-explain"
 version = "0.1.0"
 dependencies = [
