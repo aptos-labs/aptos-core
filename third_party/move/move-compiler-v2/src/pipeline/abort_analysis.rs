@@ -55,8 +55,6 @@ pub enum ExitStatus {
     Return,
     /// The program aborts
     Abort,
-    /// The program runs out of instructions, and neither returns or aborts
-    NoMoreInstruction,
 }
 
 impl Display for ExitStatus {
@@ -64,7 +62,6 @@ impl Display for ExitStatus {
         f.write_str(match self {
             ExitStatus::Return => "returns",
             ExitStatus::Abort => "aborts",
-            ExitStatus::NoMoreInstruction => "runs out of instruction",
         })
     }
 }
