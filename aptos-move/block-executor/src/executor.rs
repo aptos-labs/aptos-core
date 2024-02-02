@@ -242,10 +242,6 @@ where
                 // Record the status indicating abort.
                 ExecutionStatus::Abort(BlockExecutionError::FatalVMError((err, idx_to_execute)))
             },
-            ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
-                // TODO[agg_v2](fix) decide how to handle/propagate.
-                panic!("PayloadWriteSet::Direct transaction not alone in a block");
-            },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
@@ -900,11 +896,6 @@ where
                 ExecutionStatus::Abort(_) => {
                     txn_commit_listener.on_execution_aborted(txn_idx);
                 },
-                ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
-                    // This should already be handled and fallback to sequential called,
-                    // such a transaction should never reach this point.
-                    panic!("Cannot be materializing with DirectWriteSetTransactionNotCapableError");
-                },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                     panic!("Cannot be materializing with {}", msg);
@@ -918,11 +909,6 @@ where
                 final_results[txn_idx as usize] = t;
             },
             ExecutionStatus::Abort(_) => (),
-            ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
-                panic!("Cannot be materializing with DirectWriteSetTransactionNotCapableError");
-                // This should already be handled and fallback to sequential called,
-                // such a transaction should never reach this point.
-            },
             ExecutionStatus::SpeculativeExecutionAbortError(msg)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 panic!("Cannot be materializing with {}", msg);
@@ -1219,7 +1205,6 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-        dynamic_change_set_optimizations_enabled: bool,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -1241,12 +1226,7 @@ where
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, X>::new(
                 base_view,
-                ViewState::Unsync(SequentialState::new(
-                    &unsync_map,
-                    start_counter,
-                    &counter,
-                    dynamic_change_set_optimizations_enabled,
-                )),
+                ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,
             );
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
@@ -1312,7 +1292,8 @@ where
                     // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
                     Self::apply_output_sequential(&unsync_map, &output)?;
 
-                    if dynamic_change_set_optimizations_enabled {
+                    // If dynamic change set materialization part (indented for clarity/variable scope):
+                    {
                         let group_metadata_ops = output.resource_group_metadata_ops();
                         let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
                         for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
@@ -1396,9 +1377,9 @@ where
                                 .collect(),
                             patched_events,
                         );
-                    } else {
-                        output.set_txn_output_for_non_dynamic_change_set();
                     }
+                    // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
+                    //   output.set_txn_output_for_non_dynamic_change_set();
 
                     if latest_view.is_incorrect_use() {
                         panic!("Incorrect use in sequential execution")
@@ -1415,9 +1396,6 @@ where
                     }
                     // Record the status indicating abort.
                     return Err(BlockExecutionError::FatalVMError((err, idx as TxnIndex)));
-                },
-                ExecutionStatus::DirectWriteSetTransactionNotCapableError => {
-                    panic!("PayloadWriteSet::Direct transaction not alone in a block, in sequential execution")
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                     panic!(
@@ -1462,12 +1440,7 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
-        let dynamic_change_set_optimizations_enabled = signature_verified_block.len() != 1
-            || E::is_transaction_dynamic_change_set_capable(&signature_verified_block[0]);
-
-        let mut ret = if self.config.local.concurrency_level > 1
-            && dynamic_change_set_optimizations_enabled
-        {
+        let mut ret = if self.config.local.concurrency_level > 1 {
             self.execute_transactions_parallel(
                 executor_arguments,
                 signature_verified_block,
@@ -1478,7 +1451,6 @@ where
                 executor_arguments,
                 signature_verified_block,
                 base_view,
-                dynamic_change_set_optimizations_enabled,
             )
         };
 
@@ -1514,7 +1486,6 @@ where
                     executor_arguments,
                     signature_verified_block,
                     base_view,
-                    dynamic_change_set_optimizations_enabled,
                 );
             }
         }
