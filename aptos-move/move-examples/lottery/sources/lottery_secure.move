@@ -3,7 +3,6 @@ module lottery::lottery_secure {
     use std::option::Option;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
-    // NOTE: If deployed, this would be aptos_std (or aptos_framework).
     use aptos_framework::randomness;
     use aptos_std::smart_vector;
     use aptos_std::smart_vector::SmartVector;

@@ -25,9 +25,11 @@ On-chain randomness utils.
 -  [Function `u256_range`](#0x1_randomness_u256_range)
 -  [Function `permutation`](#0x1_randomness_permutation)
 -  [Function `safe_add_mod`](#0x1_randomness_safe_add_mod)
--  [Function `get_and_add_txn_local_state`](#0x1_randomness_get_and_add_txn_local_state)
+-  [Function `fetch_and_increment_txn_counter`](#0x1_randomness_fetch_and_increment_txn_counter)
+-  [Function `is_safe_call`](#0x1_randomness_is_safe_call)
 -  [Specification](#@Specification_1)
-    -  [Function `get_and_add_txn_local_state`](#@Specification_1_get_and_add_txn_local_state)
+    -  [Function `fetch_and_increment_txn_counter`](#@Specification_1_fetch_and_increment_txn_counter)
+    -  [Function `is_safe_call`](#@Specification_1_is_safe_call)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -90,6 +92,16 @@ This resource is updated in every block prologue.
 
 
 <pre><code><b>const</b> <a href="randomness.md#0x1_randomness_DST">DST</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [65, 80, 84, 79, 83, 95, 82, 65, 78, 68, 79, 77, 78, 69, 83, 83];
+</code></pre>
+
+
+
+<a id="0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT"></a>
+
+Randomness APIs calls must originate from a private entry function. Otherwise, test-and-abort attacks are possible.
+
+
+<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>: u64 = 1;
 </code></pre>
 
 
@@ -171,12 +183,14 @@ Generate 32 random bytes.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_next_blob">next_blob</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+    <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>);
+
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
     <b>let</b> seed = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="randomness.md#0x1_randomness">randomness</a>.seed);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, seed);
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <a href="transaction_context.md#0x1_transaction_context_get_transaction_hash">transaction_context::get_transaction_hash</a>());
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <a href="randomness.md#0x1_randomness_get_and_add_txn_local_state">get_and_add_txn_local_state</a>());
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> input, <a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>());
     <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(input)
 }
 </code></pre>
@@ -637,13 +651,14 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 
 </details>
 
-<a id="0x1_randomness_get_and_add_txn_local_state"></a>
+<a id="0x1_randomness_fetch_and_increment_txn_counter"></a>
 
-## Function `get_and_add_txn_local_state`
+## Function `fetch_and_increment_txn_counter`
+
+Fetches and increments a transaction-specific 32-byte randomness-related counter.
 
 
-
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_get_and_add_txn_local_state">get_and_add_txn_local_state</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -652,7 +667,32 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 <summary>Implementation</summary>
 
 
-<pre><code><b>native</b> <b>fun</b> <a href="randomness.md#0x1_randomness_get_and_add_txn_local_state">get_and_add_txn_local_state</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+<pre><code><b>native</b> <b>fun</b> <a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_randomness_is_safe_call"></a>
+
+## Function `is_safe_call`
+
+Called in each randomness generation function to ensure certain safety invariants.
+1. Ensure that the TXN that led to the call of this function had a private (or friend) entry function as its TXN payload.
+2. TBA
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool;
 </code></pre>
 
 
@@ -664,12 +704,28 @@ Compute <code>(a + b) % m</code>, assuming <code>m &gt;= 1, 0 &lt;= a &lt; m, 0&
 ## Specification
 
 
-<a id="@Specification_1_get_and_add_txn_local_state"></a>
+<a id="@Specification_1_fetch_and_increment_txn_counter"></a>
 
-### Function `get_and_add_txn_local_state`
+### Function `fetch_and_increment_txn_counter`
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_get_and_add_txn_local_state">get_and_add_txn_local_state</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_fetch_and_increment_txn_counter">fetch_and_increment_txn_counter</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_safe_call"></a>
+
+### Function `is_safe_call`
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool
 </code></pre>
 
 

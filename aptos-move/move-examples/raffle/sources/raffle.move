@@ -1,7 +1,6 @@
 module raffle::raffle {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
-    // NOTE: If deployed, this would be aptos_std (or aptos_framework).
     use aptos_framework::randomness;
     use aptos_std::smart_vector;
     use aptos_std::smart_vector::SmartVector;
@@ -11,8 +10,7 @@ module raffle::raffle {
     // We need this friend declaration so our tests can call `init_module`.
     friend raffle::raffle_test;
 
-    /// Error code for when a user tries to initate the drawing but no users
-    /// bought any tickets.
+    /// Error code for when a user tries to initate the drawing but no users bought any tickets.
     const E_NO_TICKETS: u64 = 2;
 
     /// Error code for when the somebody tries to draw an already-closed raffle

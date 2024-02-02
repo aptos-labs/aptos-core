@@ -13,6 +13,9 @@ module aptos_std::randomness {
 
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
+    /// Randomness APIs calls must originate from a private entry function. Otherwise, test-and-abort attacks are possible.
+    const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
+
     /// 32-byte randomness seed unique to every block.
     /// This resource is updated in every block prologue.
     struct PerBlockRandomness has drop, key {
@@ -49,12 +52,14 @@ module aptos_std::randomness {
 
     /// Generate 32 random bytes.
     public fun next_blob(): vector<u8> acquires PerBlockRandomness {
+        assert!(is_safe_call(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
+
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
         let seed = *option::borrow(&randomness.seed);
         vector::append(&mut input, seed);
         vector::append(&mut input, transaction_context::get_transaction_hash());
-        vector::append(&mut input, get_and_add_txn_local_state());
+        vector::append(&mut input, fetch_and_increment_txn_counter());
         hash::sha3_256(input)
     }
 
@@ -237,7 +242,13 @@ module aptos_std::randomness {
         }
     }
 
-    native fun get_and_add_txn_local_state(): vector<u8>;
+    /// Fetches and increments a transaction-specific 32-byte randomness-related counter.
+    native fun fetch_and_increment_txn_counter(): vector<u8>;
+
+    /// Called in each randomness generation function to ensure certain safety invariants.
+    ///  1. Ensure that the TXN that led to the call of this function had a private (or friend) entry function as its TXN payload.
+    ///  2. TBA
+    native fun is_safe_call(): bool;
 
     #[test]
     fun test_safe_add_mod() {
@@ -258,6 +269,8 @@ module aptos_std::randomness {
     fun randomness_smoke_test(fx: signer) acquires PerBlockRandomness {
         initialize(&fx);
         set_seed(x"0000000000000000000000000000000000000000000000000000000000000000");
+        // Test cases should always be a safe place to do a randomness call from.
+        assert!(is_safe_call(), 0);
         let num = u64_integer();
         debug::print(&num);
     }
