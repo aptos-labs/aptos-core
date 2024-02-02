@@ -82,16 +82,16 @@ function build-oss-fuzz() {
         usage build-oss-fuzz
     fi
     oss_fuzz_out=$1
-    mkdir -p $oss_fuzz_out
+    mkdir -p "$oss_fuzz_out"
     mkdir -p ./target
 
     # Apply all git patch from Patches directory
     wd=$(pwd)
-    cd ../../
-    for patch in $(ls $wd/Patches); do
-        git apply $wd/Patches/$patch
+    for patch in $(find "$wd/Patches" -type f); do
+        info "Applying patch $patch"
+        git -C "$wd/../.." apply "$patch"
     done
-    cd $wd
+
 
     # Workaround for build failures on oss-fuzz
     # Owner: @zi0Black
@@ -110,7 +110,7 @@ function build-oss-fuzz() {
 
     # Download corpus zip
     for corpus_zip in "${CORPUS_ZIPS[@]}"; do
-        wget --content-disposition -P $oss_fuzz_out $corpus_zip
+        wget --content-disposition -P "$oss_fuzz_out" "$corpus_zip"
     done
 }
 
