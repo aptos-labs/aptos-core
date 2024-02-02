@@ -13,12 +13,14 @@
 //!     MVC_LOG = ""                # logs everything to console (stderr)
 //!     MVC_LOG = "info"            # logs only info or higher to console
 //!     MVC_LOG = "<module_path_prefix>=info" # logs only info+ in matching modules
-//!     MVC_LOG = ":<file>"         # logs everything to given file
-//!     MVC_LOG = "info:<file>"     # as above
+//!     MVC_LOG = "@<file>"         # logs everything to given file
+//!     MVC_LOG = "info@<file>"     # as above
 //! ```
 //!
-//! The general format is `<spec>[:<file>]`, where `spec` is defined as described
-//! for the `LogSpecification` type.
+//! A module path prefix must consist of crate name and module name, as in
+//! `move_stackless_bytecode::function_target`, which matches any full module name
+//! with this prefix. The general format is `<spec>[@<file>]`, where `spec` is defined
+//! as described for the `LogSpecification` type.
 //!
 //! # How to write Logs
 //!
@@ -60,7 +62,8 @@ pub fn setup_logging_for_testing() {
 
 fn configure_logger() -> Option<Logger> {
     let var = env::var(MVC_LOG_VAR).ok()?;
-    let parts = var.splitn(2, ':').collect::<Vec<_>>();
+    let mut parts = var.rsplitn(2, '@').collect::<Vec<_>>();
+    parts.reverse();
     let spec = if parts[0].trim().is_empty() {
         // Show everything
         LogSpecification::trace()
