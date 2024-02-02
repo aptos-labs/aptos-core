@@ -134,7 +134,7 @@ module aptos_framework::genesis {
         reconfiguration_state::initialize(&aptos_framework_account);
         dkg::initialize(&aptos_framework_account);
         randomness::initialize(&aptos_framework_account);
-        config_buffer::initialize(&);
+        config_buffer::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
