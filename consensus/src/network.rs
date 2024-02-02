@@ -22,7 +22,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
-    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::commit_decision::CommitDecision,
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -379,18 +379,6 @@ impl NetworkSender {
         fail_point!("consensus::send::broadcast_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_change_proof));
         self.broadcast(msg).await
-    }
-
-    pub async fn send_commit_vote(
-        &self,
-        commit_vote: CommitVote,
-        recipient: Author,
-    ) -> anyhow::Result<()> {
-        fail_point!("consensus::send::commit_vote", |_| Ok(()));
-        let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Vote(commit_vote)));
-        self.send_rpc(recipient, msg, Duration::from_millis(500))
-            .await
-            .map(|_| ())
     }
 
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
