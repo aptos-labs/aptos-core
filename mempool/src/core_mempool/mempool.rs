@@ -97,7 +97,7 @@ impl Mempool {
     }
 
     pub(crate) fn executed_transaction(&mut self, sender: &AccountAddress, sequence_number: u64) {
-        // TODO: log
+        self.log_executed_latency(*sender, sequence_number);
         self.transactions
             .executed_transaction(sender, sequence_number);
     }
@@ -164,6 +164,15 @@ impl Mempool {
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             Self::log_txn_latency(insertion_info, bucket, stage);
+        }
+    }
+
+    fn log_executed_latency(&self, account: AccountAddress, sequence_number: u64) {
+        if let Some((insertion_info, bucket)) = self
+            .transactions
+            .get_insertion_info_and_bucket(&account, sequence_number)
+        {
+            Self::log_txn_latency(insertion_info, bucket, counters::EXECUTED_LABEL);
         }
     }
 

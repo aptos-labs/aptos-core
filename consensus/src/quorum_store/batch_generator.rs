@@ -425,7 +425,7 @@ impl BatchGenerator {
                         BatchGeneratorCommand::ExecutedBlockNotification(_block_id, proofs) => {
                             for batch_id in proofs.iter().map(|b| b.batch_id()) {
                                 if self.remove_batch_in_progress(&batch_id) {
-                                    counters::BATCH_IN_PROGRESS_COMMITTED.inc();
+                                    counters::BATCH_IN_PROGRESS_EXECUTED.inc();
                                 }
                             }
                         },
