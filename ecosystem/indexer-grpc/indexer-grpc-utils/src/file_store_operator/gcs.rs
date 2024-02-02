@@ -62,7 +62,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
     }
 
     fn store_name(&self) -> &str {
-        "GSC"
+        "GCS"
     }
 
     async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
