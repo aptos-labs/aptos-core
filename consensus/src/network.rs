@@ -389,6 +389,12 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
+    pub async fn broadcast_vote(&mut self, vote_msg: VoteMsg) {
+        fail_point!("consensus::send::vote", |_| ());
+        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
     pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
