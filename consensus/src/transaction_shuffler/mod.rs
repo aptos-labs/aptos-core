@@ -12,6 +12,7 @@ use aptos_types::{
 use sender_aware::SenderAwareShuffler;
 use std::sync::Arc;
 
+mod fairness;
 mod sender_aware;
 
 /// Interface to shuffle transactions

@@ -1,0 +1,15 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::transaction_shuffler::fairness::conflict_key::ConflictKey;
+use aptos_types::transaction::SignedTransaction;
+use move_core_types::account_address::AccountAddress;
+
+#[derive(Eq, Hash, PartialEq)]
+pub struct TxnSenderKey(AccountAddress);
+
+impl ConflictKey<SignedTransaction> for TxnSenderKey {
+    fn extract_from(txn: &SignedTransaction) -> Self {
+        TxnSenderKey(txn.sender())
+    }
+}
