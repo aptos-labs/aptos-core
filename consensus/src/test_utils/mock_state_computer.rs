@@ -65,7 +65,7 @@ impl MockStateComputer {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let (mut payload_txns, _max_txns_to_include_in_block) =
+            let (mut payload_txns, _max_txns_from_block_to_execute) =
                 self.payload_manager.get_transactions(block.block()).await?;
             txns.append(&mut payload_txns);
         }

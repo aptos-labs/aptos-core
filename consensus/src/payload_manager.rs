@@ -75,7 +75,7 @@ impl PayloadManager {
                             unreachable!("InQuorumStore should be used");
                         },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
-                        Payload::InQuorumStoreV2(proof_with_status) => {
+                        Payload::InQuorumStoreWithLimit(proof_with_status) => {
                             proof_with_status.proof_with_data.proofs
                         },
                     })
@@ -118,7 +118,7 @@ impl PayloadManager {
                 Payload::InQuorumStore(proof_with_status) => {
                     request_txns_and_update_status(proof_with_status, batch_reader.clone());
                 },
-                Payload::InQuorumStoreV2(proof_with_data) => {
+                Payload::InQuorumStoreWithLimit(proof_with_data) => {
                     request_txns_and_update_status(
                         &proof_with_data.proof_with_data,
                         batch_reader.clone(),
@@ -136,18 +136,17 @@ impl PayloadManager {
     pub async fn get_transactions(
         &self,
         block: &Block,
-    ) -> ExecutorResult<(Vec<SignedTransaction>, usize)> {
+    ) -> ExecutorResult<(Vec<SignedTransaction>, Option<usize>)> {
         let payload = match block.payload() {
             Some(p) => p,
-            None => return Ok((Vec::new(), usize::MAX)),
+            None => return Ok((Vec::new(), None)),
         };
 
         async fn process_payload(
             proof_with_data: &ProofWithData,
             batch_reader: Arc<dyn BatchReader>,
             block: &Block,
-            max_txns_to_include_in_block: usize,
-        ) -> ExecutorResult<(Vec<SignedTransaction>, usize)> {
+        ) -> ExecutorResult<Vec<SignedTransaction>> {
             let status = proof_with_data.status.lock().take();
             match status.expect("Should have been updated before.") {
                 DataStatus::Cached(data) => {
@@ -156,7 +155,7 @@ impl PayloadManager {
                         .status
                         .lock()
                         .replace(DataStatus::Cached(data.clone()));
-                    Ok((data, max_txns_to_include_in_block))
+                    Ok(data)
                 },
                 DataStatus::Requested(receivers) => {
                     let _timer = counters::BATCH_WAIT_DURATION.start_timer();
@@ -212,36 +211,34 @@ impl PayloadManager {
                         .status
                         .lock()
                         .replace(DataStatus::Cached(ret.clone()));
-                    Ok((ret, max_txns_to_include_in_block))
+                    Ok(ret)
                 },
             }
         }
 
         match (self, payload) {
             (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
-                Ok((txns.clone(), usize::MAX))
+                Ok((txns.clone(), None))
             },
             (
                 PayloadManager::InQuorumStore(batch_reader, _),
                 Payload::InQuorumStore(proof_with_data),
-            ) => process_payload(proof_with_data, batch_reader.clone(), block, usize::MAX).await,
+            ) => Ok((
+                process_payload(proof_with_data, batch_reader.clone(), block).await?,
+                None,
+            )),
             (
                 PayloadManager::InQuorumStore(batch_reader, _),
-                Payload::InQuorumStoreV2(proof_with_data),
-            ) => {
-                let max_txns_to_include_in_block = if proof_with_data.txns_to_include.is_some() {
-                    proof_with_data.txns_to_include.unwrap()
-                } else {
-                    usize::MAX
-                };
+                Payload::InQuorumStoreWithLimit(proof_with_data),
+            ) => Ok((
                 process_payload(
                     &proof_with_data.proof_with_data,
                     batch_reader.clone(),
                     block,
-                    max_txns_to_include_in_block,
                 )
-                .await
-            },
+                .await?,
+                proof_with_data.txns_to_execute,
+            )),
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    payload_manager::PayloadManager, transaction_deduper::TransactionDeduper,
-    transaction_filter::TransactionFilter, transaction_shuffler::TransactionShuffler,
+    counters::NUM_TXNS_TO_EXECUTE_PER_BLOCK, payload_manager::PayloadManager,
+    transaction_deduper::TransactionDeduper, transaction_filter::TransactionFilter,
+    transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::block::Block;
 use aptos_executor_types::ExecutorResult;
@@ -33,7 +34,7 @@ impl BlockPreparer {
     }
 
     pub async fn prepare_block(&self, block: &Block) -> ExecutorResult<Vec<SignedTransaction>> {
-        let (txns, max_txns_to_include_in_block) =
+        let (txns, max_txns_from_block_to_execute) =
             self.payload_manager.get_transactions(block).await?;
         let txn_filter = self.txn_filter.clone();
         let txn_deduper = self.txn_deduper.clone();
@@ -45,7 +46,11 @@ impl BlockPreparer {
             let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
             let mut shuffled_txns = txn_shuffler.shuffle(deduped_txns);
-            shuffled_txns.truncate(max_txns_to_include_in_block);
+
+            if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
+                shuffled_txns.truncate(max_txns_from_block_to_execute);
+            }
+            NUM_TXNS_TO_EXECUTE_PER_BLOCK.observe(shuffled_txns.len() as f64);
             Ok(shuffled_txns)
         })
         .await

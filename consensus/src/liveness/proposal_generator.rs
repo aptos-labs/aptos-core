@@ -296,7 +296,7 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (max_block_txns, max_block_bytes, max_txns_to_include_in_block, proposal_delay) =
+            let (max_block_txns, max_block_bytes, max_txns_from_block_to_execute, proposal_delay) =
                 self.calculate_max_block_sizes(voting_power_ratio, timestamp, round)
                     .await;
 
@@ -345,9 +345,9 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            if !payload.is_direct() && payload.len() > max_txns_to_include_in_block as usize {
+            if !payload.is_direct() && payload.len() > max_txns_from_block_to_execute as usize {
                 payload = payload
-                    .transform_to_quorum_store_v2(Some(max_txns_to_include_in_block as usize));
+                    .transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute as usize));
             }
             (validator_txns, payload, timestamp.as_micros() as u64)
         };
@@ -393,7 +393,7 @@ impl ProposalGenerator {
         let mut values_max_block_txns = vec![self.max_block_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
-        let mut max_txns_to_include_in_block = self.max_block_txns;
+        let mut max_txns_from_block_to_execute = self.max_block_txns;
 
         let chain_health_backoff = self
             .chain_health_backoff_config
@@ -413,7 +413,7 @@ impl ProposalGenerator {
         if let Some(value) = pipeline_backpressure {
             values_max_block_txns.push(value.max_sending_block_txns_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
-            max_txns_to_include_in_block = value.max_txns_to_include_in_block;
+            max_txns_from_block_to_execute = value.max_txns_from_block_to_execute;
             values_proposal_delay.push(Duration::from_millis(value.backpressure_proposal_delay_ms));
             PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1.0);
         } else {
@@ -438,7 +438,7 @@ impl ProposalGenerator {
         (
             max_block_txns,
             max_block_bytes,
-            max_txns_to_include_in_block,
+            max_txns_from_block_to_execute,
             proposal_delay,
         )
     }

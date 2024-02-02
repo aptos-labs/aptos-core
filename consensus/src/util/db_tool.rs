@@ -89,7 +89,7 @@ pub fn extract_txns_from_block<'a>(
                 Payload::InQuorumStore(proof_with_data) => {
                     extract_txns_from_proof_stores(&proof_with_data.proofs)
                 },
-                Payload::InQuorumStoreV2(proof_with_data) => {
+                Payload::InQuorumStoreWithLimit(proof_with_data) => {
                     extract_txns_from_proof_stores(&proof_with_data.proof_with_data.proofs)
                 },
             }

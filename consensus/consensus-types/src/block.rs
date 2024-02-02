@@ -110,9 +110,7 @@ impl Block {
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(_txns) => 0,
-                // TODO: this is used only for counters, hence the inaccurate number for now should not matter for now;
-                //       but we should fix this
-                Payload::InQuorumStoreV2(pos) => pos.proof_with_data.proofs.len(),
+                Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
             },
         }
     }

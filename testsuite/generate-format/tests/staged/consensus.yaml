@@ -501,9 +501,9 @@ Payload:
         NEWTYPE:
           TYPENAME: ProofWithData
     2:
-      InQuorumStoreV2:
+      InQuorumStoreWithLimit:
         NEWTYPE:
-          TYPENAME: ProofWithDataV2
+          TYPENAME: ProofWithDataWithTxnLimit
 ProofOfStore:
   STRUCT:
     - info:
@@ -520,11 +520,11 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
-ProofWithDataV2:
+ProofWithDataWithTxnLimit:
   STRUCT:
     - proof_with_data:
         TYPENAME: ProofWithData
-    - txns_to_include:
+    - txns_to_execute:
         OPTION: U64
 ProposalExt:
   ENUM:

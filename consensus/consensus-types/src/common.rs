@@ -140,33 +140,33 @@ impl ProofWithData {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct ProofWithDataV2 {
+pub struct ProofWithDataWithTxnLimit {
     pub proof_with_data: ProofWithData,
-    pub txns_to_include: Option<usize>,
+    pub txns_to_execute: Option<usize>,
 }
 
-impl PartialEq for ProofWithDataV2 {
+impl PartialEq for ProofWithDataWithTxnLimit {
     fn eq(&self, other: &Self) -> bool {
         self.proof_with_data == other.proof_with_data
-            && self.txns_to_include == other.txns_to_include
+            && self.txns_to_execute == other.txns_to_execute
     }
 }
 
-impl Eq for ProofWithDataV2 {}
+impl Eq for ProofWithDataWithTxnLimit {}
 
-impl ProofWithDataV2 {
-    pub fn new(proof_with_data: ProofWithData, txns_to_include: Option<usize>) -> Self {
+impl ProofWithDataWithTxnLimit {
+    pub fn new(proof_with_data: ProofWithData, txns_to_execute: Option<usize>) -> Self {
         Self {
             proof_with_data,
-            txns_to_include,
+            txns_to_execute,
         }
     }
 
-    pub fn extend(&mut self, other: ProofWithDataV2) {
+    pub fn extend(&mut self, other: ProofWithDataWithTxnLimit) {
         self.proof_with_data.extend(other.proof_with_data);
-        // InQuorumStoreV2 TODO: what is the right logic here ???
-        if self.txns_to_include.is_none() {
-            self.txns_to_include = other.txns_to_include;
+        // InQuorumStoreWithLimit TODO: what is the right logic here ???
+        if self.txns_to_execute.is_none() {
+            self.txns_to_execute = other.txns_to_execute;
         }
     }
 }
@@ -176,16 +176,16 @@ impl ProofWithDataV2 {
 pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
-    InQuorumStoreV2(ProofWithDataV2),
+    InQuorumStoreWithLimit(ProofWithDataWithTxnLimit),
 }
 
 impl Payload {
-    pub fn transform_to_quorum_store_v2(self, txns_to_include: Option<usize>) -> Self {
+    pub fn transform_to_quorum_store_v2(self, txns_to_execute: Option<usize>) -> Self {
         match self {
-            Payload::InQuorumStore(proof_with_status) => {
-                Payload::InQuorumStoreV2(ProofWithDataV2::new(proof_with_status, txns_to_include))
-            },
-            Payload::InQuorumStoreV2(_) => {
+            Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
+                ProofWithDataWithTxnLimit::new(proof_with_status, txns_to_execute),
+            ),
+            Payload::InQuorumStoreWithLimit(_) => {
                 panic!("Payload is already in quorumStoreV2 format");
             },
             Payload::DirectMempool(_) => {
@@ -210,15 +210,15 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_txns() as usize)
                 .sum(),
-            Payload::InQuorumStoreV2(proof_with_status) => {
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 let num_txns = proof_with_status
                     .proof_with_data
                     .proofs
                     .iter()
                     .map(|proof| proof.num_txns() as usize)
                     .sum();
-                if proof_with_status.txns_to_include.is_some() {
-                    min(proof_with_status.txns_to_include.unwrap(), num_txns)
+                if proof_with_status.txns_to_execute.is_some() {
+                    min(proof_with_status.txns_to_execute.unwrap(), num_txns)
                 } else {
                     num_txns
                 }
@@ -230,10 +230,10 @@ impl Payload {
         match self {
             Payload::DirectMempool(txns) => txns.is_empty(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
-            Payload::InQuorumStoreV2(proof_with_status) => {
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 proof_with_status.proof_with_data.proofs.is_empty()
-                    || (proof_with_status.txns_to_include.is_some()
-                        && proof_with_status.txns_to_include.unwrap() == 0)
+                    || (proof_with_status.txns_to_execute.is_some()
+                        && proof_with_status.txns_to_execute.unwrap() == 0)
             },
         }
     }
@@ -242,7 +242,9 @@ impl Payload {
         match (self, other) {
             (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2),
             (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
-            (Payload::InQuorumStoreV2(p1), Payload::InQuorumStoreV2(p2)) => p1.extend(p2),
+            (Payload::InQuorumStoreWithLimit(p1), Payload::InQuorumStoreWithLimit(p2)) => {
+                p1.extend(p2)
+            },
             (_, _) => unreachable!(),
         }
     }
@@ -264,9 +266,9 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
-            // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'txns_to_include'.
+            // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'txns_to_execute'.
             // Hence, it makes sense to pass the full size of the payload here.
-            Payload::InQuorumStoreV2(proof_with_status) => proof_with_status
+            Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
                 .proof_with_data
                 .proofs
                 .iter()
@@ -288,7 +290,7 @@ impl Payload {
                 }
                 Ok(())
             },
-            (true, Payload::InQuorumStoreV2(proof_with_status)) => {
+            (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
                 for proof in proof_with_status.proof_with_data.proofs.iter() {
                     proof.verify(validator)?;
                 }
@@ -312,7 +314,7 @@ impl fmt::Display for Payload {
             Payload::InQuorumStore(proof_with_status) => {
                 write!(f, "InMemory proofs: {}", proof_with_status.proofs.len())
             },
-            Payload::InQuorumStoreV2(proof_with_status) => {
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 write!(
                     f,
                     "InMemory proofs: {}",

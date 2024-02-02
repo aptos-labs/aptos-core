@@ -65,7 +65,7 @@ async fn get_proposal(
 fn assert_payload_response(
     payload: Payload,
     expected: &[ProofOfStore],
-    max_txns_to_include_in_block: Option<usize>,
+    max_txns_from_block_to_execute: Option<usize>,
 ) {
     match payload {
         Payload::InQuorumStore(proofs) => {
@@ -74,17 +74,12 @@ fn assert_payload_response(
                 assert!(expected.contains(&proof));
             }
         },
-        Payload::InQuorumStoreV2(proofs) => {
+        Payload::InQuorumStoreWithLimit(proofs) => {
             assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
             for proof in proofs.proof_with_data.proofs {
                 assert!(expected.contains(&proof));
             }
-            if max_txns_to_include_in_block.is_some() {
-                assert_eq!(
-                    proofs.txns_to_include.unwrap(),
-                    max_txns_to_include_in_block.unwrap()
-                );
-            }
+            assert_eq!(proofs.txns_to_execute, max_txns_from_block_to_execute);
         },
         _ => panic!("Unexpected variant"),
     }
@@ -114,7 +109,7 @@ async fn test_block_request() {
 }
 
 #[tokio::test]
-async fn test_max_txns_to_include_a_block() {
+async fn test_max_txns_from_block_to_execute() {
     let mut proof_manager = create_proof_manager();
 
     let proof = create_proof(PeerId::random(), 10, 1);
@@ -122,11 +117,11 @@ async fn test_max_txns_to_include_a_block() {
 
     let payload = get_proposal(&mut proof_manager, 100, &[]).await;
     // convert payload to v2 format and assert
-    let max_txns_to_include_in_block = 10;
+    let max_txns_from_block_to_execute = 10;
     assert_payload_response(
-        payload.transform_to_quorum_store_v2(Some(max_txns_to_include_in_block)),
+        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute)),
         &vec![proof],
-        Some(max_txns_to_include_in_block),
+        Some(max_txns_from_block_to_execute),
     );
 }
 
