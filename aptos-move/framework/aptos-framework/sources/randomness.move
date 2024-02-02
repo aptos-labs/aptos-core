@@ -48,7 +48,7 @@ module aptos_std::randomness {
     }
 
     /// Generate 32 random bytes.
-    public(friend) fun next_blob(): vector<u8> acquires PerBlockRandomness {
+    public fun next_blob(): vector<u8> acquires PerBlockRandomness {
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
         let seed = *option::borrow(&randomness.seed);

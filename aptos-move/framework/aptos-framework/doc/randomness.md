@@ -161,7 +161,7 @@ Invoked in block prologues to update the block-level randomness seed.
 Generate 32 random bytes.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_next_blob">next_blob</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_next_blob">next_blob</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -170,7 +170,7 @@ Generate 32 random bytes.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_next_blob">next_blob</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="randomness.md#0x1_randomness_next_blob">next_blob</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
     <b>let</b> seed = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<a href="randomness.md#0x1_randomness">randomness</a>.seed);
