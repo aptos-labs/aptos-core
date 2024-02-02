@@ -1,5 +1,5 @@
 /// On-chain randomness utils.
-module aptos_std::randomness {
+module aptos_framework::randomness {
     use std::hash;
     use std::option;
     use std::option::Option;
