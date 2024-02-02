@@ -43,7 +43,7 @@ use move_core_types::{
 };
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-use move_vm_runtime::{config::VMConfig, native_functions::NativeFunctionTable};
+use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 #[cfg(feature = "testing")]
 use std::{
@@ -190,16 +190,12 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
         .collect()
 }
 
-pub enum NativeType {
-    Aggregator = 0,
-    AggregatorSnapshot = 1,
-    DerivedAggregatorString = 2,
-}
-
-pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, LayoutTag)> {
+pub fn aptos_native_types(features: &Features) -> Vec<(StructIdentifier, LayoutTag)> {
     let mut native_types = vec![];
 
-    if vm_config.aggregator_v2_type_tagging {
+    // If aggregator execution is enabled, we need to tag aggregator_v2 types,
+    // so they can be exchanged with identifiers during VM execution.
+    if features.is_aggregator_v2_delayed_fields_enabled() {
         let aggregator = StructIdentifier {
             module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
             name: ident_str!("Aggregator").to_owned(),

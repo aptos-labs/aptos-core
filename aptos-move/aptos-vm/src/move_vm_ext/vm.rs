@@ -100,10 +100,6 @@ impl MoveVmExt {
             type_byte_cost = 1;
         }
 
-        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
-        // so they can be exchanged with identifiers during VM execution.
-        let aggregator_v2_type_tagging = features.is_aggregator_v2_delayed_fields_enabled();
-
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
             native_gas_params.clone(),
@@ -119,6 +115,7 @@ impl MoveVmExt {
         Ok(Self {
             inner: WarmVmCache::get_warm_vm(
                 builder,
+                &features,
                 VMConfig {
                     verifier: verifier_config,
                     deserializer_config: DeserializerConfig::new(
@@ -132,7 +129,6 @@ impl MoveVmExt {
                     type_max_cost,
                     type_base_cost,
                     type_byte_cost,
-                    aggregator_v2_type_tagging,
                 },
                 resolver,
             )?,

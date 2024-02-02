@@ -12,7 +12,7 @@ use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_types::on_chain_config::OnChainConfig;
+use aptos_types::on_chain_config::{Features, OnChainConfig};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
@@ -37,15 +37,17 @@ static WARM_VM_CACHE: Lazy<WarmVmCache> = Lazy::new(|| WarmVmCache {
 impl WarmVmCache {
     pub(crate) fn get_warm_vm(
         native_builder: SafeNativeBuilder,
+        features: &Features,
         vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
-        WARM_VM_CACHE.get(native_builder, vm_config, resolver)
+        WARM_VM_CACHE.get(native_builder, features, vm_config, resolver)
     }
 
     fn get(
         &self,
         mut native_builder: SafeNativeBuilder,
+        features: &Features,
         vm_config: VMConfig,
         resolver: &impl AptosMoveResolver,
     ) -> VMResult<MoveVM> {
@@ -70,7 +72,7 @@ impl WarmVmCache {
 
             let vm = MoveVM::new_with_native_types_and_config(
                 aptos_natives_with_builder(&mut native_builder),
-                aptos_native_types(&vm_config),
+                aptos_native_types(features),
                 vm_config,
             )?;
             Self::warm_vm_up(&vm, resolver);

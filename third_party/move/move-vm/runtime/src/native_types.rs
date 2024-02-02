@@ -23,7 +23,7 @@ impl NativeTypes {
         }
     }
 
-    pub fn get_native_type_id(&self, idx: &StructIdentifier) -> Option<LayoutTag> {
+    pub fn get_layout_tag(&self, idx: &StructIdentifier) -> Option<LayoutTag> {
         self.types.get(idx).cloned()
     }
 }

@@ -19,8 +19,6 @@ use move_binary_format::{
 };
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{IdentifierMappingKind, LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
@@ -1734,10 +1732,6 @@ impl Loader {
         let count_before = *count;
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
 
-        // Some types can have fields which are lifted at serialization or deserialization
-        // times. Right now these are Aggregator and AggregatorSnapshot.
-        let maybe_mapping = self.get_identifier_mapping_kind(name);
-
         let field_tys = struct_type
             .fields
             .iter()
@@ -1751,11 +1745,23 @@ impl Loader {
                 .into_iter()
                 .unzip();
 
+        // Some types can have fields which have custom layouts at serialization or
+        // deserialization times. If so, they must be tagged.
+        let maybe_layout_tag = self.native_types.get_layout_tag(name);
         let has_identifier_mappings =
-            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+            maybe_layout_tag.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
 
         let field_node_count = *count - count_before;
-        let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
+
+        // Construct struct layout.
+        // TODO[agg_v2](cleanup): Once we have a native value impl, we can also
+        //   construct "native", i.e. tagged layouts for these native fields, such
+        //   as MoveTypeLayout::Native(u64) which are fast to propagate. This can
+        //   allow us to shift matching logic below into adapter.
+        let layout = if Some(LayoutTag::IdentifierMapping(
+            IdentifierMappingKind::DerivedString,
+        )) == maybe_layout_tag
+        {
             // For DerivedString, the whole object should be lifted.
             MoveTypeLayout::Tagged(
                 LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
@@ -1763,7 +1769,7 @@ impl Loader {
             )
         } else {
             // For aggregators / snapshots, the first field should be lifted.
-            if let Some(kind) = &maybe_mapping {
+            if let Some(LayoutTag::IdentifierMapping(kind)) = maybe_layout_tag {
                 if let Some(l) = field_layouts.first_mut() {
                     *l = MoveTypeLayout::Tagged(
                         LayoutTag::IdentifierMapping(kind.clone()),
@@ -1788,37 +1794,6 @@ impl Loader {
         });
 
         Ok((layout, has_identifier_mappings))
-    }
-
-    // TODO[agg_v2](cleanup):
-    // Currently aggregator checks are hardcoded and leaking to loader.
-    // It seems that this is only because there is no support for native
-    // types.
-    // Let's think how we can do this nicer.
-    fn get_identifier_mapping_kind(
-        &self,
-        struct_name: &StructIdentifier,
-    ) -> Option<IdentifierMappingKind> {
-        if !self.vm_config.aggregator_v2_type_tagging {
-            return None;
-        }
-
-        let ident_str_to_kind = |ident_str: &IdentStr| -> Option<IdentifierMappingKind> {
-            if ident_str.eq(ident_str!("Aggregator")) {
-                Some(IdentifierMappingKind::Aggregator)
-            } else if ident_str.eq(ident_str!("AggregatorSnapshot")) {
-                Some(IdentifierMappingKind::Snapshot)
-            } else if ident_str.eq(ident_str!("DerivedStringSnapshot")) {
-                Some(IdentifierMappingKind::DerivedString)
-            } else {
-                None
-            }
-        };
-
-        (struct_name.module.address().eq(&AccountAddress::ONE)
-            && struct_name.module.name().eq(ident_str!("aggregator_v2")))
-        .then_some(ident_str_to_kind(struct_name.name.as_ident_str()))
-        .flatten()
     }
 
     fn type_to_type_layout_impl(
