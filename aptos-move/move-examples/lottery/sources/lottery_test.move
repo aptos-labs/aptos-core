@@ -22,7 +22,7 @@ module lottery::lottery_test {
     #[test_only]
     use std::vector;
     #[test_only]
-    use aptos_std::randomness;
+    use aptos_framework::randomness;
     #[test_only]
     use lottery::lottery_common;
     #[test_only]
