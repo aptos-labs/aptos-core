@@ -6,7 +6,10 @@ use crate::{
     counters::{log_grpc_step, IndexerGrpcStep},
 };
 use anyhow::{ensure, Context};
-use aptos_protos::transaction::v1::Transaction;
+use aptos_protos::{
+    event_stream::v1::Event,
+    transaction::v1::{transaction::TxnData, Transaction},
+};
 use redis::{AsyncCommands, RedisResult};
 
 // Configurations for cache.
@@ -224,7 +227,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     ) -> anyhow::Result<(Vec<Transaction>, f64, f64)> {
         let start_time = std::time::Instant::now();
         let versions = (start_version..start_version + transaction_count)
-            .map(|e| CacheEntry::build_key(e, self.storage_format).to_string())
+            .map(|e| CacheEntry::build_key(e, None, self.storage_format).to_string())
             .collect::<Vec<String>>();
         let encoded_transactions: Vec<Vec<u8>> = self
             .conn
@@ -236,7 +239,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
             let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
-            let transaction = cache_entry.into_transaction();
+            let transaction = cache_entry.into_proto();
             transactions.push(transaction);
         }
         ensure!(
@@ -261,32 +264,37 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let start_time = std::time::Instant::now();
         for transaction in transactions {
             let version = transaction.version;
-            let cache_key = CacheEntry::build_key(version, self.storage_format).to_string();
             let timestamp_in_seconds = transaction
                 .timestamp
                 .clone()
                 .map_or(0, |t| t.seconds as u64);
-            let cache_entry: CacheEntry =
-                CacheEntry::from_transaction(transaction, self.storage_format);
-            let bytes = cache_entry.into_inner();
-            size_in_bytes += bytes.len();
-            redis_pipeline
-                .cmd("SET")
-                .arg(cache_key)
-                .arg(bytes)
-                .arg("EX")
-                .arg(get_ttl_in_seconds(timestamp_in_seconds))
-                .ignore();
-            // Actively evict the expired cache. This is to avoid using Redis
-            // eviction policy, which is probabilistic-based and may evict the
-            // cache that is still needed.
-            if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
-                let key = CacheEntry::build_key(
-                    version - CACHE_SIZE_EVICTION_LOWER_BOUND,
-                    self.storage_format,
-                )
-                .to_string();
-                redis_pipeline.cmd("DEL").arg(key).ignore();
+            for event in extract_events_from_transaction(&transaction) {
+                let cache_key =
+                    CacheEntry::build_key(version, Some(&event.type_str), self.storage_format)
+                        .to_string();
+                let cache_entry: CacheEntry =
+                    CacheEntry::from_proto(event.clone(), self.storage_format);
+                let bytes = cache_entry.into_inner();
+                size_in_bytes += bytes.len();
+                redis_pipeline
+                    .cmd("SET")
+                    .arg(cache_key)
+                    .arg(bytes)
+                    .arg("EX")
+                    .arg(get_ttl_in_seconds(timestamp_in_seconds))
+                    .ignore();
+                // Actively evict the expired cache. This is to avoid using Redis
+                // eviction policy, which is probabilistic-based and may evict the
+                // cache that is still needed.
+                if version >= CACHE_SIZE_EVICTION_LOWER_BOUND {
+                    let key = CacheEntry::build_key(
+                        version - CACHE_SIZE_EVICTION_LOWER_BOUND,
+                        Some(&event.type_str),
+                        self.storage_format,
+                    )
+                    .to_string();
+                    redis_pipeline.cmd("DEL").arg(key).ignore();
+                }
             }
         }
         // Note: this method is and should be only used by `cache_worker`.
@@ -321,10 +329,13 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let cache_coverage_status = self.check_cache_coverage_status(start_version).await;
         match cache_coverage_status {
             Ok(CacheCoverageStatus::CacheHit(v)) => {
-                let versions = (start_version..start_version + v)
-                    .map(|e| CacheEntry::build_key(e, self.storage_format))
-                    .collect::<Vec<String>>();
-                let encoded_transactions: Vec<Vec<u8>> = self.conn.mget(versions).await?;
+                let mut all_keys: Vec<String> = vec![];
+                for i in start_version..start_version + v {
+                    let key = CacheEntry::build_key(i, None, self.storage_format);
+                    let keys: Vec<String> = self.conn.keys(format!("{}/*", key)).await?;
+                    all_keys.extend(keys);
+                }
+                let encoded_transactions: Vec<Vec<u8>> = self.conn.mget(all_keys).await?;
                 Ok(CacheBatchGetStatus::Ok(encoded_transactions))
             },
             Ok(CacheCoverageStatus::CacheEvicted) => Ok(CacheBatchGetStatus::EvictedFromCache),
@@ -368,7 +379,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     ) -> anyhow::Result<(Vec<Transaction>, f64, f64)> {
         let start_time = std::time::Instant::now();
         let versions = (start_version..start_version + transaction_count)
-            .map(|e| CacheEntry::build_key(e, self.storage_format))
+            .map(|e| CacheEntry::build_key(e, None, self.storage_format))
             .collect::<Vec<String>>();
         let encoded_transactions: Vec<Vec<u8>> = self
             .conn
@@ -380,7 +391,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let mut transactions = vec![];
         for encoded_transaction in encoded_transactions {
             let cache_entry: CacheEntry = CacheEntry::new(encoded_transaction, self.storage_format);
-            let transaction = cache_entry.into_transaction();
+            let transaction = cache_entry.into_proto();
             transactions.push(transaction);
         }
         ensure!(
@@ -401,6 +412,53 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             .get_transactions_with_durations(start_version, transaction_count)
             .await?;
         Ok(transactions)
+    }
+}
+
+pub fn extract_events_from_transaction(transaction: &Transaction) -> Vec<Event> {
+    let txn_data = transaction
+        .txn_data
+        .as_ref()
+        .expect("Txn Data doesn't exit!");
+    match txn_data {
+        TxnData::BlockMetadata(tx_inner) => tx_inner
+            .events
+            .iter()
+            .map(|e| {
+                event_to_event_stream_proto(e, transaction.version, transaction.timestamp.clone())
+            })
+            .collect(),
+        TxnData::Genesis(tx_inner) => tx_inner
+            .events
+            .iter()
+            .map(|e| {
+                event_to_event_stream_proto(e, transaction.version, transaction.timestamp.clone())
+            })
+            .collect(),
+        TxnData::User(tx_inner) => tx_inner
+            .events
+            .iter()
+            .map(|e| {
+                event_to_event_stream_proto(e, transaction.version, transaction.timestamp.clone())
+            })
+            .collect(),
+        _ => vec![],
+    }
+}
+
+pub fn event_to_event_stream_proto(
+    event: &aptos_protos::transaction::v1::Event,
+    transaction_version: u64,
+    transaction_timestamp: Option<aptos_protos::util::timestamp::Timestamp>,
+) -> Event {
+    Event {
+        key: event.key.clone(),
+        sequence_number: event.sequence_number,
+        r#type: event.r#type.clone(),
+        type_str: event.type_str.clone(),
+        data: event.data.clone(),
+        transaction_version,
+        transaction_timestamp,
     }
 }
 

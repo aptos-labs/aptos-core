@@ -1,15 +1,15 @@
 // @generated
 /// Generated client implementations.
-pub mod raw_data_client {
+pub mod raw_events_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
     use tonic::codegen::http::Uri;
     ///
     #[derive(Debug, Clone)]
-    pub struct RawDataClient<T> {
+    pub struct RawEventsClient<T> {
         inner: tonic::client::Grpc<T>,
     }
-    impl RawDataClient<tonic::transport::Channel> {
+    impl RawEventsClient<tonic::transport::Channel> {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
@@ -20,7 +20,7 @@ pub mod raw_data_client {
             Ok(Self::new(conn))
         }
     }
-    impl<T> RawDataClient<T>
+    impl<T> RawEventsClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
         T::Error: Into<StdError>,
@@ -38,7 +38,7 @@ pub mod raw_data_client {
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
-        ) -> RawDataClient<InterceptedService<T, F>>
+        ) -> RawEventsClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -52,7 +52,7 @@ pub mod raw_data_client {
                 http::Request<tonic::body::BoxBody>,
             >>::Error: Into<StdError> + Send + Sync,
         {
-            RawDataClient::new(InterceptedService::new(inner, interceptor))
+            RawEventsClient::new(InterceptedService::new(inner, interceptor))
         }
         /// Compress requests with the given encoding.
         ///
@@ -85,13 +85,13 @@ pub mod raw_data_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        /** Get transactions batch without any filtering from starting version and end if transaction count is present.
+        /** Get events batch without any filtering from starting version and end if transaction count is present.
 */
-        pub async fn get_transactions(
+        pub async fn get_events(
             &mut self,
-            request: impl tonic::IntoRequest<super::GetTransactionsRequest>,
+            request: impl tonic::IntoRequest<super::GetEventsRequest>,
         ) -> std::result::Result<
-            tonic::Response<tonic::codec::Streaming<super::TransactionsResponse>>,
+            tonic::Response<tonic::codec::Streaming<super::EventsResponse>>,
             tonic::Status,
         > {
             self.inner
@@ -105,41 +105,38 @@ pub mod raw_data_client {
                 })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
-                "/aptos.indexer.v1.RawData/GetTransactions",
+                "/aptos.event_stream.v1.RawEvents/GetEvents",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("aptos.indexer.v1.RawData", "GetTransactions"));
+                .insert(GrpcMethod::new("aptos.event_stream.v1.RawEvents", "GetEvents"));
             self.inner.server_streaming(req, path, codec).await
         }
     }
 }
 /// Generated server implementations.
-pub mod raw_data_server {
+pub mod raw_events_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with RawDataServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with RawEventsServer.
     #[async_trait]
-    pub trait RawData: Send + Sync + 'static {
-        /// Server streaming response type for the GetTransactions method.
-        type GetTransactionsStream: futures_core::Stream<
-                Item = std::result::Result<super::TransactionsResponse, tonic::Status>,
+    pub trait RawEvents: Send + Sync + 'static {
+        /// Server streaming response type for the GetEvents method.
+        type GetEventsStream: futures_core::Stream<
+                Item = std::result::Result<super::EventsResponse, tonic::Status>,
             >
             + Send
             + 'static;
-        /** Get transactions batch without any filtering from starting version and end if transaction count is present.
+        /** Get events batch without any filtering from starting version and end if transaction count is present.
 */
-        async fn get_transactions(
+        async fn get_events(
             &self,
-            request: tonic::Request<super::GetTransactionsRequest>,
-        ) -> std::result::Result<
-            tonic::Response<Self::GetTransactionsStream>,
-            tonic::Status,
-        >;
+            request: tonic::Request<super::GetEventsRequest>,
+        ) -> std::result::Result<tonic::Response<Self::GetEventsStream>, tonic::Status>;
     }
     ///
     #[derive(Debug)]
-    pub struct RawDataServer<T: RawData> {
+    pub struct RawEventsServer<T: RawEvents> {
         inner: _Inner<T>,
         accept_compression_encodings: EnabledCompressionEncodings,
         send_compression_encodings: EnabledCompressionEncodings,
@@ -147,7 +144,7 @@ pub mod raw_data_server {
         max_encoding_message_size: Option<usize>,
     }
     struct _Inner<T>(Arc<T>);
-    impl<T: RawData> RawDataServer<T> {
+    impl<T: RawEvents> RawEventsServer<T> {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
@@ -199,9 +196,9 @@ pub mod raw_data_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for RawDataServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for RawEventsServer<T>
     where
-        T: RawData,
+        T: RawEvents,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
@@ -217,28 +214,25 @@ pub mod raw_data_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/aptos.indexer.v1.RawData/GetTransactions" => {
+                "/aptos.event_stream.v1.RawEvents/GetEvents" => {
                     #[allow(non_camel_case_types)]
-                    struct GetTransactionsSvc<T: RawData>(pub Arc<T>);
+                    struct GetEventsSvc<T: RawEvents>(pub Arc<T>);
                     impl<
-                        T: RawData,
-                    > tonic::server::ServerStreamingService<
-                        super::GetTransactionsRequest,
-                    > for GetTransactionsSvc<T> {
-                        type Response = super::TransactionsResponse;
-                        type ResponseStream = T::GetTransactionsStream;
+                        T: RawEvents,
+                    > tonic::server::ServerStreamingService<super::GetEventsRequest>
+                    for GetEventsSvc<T> {
+                        type Response = super::EventsResponse;
+                        type ResponseStream = T::GetEventsStream;
                         type Future = BoxFuture<
                             tonic::Response<Self::ResponseStream>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::GetTransactionsRequest>,
+                            request: tonic::Request<super::GetEventsRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                (*inner).get_transactions(request).await
-                            };
+                            let fut = async move { (*inner).get_events(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -249,7 +243,7 @@ pub mod raw_data_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = GetTransactionsSvc(inner);
+                        let method = GetEventsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -280,7 +274,7 @@ pub mod raw_data_server {
             }
         }
     }
-    impl<T: RawData> Clone for RawDataServer<T> {
+    impl<T: RawEvents> Clone for RawEventsServer<T> {
         fn clone(&self) -> Self {
             let inner = self.inner.clone();
             Self {
@@ -292,7 +286,7 @@ pub mod raw_data_server {
             }
         }
     }
-    impl<T: RawData> Clone for _Inner<T> {
+    impl<T: RawEvents> Clone for _Inner<T> {
         fn clone(&self) -> Self {
             Self(Arc::clone(&self.0))
         }
@@ -302,7 +296,7 @@ pub mod raw_data_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: RawData> tonic::server::NamedService for RawDataServer<T> {
-        const NAME: &'static str = "aptos.indexer.v1.RawData";
+    impl<T: RawEvents> tonic::server::NamedService for RawEventsServer<T> {
+        const NAME: &'static str = "aptos.event_stream.v1.RawEvents";
     }
 }

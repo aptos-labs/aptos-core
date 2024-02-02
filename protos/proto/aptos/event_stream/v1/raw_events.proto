@@ -1,0 +1,54 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package aptos.event_stream.v1;
+
+import "aptos/transaction/v1/transaction.proto";
+import "aptos/util/timestamp/timestamp.proto";
+
+message Event {
+  aptos.transaction.v1.EventKey key = 1;
+  uint64 sequence_number = 2 [jstype = JS_STRING];
+  aptos.transaction.v1.MoveType type = 3;
+  string type_str = 5;
+  string data = 4;
+  uint64 transaction_version = 6 [jstype = JS_STRING];
+  aptos.util.timestamp.Timestamp transaction_timestamp = 7;
+}
+
+// This is for storage only.
+message EventsInStorage {
+  // Required; event data.
+  repeated Event transactions  = 1;
+  // Required; chain id. (?)
+  optional uint64 starting_version = 2;
+}
+
+message GetEventsRequest {
+  // Required; start version of current stream.
+  optional uint64 starting_version = 1 [jstype = JS_STRING];
+
+  // Optional; number of events to return in current stream.
+  // If not present, return an infinite stream of events.
+  optional uint64 events_count = 2 [jstype = JS_STRING];
+
+  // Optional; number of events in each `EventsResponse` for current stream.
+  // If not present, default to 1000. If larger than 1000, request will be rejected.
+  optional uint64 batch_size = 3;
+}
+
+// EventsResponse is a batch of transactions.
+message EventsResponse {
+    // Required; transactions data.
+    repeated Event events  = 1;
+    
+    // Required; chain id.
+    optional uint64 chain_id = 2 [jstype = JS_STRING];
+}
+
+service RawEvents {
+    // Get events batch without any filtering from starting version and end if transaction count is present.
+    rpc GetEvents(GetEventsRequest) returns (stream EventsResponse);
+}
