@@ -190,38 +190,38 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
         .collect()
 }
 
+macro_rules! register_identifier_mapping {
+    ($native_types:ident, $module:expr, $struct_name:expr, $kind:ident) => {
+        let struct_identifier = StructIdentifier {
+            module: ModuleId::new(AccountAddress::ONE, ident_str!($module).to_owned()),
+            name: ident_str!($struct_name).to_owned(),
+        };
+        $native_types.push((
+            struct_identifier,
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::$kind),
+        ));
+    };
+}
+
 pub fn aptos_native_types(features: &Features) -> Vec<(StructIdentifier, LayoutTag)> {
     let mut native_types = vec![];
 
     // If aggregator execution is enabled, we need to tag aggregator_v2 types,
     // so they can be exchanged with identifiers during VM execution.
     if features.is_aggregator_v2_delayed_fields_enabled() {
-        let aggregator = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
-            name: ident_str!("Aggregator").to_owned(),
-        };
-        native_types.push((
-            aggregator,
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-        ));
-
-        let snapshot = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
-            name: ident_str!("AggregatorSnapshot").to_owned(),
-        };
-        native_types.push((
-            snapshot,
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
-        ));
-
-        let derived = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
-            name: ident_str!("DerivedStringSnapshot").to_owned(),
-        };
-        native_types.push((
-            derived,
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
-        ));
+        register_identifier_mapping!(native_types, "aggregator_v2", "Aggregator", Aggregator);
+        register_identifier_mapping!(
+            native_types,
+            "aggregator_v2",
+            "AggregatorSnapshot",
+            Snapshot
+        );
+        register_identifier_mapping!(
+            native_types,
+            "aggregator_v2",
+            "DerivedStringSnapshot",
+            DerivedString
+        );
     }
 
     native_types
