@@ -27,7 +27,7 @@ use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
 };
-use futures::{future::join_all, Stream};
+use futures::Stream;
 use prost::Message;
 use redis::Client;
 use std::{
