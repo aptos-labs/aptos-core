@@ -1108,6 +1108,7 @@ impl VMValidatorResult {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct VMErrorDetail {
     status_code: StatusCode,
     message: Option<String>,
@@ -1130,8 +1131,9 @@ impl VMErrorDetail {
     }
 }
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionAuxiliaryData {
-    detail_error_message: Option<VMErrorDetail>,
+    pub detail_error_message: Option<VMErrorDetail>,
 }
 
 impl TransactionAuxiliaryData {
@@ -1545,6 +1547,16 @@ impl TransactionToCommit {
     pub fn dummy_with_transaction_info(transaction_info: TransactionInfo) -> Self {
         Self {
             transaction_info,
+            ..Self::dummy()
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_transaction_auxiliary_data(
+        transaction_auxiliary_data: TransactionAuxiliaryData,
+    ) -> Self {
+        Self {
+            transaction_auxiliary_data,
             ..Self::dummy()
         }
     }
