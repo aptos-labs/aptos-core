@@ -276,6 +276,7 @@ impl<'env> std::fmt::Display for DotCFGBlock<'env> {
                         &self.label_offsets,
                         offset as usize,
                         instruction,
+                        false,
                     );
                     writeln!(f, "{}", text)?;
                 }
