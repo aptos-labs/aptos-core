@@ -169,9 +169,10 @@ pub fn format_abort_state_annotation(
 ) -> Option<String> {
     let ExitStateAnnotation(state_per_instr) =
         target.get_annotations().get::<ExitStateAnnotation>()?;
-    let ExitStateAtCodeOffset { before, .. } = state_per_instr.get(&code_offset)?;
+    let ExitStateAtCodeOffset { before, after } = state_per_instr.get(&code_offset)?;
     Some(format!(
-        "abort state: {}",
-        before.0.to_string(|e| format!("{}", e))
+        "abort state before: {}\nabort state after : {}",
+        before.0.to_string(ExitStatus::to_string),
+        after.0.to_string(ExitStatus::to_string)
     ))
 }
