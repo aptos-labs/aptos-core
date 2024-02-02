@@ -7,8 +7,9 @@ use crate::{
     common::MAX_NUM_EPOCH_ENDING_LEDGER_INFO,
     event_store::EventStore,
     ledger_db::{
-        ledger_metadata_db::LedgerMetadataDb, transaction_info_db::TransactionInfoDb, LedgerDb,
-        LedgerDbSchemaBatches,
+        ledger_metadata_db::LedgerMetadataDb,
+        transaction_auxiliary_data_db::TransactionAuxiliaryDataDb,
+        transaction_info_db::TransactionInfoDb, LedgerDb, LedgerDbSchemaBatches,
     },
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
