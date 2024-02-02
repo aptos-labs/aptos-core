@@ -70,9 +70,9 @@ const SERVICE_TYPE: &str = "data_service";
 // Number of times to retry fetching a given txn block from the stores
 pub const NUM_DATA_FETCH_RETRIES: u8 = 5;
 
-// Max number of threads to reach out to TXN stores with
-const MAX_FETCH_THREADS_PER_REQUEST: u64 = 5;
-// THe number of transactions we store per txn block; this is used to determine max num of threads
+// Max number of tasks to reach out to TXN stores with
+const MAX_FETCH_TASKS_PER_REQUEST: u64 = 5;
+// The number of transactions we store per txn block; this is used to determine max num of tasks
 const TRANSACTIONS_PER_STORAGE_BLOCK: u64 = 1000;
 
 pub struct RawDataServerWrapper {
@@ -175,7 +175,7 @@ impl RawData for RawDataServerWrapper {
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
-                data_fetcher_thread(
+                data_fetcher_task(
                     redis_client,
                     file_store_operator,
                     cache_storage_format,
@@ -200,13 +200,13 @@ impl RawData for RawDataServerWrapper {
     }
 }
 
-enum DataFetchSubThreadResult {
+enum DataFetchSubTaskResult {
     BatchSuccess(Vec<Vec<Transaction>>),
     Success(Vec<Transaction>),
     NoResults,
 }
 
-async fn get_data_with_threads(
+async fn get_data_with_tasks(
     start_version: u64,
     transactions_count: Option<u64>,
     chain_id: u64,
@@ -214,18 +214,18 @@ async fn get_data_with_threads(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
-) -> DataFetchSubThreadResult {
+) -> DataFetchSubTaskResult {
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
         .await;
 
-    let num_threads_to_use = match cache_coverage_status {
-        Ok(CacheCoverageStatus::DataNotReady) => return DataFetchSubThreadResult::NoResults,
+    let num_tasks_to_use = match cache_coverage_status {
+        Ok(CacheCoverageStatus::DataNotReady) => return DataFetchSubTaskResult::NoResults,
         Ok(CacheCoverageStatus::CacheHit(_)) => 1,
         Ok(CacheCoverageStatus::CacheEvicted) => match transactions_count {
-            None => MAX_FETCH_THREADS_PER_REQUEST,
+            None => MAX_FETCH_TASKS_PER_REQUEST,
             Some(transactions_count) => (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK)
-                .max(MAX_FETCH_THREADS_PER_REQUEST),
+                .max(MAX_FETCH_TASKS_PER_REQUEST),
         },
         Err(_) => {
             error!("[Data Service] Failed to get cache coverage status.");
@@ -233,17 +233,17 @@ async fn get_data_with_threads(
         },
     };
 
-    let mut threads = vec![];
+    let mut tasks = tokio::task::JoinSet::new();
     let mut current_version = start_version;
 
-    for _ in 0..num_threads_to_use {
-        let thread = tokio::spawn({
+    for _ in 0..num_tasks_to_use {
+        tasks.spawn({
             // TODO: arc this instead of cloning
             let mut cache_operator = cache_operator.clone();
             let file_store_operator = file_store_operator.clone();
             let request_metadata = request_metadata.clone();
             async move {
-                get_data_in_thread(
+                get_data_in_task(
                     current_version,
                     chain_id,
                     &mut cache_operator,
@@ -254,20 +254,18 @@ async fn get_data_with_threads(
                 .await
             }
         });
-        threads.push(thread);
+        // Storage is in block of 1000: we align our current version fetch to the nearest block
         current_version += TRANSACTIONS_PER_STORAGE_BLOCK;
         current_version -= current_version % TRANSACTIONS_PER_STORAGE_BLOCK;
     }
 
     let mut transactions: Vec<Vec<Transaction>> = vec![];
-    join_all(threads)
-        .await
-        .into_iter()
-        .for_each(|result| match result {
-            Ok(DataFetchSubThreadResult::Success(txns)) => {
+    while let Some(result) = tasks.join_next().await {
+        match result {
+            Ok(DataFetchSubTaskResult::Success(txns)) => {
                 transactions.push(txns);
             },
-            Ok(DataFetchSubThreadResult::NoResults) => {},
+            Ok(DataFetchSubTaskResult::NoResults) => {},
             Err(e) => {
                 error!(
                     error = e.to_string(),
@@ -275,24 +273,25 @@ async fn get_data_with_threads(
                 );
                 panic!("Failed to get data from cache and file store.");
             },
-            Ok(_) => unreachable!("Fetching from a single thread will never return a batch"),
-        });
+            Ok(_) => unreachable!("Fetching from a single task will never return a batch"),
+        }
+    }
 
     if transactions.is_empty() {
-        DataFetchSubThreadResult::NoResults
+        DataFetchSubTaskResult::NoResults
     } else {
-        DataFetchSubThreadResult::BatchSuccess(transactions)
+        DataFetchSubTaskResult::BatchSuccess(transactions)
     }
 }
 
-async fn get_data_in_thread(
+async fn get_data_in_task(
     start_version: u64,
     chain_id: u64,
     cache_operator: &mut CacheOperator<redis::aio::ConnectionManager>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
-) -> DataFetchSubThreadResult {
+) -> DataFetchSubTaskResult {
     let current_batch_start_time = std::time::Instant::now();
 
     let fetched = data_fetch(
@@ -321,20 +320,20 @@ async fn get_data_in_thread(
             );
             ahead_of_cache_data_handling().await;
             // Retry after a short sleep.
-            return DataFetchSubThreadResult::NoResults;
+            return DataFetchSubTaskResult::NoResults;
         },
         Err(e) => {
             ERROR_COUNT.with_label_values(&["data_fetch_failed"]).inc();
             data_fetch_error_handling(e, start_version, chain_id).await;
             // Retry after a short sleep.
-            return DataFetchSubThreadResult::NoResults;
+            return DataFetchSubTaskResult::NoResults;
         },
     };
-    DataFetchSubThreadResult::Success(transaction_data)
+    DataFetchSubTaskResult::Success(transaction_data)
 }
 
-// This is a thread spawned off for servicing a users' request
-async fn data_fetcher_thread(
+// This is a task spawned off for servicing a users' request
+async fn data_fetcher_task(
     redis_client: Arc<Client>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     cache_storage_format: StorageFormat,
@@ -427,7 +426,7 @@ async fn data_fetcher_thread(
 
     loop {
         // 1. Fetch data from cache and file store.
-        let transaction_data = match get_data_with_threads(
+        let transaction_data = match get_data_with_tasks(
             current_version,
             transactions_count,
             chain_id,
@@ -438,11 +437,11 @@ async fn data_fetcher_thread(
         )
         .await
         {
-            DataFetchSubThreadResult::BatchSuccess(txns) => txns,
-            DataFetchSubThreadResult::Success(_) => {
-                unreachable!("Fetching from multiple threads will never return a single vector")
+            DataFetchSubTaskResult::BatchSuccess(txns) => txns,
+            DataFetchSubTaskResult::Success(_) => {
+                unreachable!("Fetching from multiple tasks will never return a single vector")
             },
-            DataFetchSubThreadResult::NoResults => continue,
+            DataFetchSubTaskResult::NoResults => continue,
         };
 
         let mut transaction_data = ensure_sequential_transactions(transaction_data);
@@ -676,7 +675,7 @@ async fn deserialize_cached_transactions(
             .collect::<Vec<Transaction>>()
     })
     .await;
-    task.context("Transaction bytes to CacheEntry deserialization thread failed")
+    task.context("Transaction bytes to CacheEntry deserialization task failed")
 }
 
 /// Fetches data from cache or the file store. It returns the data if it is ready in the cache or file store.

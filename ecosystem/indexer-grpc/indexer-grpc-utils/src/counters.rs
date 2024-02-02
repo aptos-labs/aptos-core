@@ -164,11 +164,11 @@ pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Number of versions that were overlapped in a multi thread fetch pull
+/// Number of versions that were overlapped in a multi-task fetch pull
 pub static NUM_MULTI_FETCH_OVERLAPPED_VERSIONS: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "indexer_grpc_num_multi_thread_fetch_overlapped_versions",
-        "Number of versions that were overlapped in a multi thread fetch pull",
+        "Number of versions that were overlapped in a multi-task fetch pull",
         &["service_type", "overlap_type"],
     )
     .unwrap()
