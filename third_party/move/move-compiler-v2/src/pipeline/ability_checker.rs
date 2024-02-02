@@ -89,7 +89,7 @@ fn cond_check_drop_for_temp_with_msg(
     err_msg: &str,
 ) {
     let abort_state = get_abort_state_at(func_target, code_offset);
-    if !abort_state.before.definitely_aborts() {
+    if !abort_state.before.may_return() {
         check_drop_for_temp_with_msg(func_target, t, loc, err_msg)
     }
 }
@@ -98,7 +98,7 @@ fn cond_check_drop_for_temp_with_msg(
 fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         let abort_state = get_abort_state_at(target, code_offset);
-        if !abort_state.before.definitely_aborts() {
+        if !abort_state.before.may_return() {
             check_drop(target, ty, loc, "write_ref: cannot drop")
         }
     } else {
