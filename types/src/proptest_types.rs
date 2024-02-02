@@ -1264,7 +1264,7 @@ impl Arbitrary for ValidatorTransaction {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         (any::<Vec<u8>>())
-            .prop_map(|(payload)| {
+            .prop_map(|payload| {
                 ValidatorTransaction::DKGResult(DKGTranscript { metadata: DKGTranscriptMetadata { epoch: 0, author: AccountAddress::ZERO }, transcript_bytes: payload })
             })
             .boxed()
