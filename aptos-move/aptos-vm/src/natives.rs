@@ -35,12 +35,15 @@ use aptos_types::{
 use bytes::Bytes;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    value::{IdentifierMappingKind, LayoutTag},
+};
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
-use move_vm_runtime::{
-    config::VMConfig, native_functions::NativeFunctionTable, native_types::NativeTypeID,
-};
+use move_vm_runtime::{config::VMConfig, native_functions::NativeFunctionTable};
 use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 #[cfg(feature = "testing")]
 use std::{
@@ -193,7 +196,7 @@ pub enum NativeType {
     DerivedAggregatorString = 2,
 }
 
-pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, NativeTypeID)> {
+pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, LayoutTag)> {
     let mut native_types = vec![];
 
     if vm_config.aggregator_v2_type_tagging {
@@ -201,7 +204,10 @@ pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, Native
             module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
             name: ident_str!("Aggregator").to_owned(),
         };
-        native_types.push((aggregator, NativeTypeID::new(NativeType::Aggregator as u64)));
+        native_types.push((
+            aggregator,
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
+        ));
 
         let snapshot = StructIdentifier {
             module: ModuleId::new(AccountAddress::ONE, ident_str!("aggregator_v2").to_owned()),
@@ -209,7 +215,7 @@ pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, Native
         };
         native_types.push((
             snapshot,
-            NativeTypeID::new(NativeType::AggregatorSnapshot as u64),
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
         ));
 
         let derived = StructIdentifier {
@@ -218,7 +224,7 @@ pub fn aptos_native_types(vm_config: &VMConfig) -> Vec<(StructIdentifier, Native
         };
         native_types.push((
             derived,
-            NativeTypeID::new(NativeType::DerivedAggregatorString as u64),
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
         ));
     }
 

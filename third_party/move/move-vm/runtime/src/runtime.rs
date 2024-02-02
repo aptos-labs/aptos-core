@@ -9,7 +9,7 @@ use crate::{
     loader::{Function, LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
-    native_types::{NativeTypeID, NativeTypes},
+    native_types::NativeTypes,
     session::{LoadedFunctionInstantiation, SerializedReturnValues},
 };
 use move_binary_format::{
@@ -24,7 +24,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
+    value::{LayoutTag, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -66,7 +66,7 @@ impl VMRuntime {
 
     pub(crate) fn new_with_native_types(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        native_types: impl IntoIterator<Item = (StructIdentifier, NativeTypeID)>,
+        native_types: impl IntoIterator<Item = (StructIdentifier, LayoutTag)>,
         vm_config: VMConfig,
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {

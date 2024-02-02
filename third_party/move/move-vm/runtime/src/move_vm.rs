@@ -8,7 +8,6 @@ use crate::{
     loader::{ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
-    native_types::NativeTypeID,
     runtime::VMRuntime,
     session::Session,
 };
@@ -18,7 +17,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    metadata::Metadata, resolver::MoveResolver,
+    metadata::Metadata, resolver::MoveResolver, value::LayoutTag,
 };
 use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 use std::sync::Arc;
@@ -47,7 +46,7 @@ impl MoveVM {
 
     pub fn new_with_native_types_and_config(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
-        native_types: impl IntoIterator<Item = (StructIdentifier, NativeTypeID)>,
+        native_types: impl IntoIterator<Item = (StructIdentifier, LayoutTag)>,
         vm_config: VMConfig,
     ) -> VMResult<Self> {
         Ok(Self {

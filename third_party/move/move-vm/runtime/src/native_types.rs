@@ -1,39 +1,29 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use move_core_types::value::LayoutTag;
 use move_vm_types::loaded_data::runtime_types::StructIdentifier;
-use std::collections::BTreeMap;
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct NativeTypeID(u64);
-
-impl NativeTypeID {
-    pub fn new(id: u64) -> Self {
-        Self(id)
-    }
-}
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct NativeTypes {
-    // check which ds is faster for these keys
-    types: BTreeMap<StructIdentifier, NativeTypeID>,
+    types: HashMap<StructIdentifier, LayoutTag>,
 }
 
 impl NativeTypes {
     pub fn empty() -> Self {
         Self {
-            types: BTreeMap::new(),
+            types: HashMap::new(),
         }
     }
 
-    pub fn new(types: impl IntoIterator<Item = (StructIdentifier, NativeTypeID)>) -> Self {
+    pub fn new(types: impl IntoIterator<Item = (StructIdentifier, LayoutTag)>) -> Self {
         Self {
-            // TODO: Allow failures? on same IDs?
-            types: BTreeMap::from_iter(types),
+            types: HashMap::from_iter(types),
         }
     }
 
-    pub fn get_native_type_id(&self, idx: &StructIdentifier) -> Option<NativeTypeID> {
-        self.types.get(idx).copied()
+    pub fn get_native_type_id(&self, idx: &StructIdentifier) -> Option<LayoutTag> {
+        self.types.get(idx).cloned()
     }
 }
