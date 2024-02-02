@@ -96,9 +96,9 @@ impl CacheEntry {
         }
     }
 
-    pub fn from_transaction(transaction: Transaction, storage_format: StorageFormat) -> Self {
+    pub fn from_proto<T: prost::Message>(proto: T, storage_format: StorageFormat) -> Self {
         let mut bytes = Vec::new();
-        transaction
+        proto
             .encode(&mut bytes)
             .expect("proto serialization failed.");
         match storage_format {
@@ -121,13 +121,17 @@ impl CacheEntry {
         }
     }
 
-    pub fn build_key(version: u64, storage_format: StorageFormat) -> String {
+    pub fn build_key(
+        version: u64,
+        type_str: Option<&str>,
+        storage_format: StorageFormat,
+    ) -> String {
         match storage_format {
             StorageFormat::GzipCompressedProto => {
-                format!("gz:{}", version)
+                format!("gz:{}/{}", version, type_str.unwrap_or_default())
             },
             StorageFormat::Base64UncompressedProto => {
-                format!("{}", version)
+                format!("{}/{}", version, type_str.unwrap_or_default())
             },
             StorageFormat::JsonBase64UncompressedProto => {
                 // This is fatal to see that we are using legacy file format in cache side.
@@ -136,7 +140,7 @@ impl CacheEntry {
         }
     }
 
-    pub fn into_transaction(self) -> Transaction {
+    pub fn into_proto<T: prost::Message + Default>(self) -> T {
         match self {
             CacheEntry::GzipCompressionProto(bytes) => {
                 let mut decompressor = GzDecoder::new(&bytes[..]);
@@ -144,11 +148,11 @@ impl CacheEntry {
                 decompressor
                     .read_to_end(&mut decompressed)
                     .expect("Gzip decompression failed.");
-                Transaction::decode(decompressed.as_slice()).expect("proto deserialization failed.")
+                T::decode(decompressed.as_slice()).expect("proto deserialization failed.")
             },
             CacheEntry::Base64UncompressedProto(bytes) => {
                 let bytes: Vec<u8> = base64::decode(bytes).expect("base64 decoding failed.");
-                Transaction::decode(bytes.as_slice()).expect("proto deserialization failed.")
+                T::decode(bytes.as_slice()).expect("proto deserialization failed.")
             },
         }
     }
@@ -308,10 +312,10 @@ mod tests {
         let transaction_clone = transaction.clone();
         let transaction_size = transaction.encoded_len();
         let cache_entry =
-            CacheEntry::from_transaction(transaction, StorageFormat::Base64UncompressedProto);
+            CacheEntry::from_proto(transaction, StorageFormat::Base64UncompressedProto);
         // Make sure data is compressed.
         assert_ne!(cache_entry.size(), transaction_size);
-        let deserialized_transaction = cache_entry.into_transaction();
+        let deserialized_transaction = cache_entry.into_proto();
         assert_eq!(transaction_clone, deserialized_transaction);
     }
 
@@ -324,11 +328,10 @@ mod tests {
         };
         let transaction_clone = transaction.clone();
         let proto_size = transaction.encoded_len();
-        let cache_entry =
-            CacheEntry::from_transaction(transaction, StorageFormat::GzipCompressedProto);
+        let cache_entry = CacheEntry::from_proto(transaction, StorageFormat::GzipCompressedProto);
         let compressed_size = cache_entry.size();
         assert!(compressed_size != proto_size);
-        let deserialized_transaction = cache_entry.into_transaction();
+        let deserialized_transaction = cache_entry.into_proto();
         assert_eq!(transaction_clone, deserialized_transaction);
     }
 
@@ -341,7 +344,7 @@ mod tests {
             ..Transaction::default()
         };
         let _cache_entry =
-            CacheEntry::from_transaction(transaction, StorageFormat::JsonBase64UncompressedProto);
+            CacheEntry::from_proto(transaction, StorageFormat::JsonBase64UncompressedProto);
     }
 
     #[test]
@@ -403,7 +406,7 @@ mod tests {
     #[test]
     fn test_cache_entry_key_to_string_gzip_compressed_proto() {
         assert_eq!(
-            CacheEntry::build_key(42, StorageFormat::GzipCompressedProto),
+            CacheEntry::build_key(42, None, StorageFormat::GzipCompressedProto),
             "gz:42"
         );
     }
@@ -411,7 +414,7 @@ mod tests {
     #[test]
     fn test_cache_entry_key_to_string_base64_uncompressed_proto() {
         assert_eq!(
-            CacheEntry::build_key(42, StorageFormat::Base64UncompressedProto),
+            CacheEntry::build_key(42, None, StorageFormat::Base64UncompressedProto),
             "42"
         );
     }
@@ -419,7 +422,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_cache_entry_key_to_string_json_base64_uncompressed_proto() {
-        let _key = CacheEntry::build_key(42, StorageFormat::JsonBase64UncompressedProto);
+        let _key = CacheEntry::build_key(42, None, StorageFormat::JsonBase64UncompressedProto);
     }
 
     #[test]

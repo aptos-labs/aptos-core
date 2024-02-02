@@ -12,10 +12,8 @@ pub mod types;
 use anyhow::{Context, Result};
 use aptos_protos::{
     indexer::v1::raw_data_client::RawDataClient,
-    internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, transaction::v1::Transaction,
-    util::timestamp::Timestamp,
+    internal::fullnode::v1::fullnode_data_client::FullnodeDataClient, util::timestamp::Timestamp,
 };
-use prost::Message;
 use std::time::Duration;
 use tonic::codec::CompressionEncoding;
 use url::Url;
@@ -120,23 +118,20 @@ pub fn parse_timestamp(ts: &Timestamp, version: i64) -> chrono::NaiveDateTime {
 
 /// Chunk transactions into chunks with chunk size less than or equal to chunk_size.
 /// If a single transaction is larger than chunk_size, it will be put into a chunk by itself.
-pub fn chunk_transactions(
-    transactions: Vec<Transaction>,
-    chunk_size: usize,
-) -> Vec<Vec<Transaction>> {
+pub fn chunk_protos<T: prost::Message>(protos: Vec<T>, chunk_size: usize) -> Vec<Vec<T>> {
     let mut chunked_transactions = vec![];
     let mut chunk = vec![];
     let mut current_size = 0;
 
-    for transaction in transactions {
+    for proto in protos {
         // Only add the chunk when it's empty.
-        if !chunk.is_empty() && current_size + transaction.encoded_len() > chunk_size {
+        if !chunk.is_empty() && current_size + proto.encoded_len() > chunk_size {
             chunked_transactions.push(chunk);
             chunk = vec![];
             current_size = 0;
         }
-        current_size += transaction.encoded_len();
-        chunk.push(transaction);
+        current_size += proto.encoded_len();
+        chunk.push(proto);
     }
     if !chunk.is_empty() {
         chunked_transactions.push(chunk);
@@ -148,6 +143,8 @@ pub fn chunk_transactions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_protos::transaction::v1::Transaction;
+    use prost::Message;
 
     #[test]
     fn test_chunk_the_transactions_correctly_with_large_transaction() {
@@ -162,7 +159,7 @@ mod tests {
         // Create a vec with 10 transactions.
         let transactions = vec![t.clone(); 10];
         assert!(t.encoded_len() > 1);
-        let chunked_transactions = chunk_transactions(transactions, 1);
+        let chunked_transactions = chunk_protos(transactions, 1);
         assert_eq!(chunked_transactions.len(), 10);
     }
 
@@ -179,7 +176,7 @@ mod tests {
         // Create a vec with 10 transactions.
         let transactions = vec![t.clone(); 10];
         assert!(t.encoded_len() == 6);
-        let chunked_transactions = chunk_transactions(transactions, 20);
+        let chunked_transactions = chunk_protos(transactions, 20);
         assert_eq!(chunked_transactions.len(), 4);
         let total_count = chunked_transactions
             .iter()

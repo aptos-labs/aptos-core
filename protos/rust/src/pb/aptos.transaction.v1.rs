@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 /// A block on Aptos holds transactions in chronological order (ordered by a transactions monotonically increasing `version` field)
 /// All blocks start with a `BlockMetadataTransaction`, and are followed by zero or more transactions.

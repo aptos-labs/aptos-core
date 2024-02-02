@@ -9,7 +9,7 @@ use crate::{
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction as APITransaction, TransactionOnChainData};
 use aptos_indexer_grpc_utils::{
-    chunk_transactions,
+    chunk_protos,
     constants::MESSAGE_SIZE_LIMIT,
     counters::{log_grpc_step_fullnode, IndexerGrpcStep},
 };
@@ -151,7 +151,7 @@ impl IndexerStreamCoordinator {
                 let mut responses = vec![];
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
-                    for chunk in chunk_transactions(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
+                    for chunk in chunk_protos(chunk.to_vec(), MESSAGE_SIZE_LIMIT) {
                         let item = TransactionsFromNodeResponse {
                             response: Some(transactions_from_node_response::Response::Data(
                                 TransactionsOutput {
