@@ -7,6 +7,7 @@
 //! - doesn't lead to an abort
 
 use abstract_domain_derive::AbstractDomain;
+use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::model::FunctionEnv;
 use move_stackless_bytecode::{
@@ -19,9 +20,11 @@ use move_stackless_bytecode::{
 };
 use std::{collections::BTreeMap, fmt::Display};
 
-/// The power set lattice of `ExitStatus`, where
-/// - the top element is { Return, Abort, NoMoreInstruction }
-/// - the bot element is {}
+/// The power set lattice of `ExitStatus`
+/// - the top element is { Return, Abort }: may return, abort, or not terminate
+/// - { Return }: may return or not terminate
+/// - { Abort }: may abort or not terminate
+/// - the bot element is {}: don't terminate
 /// - the join operation is set union
 ///
 /// The interpretation of the lattice is as follows:
@@ -42,9 +45,9 @@ impl ExitState {
         Self(SetDomain::singleton(e))
     }
 
-    /// Checks whether the state is the singleton { Abort }
-    pub fn definitely_aborts(&self) -> bool {
-        self.0 == SetDomain::singleton(ExitStatus::Abort)
+    /// Checks whether the state may return
+    pub fn may_return(&self) -> bool {
+        self.0.iter().contains(&ExitStatus::Return)
     }
 }
 
