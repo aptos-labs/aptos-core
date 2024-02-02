@@ -27,6 +27,8 @@ module std::features {
     use std::signer;
     use std::vector;
 
+    const EINVALID_FEATURE: u64 = 1;
+
     // --------------------------------------------------------------------------------------------
     // Code Publishing
 
@@ -253,12 +255,14 @@ module std::features {
         is_enabled(AGGREGATOR_V2_API)
     }
 
-    // Backed by same flag as get_aggregator_v2_api_feature
-    public fun get_aggregator_snapshots_feature(): u64 { AGGREGATOR_V2_API }
+    #[deprecated]
+    public fun get_aggregator_snapshots_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
 
-    // Backed by same flag as aggregator_v2_api_enabled
-    public fun aggregator_snapshots_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_API)
+    #[deprecated]
+    public fun aggregator_snapshots_enabled(): bool {
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
     const SAFER_RESOURCE_GROUPS: u64 = 31;
@@ -287,13 +291,23 @@ module std::features {
     /// Whether enable TokenV2 collection creation and Fungible Asset creation
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient
-    const CONCURRENT_ASSETS: u64 = 37;
+    const CONCURRENT_TOKEN_V2: u64 = 37;
 
-    public fun get_concurrent_assets_feature(): u64 { CONCURRENT_ASSETS }
+    public fun get_concurrent_token_v2_feature(): u64 { CONCURRENT_TOKEN_V2 }
 
-    public fun concurrent_assets_enabled(): bool acquires Features {
-        // concurrent assets cannot be used if aggregator v2 api is not enabled.
-        is_enabled(CONCURRENT_ASSETS) && aggregator_v2_api_enabled()
+    public fun concurrent_token_v2_enabled(): bool acquires Features {
+        // concurrent token v2 cannot be used if aggregator v2 api is not enabled.
+        is_enabled(CONCURRENT_TOKEN_V2) && aggregator_v2_api_enabled()
+    }
+
+    #[deprecated]
+    public fun get_concurrent_assets_feature(): u64 {
+        abort error::invalid_argument(EINVALID_FEATURE)
+    }
+
+    #[deprecated]
+    public fun concurrent_assets_enabled(): bool {
+        abort error::invalid_argument(EINVALID_FEATURE)
     }
 
     const LIMIT_MAX_IDENTIFIER_LENGTH: u64 = 38;
@@ -364,6 +378,18 @@ module std::features {
 
     public fun jwk_consensus_enabled(): bool acquires Features {
         is_enabled(JWK_CONSENSUS)
+    }
+
+    /// Whether enable Fungible Asset creation
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 49;
+
+    public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
+
+    public fun concurrent_fungible_assets_enabled(): bool acquires Features {
+        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
+        is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
     }
 
     // ============================================================================================
