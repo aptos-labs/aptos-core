@@ -24,6 +24,8 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
+use move_core_types::account_address::AccountAddress;
 
 pub struct MixedPayloadClient {
     validator_txn_config: ValidatorTxnConfig,
@@ -49,13 +51,12 @@ impl MixedPayloadClient {
     /// When enabled in smoke tests, generate 2 random validator transactions, 1 valid, 1 invalid.
     fn extra_test_only_vtxns(&self) -> Vec<ValidatorTransaction> {
         fail_point!("mixed_payload_client::extra_test_only_vtxns", |_| vec![
-            ValidatorTransaction::DummyTopic1(DummyValidatorTransaction {
-                valid: true,
-                payload: b"P0".to_vec(),
-            }),
-            ValidatorTransaction::DummyTopic1(DummyValidatorTransaction {
-                valid: false,
-                payload: b"P1".to_vec(),
+            ValidatorTransaction::DKGResult(DKGTranscript {
+                metadata: DKGTranscriptMetadata {
+                    epoch: 999,
+                    author: AccountAddress::ZERO,
+                },
+                transcript_bytes: vec![],
             }),
         ]);
         vec![]

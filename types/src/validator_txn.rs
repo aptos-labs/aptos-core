@@ -8,12 +8,15 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
-    DummyTopic1(DummyValidatorTransaction),
     DKGResult(DKGTranscript),
-    DummyTopic2(DummyValidatorTransaction),
     ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
+    #[cfg(any(test, feature = "fuzzing"))]
+    DummyTopic1(DummyValidatorTransaction),
+    #[cfg(any(test, feature = "fuzzing"))]
+    DummyTopic2(DummyValidatorTransaction),
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct DummyValidatorTransaction {
     pub valid: bool,
@@ -44,12 +47,14 @@ impl ValidatorTransaction {
 
     pub fn topic(&self) -> Topic {
         match self {
-            ValidatorTransaction::DummyTopic1(_) => Topic::DUMMY1,
             ValidatorTransaction::DKGResult(_) => Topic::DKG,
-            ValidatorTransaction::DummyTopic2(_) => Topic::DUMMY2,
             ValidatorTransaction::ObservedJWKUpdate(update) => {
                 Topic::JWK_CONSENSUS(update.update.issuer.clone())
             },
+            #[cfg(any(test, feature = "fuzzing"))]
+            ValidatorTransaction::DummyTopic1(_) => Topic::DUMMY1,
+            #[cfg(any(test, feature = "fuzzing"))]
+            ValidatorTransaction::DummyTopic2(_) => Topic::DUMMY2,
         }
     }
 }

@@ -57,6 +57,7 @@ use std::{
     convert::TryFrom,
     iter::Iterator,
 };
+use crate::dkg::{DKGTranscript, DKGTranscriptMetadata};
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
@@ -1264,7 +1265,7 @@ impl Arbitrary for ValidatorTransaction {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         (any::<bool>(), any::<Vec<u8>>())
             .prop_map(|(valid, payload)| {
-                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction { valid, payload })
+                ValidatorTransaction::DKGResult(DKGTranscript { metadata: DKGTranscriptMetadata { epoch: 0, author: AccountAddress::ZERO }, transcript_bytes: vec![] })
             })
             .boxed()
     }

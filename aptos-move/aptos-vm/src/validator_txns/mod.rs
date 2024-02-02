@@ -24,6 +24,7 @@ impl AptosVM {
             ValidatorTransaction::ObservedJWKUpdate(jwk_update) => {
                 self.process_jwk_update(resolver, log_context, session_id, jwk_update)
             },
+            #[cfg(any(test, feature = "fuzzing"))]
             ValidatorTransaction::DummyTopic1(dummy) | ValidatorTransaction::DummyTopic2(dummy) => {
                 self.process_dummy_validator_txn(resolver, log_context, session_id, dummy)
             },
