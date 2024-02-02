@@ -20,8 +20,6 @@ module aptos_framework::jwks {
     #[test_only]
     use aptos_framework::account::create_account_for_test;
 
-    friend aptos_framework::genesis;
-
     const EUNEXPECTED_EPOCH: u64 = 1;
     const EUNEXPECTED_VERSION: u64 = 2;
     const EUNKNOWN_PATCH_VARIANT: u64 = 3;
@@ -244,7 +242,7 @@ module aptos_framework::jwks {
     }
 
     /// Initialize some JWK resources. Should only be invoked by genesis.
-    public(friend) fun initialize(fx: &signer) {
+    public fun initialize(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         move_to(fx, SupportedOIDCProviders { providers: vector[] });
         move_to(fx, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });

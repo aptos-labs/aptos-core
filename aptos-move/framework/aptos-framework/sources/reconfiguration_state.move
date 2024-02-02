@@ -9,7 +9,6 @@ module aptos_framework::reconfiguration_state {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
 
-    friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration;
     friend aptos_framework::reconfiguration_with_dkg;
     friend aptos_framework::stake;
@@ -37,7 +36,7 @@ module aptos_framework::reconfiguration_state {
         exists<State>(@aptos_framework)
     }
 
-    public(friend) fun initialize(fx: &signer) {
+    public fun initialize(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         if (!exists<State>(@aptos_framework)) {
             move_to(fx, State {
