@@ -9,11 +9,8 @@ use crate::{
         batch_generator::BatchGeneratorCommand, batch_store::BatchReader, counters, utils::Timeouts,
     },
 };
-use aptos_consensus_types::{
-    common::Payload,
-    proof_of_store::{
-        BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
-    },
+use aptos_consensus_types::proof_of_store::{
+    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -33,7 +30,6 @@ use tokio::{
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
     AppendSignature(SignedBatchInfoMsg),
-    ExecutedBlockNotification(HashValue, Option<Payload>),
     CommitNotification(Vec<BatchInfo>),
     Shutdown(TokioOneshot::Sender<()>),
 }
@@ -299,7 +295,6 @@ impl ProofCoordinator {
                                 }
                             }
                         },
-                        ProofCoordinatorCommand::ExecutedBlockNotification()
                         ProofCoordinatorCommand::AppendSignature(signed_batch_infos) => {
                             let mut proofs = vec![];
                             for signed_batch_info in signed_batch_infos.take().into_iter() {

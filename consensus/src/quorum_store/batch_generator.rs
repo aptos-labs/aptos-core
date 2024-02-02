@@ -12,8 +12,8 @@ use crate::{
 };
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
-    common::{Payload, TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchId, BatchInfo},
+    common::{TransactionInProgress, TransactionSummary},
+    proof_of_store::{BatchId, BatchInfo, ProofOfStore},
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -29,7 +29,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    ExecutedBlockNotification(HashValue, Option<Payload>),
+    ExecutedBlockNotification(HashValue, Vec<ProofOfStore>),
     CommitNotification(u64, Vec<BatchInfo>),
     ProofExpiration(Vec<BatchId>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
@@ -422,6 +422,13 @@ impl BatchGenerator {
                 }),
                 Some(cmd) = cmd_rx.recv() => monitor!("batch_generator_handle_command", {
                     match cmd {
+                        BatchGeneratorCommand::ExecutedBlockNotification(_block_id, proofs) => {
+                            for batch_id in proofs.iter().map(|b| b.batch_id()) {
+                                if self.remove_batch_in_progress(&batch_id) {
+                                    counters::BATCH_IN_PROGRESS_COMMITTED.inc();
+                                }
+                            }
+                        },
                         BatchGeneratorCommand::CommitNotification(block_timestamp, batches) => {
                             trace!(
                                 "QS: got clean request from execution, block timestamp {}",

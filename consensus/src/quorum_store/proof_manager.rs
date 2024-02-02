@@ -24,7 +24,6 @@ use std::collections::HashSet;
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    ExecutedBlockNotification(HashValue, Option<Payload>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
@@ -85,14 +84,9 @@ impl ProofManager {
                 max_txns,
                 max_bytes,
                 return_non_full,
-                block_store,
+                filter,
                 callback,
             ) => {
-                if let Some(latest_executed_block_id) = self.latest_executed_block_id {
-                    let mut pending_blocks = block_store.path_from_commit_root()
-                }
-
-
                 let excluded_batches: HashSet<_> = match filter {
                     PayloadFilter::Empty => HashSet::new(),
                     PayloadFilter::DirectMempool(_) => {
@@ -173,13 +167,6 @@ impl ProofManager {
                             },
                             ProofManagerCommand::ReceiveProofs(proofs) => {
                                 self.receive_proofs(proofs.take());
-                            },
-                            ProofManagerCommand::ExecutedBlockNotification(_block_id, payload) => {
-                                // TODO: implement
-                                // self.executed_block_id = block_id;
-                                if let Some(_payload) = payload {
-                                //     self.proofs_for_consensus.mark_executed(block_id, payload);
-                                }
                             },
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 self.handle_commit_notification(

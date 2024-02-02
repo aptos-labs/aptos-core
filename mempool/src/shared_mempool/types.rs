@@ -207,9 +207,14 @@ impl fmt::Display for QuorumStoreRequest {
                     excluded_txns.len()
                 )
             },
-            QuorumStoreRequest::ExecutedTransactionsNotification(rejected_txns, _) => {
+            QuorumStoreRequest::ExecutedTransactionsNotification(
+                executed_txns,
+                rejected_txns,
+                _,
+            ) => {
                 format!(
-                    "RejectNotification [rejected_txns_length: {}]",
+                    "ExecutedTransactionsNotification [executed_txns_length: {}, rejected_txns_length: {}]",
+                    executed_txns.len(),
                     rejected_txns.len()
                 )
             },

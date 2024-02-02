@@ -231,15 +231,15 @@ impl StateComputer for ExecutionProxy {
 
             observe_block(timestamp, BlockStage::EXECUTED);
 
-            // notify quorum store about executed block
-            if let Some(payload_manager) = payload_manager {
-                payload_manager.notify_executed_block(block_id, payload);
-            }
-            // notify mempool about executed transactions
+            // first remove txns from mempool
             if let Err(e) = txn_notifier.notify_executed_txns(input_txns, result).await {
                 error!(
                     error = ?e, "Failed to notify mempool of executed txns",
                 );
+            }
+            // then remove batches from quorum store
+            if let Some(payload_manager) = payload_manager {
+                payload_manager.notify_executed_block(block_id, payload);
             }
             Ok(pipeline_execution_result)
         })

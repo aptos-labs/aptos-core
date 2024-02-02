@@ -66,13 +66,16 @@ impl PayloadManager {
             PayloadManager::DirectMempool => {},
             PayloadManager::InQuorumStore(_, coordinator_tx) => {
                 let mut tx = coordinator_tx.clone();
-                if let Err(e) = tx.try_send(CoordinatorCommand::ExecutedBlockNotification(
-                    block_id, payload,
-                )) {
-                    warn!(
+                if let Some(Payload::InQuorumStore(proof_with_data)) = payload {
+                    if let Err(e) = tx.try_send(CoordinatorCommand::ExecutedBlockNotification(
+                        block_id,
+                        proof_with_data.proofs,
+                    )) {
+                        warn!(
                         "ExecutedBlockNotification failed. Is the epoch shutting down? error: {}",
                         e
                     );
+                    }
                 }
             },
         }

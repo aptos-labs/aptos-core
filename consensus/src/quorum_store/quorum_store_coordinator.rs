@@ -10,7 +10,7 @@ use crate::{
     round_manager::VerifiedEvent,
 };
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::{common::Payload, proof_of_store::BatchInfo};
+use aptos_consensus_types::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -18,7 +18,7 @@ use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot};
 
 pub enum CoordinatorCommand {
-    ExecutedBlockNotification(HashValue, Option<Payload>),
+    ExecutedBlockNotification(HashValue, Vec<ProofOfStore>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(futures_channel::oneshot::Sender<()>),
 }
@@ -55,26 +55,26 @@ impl QuorumStoreCoordinator {
         while let Some(cmd) = rx.next().await {
             monitor!("quorum_store_coordinator_loop", {
                 match cmd {
-                    CoordinatorCommand::ExecutedBlockNotification(block_id, payload) => {
-                        self.proof_coordinator_cmd_tx
-                            .send(ProofCoordinatorCommand::ExecutedBlockNotification(
-                                block_id,
-                                payload.clone(),
-                            ))
-                            .await
-                            .expect("Failed to send to ProofCoordinator");
-
-                        self.proof_manager_cmd_tx
-                            .send(ProofManagerCommand::ExecutedBlockNotification(
-                                block_id,
-                                payload.clone(),
-                            ))
-                            .await
-                            .expect("Failed to send to ProofManager");
+                    CoordinatorCommand::ExecutedBlockNotification(block_id, batches) => {
+                        // self.proof_coordinator_cmd_tx
+                        //     .send(ProofCoordinatorCommand::ExecutedBlockNotification(
+                        //         block_id,
+                        //         payload.clone(),
+                        //     ))
+                        //     .await
+                        //     .expect("Failed to send to ProofCoordinator");
+                        //
+                        // self.proof_manager_cmd_tx
+                        //     .send(ProofManagerCommand::ExecutedBlockNotification(
+                        //         block_id,
+                        //         payload.clone(),
+                        //     ))
+                        //     .await
+                        //     .expect("Failed to send to ProofManager");
 
                         self.batch_generator_cmd_tx
                             .send(BatchGeneratorCommand::ExecutedBlockNotification(
-                                block_id, payload,
+                                block_id, batches,
                             ))
                             .await
                             .expect("Failed to send to BatchGenerator");
