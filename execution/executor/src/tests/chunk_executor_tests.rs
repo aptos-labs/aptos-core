@@ -157,6 +157,9 @@ fn test_executor_execute_or_apply_and_commit_chunk() {
 }
 
 #[test]
+fn test_rw_transaction_auxiliary_data() {}
+
+#[test]
 fn test_executor_execute_and_commit_chunk_restart() {
     let first_batch_size = 30;
     let second_batch_size = 40;

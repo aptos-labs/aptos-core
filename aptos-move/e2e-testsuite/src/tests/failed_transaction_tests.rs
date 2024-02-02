@@ -65,6 +65,10 @@ fn failed_transaction_cleanup_test() {
         .concrete_write_set_iter()
         .map(|(k, v)| (k, assert_some!(v)))
         .collect();
+    assert!(
+        out1.auxiliary_data().detail_error_message.is_some(),
+        "detail error shouldn't be empty"
+    );
     assert!(!write_set.is_empty());
     assert_eq!(out1.gas_used(), 90_000);
     assert!(!out1.status().is_discarded());
