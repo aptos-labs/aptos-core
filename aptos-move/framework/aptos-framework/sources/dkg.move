@@ -8,7 +8,6 @@ module aptos_framework::dkg {
     use aptos_framework::timestamp;
     use aptos_framework::validator_consensus_info::ValidatorConsensusInfo;
     friend aptos_framework::block;
-    friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
 
     const EDKG_IN_PROGRESS: u64 = 1;
@@ -42,7 +41,7 @@ module aptos_framework::dkg {
     }
 
     /// Called in genesis to initialize on-chain states.
-    public(friend) fun initialize(aptos_framework: &signer) {
+    public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to<DKGState>(
             aptos_framework,

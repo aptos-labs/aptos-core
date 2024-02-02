@@ -42,6 +42,7 @@
 <b>use</b> <a href="chain_id.md#0x1_chain_id">0x1::chain_id</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
 <b>use</b> <a href="coin.md#0x1_coin">0x1::coin</a>;
+<b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="dkg.md#0x1_dkg">0x1::dkg</a>;
@@ -372,6 +373,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize">reconfiguration_state::initialize</a>(&aptos_framework_account);
     <a href="dkg.md#0x1_dkg_initialize">dkg::initialize</a>(&aptos_framework_account);
     <a href="randomness.md#0x1_randomness_initialize">randomness::initialize</a>(&aptos_framework_account);
+    <a href="config_buffer.md#0x1_config_buffer_initialize">config_buffer::initialize</a>(&aptos_framework_account);
 }
 </code></pre>
 

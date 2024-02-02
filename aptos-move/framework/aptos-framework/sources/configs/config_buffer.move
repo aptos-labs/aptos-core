@@ -29,7 +29,7 @@ module aptos_framework::config_buffer {
         configs: SimpleMap<String, Any>,
     }
 
-    public(friend) fun initialize(aptos_framework: &signer) {
+    public fun initialize(aptos_framework: &signer) {
         move_to(aptos_framework, PendingConfigs {
             configs: simple_map::new(),
         })

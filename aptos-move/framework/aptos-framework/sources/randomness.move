@@ -10,7 +10,6 @@ module aptos_std::randomness {
     use aptos_std::debug;
 
     friend aptos_framework::block;
-    friend aptos_framework::genesis;
 
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
@@ -24,7 +23,7 @@ module aptos_std::randomness {
 
     /// Called in genesis.move.
     /// Must be called in tests to initialize the `PerBlockRandomness` resource.
-    public(friend) fun initialize(framework: &signer) {
+    public fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         move_to(framework, PerBlockRandomness {
             epoch: 0,
