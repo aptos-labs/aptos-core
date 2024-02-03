@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
-    jwks,
-};
+use crate::dkg::DKGTranscript;
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::dkg::DKGTranscriptMetadata;
+use crate::jwks;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+#[cfg(any(test, feature = "fuzzing"))]
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
