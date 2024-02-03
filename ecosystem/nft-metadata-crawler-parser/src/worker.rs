@@ -9,6 +9,7 @@ use crate::{
     utils::{
         constants::{
             DEFAULT_IMAGE_QUALITY, DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MAX_IMAGE_DIMENSIONS,
+            MAX_NUM_PARSE_RETRIES,
         },
         counters::{
             DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
@@ -80,15 +81,14 @@ impl Worker {
         // Exit if not force or if asset_uri has already been parsed
         let prev_model =
             NFTMetadataCrawlerURIsQuery::get_by_asset_uri(self.asset_uri.clone(), &mut self.conn);
-        if !self.force && prev_model.is_some() {
-            self.log_info("Duplicate asset_uri found, skipping parse");
+        if let Some(pm) = prev_model {
             DUPLICATE_ASSET_URI_COUNT.inc();
-            return Ok(());
-        }
-
-        if prev_model.unwrap_or_default().do_not_parse {
-            self.log_info("do_not_parse is true, skipping parse");
-            return Ok(());
+            if !self.force && pm.do_not_parse {
+                self.log_info("asset_uri has been marked as do_not_parse, skipping parse");
+                SKIP_URI_COUNT.with_label_values(&["do_not_parse"]).inc();
+                return Ok(());
+            }
+            self.model = pm.into();
         }
 
         // Skip if asset_uri contains any of the uris in URI_SKIP_LIST
@@ -111,72 +111,75 @@ impl Worker {
             return Ok(());
         }
 
-        // Parse asset_uri
-        self.log_info("Parsing asset_uri");
-        let json_uri = URIParser::parse(
-            self.config.ipfs_prefix.clone(),
-            self.model.get_asset_uri(),
-            self.config.ipfs_auth_key.clone(),
-        )
-        .unwrap_or_else(|_| {
-            self.log_warn("Failed to parse asset_uri", None);
-            PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-            self.model.get_asset_uri()
-        });
-
-        // Parse JSON for raw_image_uri and raw_animation_uri
-        self.log_info("Starting JSON parsing");
-        let (raw_image_uri, raw_animation_uri, json) = JSONParser::parse(
-            json_uri,
-            self.config
-                .max_file_size_bytes
-                .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
-        )
-        .await
-        .unwrap_or_else(|e| {
-            // Increment retry count if JSON parsing fails
-            self.log_warn("JSON parsing failed", Some(&e));
-            self.model.increment_json_parser_retry_count();
-            (None, None, Value::Null)
-        });
-
-        self.model.set_raw_image_uri(raw_image_uri);
-        self.model.set_raw_animation_uri(raw_animation_uri);
-
-        // Save parsed JSON to GCS
-        if json != Value::Null {
-            self.log_info("Writing JSON to GCS");
-            let cdn_json_uri_result = write_json_to_gcs(
-                self.config.bucket.clone(),
-                self.asset_data_id.clone(),
-                &json,
-                &self.gcs_client,
+        if self.force || self.model.get_cdn_json_uri().is_none() {
+            // Parse asset_uri
+            self.log_info("Parsing asset_uri");
+            let json_uri = URIParser::parse(
+                self.config.ipfs_prefix.clone(),
+                self.model.get_asset_uri(),
+                self.config.ipfs_auth_key.clone(),
             )
-            .await;
+            .unwrap_or_else(|_| {
+                self.log_warn("Failed to parse asset_uri", None);
+                PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
+                self.model.get_asset_uri()
+            });
 
-            if let Err(e) = cdn_json_uri_result.as_ref() {
-                self.log_warn(
-                    "Failed to write JSON to GCS, maybe upload timed out?",
-                    Some(e),
-                );
+            // Parse JSON for raw_image_uri and raw_animation_uri
+            self.log_info("Starting JSON parsing");
+            let (raw_image_uri, raw_animation_uri, json) = JSONParser::parse(
+                json_uri,
+                self.config
+                    .max_file_size_bytes
+                    .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
+            )
+            .await
+            .unwrap_or_else(|e| {
+                // Increment retry count if JSON parsing fails
+                self.log_warn("JSON parsing failed", Some(&e));
+                self.model.increment_json_parser_retry_count();
+                (None, None, Value::Null)
+            });
+
+            self.model.set_raw_image_uri(raw_image_uri);
+            self.model.set_raw_animation_uri(raw_animation_uri);
+
+            // Save parsed JSON to GCS
+            if json != Value::Null {
+                self.log_info("Writing JSON to GCS");
+                let cdn_json_uri_result = write_json_to_gcs(
+                    self.config.bucket.clone(),
+                    self.asset_data_id.clone(),
+                    &json,
+                    &self.gcs_client,
+                )
+                .await;
+
+                if let Err(e) = cdn_json_uri_result.as_ref() {
+                    self.log_warn(
+                        "Failed to write JSON to GCS, maybe upload timed out?",
+                        Some(e),
+                    );
+                }
+
+                let cdn_json_uri = cdn_json_uri_result
+                    .map(|value| format!("{}{}", self.config.cdn_prefix, value))
+                    .ok();
+                self.model.set_cdn_json_uri(cdn_json_uri);
             }
 
-            let cdn_json_uri = cdn_json_uri_result
-                .map(|value| format!("{}{}", self.config.cdn_prefix, value))
-                .ok();
-            self.model.set_cdn_json_uri(cdn_json_uri);
-        }
-
-        // Commit model to Postgres
-        self.log_info("Committing JSON to Postgres");
-        if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
-            self.log_error("Commit to Postgres failed", &e);
+            // Commit model to Postgres
+            self.log_info("Committing JSON to Postgres");
+            if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                self.log_error("Commit to Postgres failed", &e);
+            }
         }
 
         // Deduplicate raw_image_uri
         // Proceed with image optimization of force or if raw_image_uri has not been parsed
         // Since we default to asset_uri, this check works if raw_image_uri is null because deduplication for asset_uri has already taken place
         if self.force
+            || self.model.get_cdn_image_uri().is_none()
             || self.model.get_raw_image_uri().map_or(true, |uri_option| {
                 match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
                     self.asset_uri.clone(),
@@ -233,7 +236,7 @@ impl Worker {
                 (vec![], ImageFormat::Png)
             });
 
-            if image.is_empty() && json == Value::Null {
+            if image.is_empty() {
                 self.log_info("Image and JSON are empty, skipping parse, marking as do_not_parse");
                 self.model.set_do_not_parse(true);
                 SKIP_URI_COUNT.with_label_values(&["empty"]).inc();
@@ -278,22 +281,23 @@ impl Worker {
         // Deduplicate raw_animation_uri
         // Set raw_animation_uri_option to None if not force and raw_animation_uri already exists
         let mut raw_animation_uri_option = self.model.get_raw_animation_uri();
-        if !self.force
-            && raw_animation_uri_option.clone().map_or(true, |uri| {
-                match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
-                    self.asset_uri.clone(),
-                    uri,
-                    &mut self.conn,
-                ) {
-                    Some(uris) => {
-                        self.log_info("Duplicate raw_animation_uri found");
-                        DUPLICATE_RAW_ANIMATION_URI_COUNT.inc();
-                        self.model.set_cdn_animation_uri(uris.cdn_animation_uri);
-                        true
-                    },
-                    None => true,
-                }
-            })
+        if self.model.get_cdn_animation_uri().is_some()
+            || !self.force
+                && raw_animation_uri_option.clone().map_or(true, |uri| {
+                    match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
+                        self.asset_uri.clone(),
+                        uri,
+                        &mut self.conn,
+                    ) {
+                        Some(uris) => {
+                            self.log_info("Duplicate raw_animation_uri found");
+                            DUPLICATE_RAW_ANIMATION_URI_COUNT.inc();
+                            self.model.set_cdn_animation_uri(uris.cdn_animation_uri);
+                            true
+                        },
+                        None => true,
+                    }
+                })
         {
             raw_animation_uri_option = None;
         }
@@ -362,6 +366,17 @@ impl Worker {
         self.log_info("Committing animation to Postgres");
         if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
             self.log_error("Commit to Postgres failed", &e);
+        }
+
+        if self.model.get_json_parser_retry_count() > MAX_NUM_PARSE_RETRIES
+            || self.model.get_image_optimizer_retry_count() > MAX_NUM_PARSE_RETRIES
+            || self.model.get_animation_optimizer_retry_count() > MAX_NUM_PARSE_RETRIES
+        {
+            self.log_info("Retry count exceeded, marking as do_not_parse");
+            self.model.set_do_not_parse(true);
+            if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                self.log_error("Commit to Postgres failed", &e);
+            }
         }
 
         PARSER_SUCCESSES_COUNT.inc();
