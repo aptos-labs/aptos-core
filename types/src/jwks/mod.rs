@@ -204,18 +204,6 @@ impl QuorumCertifiedUpdate {
             multi_sig: bls12381::Signature::dummy_signature(),
         }
     }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn dummy_with_issuer(issuer: Issuer) -> Self {
-        Self {
-            authors: Default::default(),
-            update: ProviderJWKs {
-                issuer,
-                ..Default::default()
-            },
-            multi_sig: bls12381::Signature::dummy_signature(),
-        }
-    }
 }
 
 /// Move event type `0x1::jwks::ObservedJWKsUpdated` in rust.

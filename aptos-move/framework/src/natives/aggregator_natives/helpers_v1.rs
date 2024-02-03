@@ -34,8 +34,8 @@ pub(crate) fn get_handle(aggregator_table: &StructRef) -> PartialVMResult<TableH
 }
 
 /// Given a reference to `Aggregator` Move struct returns a field value at `index`.
-pub(crate) fn get_aggregator_field(aggregator: &StructRef, index: usize) -> PartialVMResult<Value> {
-    let field_ref = aggregator.borrow_field(index)?.value_as::<Reference>()?;
+pub(crate) fn get_struct_field(value: &StructRef, index: usize) -> PartialVMResult<Value> {
+    let field_ref = value.borrow_field(index)?.value_as::<Reference>()?;
     field_ref.read_ref()
 }
 
@@ -51,10 +51,9 @@ pub(crate) fn set_aggregator_field(
 
 /// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
-    let handle =
-        get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
-    let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<AccountAddress>()?;
-    let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
+    let handle = get_struct_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;
+    let key = get_struct_field(aggregator, KEY_FIELD_INDEX)?.value_as::<AccountAddress>()?;
+    let limit = get_struct_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
     Ok((AggregatorID::new(TableHandle(handle), key), limit))
 }
 

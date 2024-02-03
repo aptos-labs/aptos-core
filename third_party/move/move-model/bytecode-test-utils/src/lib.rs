@@ -58,7 +58,7 @@ pub fn test_runner(
                 targets.add_target(&func_env);
             }
         }
-        text += &print_targets_for_test(&env, "initial translation from Move", &targets);
+        text += &print_targets_for_test(&env, "initial translation from Move", &targets, false);
 
         // Run pipeline if any
         if let Some(pipeline) = pipeline_opt {
@@ -69,6 +69,7 @@ pub fn test_runner(
                     &env,
                     &format!("after pipeline `{}`", dir_name),
                     &targets,
+                    false,
                 );
             }
             text += &ProcessorResultDisplay {
