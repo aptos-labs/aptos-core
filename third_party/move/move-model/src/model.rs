@@ -3457,6 +3457,9 @@ pub struct FunctionData {
     /// Location of this function.
     pub(crate) loc: Loc,
 
+    /// Location of the function identifier, suitable for error messages alluding to the function.
+    pub(crate) id_loc: Loc,
+
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
     pub(crate) def_idx: Option<FunctionDefinitionIndex>,
@@ -3588,6 +3591,11 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
         self.data.loc.clone()
+    }
+
+    /// Returns the location of the function identifier.
+    pub fn get_id_loc(&self) -> Loc {
+        self.data.id_loc.clone()
     }
 
     /// Returns the attributes of this function.

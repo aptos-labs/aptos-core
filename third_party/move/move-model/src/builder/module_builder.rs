@@ -33,6 +33,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Type, BOOL_TYPE},
+    well_known,
 };
 use codespan::Span;
 use codespan_reporting::diagnostic::Severity;
@@ -508,9 +509,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             EA::Visibility::Internal => Visibility::Private,
         };
         let is_native = matches!(def.body.value, EA::FunctionBody_::Native);
-        let loc = et.to_loc(&def.loc);
+        let def_loc = et.to_loc(&def.loc);
+        let name_loc = et.to_loc(&name.loc());
         et.parent.parent.define_fun(qsym.clone(), FunEntry {
-            loc: loc.clone(),
+            loc: def_loc.clone(),
             module_id: et.parent.module_id,
             fun_id,
             visibility,
@@ -528,7 +530,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let spec_fun_id = SpecFunId::new(self.spec_funs.len());
         self.parent
             .define_spec_or_builtin_fun(qsym, SpecOrBuiltinFunEntry {
-                loc: loc.clone(),
+                loc: def_loc.clone(),
                 oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
                 type_params: type_params.clone(),
                 type_param_constraints: BTreeMap::default(),
@@ -540,7 +542,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         // Add $ to the name so the spec version does not name clash with the Move version.
         let spec_fun_name = self.symbol_pool().make(&format!("${}", name.0.value));
         let mut fun_decl = SpecFunDecl {
-            loc,
+            loc: def_loc,
             name: spec_fun_name,
             type_params,
             params,
@@ -3760,6 +3762,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let data = FunctionData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
+                id_loc: name.loc.clone(),
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,

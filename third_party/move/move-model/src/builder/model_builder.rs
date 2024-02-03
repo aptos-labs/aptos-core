@@ -40,7 +40,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) struct ModelBuilder<'env> {
     /// The global environment we are building.
     pub env: &'env mut GlobalEnv,
-    /// A symbol table for specification functions. Because of overloading, and entry can
+    /// A symbol table for specification functions. Because of overloading, an entry can
     /// contain multiple functions.
     pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecOrBuiltinFunEntry>>,
     /// A symbol table for specification variables.

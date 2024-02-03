@@ -153,7 +153,7 @@ fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
                 let id = func.get_qualified_id();
                 if func.is_inline() {
                     if func.get_def().is_none() {
-                        let func_loc = func.get_loc();
+                        let func_loc = func.get_id_loc();
                         let func_name = func.get_name_str();
                         if func.is_native() {
                             let msg = format!("Inline function `{}` must not be native", func_name);
@@ -421,7 +421,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                 // inline the function call
                 let type_args = self.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
-                let func_loc = func_env.get_loc();
+                let func_loc = func_env.get_id_loc();
                 let body_expr =
                     if let Some(Some(expr)) = self.inliner.funexprs_after_inlining.get(&qfid) {
                         // `qfid` was previously inlined into, use the post-inlining copy of body.
