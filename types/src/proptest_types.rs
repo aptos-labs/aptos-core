@@ -15,6 +15,7 @@ use crate::{
     block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
@@ -57,7 +58,6 @@ use std::{
     convert::TryFrom,
     iter::Iterator,
 };
-use crate::dkg::{DKGTranscript, DKGTranscriptMetadata};
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
@@ -1265,7 +1265,13 @@ impl Arbitrary for ValidatorTransaction {
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         (any::<Vec<u8>>())
             .prop_map(|payload| {
-                ValidatorTransaction::DKGResult(DKGTranscript { metadata: DKGTranscriptMetadata { epoch: 0, author: AccountAddress::ZERO }, transcript_bytes: payload })
+                ValidatorTransaction::DKGResult(DKGTranscript {
+                    metadata: DKGTranscriptMetadata {
+                        epoch: 0,
+                        author: AccountAddress::ZERO,
+                    },
+                    transcript_bytes: payload,
+                })
             })
             .boxed()
     }

@@ -11,12 +11,14 @@ use crate::{
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
 use aptos_types::{
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
     on_chain_config::ValidatorTxnConfig,
-    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::future::BoxFuture;
+use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
@@ -24,8 +26,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
-use move_core_types::account_address::AccountAddress;
 
 pub struct MixedPayloadClient {
     validator_txn_config: ValidatorTxnConfig,
@@ -128,9 +128,9 @@ impl PayloadClient for MixedPayloadClient {
 #[tokio::test]
 async fn mixed_payload_client_should_prioritize_validator_txns() {
     let all_validator_txns = vec![
-        ValidatorTransaction::dummy1(b"1".to_vec()),
-        ValidatorTransaction::dummy1(b"22".to_vec()),
-        ValidatorTransaction::dummy1(b"333".to_vec()),
+        ValidatorTransaction::dummy(b"1".to_vec()),
+        ValidatorTransaction::dummy(b"22".to_vec()),
+        ValidatorTransaction::dummy(b"333".to_vec()),
     ];
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);
@@ -233,9 +233,9 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 #[tokio::test]
 async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
     let all_validator_txns = vec![
-        ValidatorTransaction::dummy1(b"1".to_vec()),
-        ValidatorTransaction::dummy1(b"22".to_vec()),
-        ValidatorTransaction::dummy1(b"333".to_vec()),
+        ValidatorTransaction::dummy(b"1".to_vec()),
+        ValidatorTransaction::dummy(b"22".to_vec()),
+        ValidatorTransaction::dummy(b"333".to_vec()),
     ];
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);

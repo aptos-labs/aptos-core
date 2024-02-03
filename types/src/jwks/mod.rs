@@ -29,6 +29,11 @@ pub fn issuer_from_str(s: &str) -> Issuer {
     s.as_bytes().to_vec()
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn dummy_issuer() -> Issuer {
+    issuer_from_str("https:://dummy.issuer")
+}
+
 /// Move type `0x1::jwks::OIDCProvider` in rust.
 /// See its doc in Move for more details.
 #[derive(Default, Serialize, Deserialize)]
@@ -195,7 +200,19 @@ impl QuorumCertifiedUpdate {
     pub fn dummy() -> Self {
         Self {
             authors: Default::default(),
-            update: Default::default(),
+            update: ProviderJWKs::new(dummy_issuer()),
+            multi_sig: bls12381::Signature::dummy_signature(),
+        }
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_with_issuer(issuer: Issuer) -> Self {
+        Self {
+            authors: Default::default(),
+            update: ProviderJWKs {
+                issuer,
+                ..Default::default()
+            },
             multi_sig: bls12381::Signature::dummy_signature(),
         }
     }
