@@ -11,7 +11,7 @@ use crate::{
 use aptos_gas_algebra::{AbstractValueSize, AbstractValueSizePerArg};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs, u256::U256};
 use move_vm_types::{
-    values::DelayedValueHandle,
+    values::DelayedFieldID,
     views::{ValueView, ValueVisitor},
 };
 use std::collections::BTreeMap;
@@ -93,7 +93,7 @@ where
     V: ValueVisitor,
 {
     deref_visitor_delegate_simple!(
-        [visit_delayed, DelayedValueHandle],
+        [visit_delayed, DelayedFieldID],
         [visit_u8, u8],
         [visit_u16, u16],
         [visit_u32, u32],
@@ -149,7 +149,7 @@ impl<'a> AbstractValueSizeVisitor<'a> {
 
 impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     #[inline]
-    fn visit_delayed(&mut self, _depth: usize, _handle: DelayedValueHandle) {
+    fn visit_delayed(&mut self, _depth: usize, _id: DelayedFieldID) {
         // TODO[agg_v2](fix): Decode handle value to get the right size!
         self.size += self.params.u64;
     }
@@ -315,7 +315,7 @@ impl AbstractValueSizeGasParameters {
 
         impl<'a> ValueVisitor for Visitor<'a> {
             #[inline]
-            fn visit_delayed(&mut self, _depth: usize, _val: DelayedValueHandle) {
+            fn visit_delayed(&mut self, _depth: usize, _val: DelayedFieldID) {
                 // TODO[agg_v2](fix): Decode handle value to get the right size!
                 self.res = Some(self.params.u64);
             }
@@ -458,7 +458,7 @@ impl AbstractValueSizeGasParameters {
 
         impl<'a> ValueVisitor for Visitor<'a> {
             #[inline]
-            fn visit_delayed(&mut self, _depth: usize, _val: DelayedValueHandle) {
+            fn visit_delayed(&mut self, _depth: usize, _val: DelayedFieldID) {
                 // TODO[agg_v2](fix): Decode handle value to get the right size!
                 self.res = Some(self.params.per_u64_packed * NumArgs::from(1));
             }

@@ -32,17 +32,21 @@ macro_rules! return_delayed_value_error {
         // TODO[agg_v2](fix):
         //   What is the best error code here? It cannot be invariant violation
         //   because equality or similar operation can fail at runtime for delayed
-        //   values, and there is no way to gate it at this point.
+        //   values, and there is no way to gate it at this point. Currenlty, we use
+        //   a runtime error.
         return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
-            .with_message("Delayed values should not be processed by the VM".to_string()))
+            .with_message("Delayed values cannot be processed by the VM".to_string()))
     };
 }
 
-/// Handle into delayed value. We use a struct here so Move values can
-/// be casted both to u64 and handles.
-// TODO[agg_v2](cleanup): See if we combine this with delayed field IDs.
-#[derive(Debug, Clone, Copy)]
-pub struct DelayedValueHandle(pub u64);
+// TODO[agg_v2](cleanup): This is an exact copy of DelayedFieldID. All APIs can
+//   be moved to this file? Figure out where is the best place for these types.
+#[derive(Debug, Copy, Clone)]
+pub struct DelayedFieldID {
+    pub unique_index: u32,
+    // Exact number of bytes serialized delayed field will take.
+    pub width: u32,
+}
 
 /***************************************************************************************
  *
@@ -73,12 +77,12 @@ pub(crate) enum ValueImpl {
     ContainerRef(ContainerRef),
     IndexedRef(IndexedRef),
 
-    // Stores a handle to data or values stored outside of the MoveVM and
-    // processed in a "delayed" fashion, e.g., aggregators. Can only be
-    // manipulated by native functions and so any VM operation on it will
-    // result in an error.
-    // TODO[agg_v2](cleanup): consider adding size?
-    Delayed { handle: DelayedValueHandle },
+    // Stores an id which maps to values stored outside of the MoveVM and which
+    // are processed in a "delayed" fashion, e.g., aggregators. Can only be
+    // manipulated by native functions, so any VM operation on it will result in a
+    // runtime error.
+    // TODO[agg_v2](cleanup): Use a more generic name?
+    Delayed { id: DelayedFieldID },
 }
 
 /// A container is a collection of values. It is used to represent data structures like a
@@ -90,7 +94,7 @@ pub(crate) enum ValueImpl {
 ///
 /// Except when not owned by the VM stack, a container always lives inside an Rc<RefCell<>>,
 /// making it possible to be shared by references.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) enum Container {
     Locals(Rc<RefCell<Vec<ValueImpl>>>),
     Vec(Rc<RefCell<Vec<ValueImpl>>>),
@@ -726,7 +730,9 @@ impl IndexedRef {
         use Container::*;
 
         let res = match self.container_ref.container() {
-            Locals(r) | Vec(r) | Struct(r) => r.borrow()[self.idx].copy_value()?,
+            Vec(r) => r.borrow()[self.idx].copy_value()?,
+            Struct(r) => r.borrow()[self.idx].copy_value()?,
+
             VecU8(r) => ValueImpl::U8(r.borrow()[self.idx]),
             VecU16(r) => ValueImpl::U16(r.borrow()[self.idx]),
             VecU32(r) => ValueImpl::U32(r.borrow()[self.idx]),
@@ -735,6 +741,8 @@ impl IndexedRef {
             VecU256(r) => ValueImpl::U256(r.borrow()[self.idx]),
             VecBool(r) => ValueImpl::Bool(r.borrow()[self.idx]),
             VecAddress(r) => ValueImpl::Address(r.borrow()[self.idx]),
+
+            Locals(r) => r.borrow()[self.idx].copy_value()?,
         };
 
         Ok(Value(res))
@@ -922,11 +930,10 @@ impl ContainerRef {
             );
         }
 
-        let res = match self.container() {
+        Ok(match self.container() {
             Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
                 let v = r.borrow();
                 match &v[idx] {
-                    // TODO: check for the impossible combinations.
                     ValueImpl::Container(container) => {
                         let r = match self {
                             Self::Local(_) => Self::Local(container.copy_by_ref()),
@@ -937,10 +944,26 @@ impl ContainerRef {
                         };
                         ValueImpl::ContainerRef(r)
                     },
-                    _ => ValueImpl::IndexedRef(IndexedRef {
+
+                    ValueImpl::U8(_)
+                    | ValueImpl::U16(_)
+                    | ValueImpl::U32(_)
+                    | ValueImpl::U64(_)
+                    | ValueImpl::U128(_)
+                    | ValueImpl::U256(_)
+                    | ValueImpl::Bool(_)
+                    | ValueImpl::Address(_)
+                    | ValueImpl::Delayed { .. } => ValueImpl::IndexedRef(IndexedRef {
                         idx,
                         container_ref: self.copy_value(),
                     }),
+
+                    ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(format!("cannot borrow element {:?}", &v[idx])))
+                    },
                 }
             },
 
@@ -955,9 +978,7 @@ impl ContainerRef {
                 idx,
                 container_ref: self.copy_value(),
             }),
-        };
-
-        Ok(res)
+        })
     }
 }
 
@@ -994,14 +1015,11 @@ impl Locals {
             | ValueImpl::U128(_)
             | ValueImpl::U256(_)
             | ValueImpl::Bool(_)
-            | ValueImpl::Address(_) => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
+            | ValueImpl::Address(_)
+            | ValueImpl::Delayed { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
                 idx,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
             }))),
-
-            // Delayed values have to be encapsulated, and we should not be able
-            // to get a reference to them here.
-            ValueImpl::Delayed { .. } => return_delayed_value_error!(),
 
             ValueImpl::ContainerRef(_) | ValueImpl::Invalid | ValueImpl::IndexedRef(_) => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1136,9 +1154,12 @@ impl Locals {
  *
  **************************************************************************************/
 impl Value {
-    pub fn delayed_value(handle: u64) -> Self {
+    pub fn delayed_value(id: u32, width: u32) -> Self {
         Self(ValueImpl::Delayed {
-            handle: DelayedValueHandle(handle),
+            id: DelayedFieldID {
+                unique_index: id,
+                width,
+            },
         })
     }
 
@@ -1290,12 +1311,12 @@ impl_vm_value_cast!(AccountAddress, Address);
 impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
 
-impl VMValueCast<DelayedValueHandle> for Value {
-    fn cast(self) -> PartialVMResult<DelayedValueHandle> {
+impl VMValueCast<DelayedFieldID> for Value {
+    fn cast(self) -> PartialVMResult<DelayedFieldID> {
         match self.0 {
-            ValueImpl::Delayed { handle } => Ok(handle),
+            ValueImpl::Delayed { id } => Ok(id),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                .with_message(format!("cannot cast {:?} to delayed value", v))),
+                .with_message(format!("cannot cast {:?} to delayed id", v))),
         }
     }
 }
@@ -1520,12 +1541,12 @@ impl IntegerValue {
     pub fn add_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_add(l, r).map(IntegerValue::U8),
-            (U16(l), U16(r)) => u16::checked_add(l, r).map(IntegerValue::U16),
-            (U32(l), U32(r)) => u32::checked_add(l, r).map(IntegerValue::U32),
-            (U64(l), U64(r)) => u64::checked_add(l, r).map(IntegerValue::U64),
-            (U128(l), U128(r)) => u128::checked_add(l, r).map(IntegerValue::U128),
-            (U256(l), U256(r)) => u256::U256::checked_add(l, r).map(IntegerValue::U256),
+            (U8(l), U8(r)) => u8::checked_add(l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_add(l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_add(l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_add(l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_add(l, r).map(U128),
+            (U256(l), U256(r)) => u256::U256::checked_add(l, r).map(U256),
             (l, r) => {
                 let msg = format!("Cannot add {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1540,12 +1561,12 @@ impl IntegerValue {
     pub fn sub_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_sub(l, r).map(IntegerValue::U8),
-            (U16(l), U16(r)) => u16::checked_sub(l, r).map(IntegerValue::U16),
-            (U32(l), U32(r)) => u32::checked_sub(l, r).map(IntegerValue::U32),
-            (U64(l), U64(r)) => u64::checked_sub(l, r).map(IntegerValue::U64),
-            (U128(l), U128(r)) => u128::checked_sub(l, r).map(IntegerValue::U128),
-            (U256(l), U256(r)) => u256::U256::checked_sub(l, r).map(IntegerValue::U256),
+            (U8(l), U8(r)) => u8::checked_sub(l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_sub(l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_sub(l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_sub(l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_sub(l, r).map(U128),
+            (U256(l), U256(r)) => u256::U256::checked_sub(l, r).map(U256),
             (l, r) => {
                 let msg = format!("Cannot sub {:?} from {:?}", r, l);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1560,12 +1581,12 @@ impl IntegerValue {
     pub fn mul_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_mul(l, r).map(IntegerValue::U8),
-            (U16(l), U16(r)) => u16::checked_mul(l, r).map(IntegerValue::U16),
-            (U32(l), U32(r)) => u32::checked_mul(l, r).map(IntegerValue::U32),
-            (U64(l), U64(r)) => u64::checked_mul(l, r).map(IntegerValue::U64),
-            (U128(l), U128(r)) => u128::checked_mul(l, r).map(IntegerValue::U128),
-            (U256(l), U256(r)) => u256::U256::checked_mul(l, r).map(IntegerValue::U256),
+            (U8(l), U8(r)) => u8::checked_mul(l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_mul(l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_mul(l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_mul(l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_mul(l, r).map(U128),
+            (U256(l), U256(r)) => u256::U256::checked_mul(l, r).map(U256),
             (l, r) => {
                 let msg = format!("Cannot mul {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1580,12 +1601,12 @@ impl IntegerValue {
     pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_div(l, r).map(IntegerValue::U8),
-            (U16(l), U16(r)) => u16::checked_div(l, r).map(IntegerValue::U16),
-            (U32(l), U32(r)) => u32::checked_div(l, r).map(IntegerValue::U32),
-            (U64(l), U64(r)) => u64::checked_div(l, r).map(IntegerValue::U64),
-            (U128(l), U128(r)) => u128::checked_div(l, r).map(IntegerValue::U128),
-            (U256(l), U256(r)) => u256::U256::checked_div(l, r).map(IntegerValue::U256),
+            (U8(l), U8(r)) => u8::checked_div(l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_div(l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_div(l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_div(l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_div(l, r).map(U128),
+            (U256(l), U256(r)) => u256::U256::checked_div(l, r).map(U256),
             (l, r) => {
                 let msg = format!("Cannot div {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1600,12 +1621,12 @@ impl IntegerValue {
     pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_rem(l, r).map(IntegerValue::U8),
-            (U16(l), U16(r)) => u16::checked_rem(l, r).map(IntegerValue::U16),
-            (U32(l), U32(r)) => u32::checked_rem(l, r).map(IntegerValue::U32),
-            (U64(l), U64(r)) => u64::checked_rem(l, r).map(IntegerValue::U64),
-            (U128(l), U128(r)) => u128::checked_rem(l, r).map(IntegerValue::U128),
-            (U256(l), U256(r)) => u256::U256::checked_rem(l, r).map(IntegerValue::U256),
+            (U8(l), U8(r)) => u8::checked_rem(l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_rem(l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_rem(l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_rem(l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_rem(l, r).map(U128),
+            (U256(l), U256(r)) => u256::U256::checked_rem(l, r).map(U256),
             (l, r) => {
                 let msg = format!("Cannot rem {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1620,12 +1641,12 @@ impl IntegerValue {
     pub fn bit_or(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         Ok(match (self, other) {
-            (U8(l), U8(r)) => IntegerValue::U8(l | r),
-            (U16(l), U16(r)) => IntegerValue::U16(l | r),
-            (U32(l), U32(r)) => IntegerValue::U32(l | r),
-            (U64(l), U64(r)) => IntegerValue::U64(l | r),
-            (U128(l), U128(r)) => IntegerValue::U128(l | r),
-            (U256(l), U256(r)) => IntegerValue::U256(l | r),
+            (U8(l), U8(r)) => U8(l | r),
+            (U16(l), U16(r)) => U16(l | r),
+            (U32(l), U32(r)) => U32(l | r),
+            (U64(l), U64(r)) => U64(l | r),
+            (U128(l), U128(r)) => U128(l | r),
+            (U256(l), U256(r)) => U256(l | r),
             (l, r) => {
                 let msg = format!("Cannot bit_or {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1636,12 +1657,12 @@ impl IntegerValue {
     pub fn bit_and(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         Ok(match (self, other) {
-            (U8(l), U8(r)) => IntegerValue::U8(l & r),
-            (U16(l), U16(r)) => IntegerValue::U16(l & r),
-            (U32(l), U32(r)) => IntegerValue::U32(l & r),
-            (U64(l), U64(r)) => IntegerValue::U64(l & r),
-            (U128(l), U128(r)) => IntegerValue::U128(l & r),
-            (U256(l), U256(r)) => IntegerValue::U256(l & r),
+            (U8(l), U8(r)) => U8(l & r),
+            (U16(l), U16(r)) => U16(l & r),
+            (U32(l), U32(r)) => U32(l & r),
+            (U64(l), U64(r)) => U64(l & r),
+            (U128(l), U128(r)) => U128(l & r),
+            (U256(l), U256(r)) => U256(l & r),
             (l, r) => {
                 let msg = format!("Cannot bit_and {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1652,12 +1673,12 @@ impl IntegerValue {
     pub fn bit_xor(self, other: Self) -> PartialVMResult<Self> {
         use IntegerValue::*;
         Ok(match (self, other) {
-            (U8(l), U8(r)) => IntegerValue::U8(l ^ r),
-            (U16(l), U16(r)) => IntegerValue::U16(l ^ r),
-            (U32(l), U32(r)) => IntegerValue::U32(l ^ r),
-            (U64(l), U64(r)) => IntegerValue::U64(l ^ r),
-            (U128(l), U128(r)) => IntegerValue::U128(l ^ r),
-            (U256(l), U256(r)) => IntegerValue::U256(l ^ r),
+            (U8(l), U8(r)) => U8(l ^ r),
+            (U16(l), U16(r)) => U16(l ^ r),
+            (U32(l), U32(r)) => U32(l ^ r),
+            (U64(l), U64(r)) => U64(l ^ r),
+            (U128(l), U128(r)) => U128(l ^ r),
+            (U256(l), U256(r)) => U256(l ^ r),
             (l, r) => {
                 let msg = format!("Cannot bit_xor {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -1669,12 +1690,12 @@ impl IntegerValue {
         use IntegerValue::*;
 
         Ok(match self {
-            U8(x) if n_bits < 8 => IntegerValue::U8(x << n_bits),
-            U16(x) if n_bits < 16 => IntegerValue::U16(x << n_bits),
-            U32(x) if n_bits < 32 => IntegerValue::U32(x << n_bits),
-            U64(x) if n_bits < 64 => IntegerValue::U64(x << n_bits),
-            U128(x) if n_bits < 128 => IntegerValue::U128(x << n_bits),
-            U256(x) => IntegerValue::U256(x << n_bits),
+            U8(x) if n_bits < 8 => U8(x << n_bits),
+            U16(x) if n_bits < 16 => U16(x << n_bits),
+            U32(x) if n_bits < 32 => U32(x << n_bits),
+            U64(x) if n_bits < 64 => U64(x << n_bits),
+            U128(x) if n_bits < 128 => U128(x << n_bits),
+            U256(x) => U256(x << n_bits),
             _ => {
                 return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                     .with_message("Shift Left overflow".to_string()));
@@ -1686,12 +1707,12 @@ impl IntegerValue {
         use IntegerValue::*;
 
         Ok(match self {
-            U8(x) if n_bits < 8 => IntegerValue::U8(x >> n_bits),
-            U16(x) if n_bits < 16 => IntegerValue::U16(x >> n_bits),
-            U32(x) if n_bits < 32 => IntegerValue::U32(x >> n_bits),
-            U64(x) if n_bits < 64 => IntegerValue::U64(x >> n_bits),
-            U128(x) if n_bits < 128 => IntegerValue::U128(x >> n_bits),
-            U256(x) => IntegerValue::U256(x >> n_bits),
+            U8(x) if n_bits < 8 => U8(x >> n_bits),
+            U16(x) if n_bits < 16 => U16(x >> n_bits),
+            U32(x) if n_bits < 32 => U32(x >> n_bits),
+            U64(x) if n_bits < 64 => U64(x >> n_bits),
+            U128(x) if n_bits < 128 => U128(x >> n_bits),
+            U256(x) => U256(x >> n_bits),
             _ => {
                 return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                     .with_message("Shift Right overflow".to_string()));
@@ -2797,8 +2818,8 @@ pub mod debug {
     use std::fmt::Write;
 
     // Allow debug prints of the delayed values, as these are not used on-chain.
-    fn print_delayed<B: Write>(buf: &mut B, x: &DelayedValueHandle) -> PartialVMResult<()> {
-        debug_write!(buf, "<{}>", x.0)
+    fn print_delayed<B: Write>(buf: &mut B, x: &DelayedFieldID) -> PartialVMResult<()> {
+        debug_write!(buf, "<({}, {})>", x.unique_index, x.width)
     }
 
     fn print_invalid<B: Write>(buf: &mut B) -> PartialVMResult<()> {
@@ -2855,7 +2876,7 @@ pub mod debug {
             ValueImpl::ContainerRef(r) => print_container_ref(buf, r),
             ValueImpl::IndexedRef(r) => print_indexed_ref(buf, r),
 
-            ValueImpl::Delayed { handle } => print_delayed(buf, handle),
+            ValueImpl::Delayed { id: handle } => print_delayed(buf, handle),
         }
     }
 
@@ -3126,7 +3147,9 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                     // TODO[agg_v2](cleanup): Move deserialization outside of the VM to make
                     //   the handling of this variant less ugly?
                     let value_to_transform = match value_impl {
-                        ValueImpl::Delayed { handle } => Value::delayed_value(handle.0),
+                        ValueImpl::Delayed { id } => {
+                            Value::delayed_value(id.unique_index, id.width)
+                        },
                         value_impl => {
                             Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?)
                         },
@@ -3478,7 +3501,7 @@ impl ValueImpl {
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
 
-            Delayed { handle } => visitor.visit_delayed(depth, *handle),
+            Delayed { id } => visitor.visit_delayed(depth, *id),
         }
     }
 }

@@ -9,7 +9,7 @@ use move_vm_types::{
         deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
         TransformationResult, ValueToIdentifierMapping,
     },
-    values::{DelayedValueHandle, Struct, Value},
+    values::{DelayedFieldID, Struct, Value},
 };
 use std::{cell::RefCell, collections::BTreeMap};
 
@@ -37,7 +37,8 @@ impl ValueToIdentifierMapping for DelayedValueMapping {
         let mut delayed_values = self.delayed_values.borrow_mut();
 
         let identifier = delayed_values.len() as u64;
-        let identifier_value = Value::delayed_value(identifier);
+        // fixme
+        let identifier_value = Value::delayed_value(identifier as u32, 0);
 
         delayed_values.insert(identifier, value);
         Ok(identifier_value)
@@ -48,7 +49,7 @@ impl ValueToIdentifierMapping for DelayedValueMapping {
         _layout: &MoveTypeLayout,
         identifier: Value,
     ) -> TransformationResult<Value> {
-        let identifier = identifier.value_as::<DelayedValueHandle>()?.0;
+        let identifier = identifier.value_as::<DelayedFieldID>()?.unique_index as u64;
 
         let delayed_values = self.delayed_values.borrow();
         Ok(delayed_values
@@ -106,8 +107,8 @@ fn test_delayed_u64_value() {
     // Test handle is inserted and value extracted.
     assert!(mapping.contains_value_at(Value::u64(200), 0));
     assert!(delayed_value
-        .value_as::<DelayedValueHandle>()
-        .is_ok_and(|h| h.0 == 0));
+        .value_as::<DelayedFieldID>()
+        .is_ok_and(|id| id.unique_index == 0));
 }
 
 #[test]
@@ -155,13 +156,13 @@ fn test_delayed_value_inside_struct() {
     assert!(fields
         .pop()
         .unwrap()
-        .value_as::<DelayedValueHandle>()
-        .is_ok_and(|h| h.0 == 1));
+        .value_as::<DelayedFieldID>()
+        .is_ok_and(|h| h.unique_index == 1));
     assert!(fields
         .pop()
         .unwrap()
-        .value_as::<DelayedValueHandle>()
-        .is_ok_and(|h| h.0 == 0));
+        .value_as::<DelayedFieldID>()
+        .is_ok_and(|h| h.unique_index == 0));
     assert!(fields.pop().unwrap().equals(&Value::u64(400)).unwrap());
     assert!(fields.is_empty())
 }
