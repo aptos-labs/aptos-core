@@ -51,6 +51,10 @@ impl FileStoreOperator for LocalFileStoreOperator {
         self.storage_format
     }
 
+    fn store_name(&self) -> &str {
+        "local"
+    }
+
     async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key = FileEntry::build_key(version, self.storage_format).to_string();
         let file_path = self.path.join(file_entry_key);
