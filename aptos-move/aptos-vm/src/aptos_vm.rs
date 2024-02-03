@@ -365,7 +365,6 @@ impl AptosVM {
             storage_fee_refund,
         )
     }
-    
 
     fn failed_transaction_cleanup(
         &self,
@@ -497,7 +496,7 @@ impl AptosVM {
             if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data) {
                 info!(
                     *log_context,
-                    "Failed during charge_change_set: {:?}. Most likely exceded gas limited.", err,
+                    "Failed during charge_change_set: {:?}. Most likely exceeded gas limited.", err,
                 );
             };
 
@@ -1832,14 +1831,14 @@ impl AptosVM {
         func_name: Identifier,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-        gas_budget: u64,
+        max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
         let vm = AptosVM::new(&resolver);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        let mut gas_meter = match Self::memory_tracked_gas_meter(&vm, &log_context, gas_budget) {
+        let mut gas_meter = match vm.make_standard_gas_meter(max_gas_amount.into(), &log_context) {
             Ok(gas_meter) => gas_meter,
-            Err(e) => return ViewFunctionOutput::new(Err(e), 0),
+            Err(e) => return ViewFunctionOutput::new(Err(anyhow::Error::msg(format!("{}", e))), 0),
         };
 
         let mut session = vm.new_session(&resolver, SessionId::Void);
@@ -1852,34 +1851,18 @@ impl AptosVM {
             arguments,
             &mut gas_meter,
         ) {
-            Ok(result) => {
-                ViewFunctionOutput::new(Ok(result), Self::gas_used(gas_budget, &gas_meter))
+            Ok(result) => ViewFunctionOutput::new(
+                Ok(result),
+                Self::gas_used(max_gas_amount.into(), &gas_meter),
+            ),
+            Err(e) => {
+                ViewFunctionOutput::new(Err(e), Self::gas_used(max_gas_amount.into(), &gas_meter))
             },
-            Err(e) => ViewFunctionOutput::new(Err(e), Self::gas_used(gas_budget, &gas_meter)),
         }
     }
 
-    fn memory_tracked_gas_meter(
-        vm: &AptosVM,
-        log_context: &AdapterLogSchema,
-        gas_budget: u64,
-    ) -> anyhow::Result<MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>> {
-        let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-            vm.gas_feature_version,
-            get_or_vm_startup_failure(&vm.gas_params, log_context)?
-                .vm
-                .clone(),
-            get_or_vm_startup_failure(&vm.storage_gas_params, log_context)?.clone(),
-            gas_budget,
-        )));
-        Ok(gas_meter)
-    }
-
-    fn gas_used(
-        gas_budget: u64,
-        gas_meter: &MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>,
-    ) -> u64 {
-        GasQuantity::new(gas_budget)
+    fn gas_used(max_gas_amount: Gas, gas_meter: &impl AptosGasMeter) -> u64 {
+        max_gas_amount
             .checked_sub(gas_meter.balance())
             .expect("Balance should always be less than or equal to max gas amount")
             .into()
@@ -1892,7 +1875,7 @@ impl AptosVM {
         func_name: Identifier,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-        gas_meter: &mut MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>,
+        gas_meter: &mut impl AptosGasMeter,
     ) -> anyhow::Result<Vec<Vec<u8>>> {
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
