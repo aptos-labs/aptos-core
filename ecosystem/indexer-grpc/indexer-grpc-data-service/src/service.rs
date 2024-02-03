@@ -71,7 +71,7 @@ const SERVICE_TYPE: &str = "data_service";
 pub const NUM_DATA_FETCH_RETRIES: u8 = 5;
 
 // Max number of tasks to reach out to TXN stores with
-const MAX_FETCH_TASKS_PER_REQUEST: u64 = 5;
+const MAX_FETCH_TASKS_PER_REQUEST: u64 = 10;
 // The number of transactions we store per txn block; this is used to determine max num of tasks
 const TRANSACTIONS_PER_STORAGE_BLOCK: u64 = 1000;
 
