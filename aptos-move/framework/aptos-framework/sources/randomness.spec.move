@@ -1,4 +1,4 @@
-spec aptos_std::randomness {
+spec aptos_framework::randomness {
     spec fetch_and_increment_txn_counter(): vector<u8> {
         pragma opaque;
     }

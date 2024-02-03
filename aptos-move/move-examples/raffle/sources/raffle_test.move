@@ -24,7 +24,7 @@ module raffle::raffle_test {
     #[test_only]
     use aptos_std::crypto_algebra::enable_cryptography_algebra_natives;
     #[test_only]
-    use aptos_std::randomness;
+    use aptos_framework::randomness;
 
     #[test_only]
     fun give_coins(mint_cap: &MintCapability<AptosCoin>, to: &signer) {

@@ -1,5 +1,5 @@
 module 0x1::some_randapp {
-    use aptos_std::randomness;
+    use aptos_framework::randomness;
 
     entry fun safe_private_entry_call() {
         let _ = randomness::u64_integer();

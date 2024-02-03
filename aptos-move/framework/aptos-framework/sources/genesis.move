@@ -386,7 +386,7 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_std::randomness;
+    use aptos_framework::randomness;
     use aptos_framework::config_buffer;
     use aptos_framework::dkg;
     use aptos_framework::jwks;

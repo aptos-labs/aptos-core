@@ -1,7 +1,7 @@
 module module_owner::dice {
     use std::signer::address_of;
     use std::vector;
-    use aptos_std::randomness;
+    use aptos_framework::randomness;
 
     struct DiceRollHistory has key {
         rolls: vector<u64>,

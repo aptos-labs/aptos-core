@@ -5,7 +5,7 @@ module aptos_framework::block {
     use std::vector;
     use std::option;
     use std::option::Option;
-    use aptos_std::randomness;
+    use aptos_framework::randomness;
 
     use aptos_framework::account;
     use aptos_framework::dkg;
