@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::models::nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery;
-use crate::schema::nft_metadata_crawler::parsed_asset_uris;
+use crate::{
+    models::nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
+    schema::nft_metadata_crawler::parsed_asset_uris,
+};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};

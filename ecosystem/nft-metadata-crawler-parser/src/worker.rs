@@ -237,7 +237,7 @@ impl Worker {
             });
 
             if image.is_empty() {
-                self.log_info("Image and JSON are empty, skipping parse, marking as do_not_parse");
+                self.log_info("Image is empty, skipping parse");
                 self.model.set_do_not_parse(true);
                 SKIP_URI_COUNT.with_label_values(&["empty"]).inc();
                 if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
