@@ -167,10 +167,14 @@ impl RawData for RawDataServerWrapper {
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
-                get_filestore_data(
-                    current_version,
+                data_fetcher_task(
+                    redis_client,
                     file_store_operator,
-                    request_metadata.clone(),
+                    cache_storage_format,
+                    request_metadata,
+                    transactions_count,
+                    tx,
+                    current_version,
                 )
                 .await
             }
@@ -276,7 +280,7 @@ async fn get_data_with_tasks(
 }
 
 // This is a thread spawned off for servicing a users' request
-async fn data_fetcher_thread(
+async fn data_fetcher_task(
     redis_client: Arc<Client>,
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     cache_storage_format: StorageFormat,
