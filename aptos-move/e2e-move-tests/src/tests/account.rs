@@ -17,8 +17,9 @@ fn non_existent_sender() {
     let txn = sender
         .transaction()
         .payload(aptos_account_transfer(*receiver.address(), 10))
+        .sequence_number(0)
         .sign();
 
     let status = h.run(txn);
-    assert_err_eq!(status.status(), StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST,);
+    assert_err_eq!(status.status(), StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST);
 }
