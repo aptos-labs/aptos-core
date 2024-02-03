@@ -49,7 +49,8 @@ use aptos_types::{
         authenticator::AnySignature,
         signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
+        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction,
+        Transaction,
         Transaction::{
             BlockMetadata as BlockMetadataTransaction, GenesisTransaction, StateCheckpoint,
             UserTransaction,
@@ -614,30 +615,53 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
+    fn validate_and_execute_script(
+        &self,
+        session: &mut SessionExt,
+        // Note: cannot use AptosGasMeter because it is not implemented for
+        //       UnmeteredGasMeter.
+        gas_meter: &mut impl GasMeter,
+        senders: Vec<AccountAddress>,
+        script: &Script,
+    ) -> Result<SerializedReturnValues, VMStatus> {
+        let loaded_func = session.load_script(script.code(), script.ty_args().to_vec())?;
+        // TODO(Gerardo): consolidate the extended validation to verifier.
+        verifier::event_validation::verify_no_event_emission_in_script(
+            script.code(),
+            &session.get_vm_config().deserializer_config,
+        )?;
+
+        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+            session,
+            senders,
+            convert_txn_args(script.args()),
+            &loaded_func,
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+        )?;
+
+        Ok(session.execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)?)
+    }
+
     fn validate_and_execute_entry_function(
         &self,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         senders: Vec<AccountAddress>,
-        script_fn: &EntryFunction,
+        entry_fn: &EntryFunction,
     ) -> Result<SerializedReturnValues, VMStatus> {
-        let function = session.load_function(
-            script_fn.module(),
-            script_fn.function(),
-            script_fn.ty_args(),
-        )?;
-        let struct_constructors = self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let function =
+            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,
-            script_fn.args().to_vec(),
+            entry_fn.args().to_vec(),
             &function,
-            struct_constructors,
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
         Ok(session.execute_entry_function(
-            script_fn.module(),
-            script_fn.function(),
-            script_fn.ty_args().to_vec(),
+            entry_fn.module(),
+            entry_fn.function(),
+            entry_fn.ty_args().to_vec(),
             args,
             gas_meter,
         )?)
@@ -668,43 +692,25 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let loaded_func =
-                        session.load_script(script.code(), script.ty_args().to_vec())?;
-                    // Gerardo: consolidate the extended validation to verifier.
-                    verifier::event_validation::verify_no_event_emission_in_script(
-                        script.code(),
-                        &session.get_vm_config().deserializer_config,
-                    )?;
-
-                    let args =
-                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                            &mut session,
-                            txn_data.senders(),
-                            convert_txn_args(script.args()),
-                            &loaded_func,
-                            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-                        )?;
-                    session.execute_script(
-                        script.code(),
-                        script.ty_args().to_vec(),
-                        args,
+                    self.validate_and_execute_script(
+                        &mut session,
                         gas_meter,
+                        txn_data.senders(),
+                        script,
                     )?;
                 },
-                TransactionPayload::EntryFunction(script_fn) => {
+                TransactionPayload::EntryFunction(entry_fn) => {
                     self.validate_and_execute_entry_function(
                         &mut session,
                         gas_meter,
                         txn_data.senders(),
-                        script_fn,
+                        entry_fn,
                     )?;
                 },
 
                 // Not reachable as this function should only be invoked for entry or script
                 // transaction payload.
-                _ => {
-                    return Err(VMStatus::error(StatusCode::UNREACHABLE, None));
-                },
+                _ => unreachable!("Only scripts or entry functions are executed"),
             };
 
             self.resolve_pending_code_publish(
@@ -1607,7 +1613,6 @@ impl AptosVM {
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
     ) -> Result<VMChangeSet, VMStatus> {
-        let mut gas_meter = UnmeteredGasMeter;
         let change_set_configs =
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
 
@@ -1625,23 +1630,12 @@ impl AptosVM {
                     Some(sender) => vec![sender, *execute_as],
                 };
 
-                let loaded_func =
-                    tmp_session.load_script(script.code(), script.ty_args().to_vec())?;
-                let args =
-                    verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                        &mut tmp_session,
-                        senders,
-                        convert_txn_args(script.args()),
-                        &loaded_func,
-                        self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-                    )?;
-
-                return_on_failure!(tmp_session.execute_script(
-                    script.code(),
-                    script.ty_args().to_vec(),
-                    args,
-                    &mut gas_meter,
-                ));
+                self.validate_and_execute_script(
+                    &mut tmp_session,
+                    &mut UnmeteredGasMeter,
+                    senders,
+                    script,
+                )?;
                 Ok(tmp_session.finish(&change_set_configs)?)
             },
         }
