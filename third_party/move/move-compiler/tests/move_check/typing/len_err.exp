@@ -1,8 +1,0 @@
-error[E02010]: invalid name
-  ┌─ tests/move_check/typing/len_err.move:5:9
-  │  
-5 │ ╭         spec {
-6 │ │             assert len(gallery) >= len;
-7 │ │         };
-  │ ╰─────────^ Conflicting name 'len' is used as both a variable and a function pointer (including built-in functions) in spec
-

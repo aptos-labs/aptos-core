@@ -48,13 +48,6 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
-        if (executor_with_group_view.is_delayed_field_optimization_capable()
-            || executor_with_group_view.is_resource_group_split_in_change_set_capable())
-            && !Self::is_transaction_dynamic_change_set_capable(txn)
-        {
-            return ExecutionStatus::DirectWriteSetTransactionNotCapableError;
-        }
-
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self
             .vm
@@ -90,13 +83,17 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         vm_status.message().cloned().unwrap_or_default(),
                     )
-                } else if AptosVM::should_restart_execution(&vm_output) {
+                } else if AptosVM::should_restart_execution(vm_output.change_set()) {
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
                     );
                     ExecutionStatus::SkipRest(AptosTransactionOutput::new(vm_output))
                 } else {
+                    assert!(
+                        Self::is_transaction_dynamic_change_set_capable(txn),
+                        "DirectWriteSet should always create SkipRest transaction, validate_waypoint_change_set provides this guarantee"
+                    );
                     ExecutionStatus::Success(AptosTransactionOutput::new(vm_output))
                 }
             },

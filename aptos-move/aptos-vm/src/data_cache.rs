@@ -18,7 +18,7 @@ use aptos_aggregator::{
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
@@ -273,8 +273,8 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
             .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        self.executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(

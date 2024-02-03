@@ -26,7 +26,6 @@
     "annotations": {
       "kubectl.kubernetes.io/last-applied-configuration": "{\"some_very_long_json\":\"foo_bar\"}",
       "checksum/validator.yaml": "8430318f1be488c63b67a5041443bd9b70be34179068a89b42f52a1118f850e2",
-      "kubernetes.io/psp": "aptos-node",
       "seccomp.security.alpha.kubernetes.io/pod": "runtime/default"
     },
     "pod_ip": "192.168.130.132",

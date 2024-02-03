@@ -26,8 +26,8 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use aptos_types::{
-    aggregator::PanicError,
     chain_id::ChainId,
+    delayed_fields::PanicError,
     state_store::{state_key::StateKey, state_value::StateValue},
     write_set::WriteOp,
 };
@@ -104,7 +104,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         unreachable!()
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
         unreachable!()
     }
 

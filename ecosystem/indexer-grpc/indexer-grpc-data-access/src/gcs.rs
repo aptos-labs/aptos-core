@@ -110,13 +110,13 @@ impl From<google_cloud_storage::http::Error> for StorageReadError {
                 ),
                 false => StorageReadError::PermenantError(
                     GCS_STORAGE_NAME,
-                    anyhow::Error::new(e).context("Failed to download object; it's permernant."),
+                    anyhow::Error::new(e).context("Failed to download object; it's permanent."),
                 ),
             },
             Error::TokenSource(e) => StorageReadError::PermenantError(
                 GCS_STORAGE_NAME,
                 anyhow::anyhow!(e.to_string())
-                    .context("Failed to download object; authenication/token error."),
+                    .context("Failed to download object; authentication/token error."),
             ),
         }
     }

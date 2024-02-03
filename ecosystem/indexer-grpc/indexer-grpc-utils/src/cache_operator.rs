@@ -11,7 +11,7 @@ use redis::{AsyncCommands, RedisResult};
 
 // Configurations for cache.
 // Cache entries that are present.
-const CACHE_SIZE_ESTIMATION: u64 = 250_000_u64;
+pub const CACHE_SIZE_ESTIMATION: u64 = 250_000_u64;
 
 pub const MAX_CACHE_FETCH_SIZE: u64 = 1000_u64;
 
@@ -77,7 +77,7 @@ pub enum CacheUpdateStatus {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum CacheCoverageStatus {
+pub enum CacheCoverageStatus {
     /// Requested version is not processed by cache worker yet.
     DataNotReady,
     /// Requested version is cached.
@@ -188,7 +188,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
     }
 
     // Internal function to get the latest version from cache.
-    pub(crate) async fn check_cache_coverage_status(
+    pub async fn check_cache_coverage_status(
         &mut self,
         requested_version: u64,
     ) -> anyhow::Result<CacheCoverageStatus> {
@@ -312,6 +312,10 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             Err(err) => Err(err.into()),
         }
     }
+
+    // Fetching from cache
+    // Requested version x
+    // Cache hit x +
 
     // TODO: Remove this
     pub async fn batch_get_encoded_proto_data(
