@@ -178,23 +178,23 @@ impl Worker {
         // Deduplicate raw_image_uri
         // Proceed with image optimization of force or if raw_image_uri has not been parsed
         // Since we default to asset_uri, this check works if raw_image_uri is null because deduplication for asset_uri has already taken place
-        if self.force
-            || self.model.get_cdn_image_uri().is_none()
-            || self.model.get_raw_image_uri().map_or(true, |uri_option| {
-                match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
-                    self.asset_uri.clone(),
-                    uri_option,
-                    &mut self.conn,
-                ) {
-                    Some(uris) => {
-                        self.log_info("Duplicate raw_image_uri found");
-                        DUPLICATE_RAW_IMAGE_URI_COUNT.inc();
-                        self.model.set_cdn_image_uri(uris.cdn_image_uri);
-                        false
-                    },
-                    None => true,
-                }
-            })
+        if (self.force || self.model.get_cdn_image_uri().is_none())
+            && (self.model.get_cdn_image_uri().is_some()
+                || self.model.get_raw_image_uri().map_or(true, |uri_option| {
+                    match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
+                        self.asset_uri.clone(),
+                        uri_option,
+                        &mut self.conn,
+                    ) {
+                        Some(uris) => {
+                            self.log_info("Duplicate raw_image_uri found");
+                            DUPLICATE_RAW_IMAGE_URI_COUNT.inc();
+                            self.model.set_cdn_image_uri(uris.cdn_image_uri);
+                            false
+                        },
+                        None => true,
+                    }
+                }))
         {
             // Parse raw_image_uri, use asset_uri if parsing fails
             self.log_info("Parsing raw_image_uri");
