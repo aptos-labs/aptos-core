@@ -17,6 +17,7 @@ pub enum ValidatorTransaction {
 }
 
 impl ValidatorTransaction {
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy(payload: Vec<u8>) -> Self {
         Self::DKGResult(DKGTranscript {
             metadata: DKGTranscriptMetadata {

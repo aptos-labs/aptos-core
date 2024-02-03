@@ -112,6 +112,11 @@ impl AptosVM {
                 .collect::<Vec<_>>(),
         );
 
+        // Check voting power.
+        verifier
+            .check_voting_power(authors.iter(), true)
+            .map_err(|_| Expected(NotEnoughVotingPower))?;
+
         // Verify multi-sig.
         verifier
             .verify_multi_signatures(
@@ -119,11 +124,6 @@ impl AptosVM {
                 &AggregateSignature::new(signer_bit_vec, Some(multi_sig)),
             )
             .map_err(|_| Expected(MultiSigVerificationFailed))?;
-
-        // Check voting power.
-        verifier
-            .check_voting_power(authors.iter(), true)
-            .map_err(|_| Expected(NotEnoughVotingPower))?;
 
         // All verification passed. Apply the `observed`.
         let mut gas_meter = UnmeteredGasMeter;
