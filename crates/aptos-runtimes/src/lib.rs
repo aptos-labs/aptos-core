@@ -38,6 +38,11 @@ where
     let atomic_id = AtomicUsize::new(0);
     let thread_name_clone = thread_name.clone();
     let mut builder = Builder::new_multi_thread();
+    
+    // #[cfg(tokio_unstable)] to Resolve all problem about:
+    // >> no method named `disable_lifo_slot` found for mutable reference `&mut tokio::runtime::Builder` in the current scope
+    // were hinted with https://github.com/denoland/deno/issues/19528#issuecomment-1594835456
+    #[cfg(tokio_unstable)]
     builder
         .thread_name_fn(move || {
             let id = atomic_id.fetch_add(1, Ordering::SeqCst);
