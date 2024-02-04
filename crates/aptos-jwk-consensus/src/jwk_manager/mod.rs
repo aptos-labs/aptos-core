@@ -284,28 +284,27 @@ impl JWKManager {
 /// Then `JWKManager` needs to hold it. Once this resource is dropped, the corresponding QC update process will be cancelled.
 #[derive(Clone, Debug)]
 pub struct QuorumCertProcessGuard {
-    handle: Option<AbortHandle>,
+    handle: AbortHandle,
 }
 
 impl QuorumCertProcessGuard {
     pub fn new(handle: AbortHandle) -> Self {
         Self {
-            handle: Some(handle),
+            handle,
         }
     }
 
     #[cfg(test)]
     pub fn dummy() -> Self {
-        Self { handle: None }
+        let (handle, _) = AbortHandle::new_pair();
+        Self { handle }
     }
 }
 
 impl Drop for QuorumCertProcessGuard {
     fn drop(&mut self) {
         let QuorumCertProcessGuard { handle } = self;
-        if let Some(handle) = handle {
-            handle.abort();
-        }
+        handle.abort();
     }
 }
 
