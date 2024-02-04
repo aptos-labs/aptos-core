@@ -5,7 +5,6 @@ use crate::types::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
-use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
@@ -13,7 +12,7 @@ use aptos_types::{
     jwks::{ProviderJWKs, QuorumCertifiedUpdate},
 };
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 use std::collections::BTreeSet;
 use aptos_crypto::bls12381::Signature;
 use aptos_types::aggregate_signature::PartialSignatures;
@@ -79,11 +78,11 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
         // All checks passed. Aggregating.
         partial_sigs.add_signature(sender, signature);
         let voters: BTreeSet<AccountAddress> = partial_sigs.signatures().keys().copied().collect();
-        if !self
+        if self
             .epoch_state
             .verifier
             .check_voting_power(voters.iter(), true)
-            .is_ok() {
+            .is_err() {
             return Ok(None);
         }
         let multi_sig = Signature::aggregate(partial_sigs.signatures().values().cloned().collect::<Vec<_>>()).map_err(|e|anyhow!("jwk update certification failed with sig agg error: {e}"))?;
