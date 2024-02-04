@@ -367,7 +367,7 @@ impl RawTransaction {
             ),
 
             // Deprecated.
-            TransactionPayload::ModuleBundle(_) => bail!("Module bundle has been removed"),
+            TransactionPayload::ModuleBundle(_) => bail!("Module bundle payload has been removed"),
         };
         let mut f_args: String = "".to_string();
         for arg in args {

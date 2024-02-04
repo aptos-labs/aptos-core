@@ -367,7 +367,7 @@ fn new_raw_transaction(
     let chain_id = ChainId::test();
     match payload {
         TransactionPayload::ModuleBundle(_) => {
-            unreachable!("Module bundle transaction has been deprecated")
+            unreachable!("Module bundle payload has been removed")
         },
         TransactionPayload::Script(script) => RawTransaction::new_script(
             sender,

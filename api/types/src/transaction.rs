@@ -671,7 +671,7 @@ impl VerifyInput for TransactionPayload {
 
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
-                bail!("Module bundle transaction is deprecated")
+                bail!("Module bundle payload has been removed")
             },
         }
     }
