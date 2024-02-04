@@ -273,11 +273,19 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
+    let accounts: Vec<AccountBalance> = match client.get::<AccountBalanceMap>(Path::new(BALANCES_FILE)) {
+        // file does not exist, ignore the error
+        Err(CliError::UnableToReadFile(_, _)) => Ok(vec![]),
+        // otherwise, respect parsing errors
+        r => r?.try_into()
+    }?;
+
     let validators = get_validator_configs(&client, &layout, false).map_err(parse_error)?;
     let framework = client.get_framework()?;
     Ok(GenesisInfo::new(
         layout.chain_id,
         layout.root_key.unwrap(),
+        accounts,
         validators,
         framework,
         &GenesisConfiguration {

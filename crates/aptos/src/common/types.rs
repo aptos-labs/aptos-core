@@ -149,7 +149,13 @@ impl From<aptos_config::config::Error> for CliError {
 
 impl From<aptos_github_client::Error> for CliError {
     fn from(e: aptos_github_client::Error) -> Self {
-        CliError::UnexpectedError(e.to_string())
+        match e {
+            aptos_github_client::Error::NotFound(path) => CliError::UnableToReadFile(
+                path,
+                "File not found".to_string(),
+            ),
+            e => CliError::UnexpectedError(e.to_string())
+        }
     }
 }
 

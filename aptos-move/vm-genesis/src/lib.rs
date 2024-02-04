@@ -178,6 +178,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
 
 pub fn encode_genesis_transaction(
     aptos_root_key: Ed25519PublicKey,
+    accounts: &[AccountBalance],
     validators: &[Validator],
     framework: &ReleaseBundle,
     chain_id: ChainId,
@@ -188,6 +189,7 @@ pub fn encode_genesis_transaction(
 ) -> Transaction {
     Transaction::GenesisTransaction(WriteSetPayload::Direct(encode_genesis_change_set(
         &aptos_root_key,
+        accounts,
         validators,
         framework,
         chain_id,
@@ -200,6 +202,7 @@ pub fn encode_genesis_transaction(
 
 pub fn encode_genesis_change_set(
     core_resources_key: &Ed25519PublicKey,
+    accounts: &[AccountBalance],
     validators: &[Validator],
     framework: &ReleaseBundle,
     chain_id: ChainId,
@@ -245,6 +248,9 @@ pub fn encode_genesis_change_set(
         initialize_aptos_coin(&mut session);
     }
     initialize_on_chain_governance(&mut session, genesis_config);
+    for account in accounts {
+        create_account(&mut session, account);
+    }
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
@@ -535,6 +541,20 @@ fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
     );
 }
 
+fn create_account(session: &mut SessionExt, account: &AccountBalance) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_account",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Address(account.account_address),
+            MoveValue::U64(account.balance),
+        ]),
+    );
+}
+
 fn create_employee_validators(
     session: &mut SessionExt,
     employees: &[EmployeePool],
@@ -813,6 +833,7 @@ pub fn generate_test_genesis(
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
+        vec![].as_ref(),
         validators,
         framework,
         ChainId::test(),
@@ -850,6 +871,7 @@ pub fn generate_mainnet_genesis(
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
+        vec![].as_ref(),
         validators,
         framework,
         ChainId::test(),

@@ -28,7 +28,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use aptos_vm::AptosVM;
-use aptos_vm_genesis::Validator;
+use aptos_vm_genesis::{Validator, AccountBalance};
 use std::convert::TryInto;
 
 /// Holder object for all pieces needed to generate a genesis transaction
@@ -67,6 +67,9 @@ pub struct GenesisInfo {
     /// Percent of current epoch's total voting power that can be added in this epoch.
     pub voting_power_increase_limit: u64,
 
+    /// Initial accounts and balances.
+    accounts: Vec<AccountBalance>,
+
     pub consensus_config: OnChainConsensusConfig,
     pub execution_config: OnChainExecutionConfig,
     pub gas_schedule: GasScheduleV2,
@@ -76,6 +79,7 @@ impl GenesisInfo {
     pub fn new(
         chain_id: ChainId,
         root_key: Ed25519PublicKey,
+        accounts: Vec<AccountBalance>,
         configs: Vec<ValidatorConfiguration>,
         framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
@@ -89,6 +93,7 @@ impl GenesisInfo {
         Ok(GenesisInfo {
             chain_id,
             root_key,
+            accounts,
             validators,
             framework,
             genesis: None,
@@ -121,6 +126,7 @@ impl GenesisInfo {
     fn generate_genesis_txn(&self) -> Transaction {
         aptos_vm_genesis::encode_genesis_transaction(
             self.root_key.clone(),
+            &self.accounts,
             &self.validators,
             &self.framework,
             self.chain_id,
