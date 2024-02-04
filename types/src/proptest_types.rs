@@ -471,7 +471,7 @@ impl Arbitrary for SignatureCheckedTransaction {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: ()) -> Self::Strategy {
-        // TODO: Fix module bundle to never be generated!
+        // Right now only script transaction payloads are generated!
         Self::strategy_impl(ed25519::keypair_strategy(), any::<TransactionPayload>()).boxed()
     }
 }
