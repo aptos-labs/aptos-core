@@ -201,15 +201,18 @@ impl JWKManager {
             .collect();
         self.states_by_issuer
             .retain(|issuer, _| onchain_issuer_set.contains(issuer));
-        for provider_jwks in on_chain_state.entries {
-            let x = self
+        for on_chain_provider_jwks in on_chain_state.entries {
+            let locally_cached = self
                 .states_by_issuer
-                .get(&provider_jwks.issuer)
+                .get(&on_chain_provider_jwks.issuer)
                 .and_then(|s| s.on_chain.as_ref());
-            if x != Some(&provider_jwks) {
+            if locally_cached == Some(&on_chain_provider_jwks) {
+                // The on-chain update did not touch this provider.
+                // The corresponding local state does not have to be reset.
+            } else {
                 self.states_by_issuer.insert(
-                    provider_jwks.issuer.clone(),
-                    PerProviderState::new(provider_jwks),
+                    on_chain_provider_jwks.issuer.clone(),
+                    PerProviderState::new(on_chain_provider_jwks),
                 );
             }
         }
@@ -360,6 +363,7 @@ impl ConsensusState {
         }
     }
 
+    #[cfg(test)]
     pub fn my_proposal_cloned(&self) -> ObservedUpdate {
         match self {
             ConsensusState::InProgress { my_proposal, .. }
@@ -395,12 +399,6 @@ impl PerProviderState {
         self.on_chain
             .as_ref()
             .map_or(0, |provider_jwks| provider_jwks.version)
-    }
-
-    pub fn reset_with_onchain_state(&mut self, onchain_state: ProviderJWKs) {
-        if self.on_chain.as_ref() != Some(&onchain_state) {
-            *self = Self::new(onchain_state)
-        }
     }
 }
 
