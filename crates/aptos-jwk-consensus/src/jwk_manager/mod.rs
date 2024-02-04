@@ -289,9 +289,7 @@ pub struct QuorumCertProcessGuard {
 
 impl QuorumCertProcessGuard {
     pub fn new(handle: AbortHandle) -> Self {
-        Self {
-            handle,
-        }
+        Self { handle }
     }
 
     #[cfg(test)]

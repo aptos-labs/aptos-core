@@ -8,12 +8,11 @@ use aptos_channels::aptos_channel;
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     epoch_state::EpochState,
-    jwks::{ProviderJWKs, QuorumCertifiedUpdate},
+    jwks::{Issuer, ProviderJWKs, QuorumCertifiedUpdate},
 };
 use futures_util::future::{AbortHandle, Abortable};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
-use aptos_types::jwks::Issuer;
 
 /// A sub-process of the whole JWK consensus process.
 /// Once invoked by `JWKConsensusManager` to `start_produce`,
