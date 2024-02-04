@@ -2,7 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{bls12381, ed25519::{Ed25519PrivateKey, Ed25519PublicKey}, hash::{CryptoHasher as _, TestOnlyHasher}, multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature}, secp256k1_ecdsa, secp256r1_ecdsa, traits::{SigningKey, Uniform}};
+use aptos_crypto::{
+    bls12381,
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    hash::{CryptoHasher as _, TestOnlyHasher},
+    multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
+    secp256k1_ecdsa, secp256r1_ecdsa,
+    traits::{SigningKey, Uniform},
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
