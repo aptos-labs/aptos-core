@@ -99,6 +99,7 @@ pub enum FeatureFlag {
     ZkIdSignature,
     ZkIdZkLessSignature,
     RemoveDetailedError,
+    JWKConsensus,
     ObjectCodeDeployment,
 }
 
@@ -257,6 +258,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURES,
             FeatureFlag::ZkIdZkLessSignature => AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
+            FeatureFlag::JWKConsensus => AptosFeatureFlag::JWK_CONSENSUS,
             FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
         }
     }
@@ -338,6 +340,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ZK_ID_SIGNATURES => FeatureFlag::ZkIdSignature,
             AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE => FeatureFlag::ZkIdZkLessSignature,
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
+            AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JWKConsensus,
             AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
         }
     }

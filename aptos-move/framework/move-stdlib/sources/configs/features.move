@@ -355,9 +355,19 @@ module std::features {
         is_enabled(ZK_ID_ZKLESS_SIGNATURE)
     }
 
+    /// The JWK consensus feature.
+    ///
+    /// Lifetime: permanent
+    const JWK_CONSENSUS: u64 = 49;
+
+    public fun get_jwk_consensus_feature(): u64 { JWK_CONSENSUS }
+
+    public fun jwk_consensus_enabled(): bool acquires Features {
+        is_enabled(JWK_CONSENSUS)
+    }
 
     /// Whether deploying to objects is enabled.
-    const OBJECT_CODE_DEPLOYMENT: u64 = 49;
+    const OBJECT_CODE_DEPLOYMENT: u64 = 50;
     public fun is_object_code_deployment_enabled(): bool acquires Features {
         is_enabled(OBJECT_CODE_DEPLOYMENT)
     }

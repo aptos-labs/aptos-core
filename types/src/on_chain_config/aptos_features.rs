@@ -56,7 +56,8 @@ pub enum FeatureFlag {
     ZK_ID_SIGNATURES = 46,
     ZK_ID_ZKLESS_SIGNATURE = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
-    OBJECT_CODE_DEPLOYMENT = 49,
+    JWK_CONSENSUS = 49,
+    OBJECT_CODE_DEPLOYMENT = 50,
 }
 
 /// Representation of features on chain as a bitset.
@@ -91,14 +92,23 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
-    pub fn enable(&mut self, flag: FeatureFlag) {
+    fn resize_for_flag(&mut self, flag: FeatureFlag) -> (usize, u8) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
         while self.features.len() <= byte_index {
             self.features.push(0);
         }
+        (byte_index, bit_mask)
+    }
 
+    pub fn enable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
         self.features[byte_index] |= bit_mask;
+    }
+
+    pub fn disable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
+        self.features[byte_index] &= !bit_mask;
     }
 
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
