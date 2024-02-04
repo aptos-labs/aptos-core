@@ -184,14 +184,7 @@ async fn check_and_obtain_source_code(
         .await
         {
             map.insert((*addr, target_package.clone().name), target_package.clone());
-            package_cache.insert(
-                m.clone(),
-                (
-                    *addr,
-                    target_package.name.clone(), // all aptos packages are stored under 0x1
-                    map.clone(),
-                ),
-            );
+            package_cache.insert(m.clone(), (*addr, target_package.name.clone(), map.clone()));
             txns.push((
                 version,
                 transaction.clone(),

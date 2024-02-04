@@ -397,10 +397,10 @@ fn compile_aptos_packages(
 ) -> anyhow::Result<()> {
     for package in APTOS_PACKAGES {
         let root_package_dir = aptos_commons_path.join(get_aptos_dir(package).unwrap());
-        let compiler_verion = if v2_flag {
+        let compiler_version = if v2_flag {
             Some(CompilerVersion::V2)
         } else {
-            None
+            Some(CompilerVersion::V1)
         };
         // For simplicity, all packages including aptos token are stored under 0x1 in the map
         let package_info = PackageInfo {
@@ -408,7 +408,7 @@ fn compile_aptos_packages(
             package_name: package.to_string(),
             upgrade_number: None,
         };
-        let compiled_package = compile_package(root_package_dir, &package_info, compiler_verion);
+        let compiled_package = compile_package(root_package_dir, &package_info, compiler_version);
         if let Ok(built_package) = compiled_package {
             generate_compiled_blob(&package_info, &built_package, compiled_package_map);
         } else {
@@ -540,7 +540,11 @@ fn dump_and_compile_from_package_metadata(
         .compiled_package_map
         .contains_key(&package_info)
     {
-        let package_v1 = compile_package(root_package_dir.clone(), &package_info, None);
+        let package_v1 = compile_package(
+            root_package_dir.clone(),
+            &package_info,
+            Some(CompilerVersion::V1),
+        );
         if let Ok(built_package) = package_v1 {
             if execution_mode.is_some() && execution_mode.unwrap().is_v1_or_compare() {
                 generate_compiled_blob(
