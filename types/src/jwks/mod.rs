@@ -65,6 +65,7 @@ impl OnChainConfig for SupportedOIDCProviders {
 /// See its doc in Move for more details.
 #[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct ProviderJWKs {
+    #[serde(with = "serde_bytes")]
     pub issuer: Issuer,
     pub version: u64,
     pub jwks: Vec<JWKMoveStruct>,

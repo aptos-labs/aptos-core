@@ -2,13 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    hash::{CryptoHasher as _, TestOnlyHasher},
-    multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
-    secp256k1_ecdsa, secp256r1_ecdsa,
-    traits::{SigningKey, Uniform},
-};
+use aptos_crypto::{bls12381, ed25519::{Ed25519PrivateKey, Ed25519PublicKey}, hash::{CryptoHasher as _, TestOnlyHasher}, multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature}, secp256k1_ecdsa, secp256r1_ecdsa, traits::{SigningKey, Uniform}};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata_ext::BlockMetadataExt,
@@ -68,6 +62,13 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256r1_ecdsa_private_key)?;
     tracer.trace_value(samples, &secp256r1_ecdsa_public_key)?;
     tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
+
+    let bls12381_private_key = bls12381::PrivateKey::generate(&mut rng);
+    let bls12381_public_key = bls12381::PublicKey::from(&bls12381_private_key);
+    let bls12381_signature = bls12381_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &bls12381_private_key)?;
+    tracer.trace_value(samples, &bls12381_public_key)?;
+    tracer.trace_value(samples, &bls12381_signature)?;
 
     Ok(())
 }
