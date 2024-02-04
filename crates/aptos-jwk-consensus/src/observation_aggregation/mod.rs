@@ -74,7 +74,7 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
             "adding peer observation failed with mismatched view"
         );
 
-        // Verify the quorum-cert.
+        // Verify peer signature.
         self.epoch_state
             .verifier
             .verify(sender, &peer_view, &signature)?;

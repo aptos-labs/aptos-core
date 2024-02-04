@@ -29,7 +29,7 @@ pub fn start_jwk_consensus_runtime(
     runtime
 }
 
-pub mod certified_update_producer;
+pub mod update_certifier;
 pub mod network;
 pub mod network_interface;
 pub mod observation_aggregation;
