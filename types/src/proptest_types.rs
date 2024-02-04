@@ -15,6 +15,7 @@ use crate::{
     block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
@@ -29,7 +30,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
-    validator_txn::{DummyValidatorTransaction, ValidatorTransaction},
+    validator_txn::ValidatorTransaction,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -1262,9 +1263,15 @@ impl Arbitrary for ValidatorTransaction {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        (any::<bool>(), any::<Vec<u8>>())
-            .prop_map(|(valid, payload)| {
-                ValidatorTransaction::DummyTopic1(DummyValidatorTransaction { valid, payload })
+        (any::<Vec<u8>>())
+            .prop_map(|payload| {
+                ValidatorTransaction::DKGResult(DKGTranscript {
+                    metadata: DKGTranscriptMetadata {
+                        epoch: 0,
+                        author: AccountAddress::ZERO,
+                    },
+                    transcript_bytes: payload,
+                })
             })
             .boxed()
     }

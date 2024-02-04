@@ -29,6 +29,12 @@ module aptos_framework::jwks {
     const EISSUER_NOT_FOUND: u64 = 5;
     const EJWK_ID_NOT_FOUND: u64 = 6;
 
+    const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 = 0x0101;
+    const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 = 0x0102;
+    const ENATIVE_INCORRECT_VERSION: u64 = 0x0103;
+    const ENATIVE_MULTISIG_VERIFICATION_FAILED: u64 = 0x0104;
+    const ENATIVE_NOT_ENOUGH_VOTING_POWER: u64 = 0x0105;
+
     /// An OIDC provider.
     struct OIDCProvider has drop, store {
         /// The utf-8 encoded issuer string. E.g., b"https://www.facebook.com".

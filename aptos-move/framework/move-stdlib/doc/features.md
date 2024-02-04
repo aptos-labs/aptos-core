@@ -88,6 +88,8 @@ return true.
 -  [Function `zkid_feature_enabled`](#0x1_features_zkid_feature_enabled)
 -  [Function `get_zkid_zkless_feature`](#0x1_features_get_zkid_zkless_feature)
 -  [Function `zkid_zkless_feature_enabled`](#0x1_features_zkid_zkless_feature_enabled)
+-  [Function `get_jwk_consensus_feature`](#0x1_features_get_jwk_consensus_feature)
+-  [Function `jwk_consensus_enabled`](#0x1_features_jwk_consensus_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -365,6 +367,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>: u64 = 22;
+</code></pre>
+
+
+
+<a id="0x1_features_JWK_CONSENSUS"></a>
+
+The JWK consensus feature.
+
+Lifetime: permanent
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>: u64 = 49;
 </code></pre>
 
 
@@ -1913,6 +1927,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_jwk_consensus_feature"></a>
+
+## Function `get_jwk_consensus_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_jwk_consensus_feature">get_jwk_consensus_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_jwk_consensus_feature">get_jwk_consensus_feature</a>(): u64 { <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_jwk_consensus_enabled"></a>
+
+## Function `jwk_consensus_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_jwk_consensus_enabled">jwk_consensus_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_jwk_consensus_enabled">jwk_consensus_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>)
 }
 </code></pre>
 
