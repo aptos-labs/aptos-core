@@ -261,7 +261,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             },
 
             // Deprecated.
-            ModuleBundle(_) => unreachable!("Module bundle payload has been removed"),
+            ModuleBundle(_) => bail!("Module bundle payload has been removed"),
         };
         Ok(ret)
     }
@@ -693,7 +693,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
 
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
-                unreachable!("Module bundle payload has been removed")
+                bail!("Module bundle payload has been removed")
             },
         };
         Ok(ret)

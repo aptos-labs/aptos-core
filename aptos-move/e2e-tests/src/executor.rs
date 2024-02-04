@@ -625,8 +625,12 @@ impl FakeExecutor {
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has been removed")
+                    },
                 };
                 Ok(gas_profiler)
             },

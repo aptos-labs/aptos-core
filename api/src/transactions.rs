@@ -935,7 +935,8 @@ impl TransactionsApi {
                         }
                     },
 
-                    // Deprecated. To avoid panics, return an error.
+                    // Deprecated. To avoid panics when malicios users submit this
+                    // payload, return an error.
                     TransactionPayload::ModuleBundle(_) => {
                         return Err(SubmitTransactionError::bad_request_with_code(
                             "Module bundle payload has been removed",

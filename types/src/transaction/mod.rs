@@ -21,7 +21,7 @@ use crate::{
     write_set::WriteSet,
     zkid::{ZkIdPublicKey, ZkIdSignature},
 };
-use anyhow::{ensure, format_err, Context, Error, Result};
+use anyhow::{bail, ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
     ed25519::*,
     hash::CryptoHash,
@@ -345,7 +345,10 @@ impl RawTransaction {
         self.payload
     }
 
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
+    pub fn format_for_client(
+        &self,
+        get_transaction_name: impl Fn(&[u8]) -> String,
+    ) -> anyhow::Result<String> {
         let (code, args) = match &self.payload {
             TransactionPayload::Script(script) => (
                 get_transaction_name(script.code()),
@@ -362,13 +365,15 @@ impl RawTransaction {
                 ),
                 vec![],
             ),
-            TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
+
+            // Deprecated.
+            TransactionPayload::ModuleBundle(_) => bail!("Module bundle has been removed"),
         };
         let mut f_args: String = "".to_string();
         for arg in args {
             f_args = format!("{}\n\t\t\t{:02X?},", f_args, arg);
         }
-        format!(
+        Ok(format!(
             "RawTransaction {{ \n\
              \tsender: {}, \n\
              \tsequence_number: {}, \n\
@@ -390,7 +395,7 @@ impl RawTransaction {
             self.gas_unit_price,
             self.expiration_timestamp_secs,
             self.chain_id,
-        )
+        ))
     }
 
     /// Return the sender of this transaction.
@@ -791,15 +796,18 @@ impl SignedTransaction {
         all_signer_addresses.iter().any(|a| !s.insert(*a))
     }
 
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        format!(
+    pub fn format_for_client(
+        &self,
+        get_transaction_name: impl Fn(&[u8]) -> String,
+    ) -> anyhow::Result<String> {
+        Ok(format!(
             "SignedTransaction {{ \n \
              raw_txn: {}, \n \
              authenticator: {:#?}, \n \
              }}",
-            self.raw_txn.format_for_client(get_transaction_name),
+            self.raw_txn.format_for_client(get_transaction_name)?,
             self.authenticator
-        )
+        ))
     }
 
     pub fn is_multi_agent(&self) -> bool {
@@ -1883,10 +1891,13 @@ impl Transaction {
         }
     }
 
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        match self {
+    pub fn format_for_client(
+        &self,
+        get_transaction_name: impl Fn(&[u8]) -> String,
+    ) -> anyhow::Result<String> {
+        Ok(match self {
             Transaction::UserTransaction(user_txn) => {
-                user_txn.format_for_client(get_transaction_name)
+                user_txn.format_for_client(get_transaction_name)?
             },
             // TODO: display proper information for client
             Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
@@ -1900,7 +1911,7 @@ impl Transaction {
             Transaction::BlockMetadataExt(_block_metadata_ext) => {
                 String::from("block_metadata_ext")
             },
-        }
+        })
     }
 
     pub fn type_name(&self) -> &'static str {

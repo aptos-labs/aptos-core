@@ -389,9 +389,7 @@ pub fn update_counters_for_processed_chunk<T, O>(
                 },
 
                 // Deprecated.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {
-                    unreachable!("Module bundle payload has been removed")
-                },
+                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {},
             }
         }
 

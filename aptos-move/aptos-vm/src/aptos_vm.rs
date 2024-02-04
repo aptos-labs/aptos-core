@@ -113,6 +113,15 @@ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     )
 });
 
+macro_rules! deprecated_module_bundle {
+    () => {
+        VMStatus::error(
+            StatusCode::FEATURE_UNDER_GATING,
+            Some("Module bundle payload has been removed".to_string()),
+        )
+    };
+}
+
 macro_rules! unwrap_or_discard {
     ($res:expr) => {
         match $res {
@@ -1428,16 +1437,12 @@ impl AptosVM {
                 }
             },
 
-            // Deprecated. This could have been unreachable!, but we return an
-            // error in order to avoid panics if something goes wrong.
+            // Deprecated. We cannot make this `unreachable!` because a malicious
+            // validator can craft this transaction and cause the node to panic.
             TransactionPayload::ModuleBundle(_) => {
-                return (
-                    VMStatus::error(
-                        StatusCode::FEATURE_UNDER_GATING,
-                        Some("Module bundle has been deprecated".to_string()),
-                    ),
-                    discarded_output(StatusCode::FEATURE_UNDER_GATING),
-                )
+                let vm_status = deprecated_module_bundle!();
+                let discarded_output = discarded_output(vm_status.status_code());
+                return (vm_status, discarded_output);
             },
         };
 
@@ -1813,9 +1818,7 @@ impl AptosVM {
             },
 
             // Deprecated.
-            TransactionPayload::ModuleBundle(_) => {
-                unreachable!("Module bundle transaction has been deprecated")
-            },
+            TransactionPayload::ModuleBundle(_) => Err(deprecated_module_bundle!()),
         }
     }
 
