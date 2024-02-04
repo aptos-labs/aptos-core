@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Result;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_types::{
     state_store::{
@@ -11,62 +10,18 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use aptos_validator_interface::AptosValidatorInterface;
-use lru::LruCache;
-use std::sync::{Arc, Mutex};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+use aptos_validator_interface::{AptosValidatorInterface, DebuggerStateView};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 pub struct DataStateView {
-    query_sender: Mutex<
-        UnboundedSender<(
-            StateKey,
-            Version,
-            std::sync::mpsc::Sender<Result<Option<StateValue>>>,
-        )>,
-    >,
-    version: Version,
-    code_data: FakeDataStore,
+    debugger_view: DebuggerStateView,
+    code_data: Option<FakeDataStore>,
+    data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
-
-async fn handler_thread<'a>(
-    db: Arc<dyn AptosValidatorInterface + Send>,
-    mut thread_receiver: UnboundedReceiver<(
-        StateKey,
-        Version,
-        std::sync::mpsc::Sender<Result<Option<StateValue>>>,
-    )>,
-) {
-    const M: usize = 1024 * 1024;
-    let cache = Arc::new(Mutex::new(LruCache::<
-        (StateKey, Version),
-        Option<StateValue>,
-    >::new(M)));
-    loop {
-        let (key, version, sender) =
-            if let Some((key, version, sender)) = thread_receiver.recv().await {
-                (key, version, sender)
-            } else {
-                break;
-            };
-        if let Some(val) = cache.lock().unwrap().get(&(key.clone(), version)) {
-            sender.send(Ok(val.clone())).unwrap();
-        } else {
-            assert!(version > 0, "Expecting a non-genesis version");
-            let db = db.clone();
-            let cache = cache.clone();
-            tokio::spawn(async move {
-                let res = db.get_state_value_by_version(&key, version - 1).await;
-                match res {
-                    Ok(val) => {
-                        cache.lock().unwrap().put((key, version), val.clone());
-                        sender.send(Ok(val))
-                    },
-                    Err(err) => sender.send(Err(err)),
-                }
-            });
-        }
-    }
-}
+use std::ops::DerefMut;
 
 impl DataStateView {
     pub fn new(
@@ -74,32 +29,26 @@ impl DataStateView {
         version: Version,
         code_data: FakeDataStore,
     ) -> Self {
-        let (query_sender, thread_receiver) = unbounded_channel();
-        tokio::spawn(async move { handler_thread(db, thread_receiver).await });
         Self {
-            query_sender: Mutex::new(query_sender),
-            version,
-            code_data,
+            debugger_view: DebuggerStateView::new(db, version),
+            code_data: Some(code_data),
+            data_read_state_keys: None,
         }
     }
 
-    fn get_state_value_internal(
-        &self,
-        state_key: &StateKey,
+    pub fn new_with_data_reads(
+        db: Arc<dyn AptosValidatorInterface + Send>,
         version: Version,
-    ) -> Result<Option<StateValue>> {
-        if self.code_data.contains_key(state_key) {
-            return self
-                .code_data
-                .get_state_value(state_key)
-                .map_err(Into::into);
+    ) -> Self {
+        Self {
+            debugger_view: DebuggerStateView::new(db, version),
+            code_data: None,
+            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
-        let (tx, rx) = std::sync::mpsc::channel();
-        let query_handler_locked = self.query_sender.lock().unwrap();
-        query_handler_locked
-            .send((state_key.clone(), version, tx))
-            .unwrap();
-        rx.recv()?
+    }
+
+    pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
+        self.data_read_state_keys.unwrap()
     }
 }
 
@@ -107,8 +56,29 @@ impl TStateView for DataStateView {
     type Key = StateKey;
 
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
-        self.get_state_value_internal(state_key, self.version)
-            .map_err(Into::into)
+        if let Some(code) = &self.code_data {
+            if code.contains_key(state_key) {
+                return code.get_state_value(state_key).map_err(Into::into);
+            }
+        }
+        let ret = self.debugger_view.get_state_value(state_key);
+        if let Some(reads) = &self.data_read_state_keys {
+            if !state_key.is_aptos_path()
+                && !reads.lock().unwrap().contains_key(state_key)
+                && ret.is_ok()
+            {
+                let val = ret?.clone();
+                if val.is_some() {
+                    reads
+                        .lock()
+                        .unwrap()
+                        .deref_mut()
+                        .insert(state_key.clone(), val.clone().unwrap());
+                };
+                return Ok(val);
+            }
+        }
+        ret
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {

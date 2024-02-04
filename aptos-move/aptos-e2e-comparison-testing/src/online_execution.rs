@@ -9,7 +9,7 @@ use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
 use aptos_language_e2e_tests::data_store::FakeDataStore;
 use aptos_rest_client::Client;
-use aptos_types::{on_chain_config::Features, transaction::Version};
+use aptos_types::transaction::Version;
 use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};
 use move_core_types::account_address::AccountAddress;
 use std::{
@@ -221,8 +221,7 @@ impl OnlineExecutor {
                             let debugger = Arc::new(RestDebuggerInterface::new(client));
                             executor.execute_and_compare(
                                 version,
-                                &state_store,
-                                &Features::default(),
+                                state_store,
                                 &version_idx,
                                 &cache_v1,
                                 &cache_v2,

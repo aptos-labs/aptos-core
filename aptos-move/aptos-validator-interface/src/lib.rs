@@ -25,7 +25,6 @@ use move_binary_format::file_format::CompiledModule;
 use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
-    ops::DerefMut,
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -161,7 +160,6 @@ pub struct DebuggerStateView {
         )>,
     >,
     version: Version,
-    data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
 
 async fn handler_thread<'a>(
@@ -211,20 +209,6 @@ impl DebuggerStateView {
         Self {
             query_sender: Mutex::new(query_sender),
             version,
-            data_read_state_keys: None,
-        }
-    }
-
-    pub fn new_with_data_reads(
-        db: Arc<dyn AptosValidatorInterface + Send>,
-        version: Version,
-    ) -> Self {
-        let (fake_query_sender, thread_receiver) = unbounded_channel();
-        tokio::spawn(async move { handler_thread(db, thread_receiver).await });
-        Self {
-            query_sender: Mutex::new(fake_query_sender),
-            version,
-            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
     }
 
@@ -238,31 +222,7 @@ impl DebuggerStateView {
         query_handler_locked
             .send((state_key.clone(), version, tx))
             .unwrap();
-        let ret = rx.recv()?;
-        if state_key.is_aptos_path() {
-            return ret;
-        }
-        if let Some(reads) = &self.data_read_state_keys {
-            if !reads.lock().unwrap().contains_key(state_key) && ret.is_ok() {
-                let val = ret?.clone();
-                if val.is_some() {
-                    reads
-                        .lock()
-                        .unwrap()
-                        .deref_mut()
-                        .insert(state_key.clone(), val.clone().unwrap());
-                }
-                Ok(val)
-            } else {
-                ret
-            }
-        } else {
-            ret
-        }
-    }
-
-    pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
-        self.data_read_state_keys.unwrap()
+        rx.recv()?
     }
 }
 

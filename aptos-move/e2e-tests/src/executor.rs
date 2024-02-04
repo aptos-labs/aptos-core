@@ -511,7 +511,7 @@ impl FakeExecutor {
 
     pub fn execute_transaction_block_with_resolver(
         &self,
-        txn_block: &[Transaction],
+        txn_block: Vec<Transaction>,
         resolver: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
@@ -521,13 +521,13 @@ impl FakeExecutor {
             let trace_data_dir = trace_dir.join(TRACE_DIR_DATA);
             trace_map.0 = Self::trace(trace_data_dir.as_path(), self.get_state_view());
             let trace_input_dir = trace_dir.join(TRACE_DIR_INPUT);
-            for txn in txn_block {
+            for txn in &txn_block {
                 let input_seq = Self::trace(trace_input_dir.as_path(), txn);
                 trace_map.1.push(input_seq);
             }
         }
 
-        let sig_verified_block = into_signature_verified_block(txn_block.to_vec());
+        let sig_verified_block = into_signature_verified_block(txn_block);
 
         let mode = self.executor_mode.unwrap_or_else(|| {
             if env::var(ENV_ENABLE_PARALLEL).is_ok() {
@@ -604,91 +604,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
-
-        // dump serialized transaction details before execution, if tracing
-        if let Some(trace_dir) = &self.trace_dir {
-            let trace_data_dir = trace_dir.join(TRACE_DIR_DATA);
-            trace_map.0 = Self::trace(trace_data_dir.as_path(), self.get_state_view());
-            let trace_input_dir = trace_dir.join(TRACE_DIR_INPUT);
-            for txn in &txn_block {
-                let input_seq = Self::trace(trace_input_dir.as_path(), txn);
-                trace_map.1.push(input_seq);
-            }
-        }
-
-        let sig_verified_block = into_signature_verified_block(txn_block);
-
-        let mode = self.executor_mode.unwrap_or_else(|| {
-            if env::var(ENV_ENABLE_PARALLEL).is_ok() {
-                ExecutorMode::BothComparison
-            } else {
-                ExecutorMode::SequentialOnly
-            }
-        });
-
-        // TODO fetch values from state?
-        let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
-
-        let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(self.execute_transaction_block_impl(
-                &sig_verified_block,
-                onchain_config.clone(),
-                true,
-            ))
-        } else {
-            None
-        };
-
-        let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_impl(&sig_verified_block, onchain_config, false))
-        } else {
-            None
-        };
-
-        if mode == ExecutorMode::BothComparison {
-            let sequential_output = sequential_output.as_ref().unwrap();
-            let parallel_output = parallel_output.as_ref().unwrap();
-
-            // make more granular comparison, to be able to understand test failures better
-            if sequential_output.is_ok() && parallel_output.is_ok() {
-                let txns_output_1 = sequential_output.as_ref().unwrap();
-                let txns_output_2 = parallel_output.as_ref().unwrap();
-                assert_outputs_equal(txns_output_1, "sequential", txns_output_2, "parallel");
-            } else {
-                assert_eq!(sequential_output, parallel_output, "Output mismatch");
-            }
-        }
-
-        let output = sequential_output.or(parallel_output).unwrap();
-
-        if let Some(logger) = &self.executed_output {
-            logger.log(format!("{:#?}\n", output).as_str());
-        }
-
-        // dump serialized transaction output after execution, if tracing
-        if let Some(trace_dir) = &self.trace_dir {
-            match &output {
-                Ok(results) => {
-                    let trace_output_dir = trace_dir.join(TRACE_DIR_OUTPUT);
-                    for res in results {
-                        let output_seq = Self::trace(trace_output_dir.as_path(), res);
-                        trace_map.2.push(output_seq);
-                    }
-                },
-                Err(e) => {
-                    let mut error_file = OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(trace_dir.join(TRACE_FILE_ERROR))
-                        .unwrap();
-                    error_file.write_all(e.to_string().as_bytes()).unwrap();
-                },
-            }
-            let trace_meta_dir = trace_dir.join(TRACE_DIR_META);
-            Self::trace(trace_meta_dir.as_path(), &trace_map);
-        }
-        output
+        self.execute_transaction_block_with_resolver(txn_block, &self.data_store)
     }
 
     pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {
@@ -1181,6 +1097,7 @@ impl FakeExecutor {
 
         let mut features = Features::fetch_config(resolver).unwrap_or_default();
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
+        let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
             MiscGasParameters::zeros(),
@@ -1194,7 +1111,6 @@ impl FakeExecutor {
         let mut session = vm.new_session_with_flush_flag(resolver, SessionId::void(), true);
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
-        let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             &mut session,
             senders,
@@ -1218,64 +1134,6 @@ impl FakeExecutor {
             ))
             .expect("Failed to generate txn effects");
         change_set.try_materialize_aggregator_v1_delta_set(resolver)?;
-        let (write_set, events) = change_set
-            .try_into_storage_change_set()
-            .expect("Failed to convert to ChangeSet")
-            .into_inner();
-        Ok((write_set, events))
-    }
-
-    pub fn try_exec_entry_with_features(
-        &mut self,
-        senders: Vec<AccountAddress>,
-        entry_fn: &EntryFunction,
-        features: &Features,
-    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
-        let resolver = self.data_store.as_move_resolver();
-
-        let timed_features = TimedFeaturesBuilder::enable_all()
-            .with_override_profile(TimedFeatureOverride::Testing)
-            .build();
-
-        let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
-            LATEST_GAS_FEATURE_VERSION,
-            self.chain_id,
-            features.clone(),
-            timed_features,
-            &resolver,
-            features.is_aggregator_v2_delayed_fields_enabled(),
-        )
-        .unwrap();
-        let mut session = vm.new_session_with_flush_flag(&resolver, SessionId::void(), true);
-
-        let function =
-            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
-        let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
-        let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-            &mut session,
-            senders,
-            entry_fn.args().to_vec(),
-            &function,
-            struct_constructors,
-        )?;
-        session
-            .execute_entry_function(
-                entry_fn.module(),
-                entry_fn.function(),
-                entry_fn.ty_args().to_vec(),
-                args,
-                &mut UnmeteredGasMeter,
-            )
-            .map_err(|e| e.into_vm_status())?;
-
-        let mut change_set = session
-            .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ))
-            .expect("Failed to generate txn effects");
-        change_set.try_materialize_aggregator_v1_delta_set(&resolver)?;
         let (write_set, events) = change_set
             .try_into_storage_change_set()
             .expect("Failed to convert to ChangeSet")

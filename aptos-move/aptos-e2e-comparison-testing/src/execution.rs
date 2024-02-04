@@ -11,7 +11,6 @@ use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
 use aptos_types::{
     contract_event::ContractEvent,
-    on_chain_config::{FeatureFlag, Features, OnChainConfig},
     transaction::{Transaction, TransactionPayload, Version},
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -184,7 +183,11 @@ impl Execution {
         if self.execution_mode.is_v1_or_compare()
             && !compiled_package_cache.contains_key(&package_info)
         {
-            let compiled_res_v1 = compile_package(package_dir.clone(), &package_info, None);
+            let compiled_res_v1 = compile_package(
+                package_dir.clone(),
+                &package_info,
+                Some(CompilerVersion::V1),
+            );
             if let Ok(compiled_res) = compiled_res_v1 {
                 generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache);
             } else {
@@ -205,7 +208,7 @@ impl Execution {
         if v1_failed || v2_failed {
             let mut err_msg = "compilation failed at ".to_string();
             if v1_failed {
-                err_msg = format!("{} v1 ", err_msg);
+                err_msg = format!("{} v1", err_msg);
             }
             if v2_failed {
                 err_msg = format!("{} v2", err_msg);
@@ -239,16 +242,10 @@ impl Execution {
             }
             // read the state data;
             let state = data_manager.get_state(cur_version);
-            let state_view = state.as_move_resolver();
-            let mut features = Features::fetch_config(&state_view).unwrap_or_default();
-            if self.bytecode_version == 6 {
-                features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
-            }
             // execute and compare
             self.execute_and_compare(
                 cur_version,
-                &state,
-                &features,
+                state,
                 &txn_idx,
                 compiled_package_cache,
                 compiled_package_cache_v2,
@@ -261,8 +258,7 @@ impl Execution {
     pub(crate) fn execute_and_compare(
         &self,
         cur_version: Version,
-        state: &FakeDataStore,
-        features: &Features,
+        state: FakeDataStore,
         txn_idx: &TxnIndex,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         compiled_package_cache_v2: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
@@ -275,8 +271,7 @@ impl Execution {
         }
         let res_main_opt = self.execute_code(
             cur_version,
-            state,
-            features,
+            state.clone(),
             &txn_idx.package_info,
             &txn_idx.txn,
             package_cache_main,
@@ -286,7 +281,6 @@ impl Execution {
             let res_other_opt = self.execute_code(
                 cur_version,
                 state,
-                features,
                 &txn_idx.package_info,
                 &txn_idx.txn,
                 package_cache_other,
@@ -313,8 +307,7 @@ impl Execution {
     fn execute_code(
         &self,
         version: Version,
-        state: &FakeDataStore,
-        features: &Features,
+        state: FakeDataStore,
         package_info: &PackageInfo,
         txn: &Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
@@ -322,7 +315,7 @@ impl Execution {
     ) -> Option<Result<(WriteSet, Vec<ContractEvent>), VMStatus>> {
         let executor = FakeExecutor::no_genesis();
         let mut executor = executor.set_not_parallel();
-        *executor.data_store_mut() = state.clone();
+        *executor.data_store_mut() = state;
         if let Transaction::UserTransaction(signed_trans) = txn {
             let sender = signed_trans.sender();
             let payload = signed_trans.payload();
@@ -344,10 +337,10 @@ impl Execution {
                         &data_view.as_move_resolver(),
                     ));
                 } else {
-                    return Some(executor.try_exec_entry_with_features(
+                    return Some(executor.try_exec_entry_with_resolver(
                         senders,
                         entry_function,
-                        features,
+                        &executor.data_store().clone().as_move_resolver(),
                     ));
                 }
             }
@@ -356,7 +349,7 @@ impl Execution {
             let data_view = DataStateView::new(debugger, version, executor.data_store().clone());
             Some(
                 executor
-                    .execute_transaction_block_with_resolver(&[txn.clone()], &data_view)
+                    .execute_transaction_block_with_resolver([txn.clone()].to_vec(), &data_view)
                     .map(|res| res[0].clone().into()),
             )
         } else {

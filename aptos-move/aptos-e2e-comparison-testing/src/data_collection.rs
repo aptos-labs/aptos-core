@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dump_and_compile_from_package_metadata, is_aptos_package, CompilationCache, DataManager,
-    IndexWriter, PackageInfo, TxnIndex,
+    data_stateview::DataStateView, dump_and_compile_from_package_metadata, is_aptos_package,
+    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex,
 };
 use anyhow::{format_err, Result};
 use aptos_framework::natives::code::PackageMetadata;
@@ -16,9 +16,7 @@ use aptos_types::{
     },
     write_set::TOTAL_SUPPLY_STATE_KEY,
 };
-use aptos_validator_interface::{
-    AptosValidatorInterface, DebuggerStateView, FilterCondition, RestDebuggerInterface,
-};
+use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};
 use aptos_vm::{AptosVM, VMExecutor};
 use move_core_types::account_address::AccountAddress;
 use std::{
@@ -85,7 +83,7 @@ impl DataCollection {
 
     fn execute_transactions_at_version_with_state_view(
         txns: Vec<Transaction>,
-        debugger_stateview: &DebuggerStateView,
+        debugger_stateview: &DataStateView,
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
@@ -206,10 +204,9 @@ impl DataCollection {
                     let index = index_writer.clone();
 
                     let state_view =
-                        DebuggerStateView::new_with_data_reads(self.debugger.clone(), version);
+                        DataStateView::new_with_data_reads(self.debugger.clone(), version);
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
-                        // let executor = crate::Execution::new(current_dir.clone(), execution_mode);
                         let epoch_result_res =
                             Self::execute_transactions_at_version_with_state_view(
                                 vec![txn.clone()],
