@@ -134,7 +134,7 @@ impl<
     }
 
     /// Contains the latest group ops for the given group key.
-    pub fn finalize_group(&self, group_key: &K) -> Vec<(T, ValueWithLayout<V>)> {
+    pub fn finalize_group(&self, group_key: &K) -> impl Iterator<Item = (T, ValueWithLayout<V>)> {
         self.group_cache
             .borrow()
             .get(group_key)
@@ -142,7 +142,6 @@ impl<
             .borrow()
             .clone()
             .into_iter()
-            .collect()
     }
 
     pub fn insert_group_op(
@@ -280,7 +279,7 @@ mod test {
         map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
         key: &KeyType<Vec<u8>>,
     ) -> HashMap<usize, ValueWithLayout<TestValue>> {
-        map.finalize_group(key).into_iter().collect()
+        map.finalize_group(key).collect()
     }
 
     // TODO[agg_v2](test) Add tests with non trivial layout
@@ -402,7 +401,7 @@ mod test {
         let ap = KeyType(b"/foo/b".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        map.finalize_group(&ap);
+        let _ = map.finalize_group(&ap).collect::<Vec<_>>();
     }
 
     #[test]
