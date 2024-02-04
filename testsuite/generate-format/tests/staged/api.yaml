@@ -388,8 +388,7 @@ PrivateKey:
   NEWTYPESTRUCT: BYTES
 ProviderJWKs:
   STRUCT:
-    - issuer:
-        SEQ: U8
+    - issuer: BYTES
     - version: U64
     - jwks:
         SEQ:
