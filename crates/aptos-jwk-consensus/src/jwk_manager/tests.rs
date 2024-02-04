@@ -466,7 +466,7 @@ impl CertifiedUpdateProducer for DummyCertifiedUpdateProducer {
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        _agg_node_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+        _agg_node_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle {
         self.invocations.lock().push((epoch_state, payload));
         let (abort_handle, _) = AbortHandle::new_pair();

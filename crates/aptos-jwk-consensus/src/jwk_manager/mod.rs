@@ -53,7 +53,7 @@ pub struct JWKManager {
     /// Whether a CLOSE command has been received.
     stopped: bool,
 
-    qc_update_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+    qc_update_tx: Option<aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>>,
     jwk_observers: Vec<JWKObserver>,
 }
 
@@ -88,7 +88,7 @@ impl JWKManager {
     ) {
         self.reset_with_on_chain_state(observed_jwks.unwrap_or_default().into_providers_jwks())
             .unwrap();
-        let (qc_update_tx, mut qc_update_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
+        let (qc_update_tx, mut qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.qc_update_tx = Some(qc_update_tx);
 
         let (local_observation_tx, mut local_observation_rx) =
@@ -172,7 +172,7 @@ impl JWKManager {
             let abort_handle = self.certified_update_producer.start_produce(
                 self.epoch_state.clone(),
                 observed.clone(),
-                self.qc_update_tx.clone(),
+                self.qc_update_tx.clone().unwrap(),
             );
             state.consensus_state = ConsensusState::InProgress {
                 my_proposal: ObservedUpdate {

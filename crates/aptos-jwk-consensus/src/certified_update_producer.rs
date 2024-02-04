@@ -13,6 +13,7 @@ use aptos_types::{
 use futures_util::future::{AbortHandle, Abortable};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_types::jwks::Issuer;
 
 /// A sub-process of the whole JWK consensus process.
 /// Once invoked by `JWKConsensusManager` to `start_produce`,
@@ -23,7 +24,7 @@ pub trait CertifiedUpdateProducer: Send + Sync {
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        qc_update_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+        qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle;
 }
 
@@ -44,19 +45,18 @@ impl CertifiedUpdateProducer for RealCertifiedUpdateProducer {
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        qc_update_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+        qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle {
         let rb = self.reliable_broadcast.clone();
+        let issuer = payload.issuer.clone();
         let req = ObservedUpdateRequest {
             epoch: epoch_state.epoch,
-            issuer: payload.issuer.clone(),
+            issuer: issuer.clone(),
         };
         let agg_state = Arc::new(ObservationAggregationState::new(epoch_state, payload));
         let task = async move {
             let qc_update = rb.broadcast(req, agg_state).await;
-            if let Some(tx) = qc_update_tx {
-                let _ = tx.push((), qc_update);
-            }
+            let _ = qc_update_tx.push(issuer, qc_update);
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
