@@ -28,7 +28,7 @@ use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
 
 #[tokio::test]
-async fn test_openid_signature_transaction_submission() {
+async fn test_zkid_oidc_signature_transaction_submission() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
@@ -112,7 +112,7 @@ async fn test_openid_signature_transaction_submission() {
 }
 
 #[tokio::test]
-async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
+async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
@@ -196,7 +196,7 @@ async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
 }
 
 #[tokio::test]
-async fn test_openid_signature_transaction_submission_epk_expired() {
+async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
@@ -280,7 +280,7 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
 }
 
 #[tokio::test]
-async fn test_groth16_signature_transaction_submission() {
+async fn test_zkid_groth16_signature_transaction_submission() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
@@ -386,7 +386,7 @@ async fn test_groth16_signature_transaction_submission() {
 }
 
 #[tokio::test]
-async fn test_groth16_signature_transaction_submission_proof_signature_check_fails() {
+async fn test_zkid_groth16_signature_transaction_submission_proof_signature_check_fails() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)

@@ -4,12 +4,11 @@
 
 use crate::move_vm_ext::AptosMoveResolver;
 use aptos_types::{
-    bn254_circom::get_public_inputs_hash,
-    chain_id::ChainId,
+    bn254_circom::{get_public_inputs_hash, Groth16VerificationKey},
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     vm_status::{StatusCode, VMStatus},
-    zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_ZK_ID_AUTHENTICATORS_ALLOWED},
+    zkid::{Configs, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
@@ -44,6 +43,34 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
     Ok(jwks)
 }
 
+fn get_groth16_vk_onchain(
+    resolver: &impl AptosMoveResolver,
+) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
+    let error_status = VMStatus::error(
+        StatusCode::VALUE_DESERIALIZATION_ERROR,
+        Some("could not fetch on-chain Groth16 PVK".to_string()),
+    );
+    let bytes = resolver
+        .get_resource(&CORE_CODE_ADDRESS, &Groth16VerificationKey::struct_tag())
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .ok_or_else(|| error_status.clone())?;
+    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes).map_err(|_| error_status.clone())?;
+    Ok(vk)
+}
+
+fn get_configs_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Configs, VMStatus> {
+    let error_status = VMStatus::error(
+        StatusCode::VALUE_DESERIALIZATION_ERROR,
+        Some("could not fetch on-chain zkID Configs resource".to_string()),
+    );
+    let bytes = resolver
+        .get_resource(&CORE_CODE_ADDRESS, &Configs::struct_tag())
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .ok_or_else(|| error_status.clone())?;
+    let configs = bcs::from_bytes::<Configs>(&bytes).map_err(|_| error_status.clone())?;
+    Ok(configs)
+}
+
 fn get_jwk_for_zkid_authenticator(
     jwks: &PatchedJWKs,
     zkid_pub_key: &ZkIdPublicKey,
@@ -64,13 +91,14 @@ fn get_jwk_for_zkid_authenticator(
 pub fn validate_zkid_authenticators(
     authenticators: &Vec<(ZkIdPublicKey, ZkIdSignature)>,
     resolver: &impl AptosMoveResolver,
-    chain_id: ChainId,
 ) -> Result<(), VMStatus> {
     if authenticators.is_empty() {
         return Ok(());
     }
 
-    if authenticators.len() > MAX_ZK_ID_AUTHENTICATORS_ALLOWED {
+    let configs = &get_configs_onchain(resolver)?;
+
+    if authenticators.len() > configs.max_zkid_signatures_per_txn as usize {
         return Err(invalid_signature!("Too many zkID authenticators"));
     }
 
@@ -83,6 +111,9 @@ pub fn validate_zkid_authenticators(
     }
 
     let patched_jwks = get_jwks_onchain(resolver)?;
+    let pvk = &get_groth16_vk_onchain(resolver)?
+        .try_into()
+        .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
     for (zkid_pub_key, zkid_sig) in authenticators {
         let jwk = get_jwk_for_zkid_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
@@ -90,12 +121,15 @@ pub fn validate_zkid_authenticators(
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
-                    let public_inputs_hash =
-                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk).map_err(|_| {
-                            invalid_signature!("Could not compute public inputs hash")
-                        })?;
+                    let public_inputs_hash = get_public_inputs_hash(
+                        zkid_sig,
+                        zkid_pub_key,
+                        &rsa_jwk,
+                        configs.max_exp_horizon,
+                    )
+                    .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
                     proof
-                        .verify_proof(public_inputs_hash, chain_id)
+                        .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;
                 },
                 JWK::Unsupported(_) => return Err(invalid_signature!("JWK is not supported")),
@@ -103,6 +137,15 @@ pub fn validate_zkid_authenticators(
             ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
                 match jwk {
                     JWK::RSA(rsa_jwk) => {
+                        openid_sig
+                            .verify_jwt_claims(
+                                zkid_sig.exp_timestamp_secs,
+                                &zkid_sig.ephemeral_pubkey,
+                                zkid_pub_key,
+                                configs.max_exp_horizon,
+                            )
+                            .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
+
                         // TODO(OpenIdSig): Implement batch verification for all RSA signatures in
                         //  one TXN.
                         // Note: Individual OpenID RSA signature verification will be fast when the

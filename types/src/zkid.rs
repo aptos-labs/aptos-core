@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    bn254_circom::{G1Bytes, G2Bytes, DEVNET_VERIFYING_KEY},
-    chain_id::ChainId,
+    bn254_circom::{G1Bytes, G2Bytes},
     jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
@@ -15,10 +14,11 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use ark_bn254;
-use ark_groth16::{Groth16, Proof};
+use ark_bn254::{self, Bn254, Fr};
+use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};
 use ark_serialize::CanonicalSerialize;
 use base64::{URL_SAFE, URL_SAFE_NO_PAD};
+use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::skip_serializing_none;
@@ -47,17 +47,22 @@ pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
 pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 pub const MAX_JWT_HEADER_BYTES: usize = 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
-pub const MAX_ZK_PUBLIC_KEY_BYTES: usize = MAX_ISS_BYTES + MAX_EPK_BYTES;
+pub const MAX_ZKID_PUBLIC_KEY_BYTES: usize = 2 + MAX_ISS_BYTES + IDC_NUM_BYTES;
 
 // TODO(ZkIdGroth16Zkp): determine max length of zkSNARK + OIDC overhead + ephemeral pubkey and signature
-pub const MAX_ZK_SIGNATURE_BYTES: usize = 2048;
+pub const MAX_ZKID_SIGNATURE_BYTES: usize = 2048;
 
-// TODO(ZkIdGroth16Zkp): each zkID Groth16 proof will take ~2 ms to verify, or so. We cannot verify too many due to DoS.
-//  Figure out what this should be.
-pub const MAX_ZK_ID_AUTHENTICATORS_ALLOWED: usize = 10;
+/// Reflection of aptos_framework::zkid::Configs
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Configs {
+    pub max_zkid_signatures_per_txn: u16,
+    pub max_exp_horizon: u64,
+}
 
-// How far in the future from the JWT issued at time the EPK expiry can be set.
-pub const MAX_EXPIRY_HORIZON_SECS: u64 = 100255944; // 1159.55 days TODO(zkid): finalize this value
+impl MoveStructType for Configs {
+    const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Configs");
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct JwkId {
@@ -92,14 +97,12 @@ impl OpenIdSig {
         exp_timestamp_secs: u64,
         epk: &EphemeralPublicKey,
         pk: &ZkIdPublicKey,
+        max_exp_horizon_secs: u64,
     ) -> Result<()> {
-        let jwt_payload_json = base64url_to_str(&self.jwt_payload)?;
+        let jwt_payload_json = base64url_decode_as_str(&self.jwt_payload)?;
         let claims: Claims = serde_json::from_str(&jwt_payload_json)?;
 
-        // TODO(zkid): Store MAX_EXPIRY_HORIZON_SECS in a resource in zkid.move. Then, move this check
-        //  into the prologue for the ZK-less OpenID path.
-        let max_expiration_date =
-            seconds_from_epoch(claims.oidc_claims.iat + MAX_EXPIRY_HORIZON_SECS);
+        let max_expiration_date = seconds_from_epoch(claims.oidc_claims.iat + max_exp_horizon_secs);
         let expiration_date: SystemTime = seconds_from_epoch(exp_timestamp_secs);
         ensure!(
             expiration_date < max_expiration_date,
@@ -157,7 +160,7 @@ impl OpenIdSig {
             MAX_EPK_BYTES,
         )?;
 
-        frs.push(ark_bn254::Fr::from(exp_timestamp_secs));
+        frs.push(Fr::from(exp_timestamp_secs));
         frs.push(poseidon_bn254::pack_bytes_to_one_scalar(
             &self.epk_blinder[..],
         )?);
@@ -255,23 +258,12 @@ impl SignedGroth16Zkp {
         self.non_malleability_signature.verify(&self.proof, pub_key)
     }
 
-    pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
-        let vk = match chain_id.is_mainnet() {
-            true => {
-                bail!("verifying key for main net missing")
-            },
-            false => &DEVNET_VERIFYING_KEY,
-        };
-        let proof: Proof<ark_bn254::Bn254> = Proof {
-            a: self.proof.a.deserialize_into_affine()?,
-            b: self.proof.b.to_affine()?,
-            c: self.proof.c.deserialize_into_affine()?,
-        };
-        let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
-        if !result {
-            bail!("groth16 proof verification failed")
-        }
-        Ok(())
+    pub fn verify_proof(
+        &self,
+        public_inputs_hash: Fr,
+        pvk: &PreparedVerifyingKey<Bn254>,
+    ) -> Result<()> {
+        self.proof.verify_proof(public_inputs_hash, pvk)
     }
 }
 
@@ -288,19 +280,17 @@ impl Groth16Zkp {
         Groth16Zkp { a, b, c }
     }
 
-    pub fn verify_proof(&self, public_inputs_hash: ark_bn254::Fr, chain_id: ChainId) -> Result<()> {
-        let vk = match chain_id.is_mainnet() {
-            true => {
-                bail!("verifying key for main net missing")
-            },
-            false => &DEVNET_VERIFYING_KEY,
-        };
-        let proof: Proof<ark_bn254::Bn254> = Proof {
+    pub fn verify_proof(
+        &self,
+        public_inputs_hash: Fr,
+        pvk: &PreparedVerifyingKey<Bn254>,
+    ) -> Result<()> {
+        let proof: Proof<Bn254> = Proof {
             a: self.a.deserialize_into_affine()?,
             b: self.b.to_affine()?,
             c: self.c.deserialize_into_affine()?,
         };
-        let result = Groth16::<ark_bn254::Bn254>::verify_proof(vk, &proof, &[public_inputs_hash])?;
+        let result = Groth16::<Bn254>::verify_proof(pvk, &proof, &[public_inputs_hash])?;
         if !result {
             bail!("groth16 proof verification failed")
         }
@@ -361,7 +351,7 @@ pub struct JWTHeader {
 
 impl ZkIdSignature {
     pub fn parse_jwt_header(&self) -> Result<JWTHeader> {
-        let jwt_header_json = base64url_to_str(&self.jwt_header)?;
+        let jwt_header_json = base64url_decode_as_str(&self.jwt_header)?;
         let header: JWTHeader = serde_json::from_str(&jwt_header_json)?;
         Ok(header)
     }
@@ -489,7 +479,11 @@ pub fn get_zkid_authenticators(
     Ok(authenticators)
 }
 
-fn base64url_to_str(b64: &str) -> Result<String> {
+pub fn base64url_encode_str(data: &str) -> String {
+    base64::encode_config(data.as_bytes(), URL_SAFE)
+}
+
+pub fn base64url_decode_as_str(b64: &str) -> Result<String> {
     let decoded_bytes = base64::decode_config(b64, URL_SAFE)?;
     // Convert the decoded bytes to a UTF-8 string
     let str = String::from_utf8(decoded_bytes)?;
@@ -503,17 +497,32 @@ fn seconds_from_epoch(secs: u64) -> SystemTime {
 #[cfg(test)]
 mod test {
     use crate::{
-        bn254_circom::get_public_inputs_hash,
-        chain_id::ChainId,
+        bn254_circom::{get_public_inputs_hash, DEVNET_VERIFYING_KEY},
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            G1Bytes, G2Bytes, Groth16Zkp, IdCommitment, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
-            ZkIdSignature, ZkpOrOpenIdSig,
+            base64url_encode_str, G1Bytes, G2Bytes, Groth16Zkp, IdCommitment, OpenIdSig, Pepper,
+            SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, EPK_BLINDER_NUM_BYTES,
+            MAX_ISS_BYTES, MAX_ZKID_PUBLIC_KEY_BYTES,
         },
     };
     use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use std::ops::Deref;
 
+    #[test]
+    fn test_max_zkid_pubkey_size() {
+        let iss = "a".repeat(MAX_ISS_BYTES);
+        let idc =
+            IdCommitment::new_from_preimage(&Pepper::from_number(2), "aud", "uid_key", "uid_val")
+                .unwrap();
+
+        let pk = ZkIdPublicKey { iss, idc };
+
+        assert_eq!(bcs::to_bytes(&pk).unwrap().len(), MAX_ZKID_PUBLIC_KEY_BYTES);
+    }
+
+    // TODO(zkid): This test case must be rewritten to be more modular and updatable.
+    //  Right now, there are no instructions on how to produce this test case.
     #[test]
     fn test_groth16_proof_verification() {
         let a = G1Bytes::new_unchecked(
@@ -539,6 +548,7 @@ mod test {
         .unwrap();
         let proof = Groth16Zkp::new(a, b, c);
 
+        let max_exp_horizon = 100_255_944; // old hardcoded value, which is now in Move, that this testcase was generated with
         let sender = Ed25519PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();
         let sender_auth_key = AuthenticationKey::ed25519(&sender_pub);
@@ -594,10 +604,246 @@ mod test {
             n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
         };
 
-        let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &jwk).unwrap();
+        let public_inputs_hash =
+            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, max_exp_horizon).unwrap();
 
         proof
-            .verify_proof(public_inputs_hash, ChainId::test())
+            .verify_proof(public_inputs_hash, DEVNET_VERIFYING_KEY.deref())
             .unwrap();
+    }
+
+    /// Returns frequently-used JSON in our test cases
+    fn get_jwt_payload_json(
+        iss: &str,
+        uid_key: &str,
+        uid_val: &str,
+        aud: &str,
+        nonce: Option<String>,
+    ) -> String {
+        let nonce_str = match &nonce {
+            None => "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
+            Some(s) => s.as_str(),
+        };
+
+        format!(
+            r#"{{
+            "iss": "{}",
+            "{}": "{}",
+            "aud": "{}",
+            "nonce": "{}",
+            "exp": 1311281970,
+            "iat": 1311280970,
+            "name": "Jane Doe",
+            "given_name": "Jane",
+            "family_name": "Doe",
+            "gender": "female",
+            "birthdate": "0000-10-31",
+            "email": "janedoe@example.com",
+            "picture": "http://example.com/janedoe/me.jpg"
+           }}"#,
+            iss, uid_key, uid_val, aud, nonce_str
+        )
+    }
+
+    fn get_jwt_default_values() -> (
+        &'static str,
+        &'static str,
+        &'static str,
+        &'static str,
+        u64,
+        u64,
+        EphemeralPublicKey,
+        u128,
+        ZkIdPublicKey,
+    ) {
+        let iss = "https://server.example.com";
+        let aud = "s6BhdRkqt3";
+        let uid_key = "sub";
+        let uid_val = "248289761001";
+        let exp_timestamp_secs = 1311281970;
+        let max_exp_horizon = 100_255_944; // old hardcoded value, which is now in Move, that this testcase was generated with
+        let pepper = 76;
+
+        let zkid_pk = ZkIdPublicKey {
+            iss: iss.to_owned(),
+            idc: IdCommitment::new_from_preimage(
+                &Pepper::from_number(pepper),
+                aud,
+                uid_key,
+                uid_val,
+            )
+            .unwrap(),
+        };
+
+        let epk =
+            EphemeralPublicKey::ed25519(Ed25519PrivateKey::generate_for_testing().public_key());
+
+        (
+            iss,
+            aud,
+            uid_key,
+            uid_val,
+            exp_timestamp_secs,
+            max_exp_horizon,
+            epk,
+            pepper,
+            zkid_pk,
+        )
+    }
+
+    #[test]
+    fn test_zkid_oidc_sig_verifies() {
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+            get_jwt_default_values();
+
+        let oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+        assert!(oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_ok());
+    }
+
+    #[test]
+    fn test_zkid_oidc_sig_fails_with_different_pepper() {
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+            get_jwt_default_values();
+        let bad_pepper = pepper + 1;
+
+        let oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+
+        assert!(oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_ok());
+
+        let bad_oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            bad_pepper, // Pepper does not match
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+
+        assert!(bad_oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_err());
+    }
+
+    #[test]
+    fn test_zkid_oidc_sig_fails_with_expiry_past_horizon() {
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+            get_jwt_default_values();
+        let oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+
+        assert!(oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_ok());
+
+        let bad_exp_timestamp_secs = 1000000000000000000;
+        assert!(oidc_sig
+            .verify_jwt_claims(bad_exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_err());
+    }
+
+    #[test]
+    fn test_zkid_oidc_sig_fails_with_different_uid_val() {
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+            get_jwt_default_values();
+        let oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+
+        assert!(oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_ok());
+
+        let bad_uid_val = format!("{}+1", uid_val);
+        let bad_oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, bad_uid_val.as_str(), aud, None),
+        );
+
+        assert!(bad_oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_err());
+    }
+
+    #[test]
+    fn test_zkid_oidc_sig_fails_with_bad_nonce() {
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+            get_jwt_default_values();
+        let oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+
+        assert!(oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_ok());
+
+        let bad_nonce = "bad nonce".to_string();
+        let bad_oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, Some(bad_nonce)),
+        );
+
+        assert!(bad_oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_err());
+    }
+
+    #[test]
+    fn test_zkid_oidc_sig_with_different_iss() {
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+            get_jwt_default_values();
+        let oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
+        );
+
+        assert!(oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_ok());
+
+        let bad_iss = format!("{}+1", iss);
+        let bad_oidc_sig = zkid_simulate_oidc_signature(
+            uid_key,
+            pepper,
+            &get_jwt_payload_json(bad_iss.as_str(), uid_key, uid_val, aud, None),
+        );
+
+        assert!(bad_oidc_sig
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .is_err());
+    }
+
+    fn zkid_simulate_oidc_signature(
+        uid_key: &str,
+        pepper: u128,
+        jwt_payload_unencoded: &str,
+    ) -> OpenIdSig {
+        let jwt_payload = base64url_encode_str(jwt_payload_unencoded);
+
+        OpenIdSig {
+            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
+            jwt_payload,
+            uid_key: uid_key.to_owned(),
+            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+            pepper: Pepper::from_number(pepper),
+        }
     }
 }
