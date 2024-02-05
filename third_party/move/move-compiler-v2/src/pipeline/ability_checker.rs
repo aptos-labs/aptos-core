@@ -3,7 +3,6 @@
 
 //! Checks for ability violations.
 //! prerequisite:
-//! - liveness analysis and lifetime analysis have been performed
 //! - Copies and moves have been made explicit in assignment instructions
 
 use super::abort_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
