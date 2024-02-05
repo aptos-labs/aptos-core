@@ -62,6 +62,7 @@ use tokio::{
     task::{block_in_place, JoinHandle},
 };
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_types::on_chain_config::FeatureFlag;
 
 #[derive(Clone)]
 struct BootstrapBaseState {
@@ -651,6 +652,8 @@ pub(super) fn bootstrap_dag_for_test(
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
+    let mut features = Features::default();
+    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
@@ -669,7 +672,7 @@ pub(super) fn bootstrap_dag_for_test(
         false,
         ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
-        Features::default(),
+        features,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
