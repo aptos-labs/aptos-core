@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 //! This pass splits critical edges with empty blocks.
 //! A critical edge is an edge where the source node has multiple successors,
 //! and the target node has multiple predecessors.
