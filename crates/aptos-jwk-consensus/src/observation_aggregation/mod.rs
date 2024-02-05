@@ -4,19 +4,18 @@ use crate::types::{
     JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse,
 };
 use anyhow::{anyhow, ensure};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::Author;
 use aptos_crypto::bls12381::Signature;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    aggregate_signature::PartialSignatures,
+    aggregate_signature::{AggregateSignature, PartialSignatures},
     epoch_state::EpochState,
     jwks::{ProviderJWKs, QuorumCertifiedUpdate},
 };
 use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeSet, sync::Arc};
-use aptos_bitvec::BitVec;
-use aptos_types::aggregate_signature::AggregateSignature;
 
 /// The aggregation state of reliable broadcast where a validator broadcast JWK observation requests
 /// and produce quorum-certified JWK updates.
@@ -95,7 +94,14 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
                 .collect::<Vec<_>>(),
         )
         .map_err(|e| anyhow!("jwk update certification failed with sig agg error: {e}"))?;
-        let signer_bit_vec = BitVec::from(self.epoch_state.verifier.get_ordered_account_addresses().into_iter().map(|addr|voters.contains(&addr)).collect::<Vec<_>>());
+        let signer_bit_vec = BitVec::from(
+            self.epoch_state
+                .verifier
+                .get_ordered_account_addresses()
+                .into_iter()
+                .map(|addr| voters.contains(&addr))
+                .collect::<Vec<_>>(),
+        );
         let multi_sig = AggregateSignature::new(signer_bit_vec, Some(multi_sig));
 
         Ok(Some(QuorumCertifiedUpdate {
