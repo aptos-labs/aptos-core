@@ -314,8 +314,8 @@ impl fmt::Display for KeptVMStatus {
                 message,
             } => write!(
                 f,
-                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {}",
-                code_offset, function, location, message.clone().unwrap_or("".to_string())
+                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {:?}",
+                code_offset, function, location, message
             ),
         }
     }

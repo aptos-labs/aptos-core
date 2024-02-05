@@ -305,6 +305,10 @@ impl LedgerDb {
         &self.transaction_auxiliary_data_db
     }
 
+    pub(crate) fn transaction_auxiliary_data_db_raw(&self) -> &DB {
+        self.transaction_auxiliary_data_db.db()
+    }
+
     pub(crate) fn transaction_db(&self) -> &TransactionDb {
         &self.transaction_db
     }

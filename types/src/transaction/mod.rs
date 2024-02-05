@@ -980,7 +980,6 @@ impl TransactionStatus {
                 KeptVMStatus::MiscellaneousError => {
                     TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(status_code)))
                 },
-                // TODO(bowu): execution failure' message is discarded here
                 _ => TransactionStatus::Keep(recorded.into()),
             },
             Err(code) => {
@@ -992,49 +991,6 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
-        }
-    }
-
-    pub fn is_same_outcome(&self, transaction_status: &TransactionStatus) -> bool {
-        match (self, transaction_status) {
-            (TransactionStatus::Discard(_), TransactionStatus::Discard(_)) => true,
-            (TransactionStatus::Keep(status1), TransactionStatus::Keep(status2)) => {
-                match (status1, status2) {
-                    (ExecutionStatus::Success, ExecutionStatus::Success) => true,
-                    (ExecutionStatus::OutOfGas, ExecutionStatus::OutOfGas) => true,
-                    (
-                        ExecutionStatus::MoveAbort {
-                            location: loc1,
-                            code: code1,
-                            info: _,
-                        },
-                        ExecutionStatus::MoveAbort {
-                            location: loc2,
-                            code: code2,
-                            info: _,
-                        },
-                    ) => loc1 == loc2 && code1 == code2,
-                    (
-                        ExecutionStatus::ExecutionFailure {
-                            location: loc1,
-                            function: func1,
-                            code_offset: offset1,
-                        },
-                        ExecutionStatus::ExecutionFailure {
-                            location: loc2,
-                            function: func2,
-                            code_offset: offset2,
-                        },
-                    ) => loc1 == loc2 && func1 == func2 && offset1 == offset2,
-                    (
-                        ExecutionStatus::MiscellaneousError(_),
-                        ExecutionStatus::MiscellaneousError(_),
-                    ) => true,
-                    _ => false,
-                }
-            },
-            (TransactionStatus::Retry, TransactionStatus::Retry) => true,
-            _ => false,
         }
     }
 
@@ -1110,8 +1066,8 @@ impl VMValidatorResult {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct VMErrorDetail {
-    status_code: StatusCode,
-    message: Option<String>,
+    pub status_code: StatusCode,
+    pub message: Option<String>,
 }
 
 impl VMErrorDetail {
@@ -1132,8 +1088,21 @@ impl VMErrorDetail {
 }
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-pub struct TransactionAuxiliaryData {
+pub struct TransactionAuxiliaryDataV1 {
     pub detail_error_message: Option<VMErrorDetail>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum TransactionAuxiliaryData {
+    None,
+    V1(TransactionAuxiliaryDataV1),
+}
+
+impl Default for TransactionAuxiliaryData {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 impl TransactionAuxiliaryData {
@@ -1152,10 +1121,26 @@ impl TransactionAuxiliaryData {
                 let status_code = vm_status.status_code();
                 Some(VMErrorDetail::new(status_code, message))
             },
+            Err(status_code) => {
+                // emulate the behavior of
+                if status_code.status_type() == StatusType::InvariantViolation {
+                    Some(VMErrorDetail::new(status_code, None))
+                } else {
+                    None
+                }
+            },
             _ => None,
         };
-        Self {
+
+        Self::V1(TransactionAuxiliaryDataV1 {
             detail_error_message,
+        })
+    }
+
+    pub fn get_detail_error_message(&self) -> Option<&VMErrorDetail> {
+        match self {
+            Self::V1(data) => data.detail_error_message.as_ref(),
+            _ => None,
         }
     }
 }
@@ -1176,6 +1161,7 @@ pub struct TransactionOutput {
     status: TransactionStatus,
 
     /// The transaction auxiliary data that includes detail error info that is not used for calculating the hash
+    #[serde(skip)]
     auxiliary_data: TransactionAuxiliaryData,
 }
 
@@ -1192,7 +1178,7 @@ impl TransactionOutput {
             write_set,
             events,
             gas_used,
-            status: status.clone(),
+            status,
             auxiliary_data,
         }
     }

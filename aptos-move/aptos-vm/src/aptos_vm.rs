@@ -51,9 +51,9 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionAuxiliaryData, TransactionOutput, TransactionPayload, TransactionStatus,
-        VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
+        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction,
+        Transaction, TransactionAuxiliaryData, TransactionOutput, TransactionPayload,
+        TransactionStatus, VMValidatorResult, ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
@@ -134,6 +134,21 @@ macro_rules! unwrap_or_discard {
             },
         }
     };
+}
+
+pub(crate) fn get_system_transaction_output(
+    session: SessionExt,
+    fee_statement: FeeStatement,
+    status: ExecutionStatus,
+    change_set_configs: &ChangeSetConfigs,
+) -> Result<VMOutput, VMStatus> {
+    get_transaction_output(
+        session,
+        fee_statement,
+        status,
+        change_set_configs,
+        TransactionAuxiliaryData::default(),
+    )
 }
 
 pub(crate) fn get_transaction_output(
@@ -446,7 +461,7 @@ impl AptosVM {
                         change_set,
                         fee_statement,
                         TransactionStatus::Keep(status),
-                        TransactionAuxiliaryData::from_vm_status(&error_code.clone()),
+                        TransactionAuxiliaryData::from_vm_status(&error_vm_status),
                     ),
                     Err(err) => discarded_output(err.status_code()),
                 };
@@ -497,7 +512,7 @@ impl AptosVM {
 
         if is_account_init_for_sponsored_transaction {
             let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
-            // abort_info is injected using the user defined error in the move
+            // Abort information is injected using the user defined error in the Move contract.
             let status = self.inject_abort_info_if_available(status);
 
             create_account_if_does_not_exist(&mut session, gas_meter, txn_data.sender())
@@ -1689,12 +1704,11 @@ impl AptosVM {
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = get_transaction_output(
+        let output = get_system_transaction_output(
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
-            TransactionAuxiliaryData::default(),
         )?;
         Ok((VMStatus::Executed, output))
     }
@@ -1765,12 +1779,11 @@ impl AptosVM {
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output = get_transaction_output(
+        let output = get_system_transaction_output(
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
-            TransactionAuxiliaryData::default(),
         )?;
         Ok((VMStatus::Executed, output))
     }
