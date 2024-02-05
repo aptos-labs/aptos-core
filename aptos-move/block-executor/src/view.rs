@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::{ExtractUniqueIndex, PanicError},
+    delayed_fields::{ExtractUniqueIndex, PanicError, TryFromMoveValue},
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -58,8 +58,8 @@ use move_core_types::{
 use move_vm_types::{
     value_serde::{
         deserialize_and_allow_native_values, deserialize_and_replace_values_with_ids,
-        serialize_and_allow_native_values, serialize_and_replace_ids_with_values,
-        ValueToIdentifierMapping,
+        find_identifiers_in_value, serialize_and_allow_native_values,
+        serialize_and_replace_ids_with_values, ValueToIdentifierMapping,
     },
     values::{SizedID, Value},
 };
@@ -454,7 +454,6 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         }
     }
 
-    #[allow(dead_code)]
     fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.versioned_map
             .delayed_fields()
@@ -779,12 +778,10 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
         }
     }
 
-    #[allow(dead_code)]
     fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.unsync_map.write_delayed_field(id, base_value)
     }
 
-    #[allow(dead_code)]
     fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
         self.unsync_map.fetch_delayed_field(&id)
     }
@@ -1118,21 +1115,20 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok((patched_bytes, mapping.into_inner()))
     }
 
-    // Given a bytes, where values were already exchanged with identifiers,
+    // Given bytes, where values were already exchanged with identifiers,
     // return a list of identifiers present in it.
     fn extract_identifiers_from_value(
         &self,
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<HashSet<T::Identifier>> {
-        let mapping = TemporaryExtractIdentifiersMapping::<T>::new();
-        // TODO[agg_v2](cleanup) rename deserialize_and_replace_values_with_ids to not be specific to mapping trait implementation
-        // TODO[agg_v2](cleanup) provide traversal method, that doesn't create unnecessary patched value.
-        let _patched_value =
-            deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping).ok_or_else(
-                || anyhow::anyhow!("Failed to deserialize resource during id replacement"),
-            )?;
-        Ok(mapping.into_inner())
+        let value = deserialize_and_allow_native_values(bytes, layout).ok_or_else(|| {
+            anyhow::anyhow!("Failed to deserialize resource during id replacement")
+        })?;
+
+        let mut identifiers = HashSet::new();
+        find_identifiers_in_value(&value, &mut identifiers)?;
+        Ok(identifiers)
     }
 
     fn does_value_need_exchange(
@@ -1869,86 +1865,43 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
 {
     fn value_to_identifier(
         &self,
-        _kind: &IdentifierMappingKind,
-        _layout: &MoveTypeLayout,
-        _value: Value,
+        kind: &IdentifierMappingKind,
+        layout: &MoveTypeLayout,
+        value: Value,
     ) -> PartialVMResult<SizedID> {
-        todo!()
-        // let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
-        // let id = self.generate_delayed_field_id(width);
-        // match &self.latest_view.latest_view {
-        //     ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
-        //     ViewState::Unsync(state) => {
-        //         state.set_delayed_field_value(id, base_value);
-        //     },
-        // };
-        // self.delayed_field_keys.borrow_mut().insert(id);
-        // Ok(id.try_into_move_value(layout)?)
+        let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
+        let id = self.generate_delayed_field_id(width);
+        match &self.latest_view.latest_view {
+            ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
+            ViewState::Unsync(state) => state.set_delayed_field_value(id, base_value),
+        };
+        self.delayed_field_keys.borrow_mut().insert(id);
+        Ok(id.into())
     }
 
     fn identifier_to_value(
         &self,
-        _layout: &MoveTypeLayout,
-        _identifier: SizedID,
+        layout: &MoveTypeLayout,
+        identifier: SizedID,
     ) -> PartialVMResult<Value> {
-        todo!()
-        // let (id, width) = T::Identifier::try_from_move_value(layout, identifier_value, &())
-        //     .map_err(|e| e.into())?;
-        // self.delayed_field_keys.borrow_mut().insert(id);
-        // match &self.latest_view.latest_view {
-        //     ViewState::Sync(state) => state
-        //         .versioned_map
-        //         .delayed_fields()
-        //         .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
-        //         .expect("Committed value for ID must always exist"),
-        //     ViewState::Unsync(state) => state
-        //         .read_delayed_field(id)
-        //         .expect("Delayed field value for ID must always exist in sequential execution"),
-        // }
-        // .try_into_move_value(layout, width)
-    }
-}
-
-struct TemporaryExtractIdentifiersMapping<T: Transaction> {
-    // These are the delayed field keys that were touched when utilizing this mapping
-    // to replace ids with values or values with ids
-    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
-}
-
-impl<T: Transaction> TemporaryExtractIdentifiersMapping<T> {
-    pub fn new() -> Self {
-        Self {
-            delayed_field_keys: RefCell::new(HashSet::new()),
-        }
-    }
-
-    pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_keys.into_inner()
-    }
-}
-
-impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMapping<T> {
-    fn value_to_identifier(
-        &self,
-        _kind: &IdentifierMappingKind,
-        _layout: &MoveTypeLayout,
-        _value: Value,
-    ) -> PartialVMResult<SizedID> {
-        todo!()
-        // let (id, _) = T::Identifier::try_from_move_value(layout, value, &())?;
-        // self.delayed_field_keys.borrow_mut().insert(id);
-        // id.try_into_move_value(layout)
-    }
-
-    fn identifier_to_value(
-        &self,
-        _layout: &MoveTypeLayout,
-        _identifier: SizedID,
-    ) -> PartialVMResult<Value> {
-        todo!()
-        // let (id, _) = T::Identifier::try_from_move_value(layout, identifier_value, &())?;
-        // self.delayed_field_keys.borrow_mut().insert(id);
-        // id.try_into_move_value(layout)
+        self.delayed_field_keys
+            .borrow_mut()
+            .insert(identifier.into());
+        let delayed_field = match &self.latest_view.latest_view {
+            ViewState::Sync(state) => state
+                .versioned_map
+                .delayed_fields()
+                .read_latest_committed_value(
+                    &identifier.into(),
+                    self.txn_idx,
+                    ReadPosition::AfterCurrentTxn,
+                )
+                .expect("Committed value for ID must always exist"),
+            ViewState::Unsync(state) => state
+                .read_delayed_field(identifier.into())
+                .expect("Delayed field value for ID must always exist in sequential execution"),
+        };
+        delayed_field.try_into_move_value(layout, identifier.serialized_size())
     }
 }
 

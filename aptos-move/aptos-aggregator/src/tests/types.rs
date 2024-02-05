@@ -123,6 +123,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         id: u64,
     ) -> Result<Self::Identifier, PanicError> {
+        // TODO[agg_v2](fix): bug? we should extract the id, not include the width...
         if id < self.start_counter as u64 {
             return Err(code_invariant_error(format!(
                 "Invalid delayed field id: {}, we've started from {}",
