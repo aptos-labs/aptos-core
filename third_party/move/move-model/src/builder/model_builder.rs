@@ -422,7 +422,7 @@ impl<'env> ModelBuilder<'env> {
             gen_get_ty_param_kinds(ty_params),
             self.gen_get_struct_sig(),
             loc,
-            |loc, err| self.error(loc, err),
+            |loc, _, err| self.error(loc, err),
         );
     }
 

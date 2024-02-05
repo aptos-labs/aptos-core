@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: same mutable reference in local is also used in other local in same argument list
+error: same mutable reference in value is also used in other value in same argument list
   ┌─ tests/reference-safety/multiple_use_invalid.move:5:9
   │
 5 │         s(&mut s.x, &mut s.x)
@@ -18,3 +18,23 @@ error: same mutable reference in local `r` is also used in other local `x` in sa
 10 │         let x = r;
 11 │         s(r, x)
    │         ^^^^^^^ requirement enforced here
+
+error: same mutable reference in local `r1` is also used in other local `r2` in same argument list
+   ┌─ tests/reference-safety/multiple_use_invalid.move:20:9
+   │
+18 │         let r1 = &mut x;
+   │                  ------ previous mutable local borrow
+19 │         let r2 = &mut x;
+   │                  ------ previous mutable local borrow
+20 │         s(r1, r2)
+   │         ^^^^^^^^^ requirement enforced here
+
+error: same mutable reference in local `r1` is also used in other local `r2` in same argument list
+   ┌─ tests/reference-safety/multiple_use_invalid.move:27:9
+   │
+25 │         let r1 = &mut x;
+   │                  ------ previous mutable local borrow
+26 │         let r2 = &mut x;
+   │                  ------ previous mutable local borrow
+27 │         r1 == r2
+   │         ^^^^^^^^ requirement enforced here

@@ -50,7 +50,8 @@
 //! this mechanics, see the comments in the code.
 //!
 //! The safety analysis essentially evaluates each instruction under the viewpoint of the current
-//! active borrow graph at the program point, to detect any conditions of non-safety.
+//! active borrow graph at the program point, to detect any conditions of non-safety. This
+//! includes specifically the following rules:
 //!
 //! 1. A local which is borrowed (i.e. points to a node in the graph) cannot be overwritten.
 //! 2. A local which is borrowed cannot be moved.
@@ -64,10 +65,32 @@
 //! To understand the concept of a _safe_ borrow graph consider that edges have a notion of being
 //! disjoint. For instance, field selection `s.f` and `s.g` constructs two references into `s` which
 //! can safely co-exist because there is no overlap. Consider further a path `p` being a sequence
-//! of borrow steps (edges) in the graph from a root to a leaf. For two paths `p1` and `p2`,
+//! of borrow steps (edges) in the graph from a root to a leaf node. For two paths `p1` and `p2`,
 //! _diverging edges_, `(e1, e2) = diverging(p1, p2)`, are a pair of edges where the paths differ
-//! after some non-empty common prefix. There can be more than one of those pairs. A graph is
-//! called *safe w.r.t. a set of temporaries `temps`* under the following conditions:
+//! after some non-empty common prefix, and do not have a common node where they join again. Here is
+//! an example of two paths with diverging edges:
+//!
+//! ```ignore
+//!              s
+//!        &mut / \ &mut
+//!      call f |  | call g
+//!            r1  r2
+//! ```
+//!
+//! Here is another example where, while edges differ, they do not diverge because the paths later
+//! join again. Notice that this is a result of different execution paths from code
+//! like `let r = if (c) f(&mut s) else g(&mut s)`:
+//!
+//! ```ignore
+//!              s
+//!        &mut / \ &mut
+//!      call f |  | call g
+//!             \  /
+//!              r
+//! ```
+//!
+//! Given this definition, a graph is called *safe w.r.t. a set of temporaries `temps`*
+//! under the following conditions:
 //!
 //! a. Any path which does not end in `nodes(temps)` is safe and considered out of scope,
 //!    where `nodes(temps)` denotes the nodes which are associated with the given `temps`.
@@ -626,11 +649,11 @@ impl LifetimeState {
 
     /// Returns a map from labels which are used by temporaries to the set which are using them.
     fn leaves(&self) -> BTreeMap<LifetimeLabel, BTreeSet<TempIndex>> {
-        let mut leaves: BTreeMap<LifetimeLabel, BTreeSet<TempIndex>> = BTreeMap::new();
+        let mut map: BTreeMap<LifetimeLabel, BTreeSet<TempIndex>> = BTreeMap::new();
         for (temp, label) in &self.temp_to_label_map {
-            leaves.entry(*label).or_default().insert(*temp);
+            map.entry(*label).or_default().insert(*temp);
         }
-        leaves
+        map
     }
 
     /// Releases graph resources for a reference in temporary.
@@ -710,17 +733,46 @@ impl LifetimeState {
     fn roots(&self, label: &LifetimeLabel) -> BTreeSet<LifetimeLabel> {
         let mut roots = BTreeSet::new();
         let mut todo = self.node(label).parents.iter().cloned().collect::<Vec<_>>();
-        while let Some(l) = todo.pop() {
-            let mut parents = self.node(&l).parents.iter().cloned().collect::<Vec<_>>();
-            if parents.is_empty() {
-                // Found a root
-                roots.insert(l);
-            } else {
-                // Explore parents
-                todo.append(&mut parents)
+        if todo.is_empty() {
+            // Node is already root
+            roots.insert(*label);
+        } else {
+            let mut done = BTreeSet::new();
+            while let Some(l) = todo.pop() {
+                if !done.insert(l) {
+                    continue;
+                }
+                let node = self.node(&l);
+                if node.parents.is_empty() {
+                    // Found a root
+                    roots.insert(l);
+                } else {
+                    // Explore parents
+                    todo.extend(node.parents.iter().cloned())
+                }
             }
         }
         roots
+    }
+
+    /// Returns the transitive children of this node.
+    fn transitive_children(&self, label: &LifetimeLabel) -> BTreeSet<LifetimeLabel> {
+        // Helper function to collect the target nodes of the children.
+        let get_children =
+            |label: &LifetimeLabel| self.node(label).children.iter().map(|e| e.target);
+        let mut result = BTreeSet::new();
+        let mut todo = get_children(label).collect::<Vec<_>>();
+        if todo.is_empty() {
+            result.insert(*label);
+        } else {
+            while let Some(l) = todo.pop() {
+                if !result.insert(l) {
+                    continue;
+                }
+                todo.extend(get_children(&l));
+            }
+        }
+        result
     }
 
     /// Returns the temporaries borrowed
@@ -730,7 +782,7 @@ impl LifetimeState {
 
     /// Checks if the given local is borrowed
     pub fn is_borrowed(&self, temp: TempIndex) -> bool {
-        self.borrowed_locals().contains(&temp)
+        self.label_for_temp_with_children(temp).is_some()
     }
 }
 
@@ -991,6 +1043,22 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(kind2) {
                     for (e1, e2) in edges1.iter().cartesian_product(edges2.iter()) {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
+                            continue;
+                        }
+                        // If the diverging edges have common transitive children they result from
+                        // joining of conditional branches and are allowed. See also discussion in the file
+                        // comment.
+                        // NOTE: we may do this more efficiently using a lazy algorithm similar as LCA graph
+                        // algorithms as the first common children we find is enough. However, since we
+                        // expect the graph of small size, this seems not be too important.
+                        // CONJECTURE: it is sufficient here to just check for an intersection. If there is any
+                        // common child, then for any later divergences when following the edges, we will do
+                        // this check again.
+                        if !self
+                            .state
+                            .transitive_children(&e1.target)
+                            .is_disjoint(&self.state.transitive_children(&e2.target))
+                        {
                             continue;
                         }
                         self.diverging_edge_error(hyper.first().unwrap(), e1, e2, &filtered_leaves)
@@ -1258,7 +1326,16 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             match kind {
                 AssignKind::Move => self.state.move_ref(dest, src),
                 AssignKind::Copy => self.state.copy_ref(dest, src),
-                _ => panic!("assign kind expected to be Move or Copy"),
+                AssignKind::Inferred => {
+                    if self.state.label_for_temp_with_children(src).is_none()
+                        && !self.alive.after.contains_key(&src)
+                    {
+                        self.state.move_ref(dest, src)
+                    } else {
+                        self.state.copy_ref(dest, src)
+                    }
+                },
+                AssignKind::Store => panic!("unexpected assign kind"),
             }
         } else {
             self.check_read_local(src, mode);
@@ -1476,8 +1553,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         // Construct step context
         let mut step = self.new_step(code_offset, instr.get_attr_id(), state);
 
-        // Before processing the instruction, release all temps in the label map
-        // which are not longer alive at this point.
+        // Preprocessing: release all temps in the label map which are not longer alive at this point.
         step.state.debug_print("before enter release");
         let alive_temps = step.alive.before_set();
         for temp in step
@@ -1492,11 +1568,17 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             }
         }
 
-        // Check borrow safety of the currently active borrow graph for read ref, write ref, and function calls.
+        // Preprocessing: check borrow safety of the currently active borrow graph for read ref,
+        // write ref, and function calls.
         #[allow(clippy::single_match)]
         match instr {
+            // Only handle operations which can take references
             Call(_, _, oper, srcs, ..) => match oper {
-                Operation::ReadRef | Operation::WriteRef | Operation::Function(..) => {
+                Operation::ReadRef
+                | Operation::WriteRef
+                | Operation::Function(..)
+                | Operation::Eq
+                | Operation::Neq => {
                     let exclusive_refs =
                         srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
                     step.check_borrow_safety(&exclusive_refs)
@@ -1509,6 +1591,8 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
             },
             _ => {},
         }
+
+        // Process the instruction
         match instr {
             Assign(_, dest, src, kind) => {
                 step.assign(*dest, *src, *kind);
@@ -1655,7 +1739,7 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             }
         }
         let state_map = analyzer.analyze_function(state, target.get_bytecode(), &cfg);
-        let mut state_map_per_instr = analyzer.state_per_instruction(
+        let state_map_per_instr = analyzer.state_per_instruction_with_default(
             state_map,
             target.get_bytecode(),
             &cfg,
@@ -1664,13 +1748,6 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
                 after: after.clone(),
             },
         );
-        // For dead code, there may be holes in the map. Identify those and populate with default so
-        // that each code offset actually has an annotation.
-        for offset in 0..code.len() {
-            state_map_per_instr
-                .entry(offset as CodeOffset)
-                .or_insert_with(LifetimeInfoAtCodeOffset::default);
-        }
         let annotation = LifetimeAnnotation(state_map_per_instr);
         data.annotations.set(annotation, true);
         data

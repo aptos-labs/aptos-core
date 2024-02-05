@@ -99,7 +99,78 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
   7: return $t1
 }
 
-============ after ExplicitDrop: ================
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun explicate_drop::drop_at_branch($t0: bool): u8 {
+     var $t1: u8
+     # abort state: {returns}
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  0: if ($t0) goto 1 else goto 4
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  1: label L0
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  2: $t1 := 1
+     # abort state: {returns}
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  3: goto 6
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  4: label L1
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  5: $t1 := 0
+     # abort state: {returns}
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  6: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     # moved: {}
+     #
+  7: return $t1
+}
+
+============ after AbilityProcessor: ================
 
 [variant baseline]
 fun explicate_drop::drop_at_branch($t0: bool): u8 {

@@ -271,7 +271,7 @@ impl<'env> FunctionTarget<'env> {
         if let Some(sym) = self.data.local_names.get(&temp) {
             format!("local `{}`", sym.display(self.global_env().symbol_pool()))
         } else {
-            "local".to_owned()
+            "value".to_owned()
         }
     }
 
