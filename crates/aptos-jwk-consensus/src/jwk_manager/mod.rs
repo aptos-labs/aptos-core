@@ -53,7 +53,8 @@ pub struct JWKManager {
     /// Whether a CLOSE command has been received.
     stopped: bool,
 
-    qc_update_tx: Option<aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>>,
+    qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
+    qc_update_rx: aptos_channel::Receiver<Issuer, QuorumCertifiedUpdate>,
     jwk_observers: Vec<JWKObserver>,
 }
 
@@ -65,6 +66,7 @@ impl JWKManager {
         update_certifier: Arc<dyn TUpdateCertifier>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
+        let (qc_update_tx, mut qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             consensus_key,
             my_addr,
@@ -73,7 +75,8 @@ impl JWKManager {
             vtxn_pool,
             states_by_issuer: HashMap::default(),
             stopped: false,
-            qc_update_tx: None,
+            qc_update_tx,
+            qc_update_rx,
             jwk_observers: vec![],
         }
     }
@@ -88,8 +91,6 @@ impl JWKManager {
     ) {
         self.reset_with_on_chain_state(observed_jwks.unwrap_or_default().into_providers_jwks())
             .unwrap();
-        let (qc_update_tx, mut qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
-        self.qc_update_tx = Some(qc_update_tx);
 
         let (local_observation_tx, mut local_observation_rx) =
             aptos_channel::new(QueueStyle::KLAST, 100, None);
@@ -120,7 +121,7 @@ impl JWKManager {
                 (_sender, msg) = rpc_req_rx.select_next_some() => {
                     self.process_peer_request(msg)
                 },
-                qc_update = qc_update_rx.select_next_some() => {
+                qc_update = self.qc_update_rx.select_next_some() => {
                     self.process_quorum_certified_update(qc_update)
                 },
                 (issuer, jwks) = local_observation_rx.select_next_some() => {
@@ -172,7 +173,7 @@ impl JWKManager {
             let abort_handle = self.update_certifier.start_produce(
                 self.epoch_state.clone(),
                 observed.clone(),
-                self.qc_update_tx.clone().unwrap(),
+                self.qc_update_tx.clone(),
             );
             state.consensus_state = ConsensusState::InProgress {
                 my_proposal: ObservedUpdate {
