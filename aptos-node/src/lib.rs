@@ -660,7 +660,9 @@ pub fn setup_environment_and_start_node(
         );
 
     // Ensure consensus key in secure DB.
-    aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
+    if !matches!(node_config.consensus.safety_rules.initial_safety_rules_config, InitialSafetyRulesConfig::None) {
+        aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
+    }
 
     let vtxn_pool = VTxnPoolState::default();
     let maybe_dkg_dealer_sk =
