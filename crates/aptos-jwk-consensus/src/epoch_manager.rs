@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    update_certifier::UpdateCertifier,
     jwk_manager::JWKManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::JWKConsensusNetworkClient,
     types::JWKConsensusMsg,
+    update_certifier::UpdateCertifier,
 };
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
