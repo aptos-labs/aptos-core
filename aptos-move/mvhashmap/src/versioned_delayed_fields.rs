@@ -710,11 +710,10 @@ impl<K: Eq + Hash + Clone + Debug + Copy> TVersionedDelayedFieldView<K>
 mod test {
     use super::*;
     use aptos_aggregator::{
-        bounded_math::SignedU128,
-        delta_change_set::DeltaOp,
-        delta_math::DeltaHistory,
-        types::{DelayedFieldID, SnapshotToStringFormula},
+        bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
+        types::DelayedFieldID,
     };
+    use aptos_types::delayed_fields::SnapshotToStringFormula;
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use test_case::test_case;
 
@@ -767,11 +766,11 @@ mod test {
                 delta: test_delta(),
             })),
             APPLY_SNAPSHOT => Some(VersionEntry::Apply(DelayedApplyEntry::SnapshotDelta {
-                base_aggregator: DelayedFieldID::new(2),
+                base_aggregator: DelayedFieldID::new_for_test_for_u64(2),
                 delta: test_delta(),
             })),
             APPLY_DERIVED => Some(VersionEntry::Apply(DelayedApplyEntry::SnapshotDerived {
-                base_snapshot: DelayedFieldID::new(3),
+                base_snapshot: DelayedFieldID::new_for_test_for_u64(3),
                 formula: test_formula(),
             })),
             ESTIMATE_NO_BYPASS => Some(VersionEntry::Estimate(EstimatedEntry::NoBypass)),
@@ -849,10 +848,10 @@ mod test {
             assert_ok_eq!(
                 $cond,
                 VersionedRead::DependentApply(
-                    DelayedFieldID::new($expected_id),
+                    DelayedFieldID::new_for_test_for_u64($expected_id),
                     $expected_txn_index,
                     DelayedApplyEntry::SnapshotDelta {
-                        base_aggregator: DelayedFieldID::new($expected_id),
+                        base_aggregator: DelayedFieldID::new_for_test_for_u64($expected_id),
                         delta: $expected_delta
                     }
                 )
@@ -865,10 +864,10 @@ mod test {
             assert_ok_eq!(
                 $cond,
                 VersionedRead::DependentApply(
-                    DelayedFieldID::new($expected_id),
+                    DelayedFieldID::new_for_test_for_u64($expected_id),
                     $expected_txn_index,
                     DelayedApplyEntry::SnapshotDerived {
-                        base_snapshot: DelayedFieldID::new($expected_id),
+                        base_snapshot: DelayedFieldID::new_for_test_for_u64($expected_id),
                         formula: $expected_formula
                     }
                 )
@@ -1025,7 +1024,11 @@ mod test {
             let mut v = VersionedValue::new(None);
             v.insert_speculative_value(
                 8,
-                aggregator_entry_snapshot_value_and_delta(13, test_delta(), DelayedFieldID::new(2)),
+                aggregator_entry_snapshot_value_and_delta(
+                    13,
+                    test_delta(),
+                    DelayedFieldID::new_for_test_for_u64(2),
+                ),
             )
             .unwrap();
 
@@ -1084,7 +1087,7 @@ mod test {
                 aggregator_entry_derived_value_and_delta(
                     vec![70, 80, 90],
                     test_formula(),
-                    DelayedFieldID::new(3),
+                    DelayedFieldID::new_for_test_for_u64(3),
                 ),
             )
             .unwrap();

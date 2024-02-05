@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{
-    size_u32_as_uleb128, ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView,
+use crate::resolver::{ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView};
+use aptos_types::{
+    serde_helper::bcs_utils::bcs_size_of_byte_array, state_store::state_key::StateKey,
 };
-use aptos_types::state_store::state_key::StateKey;
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
@@ -52,8 +52,7 @@ pub fn group_tagged_resource_size<T: Serialize + Clone + Debug>(
             "Tag serialization error for tag {:?}: {:?}",
             tag, e
         ))
-    })? + value_byte_len
-        + size_u32_as_uleb128(value_byte_len)) as u64)
+    })? + bcs_size_of_byte_array(value_byte_len)) as u64)
 }
 
 /// Utility method to compute the size of the group as GroupSizeKind::AsSum.

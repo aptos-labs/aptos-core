@@ -6,6 +6,7 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_types::{
+    serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -295,16 +296,6 @@ pub enum ResourceGroupSize {
     },
 }
 
-pub fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
-}
-
 impl ResourceGroupSize {
     pub fn zero_combined() -> Self {
         Self::Combined {
@@ -332,13 +323,4 @@ impl ResourceGroupSize {
             },
         }
     }
-}
-
-#[test]
-fn test_size_u32_as_uleb128() {
-    assert_eq!(size_u32_as_uleb128(0), 1);
-    assert_eq!(size_u32_as_uleb128(127), 1);
-    assert_eq!(size_u32_as_uleb128(128), 2);
-    assert_eq!(size_u32_as_uleb128(128 * 128 - 1), 2);
-    assert_eq!(size_u32_as_uleb128(128 * 128), 3);
 }

@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    certified_update_producer::CertifiedUpdateProducer,
     jwk_observer::JWKObserver,
     network::IncomingRpcRequest,
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse},
+    update_certifier::TUpdateCertifier,
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -42,7 +42,7 @@ pub struct JWKManager {
     consensus_key: Arc<PrivateKey>,
 
     /// The sub-process that collects JWK updates from peers and aggregate them into a quorum-certified JWK update.
-    certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
+    update_certifier: Arc<dyn TUpdateCertifier>,
 
     /// When a quorum-certified JWK update is available, use this to put it into the validator transaction pool.
     vtxn_pool: VTxnPoolState,
@@ -53,7 +53,8 @@ pub struct JWKManager {
     /// Whether a CLOSE command has been received.
     stopped: bool,
 
-    qc_update_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+    qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
+    qc_update_rx: aptos_channel::Receiver<Issuer, QuorumCertifiedUpdate>,
     jwk_observers: Vec<JWKObserver>,
 }
 
@@ -62,18 +63,20 @@ impl JWKManager {
         consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
+        update_certifier: Arc<dyn TUpdateCertifier>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
+        let (qc_update_tx, qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             consensus_key,
             my_addr,
             epoch_state,
-            certified_update_producer,
+            update_certifier,
             vtxn_pool,
             states_by_issuer: HashMap::default(),
             stopped: false,
-            qc_update_tx: None,
+            qc_update_tx,
+            qc_update_rx,
             jwk_observers: vec![],
         }
     }
@@ -88,8 +91,6 @@ impl JWKManager {
     ) {
         self.reset_with_on_chain_state(observed_jwks.unwrap_or_default().into_providers_jwks())
             .unwrap();
-        let (qc_update_tx, mut qc_update_rx) = aptos_channel::new(QueueStyle::FIFO, 100, None);
-        self.qc_update_tx = Some(qc_update_tx);
 
         let (local_observation_tx, mut local_observation_rx) =
             aptos_channel::new(QueueStyle::KLAST, 100, None);
@@ -120,7 +121,7 @@ impl JWKManager {
                 (_sender, msg) = rpc_req_rx.select_next_some() => {
                     self.process_peer_request(msg)
                 },
-                qc_update = qc_update_rx.select_next_some() => {
+                qc_update = self.qc_update_rx.select_next_some() => {
                     self.process_quorum_certified_update(qc_update)
                 },
                 (issuer, jwks) = local_observation_rx.select_next_some() => {
@@ -169,7 +170,7 @@ impl JWKManager {
                 .consensus_key
                 .sign(&observed)
                 .map_err(|e| anyhow!("crypto material error occurred duing signing: {}", e))?;
-            let abort_handle = self.certified_update_producer.start_produce(
+            let abort_handle = self.update_certifier.start_produce(
                 self.epoch_state.clone(),
                 observed.clone(),
                 self.qc_update_tx.clone(),
@@ -201,15 +202,18 @@ impl JWKManager {
             .collect();
         self.states_by_issuer
             .retain(|issuer, _| onchain_issuer_set.contains(issuer));
-        for provider_jwks in on_chain_state.entries {
-            let x = self
+        for on_chain_provider_jwks in on_chain_state.entries {
+            let locally_cached = self
                 .states_by_issuer
-                .get(&provider_jwks.issuer)
+                .get(&on_chain_provider_jwks.issuer)
                 .and_then(|s| s.on_chain.as_ref());
-            if x != Some(&provider_jwks) {
+            if locally_cached == Some(&on_chain_provider_jwks) {
+                // The on-chain update did not touch this provider.
+                // The corresponding local state does not have to be reset.
+            } else {
                 self.states_by_issuer.insert(
-                    provider_jwks.issuer.clone(),
-                    PerProviderState::new(provider_jwks),
+                    on_chain_provider_jwks.issuer.clone(),
+                    PerProviderState::new(on_chain_provider_jwks),
                 );
             }
         }
@@ -249,7 +253,7 @@ impl JWKManager {
         }
     }
 
-    /// Triggered once the `certified_update_producer` produced a quorum-certified update.
+    /// Triggered once the `update_certifier` produced a quorum-certified update.
     pub fn process_quorum_certified_update(&mut self, update: QuorumCertifiedUpdate) -> Result<()> {
         let issuer = update.update.issuer.clone();
         let state = self.states_by_issuer.entry(issuer.clone()).or_default();
@@ -281,28 +285,25 @@ impl JWKManager {
 /// Then `JWKManager` needs to hold it. Once this resource is dropped, the corresponding QC update process will be cancelled.
 #[derive(Clone, Debug)]
 pub struct QuorumCertProcessGuard {
-    handle: Option<AbortHandle>,
+    handle: AbortHandle,
 }
 
 impl QuorumCertProcessGuard {
     pub fn new(handle: AbortHandle) -> Self {
-        Self {
-            handle: Some(handle),
-        }
+        Self { handle }
     }
 
     #[cfg(test)]
     pub fn dummy() -> Self {
-        Self { handle: None }
+        let (handle, _) = AbortHandle::new_pair();
+        Self { handle }
     }
 }
 
 impl Drop for QuorumCertProcessGuard {
     fn drop(&mut self) {
         let QuorumCertProcessGuard { handle } = self;
-        if let Some(handle) = handle {
-            handle.abort();
-        }
+        handle.abort();
     }
 }
 
@@ -360,6 +361,7 @@ impl ConsensusState {
         }
     }
 
+    #[cfg(test)]
     pub fn my_proposal_cloned(&self) -> ObservedUpdate {
         match self {
             ConsensusState::InProgress { my_proposal, .. }
@@ -395,12 +397,6 @@ impl PerProviderState {
         self.on_chain
             .as_ref()
             .map_or(0, |provider_jwks| provider_jwks.version)
-    }
-
-    pub fn reset_with_onchain_state(&mut self, onchain_state: ProviderJWKs) {
-        if self.on_chain.as_ref() != Some(&onchain_state) {
-            *self = Self::new(onchain_state)
-        }
     }
 }
 
