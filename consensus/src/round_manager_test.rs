@@ -2157,6 +2157,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         ..Default::default()
     };
 
+    let mut features = Features::default();
+    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let mut nodes = NodeSetup::create_nodes(
         &mut playground,
         runtime.handle().clone(),
@@ -2167,7 +2169,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
             vtxn: vtxn_config,
         }),
         Some(local_config),
-        None,
+        Some(features),
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
