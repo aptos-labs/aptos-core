@@ -398,8 +398,8 @@ impl ValueImpl {
             // copy of the data instead of a shallow copy of the Rc.
             Container(c) => Container(c.copy_value()?),
 
-            // Disallow copying of delayed values.
-            Delayed { .. } => return_delayed_value_error!(),
+            // Delayed values can be copied because this is how read_ref operates.
+            Delayed { id } => Delayed { id: *id },
         })
     }
 }
@@ -474,12 +474,6 @@ impl ContainerRef {
                 container: container.copy_by_ref(),
             },
         }
-    }
-}
-
-impl Value {
-    pub fn copy_value(&self) -> PartialVMResult<Self> {
-        Ok(Self(self.0.copy_value()?))
     }
 }
 

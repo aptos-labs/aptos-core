@@ -1,15 +1,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_core_types::value::{
-    IdentifierMappingKind, LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout,
-};
-use move_vm_types::{
+use crate::{
     value_transformation::{
         deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
         TransformationResult, ValueToIdentifierMapping,
     },
     values::{DelayedFieldID, Struct, Value},
+};
+use move_core_types::value::{
+    IdentifierMappingKind, LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout,
 };
 use std::{cell::RefCell, collections::BTreeMap};
 
@@ -47,16 +47,17 @@ impl ValueToIdentifierMapping for DelayedValueMapping {
     fn identifier_to_value(
         &self,
         _layout: &MoveTypeLayout,
-        identifier: Value,
+        _identifier: Value,
     ) -> TransformationResult<Value> {
-        let identifier = identifier.value_as::<DelayedFieldID>()?.unique_index as u64;
-
-        let delayed_values = self.delayed_values.borrow();
-        Ok(delayed_values
-            .get(&identifier)
-            .expect("Identifiers must always exist for delayed values")
-            .copy_value()
-            .expect("Copying extracted delayed values should never fail"))
+        todo!()
+        // let identifier = identifier.value_as::<DelayedFieldID>()?.unique_index as u64;
+        //
+        // let delayed_values = self.delayed_values.borrow();
+        // Ok(delayed_values
+        //     .get(&identifier)
+        //     .expect("Identifiers must always exist for delayed values")
+        //     .copy_value()
+        //     .expect("Copying extracted delayed values should never fail"))
     }
 }
 
