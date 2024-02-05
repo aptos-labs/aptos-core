@@ -38,7 +38,7 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
 
 struct SplitCriticalEdgesTransformation {
     data: FunctionData,
-    // labels used in the original codes and in the generated codes
+    // labels used in the original code and in the generated code
     labels: BTreeSet<Label>,
     srcs_count: BTreeMap<Label, usize>,
 }
@@ -78,18 +78,18 @@ impl SplitCriticalEdgesTransformation {
             self.split_critical_edge(attr_id, l1),
         ) {
             (None, None) => self.emit(Bytecode::Branch(attr_id, l0, l1, t)),
-            (None, Some((l1_new, codes))) => {
+            (None, Some((l1_new, code))) => {
                 self.emit(Bytecode::Branch(attr_id, l0, l1_new, t));
-                self.emit_codes(codes)
+                self.emit_codes(code)
             },
-            (Some((l0_new, codes)), None) => {
+            (Some((l0_new, code)), None) => {
                 self.emit(Bytecode::Branch(attr_id, l0_new, l1, t));
-                self.emit_codes(codes)
+                self.emit_codes(code)
             },
-            (Some((l0_new, codes0)), Some((l1_new, codes1))) => {
+            (Some((l0_new, code0)), Some((l1_new, code1))) => {
                 self.emit(Bytecode::Branch(attr_id, l0_new, l1_new, t));
-                self.emit_codes(codes0);
-                self.emit_codes(codes1);
+                self.emit_codes(code0);
+                self.emit_codes(code1);
             },
         }
     }
@@ -121,11 +121,11 @@ impl SplitCriticalEdgesTransformation {
     ///     - jumps to `label`
     fn split_edge(&mut self, attr_id: AttrId, label: Label) -> (Label, Vec<Bytecode>) {
         let new_label = self.gen_fresh_label();
-        let codes = vec![
+        let code = vec![
             Bytecode::Label(attr_id, new_label),
             Bytecode::Jump(attr_id, label),
         ];
-        (new_label, codes)
+        (new_label, code)
     }
 
     /// Generates a fresh label
@@ -145,9 +145,9 @@ impl SplitCriticalEdgesTransformation {
         self.data.code.push(bytecode)
     }
 
-    fn emit_codes(&mut self, codes: Vec<Bytecode>) {
-        for code in codes {
-            self.emit(code)
+    fn emit_codes(&mut self, code: Vec<Bytecode>) {
+        for instr in code {
+            self.emit(instr)
         }
     }
 }
@@ -168,10 +168,10 @@ fn map_inc<Key: Ord>(map: &mut BTreeMap<Key, usize>, key: Key) {
 
 /// Count the number of sources of labels
 /// labels with no sources are not included
-fn count_srcs(codes: &[Bytecode]) -> BTreeMap<Label, usize> {
+fn count_srcs(code: &[Bytecode]) -> BTreeMap<Label, usize> {
     let mut srcs_count = BTreeMap::new();
-    for (code_offset, code) in codes.iter().enumerate() {
-        match code {
+    for (code_offset, instr) in code.iter().enumerate() {
+        match instr {
             Bytecode::Jump(_, label) => map_inc(&mut srcs_count, *label),
             Bytecode::Branch(_, l0, l1, _) => {
                 map_inc(&mut srcs_count, *l0);
@@ -179,7 +179,7 @@ fn count_srcs(codes: &[Bytecode]) -> BTreeMap<Label, usize> {
             },
             Bytecode::Label(_, label) => {
                 if code_offset != 0 {
-                    let prev_instr = codes.get(code_offset - 1).unwrap();
+                    let prev_instr = code.get(code_offset - 1).unwrap();
                     // treat fall-through's to the label
                     if !prev_instr.is_branch() {
                         map_inc(&mut srcs_count, *label)
