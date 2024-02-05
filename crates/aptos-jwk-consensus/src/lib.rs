@@ -29,6 +29,7 @@ pub fn start_jwk_consensus_runtime(
     runtime
 }
 
+pub mod epoch_manager;
 pub mod jwk_manager;
 pub mod jwk_observer;
 pub mod network;
