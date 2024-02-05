@@ -769,6 +769,7 @@ dependencies = [
  "aptos",
  "aptos-crypto",
  "aptos-framework",
+ "aptos-gas-algebra",
  "aptos-gas-meter",
  "aptos-gas-profiling",
  "aptos-gas-schedule",

@@ -17,8 +17,8 @@ use aptos_bitvec::BitVec;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
-use aptos_gas_algebra::DynamicExpression;
-use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
+use aptos_gas_algebra::{DynamicExpression, Gas};
+use aptos_gas_meter::{AptosGasMeter, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{
     InitialGasSchedule, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
@@ -56,6 +56,7 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
+    gas::get_gas_parameters,
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
     verifier, AptosVM, VMExecutor, VMValidator,
 };
@@ -997,7 +998,24 @@ impl FakeExecutor {
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
         resolver: &impl AptosMoveResolver,
-    ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+    ) -> Result<(WriteSet, Vec<ContractEvent>, Gas), VMStatus> {
+        let (
+            gas_params_res,
+            storage_gas_params,
+            native_gas_params,
+            misc_gas_params,
+            gas_feature_version,
+        ) = get_gas_parameters(resolver);
+
+        let gas_params = gas_params_res.unwrap();
+        let mut gas_meter =
+            MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                gas_feature_version,
+                gas_params.clone().vm,
+                storage_gas_params.unwrap(),
+                10000000000000,
+            )));
+
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
@@ -1006,8 +1024,8 @@ impl FakeExecutor {
         features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
+            native_gas_params,
+            misc_gas_params,
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             features,
@@ -1025,16 +1043,19 @@ impl FakeExecutor {
             &function,
             struct_constructors,
         )?;
+        let gas_before = gas_meter.balance();
         session
             .execute_entry_function(
                 entry_fn.module(),
                 entry_fn.function(),
                 entry_fn.ty_args().to_vec(),
                 args,
-                &mut UnmeteredGasMeter,
+                &mut gas_meter,
             )
             .map_err(|e| e.into_vm_status())?;
 
+        let gas_after = gas_meter.balance();
+        let gas_used = gas_before.checked_sub(gas_after).unwrap();
         let mut change_set = session
             .finish(&ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
@@ -1045,7 +1066,7 @@ impl FakeExecutor {
             .try_into_storage_change_set()
             .expect("Failed to convert to ChangeSet")
             .into_inner();
-        Ok((write_set, events))
+        Ok((write_set, events, gas_used))
     }
 
     pub fn try_exec(

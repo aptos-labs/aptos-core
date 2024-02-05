@@ -42,7 +42,7 @@ pub(crate) fn get_gas_config_from_storage(
     }
 }
 
-pub(crate) fn get_gas_parameters(
+pub fn get_gas_parameters(
     config_storage: &impl ConfigStorage,
 ) -> (
     Result<AptosGasParameters, String>,

@@ -407,6 +407,10 @@ impl<U> GasQuantity<U> {
         let (n, d) = <U as ToUnitFractionalWithParams<P, T>>::ratio(params);
         GasQuantity::new(apply_ratio_round_up(self.val, n, d))
     }
+
+    pub fn get_val(&self) -> u64 {
+        self.val
+    }
 }
 /***************************************************************************************************
  * Per Unit

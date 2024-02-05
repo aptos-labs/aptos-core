@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_framework::APTOS_PACKAGES;
+use aptos_gas_algebra::Gas;
 use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
 use aptos_types::{
     contract_event::ContractEvent,
@@ -312,7 +313,7 @@ impl Execution {
         txn: &Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
-    ) -> Option<Result<(WriteSet, Vec<ContractEvent>), VMStatus>> {
+    ) -> Option<Result<(WriteSet, Vec<ContractEvent>, Gas), VMStatus>> {
         let executor = FakeExecutor::no_genesis();
         let mut executor = executor.set_not_parallel();
         *executor.data_store_mut() = state;
@@ -350,13 +351,19 @@ impl Execution {
             Some(
                 executor
                     .execute_transaction_block_with_resolver([txn.clone()].to_vec(), &data_view)
-                    .map(|res| res[0].clone().into()),
+                    .map(|res| {
+                        let (write_set, event_list) = res[0].clone().into();
+                        (write_set, event_list, Gas::new(res[0].gas_used()))
+                    }),
             )
         } else {
             Some(
                 executor
                     .execute_transaction_block(vec![txn.clone()])
-                    .map(|res| res[0].clone().into()),
+                    .map(|res| {
+                        let (write_set, event_list) = res[0].clone().into();
+                        (write_set, event_list, Gas::new(res[0].gas_used()))
+                    }),
             )
         }
     }
@@ -364,8 +371,8 @@ impl Execution {
     fn print_mismatches(
         &self,
         cur_version: u64,
-        res_1: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
-        res_2: &Result<(WriteSet, Vec<ContractEvent>), VMStatus>,
+        res_1: &Result<(WriteSet, Vec<ContractEvent>, Gas), VMStatus>,
+        res_2: &Result<(WriteSet, Vec<ContractEvent>, Gas), VMStatus>,
     ) {
         match (res_1, res_2) {
             (Err(e1), Err(e2)) => {
@@ -390,6 +397,19 @@ impl Execution {
                 ));
             },
             (Ok(res_1), Ok(res_2)) => {
+                let gas_1 = res_1.2;
+                let gas_2 = res_2.2;
+                let v2_consumed = gas_2.ge(&gas_1);
+                if v2_consumed {
+                    let diff = gas_2.checked_sub(gas_1).unwrap();
+                    self.output_result_str(format!(
+                        "V2 gas is greater than v1, v1:{}, v2:{}, diff:{}% at version:{}",
+                        gas_1,
+                        gas_2,
+                        diff.get_val() * 100 / gas_1.get_val(),
+                        cur_version
+                    ));
+                }
                 // compare events
                 for idx in 0..res_1.1.len() {
                     let event_1 = &res_1.1[idx];
