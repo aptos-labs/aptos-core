@@ -64,7 +64,7 @@ impl JWKObserver {
         observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>)>,
     ) -> Self {
         let (close_tx, close_rx) = oneshot::channel();
-        let join_handle = tokio::spawn(Self::thread_main(
+        let join_handle = tokio::spawn(Self::start(
             fetch_interval,
             my_addr,
             issuer.clone(),
@@ -83,7 +83,7 @@ impl JWKObserver {
         }
     }
 
-    async fn thread_main(
+    async fn start(
         fetch_interval: Duration,
         my_addr: AccountAddress,
         issuer: Issuer,
