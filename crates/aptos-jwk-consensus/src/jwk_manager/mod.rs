@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    certified_update_producer::CertifiedUpdateProducer,
+    update_certifier::TUpdateCertifier,
     jwk_observer::JWKObserver,
     network::IncomingRpcRequest,
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse},
@@ -42,7 +42,7 @@ pub struct JWKManager {
     consensus_key: Arc<PrivateKey>,
 
     /// The sub-process that collects JWK updates from peers and aggregate them into a quorum-certified JWK update.
-    certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
+    update_certifier: Arc<dyn TUpdateCertifier>,
 
     /// When a quorum-certified JWK update is available, use this to put it into the validator transaction pool.
     vtxn_pool: VTxnPoolState,
@@ -62,14 +62,14 @@ impl JWKManager {
         consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        certified_update_producer: Arc<dyn CertifiedUpdateProducer>,
+        update_certifier: Arc<dyn UpdateCertifier>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
             consensus_key,
             my_addr,
             epoch_state,
-            certified_update_producer,
+            update_certifier,
             vtxn_pool,
             states_by_issuer: HashMap::default(),
             stopped: false,
@@ -169,7 +169,7 @@ impl JWKManager {
                 .consensus_key
                 .sign(&observed)
                 .map_err(|e| anyhow!("crypto material error occurred duing signing: {}", e))?;
-            let abort_handle = self.certified_update_producer.start_produce(
+            let abort_handle = self.update_certifier.start_produce(
                 self.epoch_state.clone(),
                 observed.clone(),
                 self.qc_update_tx.clone().unwrap(),
@@ -252,7 +252,7 @@ impl JWKManager {
         }
     }
 
-    /// Triggered once the `certified_update_producer` produced a quorum-certified update.
+    /// Triggered once the `update_certifier` produced a quorum-certified update.
     pub fn process_quorum_certified_update(&mut self, update: QuorumCertifiedUpdate) -> Result<()> {
         let issuer = update.update.issuer.clone();
         let state = self.states_by_issuer.entry(issuer.clone()).or_default();
