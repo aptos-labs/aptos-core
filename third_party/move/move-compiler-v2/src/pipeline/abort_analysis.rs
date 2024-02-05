@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Computes if a given code offset
-//! - may lead to an abort, or
-//! - leads to an abort, or
-//! - doesn't lead to an abort
+//! Computes at a given program point, how the program may exit later.
+//! Does the program returns, aborts, or doesn't terminate?
+//! Check documentation of `ExitState` for more on the abstract domain used in the analysis.
+//! The analysis is intraprocedural, and considers any user function may abort.
 
 use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
@@ -21,16 +21,15 @@ use move_stackless_bytecode::{
 use std::{collections::BTreeMap, fmt::Display};
 
 /// The power set lattice of `ExitStatus`
+///
+/// - the join operation is set union
 /// - the top element is { Return, Abort }: may return, abort, or not terminate
 /// - { Return }: may return or not terminate
 /// - { Abort }: may abort or not terminate
 /// - the bot element is {}: don't terminate
-/// - the join operation is set union
 ///
-/// The interpretation of the lattice is as follows:
-/// if a program point has state `s : ExitState`, then all
-/// execution paths containing the program point can only
-/// ends in one of the exit state in `s`.
+/// That is, if at a program point the abstract state is `s`, then from that point,
+/// the program can only exit in the exit states contained in `s`, if the program does terminate.
 #[derive(AbstractDomain, Clone)]
 pub struct ExitState(SetDomain<ExitStatus>);
 
