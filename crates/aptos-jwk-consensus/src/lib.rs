@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::types::JWKConsensusMsg;
 use crate::{
-    epoch_manager::EpochManager, network::NetworkTask, network_interface::JWKConsensusNetworkClient,
+    epoch_manager::EpochManager, network::NetworkTask,
+    network_interface::JWKConsensusNetworkClient, types::JWKConsensusMsg,
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_event_notifications::{
