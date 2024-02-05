@@ -5,7 +5,7 @@
 use crate::serde_helper::bcs_utils::{bcs_size_of_byte_array, size_u32_as_uleb128};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_types::values::{Struct, Value};
+use move_vm_types::values::{SizedID, Struct, Value};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
@@ -84,6 +84,18 @@ impl From<(u32, u32)> for DelayedFieldID {
     fn from(value: (u32, u32)) -> Self {
         let (index, width) = value;
         Self::new_with_width(index, width)
+    }
+}
+
+impl From<DelayedFieldID> for SizedID {
+    fn from(id: DelayedFieldID) -> Self {
+        Self::new(id.unique_index, id.width)
+    }
+}
+
+impl From<SizedID> for DelayedFieldID {
+    fn from(sized_id: SizedID) -> Self {
+        Self::new_with_width(sized_id.id(), sized_id.serialized_size())
     }
 }
 
