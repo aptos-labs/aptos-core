@@ -26,7 +26,7 @@ use aptos_types::{
 use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use futures_util::future::AbortHandle;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };

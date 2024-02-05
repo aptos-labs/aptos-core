@@ -45,7 +45,7 @@ impl TUpdateCertifier for CertifiedUpdateProducer {
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        qc_update_tx: aptos_channel::Sender<(), QuorumCertifiedUpdate>,
+        qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle {
         let rb = self.reliable_broadcast.clone();
         let req = ObservedUpdateRequest {
