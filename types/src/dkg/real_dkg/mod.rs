@@ -16,7 +16,7 @@ use aptos_dkg::{
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use rounding::{
-    RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD, STEP_SIZE, WEIGHT_PER_VALIDATOR_MAX,
+    RECONSTRUCT_THRESHOLD, STAKE_GAP_THRESHOLD, STEPS, WEIGHT_PER_VALIDATOR_MAX,
     WEIGHT_PER_VALIDATOR_MIN,
 };
 use serde::{Deserialize, Serialize};
@@ -61,14 +61,12 @@ pub fn build_dkg_pvss_config(
     // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
     // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
 
-    let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * next_validators.len();
-    let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * next_validators.len();
     let dkg_rounding = DKGRounding::new(
         validator_stakes.clone(),
-        total_weight_min,
-        total_weight_max,
-        STEP_SIZE,
-        SECRECY_THRESHOLD,
+        STAKE_GAP_THRESHOLD,
+        WEIGHT_PER_VALIDATOR_MIN,
+        WEIGHT_PER_VALIDATOR_MAX,
+        STEPS,
         RECONSTRUCT_THRESHOLD,
     );
 
