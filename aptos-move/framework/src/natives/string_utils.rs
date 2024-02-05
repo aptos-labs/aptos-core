@@ -13,7 +13,7 @@ use move_core_types::{
     account_address::AccountAddress,
     language_storage::TypeTag,
     u256,
-    value::{LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
@@ -303,12 +303,11 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Native(tag, ty) => match tag {
-            // There is no need to show any lifting information!
-            // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
-            // Can we modify this to print tagging info, or is this something that cannot be changed
-            LayoutTag::IdentifierMapping(_) => native_format_impl(context, ty, val, depth, out)?,
-        },
+
+        // There is no need to show any lifting information!
+        // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
+        // Can we modify this to print tagging info, or is this something that cannot be changed
+        MoveTypeLayout::Native(_, ty) => native_format_impl(context, ty, val, depth, out)?,
     };
     if context.include_int_type {
         write!(out, "{}", suffix).unwrap();

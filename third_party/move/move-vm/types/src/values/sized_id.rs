@@ -15,11 +15,18 @@ pub struct SizedID {
 const NUM_BITS_FOR_SERIALIZED_SIZE: usize = 32;
 
 impl SizedID {
-    fn id(&self) -> u32 {
+    pub fn new(id: u32, serialized_size: u32) -> Self {
+        Self {
+            id,
+            serialized_size,
+        }
+    }
+
+    pub fn id(&self) -> u32 {
         self.id
     }
 
-    fn serialized_size(&self) -> u32 {
+    pub fn serialized_size(&self) -> u32 {
         self.serialized_size
     }
 }

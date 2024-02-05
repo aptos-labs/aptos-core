@@ -98,16 +98,6 @@ pub enum IdentifierMappingKind {
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
-pub enum LayoutTag {
-    /// The current type corresponds to an aggregator or a snapshot values
-    /// and requires special handling in serialization and deserialization:
-    /// the concrete values have to be replaced with unique identifiers and
-    /// back.
-    IdentifierMapping(IdentifierMappingKind),
-}
-
-#[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(arbitrary::Arbitrary))]
 pub enum MoveTypeLayout {
     #[serde(rename(serialize = "bool", deserialize = "bool"))]
     Bool,
@@ -134,7 +124,9 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "u256", deserialize = "u256"))]
     U256,
 
-    Native(LayoutTag, Box<MoveTypeLayout>),
+    // TODO[agg_v2](cleanup): Shift to registry based implementation so
+    //  we do not have to maintain so many enums.
+    Native(IdentifierMappingKind, Box<MoveTypeLayout>),
 }
 
 impl MoveValue {
@@ -349,11 +341,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
-            MoveTypeLayout::Native(tag, layout) => match tag {
-                // Serialization ignores the tag for types which correspond to aggregator or
-                // snapshot values.
-                LayoutTag::IdentifierMapping(_) => layout.deserialize(deserializer),
-            },
+
+            // TODO[agg_v2](check): it might be better to fail here instead?
+            MoveTypeLayout::Native(_, layout) => layout.deserialize(deserializer),
         }
     }
 }
@@ -555,9 +545,9 @@ impl fmt::Display for MoveTypeLayout {
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => write!(f, "{}", s),
             Signer => write!(f, "signer"),
-            Native(tag, typ) => match tag {
-                LayoutTag::IdentifierMapping(_) => write!(f, "{}", typ),
-            },
+
+            // TODO[agg_v2](check): check if we want to print the kind.
+            Native(_, typ) => write!(f, "{}", typ),
         }
     }
 }
@@ -604,9 +594,9 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
-            MoveTypeLayout::Native(tag, v) => match tag {
-                LayoutTag::IdentifierMapping(_) => v.as_ref().try_into()?,
-            },
+
+            // TODO[agg_v2](check): should we fail instead?
+            MoveTypeLayout::Native(_, v) => v.as_ref().try_into()?,
         })
     }
 }

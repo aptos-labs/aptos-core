@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_format::{Constant, SignatureToken};
-use move_core_types::value::{LayoutTag, MoveTypeLayout, MoveValue};
+use move_core_types::value::{MoveTypeLayout, MoveValue};
 
 fn sig_to_ty(sig: &SignatureToken) -> Option<MoveTypeLayout> {
     match sig {
@@ -38,10 +38,9 @@ fn ty_to_sig(ty: &MoveTypeLayout) -> Option<SignatureToken> {
         MoveTypeLayout::Vector(v) => Some(SignatureToken::Vector(Box::new(ty_to_sig(v.as_ref())?))),
         MoveTypeLayout::Struct(_) => None,
         MoveTypeLayout::Bool => Some(SignatureToken::Bool),
-        MoveTypeLayout::Native(tag, layout) => match tag {
-            // Ignore aggregator / snapshot mappings.
-            LayoutTag::IdentifierMapping(_) => ty_to_sig(layout.as_ref()),
-        },
+
+        // It is not possible to have native layout for constant values.
+        MoveTypeLayout::Native(_, _layout) => None,
     }
 }
 

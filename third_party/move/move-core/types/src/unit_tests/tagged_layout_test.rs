@@ -4,9 +4,7 @@
 use crate::{
     account_address::AccountAddress,
     u256,
-    value::{
-        IdentifierMappingKind, LayoutTag, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue,
-    },
+    value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
 };
 
 fn assert_same_serialization(
@@ -24,10 +22,7 @@ fn assert_same_serialization(
 macro_rules! aggregator_mapping {
     ($layout:expr) => {
         // Note: the actual kind is not important fot tests.
-        MoveTypeLayout::Native(
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-            Box::new($layout),
-        )
+        MoveTypeLayout::Native(IdentifierMappingKind::Aggregator, Box::new($layout))
     };
 }
 

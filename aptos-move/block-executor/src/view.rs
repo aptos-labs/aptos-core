@@ -18,7 +18,7 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
         code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition, TryFromMoveValue, TryIntoMoveValue,
+        ReadPosition,
     },
 };
 use aptos_logger::error;
@@ -57,10 +57,11 @@ use move_core_types::{
 };
 use move_vm_types::{
     value_serde::{
-        deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
-        TransformationError, TransformationResult, ValueToIdentifierMapping,
+        deserialize_and_allow_native_values, deserialize_and_replace_values_with_ids,
+        serialize_and_allow_native_values, serialize_and_replace_ids_with_values,
+        ValueToIdentifierMapping,
     },
-    values::Value,
+    values::{SizedID, Value},
 };
 use std::{
     cell::RefCell,
@@ -453,6 +454,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         }
     }
 
+    #[allow(dead_code)]
     fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.versioned_map
             .delayed_fields()
@@ -777,10 +779,12 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
         }
     }
 
+    #[allow(dead_code)]
     fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.unsync_map.write_delayed_field(id, base_value)
     }
 
+    #[allow(dead_code)]
     fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
         self.unsync_map.fetch_delayed_field(&id)
     }
@@ -1080,8 +1084,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                patched_value
-                    .simple_serialize(layout)
+                serialize_and_allow_native_values(&patched_value, layout)
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
@@ -1102,7 +1105,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     ) -> anyhow::Result<(Bytes, HashSet<T::Identifier>)> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
-        let value = Value::simple_deserialize(bytes, layout).ok_or_else(|| {
+        let value = deserialize_and_allow_native_values(bytes, layout).ok_or_else(|| {
             anyhow::anyhow!(
                 "Failed to deserialize resource during id replacement: {:?}",
                 bytes
@@ -1115,7 +1118,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok((patched_bytes, mapping.into_inner()))
     }
 
-    // Given a bytes, where values were already exchanged with idnetifiers,
+    // Given a bytes, where values were already exchanged with identifiers,
     // return a list of identifiers present in it.
     fn extract_identifiers_from_value(
         &self,
@@ -1830,6 +1833,7 @@ struct TemporaryValueToIdentifierMapping<
     X: Executable,
 > {
     latest_view: &'a LatestView<'a, T, S, X>,
+    #[allow(dead_code)]
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
@@ -1847,6 +1851,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
         }
     }
 
+    #[allow(dead_code)]
     fn generate_delayed_field_id(&self, width: u32) -> T::Identifier {
         self.latest_view.generate_delayed_field_id(width)
     }
@@ -1864,42 +1869,43 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
 {
     fn value_to_identifier(
         &self,
-        kind: &IdentifierMappingKind,
-        layout: &MoveTypeLayout,
-        value: Value,
-    ) -> TransformationResult<Value> {
-        let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
-        let id = self.generate_delayed_field_id(width);
-        match &self.latest_view.latest_view {
-            ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
-            ViewState::Unsync(state) => {
-                state.set_delayed_field_value(id, base_value);
-            },
-        };
-        self.delayed_field_keys.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
+        _kind: &IdentifierMappingKind,
+        _layout: &MoveTypeLayout,
+        _value: Value,
+    ) -> PartialVMResult<SizedID> {
+        todo!()
+        // let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
+        // let id = self.generate_delayed_field_id(width);
+        // match &self.latest_view.latest_view {
+        //     ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
+        //     ViewState::Unsync(state) => {
+        //         state.set_delayed_field_value(id, base_value);
+        //     },
+        // };
+        // self.delayed_field_keys.borrow_mut().insert(id);
+        // Ok(id.try_into_move_value(layout)?)
     }
 
     fn identifier_to_value(
         &self,
-        layout: &MoveTypeLayout,
-        identifier_value: Value,
-    ) -> TransformationResult<Value> {
-        let (id, width) = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_keys.borrow_mut().insert(id);
-        Ok(match &self.latest_view.latest_view {
-            ViewState::Sync(state) => state
-                .versioned_map
-                .delayed_fields()
-                .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
-                .expect("Committed value for ID must always exist"),
-            ViewState::Unsync(state) => state
-                .read_delayed_field(id)
-                .expect("Delayed field value for ID must always exist in sequential execution"),
-        }
-        .try_into_move_value(layout, width)?)
+        _layout: &MoveTypeLayout,
+        _identifier: SizedID,
+    ) -> PartialVMResult<Value> {
+        todo!()
+        // let (id, width) = T::Identifier::try_from_move_value(layout, identifier_value, &())
+        //     .map_err(|e| e.into())?;
+        // self.delayed_field_keys.borrow_mut().insert(id);
+        // match &self.latest_view.latest_view {
+        //     ViewState::Sync(state) => state
+        //         .versioned_map
+        //         .delayed_fields()
+        //         .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
+        //         .expect("Committed value for ID must always exist"),
+        //     ViewState::Unsync(state) => state
+        //         .read_delayed_field(id)
+        //         .expect("Delayed field value for ID must always exist in sequential execution"),
+        // }
+        // .try_into_move_value(layout, width)
     }
 }
 
@@ -1925,26 +1931,24 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
     fn value_to_identifier(
         &self,
         _kind: &IdentifierMappingKind,
-        layout: &MoveTypeLayout,
-        value: Value,
-    ) -> TransformationResult<Value> {
-        let (id, _) = T::Identifier::try_from_move_value(layout, value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_keys.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
+        _layout: &MoveTypeLayout,
+        _value: Value,
+    ) -> PartialVMResult<SizedID> {
+        todo!()
+        // let (id, _) = T::Identifier::try_from_move_value(layout, value, &())?;
+        // self.delayed_field_keys.borrow_mut().insert(id);
+        // id.try_into_move_value(layout)
     }
 
     fn identifier_to_value(
         &self,
-        layout: &MoveTypeLayout,
-        identifier_value: Value,
-    ) -> TransformationResult<Value> {
-        let (id, _) = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_keys.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
+        _layout: &MoveTypeLayout,
+        _identifier: SizedID,
+    ) -> PartialVMResult<Value> {
+        todo!()
+        // let (id, _) = T::Identifier::try_from_move_value(layout, identifier_value, &())?;
+        // self.delayed_field_keys.borrow_mut().insert(id);
+        // id.try_into_move_value(layout)
     }
 }
 
@@ -1984,9 +1988,7 @@ mod test {
     use aptos_vm_types::resolver::TResourceView;
     use bytes::Bytes;
     use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
-    use move_core_types::value::{
-        IdentifierMappingKind, LayoutTag, MoveStructLayout, MoveTypeLayout,
-    };
+    use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
     use move_vm_types::values::{Struct, Value};
     use std::{cell::RefCell, collections::HashMap, sync::atomic::AtomicU32};
     use test_case::test_case;
@@ -2529,10 +2531,7 @@ mod test {
 
     fn create_aggregator_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
         MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-            MoveTypeLayout::Native(
-                LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-                Box::new(inner.clone()),
-            ),
+            MoveTypeLayout::Native(IdentifierMappingKind::Aggregator, Box::new(inner.clone())),
             inner.clone(),
         ]))
     }
@@ -2543,14 +2542,14 @@ mod test {
 
     fn create_snapshot_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
         MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Native(
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
+            IdentifierMappingKind::Snapshot,
             Box::new(inner),
         )]))
     }
 
     fn create_derived_string_layout() -> MoveTypeLayout {
         MoveTypeLayout::Native(
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
+            IdentifierMappingKind::DerivedString,
             Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 create_string_layout(),
                 create_vector_layout(MoveTypeLayout::U8),

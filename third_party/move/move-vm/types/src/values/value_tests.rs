@@ -139,7 +139,7 @@ fn global_value_non_struct() -> PartialVMResult<()> {
 }
 
 #[test]
-fn leagacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
+fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
     let mut locals = Locals::new(10);
 
     locals.store_loc(0, Value::u128(0), false)?;
@@ -233,7 +233,7 @@ mod delayed_values {
 
     #[test]
     fn test_delayed_value_equality() {
-        let v = Value::delayed_value(0, 8);
+        let v = Value::native_value(SizedID::new(0, 8));
 
         // Comparing delayed to all other values results in error.
 
@@ -267,7 +267,7 @@ mod delayed_values {
         assert_err!(Value::struct_(s).equals(&v));
 
         // Comparing delayed to other delayed, even self, results in error.
-        assert_err!(Value::delayed_value(0, 1).equals(&v));
+        assert_err!(Value::native_value(SizedID::new(0, 1)).equals(&v));
         assert_err!(v.equals(&v));
     }
 
@@ -282,7 +282,7 @@ mod delayed_values {
 
     #[test]
     fn test_delayed_value_borrow() {
-        let delayed_value = Value::delayed_value(0, 8);
+        let delayed_value = Value::native_value(SizedID::new(0, 8));
         let mut locals = Locals::new(1);
         assert_ok!(locals.store_loc(0, delayed_value, false));
 
@@ -291,7 +291,7 @@ mod delayed_values {
         let v = assert_ok!(reference.read_ref());
 
         let expected_id = assert_ok!(v.value_as::<SizedID>());
-        assert_eq!(expected_id.unique_index, 0);
-        assert_eq!(expected_id.width, 8);
+        assert_eq!(expected_id.id(), 0);
+        assert_eq!(expected_id.serialized_size(), 8);
     }
 }

@@ -6,7 +6,7 @@ use crate::FuzzTargetImpl;
 use anyhow::{bail, Result};
 use aptos_proptest_helpers::ValueGenerator;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use move_core_types::value::{LayoutTag, MoveStructLayout, MoveTypeLayout};
+use move_core_types::value::{MoveStructLayout, MoveTypeLayout};
 use move_vm_types::values::{prop::layout_and_value_strategy, Value};
 use std::io::Cursor;
 
@@ -48,9 +48,8 @@ fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
             true
         },
 
-        L::Vector(layout) | L::Native(LayoutTag::IdentifierMapping(_), layout) => {
-            is_valid_layout(layout)
-        },
+        // TODO[agg_v2](cleanup): check if we need to make native layouts invalid?
+        L::Vector(layout) | L::Native(_, layout) => is_valid_layout(layout),
 
         L::Struct(struct_layout) => {
             if !matches!(struct_layout, MoveStructLayout::Runtime(_))

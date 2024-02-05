@@ -3029,7 +3029,7 @@ pub mod debug {
  *   is to involve an explicit representation of the type layout.
  *
  **************************************************************************************/
-use crate::value_serde::{CustomDeserialize, CustomSerialize};
+use crate::value_serde::{CustomDeserialize, CustomSerialize, NativeValueSimpleSerDe};
 use serde::{
     de::Error as DeError,
     ser::{Error as SerError, SerializeSeq, SerializeTuple},
@@ -3039,7 +3039,7 @@ use serde::{
 impl Value {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let seed = DeserializationSeed {
-            native_deserializer: None,
+            native_deserializer: None::<&NativeValueSimpleSerDe>,
             layout,
         };
         bcs::from_bytes_seed(seed, blob).ok()
@@ -3047,7 +3047,7 @@ impl Value {
 
     pub fn simple_serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&SerializationReadyValue {
-            native_serializer: None,
+            native_serializer: None::<&NativeValueSimpleSerDe>,
             layout,
             value: &self.0,
         })
@@ -3058,7 +3058,7 @@ impl Value {
 impl Struct {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveStructLayout) -> Option<Struct> {
         let seed = DeserializationSeed {
-            native_deserializer: None,
+            native_deserializer: None::<&NativeValueSimpleSerDe>,
             layout,
         };
         bcs::from_bytes_seed(seed, blob).ok()
@@ -3066,7 +3066,7 @@ impl Struct {
 
     pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&SerializationReadyValue {
-            native_serializer: None,
+            native_serializer: None::<&NativeValueSimpleSerDe>,
             layout,
             value: &self.fields,
         })
@@ -3194,7 +3194,7 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
     }
 }
 
-impl<'c, 'l, 'v, T: CustomSerialize> serde::Serialize
+impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
     for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>, C>
 {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -3220,7 +3220,6 @@ impl<'c, 'l, 'v, T: CustomSerialize> serde::Serialize
 
 // Seed used by deserializer to ensure there is information about the value
 // being deserialized.
-#[derive(Clone)]
 pub(crate) struct DeserializationSeed<'c, L, C> {
     // Allows to deserialize values in the custom format using external deserializer.
     pub(crate) native_deserializer: Option<&'c C>,
@@ -3324,9 +3323,9 @@ impl<'d, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
     }
 }
 
-struct VectorElementVisitor<'t, 'l, S>(DeserializationSeed<'t, &'l MoveTypeLayout, S>);
+struct VectorElementVisitor<'c, 'l, C>(DeserializationSeed<'c, &'l MoveTypeLayout, C>);
 
-impl<'d, 't, 'l, S: serde::Deserialize> serde::de::Visitor<'d> for VectorElementVisitor<'t, 'l, S> {
+impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l, C> {
     type Value = Vec<ValueImpl>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3338,14 +3337,17 @@ impl<'d, 't, 'l, S: serde::Deserialize> serde::de::Visitor<'d> for VectorElement
         A: serde::de::SeqAccess<'d>,
     {
         let mut vals = Vec::new();
-        while let Some(elem) = seq.next_element_seed(self.0.clone())? {
+        while let Some(elem) = seq.next_element_seed(DeserializationSeed {
+            native_deserializer: self.0.native_deserializer,
+            layout: self.0.layout,
+        })? {
             vals.push(elem.0)
         }
         Ok(vals)
     }
 }
 
-struct StructFieldVisitor<'c, 'l, S>(Option<&'c dyn CustomDeserialize>, &'l [MoveTypeLayout]);
+struct StructFieldVisitor<'c, 'l, C>(Option<&'c C>, &'l [MoveTypeLayout]);
 
 impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l, C> {
     type Value = Vec<Value>;
@@ -3781,9 +3783,9 @@ pub mod prop {
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
 
-            L::Native(tag, layout) => match tag {
-                LayoutTag::IdentifierMapping(_) => value_strategy_with_layout(layout.as_ref()),
-            },
+            // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
+            //  even skip kinds of layouts)?
+            L::Native(_, layout) => value_strategy_with_layout(layout.as_ref()),
         }
     }
 
@@ -3819,14 +3821,14 @@ pub mod prop {
     }
 }
 
-use move_core_types::value::{LayoutTag, MoveStruct, MoveValue};
+use move_core_types::value::{MoveStruct, MoveValue};
 
 impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         use MoveTypeLayout as L;
 
         // Make sure to strip all tags from the type layout.
-        if let L::Native(LayoutTag::IdentifierMapping(_), layout) = layout {
+        if let L::Native(_, layout) = layout {
             return self.as_move_value(layout.as_ref());
         }
 
