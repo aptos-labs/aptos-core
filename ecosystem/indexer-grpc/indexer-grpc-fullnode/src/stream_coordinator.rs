@@ -189,6 +189,15 @@ impl IndexerStreamCoordinator {
         for response in responses {
             if self.transactions_sender.send(Ok(response)).await.is_err() {
                 // Error from closed channel. This means the client has disconnected.
+                error!(
+                    start_version = first_version,
+                    end_version = end_version,
+                    num_transactions as u64,
+                    highest_known_version,
+                    duration_in_secs = sending_start_time.elapsed().as_secs_f64(),
+                    error = format!("{:?}", e),
+                    "[Indexer Fullnode] Error sending transactions to client."
+                );
                 return vec![];
             }
         }
