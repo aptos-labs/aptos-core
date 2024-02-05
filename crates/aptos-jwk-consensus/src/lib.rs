@@ -11,7 +11,6 @@ use aptos_event_notifications::{
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_types::account_address::AccountAddress;
 use aptos_validator_transaction_pool::VTxnPoolState;
-use futures_util::StreamExt;
 use tokio::runtime::Runtime;
 
 #[allow(clippy::let_and_return)]
@@ -42,6 +41,7 @@ pub fn start_jwk_consensus_runtime(
     runtime
 }
 
+pub mod counters;
 pub mod epoch_manager;
 pub mod jwk_manager;
 pub mod jwk_observer;
