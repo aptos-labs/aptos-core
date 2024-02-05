@@ -34,7 +34,7 @@ fn test_rounding_uniform_distribution() {
     // assuming each validator has a stake between 1_000_000 and 50_000_000, following uniform distribution
     // randomly generate 100~500 validators' stake distribution
     for _ in 0..num_runs {
-        let validator_num = rng.gen_range(100, 250);
+        let validator_num = rng.gen_range(100, 500);
         let mut validator_stakes = vec![];
         for _ in 0..validator_num {
             validator_stakes.push(rng.gen_range(1_000_000, 50_000_000));
@@ -76,7 +76,7 @@ fn test_rounding_zipf_distribution() {
     // assuming each validator has a stake between 1_000_000 and 50_000_000, following zipf distribution
     // randomly generate 100~500 validators' stake distribution
     for _ in 0..num_runs {
-        let validator_num = rng.gen_range(100, 250);
+        let validator_num = rng.gen_range(100, 500);
         let validator_stakes = generate_approximate_zipf(validator_num, 1_000_000, 50_000_000, 5.0);
         let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * validator_num;
         let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * validator_num;

@@ -12,6 +12,8 @@ pub const WEIGHT_PER_VALIDATOR_MAX: usize = 30;
 pub const STEP_SIZE: usize = 1;
 pub const SECRECY_THRESHOLD: f64 = 0.5;
 pub const RECONSTRUCT_THRESHOLD: f64 = 0.6667;
+// assuming 500 validator each has 100 shares
+pub const MAX_STEPS: usize = 50_000;
 
 #[derive(Clone, Debug)]
 pub struct DKGRounding {
@@ -113,11 +115,9 @@ impl DKGRoundingProfile {
         assert!(secrecy_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio);
         assert!(secrecy_threshold_in_stake_ratio <= 2.0 / 3.0);
 
-        let mut maybe_best_profile: Option<DKGRoundingProfile> = None;
         let mut step = 0;
-
         // Search for the feasible rounding profile until found.
-        while maybe_best_profile.is_none() {
+        loop {
             let total_weight = total_weight_min + step_size * step;
             step += 1;
 
@@ -126,9 +126,12 @@ impl DKGRoundingProfile {
                 total_weight,
                 secrecy_threshold_in_stake_ratio,
             );
+            if step > MAX_STEPS {
+                return profile;
+            }
 
-            // This check makes sure the randomness is live: 2/3 stakes can always reconstruct the randomness.
-            if profile.reconstruct_threshold_in_stake_ratio > 2.0 / 3.0 {
+            // This check makes sure the randomness is live.
+            if profile.reconstruct_threshold_in_stake_ratio > reconstruct_threshold_in_stake_ratio {
                 continue;
             }
 
@@ -137,25 +140,8 @@ impl DKGRoundingProfile {
                 continue;
             }
 
-            if maybe_best_profile.is_none() {
-                maybe_best_profile = Some(profile.clone());
-            }
-
-            if maybe_best_profile
-                .as_ref()
-                .unwrap()
-                .reconstruct_threshold_in_stake_ratio
-                > profile.reconstruct_threshold_in_stake_ratio
-            {
-                maybe_best_profile = Some(profile.clone());
-            }
-
-            if profile.reconstruct_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio
-            {
-                break;
-            }
+            return profile;
         }
-        maybe_best_profile.unwrap()
     }
 }
 
