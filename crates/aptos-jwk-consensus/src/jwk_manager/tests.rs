@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    update_certifier::TUpdateCertifier,
     jwk_manager::{ConsensusState, JWKManager, PerProviderState, QuorumCertProcessGuard},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
+    update_certifier::TUpdateCertifier,
 };
+use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey, Signature},
@@ -15,6 +16,7 @@ use aptos_crypto::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     epoch_state::EpochState,
     jwks::{
         issuer_from_str, jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, Issuer,
@@ -30,8 +32,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use aptos_bitvec::BitVec;
-use aptos_types::aggregate_signature::AggregateSignature;
 
 #[tokio::test]
 async fn test_jwk_manager_state_transition() {
@@ -310,7 +310,7 @@ async fn test_jwk_manager_state_transition() {
         .consensus_state
         .my_proposal_cloned()
         .observed;
-    let signer_bit_vec = BitVec::from(private_keys.iter().map(|_|true).collect::<Vec<_>>());
+    let signer_bit_vec = BitVec::from(private_keys.iter().map(|_| true).collect::<Vec<_>>());
     let sig = Signature::aggregate(
         private_keys
             .iter()
@@ -381,7 +381,13 @@ async fn test_jwk_manager_state_transition() {
         .consensus_state
         .my_proposal_cloned()
         .observed;
-    let signer_bit_vec = BitVec::from(private_keys.iter().take(3).map(|_|true).collect::<Vec<_>>());
+    let signer_bit_vec = BitVec::from(
+        private_keys
+            .iter()
+            .take(3)
+            .map(|_| true)
+            .collect::<Vec<_>>(),
+    );
     let sig = Signature::aggregate(
         private_keys
             .iter()

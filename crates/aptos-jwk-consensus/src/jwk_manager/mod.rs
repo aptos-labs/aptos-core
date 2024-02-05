@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    update_certifier::TUpdateCertifier,
     jwk_observer::JWKObserver,
     network::IncomingRpcRequest,
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateResponse},
+    update_certifier::TUpdateCertifier,
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
