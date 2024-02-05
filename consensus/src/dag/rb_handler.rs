@@ -99,6 +99,7 @@ impl NodeBroadcastHandler {
         println!("validate/1");
         for vtxn in node.validator_txns() {
             println!("validate/1.5/0");
+            println!("vtxn={:?}", vtxn);
             ensure!(
                 is_vtxn_expected(&self.features, vtxn),
                 "unexpected validator transaction: {:?}",
