@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::types::PanicOr;
-use aptos_types::aggregator::PanicError;
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::delayed_fields::PanicError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IntentionalFallbackToSequential {
@@ -13,28 +14,29 @@ pub enum IntentionalFallbackToSequential {
     /// TODO: (short-mid term) relax the limitation, and (mid-long term) provide proper multi-versioning
     /// for code (like data) for the cache.
     ModulePathReadWrite,
-    /// We defensively check certain resource group related invariant violations.
-    ResourceGroupError(String),
+    /// We defensively check resource group serialization error in the commit phase.
+    /// TODO: should trigger invariant violation in the transaction itself.
+    ResourceGroupSerializationError(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Error<E> {
+pub enum BlockExecutionError<E> {
     FallbackToSequential(PanicOr<IntentionalFallbackToSequential>),
-    /// Execution of a thread yields a non-recoverable error, such error will be propagated back to
-    /// the caller (leading to the block execution getting aborted). TODO: revisit name (UserError).
-    UserError(E),
+    /// Execution of a thread yields a non-recoverable error from the VM. Such an error will be propagated
+    /// back to the caller (leading to the block execution getting aborted).
+    FatalVMError((E, TxnIndex)),
 }
 
-pub type Result<T, E> = ::std::result::Result<T, Error<E>>;
+pub type BlockExecutionResult<T, E> = Result<T, BlockExecutionError<E>>;
 
-impl<E> From<PanicOr<IntentionalFallbackToSequential>> for Error<E> {
+impl<E> From<PanicOr<IntentionalFallbackToSequential>> for BlockExecutionError<E> {
     fn from(err: PanicOr<IntentionalFallbackToSequential>) -> Self {
-        Error::FallbackToSequential(err)
+        BlockExecutionError::FallbackToSequential(err)
     }
 }
 
-impl<E> From<PanicError> for Error<E> {
+impl<E> From<PanicError> for BlockExecutionError<E> {
     fn from(err: PanicError) -> Self {
-        Error::FallbackToSequential(err.into())
+        BlockExecutionError::FallbackToSequential(err.into())
     }
 }

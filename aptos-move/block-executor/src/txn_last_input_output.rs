@@ -3,7 +3,7 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    errors::{Error, IntentionalFallbackToSequential},
+    errors::{BlockExecutionError, IntentionalFallbackToSequential},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
@@ -34,7 +34,7 @@ type TxnInput<T> = CapturedReads<T>;
 // the WriteOps corresponding to the deltas in the corresponding outputs.
 #[derive(Debug)]
 pub(crate) struct TxnOutput<O: TransactionOutput, E: Debug> {
-    output_status: ExecutionStatus<O, Error<E>>,
+    output_status: ExecutionStatus<O, BlockExecutionError<E>>,
 }
 
 pub(crate) enum KeyKind {
@@ -44,11 +44,11 @@ pub(crate) enum KeyKind {
 }
 
 impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
-    pub fn from_output_status(output_status: ExecutionStatus<O, Error<E>>) -> Self {
+    pub fn from_output_status(output_status: ExecutionStatus<O, BlockExecutionError<E>>) -> Self {
         Self { output_status }
     }
 
-    pub fn output_status(&self) -> &ExecutionStatus<O, Error<E>> {
+    pub fn output_status(&self) -> &ExecutionStatus<O, BlockExecutionError<E>> {
         &self.output_status
     }
 }
@@ -126,14 +126,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
         input: CapturedReads<T>,
-        output: ExecutionStatus<O, Error<E>>,
+        output: ExecutionStatus<O, BlockExecutionError<E>>,
     ) -> bool {
         let written_modules = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 output.module_write_set()
             },
             ExecutionStatus::Abort(_)
-            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
         };
@@ -212,21 +211,31 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn maybe_execution_error(&self, txn_idx: TxnIndex) -> Option<Error<E>> {
+    pub(crate) fn module_rw_intersection_ok(
+        &self,
+    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
         if self.module_read_write_intersection.load(Ordering::Acquire) {
-            return Some(Error::FallbackToSequential(PanicOr::Or(
+            Err(PanicOr::Or(
                 IntentionalFallbackToSequential::ModulePathReadWrite,
-            )));
+            ))
+        } else {
+            Ok(())
         }
+    }
 
+    pub(crate) fn aborted_execution_status(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Option<BlockExecutionError<E>> {
         if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
             .output_status
         {
-            return Some(err.clone());
+            Some(err.clone())
+        } else {
+            None
         }
-        None
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
@@ -271,7 +280,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                         ),
                 ),
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -288,7 +296,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.resource_write_set())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -306,7 +313,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.delayed_field_change_set().into_keys())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -324,7 +330,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.reads_needing_delayed_field_exchange())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -342,7 +347,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.group_reads_needing_delayed_field_exchange())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -356,7 +360,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     t.aggregator_v1_delta_set().into_keys().collect()
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             },
@@ -371,7 +374,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     t.resource_group_metadata_ops()
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             },
@@ -390,7 +392,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Box::new(events.into_iter())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
                     Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
@@ -437,7 +438,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 );
             },
             ExecutionStatus::Abort(_)
-            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
@@ -462,7 +462,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
             ExecutionStatus::Abort(_)
-            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
         }
@@ -470,7 +469,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, Error<E>> {
+    pub(crate) fn take_output(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> ExecutionStatus<O, BlockExecutionError<E>> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");

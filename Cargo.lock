@@ -9,6 +9,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
+name = "abstract-domain-derive"
+version = "0.1.0"
+dependencies = [
+ "move-stackless-bytecode",
+ "proc-macro2 1.0.75",
+ "quote 1.0.35",
+ "syn 2.0.47",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -302,7 +312,7 @@ dependencies = [
  "toml 0.7.8",
  "tonic 0.10.2",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
  "version-compare",
  "walkdir",
 ]
@@ -2142,7 +2152,7 @@ dependencies = [
  "toml 0.7.8",
  "tonic 0.10.2",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
  "warp",
 ]
 
@@ -2321,7 +2331,7 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
  "warp",
 ]
 
@@ -2415,7 +2425,7 @@ dependencies = [
  "toml 0.7.8",
  "tonic 0.10.2",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
  "url",
  "warp",
 ]
@@ -2486,15 +2496,37 @@ dependencies = [
 name = "aptos-jwk-consensus"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "aptos-bitvec",
+ "aptos-bounded-executor",
+ "aptos-channels",
  "aptos-config",
+ "aptos-consensus-types",
+ "aptos-crypto",
+ "aptos-enum-conversion-derive",
  "aptos-event-notifications",
+ "aptos-global-constants",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
  "aptos-network",
+ "aptos-reliable-broadcast",
  "aptos-runtimes",
+ "aptos-time-service",
  "aptos-types",
  "aptos-validator-transaction-pool",
+ "async-trait",
+ "bytes",
+ "futures",
+ "futures-channel",
  "futures-util",
+ "move-core-types",
+ "once_cell",
+ "reqwest",
  "serde",
+ "serde_json",
  "tokio",
+ "tokio-retry",
 ]
 
 [[package]]
@@ -2596,7 +2628,7 @@ dependencies = [
  "strum_macros 0.24.3",
  "tokio",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
 ]
 
 [[package]]
@@ -2872,10 +2904,12 @@ dependencies = [
  "itertools 0.10.5",
  "maplit",
  "once_cell",
+ "ordered-float 3.9.2",
  "pin-project 1.1.3",
  "proptest",
  "proptest-derive 0.4.0",
  "rand 0.7.3",
+ "rand 0.8.5",
  "rand_core 0.5.1",
  "serde",
  "serde_bytes",
@@ -3506,6 +3540,7 @@ dependencies = [
 name = "aptos-safety-rules"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
@@ -4133,6 +4168,7 @@ dependencies = [
  "aptos-experimental-runtimes",
  "ark-bn254",
  "ark-ff",
+ "ark-groth16",
  "ark-serialize",
  "arr_macro",
  "async-trait",
@@ -4165,6 +4201,7 @@ dependencies = [
  "rayon",
  "regex",
  "serde",
+ "serde-big-array",
  "serde_bytes",
  "serde_json",
  "serde_with",
@@ -4242,6 +4279,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-bitvec",
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-crypto",
@@ -4391,6 +4429,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "rand 0.7.3",
  "serde",
  "test-case",
 ]
@@ -4496,6 +4535,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-crypto-primitives"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f3a13b34da09176a8baba701233fdffbaa7c1b1192ce031a3da4e55ce1f1a56"
+dependencies = [
+ "ark-ec",
+ "ark-ff",
+ "ark-relations",
+ "ark-serialize",
+ "ark-snark",
+ "ark-std",
+ "blake2",
+ "derivative",
+ "digest 0.10.7",
+ "rayon",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "ark-ec"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4509,6 +4567,7 @@ dependencies = [
  "hashbrown 0.13.2",
  "itertools 0.10.5",
  "num-traits",
+ "rayon",
  "zeroize",
 ]
 
@@ -4528,6 +4587,7 @@ dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
  "paste",
+ "rayon",
  "rustc_version",
  "zeroize",
 ]
@@ -4556,6 +4616,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-groth16"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20ceafa83848c3e390f1cbf124bc3193b3e639b3f02009e0e290809a501b95fc"
+dependencies = [
+ "ark-crypto-primitives",
+ "ark-ec",
+ "ark-ff",
+ "ark-poly",
+ "ark-relations",
+ "ark-serialize",
+ "ark-std",
+ "rayon",
+]
+
+[[package]]
 name = "ark-poly"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4566,6 +4642,19 @@ dependencies = [
  "ark-std",
  "derivative",
  "hashbrown 0.13.2",
+ "rayon",
+]
+
+[[package]]
+name = "ark-relations"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00796b6efc05a3f48225e59cb6a2cda78881e7c390872d5786aaf112f31fb4f0"
+dependencies = [
+ "ark-ff",
+ "ark-std",
+ "tracing",
+ "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -4592,6 +4681,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ark-snark"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84d3cc6833a335bb8a600241889ead68ee89a3cf8448081fb7694c0fe503da63"
+dependencies = [
+ "ark-ff",
+ "ark-relations",
+ "ark-serialize",
+ "ark-std",
+]
+
+[[package]]
 name = "ark-std"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4599,6 +4700,7 @@ checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
  "rand 0.8.5",
+ "rayon",
 ]
 
 [[package]]
@@ -6123,7 +6225,7 @@ dependencies = [
  "tonic 0.9.2",
  "tracing",
  "tracing-core",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
 ]
 
 [[package]]
@@ -7820,6 +7922,22 @@ checksum = "46303f565772937ffe1d394a4fac6f411c6013172fadde9dcdb1e147a086940e"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+]
+
+[[package]]
+name = "flexi_logger"
+version = "0.27.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "469e584c031833564840fb0cdbce99bdfe946fd45480a188545e73a76f45461c"
+dependencies = [
+ "chrono",
+ "glob",
+ "is-terminal",
+ "lazy_static",
+ "log",
+ "nu-ansi-term 0.49.0",
+ "regex",
+ "thiserror",
 ]
 
 [[package]]
@@ -10540,6 +10658,7 @@ dependencies = [
 name = "move-compiler-v2"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "bcs 0.1.4",
  "clap 4.4.12",
@@ -10547,8 +10666,10 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "ethnum",
+ "flexi_logger",
  "im",
  "itertools 0.10.5",
+ "log",
  "move-binary-format",
  "move-bytecode-source-map",
  "move-command-line-common",
@@ -10572,6 +10693,7 @@ version = "0.1.0"
 dependencies = [
  "datatest-stable",
  "move-command-line-common",
+ "move-compiler-v2",
  "move-transactional-test-runner",
  "once_cell",
 ]
@@ -10910,6 +11032,7 @@ dependencies = [
 name = "move-prover-bytecode-pipeline"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "async-trait",
  "atty",
@@ -10968,6 +11091,7 @@ dependencies = [
 name = "move-stackless-bytecode"
 version = "0.1.0"
 dependencies = [
+ "abstract-domain-derive",
  "anyhow",
  "codespan",
  "codespan-reporting",
@@ -11459,6 +11583,15 @@ checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
 dependencies = [
  "overload",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "nu-ansi-term"
+version = "0.49.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c073d3c1930d0751774acf49e66653acecb416c3a54c6ec095a9b11caddb5a68"
+dependencies = [
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -14180,6 +14313,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-big-array"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11fc7cc2c76d73e0f27ee52abbd64eec84d46f370c88371120433196934e4b7f"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde-generate"
 version = "0.20.6"
 source = "git+https://github.com/aptos-labs/serde-reflection?rev=73b6bbf748334b71ff6d7d09d06a29e3062ca075#73b6bbf748334b71ff6d7d09d06a29e3062ca075"
@@ -14413,7 +14555,7 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
  "warp",
 ]
 
@@ -15300,7 +15442,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
  "tracing",
- "tracing-subscriber",
+ "tracing-subscriber 0.3.18",
 ]
 
 [[package]]
@@ -15986,12 +16128,21 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
+version = "0.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
+dependencies = [
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad0f048c97dbd9faa9b7df56362b8ebcaa52adb06b498c050d2f4e32f90a7a8b"
 dependencies = [
  "matchers",
- "nu-ansi-term",
+ "nu-ansi-term 0.46.0",
  "once_cell",
  "regex",
  "serde",

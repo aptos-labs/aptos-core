@@ -12,6 +12,7 @@
 
 use super::ability_checker::check_copy;
 use crate::pipeline::ability_checker::has_ability;
+use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{Ability, CodeOffset};
@@ -218,15 +219,9 @@ impl LiveVarAnalysisProcessor {
 // Dataflow Analysis
 
 /// State of the livevar analysis,
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
+#[derive(AbstractDomain, Debug, Clone, Eq, PartialEq, PartialOrd)]
 struct LiveVarState {
     livevars: MapDomain<TempIndex, LiveVarInfo>,
-}
-
-impl AbstractDomain for LiveVarState {
-    fn join(&mut self, other: &Self) -> JoinResult {
-        self.livevars.join(&other.livevars)
-    }
 }
 
 impl AbstractDomain for LiveVarInfo {

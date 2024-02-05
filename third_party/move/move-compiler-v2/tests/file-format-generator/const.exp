@@ -1,3 +1,71 @@
+
+Diagnostics:
+warning: Unused local variable `const_true`. Consider removing or prefixing with an underscore: `_const_true`
+  ┌─ tests/file-format-generator/const.move:3:13
+  │
+3 │         let const_true = true;
+  │             ^^^^^^^^^^
+
+warning: Unused local variable `const_false`. Consider removing or prefixing with an underscore: `_const_false`
+  ┌─ tests/file-format-generator/const.move:4:13
+  │
+4 │         let const_false = false;
+  │             ^^^^^^^^^^^
+
+warning: Unused local variable `hex_u8`. Consider removing or prefixing with an underscore: `_hex_u8`
+  ┌─ tests/file-format-generator/const.move:5:13
+  │
+5 │         let hex_u8: u8 = 0x1;
+  │             ^^^^^^
+
+warning: Unused local variable `hex_u16`. Consider removing or prefixing with an underscore: `_hex_u16`
+  ┌─ tests/file-format-generator/const.move:6:13
+  │
+6 │         let hex_u16: u16 = 0x1BAE;
+  │             ^^^^^^^
+
+warning: Unused local variable `hex_u32`. Consider removing or prefixing with an underscore: `_hex_u32`
+  ┌─ tests/file-format-generator/const.move:7:13
+  │
+7 │         let hex_u32: u32 = 0xDEAD80;
+  │             ^^^^^^^
+
+warning: Unused local variable `hex_u64`. Consider removing or prefixing with an underscore: `_hex_u64`
+  ┌─ tests/file-format-generator/const.move:8:13
+  │
+8 │         let hex_u64: u64 = 0xCAFE;
+  │             ^^^^^^^
+
+warning: Unused local variable `hex_u128`. Consider removing or prefixing with an underscore: `_hex_u128`
+  ┌─ tests/file-format-generator/const.move:9:13
+  │
+9 │         let hex_u128: u128 = 0xDEADBEEF;
+  │             ^^^^^^^^
+
+warning: Unused local variable `hex_u256`. Consider removing or prefixing with an underscore: `_hex_u256`
+   ┌─ tests/file-format-generator/const.move:10:13
+   │
+10 │         let hex_u256: u256 = 0x1123_456A_BCDE_F;
+   │             ^^^^^^^^
+
+warning: Unused local variable `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/file-format-generator/const.move:11:13
+   │
+11 │         let a = @0x42;
+   │             ^
+
+warning: Unused local variable `vec`. Consider removing or prefixing with an underscore: `_vec`
+   ┌─ tests/file-format-generator/const.move:12:13
+   │
+12 │         let vec = vector[1, 2, 3];
+   │             ^^^
+
+warning: Unused local variable `s`. Consider removing or prefixing with an underscore: `_s`
+   ┌─ tests/file-format-generator/const.move:13:13
+   │
+13 │         let s = b"Hello!\n";
+   │             ^
+
 ============ initial bytecode ================
 
 [variant baseline]

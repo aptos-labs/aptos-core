@@ -48,6 +48,10 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+Any:
+  STRUCT:
+    - type_name: STR
+    - data: BYTES
 AnyPublicKey:
   ENUM:
     0:
@@ -420,10 +424,6 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
-DummyValidatorTransaction:
-  STRUCT:
-    - valid: BOOL
-    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -473,15 +473,24 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+G1Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
+G2Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 64
 Groth16Zkp:
   STRUCT:
     - a:
-        SEQ: STR
+        TYPENAME: G1Bytes
     - b:
-        SEQ:
-          SEQ: STR
+        TYPENAME: G2Bytes
     - c:
-        SEQ: STR
+        TYPENAME: G1Bytes
 HashValue:
   STRUCT:
     - hash:
@@ -495,6 +504,10 @@ IdCommitment:
       SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
+JWKMoveStruct:
+  STRUCT:
+    - variant:
+        TYPENAME: Any
 LedgerInfo:
   STRUCT:
     - commit_info:
@@ -631,6 +644,13 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+ProviderJWKs:
+  STRUCT:
+    - issuer: BYTES
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
 PublicKey:
   NEWTYPESTRUCT: BYTES
 QuorumCert:
@@ -639,6 +659,12 @@ QuorumCert:
         TYPENAME: VoteData
     - signed_ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+QuorumCertifiedUpdate:
+  STRUCT:
+    - update:
+        TYPENAME: ProviderJWKs
+    - multi_sig:
+        TYPENAME: AggregateSignature
 RandGenMessage:
   STRUCT:
     - epoch: U64
@@ -707,6 +733,12 @@ SignedBatchInfoMsg:
     - signed_infos:
         SEQ:
           TYPENAME: SignedBatchInfo
+SignedGroth16Zkp:
+  STRUCT:
+    - proof:
+        TYPENAME: Groth16Zkp
+    - non_malleability_signature:
+        TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -947,17 +979,13 @@ ValidatorConsensusInfo:
 ValidatorTransaction:
   ENUM:
     0:
-      DummyTopic1:
-        NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
-    1:
       DKGResult:
         NEWTYPE:
           TYPENAME: DKGTranscript
-    2:
-      DummyTopic2:
+    1:
+      ObservedJWKUpdate:
         NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
+          TYPENAME: QuorumCertifiedUpdate
 ValidatorVerifier:
   STRUCT:
     - validator_infos:
@@ -1067,7 +1095,7 @@ ZkpOrOpenIdSig:
     0:
       Groth16Zkp:
         NEWTYPE:
-          TYPENAME: Groth16Zkp
+          TYPENAME: SignedGroth16Zkp
     1:
       OpenIdSig:
         NEWTYPE:

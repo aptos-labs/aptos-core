@@ -1386,8 +1386,37 @@ impl AptosVM {
             ));
         }
 
-        zkid_validation::validate_zkid_authenticators(transaction, resolver, session, log_context)?;
+        // zkID feature gating
+        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction);
+        match &authenticators {
+            Ok(authenticators) => {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                    }
+                    if (!self.features.is_zkid_enabled() || !self.features.is_zkid_zkless_enabled())
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                    }
+                }
+            },
+            Err(_) => {
+                return Err(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
+            },
+        }
 
+        zkid_validation::validate_zkid_authenticators(
+            &authenticators.unwrap(),
+            resolver,
+            self.move_vm.get_chain_id(),
+        )?;
+
+        // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
+        // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
+        // end up skipping validation.
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -1619,12 +1648,29 @@ impl AptosVM {
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
 
         match write_set_payload {
-            WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
-                change_set.clone(),
-                &change_set_configs,
-                resolver.is_delayed_field_optimization_capable(),
-            )
-            .map_err(|e| e.into_vm_status()),
+            WriteSetPayload::Direct(change_set) => {
+                // this transaction is never delayed field capable.
+                // it requires restarting execution afterwards,
+                // which allows it to be used as last transaction in delayed_field_enabled context.
+                let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+                    change_set.clone(),
+                    &change_set_configs,
+                )
+                .map_err(|e| e.into_vm_status())?;
+
+                // validate_waypoint_change_set checks that this is true, so we only log here.
+                if !Self::should_restart_execution(&change) {
+                    // This invariant needs to hold irrespectively, so we log error always.
+                    // but if we are in delayed_field_optimization_capable context, we cannot execute any transaction after this.
+                    // as transaction afterwards would be executed assuming delayed fields are exchanged and
+                    // resource groups are split, but WriteSetPayload::Direct has materialized writes,
+                    // and so after executing this transaction versioned state is inconsistent.
+                    error!(
+                        "[aptos_vm] direct write set finished without requiring should_restart_execution");
+                }
+
+                Ok(change)
+            },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -1977,10 +2023,9 @@ impl AptosVM {
         }
     }
 
-    pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
+    pub fn should_restart_execution(vm_change_set: &VMChangeSet) -> bool {
         let new_epoch_event_key = new_epoch_event_key();
-        vm_output
-            .change_set()
+        vm_change_set
             .events()
             .iter()
             .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
@@ -2236,25 +2281,6 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
-
-        if !self.features.is_zkid_enabled() || !self.features.is_open_id_signature_enabled() {
-            if let Ok(authenticators) = aptos_types::zkid::get_zkid_authenticators(&transaction) {
-                for (_, sig) in authenticators {
-                    if !self.features.is_zkid_enabled()
-                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
-                    {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                    if !self.features.is_open_id_signature_enabled()
-                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
-                    {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                }
-            } else {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            };
-        };
 
         let txn = match transaction.check_signature() {
             Ok(t) => t,

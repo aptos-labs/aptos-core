@@ -39,6 +39,15 @@ pub static RECONFIGURATION_WITH_DKG_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 
 pub const FINISH_WITH_DKG_RESULT: &IdentStr = ident_str!("finish_with_dkg_result");
 
+pub static JWKS_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("jwks").to_owned(),
+    )
+});
+
+pub const UPSERT_INTO_OBSERVED_JWKS: &IdentStr = ident_str!("upsert_into_observed_jwks");
+
 pub static MULTISIG_ACCOUNT_MODULE: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(
         account_config::CORE_CODE_ADDRESS,

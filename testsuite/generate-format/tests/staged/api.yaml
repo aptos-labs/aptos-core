@@ -47,6 +47,17 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+AggregateSignature:
+  STRUCT:
+    - validator_bitmask:
+        TYPENAME: BitVec
+    - sig:
+        OPTION:
+          TYPENAME: Signature
+Any:
+  STRUCT:
+    - type_name: STR
+    - data: BYTES
 AnyPublicKey:
   ENUM:
     0:
@@ -191,10 +202,6 @@ DKGTranscriptMetadata:
 DepositEvent:
   STRUCT:
     - amount: U64
-DummyValidatorTransaction:
-  STRUCT:
-    - valid: BOOL
-    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -260,15 +267,24 @@ ExecutionStatus:
       MiscellaneousError:
         NEWTYPE:
           OPTION: U64
+G1Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 32
+G2Bytes:
+  NEWTYPESTRUCT:
+    TUPLEARRAY:
+      CONTENT: U8
+      SIZE: 64
 Groth16Zkp:
   STRUCT:
     - a:
-        SEQ: STR
+        TYPENAME: G1Bytes
     - b:
-        SEQ:
-          SEQ: STR
+        TYPENAME: G2Bytes
     - c:
-        SEQ: STR
+        TYPENAME: G1Bytes
 HashValue:
   STRUCT:
     - hash:
@@ -282,6 +298,10 @@ IdCommitment:
       SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
+JWKMoveStruct:
+  STRUCT:
+    - variant:
+        TYPENAME: Any
 Module:
   STRUCT:
     - code: BYTES
@@ -364,6 +384,23 @@ Pepper:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 31
+PrivateKey:
+  NEWTYPESTRUCT: BYTES
+ProviderJWKs:
+  STRUCT:
+    - issuer: BYTES
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
+PublicKey:
+  NEWTYPESTRUCT: BYTES
+QuorumCertifiedUpdate:
+  STRUCT:
+    - update:
+        TYPENAME: ProviderJWKs
+    - multi_sig:
+        TYPENAME: AggregateSignature
 RandMetadata:
   STRUCT:
     - metadata_to_sign:
@@ -413,6 +450,14 @@ Secp256r1EcdsaPublicKey:
   NEWTYPESTRUCT: BYTES
 Secp256r1EcdsaSignature:
   NEWTYPESTRUCT: BYTES
+Signature:
+  NEWTYPESTRUCT: BYTES
+SignedGroth16Zkp:
+  STRUCT:
+    - proof:
+        TYPENAME: Groth16Zkp
+    - non_malleability_signature:
+        TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -669,17 +714,13 @@ TypeTag:
 ValidatorTransaction:
   ENUM:
     0:
-      DummyTopic1:
-        NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
-    1:
       DKGResult:
         NEWTYPE:
           TYPENAME: DKGTranscript
-    2:
-      DummyTopic2:
+    1:
+      ObservedJWKUpdate:
         NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
+          TYPENAME: QuorumCertifiedUpdate
 WithdrawEvent:
   STRUCT:
     - amount: U64
@@ -760,7 +801,7 @@ ZkpOrOpenIdSig:
     0:
       Groth16Zkp:
         NEWTYPE:
-          TYPENAME: Groth16Zkp
+          TYPENAME: SignedGroth16Zkp
     1:
       OpenIdSig:
         NEWTYPE:

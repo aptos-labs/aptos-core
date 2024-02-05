@@ -48,8 +48,6 @@ use std::{
     },
 };
 
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -69,7 +67,7 @@ where
     type Key = K;
 
     // Contains mock storage value with STORAGE_AGGREGATOR_VALUE.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
         Ok(Some(StateValue::new_legacy(
             serialize(&STORAGE_AGGREGATOR_VALUE).into(),
         )))
@@ -79,7 +77,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -95,7 +93,7 @@ where
     type Key = K;
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
-    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateviewError> {
         if self.group_keys.contains(key) {
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
@@ -110,7 +108,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -126,7 +124,7 @@ where
     type Key = K;
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
         Ok(None)
     }
 
@@ -134,7 +132,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         unreachable!("Not used in tests");
     }
 }
