@@ -94,27 +94,20 @@ impl NodeBroadcastHandler {
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
         let num_vtxns = node.validator_txns().len() as u64;
-        println!("validate/0");
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
-        println!("validate/1");
         for vtxn in node.validator_txns() {
-            println!("validate/1.5/0");
-            println!("vtxn={:?}", vtxn);
             ensure!(
                 is_vtxn_expected(&self.features, vtxn),
                 "unexpected validator transaction: {:?}",
                 vtxn.topic()
             );
-            println!("validate/1.5/1");
         }
-        println!("validate/2");
         let vtxn_total_bytes = node
             .validator_txns()
             .iter()
             .map(ValidatorTransaction::size_in_bytes)
             .sum::<usize>() as u64;
         ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
-        println!("validate/3");
 
         let num_txns = num_vtxns + node.payload().len() as u64;
         let txn_bytes = vtxn_total_bytes + node.payload().size() as u64;

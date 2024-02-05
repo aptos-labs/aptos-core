@@ -213,34 +213,25 @@ async fn test_dag_e2e() {
     let runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());
     let (signers, validators) = random_validator_verifier(num_nodes, None, false);
-    println!("test_dag_e2e/1");
     let (nodes, mut ordered_node_receivers) = bootstrap_nodes(&mut playground, signers, validators);
     for node in nodes {
         runtime.spawn(node.start());
     }
-    println!("test_dag_e2e/2");
 
     runtime.spawn(playground.start());
-    println!("test_dag_e2e/3");
 
-    for i in 1..10 {
-        println!("test_dag_e2e/4/{i}/0");
+    for _ in 1..10 {
         let mut all_ordered = vec![];
         for receiver in &mut ordered_node_receivers {
             let block = receiver.next().await.unwrap();
             all_ordered.push(block.ordered_blocks)
         }
-        println!("test_dag_e2e/4/{i}/1");
         let first = all_ordered.first().unwrap();
-        println!("test_dag_e2e/4/{i}/2");
         assert_gt!(first.len(), 0, "must order nodes");
-        debug!("Nodes: {:?}", first);
         for a in all_ordered.iter() {
             assert_eq!(a.len(), first.len(), "length should match");
             assert_eq!(a, first);
         }
     }
-    println!("test_dag_e2e/3");
     runtime.shutdown_background();
-    println!("test_dag_e2e/4");
 }
