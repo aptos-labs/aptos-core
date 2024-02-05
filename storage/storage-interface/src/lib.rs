@@ -30,8 +30,9 @@ use aptos_types::{
         ShardedStateUpdates,
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -168,6 +169,11 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
             fetch_events: bool,
         ) -> Result<TransactionWithProof>;
+
+        fn get_transaction_auxiliary_data_by_version(
+            &self,
+            version: Version,
+        ) -> Result<TransactionAuxiliaryData>;
 
         /// See [AptosDB::get_first_txn_version].
         ///

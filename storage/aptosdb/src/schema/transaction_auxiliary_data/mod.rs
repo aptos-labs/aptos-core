@@ -2,12 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines physical storage schema for TransactionInfo structure.
+//! This module defines physical storage schema for TransactionAuxiliaryData structure.
 //!
 //! Serialized signed transaction bytes identified by version.
 //! ```text
 //! |<--key-->|<-----value---->|
-//! | version | txn_info bytes |
+//! | version | txn_auxiliary_data bytes |
 //! ```
 //!
 //! `Version` is serialized in big endian so that records in RocksDB will be in order of it's

@@ -29,6 +29,11 @@ Ok(
             status: Keep(
                 Success,
             ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: None,
+                },
+            ),
         },
     ],
 )

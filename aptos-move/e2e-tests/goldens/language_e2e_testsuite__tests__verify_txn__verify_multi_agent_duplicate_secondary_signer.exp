@@ -13,6 +13,11 @@ Ok(
             status: Discard(
                 SIGNERS_CONTAIN_DUPLICATES,
             ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: None,
+                },
+            ),
         },
     ],
 )

@@ -66,7 +66,7 @@ fn failed_transaction_cleanup_test() {
         .map(|(k, v)| (k, assert_some!(v)))
         .collect();
     assert!(
-        out1.auxiliary_data().detail_error_message.is_some(),
+        out1.auxiliary_data().get_detail_error_message().is_some(),
         "detail error shouldn't be empty"
     );
     assert!(!write_set.is_empty());

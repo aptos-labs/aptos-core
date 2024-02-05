@@ -4,7 +4,10 @@
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
-        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_infos},
+        test_helper::{
+            arb_blocks_to_commit, put_as_state_root, put_transaction_auxiliary_data,
+            put_transaction_infos,
+        },
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -24,7 +27,11 @@ use aptos_types::{
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
     },
-    transaction::{ExecutionStatus, TransactionInfo, TransactionToCommit, Version},
+    transaction::{
+        ExecutionStatus, TransactionAuxiliaryData, TransactionAuxiliaryDataV1, TransactionInfo,
+        TransactionToCommit, VMErrorDetail, Version,
+    },
+    vm_status::StatusCode,
 };
 use proptest::prelude::*;
 use std::{collections::HashSet, sync::Arc};
@@ -138,6 +145,31 @@ fn test_error_if_version_pruned() {
         "AptosDB Other Error: Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
+}
+
+#[test]
+fn test_get_transaction_auxiliary_data() {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let aux_1 = TransactionAuxiliaryData::V1(TransactionAuxiliaryDataV1 {
+        detail_error_message: Some(VMErrorDetail::new(StatusCode::TYPE_MISMATCH, None)),
+    });
+    let aux_2 = TransactionAuxiliaryData::V1(TransactionAuxiliaryDataV1 {
+        detail_error_message: Some(VMErrorDetail::new(
+            StatusCode::ARITHMETIC_ERROR,
+            Some("divided by 0".to_string()),
+        )),
+    });
+    let txns = vec![aux_1.clone(), aux_2.clone()];
+    put_transaction_auxiliary_data(&db, 0, &txns);
+    assert_eq!(
+        db.get_transaction_auxiliary_data_by_version(0).unwrap(),
+        aux_1
+    );
+    assert_eq!(
+        db.get_transaction_auxiliary_data_by_version(1).unwrap(),
+        aux_2
+    );
 }
 
 #[test]

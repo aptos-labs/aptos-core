@@ -82,7 +82,6 @@ impl DbWriter for AptosDB {
         })
     }
 
-    // TODO(bowu): populate the flag indicating the fast_sync is done.
     fn finalize_state_snapshot(
         &self,
         version: Version,
@@ -489,10 +488,8 @@ impl AptosDB {
             .start_timer();
 
         let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
         txns_to_commit
-            .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 128))
+            .iter()
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 TransactionAuxiliaryDataDb::put_transaction_auxiliary_data(
