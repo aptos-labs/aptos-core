@@ -1308,7 +1308,6 @@ fn recover_on_restart() {
         None,
         None,
         None,
-        None,
     )
     .pop()
     .unwrap();
