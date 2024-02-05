@@ -214,8 +214,9 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
-        // Ability checker is functionally not relevant so can be completely skipped if safety is off
+        // only used for ability checking
         pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
+        // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }
     // The default optimization pipeline is currently always run by the compiler.
