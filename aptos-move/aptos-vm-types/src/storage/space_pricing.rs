@@ -191,16 +191,15 @@ impl DiskSpacePricing {
             Modification { write_len } => {
                 // Change of slot size or per byte price can result in a charge or refund of the bytes fee.
                 let old_bytes_deposit = op.metadata_mut.bytes_deposit();
-                let state_bytes_charge = if write_len > op.prev_size as u64
-                    && target_bytes_deposit > old_bytes_deposit
-                {
-                    let charge_by_increase: u64 = (write_len - op.prev_size as u64)
-                        * u64::from(params.storage_fee_per_state_byte);
-                    let gap_from_target = target_bytes_deposit - old_bytes_deposit;
-                    std::cmp::min(charge_by_increase, gap_from_target)
-                } else {
-                    0
-                };
+                let state_bytes_charge =
+                    if write_len > op.prev_size && target_bytes_deposit > old_bytes_deposit {
+                        let charge_by_increase: u64 = (write_len - op.prev_size)
+                            * u64::from(params.storage_fee_per_state_byte);
+                        let gap_from_target = target_bytes_deposit - old_bytes_deposit;
+                        std::cmp::min(charge_by_increase, gap_from_target)
+                    } else {
+                        0
+                    };
                 op.metadata_mut.maybe_upgrade();
                 op.metadata_mut
                     .set_bytes_deposit(old_bytes_deposit + state_bytes_charge);
