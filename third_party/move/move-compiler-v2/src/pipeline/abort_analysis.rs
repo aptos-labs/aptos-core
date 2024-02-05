@@ -5,6 +5,8 @@
 //! Does the program returns, aborts, or doesn't terminate?
 //! Check documentation of `ExitState` for more on the abstract domain used in the analysis.
 //! The analysis is intraprocedural, and considers any user function may abort.
+//!
+//! Requires: The program cannot silently exits, i.e., neither returns nor aborts, but runs out of instructions.
 
 use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
