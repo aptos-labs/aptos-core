@@ -13,6 +13,7 @@ use move_compiler_v2::{
         exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
+        split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover,
@@ -223,6 +224,7 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/ability-checker/") {
+            pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
