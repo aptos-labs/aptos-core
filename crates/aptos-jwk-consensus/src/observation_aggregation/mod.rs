@@ -5,7 +5,6 @@ use crate::types::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
-use aptos_crypto::bls12381::Signature;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
@@ -15,8 +14,6 @@ use aptos_types::{
 };
 use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeSet, sync::Arc};
-use aptos_bitvec::BitVec;
-use aptos_types::aggregate_signature::AggregateSignature;
 
 /// The aggregation state of reliable broadcast where a validator broadcast JWK observation requests
 /// and produce quorum-certified JWK updates.
