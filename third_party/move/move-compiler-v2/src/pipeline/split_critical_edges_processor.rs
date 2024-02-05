@@ -167,13 +167,22 @@ fn map_inc<Key: Ord>(map: &mut BTreeMap<Key, usize>, key: Key) {
 /// labels with no sources are not included
 fn count_srcs(codes: &[Bytecode]) -> BTreeMap<Label, usize> {
     let mut srcs_count = BTreeMap::new();
-    for code in codes {
+    for (code_offset, code) in codes.iter().enumerate() {
         match code {
             Bytecode::Jump(_, label) => map_inc(&mut srcs_count, *label),
             Bytecode::Branch(_, l0, l1, _) => {
                 map_inc(&mut srcs_count, *l0);
                 map_inc(&mut srcs_count, *l1);
             },
+            Bytecode::Label(_, label) => {
+                if code_offset != 0 {
+                    let prev_instr = codes.get(code_offset - 1).unwrap();
+                    // treat fall-through's to the label
+                    if !prev_instr.is_branch() {
+                        map_inc(&mut srcs_count, *label)
+                    }
+                }
+            }
             _ => {},
         }
     }
