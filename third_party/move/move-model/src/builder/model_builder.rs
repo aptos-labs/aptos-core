@@ -133,6 +133,7 @@ pub(crate) struct StructEntry {
 #[derive(Debug, Clone)]
 pub(crate) struct FunEntry {
     pub loc: Loc,
+    pub name_loc: Loc,
     pub module_id: ModuleId,
     pub fun_id: FunId,
     pub visibility: Visibility,

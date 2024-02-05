@@ -342,7 +342,7 @@ impl SoliditySignature {
         }
         ctx.env.error(
             &fun.get_loc(),
-            "decode function must only have one argument of type bytes",
+            "decode function must only has one argument of type bytes",
         );
         false
     }
@@ -369,7 +369,7 @@ impl SoliditySignature {
         }
         ctx.env.error(
             &fun.get_loc(),
-            "encode function must only have one return value of type bytes",
+            "encode function must only has one return value of type bytes",
         );
         false
     }

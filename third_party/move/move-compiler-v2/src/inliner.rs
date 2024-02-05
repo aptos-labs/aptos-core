@@ -153,7 +153,7 @@ fn get_targets(env: &mut GlobalEnv) -> BTreeSet<QualifiedFunId> {
                 let id = func.get_qualified_id();
                 if func.is_inline() {
                     if func.get_def().is_none() {
-                        let func_loc = func.get_id_loc();
+                        let func_loc = func.get_loc();
                         let func_name = func.get_name_str();
                         if func.is_native() {
                             let msg = format!("Inline function `{}` must not be native", func_name);

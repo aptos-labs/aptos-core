@@ -33,9 +33,7 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, Type, BOOL_TYPE},
-    well_known,
 };
-use codespan::Span;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::{
@@ -465,6 +463,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         );
         et.parent.parent.define_struct(
             et.to_loc(&def.loc),
+            // et.to_loc(&name.loc()),
             attrs,
             qsym,
             et.parent.module_id,
@@ -513,6 +512,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let name_loc = et.to_loc(&name.loc());
         et.parent.parent.define_fun(qsym.clone(), FunEntry {
             loc: def_loc.clone(),
+            name_loc,
             module_id: et.parent.module_id,
             fun_id,
             visibility,
@@ -653,10 +653,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let loc1 = self.parent.env.to_loc(&n1.loc);
         if let Some(n2) = n2_opt {
             let loc2 = self.parent.env.to_loc(&n2.loc);
-            Loc::new(
-                loc1.file_id(),
-                Span::new(loc1.span().start(), loc2.span().end()),
-            )
+            Loc::new(loc1.file_id(), loc1.span().merge(loc2.span()))
         } else {
             loc1
         }
@@ -3762,7 +3759,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let data = FunctionData {
                 name: name.symbol,
                 loc: entry.loc.clone(),
-                id_loc: name.loc.clone(),
+                id_loc: entry.name_loc.clone(),
                 def_idx: None,
                 handle_idx: None,
                 visibility: entry.visibility,

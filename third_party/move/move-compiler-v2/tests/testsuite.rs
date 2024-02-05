@@ -15,7 +15,7 @@ use move_compiler_v2::{
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
-        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
+        unreachable_code_remover::UnreachableCodeRemover,
     },
     run_bytecode_verifier, run_file_format_gen, Options,
 };
@@ -33,8 +33,8 @@ pub const EXP_EXT: &str = "exp";
 /// Configuration for a set of tests.
 #[derive(Default)]
 struct TestConfig {
-    /// Whether only type check should be run.
-    type_check_only: bool,
+    /// Whether stackless bytecode passes should be skipped.
+    skip_bytecode_passes: bool,
     /// Whether we should dump the AST after successful type check.
     dump_ast: bool,
     /// A sequence of bytecode processors to run for this test.
@@ -95,10 +95,9 @@ impl TestConfig {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -109,26 +108,11 @@ impl TestConfig {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
-            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            Self {
-                type_check_only: false,
-                dump_ast: true,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: verbose,
-                dump_for_only_some_stages: None,
-            }
-        } else if path.contains("/inlining/") {
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-                with_copy_inference: true,
-            }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -139,19 +123,18 @@ impl TestConfig {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
             options.testing = true;
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
                 dump_for_only_some_stages: None,
             }
-        } else if path.contains("/checking/") {
+        } else if path.contains("/checking/") || path.contains("/parser/") {
             Self {
-                type_check_only: true,
+                skip_bytecode_passes: true,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -160,7 +143,7 @@ impl TestConfig {
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -172,7 +155,7 @@ impl TestConfig {
                 with_copy_inference: true,
             }));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: true,
@@ -180,9 +163,8 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/visibility-checker/") {
-            pipeline.add_processor(Box::new(VisibilityChecker {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -194,7 +176,7 @@ impl TestConfig {
                 with_copy_inference: true,
             }));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -207,7 +189,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: verbose,
                 pipeline,
                 generate_file_format: false,
@@ -221,7 +203,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: verbose,
                 pipeline,
                 generate_file_format: false,
@@ -247,7 +229,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -265,7 +247,7 @@ impl TestConfig {
                 with_copy_inference: false,
             }));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -276,7 +258,7 @@ impl TestConfig {
         } else if path.contains("/uninit-use-checker/") {
             pipeline.add_processor(Box::new(UninitializedUseChecker {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -287,7 +269,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
             pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
             Self {
-                type_check_only: false,
+                skip_bytecode_passes: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -339,7 +321,7 @@ impl TestConfig {
             // Flow-insensitive checks on AST
             flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
             function_checker::check_for_function_typed_parameters(&mut env);
-            function_checker::check_access_and_use(&mut env);
+            function_checker::check_access_and_use(&mut env, true);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
         if ok {
@@ -355,13 +337,18 @@ impl TestConfig {
             trace!("After inlining, GlobalEnv={}", env.dump_env());
         }
 
+        if ok {
+            function_checker::check_access_and_use(&mut env, false);
+            ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+        }
+
         if ok && self.dump_ast {
             let out = &mut test_output.borrow_mut();
             out.push_str("// ---- Model Dump\n");
             out.push_str(&env.dump_env());
             out.push('\n');
         }
-        if ok && !self.type_check_only {
+        if ok && !self.skip_bytecode_passes {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
