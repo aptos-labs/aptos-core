@@ -4,11 +4,9 @@ use crate::{
     observation_aggregation::ObservationAggregationState,
     types::{ObservedUpdate, ObservedUpdateResponse},
 };
-use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, SigningKey, Uniform};
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    aggregate_signature::AggregateSignature,
     epoch_state::EpochState,
     jwks::{
         jwk::{JWKMoveStruct, JWK},
@@ -123,19 +121,10 @@ fn test_observation_aggregation_state() {
         },
     });
     let QuorumCertifiedUpdate {
-        authors,
         update: observed,
         multi_sig,
     } = result.unwrap().unwrap();
     assert_eq!(view_0, observed);
-    let bits: Vec<bool> = epoch_state
-        .verifier
-        .get_ordered_account_addresses()
-        .into_iter()
-        .map(|addr| authors.contains(&addr))
-        .collect();
-    let bit_vec = BitVec::from(bits);
-    let multi_sig = AggregateSignature::new(bit_vec, Some(multi_sig));
     assert!(epoch_state
         .verifier
         .verify_multi_signatures(&observed, &multi_sig)

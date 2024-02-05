@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use log::{debug, trace};
 use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    flow_insensitive_checkers, function_checker, inliner, pipeline,
+    flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -60,6 +61,7 @@ fn path_from_crate_root(path: &str) -> String {
 }
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
+    logging::setup_logging_for_testing();
     let mut experiments = extract_test_directives(path, "// experiment:")?;
     if experiments.is_empty() {
         // If there is no experiment, use "" as the 'default' experiment.
@@ -310,9 +312,7 @@ impl TestConfig {
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
         if ok {
-            if options.debug {
-                eprint!("After error check, GlobalEnv={}", env.dump_env());
-            }
+            trace!("After error check, GlobalEnv={}", env.dump_env());
             // Flow-insensitive checks on AST
             flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
             function_checker::check_for_function_typed_parameters(&mut env);
@@ -320,18 +320,16 @@ impl TestConfig {
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
         if ok {
-            if options.debug {
-                eprint!(
-                    "After flow-insensitive checks, GlobalEnv={}",
-                    env.dump_env()
-                );
-            }
+            trace!(
+                "After flow-insensitive checks, GlobalEnv={}",
+                env.dump_env()
+            );
             // Run inlining.
             inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
-        if ok && options.debug {
-            eprint!("After inlining, GlobalEnv={}", env.dump_env());
+        if ok {
+            trace!("After inlining, GlobalEnv={}", env.dump_env());
         }
 
         if ok && self.dump_ast {
@@ -361,9 +359,20 @@ impl TestConfig {
                                     "initial bytecode",
                                     targets_before,
                                     &pipeline::register_formatters,
+                                    false,
                                 ),
                             );
                         }
+                        debug!(
+                            "{}",
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                "initial bytecode",
+                                targets_before,
+                                &pipeline::register_formatters,
+                                true,
+                            ),
+                        )
                     },
                     // Hook which is run after every step in the pipeline. Prints out
                     // bytecode after the processor, if requested.
@@ -371,21 +380,34 @@ impl TestConfig {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
                         // Note that `i` starts at 1.
-                        if self.dump_annotated_targets
-                            && (self.dump_for_only_some_stages.is_none() // dump all stages
-                                || self
-                                    .dump_for_only_some_stages
-                                    .as_ref()
-                                    .is_some_and(|list| list.contains(&(i - 1))))
-                        {
+                        let title = format!("after {}:", processor.name());
+                        let stage_dump_enabled = self.dump_for_only_some_stages.is_none()
+                            || self
+                                .dump_for_only_some_stages
+                                .as_ref()
+                                .is_some_and(|list| list.contains(&(i - 1)));
+                        if self.dump_annotated_targets && stage_dump_enabled {
                             out.push_str(
                                 &move_stackless_bytecode::print_targets_with_annotations_for_test(
                                     &env,
-                                    &format!("after {}:", processor.name()),
+                                    &title,
                                     targets_after,
                                     &pipeline::register_formatters,
+                                    false,
                                 ),
                             );
+                        }
+                        if stage_dump_enabled {
+                            debug!(
+                                "{}",
+                                &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                    &env,
+                                    &title,
+                                    targets_after,
+                                    &pipeline::register_formatters,
+                                    true,
+                                )
+                            )
                         }
                     },
                 );

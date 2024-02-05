@@ -133,7 +133,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 output.module_write_set()
             },
             ExecutionStatus::Abort(_)
-            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
         };
@@ -281,7 +280,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                         ),
                 ),
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -298,7 +296,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.resource_write_set())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -316,7 +313,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.delayed_field_change_set().into_keys())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -334,7 +330,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.reads_needing_delayed_field_exchange())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -352,7 +347,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Some(t.group_reads_needing_delayed_field_exchange())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
             })
@@ -366,7 +360,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     t.aggregator_v1_delta_set().into_keys().collect()
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             },
@@ -381,7 +374,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     t.resource_group_metadata_ops()
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
             },
@@ -400,7 +392,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     Box::new(events.into_iter())
                 },
                 ExecutionStatus::Abort(_)
-                | ExecutionStatus::DirectWriteSetTransactionNotCapableError
                 | ExecutionStatus::SpeculativeExecutionAbortError(_)
                 | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {
                     Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>())
@@ -447,7 +438,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 );
             },
             ExecutionStatus::Abort(_)
-            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
@@ -472,7 +462,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
             ExecutionStatus::Abort(_)
-            | ExecutionStatus::DirectWriteSetTransactionNotCapableError
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => HashSet::new(),
         }

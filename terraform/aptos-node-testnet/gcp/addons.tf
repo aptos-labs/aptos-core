@@ -4,6 +4,7 @@ locals {
 }
 
 resource "kubernetes_namespace" "chaos-mesh" {
+  count = var.enable_forge ? 1 : 0
   metadata {
     annotations = {
       name = "chaos-mesh"
@@ -14,8 +15,9 @@ resource "kubernetes_namespace" "chaos-mesh" {
 }
 
 resource "helm_release" "chaos-mesh" {
+  count     = var.enable_forge ? 1 : 0
   name      = "chaos-mesh"
-  namespace = kubernetes_namespace.chaos-mesh.metadata[0].name
+  namespace = kubernetes_namespace.chaos-mesh[0].metadata[0].name
 
   chart       = local.chaos_mesh_helm_chart_path
   max_history = 5
@@ -24,29 +26,14 @@ resource "helm_release" "chaos-mesh" {
   values = [
     jsonencode({
       chaos-mesh = {
+        images = {
+          registry = "us-docker.pkg.dev/aptos-registry/docker/ghcr.io"
+          tag      = "aptos-patch" // Same as the patched chart in helm/chaos
+        },
         chaosDaemon = {
           runtime    = "containerd"
           socketPath = "/run/containerd/containerd.sock"
-          image = {
-            repository = "aptos-internal/chaos-daemon"
-            tag        = "latest"
-          }
         },
-        controllerManager = {
-          image = {
-            repository = "aptos-internal/chaos-mesh"
-            tag        = "latest"
-          }
-        },
-        dashboard = {
-          image = {
-            repository = "aptos-internal/chaos-dashboard"
-            tag        = "latest"
-          }
-        }
-        images = {
-          registry = "us-west1-docker.pkg.dev/aptos-global"
-        }
       }
     })
   ]
@@ -153,13 +140,7 @@ resource "helm_release" "testnet-addons" {
       }
       ingress = {
         gce_static_ip           = "aptos-${local.workspace_name}-testnet-addons-ingress"
-        gce_managed_certificate = "aptos-${local.workspace_name}-${var.zone_name}-testnet-addons"
-      }
-      load_test = {
-        fullnodeGroups = try(var.aptos_node_helm_values.fullnode.groups, [])
-        config = {
-          numFullnodeGroups = var.num_fullnode_groups
-        }
+        gce_managed_certificate = var.create_google_managed_ssl_certificate ? "aptos-${local.workspace_name}-${var.zone_name}-testnet-addons" : null
       }
     }),
     jsonencode(var.testnet_addons_helm_values)

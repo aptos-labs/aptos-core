@@ -34,7 +34,7 @@ metadata:
     {{ if eq .Values.ingress.class "gce" }}
     # kubernetes.io/ingress.global-static-ip-name: config.ingressConfig.staticIpName # may not be necessary
     {{- if .Values.ingress.gce_managed_certificate }}
-    kubernetes.io/ingress.allow-http: "false"
+    kubernetes.io/ingress.allow-http: "true"
     networking.gke.io/managed-certificates: {{ .Values.ingress.gce_managed_certificate }}
     networking.gke.io/v1beta1.FrontendConfig: ssl-redirect
     {{- end }}

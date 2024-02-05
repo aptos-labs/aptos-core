@@ -53,19 +53,19 @@ Aptos blockchain node deployment
 | labels | string | `nil` |  |
 | loadTestGenesis | bool | `false` | Load test-data for starting a test network |
 | manageImages | bool | `true` | If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout) |
-| multicluster | object | `{"enabled":false,"targetClusters":["cluster1","cluster2","cluster3"]}` | Options for multicluster mode. This is *experimental only*. |
+| multicluster | object | `{"enabled":false,"targetClusters":["forge-multiregion-1","forge-multiregion-2","forge-multiregion-3"]}` | Options for multicluster mode. This is *experimental only*. |
 | numFullnodeGroups | int | `1` | Total number of fullnode groups to deploy |
 | numValidators | int | `1` | Number of validators to deploy |
 | overrideNodeConfig | bool | `false` | Specify validator and fullnode NodeConfigs via named ConfigMaps, rather than the generated ones from this chart. |
 | service.domain | string | `nil` | If set, the base domain name to use for External DNS |
-| service.fullnode.enableMetricsPort | bool | `true` | Enable the metrics port on fullnodes |
+| service.fullnode.enableMetricsPort | bool | `false` | Enable the metrics port on fullnodes |
 | service.fullnode.enableRestApi | bool | `true` | Enable the REST API on fullnodes |
 | service.fullnode.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for fullnodes' HAProxy |
 | service.fullnode.externalTrafficPolicy | string | `"Local"` | The externalTrafficPolicy for the fullnode service |
 | service.fullnode.internal.headless | bool | `false` |  |
 | service.fullnode.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for fullnodes |
 | service.fullnode.loadBalancerSourceRanges | string | `nil` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnodes from these CIDRs |
-| service.validator.enableMetricsPort | bool | `true` | Enable the metrics port on the validator |
+| service.validator.enableMetricsPort | bool | `false` | Enable the metrics port on the validator |
 | service.validator.enableRestApi | bool | `true` | Enable the REST API on the validator |
 | service.validator.external.type | string | `"LoadBalancer"` | The Kubernetes ServiceType to use for validator's HAProxy |
 | service.validator.externalTrafficPolicy | string | `"Local"` | The externalTrafficPolicy for the validator service |
@@ -83,7 +83,6 @@ Aptos blockchain node deployment
 | validator.image.tag | string | `nil` | Image tag to use for validator images. If set, overrides `imageTag` |
 | validator.name | string | `nil` | Internal: name of your validator for use in labels |
 | validator.nodeSelector | object | `{}` |  |
-| validator.remoteLogAddress | string | `nil` | Address for remote logging. See `logger` helm chart |
 | validator.resources.limits.cpu | float | `15.5` |  |
 | validator.resources.limits.memory | string | `"26Gi"` |  |
 | validator.resources.requests.cpu | int | `15` |  |

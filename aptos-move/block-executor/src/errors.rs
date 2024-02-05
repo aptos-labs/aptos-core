@@ -4,7 +4,7 @@
 
 use aptos_aggregator::types::PanicOr;
 use aptos_mvhashmap::types::TxnIndex;
-use aptos_types::aggregator::PanicError;
+use aptos_types::delayed_fields::PanicError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IntentionalFallbackToSequential {
