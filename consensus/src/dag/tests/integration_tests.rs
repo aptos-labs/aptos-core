@@ -224,13 +224,15 @@ async fn test_dag_e2e() {
     println!("test_dag_e2e/3");
 
     for i in 1..10 {
-        println!("test_dag_e2e/4/{i}");
+        println!("test_dag_e2e/4/{i}/0");
         let mut all_ordered = vec![];
         for receiver in &mut ordered_node_receivers {
             let block = receiver.next().await.unwrap();
             all_ordered.push(block.ordered_blocks)
         }
+        println!("test_dag_e2e/4/{i}/1");
         let first = all_ordered.first().unwrap();
+        println!("test_dag_e2e/4/{i}/2");
         assert_gt!(first.len(), 0, "must order nodes");
         debug!("Nodes: {:?}", first);
         for a in all_ordered.iter() {
