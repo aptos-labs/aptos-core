@@ -13,9 +13,10 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-    copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-    explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
+    ability_checker::AbilityChecker, abort_analysis::AbortAnalysisProcessor,
+    avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
+    dead_store_elimination::DeadStoreElimination, explicit_drop::ExplicitDrop,
+    livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor,
@@ -43,7 +44,6 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
-use pipeline::abort_analysis::AbortAnalysisProcessor;
 use std::{collections::BTreeSet, path::Path};
 
 /// Run Move compiler and print errors to stderr.

@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{
-    abort_analysis::AbortAnalysisProcessor,
-    avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    abort_analysis::AbortAnalysisProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
