@@ -14,9 +14,7 @@ use crate::{
     },
     AptosVM,
 };
-use aptos_bitvec::BitVec;
 use aptos_types::{
-    aggregate_signature::AggregateSignature,
     fee_statement::FeeStatement,
     jwks,
     jwks::{Issuer, ObservedJWKs, ProviderJWKs, QuorumCertifiedUpdate},
@@ -94,7 +92,6 @@ impl AptosVM {
         let verifier = ValidatorVerifier::from(&validator_set);
 
         let QuorumCertifiedUpdate {
-            authors,
             update: observed,
             multi_sig,
         } = update;
@@ -104,13 +101,7 @@ impl AptosVM {
             return Err(Expected(IncorrectVersion));
         }
 
-        let signer_bit_vec = BitVec::from(
-            verifier
-                .get_ordered_account_addresses()
-                .into_iter()
-                .map(|addr| authors.contains(&addr))
-                .collect::<Vec<_>>(),
-        );
+        let authors = multi_sig.get_signers_addresses(&verifier.get_ordered_account_addresses());
 
         // Check voting power.
         verifier
@@ -119,10 +110,7 @@ impl AptosVM {
 
         // Verify multi-sig.
         verifier
-            .verify_multi_signatures(
-                &observed,
-                &AggregateSignature::new(signer_bit_vec, Some(multi_sig)),
-            )
+            .verify_multi_signatures(&observed, &multi_sig)
             .map_err(|_| Expected(MultiSigVerificationFailed))?;
 
         // All verification passed. Apply the `observed`.
