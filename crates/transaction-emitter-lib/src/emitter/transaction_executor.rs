@@ -252,6 +252,25 @@ async fn submit_and_check(
     Ok(())
 }
 
+pub async fn query_sequence_number_with_client(
+    rest_client: &RestClient,
+    account_address: AccountAddress,
+) -> Result<u64> {
+    let result = RETRY_POLICY
+        .retry_if(
+            move || rest_client.get_account_bcs(account_address),
+            |error: &RestError| !is_account_not_found(error),
+        )
+        .await;
+    match result {
+        Ok(account) => Ok(account.into_inner().sequence_number()),
+        Err(error) => match is_account_not_found(&error) {
+            true => Ok(0),
+            false => Err(error.into()),
+        },
+    }
+}
+
 fn is_account_not_found(error: &RestError) -> bool {
     match error {
         RestError::Api(error) => matches!(error.error.error_code, AptosErrorCode::AccountNotFound),
@@ -273,19 +292,7 @@ impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
     }
 
     async fn query_sequence_number(&self, account_address: AccountAddress) -> Result<u64> {
-        let result = RETRY_POLICY
-            .retry_if(
-                move || self.random_rest_client().get_account_bcs(account_address),
-                |error: &RestError| !is_account_not_found(error),
-            )
-            .await;
-        match result {
-            Ok(account) => Ok(account.into_inner().sequence_number()),
-            Err(error) => match is_account_not_found(&error) {
-                true => Ok(0),
-                false => Err(error.into()),
-            },
-        }
+        query_sequence_number_with_client(self.random_rest_client(), account_address).await
     }
 
     async fn execute_transactions_with_counter(
