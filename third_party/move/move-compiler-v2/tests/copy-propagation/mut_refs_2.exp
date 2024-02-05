@@ -30,21 +30,9 @@ error: local `p` of type `m::S` does not have the `copy` ability
    ┌─ tests/copy-propagation/mut_refs_2.move:10:13
    │
 10 │         let q = p;
-   │             ^ copy needed here because value is still in use
+   │             ^ copy needed here because value is still used
 11 │         let ref = &mut p.a;
    │                        - used here
-
-error: local `p` of type `m::S` does not have the `drop` ability
-   ┌─ tests/copy-propagation/mut_refs_2.move:11:24
-   │
-11 │         let ref = &mut p.a;
-   │                        ^ still borrowed but will be implicitly dropped later since it is no longer used
-
-error: local `q` of type `m::S` does not have the `drop` ability
-   ┌─ tests/copy-propagation/mut_refs_2.move:13:9
-   │
-13 │         q.a
-   │         ^ still borrowed but will be implicitly dropped later since it is no longer used
 
 ============ after AvailableCopiesAnalysisProcessor: ================
 
