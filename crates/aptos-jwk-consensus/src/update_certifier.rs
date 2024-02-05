@@ -13,6 +13,7 @@ use aptos_types::{
 use futures_util::future::{AbortHandle, Abortable};
 use std::sync::Arc;
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_types::jwks::Issuer;
 
 /// A sub-process of the whole JWK consensus process.
 /// Once invoked by `JWKConsensusManager` to `start_produce`,
@@ -23,7 +24,7 @@ pub trait TUpdateCertifier: Send + Sync {
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        qc_update_tx: aptos_channel::Sender<(), QuorumCertifiedUpdate>,
+        qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle;
 }
 
