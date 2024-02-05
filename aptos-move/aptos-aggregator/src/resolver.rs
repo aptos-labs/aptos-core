@@ -71,9 +71,9 @@ pub trait TAggregatorV1View {
     fn get_aggregator_v1_state_value_size(
         &self,
         id: &Self::Identifier,
-    ) -> PartialVMResult<Option<usize>> {
+    ) -> PartialVMResult<Option<u64>> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
-        Ok(maybe_state_value.map(|v| v.size()))
+        Ok(maybe_state_value.map(|v| v.size() as u64))
     }
 
     /// Consumes a single delta of aggregator V1, and tries to materialize it

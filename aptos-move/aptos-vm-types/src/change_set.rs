@@ -373,9 +373,7 @@ impl VMChangeSet {
             Ok(WriteOpInfo {
                 key,
                 op_size: op.materialized_size(),
-                prev_size: executor_view
-                    .get_resource_state_value_size(key)?
-                    .unwrap_or(0),
+                prev_size: op.prev_materialized_size(key, executor_view)?,
                 metadata_mut: op.get_metadata_mut(),
             })
         });
@@ -745,6 +743,7 @@ impl VMChangeSet {
                                 metadata_op: additional_metadata_op,
                                 inner_ops: additional_inner_ops,
                                 maybe_group_op_size: additional_maybe_group_op_size,
+                                prev_group_size: _, // n.b. group.prev_group_size deliberately kept as is
                             }),
                         ) => {
                             // Squashing creation and deletion is a no-op. In that case, we have to
@@ -768,6 +767,11 @@ impl VMChangeSet {
                                 )?;
 
                                 group.maybe_group_op_size = *additional_maybe_group_op_size;
+
+                                //
+                                // n.b. group.prev_group_size deliberately kept as is
+                                //
+
                                 (false, false)
                             }
                         },
@@ -900,7 +904,7 @@ impl VMChangeSet {
 pub struct WriteOpInfo<'a> {
     pub key: &'a StateKey,
     pub op_size: WriteOpSize,
-    pub prev_size: usize,
+    pub prev_size: u64,
     pub metadata_mut: &'a mut StateValueMetadata,
 }
 
