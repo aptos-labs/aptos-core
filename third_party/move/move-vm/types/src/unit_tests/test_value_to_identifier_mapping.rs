@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    value_transformation::{
+    value_serde::{
         deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
         TransformationResult, ValueToIdentifierMapping,
     },
-    values::{DelayedFieldID, Struct, Value},
+    values::{SizedID, Struct, Value},
 };
 use move_core_types::value::{
     IdentifierMappingKind, LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout,
@@ -31,7 +31,6 @@ impl ValueToIdentifierMapping for DelayedValueMapping {
     fn value_to_identifier(
         &self,
         _kind: &IdentifierMappingKind,
-        _layout: &MoveTypeLayout,
         value: Value,
     ) -> TransformationResult<Value> {
         let mut delayed_values = self.delayed_values.borrow_mut();
@@ -88,7 +87,7 @@ fn test_no_delayed_values() {
 fn test_delayed_u64_value() {
     let mapping = DelayedValueMapping::default();
 
-    let layout = MoveTypeLayout::Tagged(
+    let layout = MoveTypeLayout::Native(
         LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
         Box::new(MoveTypeLayout::U64),
     );
@@ -108,7 +107,7 @@ fn test_delayed_u64_value() {
     // Test handle is inserted and value extracted.
     assert!(mapping.contains_value_at(Value::u64(200), 0));
     assert!(delayed_value
-        .value_as::<DelayedFieldID>()
+        .value_as::<SizedID>()
         .is_ok_and(|id| id.unique_index == 0));
 }
 
@@ -118,11 +117,11 @@ fn test_delayed_value_inside_struct() {
 
     let layout = MoveTypeLayout::Struct(Runtime(vec![
         MoveTypeLayout::U64,
-        MoveTypeLayout::Tagged(
+        MoveTypeLayout::Native(
             LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
             Box::new(MoveTypeLayout::U64),
         ),
-        MoveTypeLayout::Tagged(
+        MoveTypeLayout::Native(
             LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
             Box::new(MoveTypeLayout::U128),
         ),
@@ -157,12 +156,12 @@ fn test_delayed_value_inside_struct() {
     assert!(fields
         .pop()
         .unwrap()
-        .value_as::<DelayedFieldID>()
+        .value_as::<SizedID>()
         .is_ok_and(|h| h.unique_index == 1));
     assert!(fields
         .pop()
         .unwrap()
-        .value_as::<DelayedFieldID>()
+        .value_as::<SizedID>()
         .is_ok_and(|h| h.unique_index == 0));
     assert!(fields.pop().unwrap().equals(&Value::u64(400)).unwrap());
     assert!(fields.is_empty())

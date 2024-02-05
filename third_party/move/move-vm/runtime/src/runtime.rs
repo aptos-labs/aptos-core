@@ -212,7 +212,10 @@ impl VMRuntime {
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
-        let layout = match self.loader.type_to_type_layout(ty, module_store) {
+        let (layout, has_identifier_mappings) = match self
+            .loader
+            .type_to_type_layout_with_identifier_mappings(ty, module_store)
+        {
             Ok(layout) => layout,
             Err(_err) => {
                 return Err(PartialVMError::new(
@@ -221,6 +224,16 @@ impl VMRuntime {
                 .with_message("[VM] failed to get layout from type".to_string()));
             },
         };
+
+        // Make sure we do not construct values which might have identifiers
+        // inside.
+        // TODO[agg_v2](cleanup): We should shift this to txn args validation.
+        if has_identifier_mappings {
+            return Err(
+                PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
+                    .with_message("[VM] unsupported parameter type".to_string()),
+            );
+        }
 
         match Value::simple_deserialize(arg.borrow(), &layout) {
             Some(val) => Ok(val),

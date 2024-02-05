@@ -38,7 +38,7 @@ fn ty_to_sig(ty: &MoveTypeLayout) -> Option<SignatureToken> {
         MoveTypeLayout::Vector(v) => Some(SignatureToken::Vector(Box::new(ty_to_sig(v.as_ref())?))),
         MoveTypeLayout::Struct(_) => None,
         MoveTypeLayout::Bool => Some(SignatureToken::Bool),
-        MoveTypeLayout::Tagged(tag, layout) => match tag {
+        MoveTypeLayout::Native(tag, layout) => match tag {
             // Ignore aggregator / snapshot mappings.
             LayoutTag::IdentifierMapping(_) => ty_to_sig(layout.as_ref()),
         },

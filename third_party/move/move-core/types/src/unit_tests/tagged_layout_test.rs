@@ -24,7 +24,7 @@ fn assert_same_serialization(
 macro_rules! aggregator_mapping {
     ($layout:expr) => {
         // Note: the actual kind is not important fot tests.
-        MoveTypeLayout::Tagged(
+        MoveTypeLayout::Native(
             LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
             Box::new($layout),
         )

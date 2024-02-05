@@ -1748,7 +1748,7 @@ impl Loader {
         let field_node_count = *count - count_before;
         let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
             // For DerivedString, the whole object should be lifted.
-            MoveTypeLayout::Tagged(
+            MoveTypeLayout::Native(
                 LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
                 Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))),
             )
@@ -1756,7 +1756,7 @@ impl Loader {
             // For aggregators / snapshots, the first field should be lifted.
             if let Some(kind) = &maybe_mapping {
                 if let Some(l) = field_layouts.first_mut() {
-                    *l = MoveTypeLayout::Tagged(
+                    *l = MoveTypeLayout::Native(
                         LayoutTag::IdentifierMapping(kind.clone()),
                         Box::new(l.clone()),
                     );

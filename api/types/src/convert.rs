@@ -805,7 +805,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Signer => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
-            MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
+            MoveTypeLayout::Native(tag, inner_layout) => match tag {
                 LayoutTag::IdentifierMapping(_) => {
                     self.try_into_vm_value_from_layout(inner_layout, val)?
                 },

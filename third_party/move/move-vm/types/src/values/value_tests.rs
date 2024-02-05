@@ -290,7 +290,7 @@ mod delayed_values {
         let reference = assert_ok!(local.value_as::<Reference>());
         let v = assert_ok!(reference.read_ref());
 
-        let expected_id = assert_ok!(v.value_as::<DelayedFieldID>());
+        let expected_id = assert_ok!(v.value_as::<SizedID>());
         assert_eq!(expected_id.unique_index, 0);
         assert_eq!(expected_id.width, 8);
     }

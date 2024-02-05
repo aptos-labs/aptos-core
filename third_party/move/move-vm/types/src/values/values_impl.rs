@@ -6,6 +6,7 @@
 
 use crate::{
     loaded_data::runtime_types::Type,
+    values::SizedID,
     views::{ValueView, ValueVisitor},
 };
 use move_binary_format::{
@@ -22,30 +23,19 @@ use move_core_types::{
 };
 use std::{
     cell::RefCell,
-    fmt::{self, Debug, Display},
+    fmt::{self, Debug, Display, Formatter},
     iter,
     rc::Rc,
 };
 
-macro_rules! return_delayed_value_error {
-    () => {
-        // TODO[agg_v2](fix):
-        //   What is the best error code here? It cannot be invariant violation
-        //   because equality or similar operation can fail at runtime for delayed
-        //   values, and there is no way to gate it at this point. Currenlty, we use
-        //   a runtime error.
-        return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
-            .with_message("Delayed values cannot be processed by the VM".to_string()))
+// Native values sometimes cannot be processed by the VM, e.g., failing on
+// equality or serialization.
+macro_rules! native_value_error {
+    ($msg:expr) => {
+        return Err(
+            PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message($msg.to_string())
+        )
     };
-}
-
-// TODO[agg_v2](cleanup): This is an exact copy of DelayedFieldID. All APIs can
-//   be moved to this file? Figure out where is the best place for these types.
-#[derive(Debug, Copy, Clone)]
-pub struct DelayedFieldID {
-    pub unique_index: u32,
-    // Exact number of bytes serialized delayed field will take.
-    pub width: u32,
 }
 
 /***************************************************************************************
@@ -59,7 +49,6 @@ pub struct DelayedFieldID {
  **************************************************************************************/
 
 /// Runtime representation of a Move value.
-#[derive(Debug)]
 pub(crate) enum ValueImpl {
     Invalid,
 
@@ -77,12 +66,30 @@ pub(crate) enum ValueImpl {
     ContainerRef(ContainerRef),
     IndexedRef(IndexedRef),
 
-    // Stores an id which maps to values stored outside of the MoveVM and which
-    // are processed in a "delayed" fashion, e.g., aggregators. Can only be
-    // manipulated by native functions, so any VM operation on it will result in a
-    // runtime error.
-    // TODO[agg_v2](cleanup): Use a more generic name?
-    Delayed { id: DelayedFieldID },
+    /// Native values are values that live outside of MoveVM. The implementation
+    /// stores a unique identifier so that the value can be fetched and processed
+    /// by native functions.
+    ///
+    /// Native values are sized, and the variant carries the information about
+    /// the serialized size of the external Move value.
+    ///
+    /// Native values should not be displayed in any way, to ensure we do not
+    /// accidentally introduce non-determinism if identifiers are generated at
+    /// random. For that reason, `Debug` is not derived for this enum and
+    /// implemented.
+    ///
+    /// Semantics:
+    ///   - Native values cannot be compared. An equality check results in a
+    ///     runtime error. As a result, equality for any Move value that contains
+    ///     a native value stops being reflexive, symmetric and transitive, and
+    ///     results in a runtime error as well.
+    ///   - Native values cannot be serialized and stored in the global blockchain
+    ///     state because they are used purely at runtime. Any attempt to serialize
+    ///     a native value, e.g. using `0x1::bcs::to_bytes` results in a runtime
+    ///     error.
+    Native {
+        id: SizedID,
+    },
 }
 
 /// A container is a collection of values. It is used to represent data structures like a
@@ -398,8 +405,9 @@ impl ValueImpl {
             // copy of the data instead of a shallow copy of the Rc.
             Container(c) => Container(c.copy_value()?),
 
-            // Delayed values can be copied because this is how read_ref operates.
-            Delayed { id } => Delayed { id: *id },
+            // Native values can be copied because this is how read_ref operates,
+            // and copying is an internal API.
+            Native { id } => Native { id: *id },
         })
     }
 }
@@ -513,8 +521,12 @@ impl ValueImpl {
             (ContainerRef(l), ContainerRef(r)) => l.equals(r)?,
             (IndexedRef(l), IndexedRef(r)) => l.equals(r)?,
 
-            // Disallow equality for delayed values.
-            (Delayed { .. }, Delayed { .. }) => return_delayed_value_error!(),
+            // Disallow equality for native values. The rationale behind this
+            // semantics is that identifiers might not be deterministic, and
+            // therefore equality can have different outcomes on different nodes
+            // of the network. Note that the error returned here is not an
+            // invariant violation.
+            (Native { .. }, Native { .. }) => native_value_error!("cannot compare native values"),
 
             (Invalid, _)
             | (U8(_), _)
@@ -528,7 +540,7 @@ impl ValueImpl {
             | (Container(_), _)
             | (ContainerRef(_), _)
             | (IndexedRef(_), _)
-            | (Delayed { .. }, _) => {
+            | (Native { .. }, _) => {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                     .with_message(format!("cannot compare values: {:?}, {:?}", self, other)))
             },
@@ -843,11 +855,6 @@ impl IndexedRef {
                         )),
                 )
             },
-
-            // We should not be able to write delayed values, as they need to be
-            // encapsulated.
-            ValueImpl::Delayed { .. } => return_delayed_value_error!(),
-
             _ => (),
         }
 
@@ -947,7 +954,7 @@ impl ContainerRef {
                     | ValueImpl::U256(_)
                     | ValueImpl::Bool(_)
                     | ValueImpl::Address(_)
-                    | ValueImpl::Delayed { .. } => ValueImpl::IndexedRef(IndexedRef {
+                    | ValueImpl::Native { .. } => ValueImpl::IndexedRef(IndexedRef {
                         idx,
                         container_ref: self.copy_value(),
                     }),
@@ -1010,7 +1017,7 @@ impl Locals {
             | ValueImpl::U256(_)
             | ValueImpl::Bool(_)
             | ValueImpl::Address(_)
-            | ValueImpl::Delayed { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
+            | ValueImpl::Native { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
                 idx,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
             }))),
@@ -1148,13 +1155,8 @@ impl Locals {
  *
  **************************************************************************************/
 impl Value {
-    pub fn delayed_value(id: u32, width: u32) -> Self {
-        Self(ValueImpl::Delayed {
-            id: DelayedFieldID {
-                unique_index: id,
-                width,
-            },
-        })
+    pub fn native_value(id: SizedID) -> Self {
+        Self(ValueImpl::Native { id })
     }
 
     pub fn u8(x: u8) -> Self {
@@ -1305,12 +1307,12 @@ impl_vm_value_cast!(AccountAddress, Address);
 impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
 
-impl VMValueCast<DelayedFieldID> for Value {
-    fn cast(self) -> PartialVMResult<DelayedFieldID> {
+impl VMValueCast<SizedID> for Value {
+    fn cast(self) -> PartialVMResult<SizedID> {
         match self.0 {
-            ValueImpl::Delayed { id } => Ok(id),
+            ValueImpl::Native { id } => Ok(id),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                .with_message(format!("cannot cast {:?} to delayed id", v))),
+                .with_message(format!("cannot cast non-native value {:?} into id", v))),
         }
     }
 }
@@ -2427,7 +2429,10 @@ impl ValueImpl {
             // TODO: in case the borrow fails the VM will panic.
             Container(c) => c.legacy_size(),
 
-            Delayed { .. } => unreachable!("Delayed values do not have legacy size!"),
+            // Legacy size is only used by events natives (which should not even
+            // be part of move-stdlib), so we should never see any native values
+            // here.
+            Native { .. } => unreachable!("Native values do not have legacy size!"),
         }
     }
 }
@@ -2664,6 +2669,39 @@ impl GlobalValue {
 
 /***************************************************************************************
 *
+* Debug
+*
+*   Implementation of the Debug trait for VM Values.
+*
+**************************************************************************************/
+
+impl Debug for ValueImpl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Invalid => write!(f, "Invalid"),
+
+            Self::U8(x) => write!(f, "U8({:?})", x),
+            Self::U16(x) => write!(f, "U16({:?})", x),
+            Self::U32(x) => write!(f, "U32({:?})", x),
+            Self::U64(x) => write!(f, "U64({:?})", x),
+            Self::U128(x) => write!(f, "U128({:?})", x),
+            Self::U256(x) => write!(f, "U256({:?})", x),
+            Self::Bool(x) => write!(f, "Bool({:?})", x),
+            Self::Address(addr) => write!(f, "Address({:?})", addr),
+
+            Self::Container(r) => write!(f, "Container({:?})", r),
+
+            Self::ContainerRef(r) => write!(f, "ContainerRef({:?})", r),
+            Self::IndexedRef(r) => write!(f, "IndexedRef({:?})", r),
+
+            // Allow deterministic debug of native values.
+            Self::Native { .. } => write!(f, "Native(?)"),
+        }
+    }
+}
+
+/***************************************************************************************
+*
 * Display
 *
 *   Implementation of the Display trait for VM Values. These are supposed to be more
@@ -2690,12 +2728,8 @@ impl Display for ValueImpl {
             Self::ContainerRef(r) => write!(f, "{}", r),
             Self::IndexedRef(r) => write!(f, "{}", r),
 
-            Self::Delayed { .. } => {
-                // Display should not be used to show delayed values.
-                Err(fmt::Error::custom(
-                    "Delayed values should not be processed by the VM and displayed",
-                ))
-            },
+            // Allow deterministic display of native values.
+            Self::Native { .. } => write!(f, "Native(?)"),
         }
     }
 }
@@ -2811,9 +2845,9 @@ pub mod debug {
     use super::*;
     use std::fmt::Write;
 
-    // Allow debug prints of the delayed values, as these are not used on-chain.
-    fn print_delayed<B: Write>(buf: &mut B, x: &DelayedFieldID) -> PartialVMResult<()> {
-        debug_write!(buf, "<({}, {})>", x.unique_index, x.width)
+    // Allow deterministic debug prints of the native values.
+    fn print_native_value<B: Write>(buf: &mut B) -> PartialVMResult<()> {
+        debug_write!(buf, "<?>")
     }
 
     fn print_invalid<B: Write>(buf: &mut B) -> PartialVMResult<()> {
@@ -2870,7 +2904,7 @@ pub mod debug {
             ValueImpl::ContainerRef(r) => print_container_ref(buf, r),
             ValueImpl::IndexedRef(r) => print_indexed_ref(buf, r),
 
-            ValueImpl::Delayed { id: handle } => print_delayed(buf, handle),
+            ValueImpl::Native { .. } => print_native_value(buf),
         }
     }
 
@@ -2995,7 +3029,7 @@ pub mod debug {
  *   is to involve an explicit representation of the type layout.
  *
  **************************************************************************************/
-use crate::value_transformation::OnTagTransformation;
+use crate::value_serde::{CustomDeserialize, CustomSerialize};
 use serde::{
     de::Error as DeError,
     ser::{Error as SerError, SerializeSeq, SerializeTuple},
@@ -3004,21 +3038,18 @@ use serde::{
 
 impl Value {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
-        bcs::from_bytes_seed(
-            SeedWrapper {
-                transformation: None,
-                layout,
-            },
-            blob,
-        )
-        .ok()
+        let seed = DeserializationSeed {
+            native_deserializer: None,
+            layout,
+        };
+        bcs::from_bytes_seed(seed, blob).ok()
     }
 
     pub fn simple_serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
-        bcs::to_bytes(&AnnotatedValue {
-            transformation: None,
+        bcs::to_bytes(&SerializationReadyValue {
+            native_serializer: None,
             layout,
-            val: &self.0,
+            value: &self.0,
         })
         .ok()
     }
@@ -3026,34 +3057,32 @@ impl Value {
 
 impl Struct {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveStructLayout) -> Option<Struct> {
-        bcs::from_bytes_seed(
-            SeedWrapper {
-                transformation: None,
-                layout,
-            },
-            blob,
-        )
-        .ok()
+        let seed = DeserializationSeed {
+            native_deserializer: None,
+            layout,
+        };
+        bcs::from_bytes_seed(seed, blob).ok()
     }
 
     pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
-        bcs::to_bytes(&AnnotatedValue {
-            transformation: None,
+        bcs::to_bytes(&SerializationReadyValue {
+            native_serializer: None,
             layout,
-            val: &self.fields,
+            value: &self.fields,
         })
         .ok()
     }
 }
 
-pub(crate) struct AnnotatedValue<'t, 'l, 'v, L, V> {
-    // Optional transformation so that values can be changed during
-    // serialization.
-    pub(crate) transformation: Option<&'t dyn OnTagTransformation>,
+// Wrapper around value with additional information which can be used by the
+// serializer.
+pub(crate) struct SerializationReadyValue<'c, 'l, 'v, L, V, C> {
+    // Allows to perform a custom serialization for values.
+    pub(crate) native_serializer: Option<&'c C>,
     // Layout for guiding serialization.
     pub(crate) layout: &'l L,
     // Value to serialize.
-    pub(crate) val: &'v V,
+    pub(crate) value: &'v V,
 }
 
 fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
@@ -3062,11 +3091,14 @@ fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
     )
 }
 
-impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout, ValueImpl> {
+impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
+    for SerializationReadyValue<'c, 'l, 'v, MoveTypeLayout, ValueImpl, C>
+{
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use MoveTypeLayout as L;
 
-        match (self.layout, self.val) {
+        match (self.layout, self.value) {
+            // Primitive types.
             (L::U8, ValueImpl::U8(x)) => serializer.serialize_u8(*x),
             (L::U16, ValueImpl::U16(x)) => serializer.serialize_u16(*x),
             (L::U32, ValueImpl::U32(x)) => serializer.serialize_u32(*x),
@@ -3076,14 +3108,17 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
             (L::Bool, ValueImpl::Bool(x)) => serializer.serialize_bool(*x),
             (L::Address, ValueImpl::Address(x)) => x.serialize(serializer),
 
+            // Structs.
             (L::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
-                (AnnotatedValue {
-                    transformation: self.transformation,
+                (SerializationReadyValue {
+                    native_serializer: self.native_serializer,
                     layout: struct_layout,
-                    val: &*r.borrow(),
+                    value: &*r.borrow(),
                 })
                 .serialize(serializer)
             },
+
+            // Vectors.
             (L::Vector(layout), ValueImpl::Container(c)) => {
                 let layout = layout.as_ref();
                 match (layout, c) {
@@ -3098,18 +3133,15 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                     (_, Container::Vec(r)) => {
                         let v = r.borrow();
                         let mut t = serializer.serialize_seq(Some(v.len()))?;
-                        for val in v.iter() {
-                            t.serialize_element(&AnnotatedValue {
-                                transformation: self.transformation,
+                        for value in v.iter() {
+                            t.serialize_element(&SerializationReadyValue {
+                                native_serializer: self.native_serializer,
                                 layout,
-                                val,
+                                value,
                             })?;
                         }
                         t.end()
                     },
-
-                    // Note: this includes cases where vector types are tagged. Instead,
-                    // one should tag only the outer vector layout.
                     (layout, container) => Err(invariant_violation::<S>(format!(
                         "cannot serialize container {:?} as {:?}",
                         container, layout
@@ -3117,6 +3149,7 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                 }
             },
 
+            // Signer.
             (L::Signer, ValueImpl::Container(Container::Struct(r))) => {
                 let v = r.borrow();
                 if v.len() != 1 {
@@ -3125,52 +3158,34 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
                         v.len()
                     )));
                 }
-                (AnnotatedValue {
-                    transformation: self.transformation,
+                (SerializationReadyValue {
+                    native_serializer: self.native_serializer,
                     layout: &L::Address,
-                    val: &v[0],
+                    value: &v[0],
                 })
                 .serialize(serializer)
             },
 
-            (L::Tagged(tag, layout), value_impl) => match self.transformation {
-                Some(transformation) if transformation.matches(tag) => {
-                    // If values are supposed to be transformed, first clone
-                    // ValueImpl to construct a Value.
-                    // TODO[agg_v2](optimize)(?): Clone is cheap for current use cases, revisit if needed.
-                    // TODO[agg_v2](cleanup): Move deserialization outside of the VM to make
-                    //   the handling of this variant less ugly?
-                    let value_to_transform = match value_impl {
-                        ValueImpl::Delayed { id } => {
-                            Value::delayed_value(id.unique_index, id.width)
-                        },
-                        value_impl => {
-                            Value(value_impl.copy_value().map_err(serde::ser::Error::custom)?)
-                        },
-                    };
-
-                    let transformed_value = transformation
-                        .pre_serialization_transform(tag, layout.as_ref(), value_to_transform)
-                        .map_err(serde::ser::Error::custom)?;
-
-                    AnnotatedValue {
-                        transformation: self.transformation,
-                        layout: layout.as_ref(),
-                        val: &transformed_value.0,
-                    }
-                    .serialize(serializer)
-                },
-                _ => {
-                    // No need to apply transformation, simply continue with serialization.
-                    AnnotatedValue {
-                        transformation: self.transformation,
-                        layout: layout.as_ref(),
-                        val: value_impl,
-                    }
-                    .serialize(serializer)
-                },
+            // Native values. For their serialization, we must have custom
+            // serialization available, otherwise an error is returned.
+            (L::Native(tag, layout), ValueImpl::Native { id }) => {
+                match self.native_serializer {
+                    Some(native_serializer) => {
+                        native_serializer.custom_serialize(serializer, tag, layout, *id)
+                    },
+                    None => {
+                        // If no native serializer, it is not known how the
+                        // native value should be serialized. So, just return
+                        // an error.
+                        Err(invariant_violation::<S>(format!(
+                            "no custom serializer for native value ({:?})",
+                            tag
+                        )))
+                    },
+                }
             },
 
+            // All other cases should not be possible.
             (layout, value) => Err(invariant_violation::<S>(format!(
                 "cannot serialize value {:?} as {:?}",
                 value, layout
@@ -3179,37 +3194,43 @@ impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveTypeLayout,
     }
 }
 
-impl<'t, 'l, 'v> serde::Serialize for AnnotatedValue<'t, 'l, 'v, MoveStructLayout, Vec<ValueImpl>> {
+impl<'c, 'l, 'v, T: CustomSerialize> serde::Serialize
+    for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>, C>
+{
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let values = &self.val;
+        let values = &self.value;
         let fields = self.layout.fields();
         if fields.len() != values.len() {
             return Err(invariant_violation::<S>(format!(
                 "cannot serialize struct value {:?} as {:?} -- number of fields mismatch",
-                self.val, self.layout
+                self.value, self.layout
             )));
         }
         let mut t = serializer.serialize_tuple(values.len())?;
-        for (field_layout, val) in fields.iter().zip(values.iter()) {
-            t.serialize_element(&AnnotatedValue {
-                transformation: self.transformation,
+        for (field_layout, value) in fields.iter().zip(values.iter()) {
+            t.serialize_element(&SerializationReadyValue {
+                native_serializer: self.native_serializer,
                 layout: field_layout,
-                val,
+                value,
             })?;
         }
         t.end()
     }
 }
 
+// Seed used by deserializer to ensure there is information about the value
+// being deserialized.
 #[derive(Clone)]
-pub(crate) struct SeedWrapper<'t, L> {
-    // Transformation to apply during deserialization.
-    pub(crate) transformation: Option<&'t dyn OnTagTransformation>,
+pub(crate) struct DeserializationSeed<'c, L, C> {
+    // Allows to deserialize values in the custom format using external deserializer.
+    pub(crate) native_deserializer: Option<&'c C>,
     // Layout to guide deserialization.
     pub(crate) layout: L,
 }
 
-impl<'d, 't> serde::de::DeserializeSeed<'d> for SeedWrapper<'t, &MoveTypeLayout> {
+impl<'d, 'c, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
+    for DeserializationSeed<'c, &MoveTypeLayout, C>
+{
     type Value = Value;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(
@@ -3219,6 +3240,7 @@ impl<'d, 't> serde::de::DeserializeSeed<'d> for SeedWrapper<'t, &MoveTypeLayout>
         use MoveTypeLayout as L;
 
         match self.layout {
+            // Primitive types.
             L::Bool => bool::deserialize(deserializer).map(Value::bool),
             L::U8 => u8::deserialize(deserializer).map(Value::u8),
             L::U16 => u16::deserialize(deserializer).map(Value::u16),
@@ -3229,14 +3251,16 @@ impl<'d, 't> serde::de::DeserializeSeed<'d> for SeedWrapper<'t, &MoveTypeLayout>
             L::Address => AccountAddress::deserialize(deserializer).map(Value::address),
             L::Signer => AccountAddress::deserialize(deserializer).map(Value::signer),
 
-            L::Struct(struct_layout) => Ok(Value::struct_(
-                SeedWrapper {
-                    transformation: self.transformation,
+            // Structs.
+            L::Struct(struct_layout) => {
+                let seed = DeserializationSeed {
+                    native_deserializer: self.native_deserializer,
                     layout: struct_layout,
-                }
-                .deserialize(deserializer)?,
-            )),
+                };
+                Ok(Value::struct_(seed.deserialize(deserializer)?))
+            },
 
+            // Vectors.
             L::Vector(layout) => Ok(match layout.as_ref() {
                 L::U8 => Value::vector_u8(Vec::deserialize(deserializer)?),
                 L::U16 => Value::vector_u16(Vec::deserialize(deserializer)?),
@@ -3247,34 +3271,44 @@ impl<'d, 't> serde::de::DeserializeSeed<'d> for SeedWrapper<'t, &MoveTypeLayout>
                 L::Bool => Value::vector_bool(Vec::deserialize(deserializer)?),
                 L::Address => Value::vector_address(Vec::deserialize(deserializer)?),
                 layout => {
-                    let v = deserializer.deserialize_seq(VectorElementVisitor(SeedWrapper {
-                        transformation: self.transformation,
+                    let seed = DeserializationSeed {
+                        native_deserializer: self.native_deserializer,
                         layout,
-                    }))?;
-                    let container = Container::Vec(Rc::new(RefCell::new(v)));
-                    Value(ValueImpl::Container(container))
+                    };
+                    let vector = deserializer.deserialize_seq(VectorElementVisitor(seed))?;
+                    Value(ValueImpl::Container(Container::Vec(Rc::new(RefCell::new(
+                        vector,
+                    )))))
                 },
             }),
 
-            L::Tagged(tag, layout) => {
-                let value = SeedWrapper {
-                    transformation: self.transformation,
-                    layout: layout.as_ref(),
+            // Native values should always use custom deserialization.
+            L::Native(tag, layout) => {
+                match self.native_deserializer {
+                    Some(native_deserializer) => {
+                        native_deserializer.custom_deserialize(deserializer, tag, layout)
+                    },
+                    None => {
+                        // If no native deserializer, it is not known how the
+                        // native value should be deserialized. Just like with
+                        // serialization, we return an error.
+                        Err(D::Error::custom(
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                .with_message(format!(
+                                    "no custom deserializer for native value ({:?})",
+                                    tag
+                                )),
+                        ))
+                    },
                 }
-                .deserialize(deserializer)?;
-
-                Ok(match self.transformation {
-                    Some(transformation) if transformation.matches(tag) => transformation
-                        .post_deserialization_transform(tag, layout.as_ref(), value)
-                        .map_err(serde::de::Error::custom)?,
-                    _ => value,
-                })
             },
         }
     }
 }
 
-impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<'_, &MoveStructLayout> {
+impl<'d, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
+    for DeserializationSeed<'_, &MoveStructLayout, C>
+{
     type Value = Struct;
 
     fn deserialize<D: serde::de::Deserializer<'d>>(
@@ -3284,15 +3318,15 @@ impl<'d> serde::de::DeserializeSeed<'d> for SeedWrapper<'_, &MoveStructLayout> {
         let field_layouts = self.layout.fields();
         let fields = deserializer.deserialize_tuple(
             field_layouts.len(),
-            StructFieldVisitor(self.transformation, field_layouts),
+            StructFieldVisitor(self.native_deserializer, field_layouts),
         )?;
         Ok(Struct::pack(fields))
     }
 }
 
-struct VectorElementVisitor<'t, 'l>(SeedWrapper<'t, &'l MoveTypeLayout>);
+struct VectorElementVisitor<'t, 'l, S>(DeserializationSeed<'t, &'l MoveTypeLayout, S>);
 
-impl<'d, 't, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'t, 'l> {
+impl<'d, 't, 'l, S: serde::Deserialize> serde::de::Visitor<'d> for VectorElementVisitor<'t, 'l, S> {
     type Value = Vec<ValueImpl>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3311,9 +3345,9 @@ impl<'d, 't, 'l> serde::de::Visitor<'d> for VectorElementVisitor<'t, 'l> {
     }
 }
 
-struct StructFieldVisitor<'t, 'l>(Option<&'t dyn OnTagTransformation>, &'l [MoveTypeLayout]);
+struct StructFieldVisitor<'c, 'l, S>(Option<&'c dyn CustomDeserialize>, &'l [MoveTypeLayout]);
 
-impl<'d, 't, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'t, 'l> {
+impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l, C> {
     type Value = Vec<Value>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3326,8 +3360,8 @@ impl<'d, 't, 'l> serde::de::Visitor<'d> for StructFieldVisitor<'t, 'l> {
     {
         let mut val = Vec::new();
         for (i, field_layout) in self.1.iter().enumerate() {
-            if let Some(elem) = seq.next_element_seed(SeedWrapper {
-                transformation: self.0,
+            if let Some(elem) = seq.next_element_seed(DeserializationSeed {
+                native_deserializer: self.0,
                 layout: field_layout,
             })? {
                 val.push(elem)
@@ -3495,7 +3529,7 @@ impl ValueImpl {
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
 
-            Delayed { id } => visitor.visit_delayed(depth, *id),
+            Native { id } => visitor.visit_native_value(depth, *id),
         }
     }
 }
@@ -3747,7 +3781,7 @@ pub mod prop {
                 .prop_map(move |vals| Value::struct_(Struct::pack(vals)))
                 .boxed(),
 
-            L::Tagged(tag, layout) => match tag {
+            L::Native(tag, layout) => match tag {
                 LayoutTag::IdentifierMapping(_) => value_strategy_with_layout(layout.as_ref()),
             },
         }
@@ -3792,7 +3826,7 @@ impl ValueImpl {
         use MoveTypeLayout as L;
 
         // Make sure to strip all tags from the type layout.
-        if let L::Tagged(LayoutTag::IdentifierMapping(_), layout) = layout {
+        if let L::Native(LayoutTag::IdentifierMapping(_), layout) = layout {
             return self.as_move_value(layout.as_ref());
         }
 

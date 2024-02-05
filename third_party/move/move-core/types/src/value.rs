@@ -134,7 +134,7 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "u256", deserialize = "u256"))]
     U256,
 
-    Tagged(LayoutTag, Box<MoveTypeLayout>),
+    Native(LayoutTag, Box<MoveTypeLayout>),
 }
 
 impl MoveValue {
@@ -349,7 +349,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::Vector(layout) => Ok(MoveValue::Vector(
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
-            MoveTypeLayout::Tagged(tag, layout) => match tag {
+            MoveTypeLayout::Native(tag, layout) => match tag {
                 // Serialization ignores the tag for types which correspond to aggregator or
                 // snapshot values.
                 LayoutTag::IdentifierMapping(_) => layout.deserialize(deserializer),
@@ -555,7 +555,7 @@ impl fmt::Display for MoveTypeLayout {
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => write!(f, "{}", s),
             Signer => write!(f, "signer"),
-            Tagged(tag, typ) => match tag {
+            Native(tag, typ) => match tag {
                 LayoutTag::IdentifierMapping(_) => write!(f, "{}", typ),
             },
         }
@@ -604,7 +604,7 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
-            MoveTypeLayout::Tagged(tag, v) => match tag {
+            MoveTypeLayout::Native(tag, v) => match tag {
                 LayoutTag::IdentifierMapping(_) => v.as_ref().try_into()?,
             },
         })

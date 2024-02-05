@@ -303,7 +303,7 @@ fn native_format_impl(
             )?;
             out.push('}');
         },
-        MoveTypeLayout::Tagged(tag, ty) => match tag {
+        MoveTypeLayout::Native(tag, ty) => match tag {
             // There is no need to show any lifting information!
             // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
             // Can we modify this to print tagging info, or is this something that cannot be changed

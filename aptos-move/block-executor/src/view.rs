@@ -56,7 +56,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    value_transformation::{
+    value_serde::{
         deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
         TransformationError, TransformationResult, ValueToIdentifierMapping,
     },
@@ -2529,7 +2529,7 @@ mod test {
 
     fn create_aggregator_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
         MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-            MoveTypeLayout::Tagged(
+            MoveTypeLayout::Native(
                 LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
                 Box::new(inner.clone()),
             ),
@@ -2542,14 +2542,14 @@ mod test {
     }
 
     fn create_snapshot_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Tagged(
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Native(
             LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
             Box::new(inner),
         )]))
     }
 
     fn create_derived_string_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Tagged(
+        MoveTypeLayout::Native(
             LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
             Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 create_string_layout(),

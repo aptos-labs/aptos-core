@@ -27,7 +27,7 @@ macro_rules! debug_writeln {
 pub mod gas;
 pub mod loaded_data;
 pub mod natives;
-pub mod value_transformation;
+pub mod value_serde;
 pub mod values;
 pub mod views;
 
