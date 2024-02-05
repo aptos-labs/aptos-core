@@ -98,11 +98,13 @@ impl NodeBroadcastHandler {
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         println!("validate/1");
         for vtxn in node.validator_txns() {
+            println!("validate/1.5/0");
             ensure!(
                 is_vtxn_expected(&self.features, vtxn),
                 "unexpected validator transaction: {:?}",
                 vtxn.topic()
             );
+            println!("validate/1.5/1");
         }
         println!("validate/2");
         let vtxn_total_bytes = node
