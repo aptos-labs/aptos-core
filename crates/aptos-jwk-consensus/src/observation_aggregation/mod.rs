@@ -95,7 +95,7 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
                 .collect::<Vec<_>>(),
         )
         .map_err(|e| anyhow!("jwk update certification failed with sig agg error: {e}"))?;
-        let signer_bit_vec = BitVec::from(self.epoch_state.verifier.get_ordered_account_addresses().into_iter().map(|addr|voters.contains(&addr)).collect());
+        let signer_bit_vec = BitVec::from(self.epoch_state.verifier.get_ordered_account_addresses().into_iter().map(|addr|voters.contains(&addr)).collect::<Vec<_>>());
         let multi_sig = AggregateSignature::new(signer_bit_vec, Some(multi_sig));
 
         Ok(Some(QuorumCertifiedUpdate {
