@@ -116,50 +116,50 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      #
   2: $t7 := borrow_local($t2)
      # live vars: $t0, $t2, $t7
-     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[]}
-     # local_to_label: {$t2=L512,$t7=L513}
+     # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[]}
+     # local_to_label: {$t2=@200,$t7=@201}
      # global_to_label: {}
      # moved: {}
      #
   3: $t6 := borrow_field<m::Scalar>.data($t7)
      # live vars: $t0, $t2, $t6
-     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[]}
-     # local_to_label: {$t2=L512,$t6=L769,$t7=L513}
+     # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[]}
+     # local_to_label: {$t2=@200,$t6=@301}
      # global_to_label: {}
      # moved: {}
      #
   4: $t8 := 0
      # live vars: $t0, $t2, $t6, $t8
-     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[]}
-     # local_to_label: {$t2=L512,$t6=L769,$t7=L513}
+     # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[]}
+     # local_to_label: {$t2=@200,$t6=@301}
      # global_to_label: {}
      # moved: {}
      #
   5: $t5 := vector::borrow_mut<u8>($t6, $t8)
      # live vars: $t0, $t2, $t5
-     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[call(true) -> L1280],L1280=local($t5)[]}
-     # local_to_label: {$t2=L512,$t5=L1280,$t6=L769,$t7=L513}
+     # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[call(true) -> @500],@500=derived[]}
+     # local_to_label: {$t2=@200,$t5=@500}
      # global_to_label: {}
      # moved: {$t6,$t8}
      #
   6: $t4 := move($t5)
      # live vars: $t0, $t2, $t4
-     # graph: {L512=local($t2)[borrow(true) -> L513],L513=local($t7)[borrow_field(true) -> L769],L769=local($t6)[call(true) -> L1280],L1280=local($t5)[skip -> L1537],L1537=local($t4)[]}
-     # local_to_label: {$t2=L512,$t4=L1537,$t5=L1280,$t6=L769,$t7=L513}
+     # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[call(true) -> @500],@500=derived[]}
+     # local_to_label: {$t2=@200,$t4=@500}
      # global_to_label: {}
      # moved: {$t5,$t6,$t8}
      #
   7: write_ref($t4, $t0)
      # live vars: $t2
-     # graph: {L512=local($t2)[]}
-     # local_to_label: {$t2=L512}
+     # graph: {@200=local($t2)[]}
+     # local_to_label: {$t2=@200}
      # global_to_label: {}
      # moved: {$t5,$t6,$t8}
      #
   8: $t1 := copy($t2)
      # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
+     # graph: {@200=local($t2)[]}
+     # local_to_label: {$t2=@200}
      # global_to_label: {}
      # moved: {$t5,$t6,$t8}
      #
@@ -226,8 +226,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
   9: write_ref($t4, $t0)
  10: drop($t4)
  11: $t1 := copy($t2)
- 12: drop($t2)
- 13: return $t1
+ 12: return $t1
 }
 
 

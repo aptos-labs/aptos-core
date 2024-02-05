@@ -1,14 +1,16 @@
 
 Diagnostics:
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
+error: mutable reference in local `s` requires exclusive access
    ┌─ tests/reference-safety/v1-tests/freeze_combo.move:13:9
    │
 12 │         if (cond) f = &s.f else f = &other.f;
    │                       ---- previous field borrow
 13 │         freeze(s); // error in v2 even though s is not read
-   │         ^^^^^^^^^ passed here
+   │         ^^^^^^^^^ requirement enforced here
+14 │         *f;
+   │         -- conflicting reference `f`used here
 
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
+error: mutable reference in local `s` requires exclusive access
    ┌─ tests/reference-safety/v1-tests/freeze_combo.move:20:9
    │
 19 │         if (cond) f = &s.f else f = &s.g;
@@ -16,12 +18,16 @@ error: cannot pass mutable reference in local `s`, which is still borrowed, as f
    │                       │
    │                       previous field borrow
 20 │         freeze(s); // error in v2 even though s is not read
-   │         ^^^^^^^^^ passed here
+   │         ^^^^^^^^^ requirement enforced here
+21 │         *f;
+   │         -- conflicting reference `f`used here
 
-error: cannot pass mutable reference in local `s`, which is still borrowed, as function argument
+error: mutable reference in local `s` requires exclusive access
    ┌─ tests/reference-safety/v1-tests/freeze_combo.move:27:9
    │
 26 │         if (cond) x = freeze(s) else x = other;
    │                       --------- previous call result
 27 │         freeze(s); // error in v2 even though s is not read
-   │         ^^^^^^^^^ passed here
+   │         ^^^^^^^^^ requirement enforced here
+28 │         *x;
+   │         -- conflicting reference `x`used here

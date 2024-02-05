@@ -93,22 +93,22 @@ public fun M::test_resource($t0: &signer) {
      var $t8: u64
      var $t9: u64
      # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # local_to_label: {$t0=@2000000}
      # global_to_label: {}
      # moved: {}
      #
   0: $t2 := 1
      # live vars: $t0, $t2
-     # graph: {}
-     # local_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # local_to_label: {$t0=@2000000}
      # global_to_label: {}
      # moved: {}
      #
   1: $t1 := pack M::R($t2)
      # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # local_to_label: {$t0=@2000000}
      # global_to_label: {}
      # moved: {$t2}
      #
@@ -128,16 +128,16 @@ public fun M::test_resource($t0: &signer) {
      #
   4: $t5 := borrow_global<M::R>($t6)
      # live vars: $t5
-     # graph: {L1024=global<M::R>[borrow_global(false) -> L1025],L1025=local($t5)[]}
-     # local_to_label: {$t5=L1025}
-     # global_to_label: {M::R=L1024}
+     # graph: {@400=global<M::R>[borrow_global(false) -> @401],@401=derived[]}
+     # local_to_label: {$t5=@401}
+     # global_to_label: {M::R=@400}
      # moved: {$t0,$t1,$t2}
      #
   5: $t7 := borrow_field<M::R>.f($t5)
      # live vars: $t7
-     # graph: {L1024=global<M::R>[borrow_global(false) -> L1025],L1025=local($t5)[borrow_field(false) -> L1281],L1281=local($t7)[]}
-     # local_to_label: {$t5=L1025,$t7=L1281}
-     # global_to_label: {M::R=L1024}
+     # graph: {@400=global<M::R>[borrow_global(false) -> @401],@401=derived[borrow_field(false) -> @501],@501=derived[]}
+     # local_to_label: {$t7=@501}
+     # global_to_label: {M::R=@400}
      # moved: {$t0,$t1,$t2}
      #
   6: $t4 := read_ref($t7)
