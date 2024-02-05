@@ -1,12 +1,148 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_success, assert_vm_status, tests::common, MoveHarness};
+use crate::{
+    assert_success, assert_vm_status,
+    resource_groups::{
+        initialize, initialize_enabled_disabled_comparison, ResourceGroupsTestHarness,
+    },
+    tests::{aggregator_v2::arb_block_split, common},
+    BlockSplit, MoveHarness, SUCCESS,
+};
+use aptos_language_e2e_tests::executor::ExecutorMode;
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{account_address::AccountAddress, on_chain_config::FeatureFlag};
 use move_core_types::{identifier::Identifier, language_storage::StructTag, vm_status::StatusCode};
+use proptest::prelude::*;
 use serde::Deserialize;
 use test_case::test_case;
+
+// This mode describes whether to enable or disable RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM flag
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ResourceGroupMode {
+    EnabledOnly,
+    DisabledOnly,
+    BothComparison,
+}
+
+const STRESSTEST_MODE: bool = false;
+
+fn setup(
+    executor_mode: ExecutorMode,
+    // This mode describes whether to enable or disable RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM flag
+    resource_group_mode: ResourceGroupMode,
+    txns: usize,
+) -> ResourceGroupsTestHarness {
+    let path = common::test_dir_path("resource_groups.data/pack");
+    match resource_group_mode {
+        ResourceGroupMode::EnabledOnly => initialize(path, executor_mode, true, txns),
+        ResourceGroupMode::DisabledOnly => initialize(path, executor_mode, false, txns),
+        ResourceGroupMode::BothComparison => {
+            initialize_enabled_disabled_comparison(path, executor_mode, txns)
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct TestEnvConfig {
+    pub executor_mode: ExecutorMode,
+    pub resource_group_mode: ResourceGroupMode,
+    pub block_split: BlockSplit,
+}
+
+#[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
+fn arb_test_env(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
+    prop_oneof![
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            resource_group_mode: ResourceGroupMode::BothComparison,
+            block_split
+        }),
+    ]
+    .boxed()
+}
+
+#[allow(clippy::arc_with_non_send_sync)] // I think this is noise, don't see an issue, and tests run fine
+fn arb_test_env_non_equivalent(num_txns: usize) -> BoxedStrategy<TestEnvConfig> {
+    prop_oneof![
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            resource_group_mode: ResourceGroupMode::DisabledOnly,
+            block_split
+        }),
+        arb_block_split(num_txns).prop_map(|block_split| TestEnvConfig {
+            executor_mode: ExecutorMode::BothComparison,
+            resource_group_mode: ResourceGroupMode::EnabledOnly,
+            block_split
+        }),
+    ]
+    .boxed()
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig {
+        // Cases are expensive, few cases is enough.
+        // We will test a few more comprehensive tests more times, and the rest even fewer.
+        cases: if STRESSTEST_MODE { 1000 } else { 20 },
+        result_cache: if STRESSTEST_MODE { prop::test_runner::noop_result_cache } else {prop::test_runner::basic_result_cache },
+        .. ProptestConfig::default()
+    })]
+
+    #[test]
+    fn test_resource_groups_1(test_env in arb_test_env(12)) {
+        println!("Testing test_aggregator_lifetime {:?}", test_env);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
+
+        let txns = vec![
+            (SUCCESS, h.init_signer(vec![5,2,3])),
+            (SUCCESS, h.set_resource_group1("ABC".to_string(), 1000)),
+            (SUCCESS, h.set_resource_group2(20)),
+            (SUCCESS, h.set_resource_group3(vec![1, 2, 3, 4], vec![5, 6, 7, 8])),
+            (SUCCESS, h.unset_resource(3)),
+            (SUCCESS, h.set_resource_group2(14)),
+            (SUCCESS, h.read_or_init(3)),
+            (SUCCESS, h.set_resource_group3(vec![3,1], vec![7, 8])),
+            (SUCCESS, h.read_or_init(2)),
+            (SUCCESS, h.set_resource_group1("DEF".to_string(), 2000)),
+            (SUCCESS, h.set_resource_group2(30)),
+            (SUCCESS, h.unset_resource(1)),
+        ];
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn test_resource_groups_2(test_env in arb_test_env_non_equivalent(12)) {
+        println!("Testing test_aggregator_lifetime {:?}", test_env);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
+
+        let txns = vec![
+            (SUCCESS, h.init_signer(vec![5,2,3])),
+            (SUCCESS, h.set_resource_group1("ABC".to_string(), 1000)),
+            (SUCCESS, h.set_resource_group2(20)),
+            (SUCCESS, h.set_resource_group3(vec![1, 2, 3, 4], vec![5, 6, 7, 8])),
+            (SUCCESS, h.unset_resource(3)),
+            (SUCCESS, h.set_resource_group2(14)),
+            (SUCCESS, h.read_or_init(3)),
+            (SUCCESS, h.set_resource_group3(vec![3,1], vec![7, 8])),
+            (SUCCESS, h.read_or_init(2)),
+            (SUCCESS, h.set_resource_group1("DEF".to_string(), 2000)),
+            (SUCCESS, h.set_resource_group2(30)),
+            (SUCCESS, h.unset_resource(1)),
+        ];
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+}
+
+/*
+    Old Resource Group Tests.
+    TODO: Should we deprecate/remove these?
+*/
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Primary {
