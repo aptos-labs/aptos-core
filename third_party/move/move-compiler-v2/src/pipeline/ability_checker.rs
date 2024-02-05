@@ -5,7 +5,7 @@
 //! prerequisite:
 //! - Copies and moves have been made explicit in assignment instructions
 
-use super::abort_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
+use crate::pipeline::abort_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
 use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
