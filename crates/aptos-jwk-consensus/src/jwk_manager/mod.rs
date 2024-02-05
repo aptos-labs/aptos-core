@@ -62,7 +62,7 @@ impl JWKManager {
         consensus_key: Arc<PrivateKey>,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        update_certifier: Arc<dyn UpdateCertifier>,
+        update_certifier: Arc<dyn TUpdateCertifier>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
         Self {
