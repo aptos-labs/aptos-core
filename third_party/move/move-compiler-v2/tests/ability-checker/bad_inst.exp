@@ -101,15 +101,20 @@ fun test::test(): test::U<test::S<test::T>> {
      var $t1: test::S<test::T>
      var $t2: test::T
      var $t3: bool
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t3 := false
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t2 := pack test::T($t3)
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t1 := pack test::S<test::T>($t2)
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t0 := pack test::U<test::S<test::T>>($t1)
-     # abort state: definitely not abort
+     # abort state before: {returns}
+     # abort state after : {}
   4: return $t0
 }
 
@@ -135,14 +140,19 @@ fun test::test(): test::U<test::S<test::T>> {
      var $t1: test::S<test::T>
      var $t2: test::T
      var $t3: bool
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t3 := false
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t2 := pack test::T($t3)
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t1 := pack test::S<test::T>($t2)
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t0 := pack test::U<test::S<test::T>>($t1)
-     # abort state: definitely not abort
+     # abort state before: {returns}
+     # abort state after : {}
   4: return $t0
 }

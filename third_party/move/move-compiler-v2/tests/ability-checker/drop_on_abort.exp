@@ -200,33 +200,47 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      var $t4: &vector<#0>
      var $t5: u64
      var $t6: u64
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t4 := borrow_local($t0)
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t3 := vector::length<#0>($t4)
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   2: $t5 := 1
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   3: $t2 := >($t3, $t5)
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   4: if ($t2) goto 5 else goto 10
-     # abort state: definitely abort
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   5: label L0
-     # abort state: definitely abort
-  6: destroy($t0)
-     # abort state: definitely abort
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  6: drop($t0)
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   7: $t6 := 1
-     # abort state: definitely abort
+     # abort state before: {aborts}
+     # abort state after : {}
   8: abort($t6)
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: goto 11
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: label L1
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: label L2
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: $t1 := pack m::Option<#0>($t0)
-     # abort state: definitely not abort
+     # abort state before: {returns}
+     # abort state after : {}
  13: return $t1
 }
 
@@ -240,32 +254,46 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      var $t4: &vector<#0>
      var $t5: u64
      var $t6: u64
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t4 := borrow_local($t0)
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t3 := vector::length<#0>($t4)
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   2: $t5 := 1
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   3: $t2 := >($t3, $t5)
-     # abort state: maybe
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   4: if ($t2) goto 5 else goto 10
-     # abort state: definitely abort
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   5: label L0
-     # abort state: definitely abort
-  6: destroy($t0)
-     # abort state: definitely abort
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  6: drop($t0)
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   7: $t6 := 1
-     # abort state: definitely abort
+     # abort state before: {aborts}
+     # abort state after : {}
   8: abort($t6)
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: goto 11
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: label L1
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: label L2
-     # abort state: maybe
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: $t1 := pack m::Option<#0>($t0)
-     # abort state: definitely not abort
+     # abort state before: {returns}
+     # abort state after : {}
  13: return $t1
 }
