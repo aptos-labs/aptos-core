@@ -270,12 +270,12 @@ impl Worker {
                     .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
             }
-        }
 
-        // Commit model to Postgres
-        self.log_info("Committing image to Postgres");
-        if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
-            self.log_error("Commit to Postgres failed", &e);
+            // Commit model to Postgres
+            self.log_info("Committing image to Postgres");
+            if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                self.log_error("Commit to Postgres failed", &e);
+            }
         }
 
         // Deduplicate raw_animation_uri
@@ -360,12 +360,12 @@ impl Worker {
                     .ok();
                 self.model.set_cdn_animation_uri(cdn_animation_uri);
             }
-        }
 
-        // Commit model to Postgres
-        self.log_info("Committing animation to Postgres");
-        if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
-            self.log_error("Commit to Postgres failed", &e);
+            // Commit model to Postgres
+            self.log_info("Committing animation to Postgres");
+            if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                self.log_error("Commit to Postgres failed", &e);
+            }
         }
 
         if self.model.get_json_parser_retry_count() > MAX_NUM_PARSE_RETRIES
