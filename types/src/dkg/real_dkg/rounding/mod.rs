@@ -6,11 +6,12 @@ use std::{
     fmt::{Debug, Formatter},
 };
 
+// dkg todo: move to config file
 pub const WEIGHT_PER_VALIDATOR_MIN: usize = 1;
 pub const WEIGHT_PER_VALIDATOR_MAX: usize = 30;
-pub const STEPS: usize = 1_000;
-pub const STAKE_GAP_THRESHOLD: f64 = 0.1;
-pub const RECONSTRUCT_THRESHOLD: f64 = 0.5;
+pub const STEP_SIZE: usize = 1;
+pub const SECRECY_THRESHOLD: f64 = 0.5;
+pub const RECONSTRUCT_THRESHOLD: f64 = 0.6667;
 
 #[derive(Clone, Debug)]
 pub struct DKGRounding {
@@ -21,26 +22,28 @@ pub struct DKGRounding {
 impl DKGRounding {
     pub fn new(
         validator_stakes: Vec<u64>,
-        stake_gap_threshold: f64,
-        weight_per_validator_min: usize,
-        weight_per_validator_max: usize,
-        steps: usize,
-        reconstruct_threshold: f64,
+        total_weight_min: usize,
+        total_weight_max: usize,
+        step_size: usize,
+        secrecy_threshold_in_stake_ratio: f64,
+        reconstruct_threshold_in_stake_ratio: f64,
     ) -> Self {
         let profile = DKGRoundingProfile::new(
             validator_stakes.clone(),
-            stake_gap_threshold,
-            weight_per_validator_min,
-            weight_per_validator_max,
-            steps,
-            reconstruct_threshold,
+            total_weight_min,
+            total_weight_max,
+            step_size,
+            secrecy_threshold_in_stake_ratio,
+            reconstruct_threshold_in_stake_ratio,
         );
 
-        if profile.stake_gap > stake_gap_threshold {
+        let total_weights = profile.validator_weights.iter().sum::<usize>();
+
+        if total_weights > total_weight_max {
             // dkg todo: add alert here
             println!(
-                "[DKG] error: stake_gap {} is larger than threshold {}",
-                profile.stake_gap, stake_gap_threshold
+                "[DKG] error: total_weights {} is larger than threshold {}",
+                total_weights, total_weight_max
             );
         }
 
@@ -58,19 +61,30 @@ impl DKGRounding {
 pub struct DKGRoundingProfile {
     // calculated weights for each validator after rounding
     pub validator_weights: Vec<usize>,
-    // The extra percentage of stake that is needed to reconstruct the randomness due to rounding,
-    // i.e., reconstruction needs reconstruct_threshold + stake_gap honest stakes to reconstruct the randomness,
-    pub stake_gap: f64,
+    // The ratio of stake that may reveal the randomness, e.g. 50%
+    pub secrecy_threshold_in_stake_ratio: f64,
+    // The ratio of stake that always can reconstruct the randomness, e.g. 66.67%
+    pub reconstruct_threshold_in_stake_ratio: f64,
+    // The number of weights needed to reconstruct the randomness
     pub reconstruct_threshold_in_weights: usize,
 }
 
 impl Debug for DKGRoundingProfile {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "stake_gap: {}, ", self.stake_gap)?;
         write!(
             f,
             "total_weight: {}, ",
             self.validator_weights.iter().sum::<usize>()
+        )?;
+        write!(
+            f,
+            "secrecy_threshold_in_stake_ratio: {}, ",
+            self.secrecy_threshold_in_stake_ratio
+        )?;
+        write!(
+            f,
+            "reconstruct_threshold_in_stake_ratio: {}, ",
+            self.reconstruct_threshold_in_stake_ratio
         )?;
         write!(
             f,
@@ -86,42 +100,35 @@ impl Debug for DKGRoundingProfile {
 impl DKGRoundingProfile {
     pub fn new(
         validator_stakes: Vec<u64>,
-        stake_gap_threshold: f64,
-        weight_per_validator_min: usize,
-        weight_per_validator_max: usize,
-        steps: usize,
+        total_weight_min: usize,
+        total_weight_max: usize,
+        step_size: usize,
+        secrecy_threshold_in_stake_ratio: f64,
         reconstruct_threshold_in_stake_ratio: f64,
     ) -> Self {
-        assert!(0.0 < stake_gap_threshold && stake_gap_threshold < 1.0);
-        assert!(
-            0 < weight_per_validator_min && weight_per_validator_min <= weight_per_validator_max
-        );
-        assert!(steps > 0);
-        assert!(reconstruct_threshold_in_stake_ratio > 0.0);
+        assert!(total_weight_min >= validator_stakes.len());
+        assert!(total_weight_max >= total_weight_min);
+        assert!(step_size > 0);
+        assert!(secrecy_threshold_in_stake_ratio > 1.0 / 3.0);
+        assert!(secrecy_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio);
+        assert!(secrecy_threshold_in_stake_ratio <= 2.0 / 3.0);
 
-        let validator_num = validator_stakes.len();
-        let total_weight_min = weight_per_validator_min * validator_num;
-        let total_weight_max = weight_per_validator_max * validator_num;
         let mut maybe_best_profile: Option<DKGRoundingProfile> = None;
+        let mut step = 0;
 
-        for step in 0..steps {
-            let total_weight =
-                total_weight_min + (total_weight_max - total_weight_min) * step / steps;
+        // Search for the feasible rounding profile until found.
+        while maybe_best_profile.is_none() {
+            let total_weight = total_weight_min + step_size * step;
+            step += 1;
 
             let profile = compute_profile(
                 validator_stakes.clone(),
                 total_weight,
-                reconstruct_threshold_in_stake_ratio,
+                secrecy_threshold_in_stake_ratio,
             );
 
-            assert!(profile.stake_gap < 1.0);
-
-            if maybe_best_profile.is_none() {
-                maybe_best_profile = Some(profile.clone());
-            }
-
-            // This check makes sure the randomness is live: 2/3 stakes can reconstruct the randomness.
-            if reconstruct_threshold_in_stake_ratio + profile.stake_gap > 2.0 / 3.0 {
+            // This check makes sure the randomness is live: 2/3 stakes can always reconstruct the randomness.
+            if profile.reconstruct_threshold_in_stake_ratio > 2.0 / 3.0 {
                 continue;
             }
 
@@ -130,11 +137,21 @@ impl DKGRoundingProfile {
                 continue;
             }
 
-            if maybe_best_profile.as_ref().unwrap().stake_gap > profile.stake_gap {
+            if maybe_best_profile.is_none() {
                 maybe_best_profile = Some(profile.clone());
             }
 
-            if profile.stake_gap <= stake_gap_threshold {
+            if maybe_best_profile
+                .as_ref()
+                .unwrap()
+                .reconstruct_threshold_in_stake_ratio
+                > profile.reconstruct_threshold_in_stake_ratio
+            {
+                maybe_best_profile = Some(profile.clone());
+            }
+
+            if profile.reconstruct_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio
+            {
                 break;
             }
         }
@@ -146,7 +163,7 @@ impl DKGRoundingProfile {
 pub fn compute_profile(
     validator_stakes: Vec<u64>,
     weights_sum: usize,
-    reconstruct_threshold_in_stake_ratio: f64,
+    secrecy_threshold_in_stake_ratio: f64,
 ) -> DKGRoundingProfile {
     let hardcoded_best_rounding_threshold = 0.5;
     let stake_sum = validator_stakes.iter().sum::<u64>();
@@ -176,16 +193,18 @@ pub fn compute_profile(
         .collect::<Vec<usize>>();
 
     let reconstruct_threshold_in_weights = ((stake_sum as f64) / (stake_per_weight as f64)
-        * reconstruct_threshold_in_stake_ratio
+        * secrecy_threshold_in_stake_ratio
         + delta_up)
         .ceil() as usize;
     //dkg todo - productionize - double check if float number operations are deterministic across platform
 
     let stake_gap = stake_per_weight as f64 * delta_total / stake_sum as f64;
+    let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap;
 
     DKGRoundingProfile {
         validator_weights,
-        stake_gap,
+        secrecy_threshold_in_stake_ratio,
+        reconstruct_threshold_in_stake_ratio,
         reconstruct_threshold_in_weights,
     }
 }
