@@ -18,7 +18,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 /// Once invoked by `JWKConsensusManager` to `start_produce`,
 /// it starts producing a `QuorumCertifiedUpdate` and returns an abort handle.
 /// Once an `QuorumCertifiedUpdate` is available, it is sent back via a channel given earlier.
-pub trait TUpdateCertifier: Send + Sync {
+pub trait CertifiedUpdateProducer: Send + Sync {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
@@ -27,11 +27,11 @@ pub trait TUpdateCertifier: Send + Sync {
     ) -> AbortHandle;
 }
 
-pub struct CertifiedUpdateProducer {
+pub struct RealCertifiedUpdateProducer {
     reliable_broadcast: Arc<ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>>,
 }
 
-impl CertifiedUpdateProducer {
+impl RealCertifiedUpdateProducer {
     pub fn new(reliable_broadcast: ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>) -> Self {
         Self {
             reliable_broadcast: Arc::new(reliable_broadcast),
@@ -39,7 +39,7 @@ impl CertifiedUpdateProducer {
     }
 }
 
-impl TUpdateCertifier for CertifiedUpdateProducer {
+impl CertifiedUpdateProducer for RealCertifiedUpdateProducer {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
