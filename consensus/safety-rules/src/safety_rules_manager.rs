@@ -43,7 +43,7 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             config.enable_cached_safety_data,
         )
     } else {
-        println!("{:?}", config.initial_safety_rules_config);
+        println!("initial_safety_rules_config={:?}", config.initial_safety_rules_config);
         let storage =
             PersistentSafetyStorage::new(internal_storage, config.enable_cached_safety_data);
         // If it's initialized, then we can continue
