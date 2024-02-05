@@ -93,6 +93,7 @@ pub enum MoveStructLayout {
 pub enum IdentifierMappingKind {
     Aggregator,
     Snapshot,
+    DerivedString,
 }
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]

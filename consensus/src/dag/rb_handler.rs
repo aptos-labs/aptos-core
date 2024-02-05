@@ -102,7 +102,6 @@ impl NodeBroadcastHandler {
                 vtxn.topic()
             );
         }
-
         let vtxn_total_bytes = node
             .validator_txns()
             .iter()

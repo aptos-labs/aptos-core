@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 
 use self::jwk::JWK;
-use crate::{move_utils::as_move_value::AsMoveValue, on_chain_config::OnChainConfig};
+use crate::{
+    aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
+    on_chain_config::OnChainConfig,
+};
 use anyhow::{bail, Context};
-use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
     move_resource::MoveStructType,
@@ -15,7 +16,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     fmt::{Debug, Formatter},
 };
 
@@ -27,6 +28,11 @@ pub type Issuer = Vec<u8>;
 
 pub fn issuer_from_str(s: &str) -> Issuer {
     s.as_bytes().to_vec()
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn dummy_issuer() -> Issuer {
+    issuer_from_str("https:://dummy.issuer")
 }
 
 /// Move type `0x1::jwks::OIDCProvider` in rust.
@@ -59,6 +65,7 @@ impl OnChainConfig for SupportedOIDCProviders {
 /// See its doc in Move for more details.
 #[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct ProviderJWKs {
+    #[serde(with = "serde_bytes")]
     pub issuer: Issuer,
     pub version: u64,
     pub jwks: Vec<JWKMoveStruct>,
@@ -185,18 +192,16 @@ impl MoveStructType for PatchedJWKs {
 /// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct QuorumCertifiedUpdate {
-    pub authors: BTreeSet<AccountAddress>,
     pub update: ProviderJWKs,
-    pub multi_sig: bls12381::Signature,
+    pub multi_sig: AggregateSignature,
 }
 
 impl QuorumCertifiedUpdate {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Self {
-            authors: Default::default(),
-            update: Default::default(),
-            multi_sig: bls12381::Signature::dummy_signature(),
+            update: ProviderJWKs::new(dummy_issuer()),
+            multi_sig: AggregateSignature::empty(),
         }
     }
 }

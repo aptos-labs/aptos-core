@@ -677,7 +677,6 @@ impl CompiledPackage {
                         .collect(),
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
-                    debug: flags.debug(),
                     ..Default::default()
                 };
                 compiler_driver_v2(options)?

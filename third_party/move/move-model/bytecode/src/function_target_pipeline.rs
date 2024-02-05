@@ -432,9 +432,9 @@ impl FunctionTargetPipeline {
         self.run_with_hook(env, targets, |_| {}, |_, _, _| {})
     }
 
-    /// Runs the pipeline on all functions in the targets holder, dump the bytecode before the
-    /// pipeline as well as after each processor pass. If `dump_cfg` is set, dump the per-function
-    /// control-flow graph (in dot format) too.
+    /// Runs the pipeline on all functions in the targets holder, and dump the bytecode via `log` before the
+    /// pipeline as well as after each processor pass, identifying it by `dump_base_name`. If `dump_cfg` is set,
+    /// dump the per-function control-flow graph (in dot format) to a file, using the given base name.
     pub fn run_with_dump(
         &self,
         env: &GlobalEnv,
@@ -447,20 +447,26 @@ impl FunctionTargetPipeline {
             env,
             targets,
             |holders| {
-                Self::dump_to_file(
+                Self::debug_dump(
                     dump_base_name,
                     0,
                     "stackless",
-                    &Self::get_pre_pipeline_dump(env, holders),
+                    &Self::get_pre_pipeline_dump(env, holders, /*verbose*/ true),
                 )
             },
             |step_count, processor, holders| {
                 let suffix = processor.name();
-                Self::dump_to_file(
+                Self::debug_dump(
                     dump_base_name,
                     step_count,
                     &suffix,
-                    &Self::get_per_processor_dump(env, holders, processor, register_annotations),
+                    &Self::get_per_processor_dump(
+                        env,
+                        holders,
+                        processor,
+                        register_annotations,
+                        /*verbose*/ true,
+                    ),
                 );
                 if dump_cfg {
                     Self::dump_cfg(env, holders, dump_base_name, step_count, &suffix);
@@ -474,17 +480,23 @@ impl FunctionTargetPipeline {
         name: &str,
         targets: &FunctionTargetsHolder,
         register_annotations: &impl Fn(&FunctionTarget),
+        verbose: bool,
     ) -> String {
         print_targets_with_annotations_for_test(
             env,
             &format!("after processor `{}`", name),
             targets,
             register_annotations,
+            verbose,
         )
     }
 
-    fn get_pre_pipeline_dump(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> String {
-        Self::print_targets(env, "stackless", targets, &|_| {})
+    fn get_pre_pipeline_dump(
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+        verbose: bool,
+    ) -> String {
+        Self::print_targets(env, "stackless", targets, &|_| {}, verbose)
     }
 
     fn get_per_processor_dump(
@@ -492,6 +504,7 @@ impl FunctionTargetPipeline {
         targets: &FunctionTargetsHolder,
         processor: &dyn FunctionTargetProcessor,
         register_annotations: &impl Fn(&FunctionTarget),
+        verbose: bool,
     ) -> String {
         let mut dump = format!("{}", ProcessorResultDisplay {
             env,
@@ -507,16 +520,15 @@ impl FunctionTargetPipeline {
                 &processor.name(),
                 targets,
                 register_annotations,
+                verbose,
             ));
         }
         dump
     }
 
-    fn dump_to_file(base_name: &str, step_count: usize, suffix: &str, content: &str) {
-        let dump = format!("{}\n", content.trim());
-        let file_name = format!("{}_{}_{}.bytecode", base_name, step_count, suffix);
-        debug!("dumping bytecode to `{}`", file_name);
-        fs::write(&file_name, dump).expect("dumping bytecode");
+    fn debug_dump(base_name: &str, step_count: usize, suffix: &str, content: &str) {
+        let name = format!("bytecode of {}_{}_{}", base_name, step_count, suffix);
+        debug!("{}:\n{}\n", name, content.trim())
     }
 
     /// Generate dot files for control-flow graphs.

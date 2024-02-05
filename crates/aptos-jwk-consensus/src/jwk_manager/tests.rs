@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    certified_update_producer::CertifiedUpdateProducer,
     jwk_manager::{ConsensusState, JWKManager, PerProviderState, QuorumCertProcessGuard},
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::{JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse},
+    update_certifier::TUpdateCertifier,
 };
+use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey, Signature},
@@ -15,6 +16,7 @@ use aptos_crypto::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_types::{
     account_address::AccountAddress,
+    aggregate_signature::AggregateSignature,
     epoch_state::EpochState,
     jwks::{
         issuer_from_str, jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, Issuer,
@@ -26,7 +28,7 @@ use aptos_types::{
 use aptos_validator_transaction_pool::{TransactionFilter, VTxnPoolState};
 use futures_util::future::AbortHandle;
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -51,13 +53,13 @@ async fn test_jwk_manager_state_transition() {
         verifier: ValidatorVerifier::new(validator_consensus_infos.clone()),
     };
 
-    let certified_update_producer = DummyCertifiedUpdateProducer::default();
+    let update_certifier = DummyUpdateCertifier::default();
     let vtxn_pool = VTxnPoolState::default();
     let mut jwk_manager = JWKManager::new(
         private_keys[0].clone(),
         addrs[0],
         Arc::new(epoch_state),
-        Arc::new(certified_update_producer),
+        Arc::new(update_certifier),
         vtxn_pool.clone(),
     );
 
@@ -308,17 +310,18 @@ async fn test_jwk_manager_state_transition() {
         .consensus_state
         .my_proposal_cloned()
         .observed;
-    let multi_sig = Signature::aggregate(
+    let signer_bit_vec = BitVec::from(private_keys.iter().map(|_| true).collect::<Vec<_>>());
+    let sig = Signature::aggregate(
         private_keys
             .iter()
             .map(|sk| sk.sign(&qc_jwks_for_carl).unwrap())
             .collect::<Vec<_>>(),
     )
     .unwrap();
+    let multi_sig = AggregateSignature::new(signer_bit_vec, Some(sig));
     let qc_update_for_carl = QuorumCertifiedUpdate {
-        authors: BTreeSet::from_iter(addrs.clone()),
         update: qc_jwks_for_carl,
-        multi_sig: multi_sig.clone(),
+        multi_sig,
     };
     assert!(jwk_manager
         .process_quorum_certified_update(qc_update_for_carl.clone())
@@ -378,7 +381,14 @@ async fn test_jwk_manager_state_transition() {
         .consensus_state
         .my_proposal_cloned()
         .observed;
-    let multi_sig = Signature::aggregate(
+    let signer_bit_vec = BitVec::from(
+        private_keys
+            .iter()
+            .take(3)
+            .map(|_| true)
+            .collect::<Vec<_>>(),
+    );
+    let sig = Signature::aggregate(
         private_keys
             .iter()
             .take(3)
@@ -386,10 +396,10 @@ async fn test_jwk_manager_state_transition() {
             .collect::<Vec<_>>(),
     )
     .unwrap();
+    let multi_sig = AggregateSignature::new(signer_bit_vec, Some(sig));
     let qc_update_for_alice = QuorumCertifiedUpdate {
-        authors: BTreeSet::from_iter(addrs[0..3].to_vec()),
         update: qc_jwks_for_alice,
-        multi_sig: multi_sig.clone(),
+        multi_sig,
     };
     assert!(jwk_manager
         .process_quorum_certified_update(qc_update_for_alice.clone())
@@ -449,11 +459,11 @@ fn new_rpc_observation_request(
     }
 }
 
-pub struct DummyCertifiedUpdateProducer {
+pub struct DummyUpdateCertifier {
     pub invocations: Mutex<Vec<(Arc<EpochState>, ProviderJWKs)>>,
 }
 
-impl Default for DummyCertifiedUpdateProducer {
+impl Default for DummyUpdateCertifier {
     fn default() -> Self {
         Self {
             invocations: Mutex::new(vec![]),
@@ -461,12 +471,12 @@ impl Default for DummyCertifiedUpdateProducer {
     }
 }
 
-impl CertifiedUpdateProducer for DummyCertifiedUpdateProducer {
+impl TUpdateCertifier for DummyUpdateCertifier {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
         payload: ProviderJWKs,
-        _agg_node_tx: Option<aptos_channel::Sender<(), QuorumCertifiedUpdate>>,
+        _agg_node_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle {
         self.invocations.lock().push((epoch_state, payload));
         let (abort_handle, _) = AbortHandle::new_pair();
