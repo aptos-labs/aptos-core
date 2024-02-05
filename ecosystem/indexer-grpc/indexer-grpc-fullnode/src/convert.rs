@@ -15,7 +15,7 @@ use aptos_logger::warn;
 use aptos_protos::{
     transaction::{
         v1 as transaction,
-        v1::{any_signature, Ed25519, Secp256k1Ecdsa, WebAuthn, ZkId},
+        v1::{any_signature, Ed25519, Secp256k1Ecdsa, ZkId},
     },
     util::timestamp,
 };
@@ -601,11 +601,8 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
                 signature: s.0.clone(),
             })),
         },
-        Signature::WebAuthn(s) => transaction::AnySignature {
-            r#type: transaction::any_signature::Type::Webauthn as i32,
-            signature: Some(any_signature::Signature::Webauthn(WebAuthn {
-                signature: s.0.clone(),
-            })),
+        Signature::WebAuthn(_) => {
+            unimplemented!("WebAuthn signature is not supported")
         },
         Signature::ZkId(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Zkid as i32,
