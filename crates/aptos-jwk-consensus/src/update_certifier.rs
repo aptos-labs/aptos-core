@@ -48,14 +48,15 @@ impl TUpdateCertifier for CertifiedUpdateProducer {
         qc_update_tx: aptos_channel::Sender<Issuer, QuorumCertifiedUpdate>,
     ) -> AbortHandle {
         let rb = self.reliable_broadcast.clone();
+        let issuer = payload.issuer.clone();
         let req = ObservedUpdateRequest {
             epoch: epoch_state.epoch,
-            issuer: payload.issuer.clone(),
+            issuer: issuer.clone(),
         };
         let agg_state = Arc::new(ObservationAggregationState::new(epoch_state, payload));
         let task = async move {
             let qc_update = rb.broadcast(req, agg_state).await;
-            let _ = qc_update_tx.push((), qc_update);
+            let _ = qc_update_tx.push(issuer, qc_update);
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
