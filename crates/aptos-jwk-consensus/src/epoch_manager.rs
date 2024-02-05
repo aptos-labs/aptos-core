@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    certified_update_producer::RealCertifiedUpdateProducer,
+    update_certifier::UpdateCertifier,
     jwk_manager::JWKManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::JWKConsensusNetworkClient,
@@ -174,13 +174,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Duration::from_millis(1000),
                 BoundedExecutor::new(8, tokio::runtime::Handle::current()),
             );
-            let qc_update_producer = RealCertifiedUpdateProducer::new(rb);
+            let update_certifier = UpdateCertifier::new(rb);
 
             let jwk_consensus_manager = JWKManager::new(
                 self.consensus_key.clone(),
                 self.my_addr,
                 epoch_state.clone(),
-                Arc::new(qc_update_producer),
+                Arc::new(update_certifier),
                 self.vtxn_pool.clone(),
             );
 

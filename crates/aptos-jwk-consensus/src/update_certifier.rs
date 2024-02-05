@@ -27,11 +27,11 @@ pub trait TUpdateCertifier: Send + Sync {
     ) -> AbortHandle;
 }
 
-pub struct CertifiedUpdateProducer {
+pub struct UpdateCertifier {
     reliable_broadcast: Arc<ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>>,
 }
 
-impl CertifiedUpdateProducer {
+impl UpdateCertifier {
     pub fn new(reliable_broadcast: ReliableBroadcast<JWKConsensusMsg, ExponentialBackoff>) -> Self {
         Self {
             reliable_broadcast: Arc::new(reliable_broadcast),
@@ -39,7 +39,7 @@ impl CertifiedUpdateProducer {
     }
 }
 
-impl TUpdateCertifier for CertifiedUpdateProducer {
+impl TUpdateCertifier for UpdateCertifier {
     fn start_produce(
         &self,
         epoch_state: Arc<EpochState>,
