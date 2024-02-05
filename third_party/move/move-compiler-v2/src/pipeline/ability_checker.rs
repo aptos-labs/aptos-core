@@ -79,8 +79,8 @@ fn check_drop_for_temp_with_msg(
     check_drop(func_target, ty, loc, err_msg)
 }
 
-/// Checks if the given temporary variable has constraint drop, and add diagnostics if not,
-/// if the code abort state before the given code offset is not definitely abort
+/// If temporary variable `t` does not have ability `drop`, generates an error, unless the state before
+/// `code_offset` won't return.
 fn cond_check_drop_for_temp_with_msg(
     func_target: &FunctionTarget,
     code_offset: CodeOffset,
