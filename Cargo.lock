@@ -3518,6 +3518,7 @@ dependencies = [
 name = "aptos-safety-rules"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-config",
  "aptos-consensus-types",
  "aptos-crypto",
