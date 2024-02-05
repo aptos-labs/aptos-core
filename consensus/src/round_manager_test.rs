@@ -2038,7 +2038,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     let genesis_qc = certificate_for_genesis();
 
     let invalid_block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF]); 5],
+        vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
         Payload::empty(false),
         1,
         1,
@@ -2157,6 +2157,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         ..Default::default()
     };
 
+    let mut features = Features::default();
+    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let mut nodes = NodeSetup::create_nodes(
         &mut playground,
         runtime.handle().clone(),
@@ -2167,7 +2169,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
             vtxn: vtxn_config,
         }),
         Some(local_config),
-        None,
+        Some(features),
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
@@ -2184,7 +2186,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let block_too_many_vtxns = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 20]); 6],
+        vec![ValidatorTransaction::dummy(vec![0xFF; 20]); 6],
         Payload::DirectMempool(create_vec_signed_transactions(4)),
         1,
         1,
@@ -2195,7 +2197,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let block_too_large = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 200]); 1], // total_bytes >= 200 * 1 = 200
+        vec![ValidatorTransaction::dummy(vec![0xFF; 200]); 1], // total_bytes >= 200 * 1 = 200
         Payload::DirectMempool(create_vec_signed_transactions(9)), // = total_bytes >= 69 * 9 = 621
         1,
         1,
@@ -2206,7 +2208,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let block_vtxns_too_large = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
+        vec![ValidatorTransaction::dummy(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
         Payload::empty(false),
         1,
         1,
@@ -2217,7 +2219,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     .unwrap();
 
     let valid_block = Block::new_proposal_ext(
-        vec![ValidatorTransaction::dummy1(vec![0xFF; 60]); 5], // total_bytes >= 60 * 5 = 300
+        vec![ValidatorTransaction::dummy(vec![0xFF; 20]); 5], // total_bytes >= 60 * 5 = 300
         Payload::DirectMempool(create_vec_signed_transactions(5)), // total_bytes >= 69 * 5 = 345
         1,
         1,

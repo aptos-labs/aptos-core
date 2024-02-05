@@ -44,9 +44,9 @@ pub enum NoiseHandshakeError {
 
     #[error(
         "noise server: client {0}: client is expecting us to have a different \
-         public key: {1}"
+         public key. Expected: {1}, Actual: {2}"
     )]
-    ClientExpectingDifferentPubkey(ShortHexStr, String),
+    ClientExpectingDifferentPubkey(ShortHexStr, String, String),
 
     #[error("noise server: client {0}: error parsing handshake init message: {1}")]
     ServerParseClient(ShortHexStr, NoiseError),
