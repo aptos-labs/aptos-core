@@ -1,30 +1,25 @@
 // Copyright © Aptos Foundation
 
 use crate::dkg::real_dkg::rounding::{
-    DKGRounding, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD, STEP_SIZE, WEIGHT_PER_VALIDATOR_MAX,
+    DKGRounding, RECONSTRUCT_THRESHOLD, STAKE_GAP_THRESHOLD, STEPS, WEIGHT_PER_VALIDATOR_MAX,
     WEIGHT_PER_VALIDATOR_MIN,
 };
 use rand::Rng;
 
 #[test]
 fn compute_mainnet_rounding() {
-    let mainnet_dkg_rounding = DKGRounding::new(
-        MAINNET_STAKES.to_vec(),
-        WEIGHT_PER_VALIDATOR_MIN * MAINNET_STAKES.len(),
-        WEIGHT_PER_VALIDATOR_MAX * MAINNET_STAKES.len(),
-        STEP_SIZE,
-        SECRECY_THRESHOLD,
-        RECONSTRUCT_THRESHOLD,
-    );
-    println!("{:?}", mainnet_dkg_rounding.profile);
-    assert!(
-        mainnet_dkg_rounding
-            .profile
-            .validator_weights
-            .iter()
-            .sum::<usize>()
-            <= WEIGHT_PER_VALIDATOR_MAX * MAINNET_STAKES.len()
-    );
+    for stake_gap in (5..=100).step_by(1) {
+        let stake_gap = stake_gap as f64 / 1000.0;
+        let mainnet_dkg_rounding = DKGRounding::new(
+            MAINNET_STAKES.to_vec(),
+            stake_gap,
+            WEIGHT_PER_VALIDATOR_MIN,
+            WEIGHT_PER_VALIDATOR_MAX,
+            STEPS,
+            RECONSTRUCT_THRESHOLD,
+        );
+        println!("{:?}", mainnet_dkg_rounding.profile);
+    }
 }
 
 #[test]
@@ -39,18 +34,17 @@ fn test_rounding_uniform_distribution() {
         for _ in 0..validator_num {
             validator_stakes.push(rng.gen_range(1_000_000, 50_000_000));
         }
-        let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * validator_num;
-        let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * validator_num;
         let dkg_rounding = DKGRounding::new(
             validator_stakes,
-            total_weight_min,
-            total_weight_max,
-            STEP_SIZE,
-            SECRECY_THRESHOLD,
+            STAKE_GAP_THRESHOLD,
+            WEIGHT_PER_VALIDATOR_MIN,
+            WEIGHT_PER_VALIDATOR_MAX,
+            STEPS,
             RECONSTRUCT_THRESHOLD,
         );
-        assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.validator_weights.iter().sum::<usize>() <= total_weight_max);
+        // println!("{:?}", dkg_rounding.profile);
+        assert!(dkg_rounding.profile.stake_gap <= STAKE_GAP_THRESHOLD);
+        assert!(dkg_rounding.profile.stake_gap + RECONSTRUCT_THRESHOLD <= 2.0 / 3.0);
     }
 }
 
@@ -78,18 +72,17 @@ fn test_rounding_zipf_distribution() {
     for _ in 0..num_runs {
         let validator_num = rng.gen_range(100, 250);
         let validator_stakes = generate_approximate_zipf(validator_num, 1_000_000, 50_000_000, 5.0);
-        let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * validator_num;
-        let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * validator_num;
         let dkg_rounding = DKGRounding::new(
             validator_stakes,
-            total_weight_min,
-            total_weight_max,
-            STEP_SIZE,
-            SECRECY_THRESHOLD,
+            STAKE_GAP_THRESHOLD,
+            WEIGHT_PER_VALIDATOR_MIN,
+            WEIGHT_PER_VALIDATOR_MAX,
+            STEPS,
             RECONSTRUCT_THRESHOLD,
         );
-        assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.validator_weights.iter().sum::<usize>() <= total_weight_max);
+        // println!("{:?}", dkg_rounding.profile);
+        assert!(dkg_rounding.profile.stake_gap <= STAKE_GAP_THRESHOLD);
+        assert!(dkg_rounding.profile.stake_gap + RECONSTRUCT_THRESHOLD <= 2.0 / 3.0);
     }
 }
 
