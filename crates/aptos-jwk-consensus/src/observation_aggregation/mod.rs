@@ -3,30 +3,24 @@
 use crate::types::{
     JWKConsensusMsg, ObservedUpdate, ObservedUpdateRequest, ObservedUpdateResponse,
 };
-use anyhow::ensure;
+use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
-use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
+    aggregate_signature::PartialSignatures,
     epoch_state::EpochState,
     jwks::{ProviderJWKs, QuorumCertifiedUpdate},
 };
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 
 /// The aggregation state of reliable broadcast where a validator broadcast JWK observation requests
 /// and produce quorum-certified JWK updates.
 pub struct ObservationAggregationState {
     epoch_state: Arc<EpochState>,
     local_view: ProviderJWKs,
-    inner_state: Mutex<InnerState>,
-}
-
-#[derive(Default)]
-struct InnerState {
-    pub contributors: HashSet<AccountAddress>,
-    pub multi_sig: Option<bls12381::Signature>,
+    inner_state: Mutex<PartialSignatures>,
 }
 
 impl ObservationAggregationState {
@@ -34,7 +28,7 @@ impl ObservationAggregationState {
         Self {
             epoch_state,
             local_view,
-            inner_state: Mutex::new(InnerState::default()),
+            inner_state: Mutex::new(PartialSignatures::empty()),
         }
     }
 }
@@ -64,8 +58,8 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
             "adding peer observation failed with mismatched author",
         );
 
-        let mut aggregator = self.inner_state.lock();
-        if aggregator.contributors.contains(&sender) {
+        let mut partial_sigs = self.inner_state.lock();
+        if partial_sigs.contains_voter(&sender) {
             return Ok(None);
         }
 
@@ -74,33 +68,28 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
             "adding peer observation failed with mismatched view"
         );
 
-        // Verify the quorum-cert.
+        // Verify peer signature.
         self.epoch_state
             .verifier
             .verify(sender, &peer_view, &signature)?;
 
         // All checks passed. Aggregating.
-        aggregator.contributors.insert(sender);
-        let new_multi_sig = if let Some(existing) = aggregator.multi_sig.take() {
-            bls12381::Signature::aggregate(vec![existing, signature])?
-        } else {
-            signature
-        };
-
-        let maybe_qc_update = self
+        partial_sigs.add_signature(sender, signature);
+        let voters: BTreeSet<AccountAddress> = partial_sigs.signatures().keys().copied().collect();
+        if self
             .epoch_state
             .verifier
-            .check_voting_power(aggregator.contributors.iter(), true)
-            .ok()
-            .map(|_| QuorumCertifiedUpdate {
-                authors: aggregator.contributors.clone().into_iter().collect(),
-                update: peer_view,
-                multi_sig: new_multi_sig.clone(),
-            });
+            .check_voting_power(voters.iter(), true)
+            .is_err()
+        {
+            return Ok(None);
+        }
+        let multi_sig = self.epoch_state.verifier.aggregate_signatures(&partial_sigs).map_err(|e|anyhow!("adding peer observation failed with partial-to-aggregated conversion error: {e}"))?;
 
-        aggregator.multi_sig = Some(new_multi_sig);
-
-        Ok(maybe_qc_update)
+        Ok(Some(QuorumCertifiedUpdate {
+            update: peer_view,
+            multi_sig,
+        }))
     }
 }
 

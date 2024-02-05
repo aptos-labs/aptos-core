@@ -379,6 +379,7 @@ impl<'env> FunctionTarget<'env> {
         label_offsets: &BTreeMap<Label, CodeOffset>,
         offset: usize,
         code: &Bytecode,
+        verbose: bool,
     ) -> String {
         let mut texts = vec![];
 
@@ -389,7 +390,7 @@ impl<'env> FunctionTarget<'env> {
         }
 
         // add location
-        if cfg!(feature = "verbose-debug-print") {
+        if verbose {
             texts.push(format!(
                 "     # {}",
                 self.get_bytecode_loc(attr_id).display(self.global_env())
@@ -683,10 +684,12 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
             }
             let label_offsets = Bytecode::label_offsets(self.get_bytecode());
             for (offset, code) in self.get_bytecode().iter().enumerate() {
+                // use `f.alternate()` to determine verbose print; its activated by `{:#}` instead of `{}`
+                // in the format string
                 writeln!(
                     f,
                     "{}",
-                    self.pretty_print_bytecode(&label_offsets, offset, code)
+                    self.pretty_print_bytecode(&label_offsets, offset, code, f.alternate())
                 )?;
             }
             writeln!(f, "}}")?;

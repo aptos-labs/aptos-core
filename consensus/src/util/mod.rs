@@ -14,7 +14,6 @@ pub mod time_service;
 
 pub fn is_vtxn_expected(features: &Features, vtxn: &ValidatorTransaction) -> bool {
     match vtxn {
-        ValidatorTransaction::DummyTopic1(_) | ValidatorTransaction::DummyTopic2(_) => true,
         ValidatorTransaction::DKGResult(_) => {
             features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
         },

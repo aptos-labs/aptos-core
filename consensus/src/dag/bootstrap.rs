@@ -46,7 +46,7 @@ use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{DagConsensusConfigV1, Features, ValidatorTxnConfig},
+    on_chain_config::{DagConsensusConfigV1, FeatureFlag, Features, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
 };
 use async_trait::async_trait;
@@ -651,6 +651,8 @@ pub(super) fn bootstrap_dag_for_test(
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
+    let mut features = Features::default();
+    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
@@ -669,7 +671,7 @@ pub(super) fn bootstrap_dag_for_test(
         false,
         ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
-        Features::default(),
+        features,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
