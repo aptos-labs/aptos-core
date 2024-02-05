@@ -4,11 +4,9 @@ use crate::{
     observation_aggregation::ObservationAggregationState,
     types::{ObservedUpdate, ObservedUpdateResponse},
 };
-use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, SigningKey, Uniform};
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
-    aggregate_signature::AggregateSignature,
     epoch_state::EpochState,
     jwks::{
         jwk::{JWKMoveStruct, JWK},
