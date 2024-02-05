@@ -16,7 +16,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
-    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
@@ -114,14 +114,13 @@ impl AptosVM {
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = crate::aptos_vm::get_transaction_output(
+        let output = crate::aptos_vm::get_system_transaction_output(
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)
                 .map_err(Unexpected)?
                 .change_set_configs,
-            TransactionAuxiliaryData::default(),
         )
         .map_err(Unexpected)?;
 
