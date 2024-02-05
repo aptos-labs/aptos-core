@@ -1,10 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::types::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue};
+use aptos_aggregator::types::{
+    DelayedFieldID, DelayedFieldValue, TryFromMoveValue, TryIntoMoveValue,
+};
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use bytes::Bytes;
+use claims::assert_some;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     account_address::AccountAddress,
@@ -44,7 +47,7 @@ impl MockDB {
 /// . 3. Actual storage backend.
 #[derive(Debug, Default)]
 pub(crate) struct MockStateView {
-    mapping: RefCell<BTreeMap<u64, Value>>,
+    mapping: RefCell<BTreeMap<DelayedFieldID, Value>>,
     in_memory_cache: BTreeMap<StateKey, Bytes>,
     db: MockDB,
 }
@@ -58,9 +61,9 @@ impl MockStateView {
         self.db.store_bytes(state_key, blob.into());
     }
 
-    pub(crate) fn add_mapping(&self, identifier: u64, v: Value) {
+    pub(crate) fn add_mapping(&self, unique_index: u32, width: u32, v: Value) {
         let mut mapping = self.mapping.borrow_mut();
-        mapping.insert(identifier, v);
+        mapping.insert(DelayedFieldID::new_with_width(unique_index, width), v);
     }
 
     pub(crate) fn add_to_in_memory_cache(
@@ -77,25 +80,39 @@ impl MockStateView {
         self.in_memory_cache.insert(state_key, blob.into());
     }
 
-    pub(crate) fn assert_mapping_equal_at(&self, identifier: u64, expected_value: Value) {
-        assert!(self
-            .mapping
-            .borrow()
-            .get(&identifier)
-            .is_some_and(|actual_value| { actual_value.equals(&expected_value).unwrap() }));
+    pub(crate) fn assert_mapping_equal_at(
+        &self,
+        unique_index: u32,
+        width: u32,
+        expected_value: Value,
+    ) {
+        let mapping = self.mapping.borrow();
+        let actual_value =
+            assert_some!(mapping.get(&DelayedFieldID::new_with_width(unique_index, width)));
+
+        assert!(
+            actual_value.equals(&expected_value).unwrap(),
+            "actual_value: {:?}, expected_value: {:?}",
+            actual_value,
+            expected_value
+        );
     }
 }
 
 impl ValueToIdentifierMapping for MockStateView {
     fn value_to_identifier(
         &self,
-        _kind: &IdentifierMappingKind,
+        kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         value: Value,
     ) -> TransformationResult<Value> {
+        let (_base_value, width) =
+            DelayedFieldValue::try_from_move_value(layout, value.copy_value()?, kind)?;
+
         let mut mapping = self.mapping.borrow_mut();
-        let identifier = mapping.len() as u64;
-        let identifier_value = DelayedFieldID::new(identifier)
+        let unique_index = mapping.len() as u32;
+        let identifier = DelayedFieldID::new_with_width(unique_index, width);
+        let identifier_value = identifier
             .try_into_move_value(layout)
             .map_err(PartialVMError::from)?;
 
@@ -109,9 +126,9 @@ impl ValueToIdentifierMapping for MockStateView {
         identifier: Value,
     ) -> TransformationResult<Value> {
         let mapping = self.mapping.borrow();
-        let identifier = DelayedFieldID::try_from_move_value(layout, identifier, &())
-            .map_err(PartialVMError::from)?
-            .as_u64();
+        let (identifier, width) = DelayedFieldID::try_from_move_value(layout, identifier, &())
+            .map_err(PartialVMError::from)?;
+        assert_eq!(identifier.extract_width(), width);
 
         Ok(mapping
             .get(&identifier)

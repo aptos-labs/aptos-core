@@ -4,13 +4,10 @@
 use crate::{
     aggregator_v2::{
         initialize, initialize_enabled_disabled_comparison, AggV2TestHarness, AggregatorLocation,
-        ElementType, UseType,
+        ElementType, StructType, UseType,
     },
     tests::common,
     BlockSplit, SUCCESS,
-};
-use aptos_framework::natives::aggregator_natives::aggregator_v2::{
-    EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
 };
 use aptos_language_e2e_tests::executor::ExecutorMode;
 use proptest::prelude::*;
@@ -42,40 +39,10 @@ mod test_cases {
     use super::*;
 
     #[test]
-    fn test_copy_snapshot() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
-        let txn = h.verify_copy_snapshot();
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(
-            EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
-            txn,
-        )]);
-    }
-
-    #[test]
-    fn test_copy_string_snapshot() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
-        let txn = h.verify_copy_string_snapshot();
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(
-            EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
-            txn,
-        )]);
-    }
-
-    #[test]
     fn test_snapshot_concat() {
         let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
         let txn = h.verify_string_concat();
         h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, txn)]);
-    }
-
-    #[test]
-    fn test_string_snapshot_concat() {
-        let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 1);
-        let txn = h.verify_string_snapshot_concat();
-        h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(
-            EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-            txn,
-        )]);
     }
 
     #[test]
@@ -86,7 +53,7 @@ mod test_cases {
 
         let mut h = setup(DEFAULT_EXECUTOR_MODE, AggregatorMode::BothComparison, 100);
 
-        let init_txn = h.init(None, use_type, element_type, true);
+        let init_txn = h.init(None, use_type, element_type, StructType::Aggregator);
         h.run_block_in_parts_and_check(BlockSplit::Whole, vec![(SUCCESS, init_txn)]);
 
         let addr = *h.account.address();
@@ -256,7 +223,7 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
             (SUCCESS, h.new(&agg_loc, 1500)),
             (SUCCESS, h.add(&agg_loc, 400)), // 400
             (SUCCESS, h.materialize(&agg_loc)),
@@ -306,9 +273,9 @@ proptest! {
         println!("agg_3_loc: {:?}", agg_3_loc);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
-            (SUCCESS, h.init(Some(&acc_2), use_type, element_type, true)),
-            (SUCCESS, h.init(Some(&acc_3), use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(Some(&acc_2), use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(Some(&acc_3), use_type, element_type, StructType::Aggregator)),
             (SUCCESS, h.new_add(&agg_1_loc, 10, 5)),
             (SUCCESS, h.new_add(&agg_2_loc, 10, 5)),
             (SUCCESS, h.new_add(&agg_3_loc, 10, 5)),  // 5, 5, 5
@@ -358,7 +325,7 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
             (SUCCESS, h.new(&agg_loc, 600)),
             (SUCCESS, h.add(&agg_loc, 400)),
             // Value dropped below zero - abort with EAGGREGATOR_UNDERFLOW.
@@ -381,7 +348,7 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
             (SUCCESS, h.new(&agg_loc, 600)),
             // Underflow on materialized value leads to abort with EAGGREGATOR_UNDERFLOW.
             (EAGGREGATOR_UNDERFLOW, h.materialize_and_sub(&agg_loc, 400)),
@@ -404,7 +371,7 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
             (SUCCESS, h.new_add(&agg_loc, 600, 400)),
             // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
             (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 201))
@@ -427,7 +394,7 @@ proptest! {
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
             (SUCCESS, h.new(&agg_loc, 399)),
             // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
             (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
@@ -439,31 +406,29 @@ proptest! {
         );
     }
 
-    // TODO[agg_v2](fix) Until string snapshot serialization is fixed, this cannot work.
-    // So lines with derived_snap_loc are commented out, and 9 changed to 7
     #[test]
-    fn test_aggregator_snapshot(test_env in arb_test_env_non_equivalent(7)) {
+    fn test_aggregator_snapshot(test_env in arb_test_env_non_equivalent(10)) {
         println!("Testing test_aggregator_snapshot {:?}", test_env);
         let element_type = ElementType::U64;
         let use_type = UseType::UseResourceType;
 
-        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 7);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 10);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
         let snap_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
-        // let derived_snap_loc = AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
+        let derived_snap_loc = AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
 
         let txns = vec![
-            (SUCCESS, h.init(None, use_type, element_type, true)),
-            (SUCCESS, h.init(None, use_type, element_type, false)),
-            // (SUCCESS, h.init(None, use_type, ElementType::String, false)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Snapshot)),
+            (SUCCESS, h.init(None, use_type, ElementType::String, StructType::DerivedString)),
             (SUCCESS, h.new_add(&agg_loc, 400, 100)),
             (SUCCESS, h.snapshot(&agg_loc, &snap_loc)),
             (SUCCESS, h.check_snapshot(&snap_loc, 100)),
             (SUCCESS, h.read_snapshot(&agg_loc)),
             (SUCCESS, h.add_and_read_snapshot_u128(&agg_loc, 100)),
-            // (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
-            // (SUCCESS, h.check_snapshot(&derived_snap_loc, 1210013)),
+            (SUCCESS, h.concat(&snap_loc, &derived_snap_loc, "12", "13")),
+            (SUCCESS, h.check_derived(&derived_snap_loc, 1210013)),
         ];
 
         h.run_block_in_parts_and_check(
@@ -474,8 +439,7 @@ proptest! {
 }
 
 #[test]
-#[should_panic]
-fn test_aggregator_snapshot_not_equivalent_gas() {
+fn test_aggregator_snapshot_equivalent_gas() {
     let test_env = TestEnvConfig {
         executor_mode: ExecutorMode::BothComparison,
         aggregator_execution_mode: AggregatorMode::BothComparison,
@@ -498,9 +462,23 @@ fn test_aggregator_snapshot_not_equivalent_gas() {
         AggregatorLocation::new(*h.account.address(), ElementType::String, use_type, 0);
 
     let txns = vec![
-        (0, h.init(None, use_type, element_type, true)),
-        (0, h.init(None, use_type, element_type, false)),
-        (0, h.init(None, use_type, ElementType::String, false)),
+        (
+            0,
+            h.init(None, use_type, element_type, StructType::Aggregator),
+        ),
+        (
+            0,
+            h.init(None, use_type, element_type, StructType::Snapshot),
+        ),
+        (
+            0,
+            h.init(
+                None,
+                use_type,
+                ElementType::String,
+                StructType::DerivedString,
+            ),
+        ),
         (0, h.new_add(&agg_loc, 400, 100)),
         (0, h.snapshot(&agg_loc, &snap_loc)),
         // string needs to be large, for gas rounding to be different

@@ -66,13 +66,13 @@ tracing = { workspace = true }
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
 aptos-language-e2e-tests = { workspace = true }
-aptos-types = { workspace = true }
+aptos-types = { workspace = true, features = ["fuzzing"] }
 claims = { workspace = true }
 proptest = { workspace = true }
 rand_core = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing"]
+fuzzing = ["move-core-types/fuzzing", "move-binary-format/fuzzing", "move-vm-types/fuzzing", "aptos-framework/fuzzing", "aptos-types/fuzzing"]
 failpoints = ["fail/failpoints", "move-vm-runtime/failpoints"]
 testing = ["move-unit-test", "aptos-framework/testing"]

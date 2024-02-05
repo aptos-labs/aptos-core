@@ -5,7 +5,16 @@ metadata:
   labels:
     {{- include "pfn-addons.labels" . | nindent 4 }}
   annotations:
+    {{- if eq .Values.ingress.class "alb" }}
     alb.ingress.kubernetes.io/healthcheck-path: /v1/-/healthy
+    {{- end }}
+    {{- if eq .Values.ingress.class "gce" }}
+    {{- if .Values.ingress.backend_http2 }}
+    cloud.google.com/app-protocols: '{"default": "HTTP2"}'
+    {{- end }}
+    cloud.google.com/backend-config: '{"default":"{{ include "pfn-addons.fullname" . }}"}'
+    cloud.google.com/neg: '{"ingress": true}'
+    {{- end }}
 spec:
   selector:
     app.kubernetes.io/part-of: aptos-fullnode
@@ -15,3 +24,30 @@ spec:
     targetPort: 8080
   type: NodePort
   externalTrafficPolicy: Local
+---
+{{- if eq .Values.ingress.class "gce" }}
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ include "pfn-addons.fullname" . }}
+spec:
+  {{- if .Values.ingress.gce_security_policy }}
+  securityPolicy:
+    name: {{ .Values.ingress.gce_security_policy }}
+  {{- end }}
+  healthCheck:
+    checkIntervalSec: 30
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+    type: HTTP
+    requestPath: /v1/-/healthy
+    # container targetPort
+    port: 8080
+  {{- if .Values.ingress.enableStickyness }}
+  sessionAffinity:
+    affinityType: "GENERATED_COOKIE"
+    affinityCookieTtlSec: {{ .Values.ingress.cookieDurationSeconds }}
+  {{- end }}
+---
+{{- end }}

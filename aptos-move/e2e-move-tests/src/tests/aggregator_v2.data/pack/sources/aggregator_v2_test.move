@@ -1,5 +1,5 @@
 module 0x1::aggregator_v2_test {
-    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot};
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
     use aptos_std::debug;
     use aptos_std::table::{Self, Table};
     use std::vector;
@@ -14,6 +14,12 @@ module 0x1::aggregator_v2_test {
     const ENOT_EQUAL: u64 = 17;
 
     const EINVALID_ARG: u64 = 18;
+
+    const ERESOURCE_DOESNT_EXIST: u64 = 19;
+    const ETABLE_DOESNT_EXIST: u64 = 20;
+    const ERESOURCE_GROUP_DOESNT_EXIST: u64 = 21;
+    const EINDEX_DOESNT_EXIST: u64 = 22;
+    const EOPTION_DOESNT_EXIST: u64 = 23;
 
     struct AggregatorInResource<Agg: store> has key, store {
         data: vector<Option<Agg>>,
@@ -35,34 +41,14 @@ module 0x1::aggregator_v2_test {
         data: vector<Option<Agg>>,
     }
 
-    public entry fun verify_copy_snapshot() {
-        let snapshot = aggregator_v2::create_snapshot(42);
-        let snapshot2 = aggregator_v2::copy_snapshot(&snapshot);
-        assert!(aggregator_v2::read_snapshot(&snapshot) == 42, 1);
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == 42, 2);
-    }
-
-    public entry fun verify_copy_string_snapshot() {
-        let snapshot = aggregator_v2::create_snapshot(std::string::utf8(b"42"));
-        let snapshot2 = aggregator_v2::copy_snapshot(&snapshot);
-        assert!(aggregator_v2::read_snapshot(&snapshot) == std::string::utf8(b"42"), 3);
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == std::string::utf8(b"42"), 4);
-    }
-
     public entry fun verify_string_concat() {
         let snapshot = aggregator_v2::create_snapshot(42);
-        let snapshot2 = aggregator_v2::string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        let val = aggregator_v2::read_snapshot(&snapshot2);
+        let snapshot2 = aggregator_v2::derive_string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
+        let val = aggregator_v2::read_derived_string(&snapshot2);
 
         debug::print(&val);
         debug::print(&std::string::utf8(b"before42after"));
         assert!(val == std::string::utf8(b"before42after"), 5);
-    }
-
-    public entry fun verify_string_snapshot_concat() {
-        let snapshot = aggregator_v2::create_snapshot(std::string::utf8(b"42"));
-        let snapshot2 = aggregator_v2::string_concat(std::string::utf8(b"before"), &snapshot, std::string::utf8(b"after"));
-        assert!(aggregator_v2::read_snapshot(&snapshot2) == std::string::utf8(b"before42after"), 6);
     }
 
     fun init<Agg: store>(account: &signer, use_type: u32) {
@@ -85,12 +71,18 @@ module 0x1::aggregator_v2_test {
         init<AggregatorSnapshot<Element>>(account, use_type);
     }
 
+    public entry fun init_derived_string<Element: store>(account: &signer, use_type: u32) {
+        init<DerivedStringSnapshot>(account, use_type);
+    }
+
     fun insert<Agg: store>(account_addr: address, use_type: u32, i: u64, e: Agg) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         assert!(use_type == USE_RESOURCE_TYPE || use_type == USE_TABLE_TYPE || use_type == USE_RESOURCE_GROUP_TYPE, EINVALID_ARG);
 
         let vector_data = if (use_type == USE_RESOURCE_TYPE) {
+            assert!(exists<AggregatorInResource<Agg>>(account_addr), ERESOURCE_DOESNT_EXIST);
             &mut borrow_global_mut<AggregatorInResource<Agg>>(account_addr).data
         } else if (use_type == USE_TABLE_TYPE) {
+            assert!(exists<AggregatorInTable<Agg>>(account_addr), ETABLE_DOESNT_EXIST);
             let data = &mut borrow_global_mut<AggregatorInTable<Agg>>(account_addr).data;
             let outer = i / 10;
             let inner = i % 10;
@@ -101,6 +93,7 @@ module 0x1::aggregator_v2_test {
 
             table::borrow_mut(data, outer)
         } else { // if (use_type == USE_RESOURCE_GROUP_TYPE) {
+            assert!(exists<AggregatorInResourceGroup<Agg>>(account_addr), ERESOURCE_GROUP_DOESNT_EXIST);
             &mut borrow_global_mut<AggregatorInResourceGroup<Agg>>(account_addr).data
         };
 
@@ -115,18 +108,23 @@ module 0x1::aggregator_v2_test {
     inline fun for_element_ref<Agg: store, R>(account_addr: address, use_type: u32, i: u64, f: |&Agg|R): R acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         assert!(use_type == USE_RESOURCE_TYPE || use_type == USE_TABLE_TYPE || use_type == USE_RESOURCE_GROUP_TYPE, EINVALID_ARG);
         let vector_data = if (use_type == USE_RESOURCE_TYPE) {
+            assert!(exists<AggregatorInResource<Agg>>(account_addr), ERESOURCE_DOESNT_EXIST);
             &borrow_global<AggregatorInResource<Agg>>(account_addr).data
         } else if (use_type == USE_TABLE_TYPE) {
-           let data = &borrow_global<AggregatorInTable<Agg>>(account_addr).data;
+            assert!(exists<AggregatorInTable<Agg>>(account_addr), ETABLE_DOESNT_EXIST);
+            let data = &borrow_global<AggregatorInTable<Agg>>(account_addr).data;
             let outer = i / 10;
             let inner = i % 10;
             i = inner;
             table::borrow(data, outer)
         } else { // if (use_type == USE_RESOURCE_GROUP_TYPE) {
+            assert!(exists<AggregatorInResourceGroup<Agg>>(account_addr), ERESOURCE_GROUP_DOESNT_EXIST);
             &borrow_global<AggregatorInResourceGroup<Agg>>(account_addr).data
         };
 
+        assert!(vector::length(vector_data) > i, EINDEX_DOESNT_EXIST);
         let option_data = vector::borrow(vector_data, i);
+        assert!(option::is_some(option_data), EOPTION_DOESNT_EXIST);
         let value = option::borrow(option_data);
 
         f(value)
@@ -262,10 +260,10 @@ module 0x1::aggregator_v2_test {
     }
 
     public entry fun concat<Element: store>(_account: &signer, addr_i: address, use_type_i: u32, i: u64, addr_j: address, use_type_j: u32, j: u64, prefix: String, suffix: String) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
-        let snapshot = for_element_ref<AggregatorSnapshot<Element>, AggregatorSnapshot<String>>(addr_i, use_type_i, i, |snapshot| {
-            aggregator_v2::string_concat<Element>(prefix, snapshot, suffix)
+        let snapshot = for_element_ref<AggregatorSnapshot<Element>, DerivedStringSnapshot>(addr_i, use_type_i, i, |snapshot| {
+            aggregator_v2::derive_string_concat<Element>(prefix, snapshot, suffix)
         });
-        insert<AggregatorSnapshot<String>>(addr_j, use_type_j, j, snapshot);
+        insert<DerivedStringSnapshot>(addr_j, use_type_j, j, snapshot);
     }
 
     public entry fun read_snapshot<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
@@ -274,6 +272,11 @@ module 0x1::aggregator_v2_test {
 
     public entry fun check_snapshot<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, expected: Element) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
         let actual = for_element_ref<AggregatorSnapshot<Element>, Element>(addr, use_type, i, |snapshot| aggregator_v2::read_snapshot(snapshot));
+        assert!(actual == expected, ENOT_EQUAL)
+    }
+
+    public entry fun check_derived<Element: store + drop>(_account: &signer, addr: address, use_type: u32, i: u64, expected: String) acquires AggregatorInResource, AggregatorInTable, AggregatorInResourceGroup {
+        let actual = for_element_ref<DerivedStringSnapshot, String>(addr, use_type, i, |snapshot| aggregator_v2::read_derived_string(snapshot));
         assert!(actual == expected, ENOT_EQUAL)
     }
 
