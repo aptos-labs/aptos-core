@@ -36,8 +36,6 @@ module "validator" {
 
   # if forge enabled, standardize the helm release name for ease of operations
   helm_release_name_override = var.enable_forge ? "aptos-node" : ""
-  # Forge testing does not require calico for validator NetworkPolicies
-  enable_calico = !var.enable_forge
 
   k8s_api_sources = var.admin_sources_ipv4
   k8s_admin_roles = var.k8s_admin_roles
@@ -57,21 +55,15 @@ module "validator" {
   helm_values         = var.aptos_node_helm_values
 
   # allow all nodegroups to surge to 2x their size by default, in case of total nodes replacement
-  validator_instance_num     = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
-  validator_instance_max_num = var.validator_instance_max_num
+  validator_instance_num          = var.num_validator_instance > 0 ? 2 * var.num_validator_instance : var.num_validators
+  validator_instance_max_num      = var.validator_instance_max_num
+  validator_instance_enable_taint = true
   # create one utility instance per validator, since HAProxy requires resources 1.5 CPU, 2Gi memory for now
   utility_instance_num     = var.num_utility_instance > 0 ? var.num_utility_instance : var.num_validators
   utility_instance_max_num = var.utility_instance_max_num
 
   utility_instance_type   = var.utility_instance_type
   validator_instance_type = var.validator_instance_type
-
-  # addons
-  enable_monitoring               = var.enable_monitoring
-  enable_prometheus_node_exporter = var.enable_prometheus_node_exporter
-  enable_kube_state_metrics       = var.enable_kube_state_metrics
-  monitoring_helm_values          = var.monitoring_helm_values
-  logger_helm_values              = var.logger_helm_values
 }
 
 locals {
@@ -81,14 +73,14 @@ locals {
 provider "helm" {
   kubernetes {
     host                   = module.validator.aws_eks_cluster.endpoint
-    cluster_ca_certificate = base64decode(module.validator.aws_eks_cluster.certificate_authority.0.data)
+    cluster_ca_certificate = base64decode(module.validator.aws_eks_cluster.certificate_authority[0].data)
     token                  = module.validator.aws_eks_cluster_auth_token
   }
 }
 
 provider "kubernetes" {
   host                   = module.validator.aws_eks_cluster.endpoint
-  cluster_ca_certificate = base64decode(module.validator.aws_eks_cluster.certificate_authority.0.data)
+  cluster_ca_certificate = base64decode(module.validator.aws_eks_cluster.certificate_authority[0].data)
   token                  = module.validator.aws_eks_cluster_auth_token
 }
 
@@ -96,8 +88,8 @@ locals {
   genesis_helm_chart_path = "${path.module}/../../helm/genesis"
 }
 
-
 resource "helm_release" "genesis" {
+  count       = var.enable_genesis ? 1 : 0
   name        = "genesis"
   chart       = local.genesis_helm_chart_path
   max_history = 5

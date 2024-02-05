@@ -20,7 +20,7 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    aggregator::PanicError, state_store::state_value::StateValueMetadata,
+    delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;

@@ -573,7 +573,7 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_sequential((), &transactions, &data_view, true);
+        .execute_transactions_sequential((), &transactions, &data_view);
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(&transactions, None).assert_output(&output);

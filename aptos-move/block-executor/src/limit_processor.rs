@@ -261,7 +261,7 @@ mod test {
         proptest_types::types::{KeyType, MockEvent, MockTransaction},
         types::InputOutputKey,
     };
-    use aptos_types::aggregator::DelayedFieldID;
+    use aptos_types::delayed_fields::DelayedFieldID;
     use std::collections::HashSet;
 
     // TODO: add tests for accumulate_fee_statement / compute_conflict_multiplier for different BlockGasLimitType configs
@@ -351,9 +351,7 @@ mod test {
             .map(|key| match key {
                 InputOutputKey::Resource(k) => InputOutputKey::Resource(KeyType(*k, false)),
                 InputOutputKey::Group(k, t) => InputOutputKey::Group(KeyType(*k, false), *t),
-                InputOutputKey::DelayedField(i) => {
-                    InputOutputKey::DelayedField(DelayedFieldID::new(*i))
-                },
+                InputOutputKey::DelayedField(i) => InputOutputKey::DelayedField((*i).into()),
             })
             .collect()
     }

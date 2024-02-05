@@ -5,6 +5,7 @@
 pub const TEST_DIR: &str = "tests";
 
 use move_command_line_common::env::read_bool_env_var;
+use move_compiler_v2::logging;
 use move_transactional_test_runner::{vm_test_harness, vm_test_harness::TestRunConfig};
 use once_cell::sync::Lazy;
 use std::path::Path;
@@ -26,6 +27,7 @@ fn move_test_debug() -> bool {
 }
 
 fn run(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    logging::setup_logging_for_testing();
     let p = path.to_str().unwrap_or_default();
     if p.contains(NO_SAFETY_PATH) {
         std::env::set_var(MOVE_COMPILER_EXP, "no-safety")

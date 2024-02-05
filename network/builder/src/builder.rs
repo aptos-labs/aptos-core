@@ -158,6 +158,7 @@ impl NetworkBuilder {
             CONNECTIVITY_CHECK_INTERVAL_MS,
             NETWORK_CHANNEL_SIZE,
             mutual_authentication,
+            true, /* enable_latency_aware_dialing */
         );
 
         builder
@@ -224,6 +225,7 @@ impl NetworkBuilder {
             config.connectivity_check_interval_ms,
             config.network_channel_size,
             config.mutual_authentication,
+            config.enable_latency_aware_dialing,
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
@@ -342,6 +344,7 @@ impl NetworkBuilder {
         connectivity_check_interval_ms: u64,
         channel_size: usize,
         mutual_authentication: bool,
+        enable_latency_aware_dialing: bool,
     ) -> &mut Self {
         let pm_conn_mgr_notifs_rx = self.peer_manager_builder.add_connection_event_listener();
         let outbound_connection_limit = if !self.network_context.network_id().is_validator_network()
@@ -364,6 +367,7 @@ impl NetworkBuilder {
             pm_conn_mgr_notifs_rx,
             outbound_connection_limit,
             mutual_authentication,
+            enable_latency_aware_dialing,
         ));
         self
     }

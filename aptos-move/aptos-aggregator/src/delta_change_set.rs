@@ -219,7 +219,7 @@ mod test {
         FakeAggregatorView,
     };
     use aptos_types::{
-        aggregator::PanicError,
+        delayed_fields::PanicError,
         state_store::{state_key::StateKey, state_value::StateValue},
         write_set::WriteOp,
     };
@@ -532,7 +532,7 @@ mod test {
             Err(code_invariant_error("Error message from BadStorage.").into())
         }
 
-        fn generate_delayed_field_id(&self) -> Self::Identifier {
+        fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
             unimplemented!("Irrelevant for the test")
         }
 
