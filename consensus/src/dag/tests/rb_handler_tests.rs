@@ -17,8 +17,10 @@ use crate::dag::{
 use aptos_config::config::DagPayloadConfig;
 use aptos_infallible::RwLock;
 use aptos_types::{
-    aggregate_signature::PartialSignatures, epoch_state::EpochState,
-    on_chain_config::ValidatorTxnConfig, validator_verifier::random_validator_verifier,
+    aggregate_signature::PartialSignatures,
+    epoch_state::EpochState,
+    on_chain_config::{Features, ValidatorTxnConfig},
+    validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
 use futures::executor::block_on;
@@ -68,6 +70,7 @@ async fn test_node_broadcast_receiver_succeed() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
+        Features::default(),
     );
 
     let expected_result = Vote::new(
@@ -114,6 +117,7 @@ async fn test_node_broadcast_receiver_failure() {
                 Arc::new(MockFetchRequester {}),
                 DagPayloadConfig::default(),
                 ValidatorTxnConfig::default_disabled(),
+                Features::default(),
             )
         })
         .collect();
@@ -197,6 +201,7 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
+        Features::default(),
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -213,6 +218,7 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
+        Features::default(),
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);
