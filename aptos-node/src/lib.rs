@@ -20,8 +20,9 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
-use aptos_config::config::InitialSafetyRulesConfig;
+use aptos_config::config::{
+    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
+};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -661,7 +662,13 @@ pub fn setup_environment_and_start_node(
         );
 
     // Ensure consensus key in secure DB.
-    if !matches!(node_config.consensus.safety_rules.initial_safety_rules_config, InitialSafetyRulesConfig::None) {
+    if !matches!(
+        node_config
+            .consensus
+            .safety_rules
+            .initial_safety_rules_config,
+        InitialSafetyRulesConfig::None
+    ) {
         aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
     }
 
