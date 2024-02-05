@@ -16,11 +16,11 @@ module 0x42::test {
         borrow_global<R>(signer::address_of(s)).value
     }
 
-    fun fail1(a: address): bool reads R(a) {
+    fun fail1(_a: address): bool reads R(_a) {
         borrow_global<R>(@0x2).value
     }
 
-    fun fail2(s: &signer): bool reads R(signer::address_of(s)) {
+    fun fail2(_s: &signer): bool reads R(signer::address_of(_s)) {
         borrow_global<R>(@0x2).value
     }
 }

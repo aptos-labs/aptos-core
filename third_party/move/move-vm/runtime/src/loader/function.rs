@@ -72,7 +72,7 @@ impl Function {
         index: FunctionDefinitionIndex,
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
-        struct_name_table: &[Arc<StructIdentifier>],
+        struct_names: &[StructIdentifier],
     ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
@@ -113,7 +113,7 @@ impl Function {
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
             signature_table,
-            struct_name_table,
+            struct_names,
             &handle.access_specifiers,
         )?;
 

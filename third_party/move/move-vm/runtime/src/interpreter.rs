@@ -14,7 +14,7 @@ use fail::fail_point;
 use move_binary_format::{
     errors::*,
     file_format::{
-        Ability, AbilitySet, Bytecode, FieldInstantiationIndex, FunctionHandleIndex,
+        Ability, AbilitySet, AccessKind, Bytecode, FieldInstantiationIndex, FunctionHandleIndex,
         FunctionInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
     },
 };
@@ -630,17 +630,43 @@ impl Interpreter {
             TypeWithLoader { ty, loader },
             res.is_ok(),
         )?;
-        let access_opt = if is_mut {
-            AccessInstance::write(ty, addr)
-        } else {
-            AccessInstance::read(ty, addr)
-        };
-        if let Some(access) = access_opt {
-            self.access_control.check_access(access)?;
-        }
+        self.check_access(
+            loader,
+            if is_mut {
+                AccessKind::Writes
+            } else {
+                AccessKind::Reads
+            },
+            ty,
+            addr,
+        )?;
         self.operand_stack.push(res.map_err(|err| {
             err.with_message(format!("Failed to borrow global resource from {:?}", addr))
         })?)?;
+        Ok(())
+    }
+
+    fn check_access(
+        &self,
+        loader: &Loader,
+        kind: AccessKind,
+        ty: &Type,
+        addr: AccountAddress,
+    ) -> PartialVMResult<()> {
+        let (struct_idx, instance) = match ty {
+            Type::Struct { idx, .. } => (*idx, [].as_slice()),
+            Type::StructInstantiation { idx, ty_args, .. } => (*idx, ty_args.as_slice()),
+            _ => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("inconsistent type".to_owned()),
+                )
+            },
+        };
+        let struct_name = &*loader.name_cache.idx_to_identifier(struct_idx);
+        if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
+            self.access_control.check_access(access)?
+        }
         Ok(())
     }
 
@@ -658,9 +684,7 @@ impl Interpreter {
         let gv = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, loader }, exists)?;
-        if let Some(access) = AccessInstance::read(ty, addr) {
-            self.access_control.check_access(access)?;
-        }
+        self.check_access(loader, AccessKind::Reads, ty, addr)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
     }
@@ -686,9 +710,7 @@ impl Interpreter {
                         TypeWithLoader { ty, loader },
                         Some(&resource),
                     )?;
-                    if let Some(access) = AccessInstance::write(ty, addr) {
-                        self.access_control.check_access(access)?;
-                    }
+                    self.check_access(loader, AccessKind::Writes, ty, addr)?;
                     resource
                 },
                 Err(err) => {
@@ -726,9 +748,7 @@ impl Interpreter {
                     gv.view().unwrap(),
                     true,
                 )?;
-                if let Some(access) = AccessInstance::write(ty, addr) {
-                    self.access_control.check_access(access)?;
-                }
+                self.check_access(loader, AccessKind::Writes, ty, addr)?;
                 Ok(())
             },
             Err((err, resource)) => {

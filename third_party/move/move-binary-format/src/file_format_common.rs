@@ -540,9 +540,7 @@ pub(crate) mod versioned_data {
                 return Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION)
                     .with_message(format!("bytecode version {} unsupported", version)));
             } else if version == VERSION_NEXT
-                && !cfg!(test)
-                && !cfg!(feature = "testing")
-                && !cfg!(feature = "fuzzing")
+                && !cfg!(any(test, feature = "testing", feature = "fuzzing"))
             {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_VERSION).with_message(format!(

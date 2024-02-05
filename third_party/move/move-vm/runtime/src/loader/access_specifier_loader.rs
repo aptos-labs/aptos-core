@@ -15,25 +15,20 @@ use move_vm_types::loaded_data::{
     },
     runtime_types::{StructIdentifier, Type},
 };
-use std::sync::Arc;
 
 /// Loads an access specifier from the file format into the runtime representation.
 pub fn load_access_specifier(
     module: BinaryIndexedView,
     signature_table: &[Vec<Type>],
-    struct_name_table: &[Arc<StructIdentifier>],
+    struct_names: &[StructIdentifier],
     specifier: &Option<Vec<FF::AccessSpecifier>>,
 ) -> PartialVMResult<AccessSpecifier> {
     if let Some(specs) = specifier {
         let mut incls = vec![];
         let mut excls = vec![];
         for spec in specs {
-            let resource = load_resource_specifier(
-                module,
-                signature_table,
-                struct_name_table,
-                &spec.resource,
-            )?;
+            let resource =
+                load_resource_specifier(module, signature_table, struct_names, &spec.resource)?;
             let address = load_address_specifier(module, &spec.address)?;
             let clause = AccessSpecifierClause {
                 kind: spec.kind,
@@ -55,7 +50,7 @@ pub fn load_access_specifier(
 fn load_resource_specifier(
     module: BinaryIndexedView,
     signature_table: &[Vec<Type>],
-    struct_name_table: &[Arc<StructIdentifier>],
+    struct_names: &[StructIdentifier],
     spec: &FF::ResourceSpecifier,
 ) -> PartialVMResult<ResourceSpecifier> {
     use FF::ResourceSpecifier::*;
@@ -71,10 +66,10 @@ fn load_resource_specifier(
                 .ok_or_else(index_out_of_range)?,
         )),
         Resource(str_idx) => Ok(ResourceSpecifier::Resource(
-            access_table(struct_name_table, str_idx.0)?.as_ref().clone(),
+            access_table(struct_names, str_idx.0)?.clone(),
         )),
         ResourceInstantiation(str_idx, ty_idx) => Ok(ResourceSpecifier::ResourceInstantiation(
-            access_table(struct_name_table, str_idx.0)?.as_ref().clone(),
+            access_table(struct_names, str_idx.0)?.clone(),
             access_table(signature_table, ty_idx.0)?.clone(),
         )),
     }

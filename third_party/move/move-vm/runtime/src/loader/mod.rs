@@ -50,7 +50,6 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
-use move_vm_types::loaded_data::runtime_access_specifier::AccessSpecifier;
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 

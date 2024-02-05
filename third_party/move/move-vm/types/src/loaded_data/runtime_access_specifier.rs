@@ -102,7 +102,7 @@ pub trait AccessSpecifierEnv {
     ) -> PartialVMResult<AccountAddress>;
 }
 
-/// A struct to represent an access.
+/// A struct to represent an access instance (request).
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 pub struct AccessInstance {
     pub kind: AccessKind,
@@ -116,8 +116,8 @@ impl AccessSpecifier {
     /// may be under-approximated in the presence of exclusions. That is, if
     /// `!s.is_empty()`, it is still possible that all concrete accesses fail.
     pub fn is_empty(&self) -> bool {
-        if let AccessSpecifier::Constraint(incl, _) = self {
-            incl.is_empty()
+        if let AccessSpecifier::Constraint(incls, _) = self {
+            incls.is_empty()
         } else {
             false
         }
@@ -492,12 +492,12 @@ impl AddressSpecifierFunction {
 }
 
 impl AccessInstance {
-    pub fn new(kind: AccessKind, ty: &Type, address: AccountAddress) -> Option<Self> {
-        let (resource, instance) = match ty {
-            Type::Struct { name, .. } => (name.as_ref(), &[] as &[Type]),
-            Type::StructInstantiation { name, ty_args, .. } => (name.as_ref(), ty_args.as_slice()),
-            _ => return None,
-        };
+    pub fn new(
+        kind: AccessKind,
+        resource: &StructIdentifier,
+        instance: &[Type],
+        address: AccountAddress,
+    ) -> Option<Self> {
         Some(AccessInstance {
             kind,
             resource: resource.clone(),
@@ -506,12 +506,20 @@ impl AccessInstance {
         })
     }
 
-    pub fn read(ty: &Type, address: AccountAddress) -> Option<Self> {
-        Self::new(AccessKind::Reads, ty, address)
+    pub fn read(
+        resource: &StructIdentifier,
+        instance: &[Type],
+        address: AccountAddress,
+    ) -> Option<Self> {
+        Self::new(AccessKind::Reads, resource, instance, address)
     }
 
-    pub fn write(ty: &Type, address: AccountAddress) -> Option<Self> {
-        Self::new(AccessKind::Writes, ty, address)
+    pub fn write(
+        resource: &StructIdentifier,
+        instance: &[Type],
+        address: AccountAddress,
+    ) -> Option<Self> {
+        Self::new(AccessKind::Writes, resource, instance, address)
     }
 }
 

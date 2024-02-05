@@ -677,15 +677,15 @@ impl fmt::Display for Type {
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
-            Struct { name, ability: _ } => f.write_str(&name.to_string()),
+            Struct { idx, ability: _ } => write!(f, "s#{}", idx.0),
             StructInstantiation {
-                name,
+                idx,
                 ty_args,
                 ability: _,
             } => write!(
                 f,
-                "{}<{}>",
-                name,
+                "s#{}<{}>",
+                idx.0,
                 ty_args.iter().map(|t| t.to_string()).join(",")
             ),
             Reference(t) => write!(f, "&{}", t),
