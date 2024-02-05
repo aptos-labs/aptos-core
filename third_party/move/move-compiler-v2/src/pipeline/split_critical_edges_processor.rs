@@ -253,6 +253,15 @@ fn count_incoming_edges(code: &[Bytecode]) -> BTreeMap<Label, usize> {
                     }
                 }
             },
+            Bytecode::Label(_, label) => {
+                if code_offset != 0 {
+                    let prev_instr = codes.get(code_offset - 1).unwrap();
+                    // treat fall-through's to the label
+                    if !prev_instr.is_branch() {
+                        map_inc(&mut srcs_count, *label)
+                    }
+                }
+            }
             _ => {},
         }
     }
