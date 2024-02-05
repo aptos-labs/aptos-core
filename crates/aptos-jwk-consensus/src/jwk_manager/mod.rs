@@ -66,7 +66,7 @@ impl JWKManager {
         update_certifier: Arc<dyn TUpdateCertifier>,
         vtxn_pool: VTxnPoolState,
     ) -> Self {
-        let (qc_update_tx, mut qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
+        let (qc_update_tx, qc_update_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             consensus_key,
             my_addr,
