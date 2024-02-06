@@ -17,10 +17,7 @@ use aptos_logger::{debug, error, info};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
-use futures::{
-    stream::{FusedStream, FuturesUnordered},
-    Stream, StreamExt,
-};
+use futures::{stream::FuturesUnordered, Stream, StreamExt};
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -36,7 +33,6 @@ use tokio::sync::{
 pub struct FetchWaiter<T> {
     rx: Receiver<oneshot::Receiver<T>>,
     futures: Pin<Box<FuturesUnordered<oneshot::Receiver<T>>>>,
-    rx_terminated: bool,
 }
 
 impl<T> FetchWaiter<T> {
@@ -44,7 +40,6 @@ impl<T> FetchWaiter<T> {
         Self {
             rx,
             futures: Box::pin(FuturesUnordered::new()),
-            rx_terminated: false,
         }
     }
 }
@@ -53,39 +48,11 @@ impl<T> Stream for FetchWaiter<T> {
     type Item = Result<T, oneshot::error::RecvError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.is_terminated() {
-            return Poll::Ready(None);
+        if let Poll::Ready(Some(rx)) = self.rx.poll_recv(cx) {
+            self.futures.push(rx);
         }
 
-        if self.rx_terminated {
-            return self.futures.as_mut().poll_next(cx);
-        }
-
-        match self.rx.poll_recv(cx) {
-            Poll::Ready(Some(rx)) => {
-                self.futures.push(rx);
-            },
-            Poll::Ready(None) => {
-                self.rx_terminated = true;
-                if self.futures.is_empty() {
-                    return Poll::Ready(None);
-                }
-            },
-            Poll::Pending => {
-                if self.futures.is_empty() {
-                    return Poll::Pending;
-                }
-            },
-        };
-
-        debug_assert!(!self.futures.is_empty());
         self.futures.as_mut().poll_next(cx)
-    }
-}
-
-impl<T> FusedStream for FetchWaiter<T> {
-    fn is_terminated(&self) -> bool {
-        self.rx_terminated && self.futures.is_terminated()
     }
 }
 
