@@ -36,14 +36,14 @@ function usage() {
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
             ;;
+        "debug")
+            echo "Usage: $0 debug <fuzz_target> <testcase>"
+            ;;    
         "list")
             echo "Usage: $0 list"
             ;;
         "run")
             echo "Usage: $0 run <fuzz_target> [testcase]"
-            ;;
-        "debug")
-            echo "Usage: $0 debug <fuzz_target> <testcase>"
             ;;
         "test")
             echo "Usage: $0 test"
@@ -114,23 +114,6 @@ function build-oss-fuzz() {
     done
 }
 
-function run() {
-    if [ -z "$1" ]; then
-        usage run
-    fi
-    fuzz_target=$1
-    testcase=$2
-    if [ ! -z "$testcase" ]; then
-        if [ -f "$testcase" ]; then
-            testcase="$testcase -- -runs=1"
-        else
-            error "$testcase does not exist"
-        fi
-    fi
-    info "Running $fuzz_target"
-    cargo_fuzz run $fuzz_target $testcase
-}
-
 # use rust-gdb to debug a fuzz target with a testcase
 function debug() {
     if [ -z "$1" ]; then
@@ -154,6 +137,23 @@ function debug() {
     export LSAN_OPTIONS=verbosity=1:log_threads=1
     export RUST_BACKTRACE=1 
     rust-gdb --args $binary $testcase -- -runs=1
+}
+
+function run() {
+    if [ -z "$1" ]; then
+        usage run
+    fi
+    fuzz_target=$1
+    testcase=$2
+    if [ ! -z "$testcase" ]; then
+        if [ -f "$testcase" ]; then
+            testcase="$testcase -- -runs=1"
+        else
+            error "$testcase does not exist"
+        fi
+    fi
+    info "Running $fuzz_target"
+    cargo_fuzz run $fuzz_target $testcase
 }
 
 function test() {
@@ -234,6 +234,10 @@ case "$1" in
     shift
     build-oss-fuzz "$@"
     ;;
+  "debug")
+    shift
+    debug "$@"
+    ;;
    "list")
     shift
     list
@@ -241,10 +245,6 @@ case "$1" in
   "run")
     shift
     run  "$@"
-    ;;
-  "debug")
-    shift
-    debug "$@"
     ;;
   "test")
     shift
