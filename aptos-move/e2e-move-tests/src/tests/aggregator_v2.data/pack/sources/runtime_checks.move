@@ -1,0 +1,122 @@
+/// Aggregators and other structs that use delayed fields have certain
+/// restrictions imposed by runtime, e.g. they cannot be compared, serialized,
+/// etc.
+module 0x1::runtime_checks {
+
+    use std::bcs;
+    use std::string;
+    use std::vector;
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
+
+    //
+    // Structs and constructors.
+    //
+
+    struct StructWithAggregator<IntTy: copy + drop> has drop {
+        aggregator: Aggregator<IntTy>,
+    }
+
+    struct StructWithAggregatorSnapshot<IntTy: copy + drop> has drop {
+        snapshot: AggregatorSnapshot<IntTy>,
+    }
+
+    struct StructWithDerivedStringSnapshot has drop {
+        derived_string_snapshot: DerivedStringSnapshot,
+    }
+
+    fun with_aggregator<IntTy: copy + drop>(): StructWithAggregator<IntTy> {
+        StructWithAggregator {
+            aggregator: aggregator_v2::create_unbounded_aggregator<IntTy>()
+        }
+    }
+
+    fun with_snapshot<IntTy: copy + drop>(value: IntTy): StructWithAggregatorSnapshot<IntTy> {
+        StructWithAggregatorSnapshot {
+            snapshot: aggregator_v2::create_snapshot(value)
+        }
+    }
+
+    fun with_derived_string_snapshot(str: vector<u8>): StructWithDerivedStringSnapshot {
+        StructWithDerivedStringSnapshot {
+            derived_string_snapshot: aggregator_v2::create_derived_string(string::utf8(str))
+        }
+    }
+
+    //
+    // Equality.
+    //
+
+    public entry fun test_equality_with_aggregators_I() {
+        let a = with_aggregator<u64>();
+        let b = with_aggregator<u64>();
+        aggregator_v2::try_add(&mut b.aggregator, 10);
+        assert!(a != b, 0);
+    }
+
+    public entry fun test_equality_with_aggregators_II() {
+        let a = with_aggregator<u64>();
+        let b = with_aggregator<u64>();
+        assert!(a == b, 0);
+    }
+
+    public entry fun test_equality_with_aggregators_III() {
+        let a = with_aggregator<u64>();
+        assert!(&a == &a, 0);
+    }
+
+    public entry fun test_equality_with_snapshots_I() {
+        let a = with_snapshot<u64>(0);
+        let b = with_snapshot<u64>(10);
+        assert!(a != b, 0);
+    }
+
+    public entry fun test_equality_with_snapshots_II() {
+        let a = with_snapshot<u64>(0);
+        let b = with_snapshot<u64>(0);
+        assert!(a == b, 0);
+    }
+
+    public entry fun test_equality_with_snapshots_III() {
+        let a = with_snapshot<u64>(0);
+        assert!(&a == &a, 0);
+    }
+
+    public entry fun test_equality_with_derived_string_snapshots_I() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let b = with_derived_string_snapshot(b"bbb");
+        assert!(a != b, 0);
+    }
+
+    public entry fun test_equality_with_derived_string_snapshots_II() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let b = with_derived_string_snapshot(b"aaa");
+        assert!(a == b, 0);
+    }
+
+    public entry fun test_equality_with_derived_string_snapshots_III() {
+        let a = with_derived_string_snapshot(b"aaa");
+        assert!(&a == &a, 0);
+    }
+
+    //
+    // Serialization.
+    //
+
+    public entry fun test_serialization_with_aggregators() {
+        let a = with_aggregator<u64>();
+        let bytes = bcs::to_bytes(&a);
+        assert!(!vector::is_empty(&bytes), 0);
+    }
+
+    public entry fun test_serialization_with_snapshots() {
+        let a = with_snapshot<u64>(0);
+        let bytes = bcs::to_bytes(&a);
+        assert!(!vector::is_empty(&bytes), 0);
+    }
+
+    public entry fun test_serialization_with_derived_string_snapshots() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let bytes = bcs::to_bytes(&a);
+        assert!(!vector::is_empty(&bytes), 0);
+    }
+}

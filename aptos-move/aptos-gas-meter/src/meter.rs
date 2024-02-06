@@ -224,6 +224,7 @@ where
 
     #[inline]
     fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+        // TODO[agg_v2]: We should cache these sizes in native value?
         let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
@@ -283,6 +284,7 @@ where
 
     #[inline]
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
+        // TODO[agg_v2]: We should cache these sizes in native value?
         let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc

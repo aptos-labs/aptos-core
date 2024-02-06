@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 9e3841acf3fe31aa057dcaee1fffe59461ac64f0637761cf45090eebdd55e802 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: DisabledOnly, block_split: Whole }
+cc d036df322671ea9a2aeef4a614931f608d5a6c5136911a71d2a507a3ccd5c6b3 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: Whole }, element_type = U128, use_type = UseResourceType, is_2_collocated = false, is_3_collocated = false

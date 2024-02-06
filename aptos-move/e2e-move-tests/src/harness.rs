@@ -760,7 +760,7 @@ impl MoveHarness {
                     assert_abort_ref!(
                         output.status(),
                         error,
-                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, gotten {:?}",
+                        "Error code mismatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
                         idx + offset,
                         offset,
                         error,
