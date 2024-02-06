@@ -1,26 +1,25 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    bn254_circom::{
-        G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
-    },
-    jwks::rsa::{RSA_JWK, RSA_MODULUS_BYTES},
+    bn254_circom::{G1Bytes, G2Bytes},
+    jwks::rsa::RSA_JWK,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
         authenticator::{
             AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
-            MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE,
         },
         SignedTransaction,
     },
 };
 use anyhow::{bail, ensure, Context, Result};
+#[cfg(test)]
+use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{self, Bn254, Fr};
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};
 use ark_serialize::CanonicalSerialize;
-use base64::{URL_SAFE, URL_SAFE_NO_PAD};
+use base64::URL_SAFE_NO_PAD;
 use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -31,36 +30,57 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+/// The size of the pepper used to create a _hiding_ identity commitment (IDC) when deriving a zkID
+/// address. This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
+/// hashing with a larger pepper would lead to a different address).
 pub const PEPPER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const EPK_BLINDER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const NONCE_NUM_BYTES: usize = 32;
+
+/// The size of the identity commitment (IDC) used to derive a zkID address. This value should **NOT*
+/// be changed since on-chain addresses are based on it (e.g., hashing a larger-sized IDC would lead
+/// to a different address).
 pub const IDC_NUM_BYTES: usize = 32;
 
-// TODO(ZkIdGroth16Zkp): add some static asserts here that these don't exceed the MAX poseidon input sizes
-// TODO(ZkIdGroth16Zkp): determine what our circuit will accept
+// TODO(zkid): add some static asserts here that these don't exceed the MAX poseidon input sizes
 
-/// We support ephemeral public key lengths of up to 93 bytes.
-pub const MAX_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-// The values here are consistent with our public inputs hashing scheme.
-// Everything is a multiple of `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to maximize the input
+// TODO(zkid): The constants here must be moved to Move for uggradeability.
+// Everything is a multiple of `poseidon_bn254::BYTES_PACKED_PER_SCALAR`] to maximize the input
 // sizes that can be hashed.
-pub const MAX_ISS_BYTES: usize = 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const MAX_EXTRA_FIELD_BYTES: usize = 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const MAX_JWT_PAYLOAD_BYTES: usize = 23 * 64;
-pub const MAX_JWT_HEADER_BYTES: usize = 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
-pub const MAX_ZKID_PUBLIC_KEY_BYTES: usize = 2 + MAX_ISS_BYTES + IDC_NUM_BYTES;
+/// The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce`
+/// field. The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
+pub const NONCE_COMMITMENT_NUM_BYTES: usize = 32;
 
-pub const MAX_ZKID_SIGNATURE_BYTES: usize =
-    if MAX_ZKID_OIDC_SIGNATURE_BYTES > MAX_ZKID_GROTH16_SIGNATURE_BYTES {
-        MAX_ZKID_GROTH16_SIGNATURE_BYTES
-    } else {
-        MAX_ZKID_GROTH16_SIGNATURE_BYTES
-    };
-// TODO(ZkIdGroth16Zkp): determine max length of zkSNARK + OIDC overhead + ephemeral pubkey and signature
+/// The max length of an ephemeral public key supported in our circuit (93 bytes)
+pub const MAX_COMMITTED_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+
+/// The max length of the value of the JWT's `iss` field supported in our circuit
+/// TODO(zkid): used to be 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
+pub const MAX_ISS_BYTES: usize = 115;
+
+/// The max length of the value of the JWT's `aud` field supported in our circuit
+/// TODO(zkid): used to be 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
+pub const MAX_AUD_VAL_BYTES: usize = 115;
+
+/// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
+/// supported in our circuit
+/// TODO(zkid): used to be 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
+pub const MAX_UID_KEY_BYTES: usize = 30;
+
+/// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
+/// which is supported in our circuit
+/// TODO(zkid): used to be 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
+pub const MAX_UID_VAL_BYTES: usize = 330;
+
+/// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
+/// TODO(zkid): used to be 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_EXTRA_FIELD_BYTES: usize = 350;
+
+/// The max length of the base64url-encoded JWT payload in bytes supported in our circuit
+pub const MAX_JWT_PAYLOAD_B64_BYTES: usize = 192 * 8 - 64;
+
+/// The max length of the base64url-encoded JWT header in bytes supported in our circuit
+/// TODO(zkid) used to be 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
+pub const MAX_JWT_HEADER_B64_BYTES: usize = 300;
 
 /// Reflection of aptos_framework::zkid::Configs
 #[derive(Serialize, Deserialize, Debug)]
@@ -83,8 +103,6 @@ pub struct JwkId {
     pub kid: String,
 }
 
-pub const MAX_ZKID_OIDC_SIGNATURE_BYTES: usize = RSA_MODULUS_BYTES + MAX_JWT_PAYLOAD_BYTES;
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct OpenIdSig {
     /// The base64url encoded JWS signature of the OIDC JWT (https://datatracker.ietf.org/doc/html/rfc7515#section-3)
@@ -94,12 +112,16 @@ pub struct OpenIdSig {
     /// The name of the key in the claim that maps to the user identifier; e.g., "sub" or "email"
     pub uid_key: String,
     /// The random value used to obfuscate the EPK from OIDC providers in the nonce field
-    pub epk_blinder: [u8; EPK_BLINDER_NUM_BYTES],
+    pub epk_blinder: Vec<u8>,
     /// The privacy-preserving value used to calculate the identity commitment. It is typically uniquely derived from `(iss, client_id, uid_key, uid_val)`.
     pub pepper: Pepper,
 }
 
 impl OpenIdSig {
+    /// The size of the blinding factor used to compute the nonce commitment to the EPK and expiration
+    /// date. This can be upgraded, if the OAuth nonce reconstruction is upgraded carefully.
+    pub const EPK_BLINDER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+
     /// Verifies an `OpenIdSig` by doing the following checks:
     ///  1. Check that the ephemeral public key lifespan is under MAX_EXPIRY_HORIZON_SECS
     ///  2. Check that the iss claim in the ZkIdPublicKey matches the one in the jwt_payload
@@ -170,7 +192,7 @@ impl OpenIdSig {
     ) -> Result<String> {
         let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
             epk.to_bytes().as_slice(),
-            MAX_EPK_BYTES,
+            MAX_COMMITTED_EPK_BYTES,
         )?;
 
         frs.push(Fr::from(exp_timestamp_secs));
@@ -179,10 +201,10 @@ impl OpenIdSig {
         )?);
 
         let nonce_fr = poseidon_bn254::hash_scalars(frs)?;
-        let mut nonce_bytes = [0u8; NONCE_NUM_BYTES];
+        let mut nonce_bytes = [0u8; NONCE_COMMITMENT_NUM_BYTES];
         nonce_fr.serialize_uncompressed(&mut nonce_bytes[..])?;
 
-        Ok(base64::encode_config(nonce_bytes, URL_SAFE_NO_PAD))
+        Ok(base64url_encode(&nonce_bytes[..]))
     }
 }
 
@@ -258,16 +280,6 @@ pub struct Groth16Zkp {
     c: G1Bytes,
 }
 
-// TODO(zkid): test
-pub const GROTH16_ZKP_SIZE: usize =
-    G1_PROJECTIVE_COMPRESSED_NUM_BYTES * 2 + G2_PROJECTIVE_COMPRESSED_NUM_BYTES;
-
-// TODO(zkid): test
-pub const MAX_ZKID_GROTH16_SIGNATURE_BYTES: usize = GROTH16_ZKP_SIZE
-    + MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE * 2
-    + MAX_EXTRA_FIELD_BYTES
-    + MAX_AUD_VAL_BYTES;
-
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
@@ -279,6 +291,26 @@ pub struct SignedGroth16Zkp {
 }
 
 impl SignedGroth16Zkp {
+    /// For testing
+    #[cfg(test)]
+    fn dummy() -> SignedGroth16Zkp {
+        SignedGroth16Zkp {
+            proof: Groth16Zkp {
+                a: G1Bytes::new_from_vec(vec![0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
+                b: G2Bytes::new_from_vec(vec![0u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
+                c: G1Bytes::new_from_vec(vec![0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
+            },
+            non_malleability_signature: EphemeralSignature::ed25519(
+                Ed25519Signature::dummy_signature(),
+            ),
+            training_wheels_signature: EphemeralSignature::ed25519(
+                Ed25519Signature::dummy_signature(),
+            ),
+            extra_field: "a".repeat(MAX_EXTRA_FIELD_BYTES),
+            override_aud_val: Some("b".repeat(MAX_AUD_VAL_BYTES)),
+        }
+    }
+
     pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
         self.non_malleability_signature.verify(&self.proof, pub_key)
     }
@@ -342,7 +374,7 @@ pub struct ZkIdSignature {
     /// `exp_timestamp_secs`.
     pub sig: ZkpOrOpenIdSig,
 
-    /// The header contains two relevant fields:
+    /// The base64url-encoded header, which contains two relevant fields:
     ///  1. `kid`, which indicates which of the OIDC provider's JWKs should be used to verify the
     ///     \[ZKPoK of an\] OpenID signature.,
     ///  2. `alg`, which indicates which type of signature scheme was used to sign the JWT
@@ -508,12 +540,16 @@ pub fn get_zkid_authenticators(
     Ok(authenticators)
 }
 
+pub fn base64url_encode(data: &[u8]) -> String {
+    base64::encode_config(data, URL_SAFE_NO_PAD)
+}
+
 pub fn base64url_encode_str(data: &str) -> String {
-    base64::encode_config(data.as_bytes(), URL_SAFE)
+    base64::encode_config(data.as_bytes(), URL_SAFE_NO_PAD)
 }
 
 pub fn base64url_decode_as_str(b64: &str) -> Result<String> {
-    let decoded_bytes = base64::decode_config(b64, URL_SAFE)?;
+    let decoded_bytes = base64::decode_config(b64, URL_SAFE_NO_PAD)?;
     // Convert the decoded bytes to a UTF-8 string
     let str = String::from_utf8(decoded_bytes)?;
     Ok(str)
@@ -532,7 +568,6 @@ mod test {
         zkid::{
             base64url_encode_str, G1Bytes, G2Bytes, Groth16Zkp, IdCommitment, OpenIdSig, Pepper,
             SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, EPK_BLINDER_NUM_BYTES,
-            MAX_ISS_BYTES, MAX_ZKID_PUBLIC_KEY_BYTES,
         },
     };
     use aptos_crypto::{
@@ -540,18 +575,6 @@ mod test {
         PrivateKey, SigningKey, Uniform,
     };
     use std::ops::Deref;
-
-    #[test]
-    fn test_max_zkid_pubkey_size() {
-        let iss = "a".repeat(MAX_ISS_BYTES);
-        let idc =
-            IdCommitment::new_from_preimage(&Pepper::from_number(2), "aud", "uid_key", "uid_val")
-                .unwrap();
-
-        let pk = ZkIdPublicKey { iss, idc };
-
-        assert_eq!(bcs::to_bytes(&pk).unwrap().len(), MAX_ZKID_PUBLIC_KEY_BYTES);
-    }
 
     // TODO(zkid): This test case must be rewritten to be more modular and updatable.
     //  Right now, there are no instructions on how to produce this test case.
@@ -879,7 +902,7 @@ mod test {
             jwt_sig: "jwt_sig is verified in the prologue".to_string(),
             jwt_payload,
             uid_key: uid_key.to_owned(),
-            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+            epk_blinder: vec![0u8; OpenIdSig::EPK_BLINDER_NUM_BYTES],
             pepper: Pepper::from_number(pepper),
         }
     }

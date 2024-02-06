@@ -3,8 +3,8 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     zkid::{
-        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_AUD_VAL_BYTES, MAX_EPK_BYTES,
-        MAX_EXTRA_FIELD_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_BYTES,
+        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_AUD_VAL_BYTES, MAX_COMMITTED_EPK_BYTES,
+        MAX_EXTRA_FIELD_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_B64_BYTES,
     },
 };
 use anyhow::bail;
@@ -238,6 +238,7 @@ impl G1Bytes {
         Self::new_from_vec(bytes)
     }
 
+    /// Used internall or for testing.
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G1_PROJECTIVE_COMPRESSED_NUM_BYTES {
             let mut bytes = [0; G1_PROJECTIVE_COMPRESSED_NUM_BYTES];
@@ -352,7 +353,7 @@ pub fn get_public_inputs_hash(
     // Add the epk as padded and packed scalars
     let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
         sig.ephemeral_pubkey.to_bytes().as_slice(),
-        MAX_EPK_BYTES,
+        MAX_COMMITTED_EPK_BYTES,
     )?;
 
     // Add the id_commitment as a scalar
@@ -377,7 +378,7 @@ pub fn get_public_inputs_hash(
     let jwt_header_with_separator = format!("{}.", sig.jwt_header);
     frs.push(poseidon_bn254::pad_and_hash_string(
         &jwt_header_with_separator,
-        MAX_JWT_HEADER_BYTES,
+        MAX_JWT_HEADER_B64_BYTES,
     )?);
 
     frs.push(jwk.to_poseidon_scalar()?);

@@ -1064,9 +1064,6 @@ impl AnyPublicKey {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
 }
-
-/// Note: Actual signature is 64 bytes but BCS serialization of enums adds 2 bytes.
-pub const MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE: usize = Ed25519Signature::LENGTH + 2;
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
     Ed25519 { signature: Ed25519Signature },
@@ -1129,9 +1126,7 @@ mod tests {
     use crate::{
         bn254_circom::{G1Bytes, G2Bytes},
         transaction::{webauthn::AssertionSignature, SignedTransaction},
-        zkid::{
-            Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, EPK_BLINDER_NUM_BYTES,
-        },
+        zkid::{Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp},
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -1704,7 +1699,7 @@ mod tests {
             jwt_sig: "jwt_sig is verified in the prologue".to_string(),
             jwt_payload: "JWT payload is now verified in prologue too".to_string(),
             uid_key: "sub".to_string(),
-            epk_blinder: [0u8; EPK_BLINDER_NUM_BYTES],
+            epk_blinder: vec![0u8; OpenIdSig::EPK_BLINDER_NUM_BYTES],
             pepper,
         };
 
@@ -1725,15 +1720,6 @@ mod tests {
 
         assert!(signed_txn.verify_signature().is_ok());
         assert!(badly_signed_txn.verify_signature().is_err());
-    }
-
-    #[test]
-    fn test_ephemeral_signature_size() {
-        let sig = EphemeralSignature::ed25519(Ed25519Signature::dummy_signature());
-        assert_eq!(
-            bcs::to_bytes(&sig).unwrap().len(),
-            MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE
-        );
     }
 
     fn build_signature(

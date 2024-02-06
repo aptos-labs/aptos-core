@@ -8,7 +8,7 @@ use aptos_types::{
     bn254_circom::{get_public_inputs_hash, Groth16VerificationKey},
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
-    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
+    transaction::authenticator::EphemeralPublicKey,
     vm_status::{StatusCode, VMStatus},
     zkid::{Configuration, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
@@ -43,7 +43,8 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
         .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         .ok_or_else(|| value_deserialization_error!("get_resource failed on PatchedJWKs"))?;
-    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes).map_err(|_| value_deserialization_error!("could not deserialize PatchedJWKs"))?;
+    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes)
+        .map_err(|_| value_deserialization_error!("could not deserialize PatchedJWKs"))?;
     Ok(jwks)
 }
 
@@ -54,7 +55,8 @@ fn get_groth16_vk_onchain(
         .get_resource(&CORE_CODE_ADDRESS, &Groth16VerificationKey::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         .ok_or_else(|| value_deserialization_error!("get_resource failed on Groth16 VK"))?;
-    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes).map_err(|_| value_deserialization_error!("could not deserialize Groth16 VK"))?;
+    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes)
+        .map_err(|_| value_deserialization_error!("could not deserialize Groth16 VK"))?;
     Ok(vk)
 }
 
@@ -65,7 +67,8 @@ fn get_configs_onchain(
         .get_resource(&CORE_CODE_ADDRESS, &Configuration::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         .ok_or_else(|| value_deserialization_error!("get_resource failed on zkID configuration"))?;
-    let configs = bcs::from_bytes::<Configuration>(&bytes).map_err(|_| value_deserialization_error!("could not deserialize zkID configuration"))?;
+    let configs = bcs::from_bytes::<Configuration>(&bytes)
+        .map_err(|_| value_deserialization_error!("could not deserialize zkID configuration"))?;
     Ok(configs)
 }
 
@@ -79,10 +82,15 @@ fn get_jwk_for_zkid_authenticator(
         .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
     let jwk_move_struct = jwks
         .get_jwk(&zkid_pub_key.iss, &jwt_header.kid)
-        .map_err(|_| invalid_signature!(format!("JWK for {} with KID {} was not found", zkid_pub_key.iss, jwt_header.kid)))?;
+        .map_err(|_| {
+            invalid_signature!(format!(
+                "JWK for {} with KID {} was not found",
+                zkid_pub_key.iss, jwt_header.kid
+            ))
+        })?;
 
-    let jwk =
-        JWK::try_from(jwk_move_struct).map_err(|_| invalid_signature!("Could not unpack Any in JWK Move struct"))?;
+    let jwk = JWK::try_from(jwk_move_struct)
+        .map_err(|_| invalid_signature!("Could not unpack Any in JWK Move struct"))?;
     Ok(jwk)
 }
 
@@ -115,11 +123,11 @@ pub fn validate_zkid_authenticators(
 
     let training_wheels_pk = match &configs.training_wheels_pubkey {
         None => None,
-        Some(bytes) => {
-            EphemeralPublicKey::ed25519(Ed25519PublicKey::try_from(bytes.as_slice()).map_err(
-                || invalid_signature!("The training wheels PK set on chain is not a valid PK"),
-            )?)
-        },
+        Some(bytes) => Some(EphemeralPublicKey::ed25519(
+            Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
+                invalid_signature!("The training wheels PK set on chain is not a valid PK")
+            })?,
+        )),
     };
 
     for (zkid_pub_key, zkid_sig) in authenticators {
@@ -131,7 +139,7 @@ pub fn validate_zkid_authenticators(
                     // The training wheels signature is only checked if a training wheels PK is set on chain
                     if training_wheels_pk.is_some() {
                         proof
-                            .verify_training_wheels_sig(&training_wheels_pk)
+                            .verify_training_wheels_sig(training_wheels_pk.as_ref().unwrap())
                             .map_err(|_| {
                                 invalid_signature!("Could not verify training wheels signature")
                             })?;
