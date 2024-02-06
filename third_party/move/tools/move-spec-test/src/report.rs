@@ -73,13 +73,19 @@ impl Report {
 
         for (path, stats) in &self.files {
             for stat in stats {
+                let percentage = if stat.tested == 0 {
+                    0.0
+                } else {
+                    f64::from(stat.killed) / f64::from(stat.tested) * 100.0
+                };
+
                 builder.push_record([
                     format!("{}::{}", path.to_string_lossy(), stat.module.clone()),
                     stat.tested.to_string(),
                     stat.killed.to_string(),
                     format!(
                         "{:.2}%",
-                        (f64::from(stat.killed) / f64::from(stat.tested)) * 100.0
+                        percentage
                     ),
                 ]);
             }
