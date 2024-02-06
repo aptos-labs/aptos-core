@@ -305,6 +305,7 @@ impl VMRuntime {
             .loader
             .type_to_type_layout_with_identifier_mappings(ty, module_store)
             .map_err(|_err| {
+                // TODO: Should we use `err` instead of mapping?
                 PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
                     "entry point functions cannot have non-serializable return types".to_string(),
                 )

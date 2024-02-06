@@ -1824,7 +1824,6 @@ struct TemporaryValueToIdentifierMapping<
     X: Executable,
 > {
     latest_view: &'a LatestView<'a, T, S, X>,
-    #[allow(dead_code)]
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
@@ -1842,7 +1841,6 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
         }
     }
 
-    #[allow(dead_code)]
     fn generate_delayed_field_id(&self, width: u32) -> T::Identifier {
         self.latest_view.generate_delayed_field_id(width)
     }
