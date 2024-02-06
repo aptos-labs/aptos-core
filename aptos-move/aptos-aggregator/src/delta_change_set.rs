@@ -536,10 +536,7 @@ mod test {
             unimplemented!("Irrelevant for the test")
         }
 
-        fn validate_and_convert_delayed_field_id(
-            &self,
-            _id: u64,
-        ) -> Result<Self::Identifier, PanicError> {
+        fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
             unimplemented!("Irrelevant for the test")
         }
 

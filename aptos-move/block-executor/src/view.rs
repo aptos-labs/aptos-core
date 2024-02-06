@@ -1731,13 +1731,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         (index, width).into()
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        let result: Self::Identifier = id.into();
-
-        let unique_index = result.extract_unique_index();
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let unique_index = id.extract_unique_index();
 
         let start_counter = match &self.latest_view {
             ViewState::Sync(state) => state.start_counter,
@@ -1746,7 +1741,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
 
         if unique_index < start_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, index: {}, we've started from {}",
+                "Invalid delayed field id: {:?}, index: {}, we've started from {}",
                 id, unique_index, start_counter
             )));
         }
@@ -1758,12 +1753,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
 
         if unique_index > current {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, index: {}, we've only reached to {}",
+                "Invalid delayed field id: {:?}, index: {}, we've only reached to {}",
                 id, unique_index, current
             )));
         }
 
-        Ok(result)
+        Ok(())
     }
 
     // TODO[agg_v2](cleanup) - update comment.

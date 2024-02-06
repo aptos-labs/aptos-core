@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    delayed_fields::{ExtractUniqueIndex, PanicError},
     state_store::{state_key::StateKey, state_value::StateValue},
     write_set::WriteOp,
 };
@@ -119,12 +119,9 @@ impl TDelayedFieldView for FakeAggregatorView {
         DelayedFieldID::new_with_width(id, width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        // TODO[agg_v2](fix): bug? we should extract the id, not include the width...
-        if id < self.start_counter as u64 {
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let id = id.extract_unique_index();
+        if id < self.start_counter {
             return Err(code_invariant_error(format!(
                 "Invalid delayed field id: {}, we've started from {}",
                 id, self.start_counter
@@ -132,14 +129,13 @@ impl TDelayedFieldView for FakeAggregatorView {
         }
 
         let current = *self.counter.borrow();
-        if id > current as u64 {
+        if id > current {
             return Err(code_invariant_error(format!(
                 "Invalid delayed field id: {}, we've only reached to {}",
                 id, current
             )));
         }
-
-        Ok(Self::Identifier::from(id))
+        Ok(())
     }
 
     fn get_reads_needing_exchange(

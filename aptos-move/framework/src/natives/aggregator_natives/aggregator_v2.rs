@@ -319,8 +319,8 @@ fn native_try_add(
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let (id, agg_max_value) =
             get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-        let id = resolver
-            .validate_and_convert_delayed_field_id(id.as_u64())
+        resolver
+            .validate_delayed_field_id(&id)
             .map_err(PartialVMError::from)?;
 
         delayed_field_data.try_add_delta(
@@ -366,8 +366,8 @@ fn native_try_sub(
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let (id, agg_max_value) =
             get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-        let id = resolver
-            .validate_and_convert_delayed_field_id(id.as_u64())
+        resolver
+            .validate_delayed_field_id(&id)
             .map_err(PartialVMError::from)?;
 
         delayed_field_data.try_add_delta(
@@ -414,8 +414,8 @@ fn native_read(
         if let Some((resolver, delayed_field_data)) = get_context_data(context) {
             let (id, agg_max_value) =
                 get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-            let id = resolver
-                .validate_and_convert_delayed_field_id(id.as_u64())
+            resolver
+                .validate_delayed_field_id(&id)
                 .map_err(PartialVMError::from)?;
             (
                 delayed_field_data.read_aggregator(id, resolver)?,
@@ -457,13 +457,12 @@ fn native_snapshot(
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let (id, agg_max_value) =
             get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-        let aggregator_id = resolver
-            .validate_and_convert_delayed_field_id(id.as_u64())
+        resolver
+            .validate_delayed_field_id(&id)
             .map_err(PartialVMError::from)?;
         let width = get_width_by_type(&ty_args[0], EUNSUPPORTED_AGGREGATOR_TYPE)?;
 
-        let snapshot_id =
-            delayed_field_data.snapshot(aggregator_id, agg_max_value, width, resolver)?;
+        let snapshot_id = delayed_field_data.snapshot(id, agg_max_value, width, resolver)?;
         Value::native_value(snapshot_id.into())
     } else {
         let (agg_value, _) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
@@ -563,10 +562,10 @@ fn native_read_snapshot(
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
         let id =
             get_snapshot_field_with_native_value(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
-        let snapshot_id = resolver
-            .validate_and_convert_delayed_field_id(id.as_u64())
+        resolver
+            .validate_delayed_field_id(&id)
             .map_err(PartialVMError::from)?;
-        delayed_field_data.read_snapshot(snapshot_id, resolver)?
+        delayed_field_data.read_snapshot(id, resolver)?
     } else {
         get_snapshot_field_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?
     };
@@ -611,12 +610,12 @@ fn native_read_derived_string(
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let size_id = safely_pop_arg!(args, SizedID);
-        let delayed_id = resolver
-            .validate_and_convert_delayed_field_id(size_id.into())
+        let id: DelayedFieldID = safely_pop_arg!(args, SizedID).into();
+        resolver
+            .validate_delayed_field_id(&id)
             .map_err(PartialVMError::from)?;
 
-        delayed_field_data.read_derived(delayed_id, resolver)?
+        delayed_field_data.read_derived(id, resolver)?
     } else {
         get_derived_string_field(&safely_pop_arg!(args, StructRef))?
     };
@@ -697,9 +696,9 @@ fn native_derive_string_concat(
     }
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let id = get_snapshot_field_with_native_value(&ty_args[0], &snapshot_struct)?;
-        let base_id = resolver
-            .validate_and_convert_delayed_field_id(id.as_u64())
+        let base_id = get_snapshot_field_with_native_value(&ty_args[0], &snapshot_struct)?;
+        resolver
+            .validate_delayed_field_id(&base_id)
             .map_err(PartialVMError::from)?;
 
         let new_id = delayed_field_data.derive_string_concat(base_id, prefix, suffix, resolver)?;
