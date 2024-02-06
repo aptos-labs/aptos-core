@@ -395,8 +395,6 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
             randomly_check_layout_matches(maybe_layout, layout.as_deref()).map_err(|e| {
-                // TODO[agg_v2](cleanup): Push into `randomly_check_layout_matches` once Satya's
-                //                        change lands. Consider the error code as well.
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!("get_resource_from_group layout check: {:?}", e))
             })?;
