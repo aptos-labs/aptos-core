@@ -1,0 +1,34 @@
+name: "run online comparison-testing workflow"
+on:
+  workflow_dispatch:
+  push:
+      paths:
+        - '.github/workflows/workflow-run-comparison-testing-online.yaml'
+
+jobs:
+  run-comparison-testing:
+    runs-on: high-perf-docker
+    strategy:
+      fail-fast: false
+      matrix:
+        number: [ 0, 1 ] # *100 == start txn version
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+      - name: Build CLI binaries in release mode
+        shell: bash
+        run: cargo build --release -p aptos-comparison-testing
+
+      - name: Run testing on testnet
+        shell: bash
+        run: testsuite/comparison-testing-online.sh ${{ matrix.number }} 1 test
+        env:
+          MOVE_COMPILER_EXP: no-safety
+          RUST_MIN_STACK: 4297152
+          X_API_KEY: ${{ secrets.APTOS_NODE_API_KEY }}
+
