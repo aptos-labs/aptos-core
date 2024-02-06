@@ -2,7 +2,10 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_AUD_VAL_BYTES, MAX_EPK_BYTES, MAX_EXTRA_FIELD_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_BYTES},
+    zkid::{
+        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_AUD_VAL_BYTES, MAX_EPK_BYTES,
+        MAX_EXTRA_FIELD_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_BYTES,
+    },
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
@@ -331,11 +334,13 @@ pub fn get_public_inputs_hash(
     let extra_field_hashed;
     let override_aud_val_hashed;
     let use_override_aud;
-    if let ZkpOrOpenIdSig::Groth16Zkp( proof ) = &sig.sig  {
-        extra_field_hashed = poseidon_bn254::pad_and_hash_string(&proof.extra_field, MAX_EXTRA_FIELD_BYTES)?;
+    if let ZkpOrOpenIdSig::Groth16Zkp(proof) = &sig.sig {
+        extra_field_hashed =
+            poseidon_bn254::pad_and_hash_string(&proof.extra_field, MAX_EXTRA_FIELD_BYTES)?;
         if let Some(override_aud_val) = &proof.override_aud_val {
             use_override_aud = ark_bn254::Fr::from(1);
-            override_aud_val_hashed = poseidon_bn254::pad_and_hash_string(override_aud_val, MAX_AUD_VAL_BYTES)?;
+            override_aud_val_hashed =
+                poseidon_bn254::pad_and_hash_string(override_aud_val, MAX_AUD_VAL_BYTES)?;
         } else {
             use_override_aud = ark_bn254::Fr::from(0);
             override_aud_val_hashed = poseidon_bn254::pad_and_hash_string("", MAX_AUD_VAL_BYTES)?;
