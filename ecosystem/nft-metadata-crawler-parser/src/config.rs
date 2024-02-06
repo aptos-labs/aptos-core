@@ -58,7 +58,9 @@ impl RunnableConfig for ParserConfig {
         info!("[NFT Metadata Crawler] Finished migrations");
 
         if let Some(google_application_credentials) = &self.google_application_credentials {
-            info!("Google Application Credentials path ");
+            info!(
+                "[NFT Metadata Crawler] Google Application Credentials path found, setting env var"
+            );
             std::env::set_var(
                 "GOOGLE_APPLICATION_CREDENTIALS",
                 google_application_credentials,
