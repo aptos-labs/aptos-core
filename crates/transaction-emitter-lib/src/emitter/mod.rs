@@ -22,7 +22,9 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_transaction_generator_lib::{create_txn_generator_creator, TransactionType};
+use aptos_transaction_generator_lib::{
+    create_txn_generator_creator, ReliableTransactionSubmitter, TransactionType,
+};
 use futures::future::{try_join_all, FutureExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::StdRng, seq::IteratorRandom, Rng};
@@ -1098,6 +1100,17 @@ pub async fn create_accounts(
         info!("Accounts created and funded");
         Ok(accounts)
     } else {
+        let needed_min_balance = account_minter.get_needed_balance_per_account(req);
+        for account in &accounts {
+            let balance = txn_executor.get_account_balance(account.address()).await?;
+            assert!(
+                balance >= needed_min_balance,
+                "Account {} has balance {} < {}",
+                account.address(),
+                balance,
+                needed_min_balance
+            );
+        }
         info!("Skipping minting accounts");
         Ok(accounts)
     }

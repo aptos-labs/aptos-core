@@ -48,6 +48,22 @@ impl<'t> AccountMinter<'t> {
         }
     }
 
+    pub fn get_needed_balance_per_account(&self, req: &EmitJobRequest) -> u64 {
+        if let Some(val) = req.coins_per_account_override {
+            val
+        } else {
+            (req.expected_max_txns / 100)
+                .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
+                .unwrap()
+                .checked_add(
+                    req.max_gas_per_txn * req.gas_price
+                        // for module publishing
+                        + 2 * req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
+                )
+                .unwrap() // extra coins for secure to pay none zero gas price
+        }
+    }
+
     /// workflow of create accounts:
     /// 1. Use given source_account as the money source
     /// 1a. Optionally, and if it is root account, mint balance to that account
@@ -68,19 +84,7 @@ impl<'t> AccountMinter<'t> {
         let num_accounts = local_accounts.len();
         let expected_num_seed_accounts =
             (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
-        let coins_per_account = if let Some(val) = req.coins_per_account_override {
-            val
-        } else {
-            (req.expected_max_txns / num_accounts as u64)
-                .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
-                .unwrap()
-                .checked_add(
-                    req.max_gas_per_txn * req.gas_price
-                        // for module publishing
-                        + 2 * req.max_gas_per_txn * req.gas_price * req.init_gas_price_multiplier,
-                )
-                .unwrap() // extra coins for secure to pay none zero gas price
-        };
+        let coins_per_account = self.get_needed_balance_per_account(req);
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
