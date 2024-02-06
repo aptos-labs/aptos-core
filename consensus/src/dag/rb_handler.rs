@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::health::HealthBackoff;
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
@@ -30,8 +31,6 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
-
-use super::health::HealthBackoff;
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<RwLock<Dag>>,

@@ -77,11 +77,8 @@ async fn test_node_broadcast_receiver_succeed() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
-<<<<<<< HEAD
         Features::default(),
-=======
         health_backoff,
->>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
     );
 
     let expected_result = Vote::new(
@@ -128,15 +125,12 @@ async fn test_node_broadcast_receiver_failure() {
                 Arc::new(MockFetchRequester {}),
                 DagPayloadConfig::default(),
                 ValidatorTxnConfig::default_disabled(),
-<<<<<<< HEAD
                 Features::default(),
-=======
                 HealthBackoff::new(
                     epoch_state.clone(),
                     NoChainHealth::new(),
                     NoPipelineBackpressure::new(),
                 ),
->>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
             )
         })
         .collect();
@@ -220,15 +214,12 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
-<<<<<<< HEAD
         Features::default(),
-=======
         HealthBackoff::new(
             epoch_state.clone(),
             NoChainHealth::new(),
             NoPipelineBackpressure::new(),
         ),
->>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -245,15 +236,12 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
-<<<<<<< HEAD
         Features::default(),
-=======
         HealthBackoff::new(
             epoch_state,
             NoChainHealth::new(),
             NoPipelineBackpressure::new(),
         ),
->>>>>>> 85978d5bc8 ([dag] stop voting based on pipeline latency)
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);
