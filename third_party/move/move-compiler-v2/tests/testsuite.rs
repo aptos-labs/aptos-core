@@ -4,11 +4,9 @@
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::{debug, trace};
-use move_binary_format::binary_views::BinaryIndexedView;
-use move_command_line_common::files::FileHash;
-use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
+    annotate_units, disassemble_compiled_units, flow_insensitive_checkers, function_checker,
+    inliner, logging, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -18,10 +16,8 @@ use move_compiler_v2::{
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
     },
-    run_file_format_gen, Options,
+    run_bytecode_verifier, run_file_format_gen, Options,
 };
-use move_disassembler::disassembler::Disassembler;
-use move_ir_types::location;
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
@@ -341,7 +337,7 @@ impl TestConfig {
         if ok && !self.type_check_only {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
-            let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+            ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
             if ok {
                 // Run the target pipeline.
                 self.pipeline.run_with_hook(
@@ -411,22 +407,17 @@ impl TestConfig {
                         }
                     },
                 );
-                let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+                ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
                 if ok && self.generate_file_format {
                     let units = run_file_format_gen(&env, &targets);
                     let out = &mut test_output.borrow_mut();
                     out.push_str("\n============ disassembled file-format ==================\n");
-                    Self::check_diags(out, &env);
-                    for compiled_unit in units {
-                        let disassembled = match compiled_unit {
-                            CompiledUnit::Module(module) => {
-                                Self::disassemble(BinaryIndexedView::Module(&module.module))?
-                            },
-                            CompiledUnit::Script(script) => {
-                                Self::disassemble(BinaryIndexedView::Script(&script.script))?
-                            },
-                        };
-                        out.push_str(&disassembled);
+                    ok = Self::check_diags(out, &env);
+                    out.push_str(&disassemble_compiled_units(&units)?);
+                    if ok {
+                        let annotated_units = annotate_units(units);
+                        run_bytecode_verifier(&annotated_units, &mut env);
+                        Self::check_diags(out, &env);
                     }
                 }
             }
@@ -449,11 +440,6 @@ impl TestConfig {
         let ok = !env.has_errors();
         env.clear_diag();
         ok
-    }
-
-    fn disassemble(view: BinaryIndexedView) -> anyhow::Result<String> {
-        let diss = Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))?;
-        diss.disassemble()
     }
 }
 

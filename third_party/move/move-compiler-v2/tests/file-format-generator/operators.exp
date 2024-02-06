@@ -490,14 +490,14 @@ B18:
 	47: MoveLoc[5](loc3: bool)
 	48: Ret
 }
-equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
+equality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
 B0:
 	0: MoveLoc[0](Arg0: Ty0)
 	1: MoveLoc[1](Arg1: Ty0)
 	2: Eq
 	3: Ret
 }
-inequality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
+inequality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
 B0:
 	0: MoveLoc[0](Arg0: Ty0)
 	1: MoveLoc[1](Arg1: Ty0)

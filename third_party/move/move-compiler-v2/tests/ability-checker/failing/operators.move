@@ -11,11 +11,11 @@ module 0x42::operators {
         x && y || x && !y || !x && y || !x && !y
     }
 
-    fun equality<T: drop>(x: T, y: T): bool {
+    fun equality<T>(x: T, y: T): bool {
         x == y
     }
 
-    fun inequality<T: drop>(x: T, y: T): bool {
+    fun inequality<T>(x: T, y: T): bool {
         x != y
     }
 
