@@ -135,60 +135,20 @@ impl ResourceGroupsTestHarness {
         )
     }
 
-    pub fn set_resource_group1(&mut self, name: String, value: u32) -> SignedTransaction {
+    pub fn set_resource(&mut self, index: u32, name: String, value: u32) -> SignedTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::resource_groups_test::set_resource1").unwrap(),
+            str::parse("0x1::resource_groups_test::set_resource").unwrap(),
             vec![],
             vec![
                 bcs::to_bytes(self.account.address()).unwrap(),
+                bcs::to_bytes(&index).unwrap(),
                 bcs::to_bytes(&name).unwrap(),
                 bcs::to_bytes(&value).unwrap(),
             ],
         )
     }
-
-    pub fn set_resource_group2(&mut self, value: u32) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::resource_groups_test::set_resource2").unwrap(),
-            vec![],
-            vec![
-                bcs::to_bytes(self.account.address()).unwrap(),
-                bcs::to_bytes(&value).unwrap(),
-            ],
-        )
-    }
-
-    pub fn set_resource_group3(&mut self, name: Vec<u32>, padding: Vec<u32>) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::resource_groups_test::set_resource3").unwrap(),
-            vec![],
-            vec![
-                bcs::to_bytes(self.account.address()).unwrap(),
-                bcs::to_bytes(&name).unwrap(),
-                bcs::to_bytes(&padding).unwrap(),
-            ],
-        )
-    }
-
-    // pub fn set_resource_group4(&mut self, index: u32, value: u64) -> SignedTransaction {
-    //     self.txn_index += 1;
-    //     self.harness.create_entry_function(
-    //         &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-    //         str::parse("0x1::resource_groups_test::set_resource4").unwrap(),
-    //         vec![],
-    //         vec![
-    //             bcs::to_bytes(self.account.address()).unwrap(),
-    //             bcs::to_bytes(&index).unwrap(),
-    //             bcs::to_bytes(&value).unwrap(),
-    //         ],
-    //     )
-    // }
 
     pub fn unset_resource(&mut self, index: u32) -> SignedTransaction {
         self.txn_index += 1;
@@ -216,19 +176,53 @@ impl ResourceGroupsTestHarness {
         )
     }
 
-    // pub fn set(
-    //     account: &Account,
-    //     index: u64,
-    //     value: u128,
-    // ) -> SignedTransaction {
-    //     self.harness.create_entry_function(
-    //         account,
-    //         str::parse("0x1::resource_groups_test::set").unwrap(),
-    //         vec![],
-    //         vec![
-    //             bcs::to_bytes(&index).unwrap(),
-    //             bcs::to_bytes(&value).unwrap(),
-    //         ],
-    //     )
-    // }
+    pub fn set_3(&mut self, index1: u32, index2: u32, index3: u32, name: String, value: u32) -> SignedTransaction {
+        self.txn_index += 1;
+        self.harness.create_entry_function(
+            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
+            str::parse("0x1::resource_groups_test::set_3").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(self.account.address()).unwrap(),
+                bcs::to_bytes(&index1).unwrap(),
+                bcs::to_bytes(&index2).unwrap(),
+                bcs::to_bytes(&index3).unwrap(),
+                bcs::to_bytes(&name).unwrap(),
+                bcs::to_bytes(&value).unwrap(),
+            ],
+        )
+    }
+
+    pub fn check(&mut self, index: u32, name: String, value: u32) -> SignedTransaction {
+        self.txn_index += 1;
+        self.harness.create_entry_function(
+            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
+            str::parse("0x1::resource_groups_test::check").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(self.account.address()).unwrap(),
+                bcs::to_bytes(&index).unwrap(),
+                bcs::to_bytes(&name).unwrap(),
+                bcs::to_bytes(&value).unwrap(),
+            ],
+        )
+    }
+
+    pub fn set_and_check(&mut self, index1: u32, index2: u32, name1: String, value1: u32, name2: String, value2: u32) -> SignedTransaction {
+        self.txn_index += 1;
+        self.harness.create_entry_function(
+            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
+            str::parse("0x1::resource_groups_test::set_and_check").unwrap(),
+            vec![],
+            vec![
+                bcs::to_bytes(self.account.address()).unwrap(),
+                bcs::to_bytes(&index1).unwrap(),
+                bcs::to_bytes(&index2).unwrap(),
+                bcs::to_bytes(&name1).unwrap(),
+                bcs::to_bytes(&value1).unwrap(),
+                bcs::to_bytes(&name2).unwrap(),
+                bcs::to_bytes(&value2).unwrap(),
+            ],
+        )
+    }
 }
