@@ -57,6 +57,7 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
             author == sender,
             "adding peer observation failed with mismatched author",
         );
+        ensure!(self.epoch_state.verifier.get_voting_power(&author).is_some(), "adding peer observation failed with illegal signer");
 
         let mut partial_sigs = self.inner_state.lock();
         if partial_sigs.contains_voter(&sender) {

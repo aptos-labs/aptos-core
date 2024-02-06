@@ -153,11 +153,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
         self.epoch_state = Some(epoch_state.clone());
+        let my_index = epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self.my_addr)
+            .copied();
+
         info!("[JWK] start_new_epoch: new_epoch={}", epoch_state.epoch);
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if features.is_enabled(FeatureFlag::JWK_CONSENSUS) {
+        if let (true, Some(_my_index)) = (features.is_enabled(FeatureFlag::JWK_CONSENSUS), my_index) {
             let onchain_oidc_provider_set = payload.get::<SupportedOIDCProviders>().ok();
             let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
             info!("[JWK] JWK manager init, epoch={}", epoch_state.epoch);
