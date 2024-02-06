@@ -69,7 +69,8 @@ impl Processor {
         let legacy_file_store_metadata = self
             .legacy_file_store_operator
             .get_file_store_metadata()
-            .await.expect("Failed to get legacy file store metadata");
+            .await
+            .expect("Failed to get legacy file store metadata");
         // verify the chain ID.
         if legacy_file_store_metadata.chain_id != self.chain_id {
             panic!(
@@ -82,10 +83,7 @@ impl Processor {
             .verify_storage_bucket_existence()
             .await;
 
-        let new_file_store_metadata = self
-            .new_file_store_operator
-            .get_file_store_metadata()
-            .await;
+        let new_file_store_metadata = self.new_file_store_operator.get_file_store_metadata().await;
         let next_version_to_process = match new_file_store_metadata {
             Some(metadata) => {
                 if metadata.chain_id != self.chain_id {
@@ -101,7 +99,7 @@ impl Processor {
                     .update_file_store_metadata_internal(self.chain_id, 0)
                     .await?;
                 0
-            }
+            },
         };
         info!("Start to process from version: {}", next_version_to_process);
         let task_allocation = Arc::new(Mutex::new(next_version_to_process));
@@ -229,8 +227,7 @@ impl Processor {
                     },
                 }
             }
-        
-            
+
             tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
             info!("All tasks are finished");
             // update the file store metadata to the max version.
