@@ -618,7 +618,7 @@ Beyond that, it adds supply tracking with events.
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, collection_seed);
     <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
 
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_token_v2_enabled">features::concurrent_token_v2_enabled</a>()) {
         <b>let</b> supply = <a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a> {
             current_supply: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_aggregator">aggregator_v2::create_aggregator</a>(max_supply),
             total_minted: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">aggregator_v2::create_unbounded_aggregator</a>(),
@@ -687,7 +687,7 @@ the supply of tokens.
     <b>let</b> constructor_ref = <a href="../../aptos-framework/doc/object.md#0x1_object_create_named_object">object::create_named_object</a>(creator, collection_seed);
     <b>let</b> object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer">object::generate_signer</a>(&constructor_ref);
 
-    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>()) {
+    <b>if</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_token_v2_enabled">features::concurrent_token_v2_enabled</a>()) {
         <b>let</b> supply = <a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a> {
             current_supply: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">aggregator_v2::create_unbounded_aggregator</a>(),
             total_minted: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_unbounded_aggregator">aggregator_v2::create_unbounded_aggregator</a>(),
@@ -1121,7 +1121,7 @@ Creates a MutatorRef, which gates the ability to mutate any fields that support 
 ) <b>acquires</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>, <a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a> {
     <b>let</b> metadata_object_address = <a href="../../aptos-framework/doc/object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(ref);
     <b>let</b> metadata_object_signer = <a href="../../aptos-framework/doc/object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(ref);
-    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="collection.md#0x4_collection_ECONCURRENT_NOT_ENABLED">ECONCURRENT_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_token_v2_enabled">features::concurrent_token_v2_enabled</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="collection.md#0x4_collection_ECONCURRENT_NOT_ENABLED">ECONCURRENT_NOT_ENABLED</a>));
 
     <b>let</b> (supply, current_supply, total_minted, burn_events, mint_events) = <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(metadata_object_address)) {
         <b>let</b> <a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a> {
