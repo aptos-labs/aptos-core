@@ -9,8 +9,7 @@ use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
-        traits::{Convert, Reconstructable, Transcript},
-        Player,
+        traits::{Convert, Reconstructable, Transcript}, Player, WeightedConfig
     },
 };
 use num_traits::Zero;
@@ -55,22 +54,27 @@ pub fn build_dkg_pvss_config(
     cur_epoch: u64,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
-    let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
+    // let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
 
-    // // For mainnet-like testing
-    // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
-    // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
+    // // // For mainnet-like testing
+    // // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
+    // // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
 
-    let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * next_validators.len();
-    let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * next_validators.len();
-    let dkg_rounding = DKGRounding::new(
-        validator_stakes.clone(),
-        total_weight_min,
-        total_weight_max,
-        STEP_SIZE,
-        SECRECY_THRESHOLD,
-        RECONSTRUCT_THRESHOLD,
-    );
+    // let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * next_validators.len();
+    // let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * next_validators.len();
+    // let dkg_rounding = DKGRounding::new(
+    //     validator_stakes.clone(),
+    //     total_weight_min,
+    //     total_weight_max,
+    //     STEP_SIZE,
+    //     SECRECY_THRESHOLD,
+    //     RECONSTRUCT_THRESHOLD,
+    // );
+
+    // total weight 7000
+    let weights = vec![1000; 7];
+    let threshold_weight = weights.iter().sum::<usize>() * 2 / 3;
+    let wconfig = WeightedConfig::new(threshold_weight, weights).unwrap();
 
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()
@@ -82,7 +86,7 @@ pub fn build_dkg_pvss_config(
         .map(|k| k.to_bytes().as_slice().try_into().unwrap())
         .collect::<Vec<_>>();
 
-    let wconfig = dkg_rounding.wconfig.clone();
+    // let wconfig = dkg_rounding.wconfig.clone();
 
     let pp = DkgPP::default_with_bls_base();
 
