@@ -282,6 +282,21 @@ impl TestConfig {
                 dump_annotated_targets: true,
                 dump_for_only_some_stages: None,
             }
+        } else if path.contains("/bytecode-verify-failure/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
+            // Note that we do not run ability checker here, as we want to induce
+            // a bytecode verification failure. The test in /bytecode-verify-failure/
+            // has erroneous ability annotations.
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: true,
+                dump_annotated_targets: false,
+                dump_for_only_some_stages: None,
+            }
         } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
