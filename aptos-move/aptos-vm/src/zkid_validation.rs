@@ -19,22 +19,20 @@ macro_rules! invalid_signature {
     };
 }
 
+macro_rules! value_deserialization_error {
+    ($message:expr) => {
+        VMStatus::error(StatusCode::VALUE_DESERIALIZATION_ERROR, Some($message.to_owned()))
+    };
+}
+
 fn get_current_time_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<CurrentTimeMicroseconds, VMStatus> {
-    CurrentTimeMicroseconds::fetch_config(resolver).ok_or_else(|| {
-        VMStatus::error(
-            StatusCode::VALUE_DESERIALIZATION_ERROR,
-            Some("could not fetch CurrentTimeMicroseconds on-chain config".to_string()),
-        )
-    })
+    CurrentTimeMicroseconds::fetch_config(resolver).ok_or_else(|| value_deserialization_error!("could not fetch CurrentTimeMicroseconds on-chain config"))
 }
 
 fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
-    let error_status = VMStatus::error(
-        StatusCode::VALUE_DESERIALIZATION_ERROR,
-        Some("could not fetch PatchedJWKs".to_string()),
-    );
+    let error_status = value_deserialization_error!("could not fetch PatchedJWKs");
     let bytes = resolver
         .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
@@ -46,10 +44,7 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
 fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    let error_status = VMStatus::error(
-        StatusCode::VALUE_DESERIALIZATION_ERROR,
-        Some("could not fetch on-chain Groth16 PVK".to_string()),
-    );
+    let error_status = value_deserialization_error!("could not fetch on-chain Groth16 PVK");
     let bytes = resolver
         .get_resource(&CORE_CODE_ADDRESS, &Groth16VerificationKey::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
@@ -59,10 +54,7 @@ fn get_groth16_vk_onchain(
 }
 
 fn get_configs_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Configs, VMStatus> {
-    let error_status = VMStatus::error(
-        StatusCode::VALUE_DESERIALIZATION_ERROR,
-        Some("could not fetch on-chain zkID Configs resource".to_string()),
-    );
+    let error_status = value_deserialization_error!("could not fetch on-chain zkID Configs resource");
     let bytes = resolver
         .get_resource(&CORE_CODE_ADDRESS, &Configs::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
