@@ -1,0 +1,27 @@
+name: "run comparison-testing workflow"
+on:
+  workflow_dispatch:
+  push:
+      paths:
+        - '.github/workflows/workflow-run-comparison-testing.yaml'
+
+jobs:
+  run-comparison-testing:
+    runs-on: high-perf-docker-with-local-ssd
+    steps:
+      - uses: actions/checkout@v3
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+
+      - name: Install GCloud SDK
+        uses: "google-github-actions/setup-gcloud@62d4898025f6041e16b1068643bfc5a696863587" # pin@v1
+        with:
+          version: ">= 418.0.0"
+          install_components: "kubectl,gke-gcloud-auth-plugin"
+
+      - name: Build CLI binaries in release mode
+        shell: bash
+        run: cargo build --release -p aptos-comparison-testing
+
+      - name: Run testing in parallel
+        shell: bash
+        run: testsuite/comparison-testing.sh 0 1 mainnet
