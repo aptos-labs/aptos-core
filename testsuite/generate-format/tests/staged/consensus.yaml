@@ -524,7 +524,7 @@ ProofWithDataWithTxnLimit:
   STRUCT:
     - proof_with_data:
         TYPENAME: ProofWithData
-    - txns_to_execute:
+    - max_txns_to_execute:
         OPTION: U64
 ProposalExt:
   ENUM:

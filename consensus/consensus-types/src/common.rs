@@ -142,31 +142,31 @@ impl ProofWithData {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ProofWithDataWithTxnLimit {
     pub proof_with_data: ProofWithData,
-    pub txns_to_execute: Option<usize>,
+    pub max_txns_to_execute: Option<usize>,
 }
 
 impl PartialEq for ProofWithDataWithTxnLimit {
     fn eq(&self, other: &Self) -> bool {
         self.proof_with_data == other.proof_with_data
-            && self.txns_to_execute == other.txns_to_execute
+            && self.max_txns_to_execute == other.max_txns_to_execute
     }
 }
 
 impl Eq for ProofWithDataWithTxnLimit {}
 
 impl ProofWithDataWithTxnLimit {
-    pub fn new(proof_with_data: ProofWithData, txns_to_execute: Option<usize>) -> Self {
+    pub fn new(proof_with_data: ProofWithData, max_txns_to_execute: Option<usize>) -> Self {
         Self {
             proof_with_data,
-            txns_to_execute,
+            max_txns_to_execute,
         }
     }
 
     pub fn extend(&mut self, other: ProofWithDataWithTxnLimit) {
         self.proof_with_data.extend(other.proof_with_data);
         // InQuorumStoreWithLimit TODO: what is the right logic here ???
-        if self.txns_to_execute.is_none() {
-            self.txns_to_execute = other.txns_to_execute;
+        if self.max_txns_to_execute.is_none() {
+            self.max_txns_to_execute = other.max_txns_to_execute;
         }
     }
 }
@@ -180,10 +180,10 @@ pub enum Payload {
 }
 
 impl Payload {
-    pub fn transform_to_quorum_store_v2(self, txns_to_execute: Option<usize>) -> Self {
+    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<usize>) -> Self {
         match self {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
-                ProofWithDataWithTxnLimit::new(proof_with_status, txns_to_execute),
+                ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),
             ),
             Payload::InQuorumStoreWithLimit(_) => {
                 panic!("Payload is already in quorumStoreV2 format");
@@ -217,8 +217,8 @@ impl Payload {
                     .iter()
                     .map(|proof| proof.num_txns() as usize)
                     .sum();
-                if proof_with_status.txns_to_execute.is_some() {
-                    min(proof_with_status.txns_to_execute.unwrap(), num_txns)
+                if proof_with_status.max_txns_to_execute.is_some() {
+                    min(proof_with_status.max_txns_to_execute.unwrap(), num_txns)
                 } else {
                     num_txns
                 }
@@ -232,8 +232,8 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs.is_empty(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 proof_with_status.proof_with_data.proofs.is_empty()
-                    || (proof_with_status.txns_to_execute.is_some()
-                        && proof_with_status.txns_to_execute.unwrap() == 0)
+                    || (proof_with_status.max_txns_to_execute.is_some()
+                        && proof_with_status.max_txns_to_execute.unwrap() == 0)
             },
         }
     }
@@ -266,7 +266,7 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
-            // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'txns_to_execute'.
+            // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'max_txns_to_execute'.
             // Hence, it makes sense to pass the full size of the payload here.
             Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
                 .proof_with_data

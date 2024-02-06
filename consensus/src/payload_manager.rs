@@ -237,7 +237,7 @@ impl PayloadManager {
                     block,
                 )
                 .await?,
-                proof_with_data.txns_to_execute,
+                proof_with_data.max_txns_to_execute,
             )),
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",

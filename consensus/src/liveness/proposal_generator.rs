@@ -345,9 +345,11 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            if !payload.is_direct() && payload.len() > max_txns_from_block_to_execute as usize {
-                payload = payload
-                    .transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute as usize));
+            if !payload.is_direct()
+                && max_txns_from_block_to_execute.is_some()
+                && payload.len() > max_txns_from_block_to_execute.unwrap()
+            {
+                payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
             }
             (validator_txns, payload, timestamp.as_micros() as u64)
         };
@@ -389,11 +391,11 @@ impl ProposalGenerator {
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
-    ) -> (u64, u64, u64, Duration) {
+    ) -> (u64, u64, Option<usize>, Duration) {
         let mut values_max_block_txns = vec![self.max_block_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
-        let mut max_txns_from_block_to_execute = self.max_block_txns;
+        let mut max_txns_from_block_to_execute = None;
 
         let chain_health_backoff = self
             .chain_health_backoff_config

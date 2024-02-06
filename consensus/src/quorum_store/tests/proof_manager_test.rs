@@ -79,7 +79,7 @@ fn assert_payload_response(
             for proof in proofs.proof_with_data.proofs {
                 assert!(expected.contains(&proof));
             }
-            assert_eq!(proofs.txns_to_execute, max_txns_from_block_to_execute);
+            assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
         _ => panic!("Unexpected variant"),
     }
