@@ -59,10 +59,10 @@ module aptos_framework::zkid {
             alpha_g1: x"6d1c152d2705e35fe7a07a66eb8a10a7f42f1e38c412fbbc3ac7f9affc25dc24",
             beta_g2: x"e20a834c55ae6e2fcbd66636e09322727f317aff8957dd342afa11f936ef7c02cfdc8c9862849a0442bcaa4e03f45343e8bf261ef4ab58cead2efc17100a3b16",
             gamma_g2: x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19",
-            delta_g2: x"46b1bdc6b810f95c114bee5301568e9c7476cef69c2ec821910edf76df53c62be50f9f0319f5803b18bfc30129f6f9f81f283c78dcd3acdd24c769826ecf0d90",
+            delta_g2: x"98c9283068e4bfc51266dcbabffb56bebeb65ece8d9104609026d0d89187961d0c69a4688b23f8a813ee74349785d116aedfcf3f3de15d7c9123b32eba326f23",
             gamma_abc_g1: vector[
-                x"7b4d27193362b6bffdd509f8f873b1ed4041c7bed52bc3724ca5971aab97a323",
-                x"883684186ab474fe93e99e28250814c980e3cb2cd8fe6c2b26869920f4aa2c1c",
+                x"29f65be8be6b13c84c1b29d219f35b998db14be4f7506fff4a475512ef0d959f",
+                x"1ddc291dfd35684b634f03cda96ae18139db1653471921c555b2750cbf49908c",
             ],
         }
     }
