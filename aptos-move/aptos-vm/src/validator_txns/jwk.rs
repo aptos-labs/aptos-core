@@ -14,6 +14,7 @@ use crate::{
     },
     AptosVM,
 };
+use aptos_logger::debug;
 use aptos_types::{
     fee_statement::FeeStatement,
     jwks,
@@ -33,6 +34,7 @@ use move_core_types::{
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 enum ExpectedFailure {
     // Move equivalent: `errors::invalid_argument(*)`
     IncorrectVersion = 0x010103,
@@ -57,16 +59,27 @@ impl AptosVM {
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        debug!("Processing jwk transaction");
         match self.process_jwk_update_inner(resolver, log_context, session_id, update) {
-            Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
+            Ok((vm_status, vm_output)) => {
+                debug!("Processing jwk transaction ok.");
+                Ok((vm_status, vm_output))
+            },
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
+                debug!("Processing dkg transaction expected failure: {:?}", failure);
                 Ok((
                     VMStatus::MoveAbort(AbortLocation::Script, failure as u64),
                     VMOutput::empty_with_status(TransactionStatus::Discard(StatusCode::ABORTED)),
                 ))
             },
-            Err(Unexpected(vm_status)) => Err(vm_status),
+            Err(Unexpected(vm_status)) => {
+                debug!(
+                    "Processing jwk transaction unexpected failure: {:?}",
+                    vm_status
+                );
+                Err(vm_status)
+            },
         }
     }
 
