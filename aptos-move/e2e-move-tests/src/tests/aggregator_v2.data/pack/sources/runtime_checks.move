@@ -2,10 +2,9 @@
 /// restrictions imposed by runtime, e.g. they cannot be compared, serialized,
 /// etc.
 module 0x1::runtime_checks {
-
     use std::bcs;
     use std::string;
-    use std::vector;
+    use aptos_std::string_utils;
     use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
 
     //
@@ -104,19 +103,85 @@ module 0x1::runtime_checks {
 
     public entry fun test_serialization_with_aggregators() {
         let a = with_aggregator<u64>();
-        let bytes = bcs::to_bytes(&a);
-        assert!(!vector::is_empty(&bytes), 0);
+        let _ = bcs::to_bytes(&a);
     }
 
     public entry fun test_serialization_with_snapshots() {
         let a = with_snapshot<u64>(0);
-        let bytes = bcs::to_bytes(&a);
-        assert!(!vector::is_empty(&bytes), 0);
+        let _ = bcs::to_bytes(&a);
     }
 
     public entry fun test_serialization_with_derived_string_snapshots() {
         let a = with_derived_string_snapshot(b"aaa");
-        let bytes = bcs::to_bytes(&a);
-        assert!(!vector::is_empty(&bytes), 0);
+        let _ = bcs::to_bytes(&a);
+    }
+
+    //
+    // String utils:
+    //   - to_string
+    //   - to_string_with_canonical_addresses
+    //   - to_string_with_integer_types
+    //   - debug_string
+    //
+    // TODO[agg_v2]: consider formats of lists?
+
+    public entry fun test_to_string_with_aggregators() {
+        let a = with_aggregator<u64>();
+        let _ = string_utils::to_string(&a);
+    }
+
+    public entry fun test_to_string_with_snapshots() {
+        let a = with_snapshot<u64>(0);
+        let _ = string_utils::to_string(&a);
+    }
+
+    public entry fun test_to_string_with_derived_string_snapshots() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let _ = string_utils::to_string(&a);
+    }
+
+    public entry fun test_to_string_with_canonical_addresses_with_aggregators() {
+        let a = with_aggregator<u64>();
+        let _ = string_utils::to_string_with_canonical_addresses(&a);
+    }
+
+    public entry fun test_to_string_with_canonical_addresses_with_snapshots() {
+        let a = with_snapshot<u64>(0);
+        let _ = string_utils::to_string_with_canonical_addresses(&a);
+    }
+
+    public entry fun test_to_string_with_canonical_addresses_with_derived_string_snapshots() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let _ = string_utils::to_string_with_canonical_addresses(&a);
+    }
+
+    public entry fun test_to_string_with_integer_types_with_aggregators() {
+        let a = with_aggregator<u64>();
+        let _ = string_utils::to_string_with_integer_types(&a);
+    }
+
+    public entry fun test_to_string_with_integer_types_with_snapshots() {
+        let a = with_snapshot<u64>(0);
+        let _ = string_utils::to_string_with_integer_types(&a);
+    }
+
+    public entry fun test_to_string_with_integer_types_with_derived_string_snapshots() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let _ = string_utils::to_string_with_integer_types(&a);
+    }
+
+    public entry fun test_debug_string_with_aggregators() {
+        let a = with_aggregator<u64>();
+        let _ = string_utils::debug_string(&a);
+    }
+
+    public entry fun test_debug_string_with_snapshots() {
+        let a = with_snapshot<u64>(0);
+        let _ = string_utils::debug_string(&a);
+    }
+
+    public entry fun test_debug_string_with_derived_string_snapshots() {
+        let a = with_derived_string_snapshot(b"aaa");
+        let _ = string_utils::debug_string(&a);
     }
 }
