@@ -163,7 +163,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if let (true, Some(_my_index)) = (features.is_enabled(FeatureFlag::JWK_CONSENSUS), my_index) {
+        if features.is_enabled(FeatureFlag::JWK_CONSENSUS) && my_index.is_some() {
             let onchain_oidc_provider_set = payload.get::<SupportedOIDCProviders>().ok();
             let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
             info!("[JWK] JWK manager init, epoch={}", epoch_state.epoch);
