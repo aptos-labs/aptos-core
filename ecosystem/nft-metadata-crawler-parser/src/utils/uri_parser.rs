@@ -107,7 +107,7 @@ mod tests {
     fn test_parse_public_gateway_uri() {
         let test_public_gateway_uri = format!("https://ipfs.io/ipfs/{}/{}", CID, PATH);
         let parsed_uri =
-            URIParser::parse(IPFS_PREFIX, &test_public_gateway_uri, Some(&IPFS_AUTH)).unwrap();
+            URIParser::parse(IPFS_PREFIX, &test_public_gateway_uri, Some(IPFS_AUTH)).unwrap();
         assert_eq!(
             parsed_uri,
             format!("{IPFS_PREFIX}{CID}/{PATH}?{IPFS_AUTH_KEY}={IPFS_AUTH}")
@@ -116,7 +116,7 @@ mod tests {
         // Path is optional for public gateway URIs
         let test_public_gateway_uri_no_path = format!("https://ipfs.io/ipfs/{}/{}", CID, "");
         let parsed_uri =
-            URIParser::parse(&IPFS_PREFIX, &test_public_gateway_uri_no_path, None).unwrap();
+            URIParser::parse(IPFS_PREFIX, &test_public_gateway_uri_no_path, None).unwrap();
         assert_eq!(parsed_uri, format!("{}{}/{}", IPFS_PREFIX, CID, ""));
 
         // Some submitted URIs are in the redirected format
@@ -126,7 +126,7 @@ mod tests {
 
         // Public gateway URIs must contain a CID, expect error here
         let test_public_gateway_uri_no_cid = format!("https://ipfs.io/ipfs/{}/{}", "", PATH);
-        let parsed_uri = URIParser::parse(&IPFS_PREFIX, &test_public_gateway_uri_no_cid, None);
+        let parsed_uri = URIParser::parse(IPFS_PREFIX, &test_public_gateway_uri_no_cid, None);
         assert!(parsed_uri.is_err());
     }
 
@@ -134,7 +134,7 @@ mod tests {
     fn test_parse_non_ipfs_uri_fail() {
         // Expects an error if parsing a non-IPFS URI
         let test_non_ipfs_uri = "https://tesetnotipfsuri.com/notipfspath.json".to_string();
-        let parsed_uri = URIParser::parse(&IPFS_PREFIX, &test_non_ipfs_uri, None);
+        let parsed_uri = URIParser::parse(IPFS_PREFIX, &test_non_ipfs_uri, None);
         assert!(parsed_uri.is_err());
     }
 }

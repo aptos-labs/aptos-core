@@ -65,7 +65,7 @@ impl Worker {
             conn,
             gcs_client,
             pubsub_message: pubsub_message.to_string(),
-            model: NFTMetadataCrawlerURIs::new(&asset_uri),
+            model: NFTMetadataCrawlerURIs::new(asset_uri),
             asset_data_id: asset_data_id.to_string(),
             asset_uri: asset_uri.to_string(),
             last_transaction_version,
