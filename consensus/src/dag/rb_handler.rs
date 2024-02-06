@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::health::HealthBackoff;
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
@@ -41,6 +42,7 @@ pub(crate) struct NodeBroadcastHandler {
     payload_config: DagPayloadConfig,
     vtxn_config: ValidatorTxnConfig,
     features: Features,
+    health_backoff: HealthBackoff,
 }
 
 impl NodeBroadcastHandler {
@@ -53,6 +55,7 @@ impl NodeBroadcastHandler {
         payload_config: DagPayloadConfig,
         vtxn_config: ValidatorTxnConfig,
         features: Features,
+        health_backoff: HealthBackoff,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -67,6 +70,7 @@ impl NodeBroadcastHandler {
             payload_config,
             vtxn_config,
             features,
+            health_backoff,
         }
     }
 
@@ -189,6 +193,11 @@ impl RpcHandler for NodeBroadcastHandler {
     type Response = Vote;
 
     async fn process(&mut self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        ensure!(
+            !self.health_backoff.stop_voting(),
+            NodeBroadcastHandleError::VoteRefused
+        );
+
         let node = self.validate(node)?;
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)

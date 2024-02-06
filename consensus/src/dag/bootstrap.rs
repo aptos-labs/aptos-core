@@ -593,11 +593,17 @@ impl DagBootstrapper {
         );
 
         let chain_health: Arc<dyn TChainHealth> = ChainHealthBackoff::new(
-            ChainHealthBackoffConfig::new(self.config.chain_backoff_config.clone()),
+            ChainHealthBackoffConfig::new(self.config.health_config.chain_backoff_config.clone()),
             commit_history.clone(),
         );
         let pipeline_health = PipelineLatencyBasedBackpressure::new(
-            PipelineBackpressureConfig::new(self.config.pipeline_backpressure_config.clone()),
+            Duration::from_millis(self.config.health_config.voter_pipeline_latency_limit_ms),
+            PipelineBackpressureConfig::new(
+                self.config
+                    .health_config
+                    .pipeline_backpressure_config
+                    .clone(),
+            ),
             ordered_notifier.clone(),
         );
         let health_backoff =
@@ -616,7 +622,7 @@ impl DagBootstrapper {
             round_state,
             self.onchain_config.dag_ordering_causal_history_window as Round,
             self.config.node_payload_config.clone(),
-            health_backoff,
+            health_backoff.clone(),
             self.quorum_store_enabled,
         );
         let rb_handler = NodeBroadcastHandler::new(
@@ -628,6 +634,7 @@ impl DagBootstrapper {
             self.config.node_payload_config.clone(),
             self.vtxn_config.clone(),
             self.features.clone(),
+            health_backoff,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
