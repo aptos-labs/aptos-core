@@ -1064,7 +1064,7 @@ where
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    // TODO[agg_v2](cleanup) Using the concrete type layout here. Should we find a way to use generics?
     fn resource_group_write_set(
         &self,
     ) -> Vec<(
