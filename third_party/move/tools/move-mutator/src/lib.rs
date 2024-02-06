@@ -24,7 +24,6 @@ use crate::configuration::Configuration;
 use crate::report::Report;
 use move_compiler::parser::ast::ModuleName;
 use move_package::BuildConfig;
-use std::path::PathBuf;
 
 /// Runs the Move mutator tool.
 /// Entry point for the Move mutator tool both for the CLI and the Rust API.
@@ -44,7 +43,7 @@ use std::path::PathBuf;
 pub fn run_move_mutator(
     options: cli::CLIOptions,
     config: &BuildConfig,
-    package_path: &PathBuf,
+    package_path: &Path,
 ) -> anyhow::Result<()> {
     // We need to initialize logger using try_init() as it might be already initialized in some other tool
     // (e.g. spec-test). If we use init() instead, we will get an abort.
@@ -57,7 +56,7 @@ pub fn run_move_mutator(
     // Load configuration from file or create a new one.
     let mutator_configuration = match options.configuration_file {
         Some(path) => Configuration::from_file(path.as_path())?,
-        None => Configuration::new(options, Some(package_path.clone())),
+        None => Configuration::new(options, Some(package_path.to_owned())),
     };
 
     trace!("Mutator configuration: {mutator_configuration:?}");

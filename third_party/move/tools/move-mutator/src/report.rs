@@ -209,6 +209,12 @@ impl MutationReport {
     pub fn get_module_name(&self) -> &str {
         &self.module_name
     }
+
+    /// Return the diff.
+    #[must_use]
+    pub fn get_diff(&self) -> &str {
+        &self.diff
+    }
 }
 
 #[cfg(test)]
