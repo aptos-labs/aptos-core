@@ -29,17 +29,12 @@ module aptos_std::math64 {
     /// Return greatest common divisor of `a` & `b`, via the Euclidean algorithm.
     public inline fun gcd(a: u64, b: u64): u64 {
         let (large, small) = if (a > b) (a, b) else (b, a);
-        if (small == 0) {
-            0
-        } else {
-            loop {
-                let remainder = large % small;
-                if (remainder == 0) break;
-                large = small;
-                small = remainder;
-            };
-            small
-        }
+        while (small != 0) {
+            let tmp = small;
+            small = large % small;
+            large = tmp;
+        };
+        large
     }
 
     /// Returns a * b / c going through u128 to prevent intermediate overflow
@@ -161,11 +156,15 @@ module aptos_std::math64 {
         assert!(gcd(210, 45) == 15, 0);
         assert!(gcd(45, 210) == 15, 0);
         assert!(gcd(0, 0) == 0, 0);
-        assert!(gcd(1, 0) == 0, 0);
-        assert!(gcd(0, 1) == 0, 0);
+        assert!(gcd(1, 0) == 1, 0);
+        assert!(gcd(50, 0) == 50, 0);
+        assert!(gcd(0, 1) == 1, 0);
+        assert!(gcd(0, 50) == 50, 0);
         assert!(gcd(54, 24) == 6, 0);
         assert!(gcd(24, 54) == 6, 0);
         assert!(gcd(10, 10) == 10, 0);
+        assert!(gcd(1071, 462) == 21, 0);
+        assert!(gcd(462, 1071) == 21, 0);
     }
 
     #[test]
