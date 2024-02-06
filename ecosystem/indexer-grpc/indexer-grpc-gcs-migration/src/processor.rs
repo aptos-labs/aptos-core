@@ -108,6 +108,7 @@ impl Processor {
         let running_tasks: Arc<Mutex<BTreeSet<u64>>> = Arc::new(Mutex::new(BTreeSet::new()));
         let mut task_handlers = Vec::new();
         let max_version = self.max_version;
+        let chain_id = self.chain_id;
         for _ in 0..NUM_OF_PROCESSING_THREADS {
             let legacy_file_store_operator = self.legacy_file_store_operator.clone();
             let new_file_store_operator = self.new_file_store_operator.clone();
@@ -118,13 +119,13 @@ impl Processor {
                     let version_to_process = {
                         let mut task_allocation = task_allocation.lock().unwrap();
                         let ret = *task_allocation;
+                        if ret >= max_version {
+                            // Finish processing.
+                            break;
+                        }
                         *task_allocation += 1000;
                         ret
                     };
-                    if version_to_process > max_version {
-                        // Finish processing.
-                        break;
-                    }
                     {
                         let running_tasks = running_tasks.lock().unwrap();
                         if running_tasks.contains(&version_to_process) {
@@ -182,7 +183,7 @@ impl Processor {
         // sleep for 10 seconds.
         tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
         // watchdog thread.
-        let new_file_store_operator = self.new_file_store_operator.clone();
+        let mut new_file_store_operator = self.new_file_store_operator.clone();
         let t = tokio::spawn(async move {
             let mut failure_count = 0;
             loop {
@@ -212,7 +213,7 @@ impl Processor {
                     continue;
                 }
                 match new_file_store_operator
-                    .update_file_store_metadata_internal(2, new_metadata_version)
+                    .update_file_store_metadata_internal(chain_id, new_metadata_version)
                     .await
                 {
                     Ok(_) => {
@@ -228,6 +229,15 @@ impl Processor {
                     },
                 }
             }
+        
+            
+            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            info!("All tasks are finished");
+            // update the file store metadata to the max version.
+            new_file_store_operator
+                .update_file_store_metadata_internal(chain_id, max_version)
+                .await
+                .expect("Failed to update file store metadata");
         });
         task_handlers.push(t);
         // join all.
