@@ -96,9 +96,10 @@ impl Cluster {
             let state_timestamp = state.timestamp_usecs / 1000000;
             if state.chain_id != chain_id.id() {
                 warn!(
-                    "Excluding client {} running wrong chain {}",
+                    "Excluding client {} running wrong chain {}, instead of {}",
                     instance.peer_name(),
-                    state.chain_id
+                    state.chain_id,
+                    chain_id.id(),
                 );
             } else if state_timestamp + 20 + fetch_time_s < max_timestamp {
                 warn!(
