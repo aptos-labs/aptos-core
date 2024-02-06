@@ -109,7 +109,7 @@ impl TDelayedFieldView for AptosBlankStorage {
     }
 
     fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
-        Ok(())
+        unreachable!()
     }
 
     fn get_reads_needing_exchange(

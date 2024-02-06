@@ -140,18 +140,10 @@ impl<'a> NativeTableContext<'a> {
 
                 match op {
                     Op::New(val) => {
-                        let bytes = serialize(&value_layout_info.layout, &val)?;
-                        let layout = value_layout_info
-                            .has_identifier_mappings
-                            .then(|| value_layout_info.layout.clone());
-                        entries.insert(key, Op::New((bytes.into(), layout)));
+                        entries.insert(key, Op::New(serialize_value(&value_layout_info, &val)?));
                     },
                     Op::Modify(val) => {
-                        let bytes = serialize(&value_layout_info.layout, &val)?;
-                        let layout = value_layout_info
-                            .has_identifier_mappings
-                            .then(|| value_layout_info.layout.clone());
-                        entries.insert(key, Op::Modify((bytes.into(), layout)));
+                        entries.insert(key, Op::Modify(serialize_value(&value_layout_info, &val)?));
                     },
                     Op::Delete => {
                         entries.insert(key, Op::Delete);
@@ -357,7 +349,7 @@ fn native_add_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = ADD_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -396,7 +388,7 @@ fn native_borrow_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = BORROW_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -435,7 +427,7 @@ fn native_contains_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = CONTAINS_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -468,7 +460,7 @@ fn native_remove_box(
 
     let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
 
-    let key_bytes = serialize(&table.key_layout, &key)?;
+    let key_bytes = serialize_key(&table.key_layout, &key)?;
     let key_cost = REMOVE_BOX_PER_BYTE_SERIALIZED * NumBytes::new(key_bytes.len() as u64);
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
@@ -535,9 +527,26 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
     Ok(TableHandle(handle))
 }
 
-fn serialize(layout: &MoveTypeLayout, val: &Value) -> PartialVMResult<Vec<u8>> {
-    serialize_and_allow_native_values(val, layout)
-        .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
+fn serialize_key(layout: &MoveTypeLayout, key: &Value) -> PartialVMResult<Vec<u8>> {
+    key.simple_serialize(layout)
+        .ok_or_else(|| partial_extension_error("cannot serialize table key"))
+}
+
+fn serialize_value(
+    layout_info: &LayoutInfo,
+    val: &Value,
+) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
+    let serialization_result = if layout_info.has_identifier_mappings {
+        // Value contains delayed fields, so we should be able to serialize it.
+        serialize_and_allow_native_values(val, layout_info.layout.as_ref())
+            .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
+    } else {
+        // TNo delayed fields, make sure serialization fails if there are any
+        // native values.
+        val.simple_serialize(layout_info.layout.as_ref())
+            .map(|bytes| (bytes.into(), None))
+    };
+    serialization_result.ok_or_else(|| partial_extension_error("cannot serialize table value"))
 }
 
 fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> {

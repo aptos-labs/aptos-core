@@ -179,14 +179,25 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                                   layout: MoveTypeLayout,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
-            serialize_and_allow_native_values(&value, &layout)
-                .map(Into::into)
-                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
+            let serialization_result = if has_aggregator_lifting {
+                // We allow serialization of native values here because we want to
+                // temporarily store native values (via encoding to ensure deterministic
+                // gas charging) in block storage.
+                serialize_and_allow_native_values(&value, &layout)
+                    .map(|bytes| (bytes, Some(Arc::new(layout))))
+            } else {
+                // Otherwise, there should ne no native values so ensure
+                // serialization fails here.
+                value.simple_serialize(&layout).map(|bytes| (bytes, None))
+            };
+            serialization_result
+                .map(|(bytes, maybe_layout)| (bytes.into(), maybe_layout))
                 .ok_or_else(|| {
                     PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                         .with_message(format!("Error when serializing resource {}.", value))
                 })
         };
+
         let (change_set, mut extensions) = self
             .inner
             .finish_with_extensions_with_custom_effects(&resource_converter)?;

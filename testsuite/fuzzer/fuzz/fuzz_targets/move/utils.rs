@@ -13,7 +13,6 @@ pub(crate) fn is_valid_layout(layout: &MoveTypeLayout) -> bool {
             true
         },
 
-        // TODO[agg_v2](cleanup): check if we need to make native layouts invalid?
         L::Vector(layout) | L::Native(_, layout) => is_valid_layout(layout),
         L::Struct(struct_layout) => {
             if !matches!(struct_layout, MoveStructLayout::Runtime(_))
