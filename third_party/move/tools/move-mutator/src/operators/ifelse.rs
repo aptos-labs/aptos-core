@@ -141,7 +141,7 @@ mod tests {
         let exp = crate_exp(loc);
         let operator = IfElse::new(exp);
         let source = "if (a) { }";
-        let expected = vec!["if (true) { }", "if (false) { }"];
+        let expected = vec!["if (true) { }", "if (false) { }", "if (!(a)) { }"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

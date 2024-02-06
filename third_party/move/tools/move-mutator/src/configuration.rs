@@ -214,7 +214,7 @@ mod tests {
             Some(PathBuf::from("/path/to/output"))
         );
         assert_eq!(config.project.verify_mutants, true);
-        assert_eq!(config.project.no_overwrite.unwrap(), false);
+        assert_eq!(config.project.no_overwrite, false);
         assert_eq!(config.project.downsample_filter.unwrap(), "filter");
         assert_eq!(
             config.project.configuration_file.unwrap(),
