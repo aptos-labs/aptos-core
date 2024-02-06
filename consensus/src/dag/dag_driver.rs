@@ -153,11 +153,12 @@ impl DagDriver {
             (
                 highest_strong_links_round,
                 // unwrap is for round 0
-                dag_reader.get_strong_links_for_round(
-                    highest_strong_links_round,
-                    &self.epoch_state.verifier,
-                )
-                .unwrap_or_default(),
+                dag_reader
+                    .get_strong_links_for_round(
+                        highest_strong_links_round,
+                        &self.epoch_state.verifier,
+                    )
+                    .unwrap_or_default(),
             )
         };
 

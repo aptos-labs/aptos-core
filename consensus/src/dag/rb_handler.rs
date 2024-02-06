@@ -2,18 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{dag_store::DagStore, health::HealthBackoff};
-use crate::{dag::{
-    dag_fetcher::TFetchRequester,
-    dag_network::RpcHandler,
-    errors::NodeBroadcastHandleError,
-    observability::{
-        logging::{LogEvent, LogSchema},
-        tracing::{observe_node, NodeStage},
+use crate::{
+    dag::{
+        dag_fetcher::TFetchRequester,
+        dag_network::RpcHandler,
+        errors::NodeBroadcastHandleError,
+        observability::{
+            logging::{LogEvent, LogSchema},
+            tracing::{observe_node, NodeStage},
+        },
+        storage::DAGStorage,
+        types::{Node, NodeCertificate, Vote},
+        NodeId,
     },
-    storage::DAGStorage,
-    types::{Node, NodeCertificate, Vote},
-    NodeId,
-}, util::is_vtxn_expected};
+    util::is_vtxn_expected,
+};
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};

@@ -70,7 +70,7 @@ impl InMemDag {
 
     pub fn highest_round(&self) -> Round {
         // If stale nodes exist on the BTreeMap, ignore their rounds when calculating
-        // the highest round.        
+        // the highest round.
         *self
             .nodes_by_round
             .last_key_value()
@@ -455,7 +455,7 @@ impl DagStore {
         self.dag.write().validate_new_node(&node)?;
 
         // Note on concurrency: it is possible that a prune operation kicks in here and
-        // moves the window forward making the `node` stale. Any stale node inserted 
+        // moves the window forward making the `node` stale. Any stale node inserted
         // due to this race will be cleaned up with the next prune operation.
 
         // mutate after all checks pass

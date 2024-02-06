@@ -4,7 +4,7 @@
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::RoundRobinAnchorElection,
-    dag_store::{InMemDag, DagStore},
+    dag_store::{DagStore, InMemDag},
     order_rule::OrderRule,
     tests::{
         dag_test::MockStorage,
