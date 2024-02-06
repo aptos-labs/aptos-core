@@ -37,6 +37,7 @@ use std::{
     ops::{Deref, DerefMut},
     sync::Arc,
 };
+use move_vm_types::value_serde::serialize_and_allow_native_values;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.
@@ -179,8 +180,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                                   layout: MoveTypeLayout,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
-            value
-                .simple_serialize(&layout)
+            serialize_and_allow_native_values(&value, &layout)
                 .map(Into::into)
                 .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
                 .ok_or_else(|| {

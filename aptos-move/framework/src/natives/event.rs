@@ -20,6 +20,10 @@ use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
+use move_vm_types::value_serde::serialize_and_allow_native_values;
+#[cfg(feature = "testing")]
+use move_vm_types::value_serde::deserialize_and_allow_native_values;
+
 
 /// Cached emitted module events.
 #[derive(Default, Tid)]
@@ -174,7 +178,7 @@ fn native_emitted_events(
         .emitted_v2_events(&ty_tag)
         .into_iter()
         .map(|blob| {
-            Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
+            deserialize_and_allow_native_values(blob, &ty_layout).ok_or_else(|| {
                 SafeNativeError::InvariantViolation(PartialVMError::new(
                     StatusCode::VALUE_DESERIALIZATION_ERROR,
                 ))
@@ -229,7 +233,7 @@ fn native_write_module_event_to_store(
     let layout = context.type_to_type_layout(&ty)?;
     let (ty_layout, has_identifier_mappings) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
-    let blob = msg.simple_serialize(&layout).ok_or_else(|| {
+    let blob = serialize_and_allow_native_values(&msg, &layout).ok_or_else(|| {
         SafeNativeError::InvariantViolation(
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("Event serialization failure".to_string()),

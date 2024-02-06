@@ -37,6 +37,7 @@ use std::{
     mem::drop,
     sync::Arc,
 };
+use move_vm_types::value_serde::{deserialize_and_allow_native_values, serialize_and_allow_native_values};
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this
@@ -535,12 +536,12 @@ fn get_table_handle(table: &StructRef) -> PartialVMResult<TableHandle> {
 }
 
 fn serialize(layout: &MoveTypeLayout, val: &Value) -> PartialVMResult<Vec<u8>> {
-    val.simple_serialize(layout)
+    serialize_and_allow_native_values(val, layout)
         .ok_or_else(|| partial_extension_error("cannot serialize table key or value"))
 }
 
 fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> {
-    Value::simple_deserialize(bytes, layout)
+    deserialize_and_allow_native_values(bytes, layout)
         .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))
 }
 

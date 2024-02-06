@@ -32,6 +32,7 @@ use move_vm_types::{
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
+use move_vm_types::value_serde::serialize_and_allow_native_values;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {
@@ -311,7 +312,7 @@ impl VMRuntime {
                     "entry point functions cannot have non-serializable return types".to_string(),
                 )
             })?;
-        let bytes = value.simple_serialize(&layout).ok_or_else(|| {
+        let bytes = serialize_and_allow_native_values(&value, &layout).ok_or_else(|| {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("failed to serialize return values".to_string())
         })?;

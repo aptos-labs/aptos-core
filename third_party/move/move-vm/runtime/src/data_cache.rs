@@ -21,6 +21,7 @@ use move_vm_types::{
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
+use move_vm_types::value_serde::deserialize_and_allow_native_values;
 
 pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
@@ -205,7 +206,7 @@ impl<'r> TransactionDataCache<'r> {
 
             let gv = match data {
                 Some(blob) => {
-                    let val = match Value::simple_deserialize(&blob, &ty_layout) {
+                    let val = match deserialize_and_allow_native_values(&blob, &ty_layout) {
                         Some(val) => val,
                         None => {
                             let msg =
