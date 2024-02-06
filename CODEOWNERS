@@ -11,16 +11,15 @@
 /aptos-move/aptos-gas/ @vgao1996
 /aptos-move/aptos-vm/ @davidiw @wrwg @zekun000 @vgao1996 @georgemitenkov
 /aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
-/aptos-move/e2e-tests/src/account.rs @alinush
 /aptos-move/framework/ @davidiw @movekevin @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
-/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
+/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma @mstraka100
 /aptos-move/framework/**/*.spec.move @junkil-park
 /aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
 
 # Owner for aptos-token, cryptography natives, parallel-executor and vm-genesis.
 /aptos-move/framework/aptos-token @areshand
-/aptos-move/framework/src/natives/cryptography/ @alinush
+/aptos-move/framework/src/natives/cryptography/ @alinush @zjma @mstraka100
 /aptos-move/framework/src/natives/aggregator_natives/ @georgemitenkov @gelash @zekun000
 /aptos-move/block-executor/ @gelash @zekun000 @sasha8 @danielxiangzl
 /aptos-move/sharded_block-executor/ @sitalkedia
@@ -43,8 +42,8 @@
 /crates/aptos @gregnazario @0xjinn @banool
 
 # Owners for the `/crates/aptos-crypto*` directories.
-/crates/aptos-crypto-derive/ @alinush
-/crates/aptos-crypto/ @alinush
+/crates/aptos-crypto-derive/ @alinush @zjma @mstraka100 @rex1fernando
+/crates/aptos-crypto/ @alinush @zjma @mstraka100 @rex1fernando
 
 # Owners for the `/crates/aptos-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
 /crates/aptos-faucet @banool @gregnazario
@@ -91,7 +90,7 @@
 /ecosystem/typescript/sdk @gregnazario @banool @0xmaayan @0xjinn
 
 # Owners for execution and storage.
-/execution/ @msmouse @lightmark
+/execution/ @msmouse @lightmark @grao1991
 
 # Owners for mempool.
 /mempool/ @bchocho
@@ -103,9 +102,12 @@
 /state-sync/ @joshlind
 
 # Owners for execution and storage.
-/storage/ @msmouse @lightmark
+/storage/ @msmouse @lightmark @grao1991
 
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
 
-/types/src/transaction/authenticator.rs @alinush
+# Owners for the `aptos-dkg` crate.
+/crates/aptos-dkg @alinush @rex1fernando
+
+/types/src/transaction/authenticator.rs @alinush @mstraka100

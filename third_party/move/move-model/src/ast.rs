@@ -569,6 +569,16 @@ pub enum RewriteResult {
     Unchanged(Exp),
 }
 
+/// Visitor position
+pub enum VisitorPosition {
+    Pre,        // before visiting any subexpressions
+    MidMutate,  // after RHS and before LHS of Mutate expression.
+    BeforeBody, // Before body of Block expression.
+    BeforeThen, // Before then clause of IfElse expression.
+    BeforeElse, // Before else clause of IfElse expression.
+    Post,       // after visiting all subexpressions
+}
+
 impl ExpData {
     /// Version of `into` which does not require type annotations.
     pub fn into_exp(self) -> Exp {
@@ -915,98 +925,143 @@ impl ExpData {
     where
         F: FnMut(bool, &ExpData) -> bool,
     {
-        let _ = self.visit_pre_post_impl(&mut |x, e| if visitor(x, e) { Some(()) } else { None });
+        let _ = self.visit_positions_impl(&mut |x, e| {
+            use VisitorPosition::*;
+            let should_continue = match x {
+                Pre => visitor(false, e),
+                Post => visitor(true, e),
+                MidMutate | BeforeBody | BeforeThen | BeforeElse => true,
+            };
+            if should_continue {
+                Some(())
+            } else {
+                None
+            }
+        });
+    }
+
+    /// Recursively visits expression, calling visitor for key control points of each sub-expression.
+    /// `visitor(Pre, ...)` will be called before descending into each expression, and
+    /// `visitor(Post, ...)` will be called after the descent.  For a few expressions,
+    /// additional visitor calls will also be made at key control points between recursive
+    /// calls:
+    /// - for `Mutate(..., lhs, rhs)`, visits `rhs` before `lhs` (following execution control flow),
+    ///   with a call to `visitor(MidMutate, ...)` between the two recursive calls
+    /// - for `Block(..., binding, body)` visits `binding` before `body`, with a call to
+    ///   `visitor(BeforeBody, ...)` between the two recursive calls.
+    /// - for `IfElse(..., cond, then, else)` first recursively visits `cond`, then calls
+    ///   `visitor(BeforeThen, ...)`, then visits `then`, then calls `visitor(BeforeElse, ...)`,
+    ///   then visits `else`.
+    ///
+    /// In every case, if `visitor` returns `false`, then the visit is stopped early; otherwise
+    /// the the visit will continue.
+    pub fn visit_positions<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(VisitorPosition, &ExpData) -> bool,
+    {
+        let _ = self.visit_positions_impl(&mut |x, e| {
+            if visitor(x, e) {
+                Some(())
+            } else {
+                None
+            }
+        });
     }
 
     /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
     /// - `visitor` returns `None` to indicate that visit should stop early, and `Some(())` to continue.
-    /// - `visit_pre_post` returns `None` if visitor returned `None`.
-    fn visit_pre_post_impl<F>(&self, visitor: &mut F) -> Option<()>
+    /// - `visit_positions_impl` returns `None` if visitor returned `None`.
+    /// See `visit_positions` for more
+    fn visit_positions_impl<F>(&self, visitor: &mut F) -> Option<()>
     where
-        F: FnMut(bool, &ExpData) -> Option<()>,
+        F: FnMut(VisitorPosition, &ExpData) -> Option<()>,
     {
         use ExpData::*;
-        visitor(false, self)?;
+        visitor(VisitorPosition::Pre, self)?;
         match self {
             Call(_, _, args) => {
                 for exp in args {
-                    exp.visit_pre_post_impl(visitor)?;
+                    exp.visit_positions_impl(visitor)?;
                 }
             },
             Invoke(_, target, args) => {
-                target.visit_pre_post_impl(visitor)?;
+                target.visit_positions_impl(visitor)?;
                 for exp in args {
-                    exp.visit_pre_post_impl(visitor)?;
+                    exp.visit_positions_impl(visitor)?;
                 }
             },
-            Lambda(_, _, body) => body.visit_pre_post_impl(visitor)?,
+            Lambda(_, _, body) => body.visit_positions_impl(visitor)?,
             Quant(_, _, ranges, triggers, condition, body) => {
                 for (_, range) in ranges {
-                    range.visit_pre_post_impl(visitor)?;
+                    range.visit_positions_impl(visitor)?;
                 }
                 for trigger in triggers {
                     for e in trigger {
-                        e.visit_pre_post_impl(visitor)?;
+                        e.visit_positions_impl(visitor)?;
                     }
                 }
                 if let Some(exp) = condition {
-                    exp.visit_pre_post_impl(visitor)?;
+                    exp.visit_positions_impl(visitor)?;
                 }
-                body.visit_pre_post_impl(visitor)?;
+                body.visit_positions_impl(visitor)?;
             },
             Block(_, _, binding, body) => {
                 if let Some(exp) = binding {
-                    exp.visit_pre_post_impl(visitor)?;
+                    exp.visit_positions_impl(visitor)?;
                 }
-                body.visit_pre_post_impl(visitor)?;
+                visitor(VisitorPosition::BeforeBody, self)?;
+                body.visit_positions_impl(visitor)?;
             },
             IfElse(_, c, t, e) => {
-                c.visit_pre_post_impl(visitor)?;
-                t.visit_pre_post_impl(visitor)?;
-                e.visit_pre_post_impl(visitor)?;
+                c.visit_positions_impl(visitor)?;
+                visitor(VisitorPosition::BeforeThen, self)?;
+                t.visit_positions_impl(visitor)?;
+                visitor(VisitorPosition::BeforeElse, self)?;
+                e.visit_positions_impl(visitor)?;
             },
-            Loop(_, e) => e.visit_pre_post_impl(visitor)?,
-            Return(_, e) => e.visit_pre_post_impl(visitor)?,
+            Loop(_, e) => e.visit_positions_impl(visitor)?,
+            Return(_, e) => e.visit_positions_impl(visitor)?,
             Sequence(_, es) => {
                 for e in es {
-                    e.visit_pre_post_impl(visitor)?;
+                    e.visit_positions_impl(visitor)?;
                 }
             },
-            Assign(_, _, e) => e.visit_pre_post_impl(visitor)?,
+            Assign(_, _, e) => e.visit_positions_impl(visitor)?,
             Mutate(_, lhs, rhs) => {
-                lhs.visit_pre_post_impl(visitor)?;
-                rhs.visit_pre_post_impl(visitor)?;
+                rhs.visit_positions_impl(visitor)?;
+                visitor(VisitorPosition::MidMutate, self)?;
+                lhs.visit_positions_impl(visitor)?;
             },
-            SpecBlock(_, spec) => Self::visit_pre_post_spec_impl(spec, visitor)?,
+            SpecBlock(_, spec) => Self::visit_positions_spec_impl(spec, visitor)?,
             // Explicitly list all enum variants
             LoopCont(..) | Value(..) | LocalVar(..) | Temporary(..) | Invalid(..) => {},
         }
-        visitor(true, self)
+        visitor(VisitorPosition::Post, self)
     }
 
-    fn visit_pre_post_spec_impl<F>(spec: &Spec, visitor: &mut F) -> Option<()>
+    fn visit_positions_spec_impl<F>(spec: &Spec, visitor: &mut F) -> Option<()>
     where
-        F: FnMut(bool, &ExpData) -> Option<()>,
+        F: FnMut(VisitorPosition, &ExpData) -> Option<()>,
     {
         for cond in &spec.conditions {
-            Self::visit_pre_post_cond_impl(cond, visitor)?;
+            Self::visit_positions_cond_impl(cond, visitor)?;
         }
         for impl_spec in spec.on_impl.values() {
-            Self::visit_pre_post_spec_impl(impl_spec, visitor)?;
+            Self::visit_positions_spec_impl(impl_spec, visitor)?;
         }
         for cond in spec.update_map.values() {
-            Self::visit_pre_post_cond_impl(cond, visitor)?;
+            Self::visit_positions_cond_impl(cond, visitor)?;
         }
         Some(())
     }
 
-    fn visit_pre_post_cond_impl<F>(cond: &Condition, visitor: &mut F) -> Option<()>
+    fn visit_positions_cond_impl<F>(cond: &Condition, visitor: &mut F) -> Option<()>
     where
-        F: FnMut(bool, &ExpData) -> Option<()>,
+        F: FnMut(VisitorPosition, &ExpData) -> Option<()>,
     {
-        cond.exp.visit_pre_post_impl(visitor)?;
+        cond.exp.visit_positions_impl(visitor)?;
         for exp in &cond.additional_exps {
-            exp.visit_pre_post_impl(visitor)?;
+            exp.visit_positions_impl(visitor)?;
         }
         Some(())
     }

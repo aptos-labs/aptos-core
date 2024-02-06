@@ -20,7 +20,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness, transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
@@ -87,6 +87,7 @@ impl StateComputer for MockStateComputer {
         &self,
         block: &Block,
         _parent_block_id: HashValue,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         self.block_cache.lock().insert(
             block.id(),
@@ -144,6 +145,7 @@ impl StateComputer for MockStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 
@@ -158,6 +160,7 @@ impl StateComputer for EmptyStateComputer {
         &self,
         _block: &Block,
         _parent_block_id: HashValue,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         Ok(PipelineExecutionResult::new_dummy())
     }
@@ -182,6 +185,7 @@ impl StateComputer for EmptyStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 
@@ -213,6 +217,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         &self,
         _block: &Block,
         parent_block_id: HashValue,
+        _randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         // trapdoor for Execution Error
         let res = if parent_block_id == self.random_compute_result_root_hash {
@@ -246,6 +251,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 

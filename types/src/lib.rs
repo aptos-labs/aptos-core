@@ -10,6 +10,7 @@ pub mod account_config;
 pub mod account_state;
 pub mod block_info;
 pub mod block_metadata;
+pub mod block_metadata_ext;
 pub mod chain_id;
 pub mod contract_event;
 pub mod dkg;
@@ -31,6 +32,7 @@ pub mod on_chain_config;
 pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
+pub mod randomness;
 pub mod serde_helper;
 pub mod stake_pool;
 pub mod staking_contract;
@@ -57,9 +59,11 @@ pub use utility_coin::*;
 
 pub mod account_view;
 pub mod aggregate_signature;
-pub mod aggregator;
 pub mod block_executor;
+pub mod bn254_circom;
 pub mod bytes;
+pub mod delayed_fields;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
+pub mod zkid;

@@ -391,7 +391,7 @@ fn parse_requested_balance(
 ) -> Option<String> {
     if account_identifier.is_delegator_active_stake() {
         return balances_result
-            .get(0)
+            .first()
             .and_then(|v| v.as_str().map(|s| s.to_owned()));
     } else if account_identifier.is_delegator_inactive_stake() {
         return balances_result
@@ -421,7 +421,7 @@ fn parse_requested_balance(
 
 fn parse_lockup_expiration(lockup_secs_result: Vec<serde_json::Value>) -> u64 {
     return lockup_secs_result
-        .get(0)
+        .first()
         .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()))
         .unwrap_or(0);
 }

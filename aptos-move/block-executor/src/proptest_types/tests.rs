@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::{Error, IntentionalFallbackToSequential},
+    errors::{BlockExecutionError, IntentionalFallbackToSequential},
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -88,7 +88,7 @@ fn run_transactions<K, V, E>(
         if module_access.0 && module_access.1 {
             assert_eq!(
                 output.unwrap_err(),
-                Error::FallbackToSequential(PanicOr::Or(
+                BlockExecutionError::FallbackToSequential(PanicOr::Or(
                     IntentionalFallbackToSequential::ModulePathReadWrite
                 ))
             );
@@ -476,7 +476,7 @@ fn publishing_fixed_params_with_block_gas_limit(
 
         assert_eq!(
             output.unwrap_err(),
-            Error::FallbackToSequential(PanicOr::Or(
+            BlockExecutionError::FallbackToSequential(PanicOr::Or(
                 IntentionalFallbackToSequential::ModulePathReadWrite
             ))
         );
@@ -573,7 +573,7 @@ fn non_empty_group(
             executor_thread_pool.clone(),
             None,
         )
-        .execute_transactions_sequential((), &transactions, &data_view, true);
+        .execute_transactions_sequential((), &transactions, &data_view);
         // TODO: test dynamic disabled as well.
 
         BaselineOutput::generate(&transactions, None).assert_output(&output);

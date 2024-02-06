@@ -853,7 +853,9 @@ pub enum TransactionType {
     User,
     Genesis,
     BlockMetadata,
+    BlockMetadataExt,
     StateCheckpoint,
+    Validator,
 }
 
 impl Display for TransactionType {
@@ -863,7 +865,9 @@ impl Display for TransactionType {
             User => "User",
             Genesis => "Genesis",
             BlockMetadata => "BlockResource",
+            BlockMetadataExt => "BlockResourceExt",
             StateCheckpoint => "StateCheckpoint",
+            Validator => "Validator",
         })
     }
 }
@@ -880,6 +884,12 @@ impl Transaction {
             },
             GenesisTransaction(_) => (TransactionType::Genesis, None, txn.info, txn.events),
             BlockMetadata(_) => (TransactionType::BlockMetadata, None, txn.info, txn.events),
+            BlockMetadataExt(_) => (
+                TransactionType::BlockMetadataExt,
+                None,
+                txn.info,
+                txn.events,
+            ),
             StateCheckpoint(_) => (TransactionType::StateCheckpoint, None, txn.info, vec![]),
             ValidatorTransaction(_) => todo!(),
         };
@@ -1005,7 +1015,7 @@ fn parse_failed_operations_from_txn_payload(
             (AccountAddress::ONE, ACCOUNT_MODULE, CREATE_ACCOUNT_FUNCTION) => {
                 if let Some(Ok(address)) = inner
                     .args()
-                    .get(0)
+                    .first()
                     .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded))
                 {
                     operations.push(Operation::create_account(
@@ -1152,7 +1162,7 @@ fn parse_transfer_from_txn_payload(
 
     let args = payload.args();
     let maybe_receiver = args
-        .get(0)
+        .first()
         .map(|encoded| bcs::from_bytes::<AccountAddress>(encoded));
     let maybe_amount = args.get(1).map(|encoded| bcs::from_bytes::<u64>(encoded));
 

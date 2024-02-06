@@ -14,6 +14,7 @@ use aptos_crypto::{
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::aptos_test_root_address,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
         EntryFunction, Script, SignedTransaction,
@@ -1405,6 +1406,69 @@ async fn test_simulation_failure_error_message() {
         .as_str()
         .unwrap()
         .contains("Division by zero"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulation_filter_deny() {
+    let mut node_config = NodeConfig::default();
+
+    // Blocklist the balance function.
+    let mut filter = node_config.api.simulation_filter.clone();
+    filter = filter.add_deny_all();
+    node_config.api.simulation_filter = filter;
+
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let admin0 = context.root_account().await;
+
+    let resp = context.simulate_transaction(&admin0, json!({
+        "type": "script_payload",
+        "code": {
+            "bytecode": "a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
+        },
+        "type_arguments": [],
+        "arguments": [],
+    }), 403).await;
+
+    context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_simulation_filter_allow_sender() {
+    let mut node_config = NodeConfig::default();
+
+    // Allow the root sender only.
+    let mut filter = node_config.api.simulation_filter.clone();
+    filter = filter.add_allow_sender(aptos_test_root_address());
+    filter = filter.add_deny_all();
+    node_config.api.simulation_filter = filter;
+
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
+
+    let admin0 = context.root_account().await;
+    let other_account = context.create_account().await;
+
+    context.simulate_transaction(&admin0, json!({
+        "type": "script_payload",
+        "code": {
+            "bytecode": "a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
+        },
+        "type_arguments": [],
+        "arguments": [],
+    }), 200).await;
+
+    let resp = context.simulate_transaction(&other_account, json!({
+        "type": "script_payload",
+        "code": {
+            "bytecode": "a11ceb0b030000000105000100000000050601000000000000000600000000000000001a0102",
+        },
+        "type_arguments": [],
+        "arguments": [],
+    }), 403).await;
+
+    // It was difficult to prune when using a vec of responses so we just put the
+    // rejection response in the goldens.
+    context.check_golden_output(resp);
 }
 
 fn gen_string(len: u64) -> String {

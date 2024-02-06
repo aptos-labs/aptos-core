@@ -1,0 +1,141 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test($t0: bool, $t1: bool) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: if ($t0) goto 2 else goto 23
+  2: label L2
+  3: if ($t1) goto 4 else goto 14
+  4: label L5
+  5: label L8
+  6: goto 5
+  7: label L9
+  8: $t3 := 0
+  9: $t2 := infer($t3)
+ 10: $t5 := 1
+ 11: $t4 := +($t2, $t5)
+ 12: $t2 := infer($t4)
+ 13: goto 16
+ 14: label L6
+ 15: goto 27
+ 16: label L7
+ 17: $t7 := 0
+ 18: $t6 := infer($t7)
+ 19: $t9 := 1
+ 20: $t8 := +($t6, $t9)
+ 21: $t6 := infer($t8)
+ 22: goto 25
+ 23: label L3
+ 24: goto 27
+ 25: label L4
+ 26: goto 0
+ 27: label L1
+ 28: return ()
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::test($t0: bool, $t1: bool) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     # maybe
+  0: label L0
+     # maybe
+  1: if ($t0) goto 2 else goto 23
+     # maybe
+  2: label L2
+     # maybe
+  3: if ($t1) goto 4 else goto 14
+     # maybe
+  4: label L5
+     # maybe
+  5: label L8
+     # maybe
+  6: goto 5
+     # no
+  7: label L9
+     # no
+  8: $t3 := 0
+     # no
+  9: $t2 := infer($t3)
+     # no
+ 10: $t5 := 1
+     # no
+ 11: $t4 := +($t2, $t5)
+     # no
+ 12: $t2 := infer($t4)
+     # no
+ 13: goto 16
+     # maybe
+ 14: label L6
+     # maybe
+ 15: goto 27
+     # no
+ 16: label L7
+     # no
+ 17: $t7 := 0
+     # no
+ 18: $t6 := infer($t7)
+     # no
+ 19: $t9 := 1
+     # no
+ 20: $t8 := +($t6, $t9)
+     # no
+ 21: $t6 := infer($t8)
+     # no
+ 22: goto 25
+     # maybe
+ 23: label L3
+     # maybe
+ 24: goto 27
+     # no
+ 25: label L4
+     # no
+ 26: goto 0
+     # maybe
+ 27: label L1
+     # maybe
+ 28: return ()
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::test($t0: bool, $t1: bool) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: label L0
+  1: if ($t0) goto 2 else goto 9
+  2: label L2
+  3: if ($t1) goto 4 else goto 7
+  4: label L5
+  5: label L8
+  6: goto 5
+  7: label L6
+  8: goto 11
+  9: label L3
+ 10: goto 11
+ 11: label L1
+ 12: return ()
+}

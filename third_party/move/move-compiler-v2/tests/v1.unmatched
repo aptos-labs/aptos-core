@@ -16,7 +16,6 @@ move-compiler/tests/move_check/borrow_tests/{
   borrow_global_bad2.move,
   borrow_global_bad5.move,
   borrow_global_good.move,
-  borrow_if.move,
   borrow_return_mutable_borrow_bad.move,
   copy_loc_borrowed.move,
   copy_loc_borrowed_field.move,
@@ -61,14 +60,10 @@ move-compiler/tests/move_check/borrow_tests/{
 move-compiler/tests/move_check/borrows/{
   call_acquires.move,
   call_acquires_invalid.move,
-  eq_unassigned_local.move,
 }
 move-compiler/tests/move_check/commands/{
   abort_negative_stack_size.move,
-  assign_in_one_if_branch.move,
   assign_resource.move,
-  assign_wrong_if_branch.move,
-  assign_wrong_if_branch_no_else.move,
   assign_wrong_type.move,
   branch_assigns_then_moves.move,
   break_outside_loop.move,
@@ -80,17 +75,13 @@ move-compiler/tests/move_check/commands/{
   continue_outside_loop_in_if.move,
   dead_return.move,
   dead_return_local.move,
-  else_assigns_if_doesnt.move,
   else_moves_if_doesnt.move,
-  if_assigns_else_doesnt.move,
-  if_assigns_no_else.move,
   if_moves_else_doesnt.move,
   if_moves_no_else.move,
   invalid_fallthrough2.move,
   invalid_fallthrough3.move,
   join_failure.move,
   mixed_lvalue.move,
-  move_before_assign.move,
   no_let_outside_if.move,
   pop_negative.move,
   pop_positive.move,
@@ -99,14 +90,11 @@ move-compiler/tests/move_check/commands/{
   unpack_extra_binding.move,
   unpack_missing_binding.move,
   unpack_wrong_type.move,
-  use_before_assign.move,
   while_move_local.move,
   while_move_local_2.move,
 }
 move-compiler/tests/move_check/control_flow/{
-  for_user.move,
   infinite_loop_with_dead_exits.move,
-  loop_after_loop.move,
 }
 move-compiler/tests/move_check/deprecated/{
   assert_function.move,
@@ -181,16 +169,8 @@ move-compiler/tests/move_check/locals/{
   use_after_move_loop.move,
   use_after_move_simple.move,
   use_after_move_while.move,
-  use_before_assign_if.move,
-  use_before_assign_if_else.move,
-  use_before_assign_loop.move,
-  use_before_assign_simple.move,
-  use_before_assign_while.move,
 }
 move-compiler/tests/move_check/naming/{
-  friend_decl_out_of_account_addr.move,
-  friend_decl_self.move,
-  friend_decl_unbound_module.move,
   named_address_distinct_from_each_others_value.move,
   named_address_not_distinct_from_value.move,
   vector_literal_type_arity.move,

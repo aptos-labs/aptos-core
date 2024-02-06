@@ -322,9 +322,7 @@ jobs:
       !failure() && !cancelled() && needs.permission-check.result == 'success' && (
         (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
-        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
-        github.event.pull_request.auto_merge != null ||
-        contains(github.event.pull_request.body, '#e2e')
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-framework-upgrade-test')
       )
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-forge.yaml@main
     secrets: inherit
@@ -332,7 +330,7 @@ jobs:
       GIT_SHA: ${{ needs.determine-docker-build-metadata.outputs.gitSha }}
       FORGE_TEST_SUITE: framework_upgrade
       IMAGE_TAG: aptos-node-v1.8.3 # This workflow will test the upgradability from the current tip of the release branch to the current main branch.
-      FORGE_RUNNER_DURATION_SECS: 300
+      FORGE_RUNNER_DURATION_SECS: 3600
       COMMENT_HEADER: forge-framework-upgrade
       FORGE_NAMESPACE: forge-framework-upgrade-${{ needs.determine-docker-build-metadata.outputs.targetCacheId }}
       SKIP_JOB: ${{ needs.file_change_determinator.outputs.only_docs_changed == 'true' }}

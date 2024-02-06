@@ -45,7 +45,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
 
     async fn create_generator_fn(
         &self,
-        init_accounts: &mut [LocalAccount],
+        root_account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
@@ -59,13 +59,17 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                         .map(|_| LocalAccount::generate(rng))
                         .collect::<Vec<_>>(),
                 );
-                let sender = init_accounts.get_mut(0).unwrap();
                 txn_executor
                     .execute_transactions(
                         &new_accounts
                             .iter()
                             .map(|to| {
-                                create_account_transaction(sender, to.address(), txn_factory, 0)
+                                create_account_transaction(
+                                    root_account,
+                                    to.address(),
+                                    txn_factory,
+                                    0,
+                                )
                             })
                             .collect::<Vec<_>>(),
                     )
@@ -84,7 +88,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             );
             let builder = txn_factory.payload(payload);
 
-            match entry_point.multi_sig_additional_num() {
+            Some(match entry_point.multi_sig_additional_num() {
                 MultiSigConfig::None => account.sign_with_transaction_builder(builder),
                 MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
                     additional_signers.as_ref().unwrap().iter().collect(),
@@ -93,7 +97,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                 MultiSigConfig::Publisher => {
                     account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
                 },
-            }
+            })
         })
     }
 }

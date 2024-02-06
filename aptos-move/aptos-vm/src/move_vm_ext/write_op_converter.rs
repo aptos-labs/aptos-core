@@ -244,7 +244,6 @@ impl<'r> WriteOpConverter<'r> {
         // except it encodes the (speculative) size of the group after applying the updates
         // which is used for charging storage fees. Moreover, the metadata computation occurs
         // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
-        // TODO[agg_v2](fix) fix layout for RG
         let metadata_op = if post_group_size.get() == 0 {
             MoveStorageOp::Delete
         } else if pre_group_size.get() == 0 {

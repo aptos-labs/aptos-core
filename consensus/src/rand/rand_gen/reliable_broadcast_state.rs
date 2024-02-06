@@ -10,10 +10,12 @@ use crate::rand::rand_gen::{
     },
 };
 use anyhow::ensure;
-use aptos_consensus_types::{common::Author, randomness::RandMetadata};
+use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::{aggregate_signature::PartialSignatures, epoch_state::EpochState};
+use aptos_types::{
+    aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
+};
 use std::{collections::HashSet, sync::Arc};
 
 pub struct AugDataCertBuilder<D> {

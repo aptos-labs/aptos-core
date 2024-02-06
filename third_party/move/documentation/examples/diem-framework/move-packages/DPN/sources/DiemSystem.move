@@ -522,10 +522,10 @@ module DiemFramework::DiemSystem {
         };
         let new_validator_config = ValidatorConfig::get_config(validator_info.addr);
         // check if information is the same
-        let config_ref = &mut validator_info.config;
-        if (config_ref == &new_validator_config) {
+        if (&validator_info.config == &new_validator_config) {
             return false
         };
+        let config_ref = &mut validator_info.config;
         *config_ref = new_validator_config;
         true
     }

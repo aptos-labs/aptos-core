@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
+    bls12381,
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     hash::{CryptoHasher as _, TestOnlyHasher},
     multi_ed25519::{MultiEd25519PublicKey, MultiEd25519Signature},
@@ -12,6 +13,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     access_path::{AccessPath, Path},
     account_config::{CoinStoreResource, DepositEvent, WithdrawEvent},
+    block_metadata_ext::BlockMetadataExt,
     contract_event, event,
     state_store::{
         state_key::StateKey,
@@ -71,6 +73,13 @@ fn trace_crypto_values(tracer: &mut Tracer, samples: &mut Samples) -> Result<()>
     tracer.trace_value(samples, &secp256r1_ecdsa_public_key)?;
     tracer.trace_value(samples, &secp256r1_ecdsa_signature)?;
 
+    let bls12381_private_key = bls12381::PrivateKey::generate(&mut rng);
+    let bls12381_public_key = bls12381::PublicKey::from(&bls12381_private_key);
+    let bls12381_signature = bls12381_private_key.sign(&message).unwrap();
+    tracer.trace_value(samples, &bls12381_private_key)?;
+    tracer.trace_value(samples, &bls12381_public_key)?;
+    tracer.trace_value(samples, &bls12381_signature)?;
+
     Ok(())
 }
 
@@ -90,6 +99,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<contract_event::ContractEvent>(&samples)?;
     tracer.trace_type::<language_storage::TypeTag>(&samples)?;
     tracer.trace_type::<ValidatorTransaction>(&samples)?;
+    tracer.trace_type::<BlockMetadataExt>(&samples)?;
     tracer.trace_type::<transaction::Transaction>(&samples)?;
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
@@ -103,6 +113,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<AbortLocation>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnyPublicKey>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AnySignature>(&samples)?;
+    tracer.trace_type::<aptos_types::zkid::ZkpOrOpenIdSig>(&samples)?;
 
     // events
     tracer.trace_type::<WithdrawEvent>(&samples)?;

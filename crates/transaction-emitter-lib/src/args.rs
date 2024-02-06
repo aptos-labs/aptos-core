@@ -165,6 +165,9 @@ pub struct EmitArgs {
     pub max_gas_per_txn: Option<u64>,
 
     #[clap(long)]
+    pub init_max_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
     pub init_gas_price_multiplier: Option<u64>,
 
     #[clap(long)]

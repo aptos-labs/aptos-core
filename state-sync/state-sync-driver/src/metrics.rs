@@ -6,17 +6,30 @@ use aptos_metrics_core::{
     register_int_gauge_vec, HistogramTimer, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
+use std::time::Instant;
 
-/// Useful metric labels
+/// Driver metric labels
 pub const DRIVER_CLIENT_NOTIFICATION: &str = "driver_client_notification";
 pub const DRIVER_CONSENSUS_COMMIT_NOTIFICATION: &str = "driver_consensus_commit_notification";
 pub const DRIVER_CONSENSUS_SYNC_NOTIFICATION: &str = "driver_consensus_sync_notification";
+
+/// Data notification metric labels
+pub const NOTIFICATION_CREATE_TO_APPLY: &str = "notification_create_to_apply";
+pub const NOTIFICATION_CREATE_TO_COMMIT: &str = "notification_create_to_commit";
+pub const NOTIFICATION_CREATE_TO_COMMIT_POST_PROCESS: &str =
+    "notification_create_to_commit_post_process";
+pub const NOTIFICATION_CREATE_TO_EXECUTE: &str = "notification_create_to_execute";
+pub const NOTIFICATION_CREATE_TO_RECEIVE: &str = "notification_create_to_receive";
+pub const NOTIFICATION_CREATE_TO_UPDATE_LEDGER: &str = "notification_create_to_update_ledger";
+
+/// Storage synchronizer metric labels
 pub const STORAGE_SYNCHRONIZER_PENDING_DATA: &str = "storage_synchronizer_pending_data";
 pub const STORAGE_SYNCHRONIZER_APPLY_CHUNK: &str = "apply_chunk";
 pub const STORAGE_SYNCHRONIZER_EXECUTE_CHUNK: &str = "execute_chunk";
 pub const STORAGE_SYNCHRONIZER_UPDATE_LEDGER: &str = "update_ledger";
 pub const STORAGE_SYNCHRONIZER_COMMIT_CHUNK: &str = "commit_chunk";
 pub const STORAGE_SYNCHRONIZER_COMMIT_POST_PROCESS: &str = "commit_post_process";
+pub const STORAGE_SYNCHRONIZER_STATE_VALUE_CHUNK: &str = "state_value_chunk";
 
 /// An enum representing the component currently executing
 pub enum ExecutingComponent {
@@ -91,6 +104,17 @@ pub static DRIVER_COUNTERS: Lazy<IntCounterVec> = Lazy::new(|| {
         "aptos_state_sync_driver_counters",
         "Counters related to the state sync driver",
         &["label"]
+    )
+    .unwrap()
+});
+
+/// Counter for tracking data notification latencies
+pub static DATA_NOTIFICATION_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_state_sync_data_notification_latencies",
+        "Counters related to the data notification latencies",
+        &["label"],
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
     )
     .unwrap()
 });
@@ -179,6 +203,13 @@ pub fn increment_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, delta: u64) {
 /// Decrements the gauge with the specific label by the given delta
 pub fn decrement_gauge(gauge: &Lazy<IntGaugeVec>, label: &str, delta: u64) {
     gauge.with_label_values(&[label]).sub(delta as i64);
+}
+
+/// Adds a new duration observation for the given histogram and label
+pub fn observe_duration(histogram: &Lazy<HistogramVec>, label: &str, start_time: Instant) {
+    histogram
+        .with_label_values(&[label])
+        .observe(start_time.elapsed().as_secs_f64());
 }
 
 /// Adds a new observation for the given histogram, label and value

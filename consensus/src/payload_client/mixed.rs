@@ -10,9 +10,15 @@ use crate::{
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
-use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
+use aptos_types::{
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
+    on_chain_config::ValidatorTxnConfig,
+    validator_txn::ValidatorTransaction,
+};
 use aptos_validator_transaction_pool as vtxn_pool;
+use fail::fail_point;
 use futures::future::BoxFuture;
+use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;
 use std::{
@@ -41,6 +47,20 @@ impl MixedPayloadClient {
             user_payload_client,
         }
     }
+
+    /// When enabled in smoke tests, generate 2 random validator transactions, 1 valid, 1 invalid.
+    fn extra_test_only_vtxns(&self) -> Vec<ValidatorTransaction> {
+        fail_point!("mixed_payload_client::extra_test_only_vtxns", |_| vec![
+            ValidatorTransaction::DKGResult(DKGTranscript {
+                metadata: DKGTranscriptMetadata {
+                    epoch: 999,
+                    author: AccountAddress::ZERO,
+                },
+                transcript_bytes: vec![],
+            }),
+        ]);
+        vec![]
+    }
 }
 
 #[async_trait::async_trait]
@@ -59,7 +79,7 @@ impl PayloadClient for MixedPayloadClient {
     ) -> anyhow::Result<(Vec<ValidatorTransaction>, Payload), QuorumStoreError> {
         // Pull validator txns first.
         let validator_txn_pull_timer = Instant::now();
-        let validator_txns = self
+        let mut validator_txns = self
             .validator_txn_pool_client
             .pull(
                 max_poll_time,
@@ -74,6 +94,9 @@ impl PayloadClient for MixedPayloadClient {
                 validator_txn_filter,
             )
             .await;
+
+        validator_txns.extend(self.extra_test_only_vtxns());
+
         debug!("num_validator_txns={}", validator_txns.len());
         // Update constraints with validator txn pull results.
         max_items -= validator_txns.len() as u64;
@@ -105,9 +128,9 @@ impl PayloadClient for MixedPayloadClient {
 #[tokio::test]
 async fn mixed_payload_client_should_prioritize_validator_txns() {
     let all_validator_txns = vec![
-        ValidatorTransaction::dummy1(b"1".to_vec()),
-        ValidatorTransaction::dummy1(b"22".to_vec()),
-        ValidatorTransaction::dummy1(b"333".to_vec()),
+        ValidatorTransaction::dummy(b"1".to_vec()),
+        ValidatorTransaction::dummy(b"22".to_vec()),
+        ValidatorTransaction::dummy(b"333".to_vec()),
     ];
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);
@@ -210,9 +233,9 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
 #[tokio::test]
 async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
     let all_validator_txns = vec![
-        ValidatorTransaction::dummy1(b"1".to_vec()),
-        ValidatorTransaction::dummy1(b"22".to_vec()),
-        ValidatorTransaction::dummy1(b"333".to_vec()),
+        ValidatorTransaction::dummy(b"1".to_vec()),
+        ValidatorTransaction::dummy(b"22".to_vec()),
+        ValidatorTransaction::dummy(b"333".to_vec()),
     ];
 
     let all_user_txns = crate::test_utils::create_vec_signed_transactions(10);

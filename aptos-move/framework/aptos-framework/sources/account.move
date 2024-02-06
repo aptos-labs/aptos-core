@@ -795,7 +795,12 @@ module aptos_framework::account {
 
     #[test_only]
     public fun create_account_for_test(new_address: address): signer {
-        create_account_unchecked(new_address)
+        // Make this easier by just allowing the account to be created again in a test
+        if (!exists_at(new_address)) {
+            create_account_unchecked(new_address)
+        } else {
+            create_signer_for_test(new_address)
+        }
     }
 
     #[test]
@@ -998,7 +1003,7 @@ module aptos_framework::account {
         // Maul the signature and make sure the call would fail
         let invalid_signature = ed25519::signature_to_bytes(&sig);
         let first_sig_byte = vector::borrow_mut(&mut invalid_signature, 0);
-        *first_sig_byte = *first_sig_byte + 1;
+        *first_sig_byte = *first_sig_byte ^ 1;
 
         offer_signer_capability(&alice, invalid_signature, 0, alice_pk_bytes, bob_addr);
     }

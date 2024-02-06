@@ -110,6 +110,10 @@ pub async fn emit_transactions_with_cluster(
         emit_job_request = emit_job_request.max_gas_per_txn(max_gas_per_txn);
     }
 
+    if let Some(init_max_gas_per_txn) = args.init_max_gas_per_txn {
+        emit_job_request = emit_job_request.init_max_gas_per_txn(init_max_gas_per_txn);
+    }
+
     if let Some(init_gas_price_multiplier) = args.init_gas_price_multiplier {
         emit_job_request = emit_job_request.init_gas_price_multiplier(init_gas_price_multiplier);
     }

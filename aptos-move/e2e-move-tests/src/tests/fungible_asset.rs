@@ -49,6 +49,7 @@ fn test_basic_fungible_token() {
             vec![],
             vec![],
         )
+        .values
         .unwrap()
         .pop()
         .unwrap();

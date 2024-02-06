@@ -3,16 +3,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
+use log::{debug, trace};
 use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::compiled_unit::CompiledUnit;
 use move_compiler_v2::{
-    function_checker, inliner,
+    flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
     pipeline::{
-        ability_checker::AbilityChecker, explicit_drop::ExplicitDrop,
-        livevar_analysis_processor::LiveVarAnalysisProcessor,
+        ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
-        visibility_checker::VisibilityChecker,
+        uninitialized_use_checker::UninitializedUseChecker,
+        unreachable_code_analysis::UnreachableCodeProcessor,
+        unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
     },
     run_file_format_gen, Options,
 };
@@ -20,9 +24,7 @@ use move_disassembler::disassembler::Disassembler;
 use move_ir_types::location;
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
-use move_stackless_bytecode::{
-    function_target::FunctionTarget, function_target_pipeline::FunctionTargetPipeline,
-};
+use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use std::{
     cell::RefCell,
     path::{Path, PathBuf},
@@ -44,6 +46,12 @@ struct TestConfig {
     generate_file_format: bool,
     /// Whether we should dump annotated targets for each stage of the pipeline.
     dump_annotated_targets: bool,
+    /// Optionally, dump annotated targets for only certain stages of the pipeline.
+    /// If None, dump annotated targets for all stages.
+    /// If Some(list), dump annotated targets for pipeline stages whose index is in the list.
+    /// If `dump_annotated_targets` is false, this field is ignored.
+    /// Note: the pipeline stages are numbered starting from 0.
+    dump_for_only_some_stages: Option<Vec<usize>>,
 }
 
 fn path_from_crate_root(path: &str) -> String {
@@ -53,6 +61,7 @@ fn path_from_crate_root(path: &str) -> String {
 }
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
+    logging::setup_logging_for_testing();
     let mut experiments = extract_test_directives(path, "// experiment:")?;
     if experiments.is_empty() {
         // If there is no experiment, use "" as the 'default' experiment.
@@ -97,6 +106,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/inlining/") || path.contains("/folding/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -110,6 +120,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/inlining/") {
             pipeline.add_processor(Box::new(VisibilityChecker {}));
@@ -125,6 +136,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/unit_test/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -138,6 +150,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/checking/") {
             Self {
@@ -146,6 +159,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
@@ -154,6 +168,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/file-format-generator/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -165,6 +180,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: true,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/visibility-checker/") {
             pipeline.add_processor(Box::new(VisibilityChecker {}));
@@ -174,6 +190,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/live-var/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -185,6 +202,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/reference-safety/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -197,6 +215,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: verbose,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/explicit-drop/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -210,6 +229,7 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else if path.contains("/ability-checker/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
@@ -224,6 +244,47 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/copy-propagation/") {
+            pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {})); // 0
+            pipeline.add_processor(Box::new(CopyPropagation {})); // 1
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: false,
+            }));
+            pipeline.add_processor(Box::new(DeadStoreElimination {})); // 3
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: false,
+            }));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                // Only dump with annotations after these pipeline stages.
+                dump_for_only_some_stages: Some(vec![0, 1, 3]),
+            }
+        } else if path.contains("/uninit-use-checker/") {
+            pipeline.add_processor(Box::new(UninitializedUseChecker {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/unreachable-code-remover/") {
+            pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+            pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
             }
         } else {
             panic!(
@@ -251,23 +312,24 @@ impl TestConfig {
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
         if ok {
+            trace!("After error check, GlobalEnv={}", env.dump_env());
+            // Flow-insensitive checks on AST
+            flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
             function_checker::check_for_function_typed_parameters(&mut env);
             function_checker::check_access_and_use(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
-
         if ok {
-            if options.debug {
-                eprint!("After error check, GlobalEnv={}", env.dump_env());
-            }
-
+            trace!(
+                "After flow-insensitive checks, GlobalEnv={}",
+                env.dump_env()
+            );
             // Run inlining.
             inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
-
-            if ok && options.debug {
-                eprint!("After inlining, GlobalEnv={}", env.dump_env());
-            }
+        }
+        if ok {
+            trace!("After inlining, GlobalEnv={}", env.dump_env());
         }
 
         if ok && self.dump_ast {
@@ -296,25 +358,56 @@ impl TestConfig {
                                     &env,
                                     "initial bytecode",
                                     targets_before,
-                                    Self::register_formatters,
+                                    &pipeline::register_formatters,
+                                    false,
                                 ),
                             );
                         }
+                        debug!(
+                            "{}",
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                "initial bytecode",
+                                targets_before,
+                                &pipeline::register_formatters,
+                                true,
+                            ),
+                        )
                     },
                     // Hook which is run after every step in the pipeline. Prints out
                     // bytecode after the processor, if requested.
-                    |_, processor, targets_after| {
+                    |i, processor, targets_after| {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
-                        if self.dump_annotated_targets {
+                        // Note that `i` starts at 1.
+                        let title = format!("after {}:", processor.name());
+                        let stage_dump_enabled = self.dump_for_only_some_stages.is_none()
+                            || self
+                                .dump_for_only_some_stages
+                                .as_ref()
+                                .is_some_and(|list| list.contains(&(i - 1)));
+                        if self.dump_annotated_targets && stage_dump_enabled {
                             out.push_str(
                                 &move_stackless_bytecode::print_targets_with_annotations_for_test(
                                     &env,
-                                    &format!("after {}:", processor.name()),
+                                    &title,
                                     targets_after,
-                                    Self::register_formatters,
+                                    &pipeline::register_formatters,
+                                    false,
                                 ),
                             );
+                        }
+                        if stage_dump_enabled {
+                            debug!(
+                                "{}",
+                                &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                    &env,
+                                    &title,
+                                    targets_after,
+                                    &pipeline::register_formatters,
+                                    true,
+                                )
+                            )
                         }
                     },
                 );
@@ -344,12 +437,6 @@ impl TestConfig {
         baseline_test::verify_or_update_baseline(baseline_path.as_path(), &test_output.borrow())?;
 
         Ok(())
-    }
-
-    /// Callback from the framework to register formatters for annotations.
-    fn register_formatters(target: &FunctionTarget) {
-        LiveVarAnalysisProcessor::register_formatters(target);
-        ReferenceSafetyProcessor::register_formatters(target)
     }
 
     fn check_diags(baseline: &mut String, env: &GlobalEnv) -> bool {

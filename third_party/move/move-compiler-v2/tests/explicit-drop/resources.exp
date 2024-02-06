@@ -145,70 +145,70 @@ public fun M::test_resource($t0: &signer) {
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t7}
+     # moved: {$t0,$t1,$t2}
      #
   7: $t8 := 1
      # live vars: $t4, $t8
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t7}
+     # moved: {$t0,$t1,$t2}
      #
   8: $t3 := ==($t4, $t8)
      # live vars: $t3
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
   9: if ($t3) goto 10 else goto 12
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  10: label L0
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  11: goto 15
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  12: label L1
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  13: $t9 := 1
      # live vars: $t9
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  14: abort($t9)
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  15: label L2
      # live vars:
      # graph: {}
      # local_to_label: {}
      # global_to_label: {}
-     # moved: {$t0,$t1,$t2,$t4,$t7,$t8}
+     # moved: {$t0,$t1,$t2,$t4,$t8}
      #
  16: return ()
 }
@@ -232,16 +232,17 @@ public fun M::test_resource($t0: &signer) {
   3: $t6 := 0x42
   4: $t5 := borrow_global<M::R>($t6)
   5: $t7 := borrow_field<M::R>.f($t5)
-  6: $t4 := read_ref($t7)
-  7: destroy($t5)
-  8: $t8 := 1
-  9: $t3 := ==($t4, $t8)
- 10: if ($t3) goto 11 else goto 13
- 11: label L0
- 12: goto 16
- 13: label L1
- 14: $t9 := 1
- 15: abort($t9)
- 16: label L2
- 17: return ()
+  6: drop($t5)
+  7: $t4 := read_ref($t7)
+  8: drop($t7)
+  9: $t8 := 1
+ 10: $t3 := ==($t4, $t8)
+ 11: if ($t3) goto 12 else goto 14
+ 12: label L0
+ 13: goto 17
+ 14: label L1
+ 15: $t9 := 1
+ 16: abort($t9)
+ 17: label L2
+ 18: return ()
 }

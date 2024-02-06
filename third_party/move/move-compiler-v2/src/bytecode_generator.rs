@@ -63,7 +63,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         gen.local_names.insert(temp, name);
     }
     gen.scopes.push(scope);
-    let optional_def = gen.func_env.get_def().as_ref().cloned();
+    let optional_def = gen.func_env.get_def().cloned();
     if let Some(def) = optional_def {
         let results = gen.results.clone();
         // Need to clone expression if present because of sharing issues with `gen`. However, because

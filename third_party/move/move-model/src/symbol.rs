@@ -82,6 +82,10 @@ impl SymbolPool {
     pub fn string(&self, sym: Symbol) -> Rc<String> {
         self.inner.borrow().strings[sym.0].clone()
     }
+
+    pub fn symbol_starts_with_underscore(&self, sym: Symbol) -> bool {
+        self.string(sym).starts_with('_')
+    }
 }
 
 impl Default for SymbolPool {

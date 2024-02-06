@@ -18,7 +18,7 @@ use aptos_aggregator::{
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
@@ -117,12 +117,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
-            // TODO[agg_v2](fix) pass the layout to resource groups
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
                 resource_group.clone(),
@@ -273,8 +271,8 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
             .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        self.executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(

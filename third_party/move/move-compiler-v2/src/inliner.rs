@@ -37,9 +37,9 @@
 /// - TODO(10858): add an anchor AST node so we can implement `Return` for inline functions and
 ///   `Lambda`.
 /// - TODO(10850): add a simplifier that simplifies certain code constructs.
-use crate::options::Options;
 use codespan_reporting::diagnostic::Severity;
 use itertools::chain;
+use log::{info, trace};
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
@@ -52,7 +52,6 @@ use std::{
     fmt::Debug,
     iter,
     iter::{zip, IntoIterator, Iterator},
-    ops::Deref,
     vec::Vec,
 };
 
@@ -65,6 +64,7 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 /// Run inlining on current program's AST.  For each function which is target of the compilation,
 /// visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv) {
+    info!("Inlining");
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
     let mut todo = get_targets(env);
@@ -85,7 +85,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
         let mut visited_functions = BTreeSet::new();
         while let Some(id) = todo.pop_first() {
             if visited_functions.insert(id) {
-                if let Some(def) = env.get_function(id).get_def().deref() {
+                if let Some(def) = env.get_function(id).get_def() {
                     let callees_with_sites = def.called_funs_with_callsites();
                     for (callee, sites) in callees_with_sites {
                         todo.insert(callee);
@@ -115,9 +115,7 @@ pub fn run_inlining(env: &mut GlobalEnv) {
             // Now that all inlining finished, actually update function bodies in env.
             for (fun_id, funexpr_after_inlining) in inliner.funexprs_after_inlining {
                 if let Some(changed_funexpr) = funexpr_after_inlining {
-                    let oldexp = env.get_function(fun_id);
-                    let mut old_def = oldexp.get_mut_def();
-                    *old_def = Some(changed_funexpr);
+                    env.set_function_def(fun_id, changed_funexpr)
                 }
             }
         }
@@ -351,7 +349,6 @@ fn check_for_cycles<T: Ord + Copy + Debug>(
 
 struct Inliner<'env> {
     env: &'env GlobalEnv,
-    debug: bool,
     /// Functions already processed all get an entry here, with a new function body after inline
     /// calls are substituted here.  Functions which are unchanged (no calls to inline functions)
     /// bind to None.
@@ -361,13 +358,8 @@ struct Inliner<'env> {
 impl<'env> Inliner<'env> {
     fn new(env: &'env GlobalEnv) -> Self {
         let funexprs_after_inlining = BTreeMap::new();
-        let debug = env
-            .get_extension::<Options>()
-            .expect("Options is available")
-            .debug;
         Self {
             env,
-            debug,
             funexprs_after_inlining,
         }
     }
@@ -385,9 +377,7 @@ impl<'env> Inliner<'env> {
     fn do_inlining_in(&mut self, func_id: QualifiedFunId) {
         assert!(!self.funexprs_after_inlining.contains_key(&func_id));
         let func_env = self.env.get_function(func_id);
-
-        let optional_def_ref = func_env.get_def();
-        if let Some(def) = &*optional_def_ref {
+        if let Some(def) = func_env.get_def() {
             let mut rewriter = OuterInlinerRewriter::new(self.env, self);
 
             let rewritten = rewriter.rewrite_exp(def.clone());
@@ -439,26 +429,22 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                     } else {
                         // `qfid` was not previously inlined into, look for the original body expr.
                         let func_env_def = func_env.get_def();
-                        (*func_env_def).as_ref().cloned()
+                        func_env_def.cloned()
                     };
                 // inline here
                 if let Some(expr) = body_expr {
-                    if self.inliner.debug {
-                        eprintln!(
-                            "inlining function `{}` with args `{}`",
-                            self.env.dump_fun(&func_env),
-                            args.iter()
-                                .map(|exp| format!("{}", exp.as_ref().display(self.env)))
-                                .collect::<Vec<_>>()
-                                .join(","),
-                        );
-                    }
+                    trace!(
+                        "inlining function `{}` with args `{}`",
+                        self.env.dump_fun(&func_env),
+                        args.iter()
+                            .map(|exp| format!("{}", exp.as_ref().display(self.env)))
+                            .collect::<Vec<_>>()
+                            .join(","),
+                    );
                     let rewritten = InlinedRewriter::inline_call(
                         self.env, call_id, &func_loc, &expr, type_args, parameters, args,
                     );
-                    if self.inliner.debug {
-                        eprintln!("After inlining, expr is `{}`", rewritten.display(self.env));
-                    }
+                    trace!("After inlining, expr is `{}`", rewritten.display(self.env));
                     Some(rewritten)
                 } else {
                     None

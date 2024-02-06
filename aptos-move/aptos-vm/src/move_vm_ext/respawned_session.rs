@@ -18,7 +18,7 @@ use aptos_aggregator::{
 };
 use aptos_gas_algebra::Fee;
 use aptos_types::{
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -30,7 +30,7 @@ use aptos_types::{
 };
 use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
-    change_set::VMChangeSet,
+    change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
         TResourceGroupView, TResourceView,
@@ -44,7 +44,6 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -146,34 +145,6 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn get_storage_fee_refund(&self) -> Fee {
         *self.borrow_storage_refund()
     }
-}
-
-// Sporadically checks if the given two input type layouts match
-pub fn randomly_check_layout_matches(
-    layout_1: Option<&MoveTypeLayout>,
-    layout_2: Option<&MoveTypeLayout>,
-) -> Result<(), PanicError> {
-    if layout_1.is_some() != layout_2.is_some() {
-        return Err(code_invariant_error(format!(
-            "Layouts don't match when they are expected to: {:?} and {:?}",
-            layout_1, layout_2
-        )));
-    }
-    if layout_1.is_some() {
-        // Checking if 2 layouts are equal is a recursive operation and is expensive.
-        // We generally call this `randomly_check_layout_matches` function when we know
-        // that the layouts are supposed to match. As an optimization, we only randomly
-        // check if the layouts are matching.
-        let mut rng = rand::thread_rng();
-        let random_number: u32 = rng.gen_range(0, 100);
-        if random_number == 1 && layout_1 != layout_2 {
-            return Err(code_invariant_error(format!(
-                "Layouts don't match when they are expected to: {:?} and {:?}",
-                layout_1, layout_2
-            )));
-        }
-    }
-    Ok(())
 }
 
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
@@ -292,8 +263,8 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.base_executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        self.base_executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(
