@@ -1,7 +1,6 @@
 use clap::*;
 use move_package::BuildConfig;
 use std::path::PathBuf;
-use crate::base::reroot_path;
 
 /// Test the Move specification using the Move Mutator and Move Prover
 #[derive(Parser)]
@@ -18,12 +17,12 @@ impl SpecTest {
     /// mutants are killed by the prover.
     /// If no path is provided, the current directory is used.
     pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
-        let rerooted_path = reroot_path(path)?;
+        let path = path.unwrap_or_else(|| PathBuf::from("."));
 
         let Self { options } = self;
 
         let options = options.unwrap_or_default();
 
-        move_spec_test::run_spec_test(&options, &config, &rerooted_path)
+        move_spec_test::run_spec_test(&options, &config, &path)
     }
 }

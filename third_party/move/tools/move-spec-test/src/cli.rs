@@ -19,9 +19,15 @@ pub struct CLIOptions {
     /// Optional configuration file for prover tool.
     #[clap(long, value_parser)]
     pub prover_conf: Option<PathBuf>,
-    /// Optional configuration file for prover tool.
+    /// Save report to a JSON file.
     #[clap(short, long, value_parser)]
     pub output: Option<PathBuf>,
+    /// Use previously generated mutants.
+    #[clap(long, short, value_parser)]
+    pub use_generated_mutants: Option<PathBuf>,
+    /// Indicates if mutants should be verified and made sure mutants can compile.
+    #[clap(long, default_value = "false")]
+    pub verify_mutants: bool,
     /// Extra arguments to pass to the prover.
     #[clap(long, value_parser)]
     pub extra_prover_args: Option<Vec<String>>,
@@ -34,6 +40,7 @@ pub fn create_mutator_options(options: &CLIOptions) -> move_mutator::cli::CLIOpt
         move_sources: options.move_sources.clone(),
         mutate_modules: options.include_modules.clone(),
         configuration_file: options.mutator_conf.clone(),
+        verify_mutants: options.verify_mutants,
         ..Default::default()
     }
 }
@@ -129,5 +136,28 @@ mod tests {
 
         assert!(path.is_some());
         assert_eq!(path.unwrap(), PathBuf::from("path/to/out_mutant_dir"));
+    }
+
+    #[test]
+    fn generate_prover_options_creates_from_conf_when_conf_exists() {
+        let toml_content = r#"
+            [backend]
+            boogie_exe = "/path/to/boogie"
+            z3_exe = "/path/to/z3"
+        "#;
+
+        fs::write("test_prover_conf.toml", toml_content).unwrap();
+
+        let mut options = CLIOptions::default();
+        options.prover_conf = Some(PathBuf::from("test_prover_conf.toml"));
+
+        let prover_options = generate_prover_options(&options).unwrap();
+        fs::remove_file("test_prover_conf.toml").unwrap();
+
+        assert_eq!(
+            prover_options.backend.boogie_exe,
+            "/path/to/boogie".to_owned()
+        );
+        assert_eq!(prover_options.backend.z3_exe, "/path/to/z3".to_owned());
     }
 }
