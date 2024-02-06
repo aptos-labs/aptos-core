@@ -2,7 +2,7 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    zkid::{ZkIdPublicKey, ZkIdSignature, MAX_EPK_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_BYTES},
+    zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_AUD_VAL_BYTES, MAX_EPK_BYTES, MAX_EXTRA_FIELD_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_BYTES},
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
@@ -170,12 +170,12 @@ fn devnet_pvk() -> PreparedVerifyingKey<Bn254> {
 
     let delta_g2 = g2_projective_str_to_affine(
         [
-            "19799867077440075892798570892827678991452882191483986973420950266983588147526",
-            "7261406229996412667156189606964369006242293247396567701023787052439810543589",
+            "13383035336413649582509706700486207452846586011931357183412584451035001047448",
+            "16027419831390202773612983484735371532488572116004892088815053400700067539212",
         ],
         [
-            "15618356441847575237880159451782511420373837463064250522093342825487687558812",
-            "20490123502151072560031041764173142979409281632225526952209676367033524880945",
+            "10721769362269676365594537475401127523621006395858437793264409757117891479365",
+            "9414617267647974245692135869296333531953531782907313842629660256278861852086",
         ],
     )
     .unwrap();
@@ -183,13 +183,13 @@ fn devnet_pvk() -> PreparedVerifyingKey<Bn254> {
     let mut gamma_abc_g1 = Vec::new();
     for points in [
         g1_projective_str_to_affine(
-            "16119992548622948701752093197035559180088659648245261797962160821523395857787",
-            "10895012769720065848112628781322097989082134121307195027616506940584635557433",
+            "14285054686793701816260127455026927718457905879583517529297415545689854441001",
+            "13395601344287688734642298202885367767684033456209644714540658522143711107625",
         )
         .unwrap(),
         g1_projective_str_to_affine(
-            "12743680909720798417558674763081930985009983383780261525309863653205478749832",
-            "10808093222645961212778297519773755506856954740368509958745099866520706196565",
+            "5682689138472578222552021580925783059717819979905571889225104354089737247773",
+            "16619871408172104470576428904786565678203996113809385692990277936133285717065",
         )
         .unwrap(),
     ] {
@@ -328,6 +328,22 @@ pub fn get_public_inputs_hash(
     jwk: &RSA_JWK,
     max_exp_horizon: u64,
 ) -> anyhow::Result<Fr> {
+    let extra_field_hashed;
+    let override_aud_val_hashed;
+    let use_override_aud;
+    if let ZkpOrOpenIdSig::Groth16Zkp( proof ) = &sig.sig  {
+        extra_field_hashed = poseidon_bn254::pad_and_hash_string(&proof.extra_field, MAX_EXTRA_FIELD_BYTES)?;
+        if let Some(override_aud_val) = &proof.override_aud_val {
+            use_override_aud = ark_bn254::Fr::from(1);
+            override_aud_val_hashed = poseidon_bn254::pad_and_hash_string(override_aud_val, MAX_AUD_VAL_BYTES)?;
+        } else {
+            use_override_aud = ark_bn254::Fr::from(0);
+            override_aud_val_hashed = poseidon_bn254::pad_and_hash_string("", MAX_AUD_VAL_BYTES)?;
+        }
+    } else {
+        bail!("Cannot get_public_inputs_hash for ZkIdSignature")
+    }
+
     // Add the epk as padded and packed scalars
     let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
         sig.ephemeral_pubkey.to_bytes().as_slice(),
@@ -350,6 +366,8 @@ pub fn get_public_inputs_hash(
         MAX_ISS_BYTES,
     )?);
 
+    frs.push(extra_field_hashed);
+
     // Add the hash of the jwt_header with the "." separator appended
     let jwt_header_with_separator = format!("{}.", sig.jwt_header);
     frs.push(poseidon_bn254::pad_and_hash_string(
@@ -358,6 +376,10 @@ pub fn get_public_inputs_hash(
     )?);
 
     frs.push(jwk.to_poseidon_scalar()?);
+
+    frs.push(override_aud_val_hashed);
+
+    frs.push(use_override_aud);
 
     poseidon_bn254::hash_scalars(frs)
 }
