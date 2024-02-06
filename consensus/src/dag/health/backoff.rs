@@ -56,6 +56,7 @@ impl HealthBackoff {
         .min()
         .expect("must not be empty");
 
+        // TODO: figure out receiver side checks
         let max_txns = max_txns_per_round.saturating_div(
             (self.epoch_state.verifier.len() as f64 * voting_power_ratio).ceil() as u64,
         );

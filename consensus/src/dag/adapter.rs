@@ -93,7 +93,7 @@ pub(super) struct OrderedNotifierAdapter {
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
-    block_created_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
+    block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
 }
 
 impl OrderedNotifierAdapter {
@@ -110,12 +110,12 @@ impl OrderedNotifierAdapter {
             parent_block_info: Arc::new(RwLock::new(parent_block_info)),
             epoch_state,
             ledger_info_provider,
-            block_created_ts: Arc::new(RwLock::new(BTreeMap::new())),
+            block_ordered_ts: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
     pub(super) fn pipeline_pending_latency(&self) -> Duration {
-        match self.block_created_ts.read().first_key_value() {
+        match self.block_ordered_ts.read().first_key_value() {
             Some((round, timestamp)) => {
                 let latency = timestamp.elapsed();
                 info!(round = round, latency = latency, "pipeline pending latency");
@@ -190,10 +190,10 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let dag = self.dag.clone();
         *self.parent_block_info.write() = block_info.clone();
 
-        self.block_created_ts
+        self.block_ordered_ts
             .write()
             .insert(block_info.round(), Instant::now());
-        let block_created_ts = self.block_created_ts.clone();
+        let block_created_ts = self.block_ordered_ts.clone();
 
         let blocks_to_send = OrderedBlocks {
             ordered_blocks: vec![block],
