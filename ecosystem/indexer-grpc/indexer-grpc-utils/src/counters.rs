@@ -238,22 +238,7 @@ pub fn log_grpc_step(
 
     let start_txn_timestamp_iso = start_version_timestamp.map(timestamp_to_iso);
     let end_txn_timestamp_iso = end_version_timestamp.map(timestamp_to_iso);
-    if request_metadata.is_none() {
-        tracing::info!(
-            start_version,
-            end_version,
-            start_txn_timestamp_iso,
-            end_txn_timestamp_iso,
-            num_transactions,
-            duration_in_secs,
-            size_in_bytes,
-            service_type,
-            step = step.get_step(),
-            "{}",
-            step.get_label(),
-        );
-    } else {
-        let request_metadata = request_metadata.unwrap();
+    if let Some(request_metadata) = request_metadata {
         tracing::info!(
             start_version,
             end_version,
@@ -269,6 +254,20 @@ pub fn log_grpc_step(
             processor_name = &request_metadata.processor_name,
             connection_id = &request_metadata.request_connection_id,
             request_user_classification = &request_metadata.request_user_classification,
+            service_type,
+            step = step.get_step(),
+            "{}",
+            step.get_label(),
+        );
+    } else {
+        tracing::info!(
+            start_version,
+            end_version,
+            start_txn_timestamp_iso,
+            end_txn_timestamp_iso,
+            num_transactions,
+            duration_in_secs,
+            size_in_bytes,
             service_type,
             step = step.get_step(),
             "{}",
