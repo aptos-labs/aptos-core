@@ -5,7 +5,9 @@ mod chain_health;
 mod pipeline_health;
 
 pub use backoff::HealthBackoff;
-pub use chain_health::{ChainHealthBackoff, NoChainHealth, TChainHealth};
-pub use pipeline_health::{
-    NoPipelineBackpressure, PipelineLatencyBasedBackpressure, TPipelineHealth,
-};
+#[cfg(test)]
+pub use chain_health::NoChainHealth;
+pub use chain_health::{ChainHealthBackoff, TChainHealth};
+#[cfg(test)]
+pub use pipeline_health::NoPipelineBackpressure;
+pub use pipeline_health::PipelineLatencyBasedBackpressure;

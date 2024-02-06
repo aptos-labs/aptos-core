@@ -18,5 +18,4 @@ mod leader_reputation_adapter;
 mod round_robin;
 
 pub use leader_reputation_adapter::{LeaderReputationAdapter, MetadataBackendAdapter};
-#[cfg(test)]
 pub use round_robin::RoundRobinAnchorElection;
