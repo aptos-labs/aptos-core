@@ -2,8 +2,9 @@
 name: "\U0001FA90 DevEx RFC"
 about: Open a Request for Comments (RFC) for DevEx improvements
 title: "[DevEx RFC] "
-labels: DevEx
+labels: ''
 assignees: ''
+
 ---
 
 <!-- See an example RFC here: https://github.com/aptos-labs/aptos-core/issues/6171 -->
