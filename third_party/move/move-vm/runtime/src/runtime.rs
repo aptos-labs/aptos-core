@@ -29,7 +29,6 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    value_serde::serialize_and_allow_native_values,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -207,7 +206,7 @@ impl VMRuntime {
         Ok(())
     }
 
-    fn deserialize_value(
+    fn deserialize_arg(
         &self,
         module_store: &ModuleStorageAdapter,
         ty: &Type,
@@ -226,22 +225,21 @@ impl VMRuntime {
             },
         };
 
+        let deserialization_error = || -> PartialVMError {
+            PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
+                .with_message("[VM] failed to deserialize argument".to_string())
+        };
+
         // Make sure we do not construct values which might have identifiers
-        // inside.
-        // TODO[agg_v2](cleanup): We should shift this to txn args validation.
+        // inside. This should be guaranteed by transaction argument validation
+        // but because it does not use layouts we double-check here.
         if has_identifier_mappings {
-            return Err(
-                PartialVMError::new(StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION)
-                    .with_message("[VM] unsupported parameter type".to_string()),
-            );
+            return Err(deserialization_error());
         }
 
         match Value::simple_deserialize(arg.borrow(), &layout) {
             Some(val) => Ok(val),
-            None => Err(
-                PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
-                    .with_message("[VM] failed to deserialize argument".to_string()),
-            ),
+            None => Err(deserialization_error()),
         }
     }
 
@@ -275,14 +273,14 @@ impl VMRuntime {
                 Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
                     dummy_locals.store_loc(
                         idx,
-                        self.deserialize_value(module_store, inner_t, arg_bytes)?,
+                        self.deserialize_arg(module_store, inner_t, arg_bytes)?,
                         self.loader
                             .vm_config()
                             .enable_invariant_violation_check_in_swap_loc,
                     )?;
                     dummy_locals.borrow_loc(idx)
                 },
-                _ => self.deserialize_value(module_store, &arg_ty, arg_bytes),
+                _ => self.deserialize_arg(module_store, &arg_ty, arg_bytes),
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok((dummy_locals, deserialized_args))
@@ -303,19 +301,28 @@ impl VMRuntime {
             _ => (ty, value),
         };
 
-        let layout = self
+        let (layout, has_identifier_mappings) = self
             .loader
-            .type_to_type_layout(ty, module_store)
+            .type_to_type_layout_with_identifier_mappings(ty, module_store)
             .map_err(|_err| {
-                // TODO: Should we use `err` instead of mapping?
                 PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
                     "entry point functions cannot have non-serializable return types".to_string(),
                 )
             })?;
-        let bytes = serialize_and_allow_native_values(&value, &layout).ok_or_else(|| {
+
+        let serialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("failed to serialize return values".to_string())
-        })?;
+        };
+
+        // Disallow native values to escape through return values of a function.
+        if has_identifier_mappings {
+            return Err(serialization_error());
+        }
+
+        let bytes = value
+            .simple_serialize(&layout)
+            .ok_or_else(serialization_error)?;
         Ok((bytes, layout))
     }
 

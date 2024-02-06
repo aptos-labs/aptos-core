@@ -227,15 +227,15 @@ fn test_vm_value_vector_u64_casting() {
 }
 
 #[cfg(test)]
-mod delayed_values {
+mod native_values {
     use super::*;
     use claims::{assert_err, assert_ok};
 
     #[test]
-    fn test_delayed_value_equality() {
+    fn test_native_value_equality() {
         let v = Value::native_value(SizedID::new(0, 8));
 
-        // Comparing delayed to all other values results in error.
+        // Comparing native to all other values results in error.
 
         assert_err!(Value::bool(false).equals(&v));
 
@@ -266,22 +266,14 @@ mod delayed_values {
         let s = Struct::pack(vec![Value::u32(0), Value::u32(1)]);
         assert_err!(Value::struct_(s).equals(&v));
 
-        // Comparing delayed to other delayed, even self, results in error.
+        // Comparing native values to other native values, even self, results
+        // in error.
         assert_err!(Value::native_value(SizedID::new(0, 1)).equals(&v));
         assert_err!(v.equals(&v));
     }
 
     #[test]
-    fn test_delayed_value_copy() {
-        // let v = Value::delayed_value(0, 8);
-        // let w = assert_ok!(v.copy_value());
-        // let expected_id = assert_ok!(w.value_as::<DelayedFieldID>());
-        // assert_eq!(expected_id.unique_index, 0);
-        // assert_eq!(expected_id.width, 8);
-    }
-
-    #[test]
-    fn test_delayed_value_borrow() {
+    fn test_native_value_borrow() {
         let delayed_value = Value::native_value(SizedID::new(0, 8));
         let mut locals = Locals::new(1);
         assert_ok!(locals.store_loc(0, delayed_value, false));

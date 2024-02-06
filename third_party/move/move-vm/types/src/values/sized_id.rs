@@ -4,6 +4,7 @@
 /// Represents a unique 32-bit identifier used for values which also stores their
 /// serialized size (u32::MAX at most). Can be stored as a single 64-bit unsigned
 /// integer.
+/// TODO[agg_v2](cleanup): consolidate DelayedFiledID and this implementation!
 #[derive(Debug, Copy, Clone)]
 pub struct SizedID {
     // Unique identifier for a value.

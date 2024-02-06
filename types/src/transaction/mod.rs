@@ -1996,7 +1996,6 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Eq
         + Debug
         + Copy
-        + From<u64>
         + From<(u32, u32)>
         + ExtractUniqueIndex
         + Into<SizedID>

@@ -3077,7 +3077,7 @@ impl Struct {
 // Wrapper around value with additional information which can be used by the
 // serializer.
 pub(crate) struct SerializationReadyValue<'c, 'l, 'v, L, V, C> {
-    // Allows to perform a custom serialization for values.
+    // Allows to perform a custom serialization for native values.
     pub(crate) native_serializer: Option<&'c C>,
     // Layout for guiding serialization.
     pub(crate) layout: &'l L,
@@ -3221,7 +3221,8 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
 // Seed used by deserializer to ensure there is information about the value
 // being deserialized.
 pub(crate) struct DeserializationSeed<'c, L, C> {
-    // Allows to deserialize values in the custom format using external deserializer.
+    // Allows to deserialize native values in the custom format using external
+    // deserializer.
     pub(crate) native_deserializer: Option<&'c C>,
     // Layout to guide deserialization.
     pub(crate) layout: L,
@@ -3784,7 +3785,7 @@ pub mod prop {
                 .boxed(),
 
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
-            //  even skip kinds of layouts)?
+            //  even skip these kinds of layouts, or if need to construct a native value)?
             L::Native(_, layout) => value_strategy_with_layout(layout.as_ref()),
         }
     }

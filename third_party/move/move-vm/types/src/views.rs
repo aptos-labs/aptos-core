@@ -37,7 +37,9 @@ pub trait ValueView {
 
         impl ValueVisitor for Acc {
             fn visit_native_value(&mut self, _depth: usize, _id: SizedID) {
-                // TODO[agg_v2](cleanup): legacy_abstract_memory_size is not used anyway?
+                // TODO[agg_v2](cleanup): `legacy_abstract_memory_size` is not used
+                //   anyway, so this function will be removed soon (hopefully).
+                //   Contributions are appreciated!
             }
 
             fn visit_u8(&mut self, _depth: usize, _val: u8) {

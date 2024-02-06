@@ -342,8 +342,10 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
 
-            // TODO[agg_v2](check): it might be better to fail here instead?
-            MoveTypeLayout::Native(_, layout) => layout.deserialize(deserializer),
+            // Should not be reachable.
+            MoveTypeLayout::Native(..) => {
+                Err(D::Error::custom("Move values do not have a native value"))
+            },
         }
     }
 }
@@ -545,9 +547,8 @@ impl fmt::Display for MoveTypeLayout {
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => write!(f, "{}", s),
             Signer => write!(f, "signer"),
-
-            // TODO[agg_v2](check): check if we want to print the kind.
-            Native(_, typ) => write!(f, "{}", typ),
+            // TODO[agg_v2](cleanup): consider printing the tag as well.
+            Native(_, typ) => write!(f, "native<{}>", typ),
         }
     }
 }
@@ -595,8 +596,9 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
 
-            // TODO[agg_v2](check): should we fail instead?
-            MoveTypeLayout::Native(_, v) => v.as_ref().try_into()?,
+            // Native layout variant is only used at runtime, and so we should
+            // not be able to construct a type tag from it here.
+            MoveTypeLayout::Native(..) => bail!("No type tag exists for native layout"),
         })
     }
 }
