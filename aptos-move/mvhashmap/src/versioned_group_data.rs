@@ -347,17 +347,12 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
             .flat_map(|(tag, tree)| {
                 tree.range(ShiftedTxnIndex::zero_idx()..ShiftedTxnIndex::new(txn_idx))
                     .next_back()
-                    .and_then(|(idx, entry)| {
-                        if entry.flag == Flag::Estimate {
-                            Some(Err(MVGroupError::Dependency(
-                                idx.idx().expect("May not depend on storage version"),
-                            )))
-                        } else {
-                            entry
-                                .value
-                                .bytes_len()
-                                .map(|bytes_len| Ok((tag, bytes_len)))
-                        }
+                    .and_then(|(_idx, entry)| {
+                        // Even if entry is estimate, size doesn't need to cause conflict (unless we want to track separately size vs no size estimates)
+                        entry
+                            .value
+                            .bytes_len()
+                            .map(|bytes_len| Ok((tag, bytes_len)))
                     })
             })
             .collect::<Result<Vec<_>, MVGroupError>>()?;

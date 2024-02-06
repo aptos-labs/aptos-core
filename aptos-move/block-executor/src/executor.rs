@@ -348,7 +348,8 @@ where
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
                     Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
                     Group => {
-                        versioned_cache.data().mark_estimate(&k, txn_idx);
+                        // we are not marking metadata change as estimate
+                        // (we could check if metadata changed, and only then mark as estiamte)
                         versioned_cache.group_data().mark_estimate(&k, txn_idx);
                     },
                 };
