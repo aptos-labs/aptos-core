@@ -5,6 +5,7 @@ use crate::dag::{
     dag_fetcher::TFetchRequester,
     dag_store::Dag,
     errors::NodeBroadcastHandleError,
+    health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     tests::{
@@ -57,6 +58,12 @@ async fn test_node_broadcast_receiver_succeed() {
         TEST_DAG_WINDOW,
     )));
 
+    let health_backoff = HealthBackoff::new(
+        epoch_state.clone(),
+        NoChainHealth::new(),
+        NoPipelineBackpressure::new(),
+    );
+
     let wellformed_node = new_node(1, 10, signers[0].author(), vec![]);
     let equivocating_node = new_node(1, 20, signers[0].author(), vec![]);
 
@@ -71,6 +78,7 @@ async fn test_node_broadcast_receiver_succeed() {
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
         Features::default(),
+        health_backoff,
     );
 
     let expected_result = Vote::new(
@@ -118,6 +126,11 @@ async fn test_node_broadcast_receiver_failure() {
                 DagPayloadConfig::default(),
                 ValidatorTxnConfig::default_disabled(),
                 Features::default(),
+                HealthBackoff::new(
+                    epoch_state.clone(),
+                    NoChainHealth::new(),
+                    NoPipelineBackpressure::new(),
+                ),
             )
         })
         .collect();
@@ -202,6 +215,11 @@ async fn test_node_broadcast_receiver_storage() {
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
         Features::default(),
+        HealthBackoff::new(
+            epoch_state.clone(),
+            NoChainHealth::new(),
+            NoPipelineBackpressure::new(),
+        ),
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -213,12 +231,17 @@ async fn test_node_broadcast_receiver_storage() {
     let mut rb_receiver = NodeBroadcastHandler::new(
         dag,
         signers[3].clone(),
-        epoch_state,
+        epoch_state.clone(),
         storage.clone(),
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
         Features::default(),
+        HealthBackoff::new(
+            epoch_state,
+            NoChainHealth::new(),
+            NoPipelineBackpressure::new(),
+        ),
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);
