@@ -133,7 +133,7 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
-        zkid::initialize(&aptos_framework_account, zkid::devnet_groth16_vk(), zkid::devnet_constants());
+        zkid::initialize(&aptos_framework_account, zkid::devnet_groth16_vk(), zkid::default_devnet_configuration());
     }
 
     /// Genesis step 2: Initialize Aptos coin.

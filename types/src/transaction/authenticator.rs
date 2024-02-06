@@ -1007,7 +1007,7 @@ impl AnySignature {
             (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key: _ }) => {
                 match &signature.sig {
                     ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                        proof.verify_non_malleability(&signature.ephemeral_pubkey)?
+                        proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?
                     },
                     ZkpOrOpenIdSig::OpenIdSig(_) => {},
                 }
@@ -1065,6 +1065,8 @@ impl AnyPublicKey {
     }
 }
 
+/// Note: Actual signature is 64 bytes but BCS serialization of enums adds 2 bytes.
+pub const MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE: usize = Ed25519Signature::LENGTH + 2;
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
     Ed25519 { signature: Ed25519Signature },
@@ -1725,6 +1727,15 @@ mod tests {
         assert!(badly_signed_txn.verify_signature().is_err());
     }
 
+    #[test]
+    fn test_ephemeral_signature_size() {
+        let sig = EphemeralSignature::ed25519(Ed25519Signature::dummy_signature());
+        assert_eq!(
+            bcs::to_bytes(&sig).unwrap().len(),
+            MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE
+        );
+    }
+
     fn build_signature(
         sender_any_public_key: &AnyPublicKey,
         raw_txn: &RawTransaction,
@@ -1803,6 +1814,9 @@ mod tests {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
                 non_malleability_signature: ephem_proof_sig,
+                training_wheels_signature: EphemeralSignature::ed25519(
+                    Ed25519Signature::dummy_signature(),
+                ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
                 override_aud_val: None,
             }),

@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    bn254_circom::{G1Bytes, G2Bytes},
-    jwks::rsa::RSA_JWK,
+    bn254_circom::{
+        G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
+    },
+    jwks::rsa::{RSA_JWK, RSA_MODULUS_BYTES},
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
         authenticator::{
             AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
+            MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE,
         },
         SignedTransaction,
     },
@@ -46,23 +49,30 @@ pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
 pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 pub const MAX_EXTRA_FIELD_BYTES: usize = 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+pub const MAX_JWT_PAYLOAD_BYTES: usize = 23 * 64;
 pub const MAX_JWT_HEADER_BYTES: usize = 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
 pub const MAX_ZKID_PUBLIC_KEY_BYTES: usize = 2 + MAX_ISS_BYTES + IDC_NUM_BYTES;
 
+pub const MAX_ZKID_SIGNATURE_BYTES: usize =
+    if MAX_ZKID_OIDC_SIGNATURE_BYTES > MAX_ZKID_GROTH16_SIGNATURE_BYTES {
+        MAX_ZKID_GROTH16_SIGNATURE_BYTES
+    } else {
+        MAX_ZKID_GROTH16_SIGNATURE_BYTES
+    };
 // TODO(ZkIdGroth16Zkp): determine max length of zkSNARK + OIDC overhead + ephemeral pubkey and signature
-pub const MAX_ZKID_SIGNATURE_BYTES: usize = 2048;
 
 /// Reflection of aptos_framework::zkid::Configs
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Configs {
+pub struct Configuration {
     pub max_zkid_signatures_per_txn: u16,
     pub max_exp_horizon: u64,
+    pub training_wheels_pubkey: Option<Vec<u8>>,
 }
 
-impl MoveStructType for Configs {
+impl MoveStructType for Configuration {
     const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("Configs");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -72,6 +82,8 @@ pub struct JwkId {
     /// The Key ID associated with this JWK (https://datatracker.ietf.org/doc/html/rfc7517#section-4.5)
     pub kid: String,
 }
+
+pub const MAX_ZKID_OIDC_SIGNATURE_BYTES: usize = RSA_MODULUS_BYTES + MAX_JWT_PAYLOAD_BYTES;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct OpenIdSig {
@@ -246,19 +258,33 @@ pub struct Groth16Zkp {
     c: G1Bytes,
 }
 
+// TODO(zkid): test
+pub const GROTH16_ZKP_SIZE: usize =
+    G1_PROJECTIVE_COMPRESSED_NUM_BYTES * 2 + G2_PROJECTIVE_COMPRESSED_NUM_BYTES;
+
+// TODO(zkid): test
+pub const MAX_ZKID_GROTH16_SIGNATURE_BYTES: usize = GROTH16_ZKP_SIZE
+    + MAX_ZK_ID_EPHEMERAL_SIGNATURE_SIZE * 2
+    + MAX_EXTRA_FIELD_BYTES
+    + MAX_AUD_VAL_BYTES;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
     /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
     pub non_malleability_signature: EphemeralSignature,
-    // TODO: add training_wheels_signature: EphemeralSignature,
+    pub training_wheels_signature: EphemeralSignature,
     pub extra_field: String,
     pub override_aud_val: Option<String>,
 }
 
 impl SignedGroth16Zkp {
-    pub fn verify_non_malleability(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
+    pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
         self.non_malleability_signature.verify(&self.proof, pub_key)
+    }
+
+    pub fn verify_training_wheels_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
+        self.training_wheels_signature.verify(&self.proof, pub_key)
     }
 
     pub fn verify_proof(
@@ -509,7 +535,10 @@ mod test {
             MAX_ISS_BYTES, MAX_ZKID_PUBLIC_KEY_BYTES,
         },
     };
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, SigningKey, Uniform};
+    use aptos_crypto::{
+        ed25519::{Ed25519PrivateKey, Ed25519Signature},
+        PrivateKey, SigningKey, Uniform,
+    };
     use std::ops::Deref;
 
     #[test]
@@ -579,6 +608,9 @@ mod test {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
                 non_malleability_signature: ephem_proof_sig,
+                training_wheels_signature: EphemeralSignature::ed25519(
+                    Ed25519Signature::dummy_signature(),
+                ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
                 override_aud_val: None,
             }),

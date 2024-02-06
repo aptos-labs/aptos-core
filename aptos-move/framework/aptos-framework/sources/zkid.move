@@ -1,11 +1,13 @@
 module aptos_framework::zkid {
+    use std::option;
+    use std::option::Option;
     use std::signer;
     use aptos_framework::system_addresses;
 
     #[resource_group(scope = global)]
-    struct ConfigGroup {}
+    struct Group {}
 
-    #[resource_group_member(group = aptos_framework::zkid::ConfigGroup)]
+    #[resource_group_member(group = aptos_framework::zkid::Group)]
     /// The 288-byte Groth16 verification key (VK) for the zkID relation.
     struct Groth16VerificationKey has key, store {
         /// 32-byte serialization of `alpha * G`, where `G` is the generator of `G1`.
@@ -20,18 +22,20 @@ module aptos_framework::zkid {
         gamma_abc_g1: vector<vector<u8>>,
     }
 
-    #[resource_group_member(group = aptos_framework::zkid::ConfigGroup)]
-    struct Configs has key, store {
+    #[resource_group_member(group = aptos_framework::zkid::Group)]
+    struct Configuration has key, store {
         // No transaction can have more than this many zkID signatures.
         max_zkid_signatures_per_txn: u16,
         // How far in the future from the JWT issued at time the EPK expiry can be set.
         max_exp_horizon: u64,
+        // The training wheels PK, if training wheels are on
+        training_wheels_pubkey: Option<vector<u8>>,
     }
 
     // genesis.move needs to initialize the devnet VK
     friend aptos_framework::genesis;
 
-    public(friend) fun initialize(fx: &signer, vk: Groth16VerificationKey, constants: Configs) {
+    public(friend) fun initialize(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
         system_addresses::assert_aptos_framework(fx);
 
         move_to(fx, vk);
@@ -39,7 +43,7 @@ module aptos_framework::zkid {
     }
 
     #[test_only]
-    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configs) {
+    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
         initialize(fx, vk, constants)
     }
 
@@ -67,17 +71,18 @@ module aptos_framework::zkid {
         }
     }
 
-    public fun devnet_constants(): Configs {
+    public fun default_devnet_configuration(): Configuration {
         // TODO(zkid): Put reasonable defaults here.
-        Configs {
+        Configuration {
             max_zkid_signatures_per_txn: 3,
             max_exp_horizon: 100_255_944, // 1159.55 days
+            training_wheels_pubkey: option::some(x"aa"),
         }
     }
 
     // Sets the zkID Groth16 verification key, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
-    public entry fun set_groth16_verification_key(fx: &signer, alpha_g1: vector<u8>, beta_g2: vector<u8>, gamma_g2: vector<u8>, delta_g2: vector<u8>, gamma_abc_g1: vector<vector<u8>>) acquires Groth16VerificationKey {
+    public entry fun update_groth16_verification_key(fx: &signer, alpha_g1: vector<u8>, beta_g2: vector<u8>, gamma_g2: vector<u8>, delta_g2: vector<u8>, gamma_abc_g1: vector<vector<u8>>) acquires Groth16VerificationKey {
         system_addresses::assert_aptos_framework(fx);
 
         if (exists<Groth16VerificationKey>(signer::address_of(fx))) {
@@ -92,5 +97,27 @@ module aptos_framework::zkid {
 
         let vk = new_groth16_verification_key(alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1);
         move_to(fx, vk);
+    }
+
+    // Sets the zkID configuration, only callable via governance proposal.
+    // WARNING: If a malicious key is set, this would lead to stolen funds.
+    public entry fun update_configuration(fx: &signer, max_zkid_signatures_per_txn: u16, max_exp_horizon: u64, training_wheels_pubkey: Option<vector<u8>>) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        if (exists<Configuration>(signer::address_of(fx))) {
+            let Configuration {
+                max_zkid_signatures_per_txn: _,
+                max_exp_horizon: _,
+                training_wheels_pubkey: _,
+            } = move_from<Configuration>(signer::address_of(fx));
+        };
+
+        let configs = Configuration {
+            max_zkid_signatures_per_txn,
+            max_exp_horizon,
+            training_wheels_pubkey
+        };
+
+        move_to(fx, configs);
     }
 }

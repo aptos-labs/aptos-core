@@ -3,12 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm_ext::AptosMoveResolver;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     bn254_circom::{get_public_inputs_hash, Groth16VerificationKey},
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
+    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     vm_status::{StatusCode, VMStatus},
-    zkid::{Configs, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
+    zkid::{Configuration, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
@@ -37,35 +39,33 @@ fn get_current_time_onchain(
 }
 
 fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
-    let error_status = value_deserialization_error!("could not fetch PatchedJWKs");
     let bytes = resolver
         .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| error_status.clone())?;
-    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes).map_err(|_| error_status.clone())?;
+        .ok_or_else(|| value_deserialization_error!("get_resource failed on PatchedJWKs"))?;
+    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes).map_err(|_| value_deserialization_error!("could not deserialize PatchedJWKs"))?;
     Ok(jwks)
 }
 
 fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    let error_status = value_deserialization_error!("could not fetch on-chain Groth16 PVK");
     let bytes = resolver
         .get_resource(&CORE_CODE_ADDRESS, &Groth16VerificationKey::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| error_status.clone())?;
-    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes).map_err(|_| error_status.clone())?;
+        .ok_or_else(|| value_deserialization_error!("get_resource failed on Groth16 VK"))?;
+    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes).map_err(|_| value_deserialization_error!("could not deserialize Groth16 VK"))?;
     Ok(vk)
 }
 
-fn get_configs_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Configs, VMStatus> {
-    let error_status =
-        value_deserialization_error!("could not fetch on-chain zkID Configs resource");
+fn get_configs_onchain(
+    resolver: &impl AptosMoveResolver,
+) -> anyhow::Result<Configuration, VMStatus> {
     let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &Configs::struct_tag())
+        .get_resource(&CORE_CODE_ADDRESS, &Configuration::struct_tag())
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| error_status.clone())?;
-    let configs = bcs::from_bytes::<Configs>(&bytes).map_err(|_| error_status.clone())?;
+        .ok_or_else(|| value_deserialization_error!("get_resource failed on zkID configuration"))?;
+    let configs = bcs::from_bytes::<Configuration>(&bytes).map_err(|_| value_deserialization_error!("could not deserialize zkID configuration"))?;
     Ok(configs)
 }
 
@@ -74,15 +74,15 @@ fn get_jwk_for_zkid_authenticator(
     zkid_pub_key: &ZkIdPublicKey,
     zkid_sig: &ZkIdSignature,
 ) -> Result<JWK, VMStatus> {
-    let jwt_header_parsed = zkid_sig
+    let jwt_header = zkid_sig
         .parse_jwt_header()
-        .map_err(|_| invalid_signature!("Failed to get JWT header"))?;
+        .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
     let jwk_move_struct = jwks
-        .get_jwk(&zkid_pub_key.iss, &jwt_header_parsed.kid)
-        .map_err(|_| invalid_signature!("JWK not found"))?;
+        .get_jwk(&zkid_pub_key.iss, &jwt_header.kid)
+        .map_err(|_| invalid_signature!(format!("JWK for {} with KID {} was not found", zkid_pub_key.iss, jwt_header.kid)))?;
 
     let jwk =
-        JWK::try_from(jwk_move_struct).map_err(|_| invalid_signature!("Could not parse JWK"))?;
+        JWK::try_from(jwk_move_struct).map_err(|_| invalid_signature!("Could not unpack Any in JWK Move struct"))?;
     Ok(jwk)
 }
 
@@ -113,12 +113,30 @@ pub fn validate_zkid_authenticators(
         .try_into()
         .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
+    let training_wheels_pk = match &configs.training_wheels_pubkey {
+        None => None,
+        Some(bytes) => {
+            EphemeralPublicKey::ed25519(Ed25519PublicKey::try_from(bytes.as_slice()).map_err(
+                || invalid_signature!("The training wheels PK set on chain is not a valid PK"),
+            )?)
+        },
+    };
+
     for (zkid_pub_key, zkid_sig) in authenticators {
         let jwk = get_jwk_for_zkid_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
 
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
+                    // The training wheels signature is only checked if a training wheels PK is set on chain
+                    if training_wheels_pk.is_some() {
+                        proof
+                            .verify_training_wheels_sig(&training_wheels_pk)
+                            .map_err(|_| {
+                                invalid_signature!("Could not verify training wheels signature")
+                            })?;
+                    }
+
                     let public_inputs_hash = get_public_inputs_hash(
                         zkid_sig,
                         zkid_pub_key,
