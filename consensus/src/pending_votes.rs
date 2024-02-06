@@ -9,6 +9,7 @@
 //! Votes are automatically dropped when the structure goes out of scope.
 
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     counters,
     qc_aggregator::{create_qc_aggregator, QcAggregator},
     util::time_service::TimeService,
@@ -109,6 +110,13 @@ impl PendingVotes {
         // derive data from vote
         let li_digest = vote.ledger_info().hash();
 
+        if self.author_to_vote.is_empty() {
+            observe_block(
+                vote.vote_data().proposed().timestamp_usecs(),
+                BlockStage::FIRST_VOTE_RECEIVED,
+            );
+        }
+
         //
         // 1. Has the author already voted for this round?
         //
@@ -193,6 +201,10 @@ impl PendingVotes {
             match validator_verifier.check_voting_power(li_with_sig.signatures().keys(), true) {
                 // a quorum of signature was reached, a new QC is formed
                 Ok(aggregated_voting_power) => {
+                    observe_block(
+                        vote.vote_data().proposed().timestamp_usecs(),
+                        BlockStage::FINAL_VOTE_RECEIVED,
+                    );
                     return self.qc_aggregator.handle_aggregated_qc(
                         validator_verifier,
                         aggregated_voting_power,
