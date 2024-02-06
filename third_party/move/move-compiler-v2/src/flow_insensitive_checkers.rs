@@ -107,7 +107,6 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                 match position {
                     BeforeBody => self.seen_uses.enter_scope(),
                     Post => {
-                        // postorder
                         for (id, var) in pat.vars() {
                             self.node_symbol_decl_visitor(true, &id, &var, "local variable");
                         }

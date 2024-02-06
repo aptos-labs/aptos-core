@@ -571,12 +571,12 @@ pub enum RewriteResult {
 
 /// Visitor position
 pub enum VisitorPosition {
-    Pre,
+    Pre,        // before visiting any subexpressions
     MidMutate,  // after RHS and before LHS of Mutate expression.
     BeforeBody, // Before body of Block expression.
     BeforeThen, // Before then clause of IfElse expression.
     BeforeElse, // Before else clause of IfElse expression.
-    Post,
+    Post,       // after visiting all subexpressions
 }
 
 impl ExpData {
@@ -941,7 +941,7 @@ impl ExpData {
     }
 
     /// Recursively visits expression, calling visitor for key control points of each sub-expression.
-    /// `visitor(Pre, ...)` will be called before descending into each expresison, and
+    /// `visitor(Pre, ...)` will be called before descending into each expression, and
     /// `visitor(Post, ...)` will be called after the descent.  For a few expressions,
     /// additional visitor calls will also be made at key control points between recursive
     /// calls:
