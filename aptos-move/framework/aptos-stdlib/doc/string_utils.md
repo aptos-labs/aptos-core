@@ -168,6 +168,16 @@ The format string is not valid.
 
 
 
+<a id="0x1_string_utils_EUNABLE_TO_FORMAT"></a>
+
+Formatting is not possible.
+
+
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EUNABLE_TO_FORMAT">EUNABLE_TO_FORMAT</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x1_string_utils_to_string"></a>
 
 ## Function `to_string`

@@ -23,6 +23,9 @@ use move_vm_types::{
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, fmt::Write, ops::Deref};
 
+// Error code from Move contract when values cannot be formatted.
+const EUNABLE_TO_FORMAT: u64 = 3;
+
 struct FormatContext<'a, 'b, 'c, 'd, 'e> {
     context: &'d mut SafeNativeContext<'a, 'b, 'c, 'e>,
     should_charge_gas: bool,
@@ -304,10 +307,13 @@ fn native_format_impl(
             out.push('}');
         },
 
-        // There is no need to show any lifting information!
-        // TODO[agg_v2](cleanup): How does printing work with ephemeral identifiers?
-        // Can we modify this to print tagging info, or is this something that cannot be changed
-        MoveTypeLayout::Native(_, ty) => native_format_impl(context, ty, val, depth, out)?,
+        // This is unreachable because we check layout at the start. Still, return
+        // an error to be safe.
+        MoveTypeLayout::Native(..) => {
+            return Err(SafeNativeError::Abort {
+                abort_code: EUNABLE_TO_FORMAT,
+            })
+        },
     };
     if context.include_int_type {
         write!(out, "{}", suffix).unwrap();
@@ -322,6 +328,16 @@ pub(crate) fn native_format_debug(
     ty: &Type,
     v: Value,
 ) -> SafeNativeResult<String> {
+    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
+    let (_, has_identifier_mappings) = context
+        .deref()
+        .type_to_type_layout_with_identifier_mappings(ty)?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::Abort {
+            abort_code: EUNABLE_TO_FORMAT,
+        });
+    }
+
     let layout = context.deref().type_to_fully_annotated_layout(ty)?;
     let mut format_context = FormatContext {
         context,
@@ -344,6 +360,17 @@ fn native_format(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
+
+    // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
+    let (_, has_identifier_mappings) = context
+        .deref()
+        .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::Abort {
+            abort_code: EUNABLE_TO_FORMAT,
+        });
+    }
+
     let ty = context
         .deref()
         .type_to_fully_annotated_layout(&ty_args[0])?;
@@ -435,7 +462,17 @@ fn native_format_list(
                 val = it.next().unwrap();
                 list_ty = &ty_args[1];
 
+                // TODO[agg_v2](cleanup): Shift this to annotated layout computation.
+                let (_, has_identifier_mappings) = context
+                    .deref()
+                    .type_to_type_layout_with_identifier_mappings(&ty_args[0])?;
+                if has_identifier_mappings {
+                    return Err(SafeNativeError::Abort {
+                        abort_code: EUNABLE_TO_FORMAT,
+                    });
+                }
                 let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
+
                 let mut format_context = FormatContext {
                     context,
                     should_charge_gas: true,

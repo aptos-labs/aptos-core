@@ -103,7 +103,6 @@ fn test_equality() {
     for status in statuses.iter() {
         let status = assert_ok!(status.as_kept_status());
         assert_matches!(status, ExecutionStatus::ExecutionFailure { .. });
-        println!("{:?}", status);
     }
 }
 
@@ -153,7 +152,6 @@ fn test_serialization() {
             code: NFE_BCS_SERIALIZATION_FAILURE,
             info: None,
         });
-        println!("{:?}", status);
     }
 }
 
@@ -193,7 +191,17 @@ fn test_string_utils() {
     let statuses = h.run_block(txns);
     for status in statuses.iter() {
         let status = assert_ok!(status.as_kept_status());
-        // TODO[agg_v2](fix): fully annotated layout computation does not take into account aggregators!
-        println!("{:?}", status);
+        let string_utils_id =
+            ModuleId::new(AccountAddress::ONE, ident_str!("string_utils").to_owned());
+        if let ExecutionStatus::MoveAbort {
+            location: AbortLocation::Module(id),
+            code: 3, // EUNABLE_TO_FORMAT
+            info: Some(_),
+        } = status
+        {
+            assert_eq!(id, string_utils_id.clone())
+        } else {
+            panic!("Should be move abort!")
+        }
     }
 }

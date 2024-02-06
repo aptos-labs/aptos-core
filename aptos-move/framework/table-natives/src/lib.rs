@@ -222,7 +222,7 @@ impl Table {
 
                 let (gv, loaded) = match data {
                     Some(val_bytes) => {
-                        let val = deserialize(&self.value_layout_info.layout, &val_bytes)?;
+                        let val = deserialize_value(&self.value_layout_info, &val_bytes)?;
                         (
                             GlobalValue::cached(val)?,
                             Some(NumBytes::new(val_bytes.len() as u64)),
@@ -541,7 +541,7 @@ fn serialize_value(
         serialize_and_allow_native_values(val, layout_info.layout.as_ref())
             .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
     } else {
-        // TNo delayed fields, make sure serialization fails if there are any
+        // No delayed fields, make sure serialization fails if there are any
         // native values.
         val.simple_serialize(layout_info.layout.as_ref())
             .map(|bytes| (bytes.into(), None))
@@ -549,9 +549,14 @@ fn serialize_value(
     serialization_result.ok_or_else(|| partial_extension_error("cannot serialize table value"))
 }
 
-fn deserialize(layout: &MoveTypeLayout, bytes: &[u8]) -> PartialVMResult<Value> {
-    deserialize_and_allow_native_values(bytes, layout)
-        .ok_or_else(|| partial_extension_error("cannot deserialize table key or value"))
+fn deserialize_value(layout_info: &LayoutInfo, bytes: &[u8]) -> PartialVMResult<Value> {
+    let layout = layout_info.layout.as_ref();
+    let deserialization_result = if layout_info.has_identifier_mappings {
+        deserialize_and_allow_native_values(bytes, layout)
+    } else {
+        Value::simple_deserialize(bytes, layout)
+    };
+    deserialization_result.ok_or_else(|| partial_extension_error("cannot deserialize table value"))
 }
 
 fn partial_extension_error(msg: impl ToString) -> PartialVMError {
