@@ -32,7 +32,7 @@ pub(crate) struct NetworkHandler {
     dag_driver: Arc<DagDriver>,
     node_fetch_waiter: FetchWaiter<Node>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
-    new_round_event: tokio::sync::mpsc::Receiver<Round>,
+    new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     verified_msg_processor: Arc<VerifiedMessageProcessor>,
 }
 
@@ -45,7 +45,7 @@ impl NetworkHandler {
         node_fetch_waiter: FetchWaiter<Node>,
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
         state_sync_trigger: StateSyncTrigger,
-        new_round_event: tokio::sync::mpsc::Receiver<Round>,
+        new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     ) -> Self {
         let node_receiver = Arc::new(node_receiver);
         let dag_driver = Arc::new(dag_driver);
@@ -84,6 +84,7 @@ impl NetworkHandler {
             ..
         } = self;
 
+        // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream = concurrent_map(
             dag_rpc_rx,
             executor.clone(),
@@ -106,13 +107,25 @@ impl NetworkHandler {
             },
         );
 
+        let dag_driver_clone = dag_driver.clone();
+        let node_receiver_clone = node_receiver.clone();
+        let handle = tokio::spawn(async move {
+            while let Some(new_round) = new_round_event.recv().await {
+                monitor!("dag_on_new_round_event", {
+                    dag_driver_clone.enter_new_round(new_round).await;
+                    node_receiver_clone.gc();
+                });
+            }
+        });
+
         let mut futures = FuturesUnordered::new();
         // A separate executor to ensure the message verification sender (above) and receiver (below) are
         // not blocking each other.
+        // TODO: make this configurable
         let executor = BoundedExecutor::new(8, Handle::current());
         loop {
             select! {
-                (msg, epoch, author, responder) = verified_msg_stream.select_next_some() => {
+                Some((msg, epoch, author, responder)) = verified_msg_stream.next() => {
                     let verified_msg_processor = verified_msg_processor.clone();
                     let f = executor.spawn(async move {
                         monitor!("dag_on_verified_msg", {
@@ -136,18 +149,9 @@ impl NetworkHandler {
                 },
                 Some(status) = futures.next() => {
                     if let Some(status) = status.expect("must finish") {
+                        handle.abort();
                         return status;
                     }
-                },
-                Some(new_round) = new_round_event.recv() => {
-                    let dag_driver_clone = dag_driver.clone();
-                    let node_receiver_clone = node_receiver.clone();
-                    executor.spawn(async move {
-                        monitor!("dag_on_new_round_event", {
-                            dag_driver_clone.enter_new_round(new_round).await;
-                            node_receiver_clone.gc();
-                        });
-                    }).await;
                 },
                 Some(result) = certified_node_fetch_waiter.next() => {
                     let dag_driver_clone = dag_driver.clone();

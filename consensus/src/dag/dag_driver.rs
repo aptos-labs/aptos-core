@@ -54,7 +54,7 @@ pub(crate) struct DagDriver {
     order_rule: Mutex<OrderRule>,
     fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
-    round_state: tokio::sync::Mutex<RoundState>,
+    round_state: RoundState,
     window_size_config: Round,
     payload_config: DagPayloadConfig,
     health_backoff: HealthBackoff,
@@ -98,7 +98,7 @@ impl DagDriver {
             order_rule: Mutex::new(order_rule),
             fetch_requester,
             ledger_info_provider,
-            round_state: tokio::sync::Mutex::new(round_state),
+            round_state,
             window_size_config,
             payload_config,
             health_backoff,
@@ -113,7 +113,10 @@ impl DagDriver {
                 LogSchema::new(LogEvent::NewRound).round(node.round()),
                 "Resume round"
             );
-            block_on(driver.round_state.lock()).set_current_round(node.round());
+            driver
+                .round_state
+                .set_current_round(node.round())
+                .expect("must succeed");
             driver.broadcast_node(node);
         } else {
             // kick start a new round
@@ -124,7 +127,7 @@ impl DagDriver {
         driver
     }
 
-    async fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+    fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
         let (highest_strong_link_round, strong_links) = {
             {
                 let dag_reader = self.dag.read();
@@ -166,23 +169,21 @@ impl DagDriver {
         let minimum_delay = self
             .health_backoff
             .backoff_duration(highest_strong_link_round + 1);
-        let mut round_state_guard = self.round_state.lock().await;
-        round_state_guard
-            .check_for_new_round(highest_strong_link_round, strong_links, minimum_delay)
-            .await;
+        self.round_state.check_for_new_round(
+            highest_strong_link_round,
+            strong_links,
+            minimum_delay,
+        );
         Ok(())
     }
 
     pub async fn enter_new_round(&self, new_round: Round) {
-        {
-            let mut round_state = self.round_state.lock().await;
-            if round_state.current_round() >= new_round {
-                return;
-            }
-            debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
-            round_state.set_current_round(new_round);
-            counters::CURRENT_ROUND.set(new_round as i64);
+        if let Err(e) = self.round_state.set_current_round(new_round) {
+            debug!(error=?e, "cannot enter round");
+            return;
         }
+        debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
+        counters::CURRENT_ROUND.set(new_round as i64);
 
         let strong_links = self
             .dag
@@ -349,7 +350,6 @@ impl RpcHandler for DagDriver {
 
         let node_metadata = certified_node.metadata().clone();
         self.add_node(certified_node)
-            .await
             .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))

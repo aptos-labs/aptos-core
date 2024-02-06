@@ -155,7 +155,7 @@ fn setup(
     let ledger_info_provider = Arc::new(MockLedgerInfoProvider {
         latest_ledger_info: mock_ledger_info,
     });
-    let (round_tx, _round_rx) = tokio::sync::mpsc::channel(10);
+    let (round_tx, _round_rx) = tokio::sync::mpsc::unbounded_channel();
     let round_state = RoundState::new(
         round_tx.clone(),
         Box::new(OptimisticResponsive::new(round_tx)),
