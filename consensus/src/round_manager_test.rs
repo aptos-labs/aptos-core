@@ -2056,8 +2056,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         .update_extra_features(vec![ConsensusExtraFeature::ValidatorTransaction], vec![]);
 
     let local_config = ConsensusConfig {
-        max_receiving_block_txns_quorum_store_override: 10,
-        max_receiving_block_bytes_quorum_store_override: 256,
+        max_receiving_block_txns: 10,
+        max_receiving_block_bytes: 256,
         ..Default::default()
     };
 
