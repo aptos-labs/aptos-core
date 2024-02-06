@@ -9,12 +9,40 @@
 //! root memory locations and derivation of other references, by recording an edge for each
 //! borrow relation. For example, if `s` is the memory location of a struct, then
 //! `&s.f` is represented by a node which is derived from `s`, and those two nodes are
-//! connected by an edge labeled with `f`. The borrow graph is a DAG (acyclic).
+//! connected by an edge labeled with `.f`. In the below example, we have `&s.f` stored
+//! in `r1` and `&s.g` stored in `r2`:
+//!
+//! ```ignore
+//!              s
+//!              | &
+//!          .g / \ .f
+//!            r1 r2
+//! ```
+//!
+//! Borrow graphs do not come into a normalized form, thus different graphs can represent the
+//! same borrow relations. For example, this graph is equivalent to the above:
+//!
+//! ```ignore
+//!              s
+//!           & / \ &
+//!          .g |  | .f
+//!            r1 r2
+//! ```
+//!
+//! In general, the graph is a DAG. Joining of nodes represents branching in the code. For
+//! example, the graph below depicts that `r` can either be `&s.f` or `&s.g`:
+//!
+//! ```ignore
+//!              s
+//!           & / \ &
+//!          .g \ / .f
+//!              r
+//! ```
 //!
 //! Together with the borrow graph, a mapping from temporaries to graph nodes is maintained at
 //! each program point. These represent the currently active references into the borrowed data.
 //! All the _parents_ of those nodes are indirectly borrowed as well. Consider again `s` a
-//! struct, and assume ` let $t = &s.f` a field selection, then `$t` points to the node
+//! struct, and assume ` let r = &s.f` a field selection, then `r` points to the node
 //! representing the reference to the field. However, the original `s` from which the field
 //! was selected, is also (indirectly) borrowed, as described by the borrow graph. When
 //! any of the temporaries pointing into the borrow graph go out of scope, we perform a
@@ -941,7 +969,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// can be reached via different paths. E.g. the expressions `&mut s.f` and `&mut s.g` both construct
     /// there own `&mut s` to perform a field selection:
     ///
-    /// ```
+    /// ```ignore
     ///                 s
     ///            &mut /\ &mut
     ///             .f /  \ .g
