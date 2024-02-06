@@ -123,28 +123,23 @@ proptest! {
     }
 
     #[test]
-    fn test_resource_groups_2(test_env in arb_test_env_non_equivalent(17)) {
+    fn proptest_resource_groups_2(test_env in arb_test_env_non_equivalent(12)) {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 17);
+        let mut h = setup(test_env.executor_mode, test_env.resource_group_mode, 12);
 
         let txns = vec![
             (SUCCESS, h.init_signer(vec![5,2,3])),
             (SUCCESS, h.set_resource(4, "ABC".to_string(), 10)),
             (SUCCESS, h.set_resource(2, "DEF".to_string(), 20)),
-            (SUCCESS, h.unset_resource(3)),
+            (SUCCESS, h.read_or_init(4)),
+            (SUCCESS, h.set_resource(2, "XYZ".to_string(), 25)),
+            (ENOT_EQUAL, h.check(2, "DEF".to_string(), 20)),
+            (SUCCESS, h.check(2, "XYZ".to_string(), 25)),
             (SUCCESS, h.set_resource(3, "GHI".to_string(), 30)),
-            (SUCCESS, h.set_resource(4, "JKL".to_string(), 40)),
-            (SUCCESS, h.set_and_check(2,  4, "MNO".to_string(), 50, "JKL".to_string(), 40)),
-            (SUCCESS, h.read_or_init(1)),
-            (SUCCESS, h.check(2, "MNO".to_string(), 50)),
-            (SUCCESS, h.check(1, "init_name".to_string(), 5)),
-            (SUCCESS, h.unset_resource(1)),
-            (SUCCESS, h.set_3(1, 2, 3, "LJH".to_string(), 25)),
-            (SUCCESS, h.check(1, "LJH".to_string(), 25)),
             (SUCCESS, h.unset_resource(3)),
-            (ENOT_EQUAL, h.check(2, "MNO".to_string(), 50)),
-            (EINVALID_ARG, h.set_resource(5, "JKL".to_string(), 40)),
             (ERESOURCE_DOESNT_EXIST, h.check(3, "LJH".to_string(), 25)),
+            (ERESOURCE_DOESNT_EXIST, h.set_and_check(2,  1, "MNO".to_string(), 50, "GHI".to_string(), 30)),
+            (SUCCESS, h.check(2, "XYZ".to_string(), 25)),
         ];
         h.run_block_in_parts_and_check(
             test_env.block_split,
