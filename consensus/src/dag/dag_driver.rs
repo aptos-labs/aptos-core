@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::anchor_election::TChainHealthBackoff;
+use super::health::HealthBackoff;
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -58,7 +58,7 @@ pub(crate) struct DagDriver {
     round_state: RoundState,
     window_size_config: Round,
     payload_config: DagPayloadConfig,
-    chain_backoff: Arc<dyn TChainHealthBackoff>,
+    health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
 }
 
@@ -78,7 +78,7 @@ impl DagDriver {
         round_state: RoundState,
         window_size_config: Round,
         payload_config: DagPayloadConfig,
-        chain_backoff: Arc<dyn TChainHealthBackoff>,
+        health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
     ) -> Self {
         let pending_node = storage
@@ -102,7 +102,7 @@ impl DagDriver {
             round_state,
             window_size_config,
             payload_config,
-            chain_backoff,
+            health_backoff,
             quorum_store_enabled,
         };
 
@@ -151,8 +151,12 @@ impl DagDriver {
                     .unwrap_or_default(),
             )
         };
+
+        let minimum_delay = self
+            .health_backoff
+            .backoff_duration(highest_strong_link_round + 1);
         self.round_state
-            .check_for_new_round(highest_strong_link_round, strong_links)
+            .check_for_new_round(highest_strong_link_round, strong_links, minimum_delay)
             .await;
         Ok(())
     }
@@ -206,7 +210,9 @@ impl DagDriver {
             (validator_payload_filter, payload_filter)
         };
 
-        let (max_txns, max_size_bytes) = self.calculate_payload_limits(new_round);
+        let (max_txns, max_size_bytes) = self
+            .health_backoff
+            .calculate_payload_limits(new_round, &self.payload_config);
 
         let (validator_txns, payload) = match self
             .payload_client
@@ -301,49 +307,6 @@ impl DagDriver {
             observe_round(prev_round_timestamp, RoundStage::Finished);
             prev_handle.abort();
         }
-    }
-
-    fn calculate_payload_limits(&self, round: Round) -> (u64, u64) {
-        let (voting_power_ratio, maybe_backoff_limits) =
-            self.chain_backoff.get_round_payload_limits(round);
-        debug!(
-            "calculate_payload_limits voting_power_ratio {}",
-            voting_power_ratio
-        );
-        let (max_txns_per_round, max_size_per_round_bytes) = {
-            if let Some((backoff_max_txns, backoff_max_size_bytes)) = maybe_backoff_limits {
-                (
-                    self.payload_config
-                        .max_sending_txns_per_round
-                        .min(backoff_max_txns),
-                    self.payload_config
-                        .max_sending_size_per_round_bytes
-                        .min(backoff_max_size_bytes),
-                )
-            } else {
-                (
-                    self.payload_config.max_sending_txns_per_round,
-                    self.payload_config.max_sending_size_per_round_bytes,
-                )
-            }
-        };
-        // TODO: warn/panic if division yields 0 txns
-        let max_txns = max_txns_per_round
-            .saturating_div(
-                (self.epoch_state.verifier.len() as f64 * voting_power_ratio)
-                    .ceil()
-                    .max(1.0) as u64,
-            )
-            .max(1);
-        let max_txn_size_bytes = max_size_per_round_bytes
-            .saturating_div(
-                (self.epoch_state.verifier.len() as f64 * voting_power_ratio)
-                    .ceil()
-                    .max(1.0) as u64,
-            )
-            .max(1024);
-
-        (max_txns, max_txn_size_bytes)
     }
 }
 
