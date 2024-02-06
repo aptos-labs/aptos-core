@@ -92,8 +92,9 @@ pub fn get_aggregator_fields_with_native_value(
             Ok((id.into(), max_value))
         },
         Type::U64 => {
-            let id =  get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<SizedID>()?;
-            let max_value = get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u64>()? as u128;
+            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<SizedID>()?;
+            let max_value =
+                get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u64>()? as u128;
             Ok((id.into(), max_value))
         },
         _ => Err(SafeNativeError::Abort {

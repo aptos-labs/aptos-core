@@ -150,7 +150,7 @@ impl<'a> AbstractValueSizeVisitor<'a> {
 impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     #[inline]
     fn visit_native_value(&mut self, _depth: usize, _id: SizedID) {
-        // TODO[agg_v2](fix): Decode handle value to get the right size!
+        // TODO[agg_v2](cleanup): add a new abstract value size parameter?
         self.size += self.params.u64;
     }
 
@@ -316,7 +316,7 @@ impl AbstractValueSizeGasParameters {
         impl<'a> ValueVisitor for Visitor<'a> {
             #[inline]
             fn visit_native_value(&mut self, _depth: usize, _val: SizedID) {
-                // TODO[agg_v2](fix): Decode handle value to get the right size!
+                // TODO[agg_v2](cleanup): add a new abstract value size parameter?
                 self.res = Some(self.params.u64);
             }
 
@@ -459,7 +459,7 @@ impl AbstractValueSizeGasParameters {
         impl<'a> ValueVisitor for Visitor<'a> {
             #[inline]
             fn visit_native_value(&mut self, _depth: usize, _val: SizedID) {
-                // TODO[agg_v2](fix): Decode handle value to get the right size!
+                // TODO[agg_v2](cleanup): add a new abstract value size parameter?
                 self.res = Some(self.params.per_u64_packed * NumArgs::from(1));
             }
 

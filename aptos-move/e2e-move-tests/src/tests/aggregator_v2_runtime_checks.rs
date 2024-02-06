@@ -1,24 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use claims::{assert_matches, assert_ok};
+use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::account::Account;
-use aptos_types::on_chain_config::FeatureFlag;
-use aptos_types::transaction::{ExecutionStatus, SignedTransaction};
-use move_core_types::account_address::AccountAddress;
-use move_core_types::ident_str;
-use move_core_types::language_storage::ModuleId;
-use move_core_types::vm_status::AbortLocation;
-use move_core_types::vm_status::sub_status::NFE_BCS_SERIALIZATION_FAILURE;
-use crate::{assert_success, MoveHarness};
-use crate::tests::common;
+use aptos_types::{
+    on_chain_config::FeatureFlag,
+    transaction::{ExecutionStatus, SignedTransaction},
+};
+use claims::{assert_matches, assert_ok};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    vm_status::{sub_status::NFE_BCS_SERIALIZATION_FAILURE, AbortLocation},
+};
 
 fn publish_test_package(h: &mut MoveHarness, aptos_framework_account: &Account) {
     let path_buf = common::test_dir_path("aggregator_v2.data/pack");
     assert_success!(h.publish_package_cache_building(aptos_framework_account, path_buf.as_path()));
 }
 
-fn create_test_txn(h: &mut MoveHarness, aptos_framework_account: &Account, name: &str) -> SignedTransaction {
+fn create_test_txn(
+    h: &mut MoveHarness,
+    aptos_framework_account: &Account,
+    name: &str,
+) -> SignedTransaction {
     h.create_entry_function(
         aptos_framework_account,
         str::parse(name).unwrap(),
@@ -46,17 +52,51 @@ fn test_equality() {
     );
 
     let txns = vec![
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_aggregators_I"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_aggregators_II"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_aggregators_III"),
-
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_snapshots_I"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_snapshots_II"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_snapshots_III"),
-
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_derived_string_snapshots_I"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_derived_string_snapshots_II"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_equality_with_derived_string_snapshots_III"),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_aggregators_I",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_aggregators_II",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_aggregators_III",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_snapshots_I",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_snapshots_II",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_snapshots_III",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_derived_string_snapshots_I",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_derived_string_snapshots_II",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_equality_with_derived_string_snapshots_III",
+        ),
     ];
 
     let statuses = h.run_block(txns);
@@ -84,23 +124,35 @@ fn test_serialization() {
     );
 
     let txns = vec![
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_serialization_with_aggregators"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_serialization_with_snapshots"),
-        create_test_txn(&mut h, &aptos_framework_account, "0x1::runtime_checks::test_serialization_with_derived_string_snapshots"),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_serialization_with_aggregators",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_serialization_with_snapshots",
+        ),
+        create_test_txn(
+            &mut h,
+            &aptos_framework_account,
+            "0x1::runtime_checks::test_serialization_with_derived_string_snapshots",
+        ),
     ];
 
     let statuses = h.run_block(txns);
     for status in statuses.iter() {
         let status = assert_ok!(status.as_kept_status());
-        let bcs_location = AbortLocation::Module(ModuleId::new(AccountAddress::ONE, ident_str!("bcs").to_owned()));
-        assert_eq!(
-            status,
-            ExecutionStatus::MoveAbort {
-                location: bcs_location,
-                code: NFE_BCS_SERIALIZATION_FAILURE,
-                info: None,
-            }
-        );
+        let bcs_location = AbortLocation::Module(ModuleId::new(
+            AccountAddress::ONE,
+            ident_str!("bcs").to_owned(),
+        ));
+        assert_eq!(status, ExecutionStatus::MoveAbort {
+            location: bcs_location,
+            code: NFE_BCS_SERIALIZATION_FAILURE,
+            info: None,
+        });
         println!("{:?}", status);
     }
 }

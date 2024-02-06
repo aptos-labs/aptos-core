@@ -806,9 +806,10 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
 
-            // TODO[agg_v2](check): check if this is ok or it's better to fail here.
-            MoveTypeLayout::Native(_, inner_layout) => {
-                self.try_into_vm_value_from_layout(inner_layout, val)?
+            // Native types, e.g., aggregators, are currently used only at
+            // runtime, so we simply return an error here.
+            MoveTypeLayout::Native(..) => {
+                bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
         })
     }

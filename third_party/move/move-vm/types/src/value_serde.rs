@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::values::{
-    Container, DeserializationSeed, SerializationReadyValue, SizedID, Value, ValueImpl,
+    Container, DeserializationSeed, SerializationReadyValue, SizedID, Struct, Value, ValueImpl,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -14,9 +14,7 @@ use serde::{
     ser::Error as SerError,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use std::{collections::HashSet, hash::Hash};
-use std::str::FromStr;
-use crate::values::Struct;
+use std::{collections::HashSet, hash::Hash, str::FromStr};
 
 pub trait CustomDeserialize {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
@@ -89,16 +87,13 @@ fn bcs_size_of_byte_array(length: usize) -> usize {
     size_u32_as_uleb128(length) + length
 }
 
-fn bytes_and_width_to_derived_string_struct(
-    bytes: Vec<u8>,
-    width: usize,
-) -> Option<Value> {
+fn bytes_and_width_to_derived_string_struct(bytes: Vec<u8>, width: usize) -> Option<Value> {
     // We need to create DerivedStringSnapshot struct that serializes to exactly match given `width`.
 
     let value_width = bcs_size_of_byte_array(bytes.len());
     // padding field takes at list 1 byte (empty vector)
     if value_width + 1 > width {
-        return None
+        return None;
     }
 
     // We assume/assert that padding never exceeds length that requires more than 1 byte for size:
@@ -106,7 +101,7 @@ fn bytes_and_width_to_derived_string_struct(
     // (vec[0; 127] serializes into 128 bytes, and vec[0; 128] serializes into 130 bytes))
     let padding_len = width - value_width - 1;
     if size_u32_as_uleb128(padding_len) > 1 {
-        return None
+        return None;
     }
 
     Some(Value::struct_(Struct::pack(vec![
@@ -133,7 +128,7 @@ fn into_derived_string_struct(sized_id: SizedID) -> Option<Value> {
 
     // If we don't even have enough space to store the length of the value, we cannot proceed
     if width <= value_len_width_upper_bound + 1 {
-        return None
+        return None;
     }
 
     let id_as_string = u64_to_fixed_size_utf8_bytes(
@@ -146,10 +141,13 @@ fn into_derived_string_struct(sized_id: SizedID) -> Option<Value> {
 }
 
 fn string_to_bytes(value: Struct) -> Option<Vec<u8>> {
-    value.unpack().ok()?
+    value
+        .unpack()
+        .ok()?
         .collect::<Vec<Value>>()
         .pop()?
-        .value_as::<Vec<u8>>().ok()
+        .value_as::<Vec<u8>>()
+        .ok()
 }
 
 fn derived_string_struct_to_bytes_and_length(value: Struct) -> Option<(Vec<u8>, u32)> {
@@ -163,13 +161,13 @@ fn derived_string_struct_to_bytes_and_length(value: Struct) -> Option<(Vec<u8>, 
     let string_len = string_bytes.len();
     Some((
         string_bytes,
-        u32::try_from(bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len())).ok()?,
+        u32::try_from(bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len()))
+            .ok()?,
     ))
 }
 
 fn from_utf8_bytes<T: FromStr>(bytes: Vec<u8>) -> Option<T> {
-    String::from_utf8(bytes).ok()?
-        .parse::<T>().ok()
+    String::from_utf8(bytes).ok()?.parse::<T>().ok()
 }
 
 pub struct NativeValueSimpleSerDe;
@@ -192,15 +190,16 @@ impl CustomDeserialize for NativeValueSimpleSerDe {
                 let value = DeserializationSeed {
                     native_deserializer: None::<&NativeValueSimpleSerDe>,
                     layout,
-                }.deserialize(deserializer)?;
-                let (bytes, width) = value
+                }
+                .deserialize(deserializer)?;
+                let (bytes, _width) = value
                     .value_as::<Struct>()
-                    .map(derived_string_struct_to_bytes_and_length).expect("TODO").expect("TODO");
+                    .map(derived_string_struct_to_bytes_and_length)
+                    .expect("TODO")
+                    .expect("TODO");
                 from_utf8_bytes::<u64>(bytes).expect("TODO")
             },
-            _ => {
-                return Err(D::Error::custom("Failed serialization"))
-            },
+            _ => return Err(D::Error::custom("Failed serialization")),
         };
         let sized_id = SizedID::from(encoded);
         Ok(Value::native_value(sized_id))
@@ -223,16 +222,16 @@ impl CustomSerialize for NativeValueSimpleSerDe {
                 serializer.serialize_u128(encoded as u128)
             },
             layout if is_derived_string_struct_layout(layout) => {
-                let value = into_derived_string_struct(sized_id).ok_or_else(|| S::Error::custom("Failed serialization"))?;
+                let value = into_derived_string_struct(sized_id)
+                    .ok_or_else(|| S::Error::custom("Failed serialization"))?;
                 SerializationReadyValue {
                     native_serializer: None::<&NativeValueSimpleSerDe>,
                     layout,
                     value: &value.0,
-                }.serialize(serializer)
+                }
+                .serialize(serializer)
             },
-            _ => {
-                return Err(S::Error::custom("Failed serialization"))
-            },
+            _ => Err(S::Error::custom("Failed serialization")),
         }
     }
 }

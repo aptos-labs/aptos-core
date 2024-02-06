@@ -30,14 +30,13 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::values::Value;
+use move_vm_types::{value_serde::serialize_and_allow_native_values, values::Value};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
-use move_vm_types::value_serde::serialize_and_allow_native_values;
 
 pub(crate) enum ResourceGroupChangeSet {
     // Merged resource groups op.

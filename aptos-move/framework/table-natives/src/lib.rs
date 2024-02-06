@@ -27,6 +27,7 @@ pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    value_serde::{deserialize_and_allow_native_values, serialize_and_allow_native_values},
     values::{GlobalValue, Reference, StructRef, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -37,7 +38,6 @@ use std::{
     mem::drop,
     sync::Arc,
 };
-use move_vm_types::value_serde::{deserialize_and_allow_native_values, serialize_and_allow_native_values};
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this

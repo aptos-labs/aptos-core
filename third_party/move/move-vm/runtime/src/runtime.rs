@@ -29,10 +29,10 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
+    value_serde::serialize_and_allow_native_values,
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
-use move_vm_types::value_serde::serialize_and_allow_native_values;
 
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {

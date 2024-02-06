@@ -18,10 +18,10 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    value_serde::deserialize_and_allow_native_values,
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
-use move_vm_types::value_serde::deserialize_and_allow_native_values;
 
 pub struct AccountDataCache {
     // The bool flag in the `data_map` indicates whether the resource contains
