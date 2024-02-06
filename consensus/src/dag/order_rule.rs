@@ -9,7 +9,7 @@ use crate::dag::{
         logging::{LogEvent, LogSchema},
         tracing::{observe_node, NodeStage},
     },
-    storage::{CommitEvent, DAGStorage},
+    storage::CommitEvent,
     types::NodeMetadata,
     CertifiedNode,
 };
@@ -27,7 +27,6 @@ pub struct OrderRule {
     dag: Arc<RwLock<Dag>>,
     anchor_election: Arc<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
-    storage: Arc<dyn DAGStorage>,
     dag_window_size_config: Round,
 }
 
@@ -38,29 +37,28 @@ impl OrderRule {
         dag: Arc<RwLock<Dag>>,
         anchor_election: Arc<dyn AnchorElection>,
         notifier: Arc<dyn OrderedNotifier>,
-        storage: Arc<dyn DAGStorage>,
         dag_window_size_config: Round,
+        commit_events: Option<Vec<CommitEvent>>,
     ) -> Self {
-        let commit_events = storage
-            .get_latest_k_committed_events(10 * epoch_state.verifier.len() as u64)
-            .expect("Failed to read commit events from storage");
-        // make sure it's sorted
-        assert!(commit_events
-            .windows(2)
-            .all(|w| (w[0].epoch(), w[0].round()) < (w[1].epoch(), w[1].round())));
-        for event in commit_events {
-            if event.epoch() == epoch_state.epoch {
-                let maybe_anchor = dag
-                    .read()
-                    .get_node_by_round_author(event.round(), event.author())
-                    .cloned();
-                if let Some(anchor) = maybe_anchor {
-                    dag.write()
-                        .reachable_mut(&anchor, None)
-                        .for_each(|node_status| node_status.mark_as_ordered());
+        if let Some(commit_events) = commit_events {
+            // make sure it's sorted
+            assert!(commit_events
+                .windows(2)
+                .all(|w| (w[0].epoch(), w[0].round()) < (w[1].epoch(), w[1].round())));
+            for event in commit_events {
+                if event.epoch() == epoch_state.epoch {
+                    let maybe_anchor = dag
+                        .read()
+                        .get_node_by_round_author(event.round(), event.author())
+                        .cloned();
+                    if let Some(anchor) = maybe_anchor {
+                        dag.write()
+                            .reachable_mut(&anchor, None)
+                            .for_each(|node_status| node_status.mark_as_ordered());
+                    }
                 }
+                anchor_election.update_reputation(event);
             }
-            anchor_election.update_reputation(event);
         }
         let mut order_rule = Self {
             epoch_state,
@@ -68,7 +66,6 @@ impl OrderRule {
             dag,
             anchor_election,
             notifier,
-            storage,
             dag_window_size_config,
         };
         // re-check if anything can be ordered to recover pending anchors

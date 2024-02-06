@@ -106,8 +106,8 @@ fn create_order_rule(
             dag,
             anchor_election,
             Arc::new(TestNotifier { tx }),
-            Arc::new(MockStorage::new()),
             TEST_DAG_WINDOW as Round,
+            None,
         ),
         rx,
     )
