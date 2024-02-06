@@ -26,9 +26,6 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
         .with_init_config(Arc::new(move |_, config, _| {
             config.api.failpoints_enabled = true;
             config.consensus.max_sending_block_txns = max_block_txns;
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = max_block_txns;
             config.consensus.quorum_store.sender_max_batch_txns = config
                 .consensus
                 .quorum_store

@@ -3,6 +3,9 @@
 export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 
+# GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
+CORPUS_ZIPS=()
+
 function info() {
     echo "[info] $1"
 }
@@ -39,16 +42,20 @@ function usage() {
         "run")
             echo "Usage: $0 run <fuzz_target> [testcase]"
             ;;
+        "debug")
+            echo "Usage: $0 debug <fuzz_target> <testcase>"
+            ;;
         "test")
             echo "Usage: $0 test"
             ;;
         *)
-            echo "Usage: $0 <build|build-oss-fuzz|list|run|test>"
+            echo "Usage: $0 <build|build-oss-fuzz|list|run|debug|test>"
             echo "    add               adds a new fuzz target"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
             echo "    list              lists existing fuzz targets"
             echo "    run               runs a fuzz target"
+            echo "    debug             debugs a fuzz target with a testcase"
             echo "    test              tests all fuzz targets"
             ;;
     esac
@@ -75,8 +82,16 @@ function build-oss-fuzz() {
         usage build-oss-fuzz
     fi
     oss_fuzz_out=$1
-    mkdir -p $oss_fuzz_out
+    mkdir -p "$oss_fuzz_out"
     mkdir -p ./target
+
+    # Apply all git patch from Patches directory
+    wd=$(pwd)
+    for patch in $(find "$wd/Patches" -type f); do
+        info "Applying patch $patch"
+        git -C "$wd/../.." apply "$patch"
+    done
+
 
     # Workaround for build failures on oss-fuzz
     # Owner: @zi0Black
@@ -92,6 +107,11 @@ function build-oss-fuzz() {
         error "Build failed. Exiting."
     fi
     find ./target/*/release/ -maxdepth 1 -type f -perm /111 -exec cp {} $oss_fuzz_out \;
+
+    # Download corpus zip
+    for corpus_zip in "${CORPUS_ZIPS[@]}"; do
+        wget --content-disposition -P "$oss_fuzz_out" "$corpus_zip"
+    done
 }
 
 function run() {
@@ -102,13 +122,38 @@ function run() {
     testcase=$2
     if [ ! -z "$testcase" ]; then
         if [ -f "$testcase" ]; then
-            testcase="-runs=1 $testcase"
+            testcase="$testcase -- -runs=1"
         else
             error "$testcase does not exist"
         fi
     fi
     info "Running $fuzz_target"
     cargo_fuzz run $fuzz_target $testcase
+}
+
+# use rust-gdb to debug a fuzz target with a testcase
+function debug() {
+    if [ -z "$1" ]; then
+        usage debug
+    fi
+    fuzz_target=$1
+    testcase=$2
+    if [ -z "$testcase" ]; then
+        error "No testcase provided"
+    fi
+    if [ ! -f "$testcase" ]; then
+        error "$testcase does not exist"
+    fi
+    info "Debugging $fuzz_target with $testcase"
+    # find the binary
+    binary=$(find ./target -name $fuzz_target -type f -executable)
+    if [ -z "$binary" ]; then
+        error "Could not find binary for $fuzz_target"
+    fi
+    # run the binary with rust-gdb
+    export LSAN_OPTIONS=verbosity=1:log_threads=1
+    export RUST_BACKTRACE=1 
+    rust-gdb --args $binary $testcase -- -runs=1
 }
 
 function test() {
@@ -196,6 +241,10 @@ case "$1" in
   "run")
     shift
     run  "$@"
+    ;;
+  "debug")
+    shift
+    debug "$@"
     ;;
   "test")
     shift

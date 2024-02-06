@@ -86,7 +86,10 @@ impl JWKManager {
         oidc_providers: Option<SupportedOIDCProviders>,
         observed_jwks: Option<ObservedJWKs>,
         mut jwk_updated_rx: aptos_channel::Receiver<(), ObservedJWKsUpdated>,
-        mut rpc_req_rx: aptos_channel::Receiver<(), (AccountAddress, IncomingRpcRequest)>,
+        mut rpc_req_rx: aptos_channel::Receiver<
+            AccountAddress,
+            (AccountAddress, IncomingRpcRequest),
+        >,
         close_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         self.reset_with_on_chain_state(observed_jwks.unwrap_or_default().into_providers_jwks())
@@ -101,6 +104,7 @@ impl JWKManager {
             .into_iter()
             .map(|provider| {
                 JWKObserver::spawn(
+                    self.epoch_state.epoch,
                     self.my_addr,
                     provider.name.clone(),
                     provider.config_url.clone(),
@@ -134,7 +138,10 @@ impl JWKManager {
             };
 
             if let Err(e) = handle_result {
-                error!("[JWK] handling_err={}", e);
+                error!(
+                    epoch = self.epoch_state.epoch,
+                    "JWKManager handling error: {}", e
+                );
             }
         }
     }
@@ -158,6 +165,11 @@ impl JWKManager {
         issuer: Issuer,
         jwks: Vec<JWKMoveStruct>,
     ) -> Result<()> {
+        debug!(
+            epoch = self.epoch_state.epoch,
+            issuer = String::from_utf8(issuer.clone()).ok(),
+            "Processing new observation."
+        );
         let state = self.states_by_issuer.entry(issuer.clone()).or_default();
         state.observed = Some(jwks.clone());
         if state.observed.as_ref() != state.on_chain.as_ref().map(ProviderJWKs::jwks) {
@@ -169,7 +181,7 @@ impl JWKManager {
             let signature = self
                 .consensus_key
                 .sign(&observed)
-                .map_err(|e| anyhow!("crypto material error occurred duing signing: {}", e))?;
+                .map_err(|e| anyhow!("crypto material error occurred duing signing: {e}"))?;
             let abort_handle = self.update_certifier.start_produce(
                 self.epoch_state.clone(),
                 observed.clone(),
@@ -191,18 +203,30 @@ impl JWKManager {
 
     /// Invoked on start, or on on-chain JWK updated event.
     pub fn reset_with_on_chain_state(&mut self, on_chain_state: AllProvidersJWKs) -> Result<()> {
-        debug!(
-            "[JWK] reset_with_on_chain_state: BEGIN: on_chain_state={:?}",
-            on_chain_state
+        info!(
+            epoch = self.epoch_state.epoch,
+            "reset_with_on_chain_state starting."
         );
         let onchain_issuer_set: HashSet<Issuer> = on_chain_state
             .entries
             .iter()
             .map(|entry| entry.issuer.clone())
             .collect();
+        let local_issuer_set: HashSet<Issuer> = self.states_by_issuer.keys().cloned().collect();
+
+        for issuer in local_issuer_set.difference(&onchain_issuer_set) {
+            info!(
+                epoch = self.epoch_state.epoch,
+                op = "delete",
+                issuer = issuer.clone(),
+                "reset_with_on_chain_state"
+            );
+        }
+
         self.states_by_issuer
             .retain(|issuer, _| onchain_issuer_set.contains(issuer));
         for on_chain_provider_jwks in on_chain_state.entries {
+            let issuer = on_chain_provider_jwks.issuer.clone();
             let locally_cached = self
                 .states_by_issuer
                 .get(&on_chain_provider_jwks.issuer)
@@ -210,13 +234,34 @@ impl JWKManager {
             if locally_cached == Some(&on_chain_provider_jwks) {
                 // The on-chain update did not touch this provider.
                 // The corresponding local state does not have to be reset.
+                info!(
+                    epoch = self.epoch_state.epoch,
+                    op = "no-op",
+                    issuer = issuer,
+                    "reset_with_on_chain_state"
+                );
             } else {
-                self.states_by_issuer.insert(
+                let old_value = self.states_by_issuer.insert(
                     on_chain_provider_jwks.issuer.clone(),
                     PerProviderState::new(on_chain_provider_jwks),
                 );
+                let op = if old_value.is_some() {
+                    "update"
+                } else {
+                    "insert"
+                };
+                info!(
+                    epoch = self.epoch_state.epoch,
+                    op = op,
+                    issuer = issuer,
+                    "reset_with_on_chain_state"
+                );
             }
         }
+        info!(
+            epoch = self.epoch_state.epoch,
+            "reset_with_on_chain_state finished."
+        );
         Ok(())
     }
 
@@ -224,13 +269,8 @@ impl JWKManager {
         let IncomingRpcRequest {
             msg,
             mut response_sender,
-            sender,
+            ..
         } = rpc_req;
-        debug!(
-            "[JWK] process_peer_request: sender={}, is_self={}",
-            sender,
-            sender == self.my_addr
-        );
         match msg {
             JWKConsensusMsg::ObservationRequest(request) => {
                 let state = self.states_by_issuer.entry(request.issuer).or_default();
@@ -256,6 +296,12 @@ impl JWKManager {
     /// Triggered once the `update_certifier` produced a quorum-certified update.
     pub fn process_quorum_certified_update(&mut self, update: QuorumCertifiedUpdate) -> Result<()> {
         let issuer = update.update.issuer.clone();
+        info!(
+            epoch = self.epoch_state.epoch,
+            issuer = String::from_utf8(issuer.clone()).ok(),
+            version = update.update.version,
+            "JWKManager processing certified update."
+        );
         let state = self.states_by_issuer.entry(issuer.clone()).or_default();
         match &state.consensus_state {
             ConsensusState::InProgress { my_proposal, .. } => {
@@ -263,18 +309,23 @@ impl JWKManager {
                 let txn = ValidatorTransaction::ObservedJWKUpdate(update.clone());
                 let vtxn_guard =
                     self.vtxn_pool
-                        .put(Topic::JWK_CONSENSUS(issuer), Arc::new(txn), None);
+                        .put(Topic::JWK_CONSENSUS(issuer.clone()), Arc::new(txn), None);
                 state.consensus_state = ConsensusState::Finished {
                     vtxn_guard,
                     my_proposal: my_proposal.clone(),
                     quorum_certified: update.clone(),
                 };
-                info!("[JWK] qc update obtained, update={:?}", update);
+                info!(
+                    epoch = self.epoch_state.epoch,
+                    issuer = String::from_utf8(issuer).ok(),
+                    version = update.update.version,
+                    "certified update accepted."
+                );
                 Ok(())
             },
             _ => Err(anyhow!(
                 "qc update not expected for issuer {:?} in state {}",
-                update.update.issuer,
+                String::from_utf8(issuer.clone()),
                 state.consensus_state.name()
             )),
         }
