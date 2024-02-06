@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     dag::adapter::OrderedNotifierAdapter, liveness::proposal_generator::PipelineBackpressureConfig,
 };

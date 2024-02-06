@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     counters::CHAIN_HEALTH_BACKOFF_TRIGGERED,
     dag::anchor_election::CommitHistory,

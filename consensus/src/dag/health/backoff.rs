@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::{pipeline_health::TPipelineHealth, TChainHealth};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::Round;
