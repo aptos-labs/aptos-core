@@ -3,7 +3,6 @@
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    MAX_SENDING_BLOCK_TXNS,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
 use aptos_types::chain_id::ChainId;
