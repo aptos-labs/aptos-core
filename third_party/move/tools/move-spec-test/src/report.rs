@@ -34,13 +34,29 @@ impl Report {
     }
 
     /// Returns the number of mutants tested.
-    pub fn mutants_tested(&self) -> u64 {
+    pub fn mutants_tested(&self) -> u32 {
         self.total_count(|v| v.tested)
     }
 
     /// Returns the number of mutants killed.
-    pub fn mutants_killed(&self) -> u64 {
+    pub fn mutants_killed(&self) -> u32 {
         self.total_count(|v| v.killed)
+    }
+
+    /// Add a diff for a not killed mutant.
+    pub fn add_mutants_alive_diff(&mut self, path: &Path, module_name: &str, diff: &str) {
+        let entry = self
+            .files
+            .entry(path.to_path_buf())
+            .or_insert(vec![MutantStats::new(module_name)]);
+
+        if let Some(stat) = entry.iter_mut().find(|s| s.module == module_name) {
+            stat.mutants_alive_diffs.push(diff.to_owned());
+        } else {
+            let mut new_entry = MutantStats::new(module_name);
+            new_entry.mutants_alive_diffs.push(diff.to_owned());
+            entry.push(new_entry);
+        }
     }
 
     /// Save the report to a JSON file.
@@ -61,7 +77,10 @@ impl Report {
                     format!("{}::{}", path.to_string_lossy(), stat.module.clone()),
                     stat.tested.to_string(),
                     stat.killed.to_string(),
-                    format!("{:.2}%", (stat.killed as f64 / stat.tested as f64) * 100.0),
+                    format!(
+                        "{:.2}%",
+                        (f64::from(stat.killed) / f64::from(stat.tested)) * 100.0
+                    ),
                 ]);
             }
         }
@@ -90,13 +109,13 @@ impl Report {
     }
 
     // Internal function to count the chosen stat.
-    fn total_count<F>(&self, mut count: F) -> u64
+    fn total_count<F>(&self, mut count: F) -> u32
     where
-        F: FnMut(&MutantStats) -> u64,
+        F: FnMut(&MutantStats) -> u32,
     {
         self.files
             .values()
-            .map(|entry| entry.iter().map(&mut count).sum::<u64>())
+            .map(|entry| entry.iter().map(&mut count).sum::<u32>())
             .sum()
     }
 
@@ -114,9 +133,11 @@ pub struct MutantStats {
     /// Module name.
     pub module: String,
     /// The number of mutants tested.
-    pub tested: u64,
+    pub tested: u32,
     /// The number of mutants killed.
-    pub killed: u64,
+    pub killed: u32,
+    /// The list of not killed mutants.
+    pub mutants_alive_diffs: Vec<String>,
 }
 
 impl MutantStats {
@@ -126,6 +147,7 @@ impl MutantStats {
             module: module.to_string(),
             tested: 0,
             killed: 0,
+            mutants_alive_diffs: vec![],
         }
     }
 }
@@ -207,5 +229,32 @@ mod tests {
         report.increment_mutants_killed(&path2, module_name);
         assert_eq!(report.mutants_killed(), 2);
         assert_eq!(report.mutants_tested(), 0);
+    }
+
+    #[test]
+    fn add_mutants_alive_diff_adds_new_module_if_not_present() {
+        let mut report = Report::new();
+        let path = PathBuf::from("path/to/file");
+        let module_name = "new_module";
+        let diff = "diff";
+        report.add_mutants_alive_diff(&path, module_name, diff);
+        let entry = report.entries().get(&path).unwrap();
+        assert!(entry
+            .iter()
+            .any(|s| s.module == module_name && s.mutants_alive_diffs.contains(&diff.to_owned())));
+    }
+
+    #[test]
+    fn add_mutants_alive_diff_adds_diff_to_existing_module() {
+        let mut report = Report::new();
+        let path = PathBuf::from("path/to/file");
+        let module_name = "existing_module";
+        let diff1 = "diff1";
+        let diff2 = "diff2";
+        report.add_mutants_alive_diff(&path, module_name, diff1);
+        report.add_mutants_alive_diff(&path, module_name, diff2);
+        let entry = report.entries().get(&path).unwrap();
+        let stat = entry.iter().find(|s| s.module == module_name).unwrap();
+        assert_eq!(stat.mutants_alive_diffs, vec![diff1, diff2]);
     }
 }
