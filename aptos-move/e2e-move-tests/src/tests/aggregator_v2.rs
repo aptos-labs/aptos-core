@@ -220,8 +220,6 @@ proptest! {
         println!("Testing test_aggregator_lifetime {:?}", test_env);
         let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 14);
 
-        // FIXME: THIS FAILS!
-        let element_type = ElementType::U128;
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
         let txns = vec![
