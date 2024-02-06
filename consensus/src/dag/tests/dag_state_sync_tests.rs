@@ -6,7 +6,7 @@ use crate::{
         adapter::OrderedNotifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::DagStateSynchronizer,
-        dag_store::PersistentDagStore,
+        dag_store::DagStore,
         storage::DAGStorage,
         tests::{
             dag_test::MockStorage,
@@ -73,7 +73,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
 }
 
 struct MockDagFetcher {
-    target_dag: Arc<PersistentDagStore>,
+    target_dag: Arc<DagStore>,
     epoch_state: Arc<EpochState>,
 }
 
@@ -83,7 +83,7 @@ impl TDagFetcher for MockDagFetcher {
         &self,
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
-        new_dag: Arc<PersistentDagStore>,
+        new_dag: Arc<DagStore>,
     ) -> anyhow::Result<()> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
@@ -149,7 +149,7 @@ async fn test_dag_state_sync() {
         .collect::<Vec<_>>();
     let nodes = generate_dag_nodes(&virtual_dag, &validators);
 
-    let fast_dag = Arc::new(PersistentDagStore::new(
+    let fast_dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),
@@ -162,7 +162,7 @@ async fn test_dag_state_sync() {
         }
     }
 
-    let slow_dag = Arc::new(PersistentDagStore::new(
+    let slow_dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),

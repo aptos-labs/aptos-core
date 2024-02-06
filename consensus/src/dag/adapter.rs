@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    dag_store::PersistentDagStore,
+    dag_store::DagStore,
     observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
 };
 use crate::{
@@ -91,7 +91,7 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 
 pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -101,7 +101,7 @@ pub(super) struct OrderedNotifierAdapter {
 impl OrderedNotifierAdapter {
     pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,

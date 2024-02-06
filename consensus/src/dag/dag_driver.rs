@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::PersistentDagStore, health::HealthBackoff};
+use super::{dag_store::DagStore, health::HealthBackoff};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -44,7 +44,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
@@ -65,7 +65,7 @@ impl DagDriver {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,

@@ -3,7 +3,7 @@
 use super::{
     adapter::TLedgerInfoProvider,
     dag_fetcher::TDagFetcher,
-    dag_store::PersistentDagStore,
+    dag_store::DagStore,
     storage::DAGStorage,
     types::{CertifiedNodeMessage, RemoteFetchRequest},
     ProofNotifier,
@@ -44,7 +44,7 @@ impl fmt::Display for SyncOutcome {
 pub(super) struct StateSyncTrigger {
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
-    dag_store: Arc<PersistentDagStore>,
+    dag_store: Arc<DagStore>,
     proof_notifier: Arc<dyn ProofNotifier>,
     dag_window_size_config: Round,
 }
@@ -53,7 +53,7 @@ impl StateSyncTrigger {
     pub(super) fn new(
         epoch_state: Arc<EpochState>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
-        dag_store: Arc<PersistentDagStore>,
+        dag_store: Arc<DagStore>,
         proof_notifier: Arc<dyn ProofNotifier>,
         dag_window_size_config: Round,
     ) -> Self {
@@ -185,9 +185,9 @@ impl DagStateSynchronizer {
     pub(crate) fn build_request(
         &self,
         node: &CertifiedNodeMessage,
-        current_dag_store: Arc<PersistentDagStore>,
+        current_dag_store: Arc<DagStore>,
         highest_committed_anchor_round: Round,
-    ) -> (RemoteFetchRequest, Vec<Author>, Arc<PersistentDagStore>) {
+    ) -> (RemoteFetchRequest, Vec<Author>, Arc<DagStore>) {
         let commit_li = node.ledger_info();
 
         {
@@ -211,7 +211,7 @@ impl DagStateSynchronizer {
             .commit_info()
             .round()
             .saturating_sub(self.dag_window_size_config);
-        let sync_dag_store = Arc::new(PersistentDagStore::new_empty(
+        let sync_dag_store = Arc::new(DagStore::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),
@@ -239,9 +239,9 @@ impl DagStateSynchronizer {
         dag_fetcher: impl TDagFetcher,
         request: RemoteFetchRequest,
         responders: Vec<Author>,
-        sync_dag_store: Arc<PersistentDagStore>,
+        sync_dag_store: Arc<DagStore>,
         commit_li: LedgerInfoWithSignatures,
-    ) -> anyhow::Result<PersistentDagStore> {
+    ) -> anyhow::Result<DagStore> {
         match dag_fetcher
             .fetch(request, responders, sync_dag_store.clone())
             .await

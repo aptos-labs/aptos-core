@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::PersistentDagStore, DAGRpcResult};
+use super::{dag_store::DagStore, DAGRpcResult};
 use crate::dag::{
     dag_network::{RpcResultWithResponder, TDAGNetworkSender},
     errors::FetchRequestHandleError,
@@ -129,7 +129,7 @@ impl LocalFetchRequest {
 
 pub struct DagFetcherService {
     inner: DagFetcher,
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
     request_rx: Receiver<LocalFetchRequest>,
     ordered_authors: Vec<Author>,
 }
@@ -138,7 +138,7 @@ impl DagFetcherService {
     pub fn new(
         epoch_state: Arc<EpochState>,
         network: Arc<dyn TDAGNetworkSender>,
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
         time_service: TimeService,
         config: DagFetcherConfig,
     ) -> (
@@ -224,7 +224,7 @@ pub trait TDagFetcher: Send {
         &self,
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
     ) -> anyhow::Result<()>;
 }
 
@@ -257,7 +257,7 @@ impl TDagFetcher for DagFetcher {
         &self,
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
     ) -> anyhow::Result<()> {
         debug!(
             LogSchema::new(LogEvent::FetchNodes),
@@ -316,12 +316,12 @@ impl TDagFetcher for DagFetcher {
 }
 
 pub struct FetchRequestHandler {
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
     author_to_index: HashMap<Author, usize>,
 }
 
 impl FetchRequestHandler {
-    pub fn new(dag: Arc<PersistentDagStore>, epoch_state: Arc<EpochState>) -> Self {
+    pub fn new(dag: Arc<DagStore>, epoch_state: Arc<EpochState>) -> Self {
         Self {
             dag,
             author_to_index: epoch_state.verifier.address_to_validator_index().clone(),

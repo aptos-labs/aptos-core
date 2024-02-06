@@ -3,7 +3,7 @@
 
 use super::helpers::MockPayloadManager;
 use crate::dag::{
-    dag_store::PersistentDagStore,
+    dag_store::DagStore,
     storage::{CommitEvent, DAGStorage},
     tests::helpers::{new_certified_node, TEST_DAG_WINDOW},
     types::{CertifiedNode, DagSnapshotBitmask, Node},
@@ -112,7 +112,7 @@ impl DAGStorage for MockStorage {
 fn setup() -> (
     Vec<ValidatorSigner>,
     Arc<EpochState>,
-    PersistentDagStore,
+    DagStore,
     Arc<MockStorage>,
 ) {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
@@ -122,7 +122,7 @@ fn setup() -> (
     });
     let storage = Arc::new(MockStorage::new());
     let payload_manager = Arc::new(MockPayloadManager {});
-    let dag = PersistentDagStore::new(
+    let dag = DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         payload_manager,
@@ -221,7 +221,7 @@ fn test_dag_recover_from_storage() {
             assert!(dag.add_node(node).is_ok());
         }
     }
-    let new_dag = PersistentDagStore::new(
+    let new_dag = DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
@@ -238,7 +238,7 @@ fn test_dag_recover_from_storage() {
         verifier: epoch_state.verifier.clone(),
     });
 
-    let _new_epoch_dag = PersistentDagStore::new(
+    let _new_epoch_dag = DagStore::new(
         new_epoch_state,
         storage.clone(),
         Arc::new(MockPayloadManager {}),

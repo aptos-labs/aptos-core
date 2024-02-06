@@ -4,7 +4,7 @@
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::RoundRobinAnchorElection,
-    dag_store::{Dag, PersistentDagStore},
+    dag_store::{InMemDag, DagStore},
     order_rule::OrderRule,
     tests::{
         dag_test::MockStorage,
@@ -93,7 +93,7 @@ impl OrderedNotifier for TestNotifier {
 
 fn create_order_rule(
     epoch_state: Arc<EpochState>,
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
 ) -> (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) {
     let anchor_election = Arc::new(RoundRobinAnchorElection::new(
         epoch_state.verifier.get_ordered_account_addresses(),
@@ -134,7 +134,7 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
+        let mut dag = InMemDag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
                 dag.add_node_for_test(node.clone()).unwrap();
@@ -145,7 +145,7 @@ proptest! {
         rayon::scope(|s| {
             for seq in sequences {
                 s.spawn(|_| {
-                    let dag = Arc::new(PersistentDagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
+                    let dag = Arc::new(DagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
                     let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
                     for idx in seq {
                         order_rule.process_new_node(flatten_nodes[idx].metadata());
@@ -159,7 +159,7 @@ proptest! {
             }
         });
         // order produced by process_all
-        let dag = Arc::new(PersistentDagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
+        let dag = Arc::new(DagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
         let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
         order_rule.process_all();
         let mut ordered = vec![];
@@ -221,14 +221,14 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
+    let mut dag = InMemDag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
             dag.add_node_for_test(node.clone()).unwrap();
         }
     }
     let display = |node: &NodeMetadata| (node.round(), *author_indexes.get(node.author()).unwrap());
-    let dag = Arc::new(PersistentDagStore::new_for_test(
+    let dag = Arc::new(DagStore::new_for_test(
         dag.clone(),
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),

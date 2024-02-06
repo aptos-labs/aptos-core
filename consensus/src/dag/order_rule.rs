@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::dag_store::PersistentDagStore;
+use super::dag_store::DagStore;
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::AnchorElection,
@@ -25,7 +25,7 @@ pub struct OrderRule {
     epoch_state: Arc<EpochState>,
     // TODO: try to share order rule, instead of this Arc.
     lowest_unordered_anchor_round: Arc<RwLock<Round>>,
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
     anchor_election: Arc<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
     dag_window_size_config: Round,
@@ -35,7 +35,7 @@ impl OrderRule {
     pub fn new(
         epoch_state: Arc<EpochState>,
         lowest_unordered_anchor_round: Round,
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
         anchor_election: Arc<dyn AnchorElection>,
         notifier: Arc<dyn OrderedNotifier>,
         dag_window_size_config: Round,

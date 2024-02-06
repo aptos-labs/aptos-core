@@ -41,7 +41,7 @@ impl NodeStatus {
 }
 /// Data structure that stores the in-memory DAG representation, it maintains round based index.
 #[derive(Clone)]
-pub struct Dag {
+pub struct InMemDag {
     nodes_by_round: BTreeMap<Round, Vec<Option<NodeStatus>>>,
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
@@ -51,7 +51,7 @@ pub struct Dag {
     window_size: u64,
 }
 
-impl Dag {
+impl InMemDag {
     pub fn new_empty(epoch_state: Arc<EpochState>, start_round: Round, window_size: u64) -> Self {
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
         let nodes_by_round = BTreeMap::new();
@@ -65,19 +65,18 @@ impl Dag {
     }
 
     pub(crate) fn lowest_round(&self) -> Round {
-        *self
-            .nodes_by_round
-            .first_key_value()
-            .map(|(round, _)| round)
-            .unwrap_or(&self.start_round)
+        self.start_round
     }
 
     pub fn highest_round(&self) -> Round {
+        // If stale nodes exist on the BTreeMap, ignore their rounds when calculating
+        // the highest round.        
         *self
             .nodes_by_round
             .last_key_value()
             .map(|(round, _)| round)
             .unwrap_or(&self.start_round)
+            .max(&self.start_round)
     }
 
     /// The highest strong links round is either the highest round or the highest round - 1
@@ -95,6 +94,14 @@ impl Dag {
     }
 
     fn add_validated_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+        let round = node.round();
+        ensure!(
+            round >= self.lowest_round(),
+            "dag was pruned. given round: {}, lowest round: {}",
+            round,
+            self.lowest_round()
+        );
+
         let node = Arc::new(node);
         let round_ref = self
             .get_node_ref_mut(node.round(), node.author())
@@ -373,13 +380,13 @@ impl Dag {
     }
 }
 
-pub struct PersistentDagStore {
-    dag: RwLock<Dag>,
+pub struct DagStore {
+    dag: RwLock<InMemDag>,
     storage: Arc<dyn DAGStorage>,
     payload_manager: Arc<dyn TPayloadManager>,
 }
 
-impl PersistentDagStore {
+impl DagStore {
     pub fn new(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
@@ -424,7 +431,7 @@ impl PersistentDagStore {
         start_round: Round,
         window_size: u64,
     ) -> Self {
-        let dag = Dag::new_empty(epoch_state, start_round, window_size);
+        let dag = InMemDag::new_empty(epoch_state, start_round, window_size);
         Self {
             dag: RwLock::new(dag),
             storage,
@@ -433,7 +440,7 @@ impl PersistentDagStore {
     }
 
     pub fn new_for_test(
-        dag: Dag,
+        dag: InMemDag,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> Self {
@@ -476,8 +483,8 @@ impl PersistentDagStore {
     }
 }
 
-impl Deref for PersistentDagStore {
-    type Target = RwLock<Dag>;
+impl Deref for DagStore {
+    type Target = RwLock<InMemDag>;
 
     fn deref(&self) -> &Self::Target {
         &self.dag

@@ -1,24 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::health::HealthBackoff;
-use crate::{
-    dag::{
-        dag_fetcher::TFetchRequester,
-        dag_network::RpcHandler,
-        dag_store::Dag,
-        errors::NodeBroadcastHandleError,
-        observability::{
-            logging::{LogEvent, LogSchema},
-            tracing::{observe_node, NodeStage},
-        },
-        storage::DAGStorage,
-        types::{Node, NodeCertificate, Vote},
-        NodeId,
-        util::is_vtxn_expected,
-    }
-};
-use super::{dag_store::PersistentDagStore, health::HealthBackoff};
+use super::{dag_store::DagStore, health::HealthBackoff};
+use crate::{dag::{
+    dag_fetcher::TFetchRequester,
+    dag_network::RpcHandler,
+    errors::NodeBroadcastHandleError,
+    observability::{
+        logging::{LogEvent, LogSchema},
+        tracing::{observe_node, NodeStage},
+    },
+    storage::DAGStorage,
+    types::{Node, NodeCertificate, Vote},
+    NodeId,
+}, util::is_vtxn_expected};
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
@@ -33,7 +28,7 @@ use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
-    dag: Arc<PersistentDagStore>,
+    dag: Arc<DagStore>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
@@ -47,7 +42,7 @@ pub(crate) struct NodeBroadcastHandler {
 
 impl NodeBroadcastHandler {
     pub fn new(
-        dag: Arc<PersistentDagStore>,
+        dag: Arc<DagStore>,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,

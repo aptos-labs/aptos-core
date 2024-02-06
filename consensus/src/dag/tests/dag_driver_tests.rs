@@ -7,7 +7,7 @@ use crate::{
         dag_driver::DagDriver,
         dag_fetcher::TFetchRequester,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
-        dag_store::PersistentDagStore,
+        dag_store::DagStore,
         errors::DagDriverError,
         health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
         order_rule::OrderRule,
@@ -121,7 +121,7 @@ fn setup(
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
     let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
-    let dag = Arc::new(PersistentDagStore::new(
+    let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),

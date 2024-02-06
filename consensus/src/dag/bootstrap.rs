@@ -8,7 +8,7 @@ use super::{
     dag_handler::NetworkHandler,
     dag_network::TDAGNetworkSender,
     dag_state_sync::{DagStateSynchronizer, StateSyncTrigger},
-    dag_store::PersistentDagStore,
+    dag_store::DagStore,
     health::{ChainHealthBackoff, HealthBackoff, PipelineLatencyBasedBackpressure, TChainHealth},
     order_rule::OrderRule,
     rb_handler::NodeBroadcastHandler,
@@ -70,7 +70,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Clone)]
 struct BootstrapBaseState {
-    dag_store: Arc<PersistentDagStore>,
+    dag_store: Arc<DagStore>,
     order_rule: OrderRule,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
@@ -500,7 +500,7 @@ impl DagBootstrapper {
                 .saturating_sub(dag_window_size_config),
         );
 
-        let dag = Arc::new(PersistentDagStore::new(
+        let dag = Arc::new(DagStore::new(
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),

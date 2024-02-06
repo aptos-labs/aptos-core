@@ -3,7 +3,7 @@
 
 use crate::dag::{
     dag_fetcher::TFetchRequester,
-    dag_store::PersistentDagStore,
+    dag_store::DagStore,
     errors::NodeBroadcastHandleError,
     health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
     rb_handler::NodeBroadcastHandler,
@@ -49,7 +49,7 @@ async fn test_node_broadcast_receiver_succeed() {
 
     // Scenario: Start DAG from beginning
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(PersistentDagStore::new(
+    let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
@@ -108,7 +108,7 @@ async fn test_node_broadcast_receiver_failure() {
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
-            let dag = Arc::new(PersistentDagStore::new(
+            let dag = Arc::new(DagStore::new(
                 epoch_state.clone(),
                 storage.clone(),
                 Arc::new(MockPayloadManager {}),
@@ -195,7 +195,7 @@ async fn test_node_broadcast_receiver_storage() {
     });
 
     let storage = Arc::new(MockStorage::new());
-    let dag = Arc::new(PersistentDagStore::new(
+    let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
