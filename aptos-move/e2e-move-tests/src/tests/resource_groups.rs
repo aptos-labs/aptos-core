@@ -148,11 +148,6 @@ proptest! {
     }
 }
 
-/*
-    Old Resource Group Tests.
-    TODO: Should we deprecate/remove these?
-*/
-
 #[derive(Debug, Deserialize, Eq, PartialEq)]
 struct Primary {
     value: u64,

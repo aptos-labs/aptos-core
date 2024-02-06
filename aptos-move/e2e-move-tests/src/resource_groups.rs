@@ -84,7 +84,9 @@ pub struct ResourceGroupsTestHarness {
 }
 
 impl ResourceGroupsTestHarness {
-    // TODO: These are common functions witha aggregator_v2 tests. Move them to a common place.
+    // TODO(cleanup): These 3 functions are common with aggregator_v2 tests.
+    // Should I create struct PropTestHarness with these 3 functions, and set
+    // ResourceGroupsTestHarness { harness: PropTestHarness }?
     pub fn run_block_in_parts_and_check(
         &mut self,
         block_split: BlockSplit,
