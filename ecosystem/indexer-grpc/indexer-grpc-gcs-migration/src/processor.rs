@@ -17,7 +17,6 @@ const UPDATE_INTERVAL_IN_MILLISECONDS: u64 = 10000;
 pub struct Processor {
     legacy_file_store_operator: GcsFileStoreOperator,
     new_file_store_operator: GcsFileStoreOperator,
-    max_version: u64,
     chain_id: u64,
 }
 
@@ -25,7 +24,6 @@ impl Processor {
     pub fn new(
         legacy_file_store_config: IndexerGrpcFileStoreConfig,
         new_file_store_config: IndexerGrpcFileStoreConfig,
-        max_version: u64,
         chain_id: u64,
     ) -> Self {
         let legacy_file_store_operator = match legacy_file_store_config {
@@ -55,7 +53,6 @@ impl Processor {
         Self {
             legacy_file_store_operator,
             new_file_store_operator,
-            max_version,
             chain_id,
         }
     }
@@ -71,6 +68,7 @@ impl Processor {
             .get_file_store_metadata()
             .await
             .expect("Failed to get legacy file store metadata");
+        let max_version = legacy_file_store_metadata.version;
         // verify the chain ID.
         if legacy_file_store_metadata.chain_id != self.chain_id {
             panic!(
@@ -105,7 +103,6 @@ impl Processor {
         let task_allocation = Arc::new(Mutex::new(next_version_to_process));
         let running_tasks: Arc<Mutex<BTreeSet<u64>>> = Arc::new(Mutex::new(BTreeSet::new()));
         let mut task_handlers = Vec::new();
-        let max_version = self.max_version;
         let chain_id = self.chain_id;
         for _ in 0..NUM_OF_PROCESSING_THREADS {
             let legacy_file_store_operator = self.legacy_file_store_operator.clone();

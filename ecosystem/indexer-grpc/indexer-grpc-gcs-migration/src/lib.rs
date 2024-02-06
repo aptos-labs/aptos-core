@@ -20,8 +20,6 @@ pub struct IndexerGrpcGcsMigrationConfig {
     /// The configuration for the new file store. Write access required.
     /// Bucket write access and object write access required.
     pub new_file_store_config: IndexerGrpcFileStoreConfig,
-    /// The maximum version of the files to migrate.
-    pub max_version: u64,
     /// The chain ID of the network; verification purpose.
     pub chain_id: u64,
 }
@@ -30,13 +28,11 @@ impl IndexerGrpcGcsMigrationConfig {
     pub fn new(
         legacy_file_store_config: IndexerGrpcFileStoreConfig,
         new_file_store_config: IndexerGrpcFileStoreConfig,
-        max_version: u64,
         chain_id: u64,
     ) -> Self {
         Self {
             legacy_file_store_config,
             new_file_store_config,
-            max_version,
             chain_id,
         }
     }
@@ -48,7 +44,6 @@ impl RunnableConfig for IndexerGrpcGcsMigrationConfig {
         let mut processor = processor::Processor::new(
             self.legacy_file_store_config.clone(),
             self.new_file_store_config.clone(),
-            self.max_version,
             self.chain_id,
         );
 
