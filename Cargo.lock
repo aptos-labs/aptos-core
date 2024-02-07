@@ -5511,6 +5511,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "boxcar"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e516014975db8769c0dcd1aba681c21079475fcddf77118bf54f9e2e013f6b29"
+
+[[package]]
 name = "bstr"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11257,6 +11263,8 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "bcs 0.1.4",
+ "boxcar",
+ "dashmap",
  "derivative",
  "move-binary-format",
  "move-core-types",

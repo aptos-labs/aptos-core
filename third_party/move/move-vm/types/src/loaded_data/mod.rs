@@ -5,4 +5,7 @@
 //!
 //! This module contains the loaded definition of code data used in runtime.
 
+mod intern_table;
 pub mod runtime_types;
+
+pub use intern_table::IndexMap;
