@@ -124,7 +124,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         let current_counter = *self.counter.borrow();
 
         // We increment counter before we create an identifier from it, so
-        // it's value must be at most the current value.
+        // its value must be at most the current value.
         if id < self.start_counter || id > current_counter {
             return Err(code_invariant_error(format!(
                 "Invalid delayed field id: {} (started from {} and reached {})",

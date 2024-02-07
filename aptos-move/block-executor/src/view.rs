@@ -1750,7 +1750,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         };
 
         // We increment counter before we create an identifier from it, so
-        // it's value must be at most the current value.
+        // its value must be at most the current value.
         if unique_index < start_counter || unique_index > current_counter {
             return Err(code_invariant_error(format!(
                 "Invalid delayed field id: {:?} with index: {} (started from {} and reached {})",
