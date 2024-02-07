@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    errors::{BlockExecutionError, IntentionalFallbackToSequential},
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -20,6 +21,7 @@ use aptos_aggregator::{
     bounded_math::SignedU128,
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     delta_math::DeltaHistory,
+    types::PanicOr,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -28,10 +30,63 @@ use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
 };
 use claims::assert_matches;
+use fail::FailScenario;
 use rand::{prelude::*, random};
 use std::{
     cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
 };
+
+#[test]
+fn block_output_err_precedence() {
+    let incarnation: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
+        vec![KeyType::<u32>(1, false)],
+        vec![(
+            KeyType::<u32>(2, false),
+            ValueType::from_value(vec![5], true),
+        )],
+        vec![],
+        vec![],
+        10,
+    );
+    let txn = MockTransaction::from_behavior(incarnation);
+    let transactions = Vec::from([txn.clone(), txn]);
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        ExecutableTestType,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    let scenario = FailScenario::setup();
+    assert!(fail::has_failpoints());
+    fail::cfg("commit-all-halt-err", "return()").unwrap();
+    assert!(!fail::list().is_empty());
+    // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
+    // Confirm that the fatal VM error is still detected and sequential fallback triggered.
+    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    assert_matches!(
+        output,
+        Err(PanicOr::Or(
+            IntentionalFallbackToSequential::ResourceGroupSerializationError
+        ))
+    );
+    scenario.teardown();
+}
 
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
@@ -64,7 +119,7 @@ where
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
-    baseline.assert_output(&output);
+    baseline.assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
 }
 
 fn random_value(delete_value: bool) -> ValueType {

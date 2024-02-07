@@ -47,7 +47,8 @@ pub struct EpochManager<P: OnChainConfigProvider> {
 
     // message channels to JWK manager
     jwk_updated_event_txs: Option<aptos_channel::Sender<(), ObservedJWKsUpdated>>,
-    jwk_rpc_msg_tx: Option<aptos_channel::Sender<(), (AccountAddress, IncomingRpcRequest)>>,
+    jwk_rpc_msg_tx:
+        Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     jwk_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
 
     // network utils
@@ -91,7 +92,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) -> Result<()> {
         if Some(rpc_request.msg.epoch()) == self.epoch_state.as_ref().map(|s| s.epoch) {
             if let Some(tx) = &self.jwk_rpc_msg_tx {
-                let _ = tx.push((), (peer_id, rpc_request));
+                let _ = tx.push(peer_id, (peer_id, rpc_request));
             }
         }
         Ok(())
@@ -153,14 +154,23 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             verifier: (&validator_set).into(),
         });
         self.epoch_state = Some(epoch_state.clone());
-        info!("[JWK] start_new_epoch: new_epoch={}", epoch_state.epoch);
+        let my_index = epoch_state
+            .verifier
+            .address_to_validator_index()
+            .get(&self.my_addr)
+            .copied();
+
+        info!(
+            epoch = epoch_state.epoch,
+            "EpochManager starting new epoch."
+        );
 
         let features = payload.get::<Features>().unwrap_or_default();
 
-        if features.is_enabled(FeatureFlag::JWK_CONSENSUS) {
+        if features.is_enabled(FeatureFlag::JWK_CONSENSUS) && my_index.is_some() {
             let onchain_oidc_provider_set = payload.get::<SupportedOIDCProviders>().ok();
             let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
-            info!("[JWK] JWK manager init, epoch={}", epoch_state.epoch);
+            info!(epoch = epoch_state.epoch, "JWKManager starting.");
             let network_sender = NetworkSender::new(
                 self.my_addr,
                 self.network_sender.clone(),
@@ -199,10 +209,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 jwk_rpc_msg_rx,
                 jwk_manager_close_rx,
             ));
-            info!(
-                "jwk consensus manager spawned for epoch {}",
-                epoch_state.epoch
-            );
+            info!(epoch = epoch_state.epoch, "JWKManager spawned.",);
         }
     }
 

@@ -8,7 +8,8 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::PanicOr;
+use aptos_aggregator::types::{code_invariant_error, PanicOr};
+use aptos_logger::warn;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
@@ -22,10 +23,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 
 type TxnInput<T> = CapturedReads<T>;
@@ -70,8 +68,6 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     // Move-VM loader cache - see 'record' function comment for more information.
     module_writes: DashSet<T::Key>,
     module_reads: DashSet<T::Key>,
-
-    module_read_write_intersection: AtomicBool,
 }
 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
@@ -90,7 +86,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .collect(),
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
-            module_read_write_intersection: AtomicBool::new(false),
         }
     }
 
@@ -154,19 +149,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         module_reads_keys: impl Iterator<Item = &'a T::Key>,
         module_writes_keys: impl Iterator<Item = &'a T::Key>,
     ) -> bool {
-        if self.module_read_write_intersection.load(Ordering::Relaxed) {
-            return true;
-        }
-
         // Check if adding new read & write modules leads to intersections.
-        if Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
+        Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
             || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
-        {
-            self.module_read_write_intersection
-                .store(true, Ordering::Release);
-            return true;
-        }
-        false
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
@@ -211,30 +196,32 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn module_rw_intersection_ok(
-        &self,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
-        if self.module_read_write_intersection.load(Ordering::Acquire) {
-            Err(PanicOr::Or(
-                IntentionalFallbackToSequential::ModulePathReadWrite,
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub(crate) fn aborted_execution_status(
+    pub(crate) fn check_execution_status_during_commit(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BlockExecutionError<E>> {
-        if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
-            .load_full()
-            .expect("[BlockSTM]: Execution output must be recorded after execution")
-            .output_status
-        {
-            Some(err.clone())
+    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+        if let Some(status) = self.outputs[txn_idx as usize].load_full() {
+            match &status.output_status {
+                ExecutionStatus::Success(_) | ExecutionStatus::SkipRest(_) => Ok(()),
+                // Transaction cannot be committed with below statuses, as:
+                // - Speculative error must have failed validation.
+                // - Execution w. delayed field code error propagates the error directly,
+                // does not finish execution. Similar for FatalVMError / abort.
+                ExecutionStatus::Abort(_) => {
+                    Err(code_invariant_error("Abort status cannot be committed").into())
+                },
+                ExecutionStatus::SpeculativeExecutionAbortError(_) => {
+                    Err(code_invariant_error("Speculative error status cannot be committed").into())
+                },
+                ExecutionStatus::DelayedFieldsCodeInvariantError(_) => Err(code_invariant_error(
+                    "Delayed field invariant error cannot be committed",
+                )
+                .into()),
+            }
         } else {
-            None
+            // TODO: check carefully if such a case is possible due to early halts.
+            warn!("Possible to not find committed output (halted?)");
+            Ok(())
         }
     }
 

@@ -689,25 +689,18 @@ impl RoundManager {
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            num_validator_txns + payload_len as u64
-                <= self
-                    .local_config
-                    .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
+            num_validator_txns + payload_len as u64 <= self.local_config.max_receiving_block_txns,
             "Payload len {} exceeds the limit {}",
             payload_len,
-            self.local_config
-                .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
+            self.local_config.max_receiving_block_txns,
         );
 
         ensure!(
             validator_txns_total_bytes + payload_size as u64
-                <= self
-                    .local_config
-                    .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
+                <= self.local_config.max_receiving_block_bytes,
             "Payload size {} exceeds the limit {}",
             payload_size,
-            self.local_config
-                .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
+            self.local_config.max_receiving_block_bytes,
         );
 
         ensure!(
