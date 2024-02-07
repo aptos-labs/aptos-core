@@ -5,6 +5,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+aptos-protos = { version = "1.1.3" }
+
 anyhow = { workspace = true }
 aptos-config = { workspace = true }
 aptos-indexer-grpc-cache-worker = { workspace = true }
@@ -14,7 +16,6 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-inspection-service = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-protos = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
