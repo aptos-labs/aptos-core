@@ -58,9 +58,10 @@ use move_core_types::{
 use move_vm_types::{
     value_serde::{
         deserialize_and_allow_native_values, deserialize_and_replace_values_with_ids,
-        find_identifiers_in_value, serialize_and_allow_native_values,
-        serialize_and_replace_ids_with_values, ValueToIdentifierMapping,
+        serialize_and_allow_native_values, serialize_and_replace_ids_with_values,
+        ValueToIdentifierMapping,
     },
+    value_traversal::find_identifiers_in_value,
     values::{SizedID, Value},
 };
 use std::{
