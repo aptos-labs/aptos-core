@@ -103,6 +103,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             // execute_single_transaction only returns an error when transactions that should never fail
             // (BlockMetadataTransaction and GenesisTransaction) return an error themselves.
             Err(err) => {
+                println!("daniel vm error: {:?}", err);
                 if err.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         err.message().cloned().unwrap_or_default(),
