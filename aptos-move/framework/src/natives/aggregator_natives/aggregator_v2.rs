@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{
-    helpers_v1::get_struct_field,
-    helpers_v2::{
-        AGG_MAX_VALUE_FIELD_INDEX, AGG_SNAPSHOT_VALUE_FIELD_INDEX, AGG_VALUE_FIELD_INDEX,
-        DERIVED_STRING_VALUE_FIELD_INDEX,
-    },
-};
 use crate::natives::aggregator_natives::{
-    helpers_v2::set_aggregator_value_field, NativeAggregatorContext,
+    helpers_v2::{
+        get_aggregator_max_value, get_aggregator_value, get_aggregator_value_as_id,
+        get_derived_string_snapshot_value, get_snapshot_value, get_snapshot_value_as_id,
+        set_aggregator_value, unbounded_aggregator_max_value,
+    },
+    NativeAggregatorContext,
 };
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
@@ -58,105 +56,17 @@ pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 /// If we want to increase this, we need to modify BITS_FOR_SIZE in types/src/delayed_fields.rs.
 pub const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 1024;
 
-/// Given the native function argument and a type, returns a tuple of its
-/// fields: (`aggregator id`, `max_value`).
-pub fn get_aggregator_fields_by_type(
-    ty_arg: &Type,
-    agg: &StructRef,
-) -> SafeNativeResult<(u128, u128)> {
-    match ty_arg {
-        Type::U128 => {
-            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<u128>()?;
-            let max_value = get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u128>()?;
-            Ok((id, max_value))
-        },
-        Type::U64 => {
-            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<u64>()?;
-            let max_value = get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u64>()?;
-            Ok((id as u128, max_value as u128))
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-        }),
-    }
+macro_rules! abort_if_not_enabled {
+    ($context:expr) => {
+        if !$context.aggregator_v2_api_enabled() {
+            return Err(SafeNativeError::Abort {
+                abort_code: EAGGREGATOR_API_NOT_ENABLED,
+            });
+        }
+    };
 }
 
-pub fn get_aggregator_fields_with_native_value(
-    ty_arg: &Type,
-    agg: &StructRef,
-) -> SafeNativeResult<(DelayedFieldID, u128)> {
-    match ty_arg {
-        Type::U128 => {
-            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<SizedID>()?;
-            let max_value = get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u128>()?;
-            Ok((id.into(), max_value))
-        },
-        Type::U64 => {
-            let id = get_struct_field(agg, AGG_VALUE_FIELD_INDEX)?.value_as::<SizedID>()?;
-            let max_value =
-                get_struct_field(agg, AGG_MAX_VALUE_FIELD_INDEX)?.value_as::<u64>()? as u128;
-            Ok((id.into(), max_value))
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-        }),
-    }
-}
-
-pub fn get_snapshot_field_by_type(
-    ty_arg: &Type,
-    agg_snapshot: &StructRef,
-) -> SafeNativeResult<u128> {
-    match ty_arg {
-        Type::U128 => {
-            let value = get_struct_field(agg_snapshot, AGG_SNAPSHOT_VALUE_FIELD_INDEX)?
-                .value_as::<u128>()?;
-            Ok(value)
-        },
-        Type::U64 => {
-            let value = get_struct_field(agg_snapshot, AGG_SNAPSHOT_VALUE_FIELD_INDEX)?
-                .value_as::<u64>()?;
-            Ok(value as u128)
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-        }),
-    }
-}
-
-pub fn get_snapshot_field_with_native_value(
-    ty_arg: &Type,
-    agg_snapshot: &StructRef,
-) -> SafeNativeResult<DelayedFieldID> {
-    match ty_arg {
-        Type::U128 | Type::U64 => {
-            let value = get_struct_field(agg_snapshot, AGG_SNAPSHOT_VALUE_FIELD_INDEX)?
-                .value_as::<SizedID>()?;
-            Ok(value.into())
-        },
-        _ => Err(SafeNativeError::Abort {
-            abort_code: EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
-        }),
-    }
-}
-
-pub fn get_derived_string_field(derived_string: &StructRef) -> SafeNativeResult<Vec<u8>> {
-    Ok(string_to_bytes(
-        get_struct_field(derived_string, DERIVED_STRING_VALUE_FIELD_INDEX)?.value_as::<Struct>()?,
-    )
-    .map_err(PartialVMError::from)?)
-}
-
-pub fn get_derived_string_field_with_native_value(
-    derived_string: &StructRef,
-) -> SafeNativeResult<Vec<u8>> {
-    Ok(string_to_bytes(
-        get_struct_field(derived_string, DERIVED_STRING_VALUE_FIELD_INDEX)?.value_as::<Struct>()?,
-    )
-    .map_err(PartialVMError::from)?)
-}
-
-pub fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeResult<u32> {
+fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeResult<u32> {
     match ty_arg {
         Type::U128 => Ok(16),
         Type::U64 => Ok(8),
@@ -167,7 +77,7 @@ pub fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNat
 }
 
 /// Given the list of native function arguments and a type, pop the next argument if it is of given type.
-pub fn pop_value_by_type(
+fn pop_value_by_type(
     ty_arg: &Type,
     args: &mut VecDeque<Value>,
     error_code_if_incorrect: u64,
@@ -181,12 +91,12 @@ pub fn pop_value_by_type(
     }
 }
 
-pub fn create_value_by_type(
-    ty_arg: &Type,
+fn create_value_by_type(
+    value_ty: &Type,
     value: u128,
     error_code_if_incorrect: u64,
 ) -> SafeNativeResult<Value> {
-    match ty_arg {
+    match value_ty {
         Type::U128 => Ok(Value::u128(value)),
         Type::U64 => Ok(Value::u64(
             u128_to_u64(value).map_err(PartialVMError::from)?,
@@ -197,7 +107,7 @@ pub fn create_value_by_type(
     }
 }
 
-pub fn create_string_value(value: Vec<u8>) -> Value {
+fn create_string_value(value: Vec<u8>) -> Value {
     Value::struct_(Struct::pack(vec![Value::vector_u8(value)]))
 }
 
@@ -219,34 +129,24 @@ fn get_context_data<'t, 'b>(
     }
 }
 
-macro_rules! abort_if_not_enabled {
-    ($context:expr) => {
-        if !$context.aggregator_v2_api_enabled() {
-            return Err(SafeNativeError::Abort {
-                abort_code: EAGGREGATOR_API_NOT_ENABLED,
-            });
-        }
-    };
-}
-
-fn create_aggregator_impl(
+fn create_aggregator_with_max_value(
     context: &mut SafeNativeContext,
-    ty_arg: &Type,
+    aggregator_value_ty: &Type,
     max_value: u128,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let value_field_value =
-        if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-            let width = get_width_by_type(ty_arg, EUNSUPPORTED_AGGREGATOR_TYPE)?;
-            let id = resolver.generate_delayed_field_id(width);
-            delayed_field_data.create_new_aggregator(id);
-            Value::native_value(id.into())
-        } else {
-            create_value_by_type(ty_arg, 0, EUNSUPPORTED_AGGREGATOR_TYPE)?
-        };
+    let value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+        let width = get_width_by_type(aggregator_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+        let id = resolver.generate_delayed_field_id(width);
+        delayed_field_data.create_new_aggregator(id);
+        Value::native_value(id.into())
+    } else {
+        create_value_by_type(aggregator_value_ty, 0, EUNSUPPORTED_AGGREGATOR_TYPE)?
+    };
 
+    let max_value =
+        create_value_by_type(aggregator_value_ty, max_value, EUNSUPPORTED_AGGREGATOR_TYPE)?;
     Ok(smallvec![Value::struct_(Struct::pack(vec![
-        value_field_value,
-        create_value_by_type(ty_arg, max_value, EUNSUPPORTED_AGGREGATOR_TYPE)?,
+        value, max_value,
     ]))])
 }
 
@@ -266,7 +166,7 @@ fn native_create_aggregator(
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
 
     let max_value = pop_value_by_type(&ty_args[0], &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
-    create_aggregator_impl(context, &ty_args[0], max_value)
+    create_aggregator_with_max_value(context, &ty_args[0], max_value)
 }
 
 /***************************************************************************************************
@@ -284,19 +184,8 @@ fn native_create_unbounded_aggregator(
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
 
-    let max_value = {
-        match &ty_args[0] {
-            Type::U128 => u128::MAX,
-            Type::U64 => u64::MAX as u128,
-            _ => {
-                return Err(SafeNativeError::Abort {
-                    abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-                })
-            },
-        }
-    };
-
-    create_aggregator_impl(context, &ty_args[0], max_value)
+    let max_value = unbounded_aggregator_max_value(&ty_args[0])?;
+    create_aggregator_with_max_value(context, &ty_args[0], max_value)
 }
 
 /***************************************************************************************************
@@ -313,37 +202,32 @@ fn native_try_add(
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_TRY_ADD_BASE)?;
 
-    let input = pop_value_by_type(&ty_args[0], &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
-    let agg_struct = safely_pop_arg!(args, StructRef);
+    let aggregator_value_ty = &ty_args[0];
+    let rhs = pop_value_by_type(aggregator_value_ty, &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+    let aggregator = safely_pop_arg!(args, StructRef);
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let (id, agg_max_value) =
-            get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-        resolver
-            .validate_delayed_field_id(&id)
-            .map_err(PartialVMError::from)?;
+    let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
-        delayed_field_data.try_add_delta(
-            id,
-            agg_max_value,
-            SignedU128::Positive(input),
-            resolver,
-        )?
+    let success = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+        let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
+        delayed_field_data.try_add_delta(id, max_value, SignedU128::Positive(rhs), resolver)?
     } else {
-        let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
-        match BoundedMath::new(agg_max_value).unsigned_add(agg_value, input) {
-            Ok(sum) => {
-                set_aggregator_value_field(
-                    &agg_struct,
-                    create_value_by_type(&ty_args[0], sum, EUNSUPPORTED_AGGREGATOR_TYPE)?,
+        let lhs = get_aggregator_value(&aggregator, aggregator_value_ty)?;
+        match BoundedMath::new(max_value).unsigned_add(lhs, rhs) {
+            Ok(result) => {
+                let new_value = create_value_by_type(
+                    aggregator_value_ty,
+                    result,
+                    EUNSUPPORTED_AGGREGATOR_TYPE,
                 )?;
+                set_aggregator_value(&aggregator, new_value)?;
                 true
             },
             Err(_) => false,
         }
     };
 
-    Ok(smallvec![Value::bool(result_value)])
+    Ok(smallvec![Value::bool(success)])
 }
 
 /***************************************************************************************************
@@ -360,37 +244,32 @@ fn native_try_sub(
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
 
-    let input = pop_value_by_type(&ty_args[0], &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
-    let agg_struct = safely_pop_arg!(args, StructRef);
+    let aggregator_value_ty = &ty_args[0];
+    let rhs = pop_value_by_type(aggregator_value_ty, &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+    let aggregator = safely_pop_arg!(args, StructRef);
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let (id, agg_max_value) =
-            get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-        resolver
-            .validate_delayed_field_id(&id)
-            .map_err(PartialVMError::from)?;
+    let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
-        delayed_field_data.try_add_delta(
-            id,
-            agg_max_value,
-            SignedU128::Negative(input),
-            resolver,
-        )?
+    let success = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+        let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
+        delayed_field_data.try_add_delta(id, max_value, SignedU128::Negative(rhs), resolver)?
     } else {
-        let (agg_value, agg_max_value) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
-        match BoundedMath::new(agg_max_value).unsigned_subtract(agg_value, input) {
-            Ok(sum) => {
-                set_aggregator_value_field(
-                    &agg_struct,
-                    create_value_by_type(&ty_args[0], sum, EUNSUPPORTED_AGGREGATOR_TYPE)?,
+        let lhs = get_aggregator_value(&aggregator, aggregator_value_ty)?;
+        match BoundedMath::new(max_value).unsigned_subtract(lhs, rhs) {
+            Ok(result) => {
+                let new_value = create_value_by_type(
+                    aggregator_value_ty,
+                    result,
+                    EUNSUPPORTED_AGGREGATOR_TYPE,
                 )?;
+                set_aggregator_value(&aggregator, new_value)?;
                 true
             },
             Err(_) => false,
         }
     };
 
-    Ok(smallvec![Value::bool(result_value)])
+    Ok(smallvec![Value::bool(success)])
 }
 
 /***************************************************************************************************
@@ -408,33 +287,25 @@ fn native_read(
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_BASE)?;
 
-    let agg_struct = safely_pop_arg!(args, StructRef);
+    let aggregator_value_ty = &ty_args[0];
+    let aggregator = safely_pop_arg!(args, StructRef);
 
-    let (result_value, agg_max_value) =
-        if let Some((resolver, delayed_field_data)) = get_context_data(context) {
-            let (id, agg_max_value) =
-                get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-            resolver
-                .validate_delayed_field_id(&id)
-                .map_err(PartialVMError::from)?;
-            (
-                delayed_field_data.read_aggregator(id, resolver)?,
-                agg_max_value,
-            )
-        } else {
-            get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?
-        };
-
-    if result_value > agg_max_value {
-        return Err(SafeNativeError::InvariantViolation(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )));
+    let value = if let Some((resolver, delayed_field_data)) = get_context_data(context) {
+        let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
+        delayed_field_data.read_aggregator(id, resolver)?
+    } else {
+        get_aggregator_value(&aggregator, aggregator_value_ty)?
     };
-    Ok(smallvec![create_value_by_type(
-        &ty_args[0],
-        result_value,
-        EUNSUPPORTED_AGGREGATOR_TYPE
-    )?])
+
+    // Paranoid check to make sure read result makes sense.
+    let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
+    if value > max_value {
+        let error = PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!("Aggregator read returned the value greater than maximum possible value: {value} > {max_value}"));
+        return Err(SafeNativeError::InvariantViolation(error));
+    };
+
+    let value = create_value_by_type(aggregator_value_ty, value, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+    Ok(smallvec![value])
 }
 
 /***************************************************************************************************
@@ -452,23 +323,21 @@ fn native_snapshot(
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_SNAPSHOT_BASE)?;
 
-    let agg_struct = safely_pop_arg!(args, StructRef);
+    let aggregator_value_ty = &ty_args[0];
+    let aggregator = safely_pop_arg!(args, StructRef);
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let (id, agg_max_value) =
-            get_aggregator_fields_with_native_value(&ty_args[0], &agg_struct)?;
-        resolver
-            .validate_delayed_field_id(&id)
-            .map_err(PartialVMError::from)?;
-        let width = get_width_by_type(&ty_args[0], EUNSUPPORTED_AGGREGATOR_TYPE)?;
+        let width = get_width_by_type(aggregator_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+        let id = get_aggregator_value_as_id(&aggregator, aggregator_value_ty, resolver)?;
+        let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
-        let snapshot_id = delayed_field_data.snapshot(id, agg_max_value, width, resolver)?;
+        let snapshot_id = delayed_field_data.snapshot(id, max_value, width, resolver)?;
         Value::native_value(snapshot_id.into())
     } else {
-        let (agg_value, _) = get_aggregator_fields_by_type(&ty_args[0], &agg_struct)?;
+        let value = get_aggregator_value(&aggregator, aggregator_value_ty)?;
         create_value_by_type(
-            &ty_args[0],
-            agg_value,
+            aggregator_value_ty,
+            value,
             EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
         )?
     };
@@ -491,21 +360,29 @@ fn native_create_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
-    let input = pop_value_by_type(
-        &ty_args[0],
+    let snapshot_value_ty = &ty_args[0];
+    let value = pop_value_by_type(
+        snapshot_value_ty,
         &mut args,
         EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
     )?;
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let width = get_width_by_type(&ty_args[0], EUNSUPPORTED_AGGREGATOR_TYPE)?;
-        let snapshot_id = delayed_field_data.create_new_snapshot(input, width, resolver);
+    let snapshot_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context)
+    {
+        let width = get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+        let snapshot_id = delayed_field_data.create_new_snapshot(value, width, resolver);
         Value::native_value(snapshot_id.into())
     } else {
-        create_value_by_type(&ty_args[0], input, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE)?
+        create_value_by_type(
+            snapshot_value_ty,
+            value,
+            EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE,
+        )?
     };
 
-    Ok(smallvec![Value::struct_(Struct::pack(vec![result_value]))])
+    Ok(smallvec![Value::struct_(Struct::pack(vec![
+        snapshot_value
+    ]))])
 }
 
 /***************************************************************************************************
@@ -559,19 +436,18 @@ fn native_read_snapshot(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
+    let snapshot_value_ty = &ty_args[0];
+    let snapshot = safely_pop_arg!(args, StructRef);
+
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let id =
-            get_snapshot_field_with_native_value(&ty_args[0], &safely_pop_arg!(args, StructRef))?;
-        resolver
-            .validate_delayed_field_id(&id)
-            .map_err(PartialVMError::from)?;
+        let id = get_snapshot_value_as_id(&snapshot, snapshot_value_ty, resolver)?;
         delayed_field_data.read_snapshot(id, resolver)?
     } else {
-        get_snapshot_field_by_type(&ty_args[0], &safely_pop_arg!(args, StructRef))?
+        get_snapshot_value(&snapshot, snapshot_value_ty)?
     };
 
     Ok(smallvec![create_value_by_type(
-        &ty_args[0],
+        snapshot_value_ty,
         result_value,
         EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE
     )?])
@@ -617,7 +493,8 @@ fn native_read_derived_string(
 
         delayed_field_data.read_derived(id, resolver)?
     } else {
-        get_derived_string_field(&safely_pop_arg!(args, StructRef))?
+        let derived_string_snapshot = safely_pop_arg!(args, StructRef);
+        get_derived_string_snapshot_value(&derived_string_snapshot)?
     };
 
     Ok(smallvec![create_string_value(result_value)])
@@ -638,23 +515,28 @@ fn native_create_derived_string(
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
-    let input = string_to_bytes(safely_pop_arg!(args, Struct)).map_err(PartialVMError::from)?;
+    let value_bytes = string_to_bytes(safely_pop_arg!(args, Struct))
+        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
+    context
+        .charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(value_bytes.len() as u64))?;
 
-    context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(input.len() as u64))?;
-    if input.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
+    if value_bytes.len() > DERIVED_STRING_INPUT_MAX_LENGTH {
         return Err(SafeNativeError::Abort {
             abort_code: EINPUT_STRING_LENGTH_TOO_LARGE,
         });
     }
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let snapshot_id = delayed_field_data.create_new_derived(input, resolver)?;
-        Value::native_value(snapshot_id.into())
-    } else {
-        let width = calculate_width_for_constant_string(input.len());
-        bytes_and_width_to_derived_string_struct(input, width).map_err(PartialVMError::from)?
-    };
-    Ok(smallvec![result_value])
+    let derived_string_snapshot =
+        if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
+            let id = delayed_field_data.create_new_derived(value_bytes, resolver)?;
+            Value::native_value(id.into())
+        } else {
+            let width = calculate_width_for_constant_string(value_bytes.len());
+            bytes_and_width_to_derived_string_struct(value_bytes, width)
+                .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?
+        };
+
+    Ok(smallvec![derived_string_snapshot])
 }
 
 /***************************************************************************************************
@@ -676,13 +558,16 @@ fn native_derive_string_concat(
     debug_assert_eq!(args.len(), 3);
     context.charge(AGGREGATOR_V2_STRING_CONCAT_BASE)?;
 
-    // popping arguments from the end
-    let suffix = string_to_bytes(safely_pop_arg!(args, Struct)).map_err(PartialVMError::from)?;
+    // Popping arguments from the end.
+    let suffix = string_to_bytes(safely_pop_arg!(args, Struct))
+        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(suffix.len() as u64))?;
 
-    let snapshot_struct = safely_pop_arg!(args, StructRef);
+    let snapshot_value_ty = &ty_args[0];
+    let snapshot = safely_pop_arg!(args, StructRef);
 
-    let prefix = string_to_bytes(safely_pop_arg!(args, Struct)).map_err(PartialVMError::from)?;
+    let prefix = string_to_bytes(safely_pop_arg!(args, Struct))
+        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(prefix.len() as u64))?;
 
     if prefix
@@ -695,28 +580,28 @@ fn native_derive_string_concat(
         });
     }
 
-    let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let base_id = get_snapshot_field_with_native_value(&ty_args[0], &snapshot_struct)?;
-        resolver
-            .validate_delayed_field_id(&base_id)
-            .map_err(PartialVMError::from)?;
-
-        let new_id = delayed_field_data.derive_string_concat(base_id, prefix, suffix, resolver)?;
-        Value::native_value(new_id.into())
+    let derived_string_snapshot = if let Some((resolver, mut delayed_field_data)) =
+        get_context_data(context)
+    {
+        let id = get_snapshot_value_as_id(&snapshot, snapshot_value_ty, resolver)?;
+        let derived_string_snapshot_id =
+            delayed_field_data.derive_string_concat(id, prefix, suffix, resolver)?;
+        Value::native_value(derived_string_snapshot_id.into())
     } else {
-        let snapshot_width = get_width_by_type(&ty_args[0], EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE)?;
+        let snapshot_width =
+            get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE)?;
         let width = calculate_width_for_integer_embeded_string(
             prefix.len() + suffix.len(),
             DelayedFieldID::new_with_width(0, snapshot_width),
         )
-        .map_err(PartialVMError::from)?;
+        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
 
-        let snapshot_value = get_snapshot_field_by_type(&ty_args[0], &snapshot_struct)?;
+        let snapshot_value = get_snapshot_value(&snapshot, snapshot_value_ty)?;
         let output = SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value);
         bytes_and_width_to_derived_string_struct(output, width).map_err(PartialVMError::from)?
     };
 
-    Ok(smallvec![result_value])
+    Ok(smallvec![derived_string_snapshot])
 }
 
 #[test]
