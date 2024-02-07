@@ -159,7 +159,7 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 <code>max_iss_field_bytes: u16</code>
 </dt>
 <dd>
- The max length of the field name and value of the JWT's <code>iss</code> field supported in our circuit
+ The max length of the field name and value of the JWT's <code>iss</code> field supported in our circuit (e.g., <code>"iss":"aptos.com"</code>)
 </dd>
 <dt>
 <code>max_extra_field_bytes: u16</code>
