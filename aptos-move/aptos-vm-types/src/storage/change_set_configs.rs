@@ -29,13 +29,14 @@ impl ChangeSetConfigs {
     }
 
     pub fn new(feature_version: u64, gas_params: &AptosGasParameters) -> Self {
-        if feature_version >= 5 {
-            Self::from_gas_params(feature_version, gas_params)
-        } else if feature_version >= 3 {
-            Self::for_feature_version_3()
-        } else {
-            Self::unlimited_at_gas_feature_version(feature_version)
-        }
+        // if feature_version >= 5 {
+        //     Self::from_gas_params(feature_version, gas_params)
+        // } else if feature_version >= 3 {
+        //     Self::for_feature_version_3()
+        // } else {
+        //     Self::unlimited_at_gas_feature_version(feature_version)
+        // }
+        Self::unlimited_at_gas_feature_version(feature_version)
     }
 
     fn new_impl(
