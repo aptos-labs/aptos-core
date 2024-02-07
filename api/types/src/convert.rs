@@ -802,13 +802,11 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
-            MoveTypeLayout::Signer => {
-                bail!("unexpected move type {:?} for value {:?}", layout, val)
-            },
 
-            // Native types, e.g., aggregators, are currently used only at
-            // runtime, so we simply return an error here.
-            MoveTypeLayout::Native(..) => {
+            // Some values, e.g., signer or ones with custom serialization
+            // (native), are not stored to storage and so we do not expect
+            // to see them here.
+            MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
             },
         })
