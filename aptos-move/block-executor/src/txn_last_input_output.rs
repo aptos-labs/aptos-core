@@ -9,6 +9,7 @@ use crate::{
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::PanicOr;
+use aptos_logger::debug;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
@@ -235,6 +236,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
+            debug!("update_to_skip_rest failed {:?}", self.take_output(txn_idx));
             unreachable!();
         }
     }
