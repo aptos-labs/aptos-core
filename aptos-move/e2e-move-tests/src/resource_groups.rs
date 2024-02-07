@@ -84,7 +84,7 @@ pub struct ResourceGroupsTestHarness {
 }
 
 impl ResourceGroupsTestHarness {
-    // TODO(cleanup): These 3 functions are common with aggregator_v2 tests.
+    // TODO[agg_v2](cleanup): These 3 functions are common with aggregator_v2 tests.
     // Should I create struct PropTestHarness with these 3 functions, and set
     // ResourceGroupsTestHarness { harness: PropTestHarness }?
     pub fn run_block_in_parts_and_check(
@@ -178,11 +178,18 @@ impl ResourceGroupsTestHarness {
         )
     }
 
-    pub fn set_3(&mut self, index1: u32, index2: u32, index3: u32, name: String, value: u32) -> SignedTransaction {
+    pub fn set_3_group_members(
+        &mut self,
+        index1: u32,
+        index2: u32,
+        index3: u32,
+        name: String,
+        value: u32,
+    ) -> SignedTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::resource_groups_test::set_3").unwrap(),
+            str::parse("0x1::resource_groups_test::set_3_group_members").unwrap(),
             vec![],
             vec![
                 bcs::to_bytes(self.account.address()).unwrap(),
@@ -210,7 +217,15 @@ impl ResourceGroupsTestHarness {
         )
     }
 
-    pub fn set_and_check(&mut self, index1: u32, index2: u32, name1: String, value1: u32, name2: String, value2: u32) -> SignedTransaction {
+    pub fn set_and_check(
+        &mut self,
+        index1: u32,
+        index2: u32,
+        name1: String,
+        value1: u32,
+        name2: String,
+        value2: u32,
+    ) -> SignedTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],

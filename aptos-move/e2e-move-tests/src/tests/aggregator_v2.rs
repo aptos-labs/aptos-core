@@ -116,7 +116,6 @@ mod test_cases {
     }
 }
 
-#[allow(dead_code)]
 pub fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
     (0..3)
         .prop_flat_map(move |enum_type| {

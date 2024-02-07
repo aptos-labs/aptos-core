@@ -30,7 +30,8 @@ const ENOT_EQUAL: u64 = 17;
 const EINVALID_ARG: u64 = 18;
 const ERESOURCE_DOESNT_EXIST: u64 = 19;
 
-
+// TODO[agg_v2](cleanup): This interface looks similar to aggregator v2 test harness.
+// Could cleanup later on.
 fn setup(
     executor_mode: ExecutorMode,
     // This mode describes whether to enable or disable RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM flag
@@ -100,21 +101,21 @@ proptest! {
         let txns = vec![
             (SUCCESS, h.init_signer(vec![5,2,3])),
             (SUCCESS, h.set_resource(4, "ABC".to_string(), 10)),
-            (SUCCESS, h.set_resource(2, "DEF".to_string(), 20)),
+            (SUCCESS, h.set_resource(2, "DEFG".to_string(), 20)),
             (SUCCESS, h.unset_resource(3)),
-            (SUCCESS, h.set_resource(3, "GHI".to_string(), 30)),
-            (SUCCESS, h.set_resource(4, "JKL".to_string(), 40)),
-            (SUCCESS, h.set_and_check(2,  4, "MNO".to_string(), 50, "JKL".to_string(), 40)),
+            (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
+            (SUCCESS, h.set_resource(4, "JKLMNO".to_string(), 40)),
+            (SUCCESS, h.set_and_check(2,  4, "MNOP".to_string(), 50, "JKLMNO".to_string(), 40)),
             (SUCCESS, h.read_or_init(1)),
-            (SUCCESS, h.check(2, "MNO".to_string(), 50)),
+            (SUCCESS, h.check(2, "MNOP".to_string(), 50)),
             (SUCCESS, h.check(1, "init_name".to_string(), 5)),
             (SUCCESS, h.unset_resource(1)),
-            (SUCCESS, h.set_3(1, 2, 3, "LJH".to_string(), 25)),
-            (SUCCESS, h.check(1, "LJH".to_string(), 25)),
+            (SUCCESS, h.set_3_group_members(1, 2, 3, "L".to_string(), 25)),
+            (SUCCESS, h.check(1, "L".to_string(), 25)),
             (SUCCESS, h.unset_resource(3)),
-            (ENOT_EQUAL, h.check(2, "MNO".to_string(), 50)),
-            (EINVALID_ARG, h.set_resource(5, "JKL".to_string(), 40)),
-            (ERESOURCE_DOESNT_EXIST, h.check(3, "LJH".to_string(), 25)),
+            (ENOT_EQUAL, h.check(2, "MNOP".to_string(), 50)),
+            (EINVALID_ARG, h.set_resource(5, "JKLI".to_string(), 40)),
+            (ERESOURCE_DOESNT_EXIST, h.check(3, "L".to_string(), 25)),
         ];
         h.run_block_in_parts_and_check(
             test_env.block_split,
@@ -129,17 +130,17 @@ proptest! {
 
         let txns = vec![
             (SUCCESS, h.init_signer(vec![5,2,3])),
-            (SUCCESS, h.set_resource(4, "ABC".to_string(), 10)),
+            (SUCCESS, h.set_resource(4, "ABCDEF".to_string(), 10)),
             (SUCCESS, h.set_resource(2, "DEF".to_string(), 20)),
             (SUCCESS, h.read_or_init(4)),
-            (SUCCESS, h.set_resource(2, "XYZ".to_string(), 25)),
+            (SUCCESS, h.set_resource(2, "XYZK".to_string(), 25)),
             (ENOT_EQUAL, h.check(2, "DEF".to_string(), 20)),
-            (SUCCESS, h.check(2, "XYZ".to_string(), 25)),
-            (SUCCESS, h.set_resource(3, "GHI".to_string(), 30)),
+            (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
+            (SUCCESS, h.set_resource(3, "GH".to_string(), 30)),
             (SUCCESS, h.unset_resource(3)),
             (ERESOURCE_DOESNT_EXIST, h.check(3, "LJH".to_string(), 25)),
-            (ERESOURCE_DOESNT_EXIST, h.set_and_check(2,  1, "MNO".to_string(), 50, "GHI".to_string(), 30)),
-            (SUCCESS, h.check(2, "XYZ".to_string(), 25)),
+            (ERESOURCE_DOESNT_EXIST, h.set_and_check(2,  1, "MNO".to_string(), 50, "GH".to_string(), 30)),
+            (SUCCESS, h.check(2, "XYZK".to_string(), 25)),
         ];
         h.run_block_in_parts_and_check(
             test_env.block_split,

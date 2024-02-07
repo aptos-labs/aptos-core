@@ -46,7 +46,7 @@ module 0x1::resource_groups_test {
         move_to<MainResource>(main_account, main_resource);
     }
 
-    public entry fun set_resource(_delegated_signer: &signer, main_account: address, index: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+    public entry fun set_resource(main_account: address, index: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
         let main_resource = borrow_global_mut<MainResource>(main_account);
         let owner = account::create_signer_with_capability(&main_resource.signer_cap);
         let owner_address = signer::address_of(&owner);
@@ -104,7 +104,7 @@ module 0x1::resource_groups_test {
         }
     }
 
-    public entry fun check(_delegated_signer: &signer, main_account: address, index: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+    public entry fun check(main_account: address, index: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
         let main_resource = borrow_global_mut<MainResource>(main_account);
         let owner_address = account::get_signer_capability_address(&main_resource.signer_cap);
 
@@ -145,7 +145,7 @@ module 0x1::resource_groups_test {
         }
     }
 
-    public entry fun unset_resource(_delegated_signer: &signer,  main_account: address, index: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+    public entry fun unset_resource(main_account: address, index: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
         let main_resource = borrow_global_mut<MainResource>(main_account);
         let owner_address = account::get_signer_capability_address(&main_resource.signer_cap);
         // TODO: Is this how we unset a resource?
@@ -170,7 +170,7 @@ module 0x1::resource_groups_test {
         }
     }
 
-    public entry fun read_or_init(_delegated_signer: &signer, main_account: address, index: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+    public entry fun read_or_init(main_account: address, index: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
         let main_resource = borrow_global_mut<MainResource>(main_account);
         let owner = account::create_signer_with_capability(&main_resource.signer_cap);
         let owner_address = signer::address_of(&owner);
@@ -220,19 +220,19 @@ module 0x1::resource_groups_test {
         }
     }
 
-    public entry fun set_3(delegated_signer: &signer, main_account: address, index1: u32, index2: u32, index3: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
-        set_resource(delegated_signer, main_account, index1, name, value);
-        set_resource(delegated_signer, main_account, index2, name, value);
-        set_resource(delegated_signer, main_account, index3, name, value);
+    public entry fun set_3_group_members(main_account: address, index1: u32, index2: u32, index3: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+        set_resource(main_account, index1, name, value);
+        set_resource(main_account, index2, name, value);
+        set_resource(main_account, index3, name, value);
     }
 
-    public entry fun set_resource_and_read(delegated_signer: &signer, main_account: address, set_index: u32, read_index: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
-        set_resource(delegated_signer, main_account, set_index, name, value);
-        read_or_init(delegated_signer, main_account, read_index);
+    public entry fun set_resource_and_read(main_account: address, set_index: u32, read_index: u32, name: String, value: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+        set_resource(main_account, set_index, name, value);
+        read_or_init(main_account, read_index);
     }
 
-    public entry fun set_and_check(delegated_signer: &signer, main_account: address, set_index: u32, check_index: u32, name1: String, value1: u32, name2: String, value2: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
-        set_resource(delegated_signer, main_account, set_index, name1, value1);
-        check(delegated_signer, main_account, check_index, name2, value2);
+    public entry fun set_and_check(main_account: address, set_index: u32, check_index: u32, name1: String, value1: u32, name2: String, value2: u32) acquires MainResource, MyResource1, MyResource2, MyResource3, MyResource4 {
+        set_resource(main_account, set_index, name1, value1);
+        check(main_account, check_index, name2, value2);
     }
 }
