@@ -24,7 +24,7 @@ use aptos_aggregator::{
     types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{debug, error};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDataOutput, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -46,6 +46,7 @@ use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
+use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use num_cpus;
 use rand::{thread_rng, Rng};
@@ -54,7 +55,10 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
-    sync::{atomic::AtomicU32, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicU32, Ordering},
+        Arc,
+    },
 };
 
 pub struct BlockExecutor<T, E, S, L, X> {
@@ -238,20 +242,26 @@ where
                 apply_updates(&output)?;
                 ExecutionStatus::SkipRest(output)
             },
-            ExecutionStatus::Abort(err) => {
-                // Record the status indicating abort.
-                ExecutionStatus::Abort(BlockExecutionError::FatalVMError((err, idx_to_execute)))
-            },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
                 ));
                 ExecutionStatus::SpeculativeExecutionAbortError(msg)
             },
+            ExecutionStatus::Abort(err) => {
+                // Abort indicates an unrecoverable VM failure, and should not occur
+                // even due to speculation. Thus, we do not need to finish execution and
+                // can directly return an error.
+                return Err(code_invariant_error(format!(
+                    "FatalVMError from parallel execution {:?} at txn {}",
+                    err, idx_to_execute
+                ))
+                .into());
+            },
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 return Err(code_invariant_error(format!(
-                    "Transaction execution failed with DelayedFieldsCodeInvariantError: {:?}",
-                    msg
+                    "[Execution] At txn {}, failed with DelayedFieldsCodeInvariantError: {:?}",
+                    idx_to_execute, msg
                 ))
                 .into());
             },
@@ -276,7 +286,10 @@ where
 
         if !last_input_output.record(idx_to_execute, read_set, result) {
             return Err(PanicOr::Or(
-                IntentionalFallbackToSequential::ModulePathReadWrite,
+                IntentionalFallbackToSequential::module_path_read_write(
+                    "Module read & write".into(),
+                    idx_to_execute,
+                ),
             ));
         }
         Ok(updates_outside)
@@ -422,7 +435,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) -> BlockExecutionResult<(), E::Error> {
+    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
@@ -527,7 +540,6 @@ where
 
             let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
             let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
-            let mut maybe_code_error = Ok(());
             for (group_key, metadata_op) in group_metadata_ops.into_iter() {
                 // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
                 let finalized_result = versioned_cache
@@ -538,53 +550,39 @@ where
                         finalized_groups.push((group_key, metadata_op, finalized_group));
                     },
                     Err(err) => {
-                        maybe_code_error = Err(err.into());
-                        break;
+                        return Err(err.into());
                     },
                 }
             }
 
-            if maybe_code_error.is_ok() {
-                if let Some(group_reads_needing_delayed_field_exchange) =
-                    last_input_output.group_reads_needing_delayed_field_exchange(txn_idx)
+            if let Some(group_reads_needing_delayed_field_exchange) =
+                last_input_output.group_reads_needing_delayed_field_exchange(txn_idx)
+            {
+                for (group_key, metadata_op) in
+                    group_reads_needing_delayed_field_exchange.into_iter()
                 {
-                    for (group_key, metadata_op) in
-                        group_reads_needing_delayed_field_exchange.into_iter()
-                    {
-                        let finalized_result = versioned_cache
-                            .group_data()
-                            .get_last_committed_group(&group_key);
-                        match process_finalized_group(finalized_result, metadata_op.is_deletion()) {
-                            Ok(finalized_group) => {
-                                finalized_groups.push((group_key, metadata_op, finalized_group));
-                            },
-                            Err(err) => {
-                                maybe_code_error = Err(err.into());
-                                break;
-                            },
-                        }
-                        if maybe_code_error.is_err() {
-                            break;
-                        }
+                    let finalized_result = versioned_cache
+                        .group_data()
+                        .get_last_committed_group(&group_key);
+                    match process_finalized_group(finalized_result, metadata_op.is_deletion()) {
+                        Ok(finalized_group) => {
+                            finalized_groups.push((group_key, metadata_op, finalized_group));
+                        },
+                        Err(err) => {
+                            return Err(err.into());
+                        },
                     }
                 }
             }
 
-            // We return an error (leads to halting the execution) in the following cases:
-            // 1) Code invariant violation.
-            // 2) We detect module read/write intersection
-            // 3) A transaction triggered an Abort
+            // Note that module read/write intersection would be detected on record, and directly
+            // propagated as an error. Similarly, an unrecoverable VM failure, would also be
+            // directly propagated as error even from a speculative transaction execution.
+
+            // An additional invariant check on the recorded outputs.
+            last_input_output.check_execution_status_during_commit(txn_idx)?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
-
-            // We cover cases 1 and 2 here
-            maybe_code_error.and_then(|_| last_input_output.module_rw_intersection_ok())?;
-
-            // Next, we handle 3, an abort / an unrecoverable VM error.
-            if let Some(err) = last_input_output.aborted_execution_status(txn_idx) {
-                assert!(matches!(err, BlockExecutionError::FatalVMError(_)));
-                return Err(err);
-            }
 
             // While the above propagate errors and lead to eventually halting parallel execution,
             // below we may halt the execution without an error in cases when:
@@ -606,8 +604,11 @@ where
                         txn_idx + 1,
                         scheduler.num_txns(),
                     );
+                    fail_point!("commit-all-halt-err", |_| Err(PanicOr::Or(
+                        IntentionalFallbackToSequential::ResourceGroupSerializationError
+                    )));
                 }
-                break;
+                return Ok(());
             }
         }
         Ok(())
@@ -777,6 +778,7 @@ where
 
     fn serialize_groups(
         finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
+        txn_idx: TxnIndex,
     ) -> Result<Vec<(T::Key, T::Value)>, PanicOr<IntentionalFallbackToSequential>> {
         finalized_groups
             .into_iter()
@@ -795,8 +797,9 @@ where
                 let res = bcs::to_bytes(&btree)
                     .map_err(|e| {
                         PanicOr::Or(
-                            IntentionalFallbackToSequential::ResourceGroupSerializationError(
+                            IntentionalFallbackToSequential::resource_group_serialization_error(
                                 format!("Unexpected resource group error {:?}", e),
+                                txn_idx,
                             ),
                         )
                     })
@@ -874,7 +877,7 @@ where
             base_view,
         );
 
-        let serialized_groups = Self::serialize_groups(patched_finalized_groups)?;
+        let serialized_groups = Self::serialize_groups(patched_finalized_groups, txn_idx)?;
 
         last_input_output.record_materialized_txn_output(
             txn_idx,
@@ -930,7 +933,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> BlockExecutionResult<(), E::Error> {
+    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -1035,7 +1038,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, PanicOr<IntentionalFallbackToSequential>> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -1060,7 +1063,7 @@ where
             self.config.onchain.block_gas_limit_type.clone(),
             num_txns,
         ));
-        let shared_maybe_error = ExplicitSyncWrapper::new(Ok(()));
+        let shared_maybe_error = AtomicBool::new(false);
 
         let final_results = ExplicitSyncWrapper::new(Vec::with_capacity(num_txns));
 
@@ -1091,21 +1094,16 @@ where
                         &shared_commit_state,
                         &final_results,
                     ) {
-                        if scheduler.halt() {
-                            // Only one thread / worker will successfully halt, hence below
-                            // ExplicitSyncWrapper acquires are safe.
+                        // If there are multiple errors, they all get logged:
+                        // IntentionalFallbackToSequential variant is logged at construction,
+                        // and below we log CodeInvariantErrors.
+                        if let PanicOr::CodeInvariantError(err_msg) = &e {
+                            alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                        };
+                        shared_maybe_error.store(true, Ordering::SeqCst);
 
-                            if let BlockExecutionError::FatalVMError((inner_err, txn_idx)) = &e {
-                                let block_limit_processor = shared_commit_state.acquire();
-                                info!("Block execution was aborted due to {:?}", inner_err);
-                                block_limit_processor.finish_parallel_update_counters_and_log_info(
-                                    txn_idx + 1,
-                                    scheduler.num_txns(),
-                                );
-                            }
-
-                            *shared_maybe_error.acquire() = Err(e);
-                        }
+                        // Make sure to halt the scheduler if it hasn't already been halted.
+                        scheduler.halt();
                     }
                 });
             }
@@ -1117,9 +1115,15 @@ where
         // TODO add block end info to output.
         // block_limit_processor.is_block_limit_reached();
 
-        shared_maybe_error
-            .into_inner()
-            .map(|()| BlockOutput::new(final_results.into_inner()))
+        (!shared_maybe_error.load(Ordering::SeqCst))
+            .then(|| BlockOutput::new(final_results.into_inner()))
+            .ok_or(PanicOr::Or(
+                // All errors (if more than one) have been logged, and here any error
+                // leads to a sequential fallback. We use serialization error for now
+                // to be defensive and avoid any scenarios where the fallback would not
+                // have the specialized logic enabled. TODO: refactor.
+                IntentionalFallbackToSequential::ResourceGroupSerializationError,
+            ))
     }
 
     fn apply_output_sequential(
@@ -1362,8 +1366,9 @@ where
                             &latest_view,
                         );
 
-                        let serialized_groups = Self::serialize_groups(patched_finalized_groups)
-                            .map_err(BlockExecutionError::FallbackToSequential)?;
+                        let serialized_groups =
+                            Self::serialize_groups(patched_finalized_groups, idx as TxnIndex)
+                                .map_err(BlockExecutionError::FallbackToSequential)?;
 
                         // TODO[agg_v2] patch resources in groups and provide explicitly
                         output.incorporate_materialized_txn_output(
@@ -1394,23 +1399,20 @@ where
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_execution_aborted(idx as TxnIndex);
                     }
-                    // Record the status indicating abort.
-                    return Err(BlockExecutionError::FatalVMError((err, idx as TxnIndex)));
+                    alert!("Fatal VM error by transaction {}", idx as TxnIndex);
+                    // Record the status indicating the unrecoverable VM failure.
+                    return Err(BlockExecutionError::FatalVMError(err));
+                },
+                ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
+                    return Err(BlockExecutionError::FallbackToSequential(
+                        code_invariant_error(msg).into(),
+                    ));
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                     panic!(
                         "Sequential execution must not have SpeculativeExecutionAbortError: {:?}",
                         msg
                     );
-                },
-                ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    error!(
-                        "Sequential execution failed with DelayedFieldsCodeInvariantError: {:?}",
-                        msg
-                    );
-                    return Err(BlockExecutionError::FallbackToSequential(
-                        PanicOr::CodeInvariantError(msg),
-                    ));
                 },
             };
             // When the txn is a SkipRest txn, halt sequential execution.
@@ -1446,6 +1448,7 @@ where
                 signature_verified_block,
                 base_view,
             )
+            .map_err(BlockExecutionError::FallbackToSequential)
         } else {
             self.execute_transactions_sequential(
                 executor_arguments,
@@ -1457,26 +1460,9 @@ where
         // Sequential execution fallback
         // Only worth doing if we did parallel before, i.e. if we did a different pass.
         if self.config.local.concurrency_level > 1 {
-            if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
-                match e {
-                    PanicOr::Or(IntentionalFallbackToSequential::ModulePathReadWrite) => {
-                        debug!("[Execution]: Module read & written, sequential fallback");
-                    },
-                    PanicOr::Or(
-                        IntentionalFallbackToSequential::ResourceGroupSerializationError(msg),
-                    ) => {
-                        error!(
-                            "[Execution]: ResourceGroupSerializationError {}, sequential fallback",
-                            msg
-                        );
-                    },
-                    PanicOr::CodeInvariantError(msg) => {
-                        error!(
-                            "[Execution]: CodeInvariantError({:?}), sequential fallback",
-                            msg
-                        );
-                    },
-                };
+            if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
+                // Any error logs are already written at appropriate levels.
+                debug!("Sequential_fallback occurred");
 
                 // All logs from the parallel execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
