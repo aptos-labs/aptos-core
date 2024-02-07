@@ -483,6 +483,9 @@ where
                 scheduler.add_to_commit_queue(txn_idx);
             }
 
+            // An invariant check on the recorded outputs.
+            last_input_output.check_execution_status_during_commit(txn_idx)?;
+
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
                     last_input_output
@@ -574,13 +577,6 @@ where
                     }
                 }
             }
-
-            // Note that module read/write intersection would be detected on record, and directly
-            // propagated as an error. Similarly, an unrecoverable VM failure, would also be
-            // directly propagated as error even from a speculative transaction execution.
-
-            // An additional invariant check on the recorded outputs.
-            last_input_output.check_execution_status_during_commit(txn_idx)?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
 

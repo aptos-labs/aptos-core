@@ -9,7 +9,6 @@ use crate::{
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::{code_invariant_error, PanicOr};
-use aptos_logger::warn;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
@@ -219,19 +218,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .into()),
             }
         } else {
-            // TODO: check carefully if such a case is possible due to early halts.
-            warn!("Possible to not find committed output (halted?)");
-            Ok(())
+            Err(code_invariant_error("Recorded output not found during commit").into())
         }
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+        if self.block_skips_rest_at_idx(txn_idx) {
+            // Already skipping.
+            return;
+        }
+
+        // check_execution_status_during_commit must be used for checks re:status.
+        // Hence, since the status is not SkipRest, it must be Success.
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
-            unreachable!();
+            unreachable!("Unexpected status");
         }
     }
 

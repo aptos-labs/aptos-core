@@ -57,7 +57,7 @@ fn run_transactions<K, V, E>(
         *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::Abort;
     }
     for i in skip_rest_transactions {
-        *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest;
+        *transactions.get_mut(i.index(length)).unwrap() = MockTransaction::SkipRest(0);
     }
 
     let data_view = EmptyDataView::<KeyType<K>> {
