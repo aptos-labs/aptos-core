@@ -20,8 +20,8 @@ use std::time::Duration;
 
 /// Writes JSON Value to GCS
 pub async fn write_json_to_gcs(
-    bucket: String,
-    id: String,
+    bucket: &str,
+    id: &str,
     json: &Value,
     client: &Client,
 ) -> anyhow::Result<String> {
@@ -41,7 +41,7 @@ pub async fn write_json_to_gcs(
             Ok(client
                 .upload_object(
                     &UploadObjectRequest {
-                        bucket: bucket.clone(),
+                        bucket: bucket.to_string(),
                         ..Default::default()
                     },
                     json_bytes.clone(),
@@ -73,8 +73,8 @@ pub async fn write_json_to_gcs(
 /// Infers file type and writes image to GCS
 pub async fn write_image_to_gcs(
     img_format: ImageFormat,
-    bucket: String,
-    id: String,
+    bucket: &str,
+    id: &str,
     buffer: Vec<u8>,
     client: &Client,
 ) -> anyhow::Result<String> {
@@ -100,7 +100,7 @@ pub async fn write_image_to_gcs(
             Ok(client
                 .upload_object(
                     &UploadObjectRequest {
-                        bucket: bucket.clone(),
+                        bucket: bucket.to_string(),
                         ..Default::default()
                     },
                     buffer.clone(),

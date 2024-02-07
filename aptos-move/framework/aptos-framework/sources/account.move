@@ -1003,7 +1003,7 @@ module aptos_framework::account {
         // Maul the signature and make sure the call would fail
         let invalid_signature = ed25519::signature_to_bytes(&sig);
         let first_sig_byte = vector::borrow_mut(&mut invalid_signature, 0);
-        *first_sig_byte = *first_sig_byte + 1;
+        *first_sig_byte = *first_sig_byte ^ 1;
 
         offer_signer_capability(&alice, invalid_signature, 0, alice_pk_bytes, bob_addr);
     }
