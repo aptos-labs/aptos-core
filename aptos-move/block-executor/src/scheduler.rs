@@ -581,17 +581,21 @@ impl Scheduler {
     }
 
     /// This function can halt the BlockSTM early, even if there are unfinished tasks.
-    /// It will set the done_marker to be true, resolve all pending dependencies.
+    /// It will set the done_marker to be true, and resolve all pending dependencies.
     ///
-    /// Currently there are 4 scenarios to early halt the BlockSTM execution.
-    /// 1. There is a module publishing txn that has read/write intersection with any txns even during speculative execution.
-    /// 2. There is a txn with VM execution status Abort.
-    /// 3. There is a txn with VM execution status SkipRest.
-    /// 4. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.
+    /// Currently, the reasons for halting the scheduler are as follows:
+    /// 1. There is a module publishing txn that has read/write intersection with any txns
+    ///    even during speculative execution.
+    /// 2. There is a resource group serialization error.
+    /// 3. There is a txn with VM execution status Abort.
+    /// 4. There is a txn with VM execution status SkipRest.
+    /// 5. The committed txns have exceeded the PER_BLOCK_GAS_LIMIT.
+    /// 6. All transactions have been committed.
     ///
-    /// For scenarios 1 and 2, only the error will be returned as the output of the block execution.
-    /// For scenarios 3 and 4, the execution outputs of the committed txn prefix will be returned.
-    pub fn halt(&self) -> bool {
+    /// For scenarios 1, 2 & 3, the output of the block execution will be an error, leading
+    /// to a fallback with sequential execution. For scenarios 4, 5 & 6, execution outputs
+    /// of the committed txn prefix will be returned from block execution.
+    pub(crate) fn halt(&self) -> bool {
         // The first thread that sets done_marker to be true will be responsible for
         // resolving the conditional variables, to help other theads that may be pending
         // on the read dependency. See the comment of the function halt_transaction_execution().
@@ -924,5 +928,19 @@ impl Scheduler {
     /// Checks whether the done marker is set. The marker can only be set by 'try_commit'.
     fn done(&self) -> bool {
         self.done_marker.load(Ordering::Acquire)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scheduler_halt() {
+        let s = Scheduler::new(5);
+        assert!(!s.done());
+        assert!(s.halt());
+        assert!(s.done());
+        assert!(!s.halt());
     }
 }

@@ -1,0 +1,146 @@
+diff --git a/aptos-move/aptos-vm/src/aptos_vm.rs b/aptos-move/aptos-vm/src/aptos_vm.rs
+index fee3fcdadd..fae1653841 100644
+--- a/aptos-move/aptos-vm/src/aptos_vm.rs
++++ b/aptos-move/aptos-vm/src/aptos_vm.rs
+@@ -114,7 +114,7 @@ static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
+ pub static RAYON_EXEC_POOL: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
+     Arc::new(
+         rayon::ThreadPoolBuilder::new()
+-            .num_threads(num_cpus::get())
++            .num_threads(1)
+             .thread_name(|index| format!("par_exec-{}", index))
+             .build()
+             .unwrap(),
+diff --git a/aptos-move/e2e-tests/src/executor.rs b/aptos-move/e2e-tests/src/executor.rs
+index 76b94ce0e9..e8e38f72a0 100644
+--- a/aptos-move/e2e-tests/src/executor.rs
++++ b/aptos-move/e2e-tests/src/executor.rs
+@@ -116,9 +116,9 @@ pub enum ExecutorMode {
+ pub struct FakeExecutor {
+     data_store: FakeDataStore,
+     event_store: Vec<ContractEvent>,
+-    executor_thread_pool: Arc<rayon::ThreadPool>,
++    //executor_thread_pool: Arc<rayon::ThreadPool>,
+     block_time: u64,
+-    executed_output: Option<GoldenOutputs>,
++    //executed_output: Option<GoldenOutputs>,
+     trace_dir: Option<PathBuf>,
+     rng: KeyGen,
+     /// If set, determines whether or not to execute a comparison test with the parallel
+@@ -138,18 +138,18 @@ pub enum GasMeterType {
+ impl FakeExecutor {
+     /// Creates an executor from a genesis [`WriteSet`].
+     pub fn from_genesis(write_set: &WriteSet, chain_id: ChainId) -> Self {
+-        let executor_thread_pool = Arc::new(
+-            rayon::ThreadPoolBuilder::new()
+-                .num_threads(num_cpus::get())
+-                .build()
+-                .unwrap(),
+-        );
++        //let executor_thread_pool = Arc::new(
++        //    rayon::ThreadPoolBuilder::new()
++        //        .num_threads(num_cpus::get())
++        //        .build()
++        //        .unwrap(),
++        //);
+         let mut executor = FakeExecutor {
+             data_store: FakeDataStore::default(),
+             event_store: Vec::new(),
+-            executor_thread_pool,
++            //executor_thread_pool,
+             block_time: 0,
+-            executed_output: None,
++            //executed_output: None,
+             trace_dir: None,
+             rng: KeyGen::from_seed(RNG_SEED),
+             executor_mode: None,
+@@ -219,18 +219,18 @@ impl FakeExecutor {
+ 
+     /// Creates an executor in which no genesis state has been applied yet.
+     pub fn no_genesis() -> Self {
+-        let executor_thread_pool = Arc::new(
+-            rayon::ThreadPoolBuilder::new()
+-                .num_threads(num_cpus::get())
+-                .build()
+-                .unwrap(),
+-        );
++        //let executor_thread_pool = Arc::new(
++        //    rayon::ThreadPoolBuilder::new()
++        //        .num_threads(num_cpus::get())
++        //        .build()
++        //        .unwrap(),
++        //);
+         FakeExecutor {
+             data_store: FakeDataStore::default(),
+             event_store: Vec::new(),
+-            executor_thread_pool,
++            //executor_thread_pool,
+             block_time: 0,
+-            executed_output: None,
++            //executed_output: None,
+             trace_dir: None,
+             rng: KeyGen::from_seed(RNG_SEED),
+             executor_mode: None,
+@@ -243,7 +243,7 @@ impl FakeExecutor {
+         // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
+         // files can persist on windows machines.
+         let file_name = test_name.replace(':', "_");
+-        self.executed_output = Some(GoldenOutputs::new(&file_name));
++        //self.executed_output = Some(GoldenOutputs::new(&file_name));
+         self.set_tracing(test_name, file_name)
+     }
+ 
+@@ -251,7 +251,7 @@ impl FakeExecutor {
+         // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
+         // files can persist on windows machines.
+         let file_name = test_name.replace(':', "_");
+-        self.executed_output = Some(GoldenOutputs::new_at_path(PathBuf::from(path), &file_name));
++        //self.executed_output = Some(GoldenOutputs::new_at_path(PathBuf::from(path), &file_name));
+         self.set_tracing(test_name, file_name)
+     }
+ 
+@@ -475,18 +475,19 @@ impl FakeExecutor {
+         txn_block: &[SignatureVerifiedTransaction],
+         onchain_config: BlockExecutorConfigFromOnchain,
+     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+-        BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
+-            self.executor_thread_pool.clone(),
+-            txn_block,
+-            &self.data_store,
+-            BlockExecutorConfig {
+-                local: BlockExecutorLocalConfig {
+-                    concurrency_level: usize::min(4, num_cpus::get()),
+-                },
+-                onchain: onchain_config,
+-            },
+-            None,
+-        ).map(BlockOutput::into_transaction_outputs_forced)
++        //BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
++        //    self.executor_thread_pool.clone(),
++        //    txn_block,
++        //    &self.data_store,
++        //    BlockExecutorConfig {
++        //        local: BlockExecutorLocalConfig {
++        //            concurrency_level: usize::min(4, num_cpus::get()),
++        //        },
++        //        onchain: onchain_config,
++        //    },
++        //    None,
++        //).map(BlockOutput::into_transaction_outputs_forced)
++        todo!()
+     }
+ 
+     pub fn execute_transaction_block(
+@@ -554,9 +555,9 @@ impl FakeExecutor {
+ 
+         let output = sequential_output.or(parallel_output).unwrap();
+ 
+-        if let Some(logger) = &self.executed_output {
+-            logger.log(format!("{:#?}\n", output).as_str());
+-        }
++        //if let Some(logger) = &self.executed_output {
++        //    logger.log(format!("{:#?}\n", output).as_str());
++        //}
+ 
+         // dump serialized transaction output after execution, if tracing
+         if let Some(trace_dir) = &self.trace_dir {

@@ -88,7 +88,7 @@ Represents the common fields to all tokens.
 </dt>
 <dd>
  Deprecated in favor of <code>index</code> inside TokenIdentifiers.
- Will be populated until concurrent_assets_enabled feature flag is enabled.
+ Will be populated until concurrent_token_v2_enabled feature flag is enabled.
 
  Unique identifier within the collection, optional, 0 means unassigned
 </dd>
@@ -103,7 +103,7 @@ Represents the common fields to all tokens.
 </dt>
 <dd>
  Deprecated in favor of <code>name</code> inside TokenIdentifiers.
- Will be populated until concurrent_assets_enabled feature flag is enabled.
+ Will be populated until concurrent_token_v2_enabled feature flag is enabled.
 
  The name of the token, which should be unique within the collection; the length of name
  should be smaller than 128, characters, eg: "Aptos Animal #1234"
@@ -440,7 +440,7 @@ The token name is over the maximum length
     // Flag which controls whether <a href="../../aptos-framework/../aptos-stdlib/doc/any.md#0x1_any">any</a> functions from <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2">aggregator_v2</a> <b>module</b> can be called.
     <b>let</b> aggregator_api_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_aggregator_v2_api_enabled">features::aggregator_v2_api_enabled</a>();
     // Flag which controls whether we are going <b>to</b> still <b>continue</b> writing <b>to</b> deprecated fields.
-    <b>let</b> concurrent_assets_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_assets_enabled">features::concurrent_assets_enabled</a>();
+    <b>let</b> concurrent_token_v2_enabled = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_token_v2_enabled">features::concurrent_token_v2_enabled</a>();
 
     <b>let</b> (deprecated_index, deprecated_name) = <b>if</b> (aggregator_api_enabled) {
         <b>let</b> index = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_with_default">option::destroy_with_default</a>(
@@ -455,15 +455,15 @@ The token name is over the maximum length
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_create_derived_string">aggregator_v2::create_derived_string</a>(name_prefix)
         };
 
-        // Until concurrent_assets_enabled is enabled, we still need <b>to</b> write <b>to</b> deprecated fields.
+        // Until concurrent_token_v2_enabled is enabled, we still need <b>to</b> write <b>to</b> deprecated fields.
         // Otherwise we put empty values there.
         // (we need <b>to</b> do these calls before creating token_concurrent, <b>to</b> avoid copying objects)
-        <b>let</b> deprecated_index = <b>if</b> (concurrent_assets_enabled) {
+        <b>let</b> deprecated_index = <b>if</b> (concurrent_token_v2_enabled) {
             0
         } <b>else</b> {
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_snapshot">aggregator_v2::read_snapshot</a>(&index)
         };
-        <b>let</b> deprecated_name = <b>if</b> (concurrent_assets_enabled) {
+        <b>let</b> deprecated_name = <b>if</b> (concurrent_token_v2_enabled) {
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"")
         } <b>else</b> {
             <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_read_derived_string">aggregator_v2::read_derived_string</a>(&name)
@@ -559,7 +559,7 @@ for additional specialization.
 Creates a new token object with a unique address and returns the ConstructorRef
 for additional specialization.
 The name is created by concatenating the (name_prefix, index, name_suffix).
-After flag concurrent_assets_enabled is enabled, this function will allow
+After flag concurrent_token_v2_enabled is enabled, this function will allow
 creating tokens in parallel, from the same collection, while providing sequential names.
 
 
