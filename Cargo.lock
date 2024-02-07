@@ -860,6 +860,7 @@ dependencies = [
  "serde_json",
  "serde_merge",
  "serde_yaml 0.8.26",
+ "tempfile",
  "thiserror",
  "url",
 ]
