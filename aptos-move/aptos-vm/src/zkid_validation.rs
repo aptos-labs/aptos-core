@@ -146,7 +146,7 @@ pub fn validate_zkid_authenticators(
                     }
 
                     let public_inputs_hash =
-                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, &config).map_err(
+                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, config).map_err(
                             |_| invalid_signature!("Could not compute public inputs hash"),
                         )?;
                     proof
