@@ -33,11 +33,6 @@ use std::{
 /// hashing with a larger pepper would lead to a different address).
 pub const PEPPER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
-/// The size of the identity commitment (IDC) used to derive a zkID address. This value should **NOT*
-/// be changed since on-chain addresses are based on it (e.g., hashing a larger-sized IDC would lead
-/// to a different address).
-pub const IDC_NUM_BYTES: usize = 32;
-
 /// Reflection of aptos_framework::zkid::Configs
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
@@ -418,7 +413,14 @@ impl Pepper {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct IdCommitment(pub(crate) [u8; IDC_NUM_BYTES]);
+pub struct IdCommitment(pub(crate) Vec<u8>);
+
+impl IdCommitment {
+    /// The size of the identity commitment (IDC) used to derive a zkID address. This value should **NOT*
+    /// be changed since on-chain addresses are based on it (e.g., hashing a larger-sized IDC would lead
+    /// to a different address).
+    pub const NUM_BYTES: usize = 32;
+}
 
 impl IdCommitment {
     /// The max length of the value of the JWT's `aud` field supported in our circuit. zkID address
@@ -453,7 +455,7 @@ impl IdCommitment {
             uid_key_hash,
         ])?;
 
-        let mut idc_bytes = [0u8; IDC_NUM_BYTES];
+        let mut idc_bytes = vec![0u8; IdCommitment::NUM_BYTES];
         fr.serialize_uncompressed(&mut idc_bytes[..])?;
         Ok(IdCommitment(idc_bytes))
     }
@@ -490,7 +492,7 @@ pub struct ZkIdPublicKey {
 impl ZkIdPublicKey {
     /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
     /// enforced by our full nodes when they receive zkID TXNs.
-    pub const MAX_LEN: usize = 200 + IDC_NUM_BYTES;
+    pub const MAX_LEN: usize = 200 + IdCommitment::NUM_BYTES;
     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
