@@ -366,7 +366,7 @@ pub fn get_public_inputs_hash(
     let formatted_iss = format!("\"iss\":\"{}\",", pk.iss);
     frs.push(poseidon_bn254::pad_and_hash_string(
         &formatted_iss,
-        config.max_iss_bytes as usize,
+        config.max_iss_field_bytes as usize,
     )?);
 
     frs.push(extra_field_hashed);

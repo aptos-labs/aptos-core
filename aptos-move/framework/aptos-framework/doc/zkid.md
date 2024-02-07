@@ -156,7 +156,7 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
  The max length of an ephemeral public key supported in our circuit (93 bytes)
 </dd>
 <dt>
-<code>max_iss_bytes: u16</code>
+<code>max_iss_field_bytes: u16</code>
 </dt>
 <dd>
  The max length of the value of the JWT's <code>iss</code> field supported in our circuit
@@ -256,7 +256,7 @@ The training wheels PK needs to be 32 bytes long.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16, max_commited_epk_bytes: u16, max_iss_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16, max_commited_epk_bytes: u16, max_iss_field_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
 </code></pre>
 
 
@@ -271,7 +271,7 @@ The training wheels PK needs to be 32 bytes long.
     training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
     nonce_commitment_num_bytes: u16,
     max_commited_epk_bytes: u16,
-    max_iss_bytes: u16,
+    max_iss_field_bytes: u16,
     max_extra_field_bytes: u16,
     max_jwt_header_b64_bytes: u32
 ): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
@@ -281,7 +281,7 @@ The training wheels PK needs to be 32 bytes long.
         training_wheels_pubkey,
         nonce_commitment_num_bytes,
         max_commited_epk_bytes,
-        max_iss_bytes,
+        max_iss_field_bytes,
         max_extra_field_bytes,
         max_jwt_header_b64_bytes,
     }
@@ -351,7 +351,7 @@ Returns the configuration for our devnet deployment.
         // The commitment is using the Poseidon-BN254 <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> function, hence the 254-bit (32 byte) size.
         nonce_commitment_num_bytes: 32,
         max_commited_epk_bytes: 3 * 31,
-        max_iss_bytes: 126,
+        max_iss_field_bytes: 126,
         max_extra_field_bytes:  350,
         max_jwt_header_b64_bytes: 300,
     }
@@ -430,7 +430,7 @@ Returns the configuration for our devnet deployment.
             training_wheels_pubkey: _,
             nonce_commitment_num_bytes: _,
             max_commited_epk_bytes: _,
-            max_iss_bytes: _,
+            max_iss_field_bytes: _,
             max_extra_field_bytes: _,
             max_jwt_header_b64_bytes: _,
         } = <b>move_from</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));

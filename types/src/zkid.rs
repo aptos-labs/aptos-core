@@ -41,7 +41,7 @@ pub struct Configuration {
     pub training_wheels_pubkey: Option<Vec<u8>>,
     pub nonce_commitment_num_bytes: u16,
     pub max_commited_epk_bytes: u16,
-    pub max_iss_bytes: u16,
+    pub max_iss_field_bytes: u16,
     pub max_extra_field_bytes: u16,
     pub max_jwt_header_b64_bytes: u32,
 }
@@ -62,7 +62,7 @@ impl Configuration {
             training_wheels_pubkey: None,
             nonce_commitment_num_bytes: 32,
             max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_iss_bytes: 126,
+            max_iss_field_bytes: 126,
             max_extra_field_bytes: 350,
             max_jwt_header_b64_bytes: 300,
         }

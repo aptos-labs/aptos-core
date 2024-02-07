@@ -40,7 +40,7 @@ module aptos_framework::zkid {
         /// The max length of an ephemeral public key supported in our circuit (93 bytes)
         max_commited_epk_bytes: u16,
         /// The max length of the value of the JWT's `iss` field supported in our circuit
-        max_iss_bytes: u16,
+        max_iss_field_bytes: u16,
         /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
         max_extra_field_bytes: u16,
         /// The max length of the base64url-encoded JWT header in bytes supported in our circuit
@@ -78,7 +78,7 @@ module aptos_framework::zkid {
         training_wheels_pubkey: Option<vector<u8>>,
         nonce_commitment_num_bytes: u16,
         max_commited_epk_bytes: u16,
-        max_iss_bytes: u16,
+        max_iss_field_bytes: u16,
         max_extra_field_bytes: u16,
         max_jwt_header_b64_bytes: u32
     ): Configuration {
@@ -88,7 +88,7 @@ module aptos_framework::zkid {
             training_wheels_pubkey,
             nonce_commitment_num_bytes,
             max_commited_epk_bytes,
-            max_iss_bytes,
+            max_iss_field_bytes,
             max_extra_field_bytes,
             max_jwt_header_b64_bytes,
         }
@@ -118,7 +118,7 @@ module aptos_framework::zkid {
             // The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
             nonce_commitment_num_bytes: 32,
             max_commited_epk_bytes: 3 * 31,
-            max_iss_bytes: 126,
+            max_iss_field_bytes: 126,
             max_extra_field_bytes:  350,
             max_jwt_header_b64_bytes: 300,
         }
@@ -161,7 +161,7 @@ module aptos_framework::zkid {
                 training_wheels_pubkey: _,
                 nonce_commitment_num_bytes: _,
                 max_commited_epk_bytes: _,
-                max_iss_bytes: _,
+                max_iss_field_bytes: _,
                 max_extra_field_bytes: _,
                 max_jwt_header_b64_bytes: _,
             } = move_from<Configuration>(signer::address_of(fx));
