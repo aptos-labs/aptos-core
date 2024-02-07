@@ -746,6 +746,7 @@ impl TryFrom<Script> for ScriptPayload {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Union)]
 pub enum MultisigTransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
+    ScriptPayload(ScriptPayload),
 }
 
 /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
@@ -768,6 +769,7 @@ impl VerifyInput for MultisigPayload {
                         type_arg.verify(0)?;
                     }
                 },
+                MultisigTransactionPayload::ScriptPayload(script) => script.verify()?,
             }
         }
 

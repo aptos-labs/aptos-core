@@ -931,6 +931,28 @@ impl TransactionsApi {
                                         entry_function,
                                     )?;
                                 },
+                                MultisigTransactionPayload::Script(script) => {
+                                    if script.code().is_empty() {
+                                        return Err(SubmitTransactionError::bad_request_with_code(
+                                            "Script payload bytecode must not be empty",
+                                            AptosErrorCode::InvalidInput,
+                                            ledger_info,
+                                        ));
+                                    }
+
+                                    for arg in script.ty_args() {
+                                        let arg = MoveType::from(arg);
+                                        arg.verify(0)
+                                            .context("Transaction script function type arg invalid")
+                                            .map_err(|err| {
+                                                SubmitTransactionError::bad_request_with_code(
+                                                    err,
+                                                    AptosErrorCode::InvalidInput,
+                                                    ledger_info,
+                                                )
+                                            })?;
+                                    }
+                                },
                             }
                         }
                     },
@@ -1252,6 +1274,9 @@ impl TransactionsApi {
                                 entry_function.module(),
                                 &entry_function.function().into(),
                             )
+                        },
+                        MultisigTransactionPayload::Script(_) => {
+                            format!("Multisig::{}", txn.clone().committed_hash()).to_string()
                         },
                     }
                 } else {

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::EntryFunction;
+use crate::transaction::{EntryFunction, Script};
 use move_core_types::{account_address::AccountAddress, vm_status::VMStatus};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,7 @@ pub struct Multisig {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum MultisigTransactionPayload {
     EntryFunction(EntryFunction),
+    Script(Script),
 }
 
 /// Contains information about execution failure.

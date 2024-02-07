@@ -102,6 +102,7 @@ use std::{
         Arc,
     },
 };
+use aptos_types::transaction::Script;
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
@@ -664,6 +665,37 @@ impl AptosVM {
         )?)
     }
 
+    fn validate_and_execute_script(
+        &self,
+        session: &mut SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        senders: Vec<AccountAddress>,
+        script: &Script,
+    ) -> Result<SerializedReturnValues, VMStatus> {
+        let loaded_func =
+            session.load_script(script.code(), script.ty_args().to_vec())?;
+        // Gerardo: consolidate the extended validation to verifier.
+        verifier::event_validation::verify_no_event_emission_in_script(
+            script.code(),
+            &session.get_vm_config().deserializer_config,
+        )?;
+
+        let args =
+            verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
+                session,
+                senders,
+                convert_txn_args(script.args()),
+                &loaded_func,
+                self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            )?;
+        Ok(session.execute_script(
+            script.code(),
+            script.ty_args().to_vec(),
+            args,
+            gas_meter,
+        )?)
+    }
+
     fn execute_script_or_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -689,27 +721,11 @@ impl AptosVM {
 
             match payload {
                 TransactionPayload::Script(script) => {
-                    let loaded_func =
-                        session.load_script(script.code(), script.ty_args().to_vec())?;
-                    // Gerardo: consolidate the extended validation to verifier.
-                    verifier::event_validation::verify_no_event_emission_in_script(
-                        script.code(),
-                        &session.get_vm_config().deserializer_config,
-                    )?;
-
-                    let args =
-                        verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
-                            &mut session,
-                            txn_data.senders(),
-                            convert_txn_args(script.args()),
-                            &loaded_func,
-                            self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
-                        )?;
-                    session.execute_script(
-                        script.code(),
-                        script.ty_args().to_vec(),
-                        args,
+                    self.validate_and_execute_script(
+                        &mut session,
                         gas_meter,
+                        txn_data.senders(),
+                        script,
                     )?;
                 },
                 TransactionPayload::EntryFunction(script_fn) => {
@@ -835,6 +851,36 @@ impl AptosVM {
                             )
                         })
                     },
+                    MultisigTransactionPayload::Script(script) => {
+                        aptos_try!({
+                            return_on_failure!(self.execute_multisig_script(
+                                &mut session,
+                                gas_meter,
+                                multisig.multisig_address,
+                                script,
+                                new_published_modules_loaded,
+                            ));
+                            // TODO: Deduplicate this against execute_multisig_transaction
+                            // A bit tricky since we need to skip success/failure cleanups,
+                            // which is in the middle. Introducing a boolean would make the code
+                            // messier.
+                            let respawned_session = self.charge_change_set_and_respawn_session(
+                                session,
+                                resolver,
+                                gas_meter,
+                                change_set_configs,
+                                txn_data,
+                            )?;
+
+                            self.success_transaction_cleanup(
+                                respawned_session,
+                                gas_meter,
+                                txn_data,
+                                log_context,
+                                change_set_configs,
+                            )
+                        })
+                    }
                 }
             },
         }
@@ -929,6 +975,13 @@ impl AptosVM {
                     &entry_function,
                     new_published_modules_loaded,
                 ),
+            MultisigTransactionPayload::Script(script) => self.execute_multisig_script(
+                &mut session,
+                gas_meter,
+                txn_payload.multisig_address,
+                &script,
+                new_published_modules_loaded,
+            ),
         };
 
         // Step 3: Call post transaction cleanup function in multisig account module with the result
@@ -987,6 +1040,29 @@ impl AptosVM {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
+            session,
+            gas_meter,
+            vec![multisig_address],
+            payload,
+        )?;
+
+        // Resolve any pending module publishes in case the multisig transaction is deploying
+        // modules.
+        self.resolve_pending_code_publish(session, gas_meter, new_published_modules_loaded)?;
+        Ok(())
+    }
+
+    fn execute_multisig_script(
+        &self,
+        session: &mut SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        multisig_address: AccountAddress,
+        payload: &Script,
+        new_published_modules_loaded: &mut bool,
+    ) -> Result<(), VMStatus> {
+        // If txn args are not valid, we'd still consider the transaction as executed but
+        // failed. This is primarily because it's unrecoverable at this point.
+        self.validate_and_execute_script(
             session,
             gas_meter,
             vec![multisig_address],
