@@ -39,7 +39,7 @@ module aptos_framework::zkid {
         nonce_commitment_num_bytes: u16,
         /// The max length of an ephemeral public key supported in our circuit (93 bytes)
         max_commited_epk_bytes: u16,
-        /// The max length of the value of the JWT's `iss` field supported in our circuit
+        /// The max length of the field name and value of the JWT's `iss` field supported in our circuit (e.g., `"iss":"aptos.com"`)
         max_iss_field_bytes: u16,
         /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
         max_extra_field_bytes: u16,
