@@ -6,11 +6,12 @@ use crate::natives::aggregator_natives::aggregator_v2::{
 };
 use aptos_aggregator::resolver::DelayedFieldResolver;
 use aptos_native_interface::{safely_get_struct_field_as, SafeNativeError, SafeNativeResult};
-use aptos_types::delayed_fields::{string_to_bytes, DelayedFieldID};
+use aptos_types::delayed_fields::DelayedFieldID;
 use move_binary_format::errors::PartialVMError;
 use move_vm_types::{
+    delayed_values::{derived_string_snapshot::string_to_bytes, sized_id::SizedID},
     loaded_data::runtime_types::Type,
-    values::{Reference, SizedID, Struct, StructRef, Value},
+    values::{Reference, Struct, StructRef, Value},
 };
 
 // Field indices for aggregator Move struct.
@@ -139,6 +140,5 @@ pub(crate) fn get_derived_string_snapshot_value(
         DERIVED_STRING_SNAPSHOT_VALUE_FIELD_INDEX,
         Struct
     );
-    string_to_bytes(derived_string_snapshot_value)
-        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))
+    string_to_bytes(derived_string_snapshot_value).map_err(SafeNativeError::InvariantViolation)
 }

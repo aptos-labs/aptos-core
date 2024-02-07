@@ -21,16 +21,21 @@ use aptos_native_interface::{
     SafeNativeResult,
 };
 use aptos_types::delayed_fields::{
-    bytes_and_width_to_derived_string_struct, calculate_width_for_constant_string,
-    calculate_width_for_integer_embeded_string, string_to_bytes, u128_to_u64, DelayedFieldID,
-    SnapshotToStringFormula,
+    calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
+    DelayedFieldID, SnapshotToStringFormula,
 };
 use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
+    delayed_values::{
+        derived_string_snapshot::{
+            bytes_and_width_to_derived_string_struct, string_to_bytes, u128_to_u64,
+        },
+        sized_id::SizedID,
+    },
     loaded_data::runtime_types::Type,
-    values::{SizedID, Struct, StructRef, Value},
+    values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{cell::RefMut, collections::VecDeque};
@@ -516,7 +521,7 @@ fn native_create_derived_string(
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
     let value_bytes = string_to_bytes(safely_pop_arg!(args, Struct))
-        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
+        .map_err(SafeNativeError::InvariantViolation)?;
     context
         .charge(AGGREGATOR_V2_CREATE_SNAPSHOT_PER_BYTE * NumBytes::new(value_bytes.len() as u64))?;
 
@@ -533,7 +538,7 @@ fn native_create_derived_string(
         } else {
             let width = calculate_width_for_constant_string(value_bytes.len());
             bytes_and_width_to_derived_string_struct(value_bytes, width)
-                .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?
+                .map_err(SafeNativeError::InvariantViolation)?
         };
 
     Ok(smallvec![derived_string_snapshot])
@@ -560,14 +565,14 @@ fn native_derive_string_concat(
 
     // Popping arguments from the end.
     let suffix = string_to_bytes(safely_pop_arg!(args, Struct))
-        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
+        .map_err(SafeNativeError::InvariantViolation)?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(suffix.len() as u64))?;
 
     let snapshot_value_ty = &ty_args[0];
     let snapshot = safely_pop_arg!(args, StructRef);
 
     let prefix = string_to_bytes(safely_pop_arg!(args, Struct))
-        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
+        .map_err(SafeNativeError::InvariantViolation)?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(prefix.len() as u64))?;
 
     if prefix
@@ -590,7 +595,7 @@ fn native_derive_string_concat(
     } else {
         let snapshot_width =
             get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE)?;
-        let width = calculate_width_for_integer_embeded_string(
+        let width = calculate_width_for_integer_embedded_string(
             prefix.len() + suffix.len(),
             DelayedFieldID::new_with_width(0, snapshot_width),
         )
@@ -609,7 +614,7 @@ fn test_max_size_fits() {
     DelayedFieldID::new_with_width(
         0,
         u32::try_from(
-            (calculate_width_for_integer_embeded_string(
+            (calculate_width_for_integer_embedded_string(
                 DERIVED_STRING_INPUT_MAX_LENGTH,
                 DelayedFieldID::new_with_width(0, 16),
             ))

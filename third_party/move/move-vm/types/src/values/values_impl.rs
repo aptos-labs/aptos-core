@@ -6,7 +6,6 @@
 
 use crate::{
     loaded_data::runtime_types::Type,
-    values::SizedID,
     views::{ValueView, ValueVisitor},
 };
 use move_binary_format::{
@@ -3822,6 +3821,7 @@ pub mod prop {
     }
 }
 
+use crate::delayed_values::sized_id::SizedID;
 use move_core_types::value::{MoveStruct, MoveValue};
 
 impl ValueImpl {

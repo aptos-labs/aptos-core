@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{DelayedFieldValue, TryFromMoveValue};
-use aptos_types::delayed_fields::bytes_and_width_to_derived_string_struct;
+use crate::types::DelayedFieldValue;
 use claims::{assert_err, assert_ok};
 use move_core_types::value::{
     IdentifierMappingKind,
@@ -10,7 +9,13 @@ use move_core_types::value::{
     MoveTypeLayout,
     MoveTypeLayout::{Address, Bool, Struct, Vector, U128, U64, U8},
 };
-use move_vm_types::values::Value;
+use move_vm_types::{
+    delayed_values::{
+        derived_string_snapshot::bytes_and_width_to_derived_string_struct,
+        sized_id::{SizedID, TryFromMoveValue, TryIntoMoveValue},
+    },
+    values::Value,
+};
 use once_cell::sync::Lazy;
 use test_case::test_case;
 use DelayedFieldValue as A;
@@ -25,10 +30,30 @@ static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
     ]))
 });
 
-// TODO[agg_v2](tests): These tests are for `Value <--> DelayedFieldValue`
-//   conversions only, we should also consider doing the same for IDs inside
-//   third-party.
+#[test_case(&U128, 16)]
+#[test_case(&*DERIVED_STRING, 20)]
+fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: u32) {
+    let input = SizedID::new(100, width);
+    let value = assert_ok!(input.try_into_move_value(layout));
+    let (id, _) = assert_ok!(SizedID::try_from_move_value(layout, value, &()));
+    assert_eq!(id, input);
+}
 
+#[test_case(&U8)]
+#[test_case(&Bool)]
+#[test_case(&Address)]
+#[test_case(&Vector(Box::new(U8)))]
+fn test_aggregator_id_to_value_err(layout: &MoveTypeLayout) {
+    assert_err!(SizedID::new(100, 8).try_into_move_value(layout));
+}
+
+#[test_case(&U64, Value::u8(1))]
+#[test_case(&U8, Value::u8(1))]
+#[test_case(&Bool, Value::u8(1))]
+#[test_case(&Vector(Box::new(U8)), Value::vector_u8(vec![0, 1]))]
+fn test_aggregator_id_from_value_err(layout: &MoveTypeLayout, value: Value) {
+    assert_err!(SizedID::try_from_move_value(layout, value, &()));
+}
 #[test_case(A::Aggregator(10), &U64, K::Aggregator, 8)]
 #[test_case(A::Aggregator(10), &U128, K::Aggregator, 16)]
 #[test_case(A::Snapshot(10), &U64, K::Snapshot, 8)]

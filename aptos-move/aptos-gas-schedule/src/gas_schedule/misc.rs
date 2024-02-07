@@ -11,7 +11,7 @@ use crate::{
 use aptos_gas_algebra::{AbstractValueSize, AbstractValueSizePerArg};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs, u256::U256};
 use move_vm_types::{
-    values::SizedID,
+    delayed_values::sized_id::SizedID,
     views::{ValueView, ValueVisitor},
 };
 use std::collections::BTreeMap;

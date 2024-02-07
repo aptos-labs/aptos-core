@@ -229,6 +229,7 @@ fn test_vm_value_vector_u64_casting() {
 #[cfg(test)]
 mod native_values {
     use super::*;
+    use crate::delayed_values::sized_id::SizedID;
     use claims::{assert_err, assert_ok};
 
     #[test]

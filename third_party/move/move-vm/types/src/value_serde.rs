@@ -1,15 +1,17 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::{DeserializationSeed, SerializationReadyValue, SizedID, Struct, Value};
+use crate::{
+    delayed_values::sized_id::{SizedID, TryFromMoveValue, TryIntoMoveValue},
+    values::{DeserializationSeed, SerializationReadyValue, Value},
+};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
 use serde::{
     de::{DeserializeSeed, Error as DeError},
     ser::Error as SerError,
-    Deserialize, Deserializer, Serialize, Serializer,
+    Deserializer, Serialize, Serializer,
 };
-use std::str::FromStr;
 
 pub trait CustomDeserialize {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
@@ -30,141 +32,6 @@ pub trait CustomSerialize {
     ) -> Result<S::Ok, S::Error>;
 }
 
-// FIXME: consolidate
-fn is_string_layout(layout: &MoveTypeLayout) -> bool {
-    use MoveTypeLayout::*;
-    if let Struct(move_struct) = layout {
-        if let [Vector(elem)] = move_struct.fields().iter().as_slice() {
-            if let U8 = elem.as_ref() {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-fn is_derived_string_struct_layout(layout: &MoveTypeLayout) -> bool {
-    use MoveTypeLayout::*;
-    if let Struct(move_struct) = layout {
-        if let [value_field, Vector(padding_elem)] = move_struct.fields().iter().as_slice() {
-            if is_string_layout(value_field) {
-                if let U8 = padding_elem.as_ref() {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
-}
-
-fn u64_to_fixed_size_utf8_bytes(value: u64, length: usize) -> Option<Vec<u8>> {
-    let result = format!("{:0>width$}", value, width = length)
-        .to_string()
-        .into_bytes();
-    if result.len() != length {
-        None
-    } else {
-        Some(result)
-    }
-}
-
-fn bcs_size_of_byte_array(length: usize) -> usize {
-    size_u32_as_uleb128(length) + length
-}
-
-fn bytes_and_width_to_derived_string_struct(bytes: Vec<u8>, width: usize) -> Option<Value> {
-    // We need to create DerivedStringSnapshot struct that serializes to exactly match given `width`.
-
-    let value_width = bcs_size_of_byte_array(bytes.len());
-    // padding field takes at list 1 byte (empty vector)
-    if value_width + 1 > width {
-        return None;
-    }
-
-    // We assume/assert that padding never exceeds length that requires more than 1 byte for size:
-    // (otherwise it complicates the logic to fill until the exact width, as padding can never be serialized into 129 bytes
-    // (vec[0; 127] serializes into 128 bytes, and vec[0; 128] serializes into 130 bytes))
-    let padding_len = width - value_width - 1;
-    if size_u32_as_uleb128(padding_len) > 1 {
-        return None;
-    }
-
-    Some(Value::struct_(Struct::pack(vec![
-        bytes_to_string(bytes),
-        Value::vector_u8(vec![0; padding_len]),
-    ])))
-}
-
-fn bytes_to_string(bytes: Vec<u8>) -> Value {
-    Value::struct_(Struct::pack(vec![Value::vector_u8(bytes)]))
-}
-
-fn into_derived_string_struct(sized_id: SizedID) -> Option<Value> {
-    let width = sized_id.serialized_size() as usize;
-
-    // we need to create DerivedString struct that serializes to exactly match given `width`.
-    // I.e: size_u32_as_uleb128(value.len()) + value.len() + size_u32_as_uleb128(padding.len()) + padding.len() == width
-    // As padding has a fixed allowed max width, it is easiest to expand value to have the padding be minimal.
-    // We cannot always make padding to be 0 byte vector (serialized into 1 byte) - as not all sizes are possible
-    // for string due to variable encoding of string length.
-
-    // So we will over-estimate the serialized length of the value a bit.
-    let value_len_width_upper_bound = size_u32_as_uleb128(width - 2); // we subtract 2 because uleb sizes (for both value and padding fields) are at least 1 byte.
-
-    // If we don't even have enough space to store the length of the value, we cannot proceed
-    if width <= value_len_width_upper_bound + 1 {
-        return None;
-    }
-
-    let id_as_string = u64_to_fixed_size_utf8_bytes(
-        sized_id.into(),
-        // fill the string representation to leave 1 byte for padding and upper bound for it's own length serialization.
-        width - value_len_width_upper_bound - 1,
-    )?;
-
-    bytes_and_width_to_derived_string_struct(id_as_string, width)
-}
-
-fn string_to_bytes(value: Struct) -> Option<Vec<u8>> {
-    value
-        .unpack()
-        .ok()?
-        .collect::<Vec<Value>>()
-        .pop()?
-        .value_as::<Vec<u8>>()
-        .ok()
-}
-
-fn derived_string_struct_to_bytes_and_length(value: Struct) -> Option<(Vec<u8>, u32)> {
-    let mut fields = value.unpack().ok()?.collect::<Vec<Value>>();
-    if fields.len() != 2 {
-        return None;
-    }
-    let padding = fields.pop().unwrap().value_as::<Vec<u8>>().ok()?;
-    let value = fields.pop().unwrap();
-    let string_bytes = string_to_bytes(value.value_as::<Struct>().ok()?)?;
-    let string_len = string_bytes.len();
-    Some((
-        string_bytes,
-        u32::try_from(bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len()))
-            .ok()?,
-    ))
-}
-
-fn from_utf8_bytes<T: FromStr>(bytes: Vec<u8>) -> Option<T> {
-    String::from_utf8(bytes).ok()?.parse::<T>().ok()
-}
-
 pub struct NativeValueSimpleSerDe;
 
 impl CustomDeserialize for NativeValueSimpleSerDe {
@@ -174,30 +41,14 @@ impl CustomDeserialize for NativeValueSimpleSerDe {
         _tag: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
     ) -> Result<Value, D::Error> {
-        let encoded = match layout {
-            // FIXME Add checks!
-            MoveTypeLayout::U64 => u64::deserialize(deserializer)?,
-            MoveTypeLayout::U128 => u128::deserialize(deserializer)? as u64,
-            layout if is_derived_string_struct_layout(layout) => {
-                // Here, we make sure we convert identifiers to fixed-size Move
-                // values. This is needed because we charge gas based on the resource
-                // size with identifiers inside, and so it has to be deterministic.
-                let value = DeserializationSeed {
-                    native_deserializer: None::<&NativeValueSimpleSerDe>,
-                    layout,
-                }
-                .deserialize(deserializer)?;
-                let (bytes, _width) = value
-                    .value_as::<Struct>()
-                    .map(derived_string_struct_to_bytes_and_length)
-                    .expect("TODO")
-                    .expect("TODO");
-                from_utf8_bytes::<u64>(bytes).expect("TODO")
-            },
-            _ => return Err(D::Error::custom("Failed serialization")),
-        };
-        let sized_id = SizedID::from(encoded);
-        Ok(Value::native_value(sized_id))
+        let value = DeserializationSeed {
+            native_deserializer: None::<&NativeValueSimpleSerDe>,
+            layout,
+        }
+        .deserialize(deserializer)?;
+        let (id, _width) = SizedID::try_from_move_value(layout, value, &())
+            .map_err(|_| D::Error::custom("Failed deserialization"))?;
+        Ok(Value::native_value(id))
     }
 }
 
@@ -209,25 +60,15 @@ impl CustomSerialize for NativeValueSimpleSerDe {
         layout: &MoveTypeLayout,
         sized_id: SizedID,
     ) -> Result<S::Ok, S::Error> {
-        match layout {
-            // FIXME Add checks!
-            MoveTypeLayout::U64 => serializer.serialize_u64(sized_id.into()),
-            MoveTypeLayout::U128 => {
-                let encoded: u64 = sized_id.into();
-                serializer.serialize_u128(encoded as u128)
-            },
-            layout if is_derived_string_struct_layout(layout) => {
-                let value = into_derived_string_struct(sized_id)
-                    .ok_or_else(|| S::Error::custom("Failed serialization"))?;
-                SerializationReadyValue {
-                    native_serializer: None::<&NativeValueSimpleSerDe>,
-                    layout,
-                    value: &value.0,
-                }
-                .serialize(serializer)
-            },
-            _ => Err(S::Error::custom("Failed serialization")),
+        let value = sized_id
+            .try_into_move_value(layout)
+            .map_err(|_| S::Error::custom("Failed serialization"))?;
+        SerializationReadyValue {
+            native_serializer: None::<&NativeValueSimpleSerDe>,
+            layout,
+            value: &value.0,
         }
+        .serialize(serializer)
     }
 }
 

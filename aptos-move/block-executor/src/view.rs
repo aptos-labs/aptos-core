@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::{ExtractUniqueIndex, PanicError, TryFromMoveValue},
+    delayed_fields::{ExtractUniqueIndex, PanicError},
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -56,13 +56,14 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
+    delayed_values::sized_id::{SizedID, TryFromMoveValue},
     value_serde::{
         deserialize_and_allow_native_values, deserialize_and_replace_values_with_ids,
         serialize_and_allow_native_values, serialize_and_replace_ids_with_values,
         ValueToIdentifierMapping,
     },
     value_traversal::find_identifiers_in_value,
-    values::{SizedID, Value},
+    values::Value,
 };
 use std::{
     cell::RefCell,
@@ -1921,7 +1922,7 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        delayed_fields::{bytes_and_width_to_derived_string_struct, to_utf8_bytes, DelayedFieldID},
+        delayed_fields::DelayedFieldID,
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
@@ -1934,7 +1935,12 @@ mod test {
     use bytes::Bytes;
     use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
     use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
-    use move_vm_types::values::{Struct, Value};
+    use move_vm_types::{
+        delayed_values::derived_string_snapshot::{
+            bytes_and_width_to_derived_string_struct, to_utf8_bytes,
+        },
+        values::{Struct, Value},
+    };
     use std::{cell::RefCell, collections::HashMap, sync::atomic::AtomicU32};
     use test_case::test_case;
 
@@ -2768,13 +2774,13 @@ mod test {
 
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                DelayedFieldID::new_with_width(12, 60)
+                SizedID::from(DelayedFieldID::new_with_width(12, 60))
                     .into_derived_string_struct()
                     .unwrap(),
-                DelayedFieldID::new_with_width(13, 55)
+                SizedID::from(DelayedFieldID::new_with_width(13, 55))
                     .into_derived_string_struct()
                     .unwrap(),
-                DelayedFieldID::new_with_width(14, 50)
+                SizedID::from(DelayedFieldID::new_with_width(14, 50))
                     .into_derived_string_struct()
                     .unwrap(),
             ])]));
