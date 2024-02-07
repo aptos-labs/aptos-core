@@ -844,9 +844,9 @@ pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
 });
 
 /// Histogram for the number of txns to be executed in a block.
-pub static NUM_TXNS_TO_EXECUTE_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
+pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
-        "quorum_store_with_limit_num_txns_to_execute_per_block",
+        "max_txns_from_block_to_execute",
         "Histogram for the number of txns to be executed in a block.",
         exponential_buckets(/*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25).unwrap(),
     )
