@@ -9,7 +9,10 @@ use aptos_sdk::{
         account_address::AccountAddress, ident_str, identifier::Identifier,
         language_storage::ModuleId,
     },
-    types::transaction::{EntryFunction, TransactionPayload},
+    types::{
+        serde_helper::bcs_utils::bcs_size_of_byte_array,
+        transaction::{EntryFunction, TransactionPayload},
+    },
 };
 use move_binary_format::{
     file_format::{FunctionHandleIndex, IdentifierIndex, SignatureToken},
@@ -727,10 +730,16 @@ fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayl
 }
 
 fn rand_string(rng: &mut StdRng, len: usize) -> String {
-    rng.sample_iter(&Alphanumeric)
+    let res = rng
+        .sample_iter(&Alphanumeric)
         .take(len)
         .map(char::from)
-        .collect()
+        .collect();
+    assert_eq!(
+        bcs::serialized_size(&res).unwrap(),
+        bcs_size_of_byte_array(len)
+    );
+    res
 }
 
 fn make_or_change(
