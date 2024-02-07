@@ -416,7 +416,7 @@ mod tests {
         }
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_delete_modify_ops() {
@@ -474,7 +474,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_new_op() {
@@ -515,7 +515,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_new_group() {
@@ -541,7 +541,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_delete_group() {

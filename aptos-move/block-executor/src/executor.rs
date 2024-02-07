@@ -887,7 +887,7 @@ where
                 .chain(serialized_groups)
                 .collect(),
             patched_events,
-        );
+        )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
@@ -1370,18 +1370,20 @@ where
                             Self::serialize_groups(patched_finalized_groups, idx as TxnIndex)
                                 .map_err(BlockExecutionError::FallbackToSequential)?;
 
-                        // TODO[agg_v2] patch resources in groups and provide explicitly
-                        output.incorporate_materialized_txn_output(
-                            // No aggregator v1 delta writes are needed for sequential execution.
-                            // They are already handled because we passed materialize_deltas=true
-                            // to execute_transaction.
-                            vec![],
-                            patched_resource_write_set
-                                .into_iter()
-                                .chain(serialized_groups.into_iter())
-                                .collect(),
-                            patched_events,
-                        );
+                        output
+                            .incorporate_materialized_txn_output(
+                                // No aggregator v1 delta writes are needed for sequential execution.
+                                // They are already handled because we passed materialize_deltas=true
+                                // to execute_transaction.
+                                vec![],
+                                patched_resource_write_set
+                                    .into_iter()
+                                    .chain(serialized_groups.into_iter())
+                                    .collect(),
+                                patched_events,
+                            )
+                            .map_err(PanicOr::from)
+                            .map_err(BlockExecutionError::FallbackToSequential)?;
                     }
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
