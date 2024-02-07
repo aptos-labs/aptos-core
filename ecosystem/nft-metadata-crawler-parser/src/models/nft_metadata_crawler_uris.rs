@@ -26,9 +26,9 @@ pub struct NFTMetadataCrawlerURIs {
 }
 
 impl NFTMetadataCrawlerURIs {
-    pub fn new(asset_uri: String) -> Self {
+    pub fn new(asset_uri: &str) -> Self {
         Self {
-            asset_uri,
+            asset_uri: asset_uri.to_string(),
             raw_image_uri: None,
             raw_animation_uri: None,
             cdn_json_uri: None,
