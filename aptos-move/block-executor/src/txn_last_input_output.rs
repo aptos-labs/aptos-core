@@ -231,12 +231,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
-        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
+        let output = self.take_output(txn_idx);
+        if let ExecutionStatus::Success(output) = output {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
-            debug!("update_to_skip_rest failed {:?}", self.take_output(txn_idx));
+            println!("update_to_skip_rest failed {:?}", output);
             unreachable!();
         }
     }
