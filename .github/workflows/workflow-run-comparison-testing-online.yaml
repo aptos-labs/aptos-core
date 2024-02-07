@@ -4,6 +4,7 @@ on:
   push:
       paths:
         - '.github/workflows/workflow-run-comparison-testing-online.yaml'
+        - 'testsuite/comparison-testing-online.sh'
 
 jobs:
   run-comparison-testing:
