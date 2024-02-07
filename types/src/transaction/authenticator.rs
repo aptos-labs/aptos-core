@@ -1746,9 +1746,9 @@ mod tests {
         SignedTransaction::new_single_sender(raw_txn.clone(), account_auth)
     }
 
-    /// TODO(zkid): A similar test case is in types/src/zkid.rs
+    /// TODO(zkid): Redundancy; a similar test case is in types/src/zkid.rs
     #[test]
-    fn test_groth16_proof_verification() {
+    fn test_zkid_groth16_proof_verification() {
         let a = G1Bytes::new_unchecked(
             "19843734071102143602441202443608981862760142725808945198375332557568733182487",
             "7490772921219489322991985736547330118240504032652964776703563444800470517507",

@@ -2,7 +2,15 @@ module aptos_framework::zkid {
     use std::option;
     use std::option::Option;
     use std::signer;
+    use std::vector;
     use aptos_framework::system_addresses;
+
+    /// The training wheels PK needs to be 32 bytes long.
+    const E_TRAINING_WHEELS_PK_WRONG_SIZE : u64 = 1;
+
+    /// The number of bytes we can pack in a Poseidon scalar
+    /// TODO(zkid): remove
+    const POSEIDON_BYTES_PACKED_PER_SCALAR : u16 = 31;
 
     #[resource_group(scope = global)]
     struct Group {}
@@ -31,9 +39,16 @@ module aptos_framework::zkid {
         max_exp_horizon_secs: u64,
         // The training wheels PK, if training wheels are on
         training_wheels_pubkey: Option<vector<u8>>,
-        // The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce`
-        // field.
+        // The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce` field.
         nonce_commitment_num_bytes: u16,
+        // The max length of an ephemeral public key supported in our circuit (93 bytes)
+        max_commited_epk_bytes: u16,
+        // The max length of the value of the JWT's `iss` field supported in our circuit
+        max_iss_bytes: u16,
+        // The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
+        max_extra_field_bytes: u16,
+        // The max length of the base64url-encoded JWT header in bytes supported in our circuit
+        max_jwt_header_b64_bytes: u32,
     }
 
     // genesis.move needs to initialize the devnet VK
@@ -61,6 +76,28 @@ module aptos_framework::zkid {
         }
     }
 
+    public fun new_configuration(
+        max_zkid_signatures_per_txn: u16,
+        max_exp_horizon_secs: u64,
+        training_wheels_pubkey: Option<vector<u8>>,
+        nonce_commitment_num_bytes: u16,
+        max_commited_epk_bytes: u16,
+        max_iss_bytes: u16,
+        max_extra_field_bytes: u16,
+        max_jwt_header_b64_bytes: u32
+    ): Configuration {
+        Configuration {
+            max_zkid_signatures_per_txn,
+            max_exp_horizon_secs,
+            training_wheels_pubkey,
+            nonce_commitment_num_bytes,
+            max_commited_epk_bytes,
+            max_iss_bytes,
+            max_extra_field_bytes,
+            max_jwt_header_b64_bytes,
+        }
+    }
+
     /// Returns the Groth16 VK for our devnet deployment.
     public fun devnet_groth16_vk(): Groth16VerificationKey {
         Groth16VerificationKey {
@@ -75,6 +112,7 @@ module aptos_framework::zkid {
         }
     }
 
+    /// Returns the configuration for our devnet deployment.
     public fun default_devnet_configuration(): Configuration {
         // TODO(zkid): Put reasonable defaults here.
         Configuration {
@@ -83,6 +121,10 @@ module aptos_framework::zkid {
             training_wheels_pubkey: option::some(x"aa"),
             // The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
             nonce_commitment_num_bytes: 32,
+            max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_iss_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR, // TODO(zkid): set to 115,
+            max_extra_field_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR, // TODO(zkid): set to 350,
+            max_jwt_header_b64_bytes: (8 * POSEIDON_BYTES_PACKED_PER_SCALAR as u32) // TODO(zkid): set to 300,
         }
     }
 
@@ -113,12 +155,7 @@ module aptos_framework::zkid {
 
     // Sets the zkID configuration, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
-    public fun update_configuration(fx: &signer,
-                                    max_zkid_signatures_per_txn: u16,
-                                    max_exp_horizon_secs: u64,
-                                    training_wheels_pubkey: Option<vector<u8>>,
-                                    nonce_commitment_num_bytes: u16,
-    ) acquires Configuration {
+    public fun update_configuration(fx: &signer, config: Configuration) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
         if (exists<Configuration>(signer::address_of(fx))) {
@@ -127,16 +164,25 @@ module aptos_framework::zkid {
                 max_exp_horizon_secs: _,
                 training_wheels_pubkey: _,
                 nonce_commitment_num_bytes: _,
+                max_commited_epk_bytes: _,
+                max_iss_bytes: _,
+                max_extra_field_bytes: _,
+                max_jwt_header_b64_bytes: _,
             } = move_from<Configuration>(signer::address_of(fx));
         };
 
-        let configs = Configuration {
-            max_zkid_signatures_per_txn,
-            max_exp_horizon_secs,
-            training_wheels_pubkey,
-            nonce_commitment_num_bytes,
+        move_to(fx, config);
+    }
+
+    // Convenience method to set the zkID training wheels, only callable via governance proposal.
+    // WARNING: If a malicious key is set, this would lead to stolen funds.
+    public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+        if (option::is_some(&pk)) {
+            assert!(vector::length(option::borrow(&pk)) == 32, E_TRAINING_WHEELS_PK_WRONG_SIZE)
         };
 
-        move_to(fx, configs);
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.training_wheels_pubkey = pk;
     }
 }

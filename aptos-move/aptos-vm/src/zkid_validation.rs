@@ -102,9 +102,9 @@ pub fn validate_zkid_authenticators(
         return Ok(());
     }
 
-    let configuration = &get_configs_onchain(resolver)?;
+    let config = &get_configs_onchain(resolver)?;
 
-    if authenticators.len() > configuration.max_zkid_signatures_per_txn as usize {
+    if authenticators.len() > config.max_zkid_signatures_per_txn as usize {
         return Err(invalid_signature!("Too many zkID authenticators"));
     }
 
@@ -121,7 +121,7 @@ pub fn validate_zkid_authenticators(
         .try_into()
         .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
-    let training_wheels_pk = match &configuration.training_wheels_pubkey {
+    let training_wheels_pk = match &config.training_wheels_pubkey {
         None => None,
         Some(bytes) => Some(EphemeralPublicKey::ed25519(
             Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
@@ -145,13 +145,10 @@ pub fn validate_zkid_authenticators(
                             })?;
                     }
 
-                    let public_inputs_hash = get_public_inputs_hash(
-                        zkid_sig,
-                        zkid_pub_key,
-                        &rsa_jwk,
-                        configuration.max_exp_horizon_secs,
-                    )
-                    .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
+                    let public_inputs_hash =
+                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, &config).map_err(
+                            |_| invalid_signature!("Could not compute public inputs hash"),
+                        )?;
                     proof
                         .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;
@@ -166,7 +163,7 @@ pub fn validate_zkid_authenticators(
                                 zkid_sig.exp_timestamp_secs,
                                 &zkid_sig.ephemeral_pubkey,
                                 zkid_pub_key,
-                                configuration,
+                                config,
                             )
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
 

@@ -3,7 +3,11 @@
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType, SigningKey};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    encoding_type::EncodingType,
+    SigningKey, Uniform,
+};
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
@@ -25,7 +29,10 @@ use aptos_types::{
     },
 };
 use move_core_types::account_address::AccountAddress;
+use rand::thread_rng;
 use std::time::Duration;
+
+// TODO(zkid): These tests are not modular and they lack instructions for how to regenerate the proofs.
 
 #[tokio::test]
 async fn test_zkid_oidc_signature_transaction_submission() {
@@ -33,7 +40,7 @@ async fn test_zkid_oidc_signature_transaction_submission() {
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let _ = test_setup(&mut swarm, &mut cli).await;
 
     let mut info = swarm.aptos_public_info();
 
@@ -117,7 +124,7 @@ async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification(
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let _ = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::new([0u8; 31]);
@@ -201,7 +208,7 @@ async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let _ = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::new([0u8; 31]);
@@ -285,7 +292,7 @@ async fn test_zkid_groth16_signature_transaction_submission() {
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let tw_sk = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::from_number(76);
@@ -365,10 +372,14 @@ async fn test_zkid_groth16_signature_transaction_submission() {
     let proof_sig = ephemeral_account.private_key().sign(&proof).unwrap();
     let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
 
+    // TODO(zkid): Refactor tests to be modular and add test for bad training wheels signature (commented out below).
+    //let bad_sk = Ed25519PrivateKey::generate(&mut thread_rng());
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephem_proof_sig,
+            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
+            //training_wheels_signature: EphemeralSignature::ed25519(bad_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
             override_aud_val: None,
         }),
@@ -393,7 +404,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let tw_sk = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::from_number(76);
@@ -474,6 +485,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephemeral_signature.clone(), // Wrong signature
+            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
             override_aud_val: None,
         }),
@@ -492,7 +504,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
         .unwrap_err();
 }
 
-async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
+async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) -> Ed25519PrivateKey {
     let client = swarm.validators().next().unwrap().rest_client();
     let root_idx = cli.add_account_with_address_to_cli(
         swarm.root_key(),
@@ -512,13 +524,18 @@ async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
         n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
     };
 
+    let training_wheels_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+    let training_wheels_pk = Ed25519PublicKey::from(&training_wheels_sk);
+
     info!("Insert a JWK.");
     let jwk_patch_script = format!(
         r#"
 script {{
 use aptos_framework::jwks;
+use aptos_framework::zkid;
 use aptos_framework::aptos_governance;
 use std::string::utf8;
+use std::option;
 fun main(core_resources: &signer) {{
     let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
     let google_jwk_0 = jwks::new_rsa_jwk(
@@ -532,10 +549,15 @@ fun main(core_resources: &signer) {{
         jwks::new_patch_upsert_jwk(b"{}", google_jwk_0),
     ];
     jwks::set_patches(&framework_signer, patches);
+
+    zkid::update_training_wheels(&framework_signer, option::some(x"{}"));
 }}
 }}
 "#,
-        jwk.kid, jwk.n, iss
+        jwk.kid,
+        jwk.n,
+        iss,
+        hex::encode(training_wheels_pk.to_bytes())
     );
 
     let txn_summary = cli.run_script(root_idx, &jwk_patch_script).await.unwrap();
@@ -558,6 +580,8 @@ fun main(core_resources: &signer) {{
 
     // Increment sequence number since we patched a JWK
     info.root_account().increment_sequence_number();
+
+    training_wheels_sk
 }
 
 async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {

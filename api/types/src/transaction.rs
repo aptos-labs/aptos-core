@@ -15,21 +15,14 @@ use aptos_crypto::{
     secp256r1_ecdsa::PUBLIC_KEY_LENGTH,
     ValidCryptoMaterial,
 };
-use aptos_types::{
-    account_address::AccountAddress,
-    block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
-    contract_event::{ContractEvent, EventWithVersion},
-    transaction::{
-        authenticator::{
-            AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
-            SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
-        },
-        webauthn::PartialAuthenticatorAssertionResponse,
-        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
+use aptos_types::{account_address::AccountAddress, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, contract_event::{ContractEvent, EventWithVersion}, transaction::{
+    authenticator::{
+        AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
+        SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
     },
-    zkid::{MAX_ZKID_PUBLIC_KEY_BYTES, MAX_ZKID_SIGNATURE_BYTES},
-};
+    webauthn::PartialAuthenticatorAssertionResponse,
+    Script, SignedTransaction, TransactionOutput, TransactionWithProof,
+}, zkid};
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
 use serde::{Deserialize, Serialize};
@@ -1205,18 +1198,17 @@ impl VerifyInput for ZkIdSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > MAX_ZKID_PUBLIC_KEY_BYTES {
+        if public_key_len > zkid::ZkIdPublicKey::MAX_LEN {
             bail!(
-                "ZKID public key length is greater than the maximum number of {} bytes: found {} bytes",
-                MAX_ZKID_PUBLIC_KEY_BYTES, public_key_len
+                "zkID public key length is greater than the maximum number of {} bytes: found {} bytes",
+                zkid::ZkIdPublicKey::MAX_LEN, public_key_len
             )
-        } else if signature_len > MAX_ZKID_SIGNATURE_BYTES {
+        } else if signature_len > zkid::ZkIdSignature::MAX_LEN {
             bail!(
-                "ZKID signature length is greater than the maximum number of {} bytes: found {} bytes",
-                MAX_ZKID_SIGNATURE_BYTES, signature_len
+                "zkID signature length is greater than the maximum number of {} bytes: found {} bytes",
+                zkid::ZkIdSignature::MAX_LEN, signature_len
             )
         } else {
-            // TODO(zkid): Any other checks we can do here?
             Ok(())
         }
     }

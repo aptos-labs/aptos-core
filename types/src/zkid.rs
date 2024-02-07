@@ -12,8 +12,6 @@ use crate::{
     },
 };
 use anyhow::{bail, ensure, Context, Result};
-#[cfg(test)]
-use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{self, Bn254, Fr};
@@ -40,44 +38,6 @@ pub const PEPPER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 /// to a different address).
 pub const IDC_NUM_BYTES: usize = 32;
 
-// TODO(zkid): add some static asserts here that these don't exceed the MAX poseidon input sizes
-
-// TODO(zkid): The constants here must be moved to Move for uggradeability.
-// Everything is a multiple of `poseidon_bn254::BYTES_PACKED_PER_SCALAR`] to maximize the input
-// sizes that can be hashed.
-
-/// The max length of an ephemeral public key supported in our circuit (93 bytes)
-pub const MAX_COMMITTED_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-
-/// The max length of the value of the JWT's `iss` field supported in our circuit
-/// TODO(zkid): used to be 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
-pub const MAX_ISS_BYTES: usize = 115;
-
-/// The max length of the value of the JWT's `aud` field supported in our circuit
-/// TODO(zkid): used to be 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
-pub const MAX_AUD_VAL_BYTES: usize = 115;
-
-/// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
-/// supported in our circuit
-/// TODO(zkid): used to be 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
-pub const MAX_UID_KEY_BYTES: usize = 30;
-
-/// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
-/// which is supported in our circuit
-/// TODO(zkid): used to be 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
-pub const MAX_UID_VAL_BYTES: usize = 330;
-
-/// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
-/// TODO(zkid): used to be 5 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
-pub const MAX_EXTRA_FIELD_BYTES: usize = 350;
-
-/// The max length of the base64url-encoded JWT payload in bytes supported in our circuit
-pub const MAX_JWT_PAYLOAD_B64_BYTES: usize = 192 * 8 - 64;
-
-/// The max length of the base64url-encoded JWT header in bytes supported in our circuit
-/// TODO(zkid) used to be 8 * poseidon_bn254::BYTES_PACKED_PER_SCALAR
-pub const MAX_JWT_HEADER_B64_BYTES: usize = 300;
-
 /// Reflection of aptos_framework::zkid::Configs
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
@@ -85,11 +45,34 @@ pub struct Configuration {
     pub max_exp_horizon_secs: u64,
     pub training_wheels_pubkey: Option<Vec<u8>>,
     pub nonce_commitment_num_bytes: u16,
+    pub max_commited_epk_bytes: u16,
+    pub max_iss_bytes: u16,
+    pub max_extra_field_bytes: u16,
+    pub max_jwt_header_b64_bytes: u32,
 }
 
 impl MoveStructType for Configuration {
     const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
     const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
+}
+
+impl Configuration {
+    #[cfg(test)]
+    pub fn new_for_testing() -> Configuration {
+        const POSEIDON_BYTES_PACKED_PER_SCALAR: u16 = 31;
+
+        Configuration {
+            max_zkid_signatures_per_txn: 3,
+            max_exp_horizon_secs: 100_255_944,
+            training_wheels_pubkey: None,
+            nonce_commitment_num_bytes: 32,
+            // TODO(zkid): update these constants & the test cases
+            max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_iss_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_extra_field_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_jwt_header_b64_bytes: (8 * POSEIDON_BYTES_PACKED_PER_SCALAR) as u32,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -167,12 +150,8 @@ impl OpenIdSig {
         );
 
         ensure!(
-            self.reconstruct_oauth_nonce(
-                exp_timestamp_secs,
-                epk,
-                config.nonce_commitment_num_bytes as usize
-            )?
-            .eq(&claims.oidc_claims.nonce),
+            self.reconstruct_oauth_nonce(exp_timestamp_secs, epk, config)?
+                .eq(&claims.oidc_claims.nonce),
             "'nonce' claim did not contain the expected EPK and expiration date commitment"
         );
 
@@ -191,11 +170,11 @@ impl OpenIdSig {
         &self,
         exp_timestamp_secs: u64,
         epk: &EphemeralPublicKey,
-        nonce_commitment_num_bytes: usize,
+        config: &Configuration,
     ) -> Result<String> {
         let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
             epk.to_bytes().as_slice(),
-            MAX_COMMITTED_EPK_BYTES,
+            config.max_commited_epk_bytes as usize,
         )?;
 
         frs.push(Fr::from(exp_timestamp_secs));
@@ -204,7 +183,7 @@ impl OpenIdSig {
         )?);
 
         let nonce_fr = poseidon_bn254::hash_scalars(frs)?;
-        let mut nonce_bytes = vec![0u8; nonce_commitment_num_bytes];
+        let mut nonce_bytes = vec![0u8; config.nonce_commitment_num_bytes as usize];
         nonce_fr.serialize_uncompressed(&mut nonce_bytes[..])?;
 
         Ok(base64url_encode(&nonce_bytes[..]))
@@ -294,26 +273,6 @@ pub struct SignedGroth16Zkp {
 }
 
 impl SignedGroth16Zkp {
-    /// For testing
-    #[cfg(test)]
-    fn dummy() -> SignedGroth16Zkp {
-        SignedGroth16Zkp {
-            proof: Groth16Zkp {
-                a: G1Bytes::new_from_vec(vec![0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
-                b: G2Bytes::new_from_vec(vec![0u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
-                c: G1Bytes::new_from_vec(vec![0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
-            },
-            non_malleability_signature: EphemeralSignature::ed25519(
-                Ed25519Signature::dummy_signature(),
-            ),
-            training_wheels_signature: EphemeralSignature::ed25519(
-                Ed25519Signature::dummy_signature(),
-            ),
-            extra_field: "a".repeat(MAX_EXTRA_FIELD_BYTES),
-            override_aud_val: Some("b".repeat(MAX_AUD_VAL_BYTES)),
-        }
-    }
-
     pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
         self.non_malleability_signature.verify(&self.proof, pub_key)
     }
@@ -414,6 +373,10 @@ pub struct JWTHeader {
 }
 
 impl ZkIdSignature {
+    /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
+    /// enforced by our full nodes when they receive zkID TXNs.
+    pub const MAX_LEN : usize = 4000;
+
     pub fn parse_jwt_header(&self) -> Result<JWTHeader> {
         let jwt_header_json = base64url_decode_as_str(&self.jwt_header)?;
         let header: JWTHeader = serde_json::from_str(&jwt_header_json)?;
@@ -458,15 +421,29 @@ impl Pepper {
 pub struct IdCommitment(pub(crate) [u8; IDC_NUM_BYTES]);
 
 impl IdCommitment {
+    /// The max length of the value of the JWT's `aud` field supported in our circuit. zkID address
+    /// derivation depends on this, so it should not be changed.
+    /// TODO(zkid): set to 115;
+    pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    /// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
+    /// supported in our circuit. zkID address derivation depends on this, so it should not be changed.
+    /// TODO(zkid): set to 30
+    pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    /// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
+    /// which is supported in our circuit. zkID address derivation depends on this, so it should not
+    /// be changed.
+    /// TODO(zkid): set to 330;
+    pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+
     pub fn new_from_preimage(
         pepper: &Pepper,
         aud: &str,
         uid_key: &str,
         uid_val: &str,
     ) -> Result<Self> {
-        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES)?;
-        let uid_key_hash = poseidon_bn254::pad_and_hash_string(uid_key, MAX_UID_KEY_BYTES)?;
-        let uid_val_hash = poseidon_bn254::pad_and_hash_string(uid_val, MAX_UID_VAL_BYTES)?;
+        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, Self::MAX_AUD_VAL_BYTES)?;
+        let uid_key_hash = poseidon_bn254::pad_and_hash_string(uid_key, Self::MAX_UID_KEY_BYTES)?;
+        let uid_val_hash = poseidon_bn254::pad_and_hash_string(uid_val, Self::MAX_UID_VAL_BYTES)?;
         let pepper_scalar = poseidon_bn254::pack_bytes_to_one_scalar(pepper.0.as_slice())?;
 
         let fr = poseidon_bn254::hash_scalars(vec![
@@ -511,6 +488,9 @@ pub struct ZkIdPublicKey {
 }
 
 impl ZkIdPublicKey {
+    /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
+    /// enforced by our full nodes when they receive zkID TXNs.
+    pub const MAX_LEN: usize = 200 + IDC_NUM_BYTES;
     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
@@ -569,8 +549,8 @@ mod test {
         jwks::rsa::RSA_JWK,
         transaction::authenticator::{AuthenticationKey, EphemeralPublicKey, EphemeralSignature},
         zkid::{
-            base64url_encode_str, G1Bytes, G2Bytes, Groth16Zkp, IdCommitment, OpenIdSig, Pepper,
-            SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, EPK_BLINDER_NUM_BYTES,
+            base64url_encode_str, Configuration, G1Bytes, G2Bytes, Groth16Zkp, IdCommitment,
+            OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
         },
     };
     use aptos_crypto::{
@@ -582,7 +562,7 @@ mod test {
     // TODO(zkid): This test case must be rewritten to be more modular and updatable.
     //  Right now, there are no instructions on how to produce this test case.
     #[test]
-    fn test_groth16_proof_verification() {
+    fn test_zkid_groth16_proof_verification() {
         let a = G1Bytes::new_unchecked(
             "19843734071102143602441202443608981862760142725808945198375332557568733182487",
             "7490772921219489322991985736547330118240504032652964776703563444800470517507",
@@ -606,7 +586,6 @@ mod test {
         .unwrap();
         let proof = Groth16Zkp::new(a, b, c);
 
-        let max_exp_horizon = 100_255_944; // old hardcoded value, which is now in Move, that this testcase was generated with
         let sender = Ed25519PrivateKey::generate_for_testing();
         let sender_pub = sender.public_key();
         let sender_auth_key = AuthenticationKey::ed25519(&sender_pub);
@@ -668,7 +647,8 @@ mod test {
         };
 
         let public_inputs_hash =
-            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, max_exp_horizon).unwrap();
+            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, &Configuration::new_for_testing())
+                .unwrap();
 
         proof
             .verify_proof(public_inputs_hash, DEVNET_VERIFYING_KEY.deref())
@@ -714,7 +694,7 @@ mod test {
         &'static str,
         &'static str,
         u64,
-        u64,
+        Configuration,
         EphemeralPublicKey,
         u128,
         ZkIdPublicKey,
@@ -724,7 +704,7 @@ mod test {
         let uid_key = "sub";
         let uid_val = "248289761001";
         let exp_timestamp_secs = 1311281970;
-        let max_exp_horizon = 100_255_944; // old hardcoded value, which is now in Move, that this testcase was generated with
+        let config = Configuration::new_for_testing();
         let pepper = 76;
 
         let zkid_pk = ZkIdPublicKey {
@@ -747,7 +727,7 @@ mod test {
             uid_key,
             uid_val,
             exp_timestamp_secs,
-            max_exp_horizon,
+            config,
             epk,
             pepper,
             zkid_pk,
@@ -756,7 +736,7 @@ mod test {
 
     #[test]
     fn test_zkid_oidc_sig_verifies() {
-        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, config, epk, pepper, zkid_pk) =
             get_jwt_default_values();
 
         let oidc_sig = zkid_simulate_oidc_signature(
@@ -765,13 +745,13 @@ mod test {
             &get_jwt_payload_json(iss, uid_key, uid_val, aud, None),
         );
         assert!(oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_ok());
     }
 
     #[test]
     fn test_zkid_oidc_sig_fails_with_different_pepper() {
-        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, config, epk, pepper, zkid_pk) =
             get_jwt_default_values();
         let bad_pepper = pepper + 1;
 
@@ -782,7 +762,7 @@ mod test {
         );
 
         assert!(oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_ok());
 
         let bad_oidc_sig = zkid_simulate_oidc_signature(
@@ -792,13 +772,13 @@ mod test {
         );
 
         assert!(bad_oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_err());
     }
 
     #[test]
     fn test_zkid_oidc_sig_fails_with_expiry_past_horizon() {
-        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, config, epk, pepper, zkid_pk) =
             get_jwt_default_values();
         let oidc_sig = zkid_simulate_oidc_signature(
             uid_key,
@@ -807,18 +787,18 @@ mod test {
         );
 
         assert!(oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_ok());
 
         let bad_exp_timestamp_secs = 1000000000000000000;
         assert!(oidc_sig
-            .verify_jwt_claims(bad_exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(bad_exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_err());
     }
 
     #[test]
     fn test_zkid_oidc_sig_fails_with_different_uid_val() {
-        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, config, epk, pepper, zkid_pk) =
             get_jwt_default_values();
         let oidc_sig = zkid_simulate_oidc_signature(
             uid_key,
@@ -827,7 +807,7 @@ mod test {
         );
 
         assert!(oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_ok());
 
         let bad_uid_val = format!("{}+1", uid_val);
@@ -838,13 +818,13 @@ mod test {
         );
 
         assert!(bad_oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_err());
     }
 
     #[test]
     fn test_zkid_oidc_sig_fails_with_bad_nonce() {
-        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, config, epk, pepper, zkid_pk) =
             get_jwt_default_values();
         let oidc_sig = zkid_simulate_oidc_signature(
             uid_key,
@@ -853,7 +833,7 @@ mod test {
         );
 
         assert!(oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_ok());
 
         let bad_nonce = "bad nonce".to_string();
@@ -864,13 +844,13 @@ mod test {
         );
 
         assert!(bad_oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_err());
     }
 
     #[test]
     fn test_zkid_oidc_sig_with_different_iss() {
-        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, max_exp_horizon, epk, pepper, zkid_pk) =
+        let (iss, aud, uid_key, uid_val, exp_timestamp_secs, config, epk, pepper, zkid_pk) =
             get_jwt_default_values();
         let oidc_sig = zkid_simulate_oidc_signature(
             uid_key,
@@ -879,7 +859,7 @@ mod test {
         );
 
         assert!(oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_ok());
 
         let bad_iss = format!("{}+1", iss);
@@ -890,7 +870,7 @@ mod test {
         );
 
         assert!(bad_oidc_sig
-            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, max_exp_horizon,)
+            .verify_jwt_claims(exp_timestamp_secs, &epk, &zkid_pk, &config)
             .is_err());
     }
 

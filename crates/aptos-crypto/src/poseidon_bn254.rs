@@ -243,8 +243,8 @@ mod test {
     #[test]
     fn test_poseidon_bn254_pad_and_hash_bytes() {
         let aud = "google";
-        const MAX_AUD_VAL_BYTES: usize = 248;
-        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES).unwrap();
+        const LEN: usize = 248;
+        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, LEN).unwrap();
         assert_eq!(
             aud_val_hash.to_string(),
             "4022319167392179362271493931675371567039199401695470709241660273812313544045"

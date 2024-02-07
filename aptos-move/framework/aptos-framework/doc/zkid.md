@@ -8,12 +8,15 @@
 -  [Struct `Group`](#0x1_zkid_Group)
 -  [Resource `Groth16VerificationKey`](#0x1_zkid_Groth16VerificationKey)
 -  [Resource `Configuration`](#0x1_zkid_Configuration)
+-  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_zkid_initialize)
 -  [Function `new_groth16_verification_key`](#0x1_zkid_new_groth16_verification_key)
+-  [Function `new_configuration`](#0x1_zkid_new_configuration)
 -  [Function `devnet_groth16_vk`](#0x1_zkid_devnet_groth16_vk)
 -  [Function `default_devnet_configuration`](#0x1_zkid_default_devnet_configuration)
 -  [Function `update_groth16_verification_key`](#0x1_zkid_update_groth16_verification_key)
 -  [Function `update_configuration`](#0x1_zkid_update_configuration)
+-  [Function `update_training_wheels`](#0x1_zkid_update_training_wheels)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -146,10 +149,60 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 <dd>
 
 </dd>
+<dt>
+<code>max_commited_epk_bytes: u16</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_iss_bytes: u16</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_extra_field_bytes: u16</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>max_jwt_header_b64_bytes: u32</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
 </details>
+
+<a id="@Constants_0"></a>
+
+## Constants
+
+
+<a id="0x1_zkid_E_TRAINING_WHEELS_PK_WRONG_SIZE"></a>
+
+The training wheels PK needs to be 32 bytes long.
+
+
+<pre><code><b>const</b> <a href="zkid.md#0x1_zkid_E_TRAINING_WHEELS_PK_WRONG_SIZE">E_TRAINING_WHEELS_PK_WRONG_SIZE</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR"></a>
+
+The number of bytes we can pack in a Poseidon scalar
+TODO(zkid): remove
+
+
+<pre><code><b>const</b> <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>: u16 = 31;
+</code></pre>
+
+
 
 <a id="0x1_zkid_initialize"></a>
 
@@ -208,6 +261,48 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 
 </details>
 
+<a id="0x1_zkid_new_configuration"></a>
+
+## Function `new_configuration`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16, max_commited_epk_bytes: u16, max_iss_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(
+    max_zkid_signatures_per_txn: u16,
+    max_exp_horizon_secs: u64,
+    training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    nonce_commitment_num_bytes: u16,
+    max_commited_epk_bytes: u16,
+    max_iss_bytes: u16,
+    max_extra_field_bytes: u16,
+    max_jwt_header_b64_bytes: u32
+): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+    <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+        max_zkid_signatures_per_txn,
+        max_exp_horizon_secs,
+        training_wheels_pubkey,
+        nonce_commitment_num_bytes,
+        max_commited_epk_bytes,
+        max_iss_bytes,
+        max_extra_field_bytes,
+        max_jwt_header_b64_bytes,
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_zkid_devnet_groth16_vk"></a>
 
 ## Function `devnet_groth16_vk`
@@ -246,6 +341,7 @@ Returns the Groth16 VK for our devnet deployment.
 
 ## Function `default_devnet_configuration`
 
+Returns the configuration for our devnet deployment.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_default_devnet_configuration">default_devnet_configuration</a>(): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
@@ -265,6 +361,10 @@ Returns the Groth16 VK for our devnet deployment.
         training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x"aa"),
         // The commitment is using the Poseidon-BN254 <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> function, hence the 254-bit (32 byte) size.
         nonce_commitment_num_bytes: 32,
+        max_commited_epk_bytes: 3 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>,
+        max_iss_bytes: 5 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>, // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): set <b>to</b> 115,
+        max_extra_field_bytes: 5 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>, // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): set <b>to</b> 350,
+        max_jwt_header_b64_bytes: (8 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a> <b>as</b> u32) // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): set <b>to</b> 300,
     }
 }
 </code></pre>
@@ -322,7 +422,7 @@ Returns the Groth16 VK for our devnet deployment.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16)
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>)
 </code></pre>
 
 
@@ -331,12 +431,7 @@ Returns the Groth16 VK for our devnet deployment.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-                                      max_zkid_signatures_per_txn: u16,
-                                      max_exp_horizon_secs: u64,
-                                      training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-                                      nonce_commitment_num_bytes: u16,
-) <b>acquires</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="zkid.md#0x1_zkid_Configuration">Configuration</a>) <b>acquires</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
 
     <b>if</b> (<b>exists</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx))) {
@@ -345,17 +440,44 @@ Returns the Groth16 VK for our devnet deployment.
             max_exp_horizon_secs: _,
             training_wheels_pubkey: _,
             nonce_commitment_num_bytes: _,
+            max_commited_epk_bytes: _,
+            max_iss_bytes: _,
+            max_extra_field_bytes: _,
+            max_jwt_header_b64_bytes: _,
         } = <b>move_from</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
     };
 
-    <b>let</b> configs = <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
-        max_zkid_signatures_per_txn,
-        max_exp_horizon_secs,
-        training_wheels_pubkey,
-        nonce_commitment_num_bytes,
+    <b>move_to</b>(fx, config);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_zkid_update_training_wheels"></a>
+
+## Function `update_training_wheels`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_training_wheels">update_training_wheels</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pk: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_training_wheels">update_training_wheels</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pk: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&pk)) {
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&pk)) == 32, <a href="zkid.md#0x1_zkid_E_TRAINING_WHEELS_PK_WRONG_SIZE">E_TRAINING_WHEELS_PK_WRONG_SIZE</a>)
     };
 
-    <b>move_to</b>(fx, configs);
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
+    config.training_wheels_pubkey = pk;
 }
 </code></pre>
 

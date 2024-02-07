@@ -2,10 +2,7 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    zkid::{
-        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig, MAX_AUD_VAL_BYTES, MAX_COMMITTED_EPK_BYTES,
-        MAX_EXTRA_FIELD_BYTES, MAX_ISS_BYTES, MAX_JWT_HEADER_B64_BYTES,
-    },
+    zkid::{Configuration, IdCommitment, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
@@ -330,21 +327,26 @@ pub fn get_public_inputs_hash(
     sig: &ZkIdSignature,
     pk: &ZkIdPublicKey,
     jwk: &RSA_JWK,
-    max_exp_horizon: u64,
+    config: &Configuration,
 ) -> anyhow::Result<Fr> {
     let extra_field_hashed;
     let override_aud_val_hashed;
     let use_override_aud;
     if let ZkpOrOpenIdSig::Groth16Zkp(proof) = &sig.sig {
-        extra_field_hashed =
-            poseidon_bn254::pad_and_hash_string(&proof.extra_field, MAX_EXTRA_FIELD_BYTES)?;
+        extra_field_hashed = poseidon_bn254::pad_and_hash_string(
+            &proof.extra_field,
+            config.max_extra_field_bytes as usize,
+        )?;
         if let Some(override_aud_val) = &proof.override_aud_val {
             use_override_aud = ark_bn254::Fr::from(1);
-            override_aud_val_hashed =
-                poseidon_bn254::pad_and_hash_string(override_aud_val, MAX_AUD_VAL_BYTES)?;
+            override_aud_val_hashed = poseidon_bn254::pad_and_hash_string(
+                override_aud_val,
+                IdCommitment::MAX_AUD_VAL_BYTES,
+            )?;
         } else {
             use_override_aud = ark_bn254::Fr::from(0);
-            override_aud_val_hashed = poseidon_bn254::pad_and_hash_string("", MAX_AUD_VAL_BYTES)?;
+            override_aud_val_hashed =
+                poseidon_bn254::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?;
         }
     } else {
         bail!("Cannot get_public_inputs_hash for ZkIdSignature")
@@ -353,7 +355,7 @@ pub fn get_public_inputs_hash(
     // Add the epk as padded and packed scalars
     let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
         sig.ephemeral_pubkey.to_bytes().as_slice(),
-        MAX_COMMITTED_EPK_BYTES,
+        config.max_commited_epk_bytes as usize,
     )?;
 
     // Add the id_commitment as a scalar
@@ -363,13 +365,13 @@ pub fn get_public_inputs_hash(
     frs.push(Fr::from(sig.exp_timestamp_secs));
 
     // Add the epk lifespan as a scalar
-    frs.push(Fr::from(max_exp_horizon));
+    frs.push(Fr::from(config.max_exp_horizon_secs));
 
     // Add the hash of the iss (formatted key-value pair string).
     let formatted_iss = format!("\"iss\":\"{}\",", pk.iss);
     frs.push(poseidon_bn254::pad_and_hash_string(
         &formatted_iss,
-        MAX_ISS_BYTES,
+        config.max_iss_bytes as usize,
     )?);
 
     frs.push(extra_field_hashed);
@@ -378,7 +380,7 @@ pub fn get_public_inputs_hash(
     let jwt_header_with_separator = format!("{}.", sig.jwt_header);
     frs.push(poseidon_bn254::pad_and_hash_string(
         &jwt_header_with_separator,
-        MAX_JWT_HEADER_B64_BYTES,
+        config.max_jwt_header_b64_bytes as usize,
     )?);
 
     frs.push(jwk.to_poseidon_scalar()?);
