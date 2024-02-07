@@ -4,11 +4,10 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, find_value};
-use aptos_api_types::{MoveModuleBytecode, MoveResource, StateKeyWrapper};
+use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
 use serde_json::json;
 use std::str::FromStr;
-use aptos_api_types::MoveStructTag;
 
 /* TODO: reactivate once cause of failure for `"8"` vs `8` in the JSON output is known.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -231,7 +230,11 @@ async fn test_get_account_resources_with_pagination() {
     let cursor_header = StateKeyWrapper::from_str(cursor_header.to_str().unwrap()).unwrap();
     let resources: Vec<MoveResource> = serde_json::from_slice(resp.body()).unwrap();
     println!("Returned {} resources:", resources.len());
-    for r in resources.iter().map(|mvr| &mvr.typ).collect::<Vec<&MoveStructTag>>() {
+    for r in resources
+        .iter()
+        .map(|mvr| &mvr.typ)
+        .collect::<Vec<&MoveStructTag>>()
+    {
         println!("0x1::{}::{}", r.module, r.name);
     }
     assert_eq!(resources.len(), 5);
