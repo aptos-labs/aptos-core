@@ -1,13 +1,32 @@
+---
+id: move-mutator
+title: Move Mutation Tool
+---
+
 # move-mutator
+
+## Summary
+
+The `move-mutator` tool is a mutation testing tool for the Move language. 
+
+## Overview
+
+The Move mutator is a tool that mutates Move source code. It can be used to
+help test the robustness of Move specifications and tests by generating 
+different code versions (mutants).
+
+Please refer to the design document for more details: [Move Mutator Design](doc/design.md).
+
+## Example Usage
 
 Please build the whole repository first. In the `aptos-core` directory, run:
 ```bash
-cargo build
+cargo build -r
 ```
 
 Then build also the `move-cli` tool:
 ```bash
-cargo build -p move-cli
+cargo build -r -p move-cli
 ```
 
 Check if the tool is working properly by running its tests:
@@ -19,154 +38,217 @@ cargo test -p move-mutator
 
 To check if it works, run the following command:
 ```bash
-./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
+./target/release/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
 or
 
 ```bash
-./target/debug/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
+./target/release/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
-The output will be generated under the `mutants_output` (or any other selected) directory.
+The output will be generated to the chosen directory, or in case no directory
+was selected, produced mutants, and reports will be stored under 
+`mutants_output` directory.
 
-Mutator tool respects `RUST_LOG` variable, and it will print out as much information as the variable allows. To see all the logs run:
+The mutator tool respects `RUST_LOG` variable, and it will print out as much
+information as the variable allows. To see all the logs run:
 ```bash
 RUST_LOG=trace ./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
-There is possibility to enable logging only for the specific modules. Please refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
+There is possibility to enable logging only for the specific modules. Please
+refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
 
-To check possible options run:
-```bash
-./target/debug/move mutate --help
+There are also good tests in the Move Prover repository that can be used to
+check the tool. To run them, just use:
 ```
-or
-```bash
-./target/debug/aptos move mutate --help
+./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
+./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
+./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
+./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/shift.move
 ```
+and observe `mutants_output` directory. You can freely experiment with the
+mutator tool and check how it works on different Move files.
 
-There are also good tests in the Move Prover repository that can be used to test the tool. To run them just use:
-```
-./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
-./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
-./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
-./target/debug/move mutate -m third_party/move/move-prover/tests/sources/functional/shift.move
-```
-
-To generate mutants for all files within a test project run (there are `Sum.move`, `Operators.move`, `Negation.move` and `StillSimple.move`):
+To generate mutants for all files within a test project (for the whole Move 
+package) run:
 ```bash
-./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/
+./target/release/move mutate -p third_party/move/tools/move-mutator/tests/move-assets/simple/
 ```
 or appropriately for `aptos`:
 ```bash
-./target/debug/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/
+./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/
 ```
 
-Running the above command (`aptos` one) will generate mutants for all files within the `simple` test project and should generate following output:
+Running the above command (`aptos` one) will generate mutants for all files
+within the `simple` test project and should generate following output:
 ```
-./target/debug/aptos move mutate --move-sources third_party/move/tools/move-mutator/tests/move-assets/simple/sources/
-Executed move-mutator with the following options: Options { move_sources: ["third_party/move/tools/move-mutator/tests/move-assets/simple/sources/"] } 
- config: BuildConfig { dev_mode: false, test_mode: true, generate_docs: false, generate_abis: false, generate_move_model: false, full_model_generation: false, install_dir: None, force_recompilation: false, additional_named_addresses: {}, architecture: None, fetch_deps_only: false, skip_fetch_latest_git_deps: false, compiler_config: CompilerConfig { bytecode_version: None, known_attributes: {"bytecode_instruction", "deprecated", "event", "expected_failure", "legacy_entry_fun", "native_interface", "resource_group", "resource_group_member", "test", "test_only", "verify_only", "view"}, skip_attribute_checks: false, compiler_version: None } } 
- package path: "/home/test/Projects/aptos-core"
-Mutant: BinaryOperator(+, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 77, index stop: 78) written to mutants_output/Operators_0.move
-Mutant: BinaryOperator(+, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 77, index stop: 78) written to mutants_output/Operators_1.move
-Mutant: BinaryOperator(+, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 77, index stop: 78) written to mutants_output/Operators_2.move
-Mutant: BinaryOperator(+, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 77, index stop: 78) written to mutants_output/Operators_3.move
-Mutant: BinaryOperator(-, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 133, index stop: 134) written to mutants_output/Operators_4.move
-Mutant: BinaryOperator(-, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 133, index stop: 134) written to mutants_output/Operators_5.move
-Mutant: BinaryOperator(-, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 133, index stop: 134) written to mutants_output/Operators_6.move
-Mutant: BinaryOperator(-, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 133, index stop: 134) written to mutants_output/Operators_7.move
-Mutant: BinaryOperator(*, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 189, index stop: 190) written to mutants_output/Operators_8.move
-Mutant: BinaryOperator(*, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 189, index stop: 190) written to mutants_output/Operators_9.move
-Mutant: BinaryOperator(*, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 189, index stop: 190) written to mutants_output/Operators_10.move
-Mutant: BinaryOperator(*, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 189, index stop: 190) written to mutants_output/Operators_11.move
-Mutant: BinaryOperator(%, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 245, index stop: 246) written to mutants_output/Operators_12.move
-Mutant: BinaryOperator(%, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 245, index stop: 246) written to mutants_output/Operators_13.move
-Mutant: BinaryOperator(%, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 245, index stop: 246) written to mutants_output/Operators_14.move
-Mutant: BinaryOperator(%, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 245, index stop: 246) written to mutants_output/Operators_15.move
-Mutant: BinaryOperator(/, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 301, index stop: 302) written to mutants_output/Operators_16.move
-Mutant: BinaryOperator(/, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 301, index stop: 302) written to mutants_output/Operators_17.move
-Mutant: BinaryOperator(/, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 301, index stop: 302) written to mutants_output/Operators_18.move
-Mutant: BinaryOperator(/, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 301, index stop: 302) written to mutants_output/Operators_19.move
-Mutant: BinaryOperator(&, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 357, index stop: 358) written to mutants_output/Operators_20.move
-Mutant: BinaryOperator(&, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 357, index stop: 358) written to mutants_output/Operators_21.move
-Mutant: BinaryOperator(|, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 412, index stop: 413) written to mutants_output/Operators_22.move
-Mutant: BinaryOperator(|, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 412, index stop: 413) written to mutants_output/Operators_23.move
-Mutant: BinaryOperator(^, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 468, index stop: 469) written to mutants_output/Operators_24.move
-Mutant: BinaryOperator(^, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 468, index stop: 469) written to mutants_output/Operators_25.move
-Mutant: BinaryOperator(<<, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 523, index stop: 525) written to mutants_output/Operators_26.move
-Mutant: BinaryOperator(>>, location: file hash: 871072646343dc04b16c8b19009982460f2afbc55f14d2f1c2710e741d9a0ce1, index start: 579, index stop: 581) written to mutants_output/Operators_27.move
-Mutant: UnaryOperator(!, location: file hash: 2adb714d41fdc23364c90e2fd21f9807a887ffd59343df63f9dfedde3fc62233, index start: 72, index stop: 73) written to mutants_output/Negation_0.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 93, index stop: 94) written to mutants_output/StillSimple_0.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 93, index stop: 94) written to mutants_output/StillSimple_1.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 93, index stop: 94) written to mutants_output/StillSimple_2.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 93, index stop: 94) written to mutants_output/StillSimple_3.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 111, index stop: 112) written to mutants_output/StillSimple_4.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 111, index stop: 112) written to mutants_output/StillSimple_5.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 111, index stop: 112) written to mutants_output/StillSimple_6.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 111, index stop: 112) written to mutants_output/StillSimple_7.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 302, index stop: 303) written to mutants_output/StillSimple_8.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 302, index stop: 303) written to mutants_output/StillSimple_9.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 302, index stop: 303) written to mutants_output/StillSimple_10.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 302, index stop: 303) written to mutants_output/StillSimple_11.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 444, index stop: 445) written to mutants_output/StillSimple_12.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 444, index stop: 445) written to mutants_output/StillSimple_13.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 444, index stop: 445) written to mutants_output/StillSimple_14.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 444, index stop: 445) written to mutants_output/StillSimple_15.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 429, index stop: 430) written to mutants_output/StillSimple_16.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 429, index stop: 430) written to mutants_output/StillSimple_17.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 429, index stop: 430) written to mutants_output/StillSimple_18.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 429, index stop: 430) written to mutants_output/StillSimple_19.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 613, index stop: 614) written to mutants_output/StillSimple_20.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 613, index stop: 614) written to mutants_output/StillSimple_21.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 613, index stop: 614) written to mutants_output/StillSimple_22.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 613, index stop: 614) written to mutants_output/StillSimple_23.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 705, index stop: 706) written to mutants_output/StillSimple_24.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 705, index stop: 706) written to mutants_output/StillSimple_25.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 705, index stop: 706) written to mutants_output/StillSimple_26.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 705, index stop: 706) written to mutants_output/StillSimple_27.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 839, index stop: 840) written to mutants_output/StillSimple_28.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 839, index stop: 840) written to mutants_output/StillSimple_29.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 839, index stop: 840) written to mutants_output/StillSimple_30.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 839, index stop: 840) written to mutants_output/StillSimple_31.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 857, index stop: 858) written to mutants_output/StillSimple_32.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 857, index stop: 858) written to mutants_output/StillSimple_33.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 857, index stop: 858) written to mutants_output/StillSimple_34.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 857, index stop: 858) written to mutants_output/StillSimple_35.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 852, index stop: 853) written to mutants_output/StillSimple_36.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 852, index stop: 853) written to mutants_output/StillSimple_37.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 852, index stop: 853) written to mutants_output/StillSimple_38.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 852, index stop: 853) written to mutants_output/StillSimple_39.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 937, index stop: 938) written to mutants_output/StillSimple_40.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 937, index stop: 938) written to mutants_output/StillSimple_41.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 937, index stop: 938) written to mutants_output/StillSimple_42.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 937, index stop: 938) written to mutants_output/StillSimple_43.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 948, index stop: 949) written to mutants_output/StillSimple_44.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 948, index stop: 949) written to mutants_output/StillSimple_45.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 948, index stop: 949) written to mutants_output/StillSimple_46.move
-Mutant: BinaryOperator(+, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 948, index stop: 949) written to mutants_output/StillSimple_47.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 944, index stop: 945) written to mutants_output/StillSimple_48.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 944, index stop: 945) written to mutants_output/StillSimple_49.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 944, index stop: 945) written to mutants_output/StillSimple_50.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 944, index stop: 945) written to mutants_output/StillSimple_51.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 952, index stop: 953) written to mutants_output/StillSimple_52.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 952, index stop: 953) written to mutants_output/StillSimple_53.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 952, index stop: 953) written to mutants_output/StillSimple_54.move
-Mutant: BinaryOperator(*, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 952, index stop: 953) written to mutants_output/StillSimple_55.move
-Mutant: BinaryOperator(/, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 954, index stop: 955) written to mutants_output/StillSimple_56.move
-Mutant: BinaryOperator(/, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 954, index stop: 955) written to mutants_output/StillSimple_57.move
-Mutant: BinaryOperator(/, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 954, index stop: 955) written to mutants_output/StillSimple_58.move
-Mutant: BinaryOperator(/, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 954, index stop: 955) written to mutants_output/StillSimple_59.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 941, index stop: 942) written to mutants_output/StillSimple_60.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 941, index stop: 942) written to mutants_output/StillSimple_61.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 941, index stop: 942) written to mutants_output/StillSimple_62.move
-Mutant: BinaryOperator(-, location: file hash: b63e76f992c022b7d34f479a1b1fe5bb744ec27afa38aa4fe22d081897a91fa0, index start: 941, index stop: 942) written to mutants_output/StillSimple_63.move
-Mutant: BinaryOperator(+, location: file hash: cf19f52b0c8c5facfd7cc8f34dbd487a4ea8719e613bbab2f5abb24d51bc355e, index start: 86, index stop: 87) written to mutants_output/Sum_0.move
-Mutant: BinaryOperator(+, location: file hash: cf19f52b0c8c5facfd7cc8f34dbd487a4ea8719e613bbab2f5abb24d51bc355e, index start: 86, index stop: 87) written to mutants_output/Sum_1.move
-Mutant: BinaryOperator(+, location: file hash: cf19f52b0c8c5facfd7cc8f34dbd487a4ea8719e613bbab2f5abb24d51bc355e, index start: 86, index stop: 87) written to mutants_output/Sum_2.move
-Mutant: BinaryOperator(+, location: file hash: cf19f52b0c8c5facfd7cc8f34dbd487a4ea8719e613bbab2f5abb24d51bc355e, index start: 86, index stop: 87) written to mutants_output/Sum_3.move
+$ ./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/
 {
   "Result": "Success"
 }
+```
 
+You can also examine reports made inside the output directory.
+
+It's also possible to generate mutants for a specific module by using the 
+`--mutate-modules` option:
+```bash
+./target/release/move mutate -p third_party/move/tools/move-mutator/tests/move-assets/simple/ --mutate-modules "Sum"
+```
+
+Running the mutator tool generates a lot of files. Except for the mutants, it
+also generates reports - in JSON and text format. Those reports are stored in 
+the output directory.
+
+Generating mutants for the whole package can be time-consuming. To speed up the
+process, mutant verification is disabled by default. To enable it, use the
+`--verify-mutants` option:
+```bash
+./target/release/move mutate -p third_party/move/tools/move-mutator/tests/move-assets/simple/ --verify-mutants
+```
+Verification of mutants is done by compiling them. If the compilation fails, the
+mutant is considered invalid. It's highly recommended to enable this option
+as it helps to filter out invalid mutants, which would be a waste of time to
+prove.
+
+There are several test projects under `third_party/move/tools/move-mutator/tests/move-assets/`
+directory. They can be used to check the mutator tool as well.
+
+## Command-line options
+
+Command line options are slightly different when using the `move-cli` tool and
+when using the `aptos` tool.
+
+To check possible options run:
+```bash
+./target/release/move mutate --help
+```
+or
+```bash
+./target/release/aptos move mutate --help
+```
+
+When using the `move-cli` tool, the command line options are as follows:
+```text
+Usage: move mutate [OPTIONS]
+
+Options:
+  -m, --move-sources <MOVE_SOURCES>
+          The paths to the Move sources
+  -p, --path <PACKAGE_PATH>
+          Path to a package which the command should be run with respect to
+      --mutate-modules <MUTATE_MODULES>
+          Module names to be mutated [default: all]
+  -v
+          Print additional diagnostics if available
+  -d, --dev
+          Compile in 'dev' mode. The 'dev-addresses' and 'dev-dependencies' fields will be used if this flag is set. This flag is useful for development of packages that expose named addresses that are not set to a specific value
+  -o, --out-mutant-dir <OUT_MUTANT_DIR>
+          The path where to put the output files
+      --test
+          Compile in 'test' mode. The 'dev-addresses' and 'dev-dependencies' fields will be used along with any code in the 'tests' directory
+      --verify-mutants
+          Indicates if mutants should be verified and made sure mutants can compile
+      --doc
+          Generate documentation for packages
+  -n, --no-overwrite
+          Indicates if the output files should be overwritten
+      --abi
+          Generate ABIs for packages
+      --downsampling-ratio-percentage <DOWNSAMPLING_RATIO_PERCENTAGE>
+          Remove averagely given percentage of mutants. See the doc for more details
+      --install-dir <INSTALL_DIR>
+          Installation directory for compiled artifacts. Defaults to current directory
+  -c, --configuration-file <CONFIGURATION_FILE>
+          Optional configuration file. If provided, it will override the default configuration
+      --force
+          Force recompilation of all packages
+      --arch <ARCHITECTURE>
+          
+      --fetch-deps-only
+          Only fetch dependency repos to MOVE_HOME
+      --skip-fetch-latest-git-deps
+          Skip fetching latest git dependencies
+      --bytecode-version <BYTECODE_VERSION>
+          Bytecode version to compile move code
+      --compiler-version <COMPILER_VERSION>
+          Compiler version to use [possible values: v1, v2]
+  -h, --help
+          Print help
+```
+
+When using the `aptos` tool, the command line options are as follows:
+```text
+Usage: aptos move mutate [OPTIONS]
+
+Options:
+      --dev
+          Enables dev mode, which uses all dev-addresses and dev-dependencies
+          
+          Dev mode allows for changing dependencies and addresses to the preset [dev-addresses] and [dev-dependencies] fields.  This works both inside and out of tests for using preset values.
+          
+          Currently, it also additionally pulls in all test compilation artifacts
+
+      --package-dir <PACKAGE_DIR>
+          Path to a move package (the folder with a Move.toml file)
+
+      --output-dir <OUTPUT_DIR>
+          Path to save the compiled move package
+          
+          Defaults to `<package_dir>/build`
+
+      --named-addresses <NAMED_ADDRESSES>
+          Named addresses for the move binary
+          
+          Example: alice=0x1234, bob=0x5678
+          
+          Note: This will fail if there are duplicates in the Move.toml file remove those first.
+          
+          [default: ]
+
+      --skip-fetch-latest-git-deps
+          Skip pulling the latest git dependencies
+          
+          If you don't have a network connection, the compiler may fail due to no ability to pull git dependencies.  This will allow overriding this for local development.
+
+      --bytecode-version <BYTECODE_VERSION>
+          Specify the version of the bytecode the compiler is going to emit
+
+      --skip-attribute-checks
+          Do not complain about unknown attributes in Move code
+
+      --check-test-code
+          Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code. NOTE: this behavior will become the default in the future. See https://github.com/aptos-labs/aptos-core/issues/10335
+          
+          [env: APTOS_CHECK_TEST_CODE=]
+
+  -m, --move-sources <MOVE_SOURCES>
+          The paths to the Move sources
+
+      --mutate-modules <MUTATE_MODULES>
+          Module names to be mutated
+          
+          [default: all]
+
+  -o, --out-mutant-dir <OUT_MUTANT_DIR>
+          The path where to put the output files
+
+      --verify-mutants
+          Indicates if mutants should be verified and made sure mutants can compile
+
+  -n, --no-overwrite
+          Indicates if the output files should be overwritten
+
+      --downsampling-ratio-percentage <DOWNSAMPLING_RATIO_PERCENTAGE>
+          Remove averagely given percentage of mutants. See the doc for more details
+
+  -c, --configuration-file <CONFIGURATION_FILE>
+          Optional configuration file. If provided, it will override the default configuration
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print versio
 ```
