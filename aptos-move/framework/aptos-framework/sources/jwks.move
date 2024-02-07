@@ -45,7 +45,7 @@ module aptos_framework::jwks {
         config_url: vector<u8>,
     }
 
-    /// A list of OIDC providers whose JWKs should be watched by validators. Maintained by ce proposals.
+    /// A list of OIDC providers whose JWKs should be watched by validators. Maintained by governance proposals.
     struct SupportedOIDCProviders has key {
         providers: vector<OIDCProvider>,
     }
