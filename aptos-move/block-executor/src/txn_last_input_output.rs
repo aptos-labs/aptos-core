@@ -231,14 +231,20 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
-        let output = self.take_output(txn_idx);
-        if let ExecutionStatus::Success(output) = output {
+        if self.block_skips_rest_at_idx(txn_idx) {
+            // Already skipping.
+            println!("daniel Already skipping at index {}", txn_idx);
+            return;
+        }
+
+        // check_execution_status_during_commit must be used for checks re:status.
+        // Hence, since the status is not SkipRest, it must be Success.
+        if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
-            println!("update_to_skip_rest failed {:?}", output);
-            unreachable!();
+            unreachable!("Unexpected status");
         }
     }
 
