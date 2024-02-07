@@ -896,14 +896,6 @@ pub enum EntryFunctionCall {
     VestingVestMany {
         contract_addresses: Vec<AccountAddress>,
     },
-
-    ZkidSetGroth16VerificationKey {
-        alpha_g1: Vec<u8>,
-        beta_g2: Vec<u8>,
-        gamma_g2: Vec<u8>,
-        delta_g2: Vec<u8>,
-        gamma_abc_g1: Vec<Vec<u8>>,
-    },
 }
 
 impl EntryFunctionCall {
@@ -1441,19 +1433,6 @@ impl EntryFunctionCall {
             } => vesting_update_voter(contract_address, new_voter),
             VestingVest { contract_address } => vesting_vest(contract_address),
             VestingVestMany { contract_addresses } => vesting_vest_many(contract_addresses),
-            ZkidSetGroth16VerificationKey {
-                alpha_g1,
-                beta_g2,
-                gamma_g2,
-                delta_g2,
-                gamma_abc_g1,
-            } => zkid_set_groth16_verification_key(
-                alpha_g1,
-                beta_g2,
-                gamma_g2,
-                delta_g2,
-                gamma_abc_g1,
-            ),
         }
     }
 
@@ -4051,33 +4030,6 @@ pub fn vesting_vest_many(contract_addresses: Vec<AccountAddress>) -> Transaction
         vec![bcs::to_bytes(&contract_addresses).unwrap()],
     ))
 }
-
-pub fn zkid_set_groth16_verification_key(
-    alpha_g1: Vec<u8>,
-    beta_g2: Vec<u8>,
-    gamma_g2: Vec<u8>,
-    delta_g2: Vec<u8>,
-    gamma_abc_g1: Vec<Vec<u8>>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("zkid").to_owned(),
-        ),
-        ident_str!("set_groth16_verification_key").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&alpha_g1).unwrap(),
-            bcs::to_bytes(&beta_g2).unwrap(),
-            bcs::to_bytes(&gamma_g2).unwrap(),
-            bcs::to_bytes(&delta_g2).unwrap(),
-            bcs::to_bytes(&gamma_abc_g1).unwrap(),
-        ],
-    ))
-}
 mod decoder {
     use super::*;
     pub fn account_offer_rotation_capability(
@@ -5570,22 +5522,6 @@ mod decoder {
             None
         }
     }
-
-    pub fn zkid_set_groth16_verification_key(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::ZkidSetGroth16VerificationKey {
-                alpha_g1: bcs::from_bytes(script.args().get(0)?).ok()?,
-                beta_g2: bcs::from_bytes(script.args().get(1)?).ok()?,
-                gamma_g2: bcs::from_bytes(script.args().get(2)?).ok()?,
-                delta_g2: bcs::from_bytes(script.args().get(3)?).ok()?,
-                gamma_abc_g1: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
 }
 
 type EntryFunctionDecoderMap = std::collections::HashMap<
@@ -6073,10 +6009,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "vesting_vest_many".to_string(),
             Box::new(decoder::vesting_vest_many),
-        );
-        map.insert(
-            "zkid_set_groth16_verification_key".to_string(),
-            Box::new(decoder::zkid_set_groth16_verification_key),
         );
         map
     });

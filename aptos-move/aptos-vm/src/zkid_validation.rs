@@ -102,9 +102,9 @@ pub fn validate_zkid_authenticators(
         return Ok(());
     }
 
-    let configs = &get_configs_onchain(resolver)?;
+    let configuration = &get_configs_onchain(resolver)?;
 
-    if authenticators.len() > configs.max_zkid_signatures_per_txn as usize {
+    if authenticators.len() > configuration.max_zkid_signatures_per_txn as usize {
         return Err(invalid_signature!("Too many zkID authenticators"));
     }
 
@@ -121,7 +121,7 @@ pub fn validate_zkid_authenticators(
         .try_into()
         .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
-    let training_wheels_pk = match &configs.training_wheels_pubkey {
+    let training_wheels_pk = match &configuration.training_wheels_pubkey {
         None => None,
         Some(bytes) => Some(EphemeralPublicKey::ed25519(
             Ed25519PublicKey::try_from(bytes.as_slice()).map_err(|_| {
@@ -149,7 +149,7 @@ pub fn validate_zkid_authenticators(
                         zkid_sig,
                         zkid_pub_key,
                         &rsa_jwk,
-                        configs.max_exp_horizon,
+                        configuration.max_exp_horizon_secs,
                     )
                     .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
                     proof
@@ -166,7 +166,7 @@ pub fn validate_zkid_authenticators(
                                 zkid_sig.exp_timestamp_secs,
                                 &zkid_sig.ephemeral_pubkey,
                                 zkid_pub_key,
-                                configs.max_exp_horizon,
+                                configuration,
                             )
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
 

@@ -5,30 +5,32 @@
 
 
 
--  [Struct `ConfigGroup`](#0x1_zkid_ConfigGroup)
+-  [Struct `Group`](#0x1_zkid_Group)
 -  [Resource `Groth16VerificationKey`](#0x1_zkid_Groth16VerificationKey)
--  [Resource `Configs`](#0x1_zkid_Configs)
+-  [Resource `Configuration`](#0x1_zkid_Configuration)
 -  [Function `initialize`](#0x1_zkid_initialize)
 -  [Function `new_groth16_verification_key`](#0x1_zkid_new_groth16_verification_key)
 -  [Function `devnet_groth16_vk`](#0x1_zkid_devnet_groth16_vk)
--  [Function `devnet_constants`](#0x1_zkid_devnet_constants)
--  [Function `set_groth16_verification_key`](#0x1_zkid_set_groth16_verification_key)
+-  [Function `default_devnet_configuration`](#0x1_zkid_default_devnet_configuration)
+-  [Function `update_groth16_verification_key`](#0x1_zkid_update_groth16_verification_key)
+-  [Function `update_configuration`](#0x1_zkid_update_configuration)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
 
 
-<a id="0x1_zkid_ConfigGroup"></a>
+<a id="0x1_zkid_Group"></a>
 
-## Struct `ConfigGroup`
+## Struct `Group`
 
 
 
 <pre><code>#[resource_group(#[scope = <b>global</b>])]
-<b>struct</b> <a href="zkid.md#0x1_zkid_ConfigGroup">ConfigGroup</a>
+<b>struct</b> <a href="zkid.md#0x1_zkid_Group">Group</a>
 </code></pre>
 
 
@@ -56,7 +58,7 @@
 The 288-byte Groth16 verification key (VK) for the zkID relation.
 
 
-<pre><code>#[resource_group_member(#[group = <a href="zkid.md#0x1_zkid_ConfigGroup">0x1::zkid::ConfigGroup</a>])]
+<pre><code>#[resource_group_member(#[group = <a href="zkid.md#0x1_zkid_Group">0x1::zkid::Group</a>])]
 <b>struct</b> <a href="zkid.md#0x1_zkid_Groth16VerificationKey">Groth16VerificationKey</a> <b>has</b> store, key
 </code></pre>
 
@@ -95,21 +97,22 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 <code>gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
- 64-byte serialization of <code>\<b>forall</b> i \in {0, 1}, gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H</code>, where <code>H</code> is the generator of <code>G1</code>.
+ <code>\<b>forall</b> i \in {0, \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H</code>, where
+ <code>H</code> is the generator of <code>G1</code> and <code>\ell</code> is 1 for the zkID relation.
 </dd>
 </dl>
 
 
 </details>
 
-<a id="0x1_zkid_Configs"></a>
+<a id="0x1_zkid_Configuration"></a>
 
-## Resource `Configs`
+## Resource `Configuration`
 
 
 
-<pre><code>#[resource_group_member(#[group = <a href="zkid.md#0x1_zkid_ConfigGroup">0x1::zkid::ConfigGroup</a>])]
-<b>struct</b> <a href="zkid.md#0x1_zkid_Configs">Configs</a> <b>has</b> store, key
+<pre><code>#[resource_group_member(#[group = <a href="zkid.md#0x1_zkid_Group">0x1::zkid::Group</a>])]
+<b>struct</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> <b>has</b> store, key
 </code></pre>
 
 
@@ -126,7 +129,19 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 
 </dd>
 <dt>
-<code>max_exp_horizon: u64</code>
+<code>max_exp_horizon_secs: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>nonce_commitment_num_bytes: u16</code>
 </dt>
 <dd>
 
@@ -142,7 +157,7 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="zkid.md#0x1_zkid_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vk: <a href="zkid.md#0x1_zkid_Groth16VerificationKey">zkid::Groth16VerificationKey</a>, constants: <a href="zkid.md#0x1_zkid_Configs">zkid::Configs</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="zkid.md#0x1_zkid_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vk: <a href="zkid.md#0x1_zkid_Groth16VerificationKey">zkid::Groth16VerificationKey</a>, constants: <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>)
 </code></pre>
 
 
@@ -151,7 +166,7 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="zkid.md#0x1_zkid_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vk: <a href="zkid.md#0x1_zkid_Groth16VerificationKey">Groth16VerificationKey</a>, constants: <a href="zkid.md#0x1_zkid_Configs">Configs</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="zkid.md#0x1_zkid_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, vk: <a href="zkid.md#0x1_zkid_Groth16VerificationKey">Groth16VerificationKey</a>, constants: <a href="zkid.md#0x1_zkid_Configuration">Configuration</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
 
     <b>move_to</b>(fx, vk);
@@ -227,13 +242,13 @@ Returns the Groth16 VK for our devnet deployment.
 
 </details>
 
-<a id="0x1_zkid_devnet_constants"></a>
+<a id="0x1_zkid_default_devnet_configuration"></a>
 
-## Function `devnet_constants`
+## Function `default_devnet_configuration`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_devnet_constants">devnet_constants</a>(): <a href="zkid.md#0x1_zkid_Configs">zkid::Configs</a>
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_default_devnet_configuration">default_devnet_configuration</a>(): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
 </code></pre>
 
 
@@ -242,11 +257,14 @@ Returns the Groth16 VK for our devnet deployment.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_devnet_constants">devnet_constants</a>(): <a href="zkid.md#0x1_zkid_Configs">Configs</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_default_devnet_configuration">default_devnet_configuration</a>(): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
     // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): Put reasonable defaults here.
-    <a href="zkid.md#0x1_zkid_Configs">Configs</a> {
+    <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
         max_zkid_signatures_per_txn: 3,
-        max_exp_horizon: 100_255_944, // 1159.55 days
+        max_exp_horizon_secs: 100_255_944, // ~1160 days
+        training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x"aa"),
+        // The commitment is using the Poseidon-BN254 <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> function, hence the 254-bit (32 byte) size.
+        nonce_commitment_num_bytes: 32,
     }
 }
 </code></pre>
@@ -255,13 +273,13 @@ Returns the Groth16 VK for our devnet deployment.
 
 </details>
 
-<a id="0x1_zkid_set_groth16_verification_key"></a>
+<a id="0x1_zkid_update_groth16_verification_key"></a>
 
-## Function `set_groth16_verification_key`
+## Function `update_groth16_verification_key`
 
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="zkid.md#0x1_zkid_set_groth16_verification_key">set_groth16_verification_key</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, alpha_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, beta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gamma_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, delta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_groth16_verification_key">update_groth16_verification_key</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, alpha_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, beta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gamma_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, delta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
 </code></pre>
 
 
@@ -270,7 +288,13 @@ Returns the Groth16 VK for our devnet deployment.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="zkid.md#0x1_zkid_set_groth16_verification_key">set_groth16_verification_key</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, alpha_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, beta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gamma_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, delta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="zkid.md#0x1_zkid_Groth16VerificationKey">Groth16VerificationKey</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_groth16_verification_key">update_groth16_verification_key</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+                                           alpha_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+                                           beta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+                                           gamma_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+                                           delta_g2: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+                                           gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+) <b>acquires</b> <a href="zkid.md#0x1_zkid_Groth16VerificationKey">Groth16VerificationKey</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
 
     <b>if</b> (<b>exists</b>&lt;<a href="zkid.md#0x1_zkid_Groth16VerificationKey">Groth16VerificationKey</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx))) {
@@ -285,6 +309,53 @@ Returns the Groth16 VK for our devnet deployment.
 
     <b>let</b> vk = <a href="zkid.md#0x1_zkid_new_groth16_verification_key">new_groth16_verification_key</a>(alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1);
     <b>move_to</b>(fx, vk);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_zkid_update_configuration"></a>
+
+## Function `update_configuration`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_configuration">update_configuration</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+                                      max_zkid_signatures_per_txn: u16,
+                                      max_exp_horizon_secs: u64,
+                                      training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+                                      nonce_commitment_num_bytes: u16,
+) <b>acquires</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+
+    <b>if</b> (<b>exists</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx))) {
+        <b>let</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+            max_zkid_signatures_per_txn: _,
+            max_exp_horizon_secs: _,
+            training_wheels_pubkey: _,
+            nonce_commitment_num_bytes: _,
+        } = <b>move_from</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
+    };
+
+    <b>let</b> configs = <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+        max_zkid_signatures_per_txn,
+        max_exp_horizon_secs,
+        training_wheels_pubkey,
+        nonce_commitment_num_bytes,
+    };
+
+    <b>move_to</b>(fx, configs);
 }
 </code></pre>
 

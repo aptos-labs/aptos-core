@@ -18,7 +18,8 @@ module aptos_framework::zkid {
         gamma_g2: vector<u8>,
         /// 64-byte serialization of `delta * H`, where `H` is the generator of `G2`.
         delta_g2: vector<u8>,
-        /// 64-byte serialization of `\forall i \in {0, 1}, gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where `H` is the generator of `G1`.
+        /// `\forall i \in {0, \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where
+        /// `H` is the generator of `G1` and `\ell` is 1 for the zkID relation.
         gamma_abc_g1: vector<vector<u8>>,
     }
 
@@ -27,9 +28,12 @@ module aptos_framework::zkid {
         // No transaction can have more than this many zkID signatures.
         max_zkid_signatures_per_txn: u16,
         // How far in the future from the JWT issued at time the EPK expiry can be set.
-        max_exp_horizon: u64,
+        max_exp_horizon_secs: u64,
         // The training wheels PK, if training wheels are on
         training_wheels_pubkey: Option<vector<u8>>,
+        // The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce`
+        // field.
+        nonce_commitment_num_bytes: u16,
     }
 
     // genesis.move needs to initialize the devnet VK
@@ -75,14 +79,22 @@ module aptos_framework::zkid {
         // TODO(zkid): Put reasonable defaults here.
         Configuration {
             max_zkid_signatures_per_txn: 3,
-            max_exp_horizon: 100_255_944, // 1159.55 days
+            max_exp_horizon_secs: 100_255_944, // ~1160 days
             training_wheels_pubkey: option::some(x"aa"),
+            // The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
+            nonce_commitment_num_bytes: 32,
         }
     }
 
     // Sets the zkID Groth16 verification key, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
-    public entry fun update_groth16_verification_key(fx: &signer, alpha_g1: vector<u8>, beta_g2: vector<u8>, gamma_g2: vector<u8>, delta_g2: vector<u8>, gamma_abc_g1: vector<vector<u8>>) acquires Groth16VerificationKey {
+    public fun update_groth16_verification_key(fx: &signer,
+                                               alpha_g1: vector<u8>,
+                                               beta_g2: vector<u8>,
+                                               gamma_g2: vector<u8>,
+                                               delta_g2: vector<u8>,
+                                               gamma_abc_g1: vector<vector<u8>>,
+    ) acquires Groth16VerificationKey {
         system_addresses::assert_aptos_framework(fx);
 
         if (exists<Groth16VerificationKey>(signer::address_of(fx))) {
@@ -101,21 +113,28 @@ module aptos_framework::zkid {
 
     // Sets the zkID configuration, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
-    public entry fun update_configuration(fx: &signer, max_zkid_signatures_per_txn: u16, max_exp_horizon: u64, training_wheels_pubkey: Option<vector<u8>>) acquires Configuration {
+    public fun update_configuration(fx: &signer,
+                                    max_zkid_signatures_per_txn: u16,
+                                    max_exp_horizon_secs: u64,
+                                    training_wheels_pubkey: Option<vector<u8>>,
+                                    nonce_commitment_num_bytes: u16,
+    ) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
         if (exists<Configuration>(signer::address_of(fx))) {
             let Configuration {
                 max_zkid_signatures_per_txn: _,
-                max_exp_horizon: _,
+                max_exp_horizon_secs: _,
                 training_wheels_pubkey: _,
+                nonce_commitment_num_bytes: _,
             } = move_from<Configuration>(signer::address_of(fx));
         };
 
         let configs = Configuration {
             max_zkid_signatures_per_txn,
-            max_exp_horizon,
-            training_wheels_pubkey
+            max_exp_horizon_secs,
+            training_wheels_pubkey,
+            nonce_commitment_num_bytes,
         };
 
         move_to(fx, configs);

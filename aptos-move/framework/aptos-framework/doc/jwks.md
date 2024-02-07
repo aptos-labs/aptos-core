@@ -105,7 +105,7 @@ An OIDC provider.
 
 ## Resource `SupportedOIDCProviders`
 
-A list of OIDC providers whose JWKs should be watched by validators. Maintained by governance proposals.
+A list of OIDC providers whose JWKs should be watched by validators. Maintained by ce proposals.
 
 
 <pre><code><b>struct</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> <b>has</b> key

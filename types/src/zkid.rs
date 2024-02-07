@@ -46,10 +46,6 @@ pub const IDC_NUM_BYTES: usize = 32;
 // Everything is a multiple of `poseidon_bn254::BYTES_PACKED_PER_SCALAR`] to maximize the input
 // sizes that can be hashed.
 
-/// The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce`
-/// field. The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
-pub const NONCE_COMMITMENT_NUM_BYTES: usize = 32;
-
 /// The max length of an ephemeral public key supported in our circuit (93 bytes)
 pub const MAX_COMMITTED_EPK_BYTES: usize = 3 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
@@ -86,8 +82,9 @@ pub const MAX_JWT_HEADER_B64_BYTES: usize = 300;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
     pub max_zkid_signatures_per_txn: u16,
-    pub max_exp_horizon: u64,
+    pub max_exp_horizon_secs: u64,
     pub training_wheels_pubkey: Option<Vec<u8>>,
+    pub nonce_commitment_num_bytes: u16,
 }
 
 impl MoveStructType for Configuration {
@@ -132,12 +129,13 @@ impl OpenIdSig {
         exp_timestamp_secs: u64,
         epk: &EphemeralPublicKey,
         pk: &ZkIdPublicKey,
-        max_exp_horizon_secs: u64,
+        config: &Configuration,
     ) -> Result<()> {
         let jwt_payload_json = base64url_decode_as_str(&self.jwt_payload)?;
         let claims: Claims = serde_json::from_str(&jwt_payload_json)?;
 
-        let max_expiration_date = seconds_from_epoch(claims.oidc_claims.iat + max_exp_horizon_secs);
+        let max_expiration_date =
+            seconds_from_epoch(claims.oidc_claims.iat + config.max_exp_horizon_secs);
         let expiration_date: SystemTime = seconds_from_epoch(exp_timestamp_secs);
         ensure!(
             expiration_date < max_expiration_date,
@@ -169,8 +167,12 @@ impl OpenIdSig {
         );
 
         ensure!(
-            self.reconstruct_oauth_nonce(exp_timestamp_secs, epk)?
-                .eq(&claims.oidc_claims.nonce),
+            self.reconstruct_oauth_nonce(
+                exp_timestamp_secs,
+                epk,
+                config.nonce_commitment_num_bytes as usize
+            )?
+            .eq(&claims.oidc_claims.nonce),
             "'nonce' claim did not contain the expected EPK and expiration date commitment"
         );
 
@@ -189,6 +191,7 @@ impl OpenIdSig {
         &self,
         exp_timestamp_secs: u64,
         epk: &EphemeralPublicKey,
+        nonce_commitment_num_bytes: usize,
     ) -> Result<String> {
         let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
             epk.to_bytes().as_slice(),
@@ -201,7 +204,7 @@ impl OpenIdSig {
         )?);
 
         let nonce_fr = poseidon_bn254::hash_scalars(frs)?;
-        let mut nonce_bytes = [0u8; NONCE_COMMITMENT_NUM_BYTES];
+        let mut nonce_bytes = vec![0u8; nonce_commitment_num_bytes];
         nonce_fr.serialize_uncompressed(&mut nonce_bytes[..])?;
 
         Ok(base64url_encode(&nonce_bytes[..]))
