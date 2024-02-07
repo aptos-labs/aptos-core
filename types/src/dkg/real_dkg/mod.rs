@@ -71,8 +71,8 @@ pub fn build_dkg_pvss_config(
     //     RECONSTRUCT_THRESHOLD,
     // );
 
-    // total weight 4000
-    let weights = vec![1000; 4];
+    // total weight 10_000
+    let weights = vec![1000; 10];
     let threshold_weight = weights.iter().sum::<usize>() * 2 / 3;
     let wconfig = WeightedConfig::new(threshold_weight, weights).unwrap();
 
