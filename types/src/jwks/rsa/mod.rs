@@ -60,6 +60,7 @@ impl RSA_JWK {
 
     // TODO(zkid): Move this to aptos-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
+        // TODO(zkid): finalize the jwk hashing scheme.
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256
         if modulus.len() != Self::RSA_MODULUS_BYTES {
@@ -68,8 +69,11 @@ impl RSA_JWK {
                 Self::RSA_MODULUS_BYTES
             );
         }
-        modulus.reverse(); // This is done to match the circuit, which requires the modulus in a verify specific format due to how RSA verification is implemented
-                           // TODO(zkid): finalize the jwk hashing scheme.
+
+        // This is done to match the circuit, which requires the modulus in a verify specific format
+        // due to how RSA verification is implemented
+        modulus.reverse();
+
         let mut scalars = modulus
             .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
             .map(|chunk| {

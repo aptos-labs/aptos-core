@@ -8,10 +8,6 @@ module aptos_framework::zkid {
     /// The training wheels PK needs to be 32 bytes long.
     const E_TRAINING_WHEELS_PK_WRONG_SIZE : u64 = 1;
 
-    /// The number of bytes we can pack in a Poseidon scalar
-    /// TODO(zkid): remove
-    const POSEIDON_BYTES_PACKED_PER_SCALAR : u16 = 31;
-
     #[resource_group(scope = global)]
     struct Group {}
 
@@ -114,17 +110,17 @@ module aptos_framework::zkid {
 
     /// Returns the configuration for our devnet deployment.
     public fun default_devnet_configuration(): Configuration {
-        // TODO(zkid): Put reasonable defaults here.
+        // TODO(zkid): Put reasonable defaults & circuit-specific constants here.
         Configuration {
             max_zkid_signatures_per_txn: 3,
             max_exp_horizon_secs: 100_255_944, // ~1160 days
             training_wheels_pubkey: option::some(x"aa"),
             // The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
             nonce_commitment_num_bytes: 32,
-            max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_iss_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR, // TODO(zkid): set to 115,
-            max_extra_field_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR, // TODO(zkid): set to 350,
-            max_jwt_header_b64_bytes: (8 * POSEIDON_BYTES_PACKED_PER_SCALAR as u32) // TODO(zkid): set to 300,
+            max_commited_epk_bytes: 3 * 31,
+            max_iss_bytes: 115, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR
+            max_extra_field_bytes:  350, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR
+            max_jwt_header_b64_bytes: 300, // (8 * POSEIDON_BYTES_PACKED_PER_SCALAR as u32)
         }
     }
 

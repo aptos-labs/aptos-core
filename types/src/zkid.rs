@@ -61,11 +61,10 @@ impl Configuration {
             max_exp_horizon_secs: 100_255_944,
             training_wheels_pubkey: None,
             nonce_commitment_num_bytes: 32,
-            // TODO(zkid): update these constants & the test cases
             max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_iss_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_extra_field_bytes: 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_jwt_header_b64_bytes: (8 * POSEIDON_BYTES_PACKED_PER_SCALAR) as u32,
+            max_iss_bytes: 115, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_extra_field_bytes: 350, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_jwt_header_b64_bytes: 300, // (8 * POSEIDON_BYTES_PACKED_PER_SCALAR) as u32,
         }
     }
 }
@@ -425,17 +424,14 @@ impl IdCommitment {
 impl IdCommitment {
     /// The max length of the value of the JWT's `aud` field supported in our circuit. zkID address
     /// derivation depends on this, so it should not be changed.
-    /// TODO(zkid): set to 115;
-    pub const MAX_AUD_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const MAX_AUD_VAL_BYTES: usize = 115; // 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
     /// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
     /// supported in our circuit. zkID address derivation depends on this, so it should not be changed.
-    /// TODO(zkid): set to 30
-    pub const MAX_UID_KEY_BYTES: usize = 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const MAX_UID_KEY_BYTES: usize = 30; // 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
     /// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
     /// which is supported in our circuit. zkID address derivation depends on this, so it should not
     /// be changed.
-    /// TODO(zkid): set to 330;
-    pub const MAX_UID_VAL_BYTES: usize = 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const MAX_UID_VAL_BYTES: usize = 330; // 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
     pub fn new_from_preimage(
         pepper: &Pepper,

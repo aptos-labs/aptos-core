@@ -193,17 +193,6 @@ The training wheels PK needs to be 32 bytes long.
 
 
 
-<a id="0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR"></a>
-
-The number of bytes we can pack in a Poseidon scalar
-TODO(zkid): remove
-
-
-<pre><code><b>const</b> <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>: u16 = 31;
-</code></pre>
-
-
-
 <a id="0x1_zkid_initialize"></a>
 
 ## Function `initialize`
@@ -361,10 +350,10 @@ Returns the configuration for our devnet deployment.
         training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x"aa"),
         // The commitment is using the Poseidon-BN254 <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> function, hence the 254-bit (32 byte) size.
         nonce_commitment_num_bytes: 32,
-        max_commited_epk_bytes: 3 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>,
-        max_iss_bytes: 5 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>, // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): set <b>to</b> 115,
-        max_extra_field_bytes: 5 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a>, // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): set <b>to</b> 350,
-        max_jwt_header_b64_bytes: (8 * <a href="zkid.md#0x1_zkid_POSEIDON_BYTES_PACKED_PER_SCALAR">POSEIDON_BYTES_PACKED_PER_SCALAR</a> <b>as</b> u32) // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): set <b>to</b> 300,
+        max_commited_epk_bytes: 3 * 31,
+        max_iss_bytes: 115, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR
+        max_extra_field_bytes:  350, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR
+        max_jwt_header_b64_bytes: 300, // (8 * POSEIDON_BYTES_PACKED_PER_SCALAR <b>as</b> u32)
     }
 }
 </code></pre>
