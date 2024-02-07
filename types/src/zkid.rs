@@ -86,6 +86,7 @@ pub struct OpenIdSig {
     /// The name of the key in the claim that maps to the user identifier; e.g., "sub" or "email"
     pub uid_key: String,
     /// The random value used to obfuscate the EPK from OIDC providers in the nonce field
+    #[serde(with = "serde_bytes")]
     pub epk_blinder: Vec<u8>,
     /// The privacy-preserving value used to calculate the identity commitment. It is typically uniquely derived from `(iss, client_id, uid_key, uid_val)`.
     pub pepper: Pepper,
@@ -412,7 +413,10 @@ impl Pepper {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct IdCommitment(pub(crate) Vec<u8>);
+pub struct IdCommitment(
+    #[serde(with = "serde_bytes")]
+    pub(crate) Vec<u8>
+);
 
 impl IdCommitment {
     /// The size of the identity commitment (IDC) used to derive a zkID address. This value should **NOT*

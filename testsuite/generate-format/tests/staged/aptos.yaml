@@ -238,10 +238,7 @@ HashValue:
           CONTENT: U8
           SIZE: 32
 IdCommitment:
-  NEWTYPESTRUCT:
-    TUPLEARRAY:
-      CONTENT: U8
-      SIZE: 32
+  NEWTYPESTRUCT: BYTES
 Identifier:
   NEWTYPESTRUCT: STR
 JWKMoveStruct:
@@ -299,10 +296,7 @@ OpenIdSig:
     - jwt_sig: STR
     - jwt_payload: STR
     - uid_key: STR
-    - epk_blinder:
-        TUPLEARRAY:
-          CONTENT: U8
-          SIZE: 31
+    - epk_blinder: BYTES
     - pepper:
         TYPENAME: Pepper
 PartialAuthenticatorAssertionResponse:
@@ -390,6 +384,11 @@ SignedGroth16Zkp:
         TYPENAME: Groth16Zkp
     - non_malleability_signature:
         TYPENAME: EphemeralSignature
+    - training_wheels_signature:
+        TYPENAME: EphemeralSignature
+    - extra_field: STR
+    - override_aud_val:
+        OPTION: STR
 SignedTransaction:
   STRUCT:
     - raw_txn:
