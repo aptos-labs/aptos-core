@@ -62,9 +62,9 @@ impl Configuration {
             training_wheels_pubkey: None,
             nonce_commitment_num_bytes: 32,
             max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_iss_bytes: 115,            // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_extra_field_bytes: 350,    // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_jwt_header_b64_bytes: 300, // (8 * POSEIDON_BYTES_PACKED_PER_SCALAR) as u32,
+            max_iss_bytes: 126,
+            max_extra_field_bytes: 350,
+            max_jwt_header_b64_bytes: 300,
         }
     }
 }
@@ -413,10 +413,7 @@ impl Pepper {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct IdCommitment(
-    #[serde(with = "serde_bytes")]
-    pub(crate) Vec<u8>
-);
+pub struct IdCommitment(#[serde(with = "serde_bytes")] pub(crate) Vec<u8>);
 
 impl IdCommitment {
     /// The size of the identity commitment (IDC) used to derive a zkID address. This value should **NOT*
@@ -568,29 +565,27 @@ mod test {
 
     // TODO(zkid): This test case must be rewritten to be more modular and updatable.
     //  Right now, there are no instructions on how to produce this test case.
-    // TODO(zkid): heliuchuan, please regenerate Groth16 proof
-    #[ignore]
     #[test]
     fn test_zkid_groth16_proof_verification() {
         let a = G1Bytes::new_unchecked(
-            "19843734071102143602441202443608981862760142725808945198375332557568733182487",
-            "7490772921219489322991985736547330118240504032652964776703563444800470517507",
+            "20534193224874816823038374805971256353897254359389549519579800571198905682623",
+            "3128047629776327625062258700337193014005673411952335683536865294076478098678",
         )
         .unwrap();
         let b = G2Bytes::new_unchecked(
             [
-                "799096037534263564394323941982781608031806843599379318443427814019873224162",
-                "14026173330568980628011709588549732085308934280497623796136346291913189596064",
+                "11831059544281359959902363827760224027191828999098259913907764686593049260801",
+                "14933419822301565783764657928814181728459886670248956535955133596731082875810",
             ],
             [
-                "18512483370445888670421748202641195280704367913960380279153644128302403162953",
-                "11254131899335650800706930224907562847943361881351835752623166468667575239687",
+                "16616167200367085072660100259194052934821478809307596510515652443339946625933",
+                "1103855954970567341442645156173756328940907403537523212700521414512165362008",
             ],
         )
         .unwrap();
         let c = G1Bytes::new_unchecked(
-            "161411929919357135819312594620804205291494587085213166645876168613542945746",
-            "20470377953299181976881540108292343474195200393467944112548990712451344598537",
+            "296457556259014920933232985275282694032456344171046224944953719399946325676",
+            "10314488872240559867545387237625153841351761679810222583912967187658678987385",
         )
         .unwrap();
         let proof = Groth16Zkp::new(a, b, c);

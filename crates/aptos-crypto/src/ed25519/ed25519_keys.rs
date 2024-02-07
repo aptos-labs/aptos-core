@@ -68,7 +68,6 @@ impl Ed25519PrivateKey {
 }
 
 impl Ed25519PublicKey {
-
     /// The maximum size in bytes.
     pub const LENGTH: usize = ED25519_PUBLIC_KEY_LENGTH;
 

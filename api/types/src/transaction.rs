@@ -15,14 +15,21 @@ use aptos_crypto::{
     secp256r1_ecdsa::PUBLIC_KEY_LENGTH,
     ValidCryptoMaterial,
 };
-use aptos_types::{account_address::AccountAddress, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt, contract_event::{ContractEvent, EventWithVersion}, transaction::{
-    authenticator::{
-        AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
-        SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
+use aptos_types::{
+    account_address::AccountAddress,
+    block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
+    contract_event::{ContractEvent, EventWithVersion},
+    transaction::{
+        authenticator::{
+            AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
+            SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
+        },
+        webauthn::PartialAuthenticatorAssertionResponse,
+        Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
-    webauthn::PartialAuthenticatorAssertionResponse,
-    Script, SignedTransaction, TransactionOutput, TransactionWithProof,
-}, zkid};
+    zkid,
+};
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
 use serde::{Deserialize, Serialize};

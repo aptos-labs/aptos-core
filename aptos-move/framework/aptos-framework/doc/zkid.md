@@ -313,10 +313,10 @@ Returns the Groth16 VK for our devnet deployment.
         alpha_g1: x"6d1c152d2705e35fe7a07a66eb8a10a7f42f1e38c412fbbc3ac7f9affc25dc24",
         beta_g2: x"e20a834c55ae6e2fcbd66636e09322727f317aff8957dd342afa11f936ef7c02cfdc8c9862849a0442bcaa4e03f45343e8bf261ef4ab58cead2efc17100a3b16",
         gamma_g2: x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19",
-        delta_g2: x"98c9283068e4bfc51266dcbabffb56bebeb65ece8d9104609026d0d89187961d0c69a4688b23f8a813ee74349785d116aedfcf3f3de15d7c9123b32eba326f23",
+        delta_g2: x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19",
         gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
-            x"29f65be8be6b13c84c1b29d219f35b998db14be4f7506fff4a475512ef0d959f",
-            x"1ddc291dfd35684b634f03cda96ae18139db1653471921c555b2750cbf49908c",
+            x"9aae6580d6040e77969d70e748e861664228e3567e77aa99822f8a4a19c29101",
+            x"e38ad8b845e3ef599232b43af2a64a73ada04d5f0e73f1848e6631e17a247415",
         ],
     }
 }
@@ -351,9 +351,9 @@ Returns the configuration for our devnet deployment.
         // The commitment is using the Poseidon-BN254 <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> function, hence the 254-bit (32 byte) size.
         nonce_commitment_num_bytes: 32,
         max_commited_epk_bytes: 3 * 31,
-        max_iss_bytes: 115, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR
-        max_extra_field_bytes:  350, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR
-        max_jwt_header_b64_bytes: 300, // (8 * POSEIDON_BYTES_PACKED_PER_SCALAR <b>as</b> u32)
+        max_iss_bytes: 126,
+        max_extra_field_bytes:  350,
+        max_jwt_header_b64_bytes: 300,
     }
 }
 </code></pre>
