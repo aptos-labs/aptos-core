@@ -654,6 +654,7 @@ dependencies = [
  "crossbeam",
  "dashmap",
  "derivative",
+ "fail 0.5.1",
  "itertools 0.10.5",
  "move-binary-format",
  "move-core-types",
