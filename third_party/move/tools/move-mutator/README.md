@@ -36,25 +36,22 @@ cargo test -p move-mutator
 
 ## Usage
 
-To check if it works, run the following command:
-```bash
-./target/release/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
-```
-
-or
+The `move-mutator` tool can be run using the `move-cli` tool or the `aptos`
+tool. The command line options are slightly different for both tools. Last 
+section of this document describes the command line options for both tools. For
+the rest of this document, we will use the `aptos` tool.
 
 ```bash
 ./target/release/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 
-The output will be generated to the chosen directory, or in case no directory
-was selected, produced mutants, and reports will be stored under 
-`mutants_output` directory.
+By default, the output shall be stored in the `mutants_output` directory unless
+otherwise specified.
 
 The mutator tool respects `RUST_LOG` variable, and it will print out as much
 information as the variable allows. To see all the logs run:
 ```bash
-RUST_LOG=trace ./target/debug/move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
+RUST_LOG=trace ./target/debug/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
 There is possibility to enable logging only for the specific modules. Please
 refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
@@ -62,26 +59,21 @@ refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documen
 There are also good tests in the Move Prover repository that can be used to
 check the tool. To run them, just use:
 ```
-./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
-./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
-./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
-./target/release/move mutate -m third_party/move/move-prover/tests/sources/functional/shift.move
+./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
+./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
+./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
+./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/shift.move
 ```
-and observe `mutants_output` directory. You can freely experiment with the
-mutator tool and check how it works on different Move files.
+and observe `mutants_output` directory.
 
 To generate mutants for all files within a test project (for the whole Move 
 package) run:
 ```bash
-./target/release/move mutate -p third_party/move/tools/move-mutator/tests/move-assets/simple/
-```
-or appropriately for `aptos`:
-```bash
 ./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/
 ```
 
-Running the above command (`aptos` one) will generate mutants for all files
-within the `simple` test project and should generate following output:
+Running the above command will generate mutants for all files within the
+`simple` test project and should generate following output:
 ```
 $ ./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/
 {
@@ -94,31 +86,33 @@ You can also examine reports made inside the output directory.
 It's also possible to generate mutants for a specific module by using the 
 `--mutate-modules` option:
 ```bash
-./target/release/move mutate -p third_party/move/tools/move-mutator/tests/move-assets/simple/ --mutate-modules "Sum"
+./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/ --mutate-modules "Sum"
 ```
 
-Running the mutator tool generates a lot of files. Except for the mutants, it
-also generates reports - in JSON and text format. Those reports are stored in 
-the output directory.
+The mutator tool generates:
+- mutants (modified move source code)
+- reports about mutants in JSON and text format.
 
 Generating mutants for the whole package can be time-consuming. To speed up the
 process, mutant verification is disabled by default. To enable it, use the
 `--verify-mutants` option:
 ```bash
-./target/release/move mutate -p third_party/move/tools/move-mutator/tests/move-assets/simple/ --verify-mutants
+./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/ --verify-mutants
 ```
-Verification of mutants is done by compiling them. If the compilation fails, the
-mutant is considered invalid. It's highly recommended to enable this option
+Mutants verification is done by compiling them. If the compilation fails,
+the mutant is considered invalid. It's highly recommended to enable this option
 as it helps to filter out invalid mutants, which would be a waste of time to
 prove.
 
-There are several test projects under `third_party/move/tools/move-mutator/tests/move-assets/`
+There are several test projects under: 
+`third_party/move/tools/move-mutator/tests/move-assets/`
 directory. They can be used to check the mutator tool as well.
 
 ## Command-line options
 
 Command line options are slightly different when using the `move-cli` tool and
-when using the `aptos` tool.
+when using the `aptos` tool. Running tool using either of them will produce
+the same results as they finally call the same entry point in the mutator code.
 
 To check possible options run:
 ```bash
@@ -128,6 +122,10 @@ or
 ```bash
 ./target/release/aptos move mutate --help
 ```
+
+The most notable difference is that the `move-cli` tool uses the `--path`/`-p`
+option for pointing Move package, while the `aptos` tool uses the
+`--package-dir` option.
 
 When using the `move-cli` tool, the command line options are as follows:
 ```text
