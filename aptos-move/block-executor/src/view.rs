@@ -1122,6 +1122,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         bytes: &Bytes,
         layout: &MoveTypeLayout,
     ) -> anyhow::Result<HashSet<T::Identifier>> {
+        // TODO[agg_v2](optimize): this performs 2 traversals of a value:
+        //   1) deserialize,
+        //   2) find identifiers to populate the set.
+        //   See if can cache identifiers in advance, or combine it with
+        //   deserialization.
         let value = deserialize_and_allow_native_values(bytes, layout).ok_or_else(|| {
             anyhow::anyhow!("Failed to deserialize resource during id replacement")
         })?;

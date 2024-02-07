@@ -125,7 +125,7 @@ fn test_string_utils() {
     run_entry_functions(func_names, |status: ExecutionStatus| {
         if let ExecutionStatus::MoveAbort {
             location: AbortLocation::Module(id),
-            code: 3, // EUNABLE_TO_FORMAT
+            code: 3, // EUNABLE_TO_FORMAT_DELAYED_FIELD
             info: Some(_),
         } = status
         {
