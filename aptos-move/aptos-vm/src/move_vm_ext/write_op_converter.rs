@@ -115,7 +115,7 @@ fn check_size_and_existence_match(
     if exists {
         if size.get() == 0 {
             Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
                     format!(
                         "Group tag count/size shouldn't be 0 for an existing group: {:?}",
                         state_key
@@ -127,7 +127,7 @@ fn check_size_and_existence_match(
         }
     } else if size.get() > 0 {
         Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
                 format!(
                     "Group tag count/size should be 0 for a new group: {:?}",
                     state_key
