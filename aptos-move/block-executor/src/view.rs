@@ -1744,26 +1744,19 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Sync(state) => state.start_counter,
             ViewState::Unsync(state) => state.start_counter,
         };
-
-        if unique_index < start_counter {
-            return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {:?}, index: {}, we've started from {}",
-                id, unique_index, start_counter
-            )));
-        }
-
-        let current = match &self.latest_view {
+        let current_counter = match &self.latest_view {
             ViewState::Sync(state) => state.counter.load(Ordering::SeqCst),
             ViewState::Unsync(state) => *state.counter.borrow(),
         };
 
-        if unique_index > current {
+        // We increment counter before we create an identifier from it, so
+        // it's value must be at most the current value.
+        if unique_index < start_counter || unique_index > current_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {:?}, index: {}, we've only reached to {}",
-                id, unique_index, current
+                "Invalid delayed field id: {:?} with index: {} (started from {} and reached {})",
+                id, unique_index, start_counter, current_counter
             )));
         }
-
         Ok(())
     }
 
