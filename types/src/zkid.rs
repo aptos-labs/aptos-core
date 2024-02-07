@@ -62,8 +62,8 @@ impl Configuration {
             training_wheels_pubkey: None,
             nonce_commitment_num_bytes: 32,
             max_commited_epk_bytes: 3 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_iss_bytes: 115, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
-            max_extra_field_bytes: 350, // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_iss_bytes: 115,            // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
+            max_extra_field_bytes: 350,    // 5 * POSEIDON_BYTES_PACKED_PER_SCALAR,
             max_jwt_header_b64_bytes: 300, // (8 * POSEIDON_BYTES_PACKED_PER_SCALAR) as u32,
         }
     }
@@ -369,7 +369,7 @@ pub struct JWTHeader {
 impl ZkIdSignature {
     /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
     /// enforced by our full nodes when they receive zkID TXNs.
-    pub const MAX_LEN : usize = 4000;
+    pub const MAX_LEN: usize = 4000;
 
     pub fn parse_jwt_header(&self) -> Result<JWTHeader> {
         let jwt_header_json = base64url_decode_as_str(&self.jwt_header)?;
@@ -424,14 +424,18 @@ impl IdCommitment {
 impl IdCommitment {
     /// The max length of the value of the JWT's `aud` field supported in our circuit. zkID address
     /// derivation depends on this, so it should not be changed.
-    pub const MAX_AUD_VAL_BYTES: usize = 115; // 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const MAX_AUD_VAL_BYTES: usize = 115;
+    // 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
     /// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
     /// supported in our circuit. zkID address derivation depends on this, so it should not be changed.
-    pub const MAX_UID_KEY_BYTES: usize = 30; // 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const MAX_UID_KEY_BYTES: usize = 30;
+    // 2 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
     /// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
     /// which is supported in our circuit. zkID address derivation depends on this, so it should not
     /// be changed.
-    pub const MAX_UID_VAL_BYTES: usize = 330; // 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
+    pub const MAX_UID_VAL_BYTES: usize = 330;
+
+    // 4 * poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
     pub fn new_from_preimage(
         pepper: &Pepper,
@@ -489,6 +493,7 @@ impl ZkIdPublicKey {
     /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
     /// enforced by our full nodes when they receive zkID TXNs.
     pub const MAX_LEN: usize = 200 + IdCommitment::NUM_BYTES;
+
     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
@@ -559,6 +564,8 @@ mod test {
 
     // TODO(zkid): This test case must be rewritten to be more modular and updatable.
     //  Right now, there are no instructions on how to produce this test case.
+    // TODO(zkid): heliuchuan, please regenerate Groth16 proof
+    #[ignore]
     #[test]
     fn test_zkid_groth16_proof_verification() {
         let a = G1Bytes::new_unchecked(

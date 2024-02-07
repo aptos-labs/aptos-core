@@ -33,15 +33,10 @@ macro_rules! serialize {
 /// Reflection of aptos_framework::zkid::Groth16PreparedVerificationKey
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Groth16VerificationKey {
-    /// Serialization of `alpha * G`, where `G` is the generator of `G1`.
     alpha_g1: Vec<u8>,
-    /// Serialization of `alpha * H`, where `H` is the generator of `G2`.
     beta_g2: Vec<u8>,
-    /// Serialization of `gamma * H`, where `H` is the generator of `G2`.
     gamma_g2: Vec<u8>,
-    /// Serialization of `delta * H`, where `H` is the generator of `G2`.
     delta_g2: Vec<u8>,
-    /// Serialization of `\forall i \in {0, 1}, gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where `H` is the generator of `G1`.
     gamma_abc_g1: Vec<Vec<u8>>,
 }
 

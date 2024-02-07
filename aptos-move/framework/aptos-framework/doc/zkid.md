@@ -100,7 +100,7 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 <code>gamma_abc_g1: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
- <code>\<b>forall</b> i \in {0, \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H</code>, where
+ <code>\<b>forall</b> i \in {0, ..., \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H</code>, where
  <code>H</code> is the generator of <code>G1</code> and <code>\ell</code> is 1 for the zkID relation.
 </dd>
 </dl>
@@ -129,49 +129,49 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 <code>max_zkid_signatures_per_txn: u16</code>
 </dt>
 <dd>
-
+ No transaction can have more than this many zkID signatures.
 </dd>
 <dt>
 <code>max_exp_horizon_secs: u64</code>
 </dt>
 <dd>
-
+ How far in the future from the JWT issued at time the EPK expiry can be set.
 </dd>
 <dt>
 <code>training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
-
+ The training wheels PK, if training wheels are on
 </dd>
 <dt>
 <code>nonce_commitment_num_bytes: u16</code>
 </dt>
 <dd>
-
+ The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's <code>nonce</code> field.
 </dd>
 <dt>
 <code>max_commited_epk_bytes: u16</code>
 </dt>
 <dd>
-
+ The max length of an ephemeral public key supported in our circuit (93 bytes)
 </dd>
 <dt>
 <code>max_iss_bytes: u16</code>
 </dt>
 <dd>
-
+ The max length of the value of the JWT's <code>iss</code> field supported in our circuit
 </dd>
 <dt>
 <code>max_extra_field_bytes: u16</code>
 </dt>
 <dd>
-
+ The max length of the JWT field name and value (e.g., <code>"max_age":"18"</code>) supported in our circuit
 </dd>
 <dt>
 <code>max_jwt_header_b64_bytes: u32</code>
 </dt>
 <dd>
-
+ The max length of the base64url-encoded JWT header in bytes supported in our circuit
 </dd>
 </dl>
 
@@ -343,7 +343,7 @@ Returns the configuration for our devnet deployment.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_default_devnet_configuration">default_devnet_configuration</a>(): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
-    // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): Put reasonable defaults here.
+    // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): Put reasonable defaults & circuit-specific constants here.
     <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
         max_zkid_signatures_per_txn: 3,
         max_exp_horizon_secs: 100_255_944, // ~1160 days

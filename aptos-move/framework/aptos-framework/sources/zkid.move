@@ -22,28 +22,28 @@ module aptos_framework::zkid {
         gamma_g2: vector<u8>,
         /// 64-byte serialization of `delta * H`, where `H` is the generator of `G2`.
         delta_g2: vector<u8>,
-        /// `\forall i \in {0, \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where
+        /// `\forall i \in {0, ..., \ell}, 64-byte serialization of gamma^{-1} * (beta * a_i + alpha * b_i + c_i) * H`, where
         /// `H` is the generator of `G1` and `\ell` is 1 for the zkID relation.
         gamma_abc_g1: vector<vector<u8>>,
     }
 
     #[resource_group_member(group = aptos_framework::zkid::Group)]
     struct Configuration has key, store {
-        // No transaction can have more than this many zkID signatures.
+        /// No transaction can have more than this many zkID signatures.
         max_zkid_signatures_per_txn: u16,
-        // How far in the future from the JWT issued at time the EPK expiry can be set.
+        /// How far in the future from the JWT issued at time the EPK expiry can be set.
         max_exp_horizon_secs: u64,
-        // The training wheels PK, if training wheels are on
+        /// The training wheels PK, if training wheels are on
         training_wheels_pubkey: Option<vector<u8>>,
-        // The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce` field.
+        /// The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce` field.
         nonce_commitment_num_bytes: u16,
-        // The max length of an ephemeral public key supported in our circuit (93 bytes)
+        /// The max length of an ephemeral public key supported in our circuit (93 bytes)
         max_commited_epk_bytes: u16,
-        // The max length of the value of the JWT's `iss` field supported in our circuit
+        /// The max length of the value of the JWT's `iss` field supported in our circuit
         max_iss_bytes: u16,
-        // The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
+        /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
         max_extra_field_bytes: u16,
-        // The max length of the base64url-encoded JWT header in bytes supported in our circuit
+        /// The max length of the base64url-encoded JWT header in bytes supported in our circuit
         max_jwt_header_b64_bytes: u32,
     }
 
