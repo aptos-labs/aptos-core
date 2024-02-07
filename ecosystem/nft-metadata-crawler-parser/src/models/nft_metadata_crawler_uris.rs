@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::schema::nft_metadata_crawler::parsed_asset_uris;
+use crate::{
+    models::nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
+    schema::nft_metadata_crawler::parsed_asset_uris,
+};
 use diesel::prelude::*;
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
@@ -151,5 +154,22 @@ impl NFTMetadataCrawlerURIs {
 
     pub fn set_do_not_parse(&mut self, do_not_parse: bool) {
         self.do_not_parse = do_not_parse;
+    }
+}
+
+impl From<NFTMetadataCrawlerURIsQuery> for NFTMetadataCrawlerURIs {
+    fn from(query: NFTMetadataCrawlerURIsQuery) -> Self {
+        Self {
+            asset_uri: query.asset_uri,
+            raw_image_uri: query.raw_image_uri,
+            raw_animation_uri: query.raw_animation_uri,
+            cdn_json_uri: query.cdn_json_uri,
+            cdn_image_uri: query.cdn_image_uri,
+            cdn_animation_uri: query.cdn_animation_uri,
+            json_parser_retry_count: query.json_parser_retry_count,
+            image_optimizer_retry_count: query.image_optimizer_retry_count,
+            animation_optimizer_retry_count: query.animation_optimizer_retry_count,
+            do_not_parse: query.do_not_parse,
+        }
     }
 }

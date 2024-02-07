@@ -432,7 +432,7 @@ impl BlockAptosVM {
                     e
                 )
             },
-            Err(BlockExecutionError::FatalVMError((err, _))) => Err(err),
+            Err(BlockExecutionError::FatalVMError(err)) => Err(err),
         }
     }
 }

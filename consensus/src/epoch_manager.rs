@@ -823,6 +823,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        features: Features,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -891,10 +892,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_client,
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
-            self.config
-                .max_sending_block_txns(self.quorum_store_enabled),
-            self.config
-                .max_sending_block_bytes(self.quorum_store_enabled),
+            self.config.max_sending_block_txns,
+            self.config.max_sending_block_bytes,
             onchain_consensus_config.max_failed_authors_to_store(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
@@ -930,6 +929,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config,
             buffered_proposal_tx,
             self.config.clone(),
+            features,
         );
 
         round_manager.init(last_vote).await;
@@ -975,7 +975,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
-        let features = payload.get::<Features>().ok().unwrap_or_default();
+        let features = payload.get::<Features>();
 
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
@@ -985,11 +985,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
+        if let Err(error) = &features {
+            error!("Failed to read on-chain features {}", error);
+        }
+
         self.epoch_state = Some(epoch_state.clone());
 
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
+        let features = features.unwrap_or_default();
+
         let (network_sender, payload_client, payload_manager) = self
             .initialize_shared_component(
                 &epoch_state,
@@ -1006,6 +1012,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
+                features,
             )
             .await
         } else {
@@ -1015,6 +1022,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 network_sender,
                 payload_client,
                 payload_manager,
+                features,
             )
             .await
         }
@@ -1061,6 +1069,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        features: Features,
     ) {
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1072,6 +1081,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     network_sender,
                     payload_client,
                     payload_manager,
+                    features,
                 )
                 .await
             },
@@ -1095,6 +1105,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
+        features: Features,
     ) {
         let epoch = epoch_state.epoch;
 
@@ -1147,6 +1158,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.effective_validator_txn_config(),
             self.bounded_executor.clone(),
+            features,
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

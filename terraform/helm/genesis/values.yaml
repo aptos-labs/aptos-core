@@ -31,6 +31,10 @@ chain:
   rewards_apy_percentage: 10
   # -- Minimum price per gas unit
   min_price_per_gas_unit: 1
+  # -- Onchain Consensus Config
+  on_chain_consensus_config:
+  # -- Onchain Execution Config
+  on_chain_execution_config:
 
 # -- Default image tag to use for all tools images
 imageTag: testnet

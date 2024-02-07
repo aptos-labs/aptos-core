@@ -164,6 +164,26 @@ pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Number of versions that were overlapped in a multi-task fetch pull
+pub static NUM_MULTI_FETCH_OVERLAPPED_VERSIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_multi_thread_fetch_overlapped_versions",
+        "Number of versions that were overlapped in a multi-task fetch pull",
+        &["service_type", "overlap_type"],
+    )
+    .unwrap()
+});
+
+/// Number of times we internally retry fetching a transaction/block
+pub static TRANSACTION_STORE_FETCH_RETRIES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_transaction_store_fetch_retries",
+        "Number of times we internally retry fetching a transaction/block",
+        &["store"],
+    )
+    .unwrap()
+});
+
 /// Generic duration metric
 pub static DURATION_IN_SECS: Lazy<GaugeVec> = Lazy::new(|| {
     register_gauge_vec!("indexer_grpc_duration_in_secs", "Duration in seconds", &[
@@ -196,7 +216,7 @@ pub fn log_grpc_step(
     duration_in_secs: Option<f64>,
     size_in_bytes: Option<usize>,
     num_transactions: Option<i64>,
-    request_metadata: Option<IndexerGrpcRequestMetadata>,
+    request_metadata: Option<&IndexerGrpcRequestMetadata>,
 ) {
     if let Some(duration_in_secs) = duration_in_secs {
         DURATION_IN_SECS
@@ -242,7 +262,7 @@ pub fn log_grpc_step(
             step.get_label(),
         );
     } else {
-        let request_metadata = request_metadata.clone().unwrap();
+        let request_metadata = request_metadata.unwrap();
         tracing::info!(
             start_version,
             end_version,
@@ -252,12 +272,12 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_name = request_metadata.processor_name.as_str(),
-            request_email = request_metadata.request_email.as_str(),
-            request_api_key_name = request_metadata.request_api_key_name.as_str(),
-            processor_name = request_metadata.processor_name.as_str(),
-            connection_id = request_metadata.request_connection_id.as_str(),
-            request_user_classification = request_metadata.request_user_classification.as_str(),
+            request_name = &request_metadata.processor_name,
+            request_email = &request_metadata.request_email,
+            request_api_key_name = &request_metadata.request_api_key_name,
+            processor_name = &request_metadata.processor_name,
+            connection_id = &request_metadata.request_connection_id,
+            request_user_classification = &request_metadata.request_user_classification,
             service_type,
             step = step.get_step(),
             "{}",
