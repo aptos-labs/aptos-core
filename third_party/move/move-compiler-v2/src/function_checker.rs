@@ -102,17 +102,14 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
 
                         // Same module is always visible
                         let same_module = callee_env.module_env.get_id() == caller_module_id;
-                        // Call involves an inline function, so we need
-                        // to check it before inlining.  Otherwise, we only
-                        // check it after inlining (to verify runtime visbility).
                         let call_involves_inline_function =
                             callee_env.is_inline() || caller_func.is_inline();
-                        let skip_check = same_module
-                            || if before_inlining {
-                                call_involves_inline_function
-                            } else {
-                                !call_involves_inline_function
-                            };
+
+                        // SKIP check if same_module or
+                        // if before inlining and the call doesn't involve inline function
+                        // OR if after inlining and call *does* involve an inline function
+                        let skip_check =
+                            same_module || (before_inlining != call_involves_inline_function);
 
                         let callee_is_accessible = if skip_check {
                             true
@@ -232,7 +229,13 @@ fn generic_error(
         called_from,
         why,
     );
-    env.diag_with_labels(Severity::Error, &callee.get_id_loc(), &msg, call_details);
+    env.diag_with_primary_and_labels(
+        Severity::Error,
+        &callee.get_id_loc(),
+        &msg,
+        "callee",
+        call_details,
+    );
 }
 
 fn cannot_call_error(
