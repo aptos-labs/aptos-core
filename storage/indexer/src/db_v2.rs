@@ -6,7 +6,6 @@
 /// from storage critical path to indexer, the other file will be removed
 /// and this file will be moved to /ecosystem/indexer-grpc/indexer-grpc-table-info.
 use crate::{
-    db_ops::{read_db, write_db},
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
@@ -64,12 +63,9 @@ pub struct IndexerAsyncV2 {
 
 impl IndexerAsyncV2 {
     pub fn new(db: DB) -> Result<Self> {
-        let next_version = read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
-            &db,
-            &MetadataKey::LatestVersion,
-        )
-        .unwrap()
-        .map_or(0, |v| v.expect_version());
+        let next_version = db
+            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)?
+            .map_or(0, |v| v.expect_version());
 
         Ok(Self {
             db,
@@ -138,10 +134,9 @@ impl IndexerAsyncV2 {
     }
 
     pub fn update_next_version(&self, end_version: u64) -> Result<()> {
-        write_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
-            &self.db,
-            MetadataKey::LatestVersion,
-            MetadataValue::Version(end_version),
+        self.db.put::<IndexerMetadataSchema>(
+            &MetadataKey::LatestVersion,
+            &MetadataValue::Version(end_version - 1),
         )?;
         self.next_version.store(end_version, Ordering::Relaxed);
         Ok(())
@@ -187,12 +182,10 @@ impl IndexerAsyncV2 {
     }
 
     pub fn next_version(&self) -> Version {
-        read_db::<MetadataKey, MetadataValue, IndexerMetadataSchema>(
-            &self.db,
-            &MetadataKey::LatestVersion,
-        )
-        .unwrap()
-        .map_or(0, |v| v.expect_version())
+        self.db
+            .get::<IndexerMetadataSchema>(&MetadataKey::LatestVersion)
+            .unwrap()
+            .map_or(0, |v| v.expect_version())
     }
 
     pub fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {

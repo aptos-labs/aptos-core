@@ -429,29 +429,14 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         key: &[u8],
         value: &[u8],
     ) -> Result<Option<DecodedTableData>> {
-        // Define a closure to encapsulate the logic
-        let get_table_info = |handle| -> Result<Option<TableInfo>> {
-            if let Some(table_info_reader) = self.table_info_reader.as_ref() {
-                // If table_info_reader exists, use it to get table_info
-                Ok(table_info_reader.get_table_info(handle)?)
-            } else if self.db.indexer_enabled() {
-                // If indexer is enabled in db, get table_info from the db
-                Ok(Some(self.db.get_table_info(handle)?))
-            } else {
-                // If neither condition is met, return None
-                Ok(None)
-            }
-        };
-
-        // Use the above closure to get table_info
-        let table_info = match get_table_info(handle)? {
+        let table_info = match self.get_table_info(handle)? {
             Some(ti) => ti,
             None => {
                 aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
                 );
-                return Ok(None);
+                return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
 
@@ -471,33 +456,17 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         handle: TableHandle,
         key: &[u8],
     ) -> Result<Option<DeletedTableData>> {
-        // Define a closure to encapsulate the logic
-        let get_table_info = |handle| -> Result<Option<TableInfo>> {
-            if let Some(table_info_reader) = self.table_info_reader.as_ref() {
-                // If table_info_reader exists, use it to get table_info
-                Ok(table_info_reader.get_table_info(handle)?)
-            } else if self.db.indexer_enabled() {
-                // If indexer is enabled in db, get table_info from the db
-                Ok(Some(self.db.get_table_info(handle)?))
-            } else {
-                // If neither condition is met, return None
-                Ok(None)
-            }
-        };
-
-        // Use the closure to get table_info
-        let table_info = match get_table_info(handle)? {
+        let table_info = match self.get_table_info(handle)? {
             Some(ti) => ti,
             None => {
                 aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
                 );
-                return Ok(None);
+                return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
 
-        // Continue processing with the obtained table_info
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
         Ok(Some(DeletedTableData {
@@ -957,6 +926,18 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 .collect::<Result<_>>()?,
             args,
         })
+    }
+
+    fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        if let Some(table_info_reader) = self.table_info_reader.as_ref() {
+            // Attempt to get table_info from the table_info_reader if it exists
+            Ok(table_info_reader.get_table_info(handle)?)
+        } else if self.db.indexer_enabled() {
+            // Attempt to get table_info from the db if indexer is enabled
+            Ok(Some(self.db.get_table_info(handle)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

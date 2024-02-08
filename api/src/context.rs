@@ -127,6 +127,9 @@ impl Context {
                 block_executor_onchain_config: OnChainExecutionConfig::default_if_missing()
                     .block_executor_onchain_config(),
             })),
+            view_function_stats,
+            simulate_txn_stats,
+            table_info_reader,
         }
     }
 

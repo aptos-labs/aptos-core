@@ -14,6 +14,6 @@ pub trait TableInfoReader: Send + Sync {
 
 impl TableInfoReader for IndexerAsyncV2 {
     fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        Self::get_table_info_with_retry(self, handle)
+        self.get_table_info_with_retry(handle)
     }
 }
