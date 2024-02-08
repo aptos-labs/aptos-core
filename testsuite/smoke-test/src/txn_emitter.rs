@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
 use anyhow::ensure;
 use aptos_forge::{
     args::TransactionTypeArg, EmitJobMode, EmitJobRequest, EntryPoints, NodeExt, Result, Swarm,
@@ -9,7 +9,7 @@ use aptos_forge::{
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub async fn generate_traffic(
     swarm: &mut dyn Swarm,
@@ -122,4 +122,41 @@ async fn test_txn_emmitter() {
     // assert some much smaller number than expected, so it doesn't fail under contention
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);
+}
+
+#[tokio::test]
+async fn test_txn_emmitter_with_high_pending_latency() {
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, conf, _| {
+            conf.api.failpoints_enabled = true;
+            conf.consensus.pipeline_backpressure.truncate(1);
+            conf.consensus.pipeline_backpressure[0].max_txns_from_block_to_execute = Some(2);
+            conf.consensus.pipeline_backpressure[0].back_pressure_pipeline_latency_limit_ms = 0;
+        }))
+        .build()
+        .await;
+
+    let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
+
+    let txn_stat = generate_traffic(
+        &mut swarm,
+        &all_validators,
+        Duration::from_secs(20),
+        100,
+        vec![vec![(
+            TransactionType::CallCustomModules {
+                entry_point: EntryPoints::SmartTablePicture {
+                    length: 128 * 1024,
+                    num_points_per_txn: 256,
+                },
+                num_modules: 1,
+                use_account_pool: false,
+            },
+            1,
+        )]],
+    )
+    .await
+    .unwrap();
+    assert!(txn_stat.submitted > 30);
 }
