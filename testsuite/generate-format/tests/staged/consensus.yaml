@@ -600,6 +600,10 @@ Payload:
       InQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithData
+    2:
+      InQuorumStoreWithLimit:
+        NEWTYPE:
+          TYPENAME: ProofWithDataWithTxnLimit
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -621,6 +625,12 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+ProofWithDataWithTxnLimit:
+  STRUCT:
+    - proof_with_data:
+        TYPENAME: ProofWithData
+    - max_txns_to_execute:
+        OPTION: U64
 ProposalExt:
   ENUM:
     0:
