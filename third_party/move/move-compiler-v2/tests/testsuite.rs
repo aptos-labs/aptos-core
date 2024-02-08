@@ -224,7 +224,6 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/ability-checker/") {
-            pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
