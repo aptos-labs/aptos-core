@@ -30,10 +30,10 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{
-        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type, TypeContext
     },
 };
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use parking_lot::RwLock;
 use sha3::{Digest, Sha3_256};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet, HashMap},
@@ -88,48 +88,6 @@ where
     }
 }
 
-pub(crate) struct StructNameCache {
-    data: RwLock<(
-        BTreeMap<StructIdentifier, StructNameIndex>,
-        Vec<StructIdentifier>,
-    )>,
-}
-
-impl Clone for StructNameCache {
-    fn clone(&self) -> Self {
-        let inner = self.data.read();
-        Self {
-            data: RwLock::new((inner.0.clone(), inner.1.clone())),
-        }
-    }
-}
-
-impl StructNameCache {
-    pub(crate) fn new() -> Self {
-        Self {
-            data: RwLock::new((BTreeMap::new(), vec![])),
-        }
-    }
-
-    pub(crate) fn insert_or_get(&self, name: StructIdentifier) -> StructNameIndex {
-        if let Some(idx) = self.data.read().0.get(&name) {
-            return *idx;
-        }
-        let mut inner_data = self.data.write();
-        let idx = StructNameIndex(inner_data.1.len());
-        inner_data.0.insert(name.clone(), idx);
-        inner_data.1.push(name);
-        idx
-    }
-
-    pub(crate) fn idx_to_identifier(
-        &self,
-        idx: StructNameIndex,
-    ) -> MappedRwLockReadGuard<StructIdentifier> {
-        RwLockReadGuard::map(self.data.read(), |inner| &inner.1[idx.0])
-    }
-}
-
 //
 // Loader
 //
@@ -142,7 +100,7 @@ pub(crate) struct Loader {
     scripts: RwLock<ScriptCache>,
     type_cache: RwLock<TypeCache>,
     natives: NativeFunctions,
-    pub(crate) name_cache: StructNameCache,
+    pub(crate) type_context: Arc<TypeContext>,
 
     // The below field supports a hack to workaround well-known issues with the
     // loader cache. This cache is not designed to support module upgrade or deletion.
@@ -183,7 +141,7 @@ impl Clone for Loader {
             scripts: RwLock::new(self.scripts.read().clone()),
             type_cache: RwLock::new(self.type_cache.read().clone()),
             natives: self.natives.clone(),
-            name_cache: self.name_cache.clone(),
+            type_context: self.type_context.clone(),
             invalidated: RwLock::new(*self.invalidated.read()),
             module_cache_hits: RwLock::new(self.module_cache_hits.read().clone()),
             vm_config: self.vm_config.clone(),
@@ -196,7 +154,7 @@ impl Loader {
         Self {
             scripts: RwLock::new(ScriptCache::new()),
             type_cache: RwLock::new(TypeCache::new()),
-            name_cache: StructNameCache::new(),
+            type_context: Arc::new(TypeContext::new()),
             natives,
             invalidated: RwLock::new(false),
             module_cache_hits: RwLock::new(BTreeSet::new()),
@@ -258,7 +216,8 @@ impl Loader {
             None => {
                 let ver_script =
                     self.deserialize_and_verify_script(script_blob, data_store, module_store)?;
-                let script = Script::new(ver_script, &hash_value, module_store, &self.name_cache)?;
+                let script =
+                    Script::new(ver_script, &hash_value, module_store, &self.type_context)?;
                 scripts.insert(hash_value, script)
             },
         };
@@ -917,7 +876,7 @@ impl Loader {
 
         // if linking goes well, insert the module to the code cache
         let module_ref =
-            module_store.insert(&self.natives, id.clone(), module, &self.name_cache)?;
+            module_store.insert(&self.natives, id.clone(), module, &self.type_context)?;
 
         Ok(module_ref)
     }
@@ -1624,7 +1583,7 @@ impl Loader {
         ty_args: &[Type],
         gas_context: &mut PseudoGasContext,
     ) -> PartialVMResult<StructTag> {
-        let name = &*self.name_cache.idx_to_identifier(struct_idx);
+        let name = &*self.type_context.get_identifier_by_idx(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some((struct_tag, gas)) = &struct_info.struct_tag {
@@ -1729,7 +1688,7 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<(MoveStructLayout, bool)> {
-        let name = &*self.name_cache.idx_to_identifier(struct_idx);
+        let name = &*self.type_context.get_identifier_by_idx(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(struct_layout_info) = &struct_info.struct_layout_info {
@@ -1913,7 +1872,7 @@ impl Loader {
         count: &mut u64,
         depth: u64,
     ) -> PartialVMResult<MoveStructLayout> {
-        let name = &*self.name_cache.idx_to_identifier(struct_idx);
+        let name = &*self.type_context.get_identifier_by_idx(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(annotated_node_count) = &struct_info.annotated_node_count {
@@ -2022,7 +1981,7 @@ impl Loader {
         struct_idx: StructNameIndex,
         module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<DepthFormula> {
-        let name = &*self.name_cache.idx_to_identifier(struct_idx);
+        let name = &*self.type_context.get_identifier_by_idx(struct_idx);
         if let Some(depth_formula) = self.type_cache.read().depth_formula.get(name) {
             return Ok(depth_formula.clone());
         }

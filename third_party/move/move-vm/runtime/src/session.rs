@@ -440,8 +440,8 @@ impl<'r, 'l> Session<'r, 'l> {
             .move_vm
             .runtime
             .loader()
-            .name_cache
-            .idx_to_identifier(index);
+            .type_context
+            .get_identifier_by_idx(index);
         self.module_store
             .get_struct_type_by_identifier(&name.name, &name.module)
             .ok()

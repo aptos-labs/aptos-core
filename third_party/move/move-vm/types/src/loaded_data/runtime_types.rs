@@ -24,6 +24,7 @@ use std::{
     fmt::Debug,
 };
 use triomphe::Arc as TriompheArc;
+use crate::loaded_data::IndexMap;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -647,5 +648,25 @@ mod unit_tests {
         for (ty, ty_args, expected) in cases {
             assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
         }
+    }
+}
+
+pub struct TypeContext {
+    identifier_cache: IndexMap<StructIdentifier>,
+}
+
+impl TypeContext {
+    pub fn new() -> Self {
+        Self {
+            identifier_cache: IndexMap::new(),
+        }
+    }
+
+    pub fn get_idx_by_identifier(&self, struct_identifier: StructIdentifier) -> StructNameIndex {
+        StructNameIndex(self.identifier_cache.get_or_insert(struct_identifier))
+    }
+
+    pub fn get_identifier_by_idx(&self, idx: StructNameIndex) -> &StructIdentifier {
+        self.identifier_cache.get_by_index(idx.0)
     }
 }

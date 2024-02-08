@@ -3,7 +3,7 @@
 
 use super::{
     intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation,
-    ModuleStorageAdapter, Scope, ScriptHash, StructNameCache,
+    ModuleStorageAdapter, Scope, ScriptHash,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -12,7 +12,7 @@ use move_binary_format::{
     file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
+use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type, TypeContext};
 use std::{collections::BTreeMap, sync::Arc};
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
@@ -47,7 +47,7 @@ impl Script {
         script: CompiledScript,
         script_hash: &ScriptHash,
         cache: &ModuleStorageAdapter,
-        name_cache: &StructNameCache,
+        type_context: &TypeContext,
     ) -> VMResult<Self> {
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
@@ -60,7 +60,7 @@ impl Script {
                 .check_compatibility(struct_handle)
                 .map_err(|err| err.finish(Location::Script))?;
 
-            struct_names.push(name_cache.insert_or_get(StructIdentifier {
+            struct_names.push(type_context.get_idx_by_identifier(StructIdentifier {
                 module: module_id,
                 name: struct_name.to_owned(),
             }));

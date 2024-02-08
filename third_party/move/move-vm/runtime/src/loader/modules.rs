@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use super::StructNameCache;
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
@@ -27,7 +26,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
-    StructIdentifier, StructNameIndex, StructType, Type,
+    StructIdentifier, StructNameIndex, StructType, Type, TypeContext,
 };
 use parking_lot::RwLock;
 use std::{
@@ -94,13 +93,13 @@ impl ModuleStorageAdapter {
         natives: &NativeFunctions,
         id: ModuleId,
         module: CompiledModule,
-        name_cache: &StructNameCache,
+        type_context: &TypeContext,
     ) -> VMResult<Arc<Module>> {
         if let Some(cached) = self.module_at(&id) {
             return Ok(cached);
         }
 
-        match Module::new(natives, module, self, name_cache) {
+        match Module::new(natives, module, self, type_context) {
             Ok(module) => Ok(self.modules.store_module(&id, module)),
             Err((err, _)) => Err(err.finish(Location::Undefined)),
         }
@@ -254,7 +253,7 @@ impl Module {
         natives: &NativeFunctions,
         module: CompiledModule,
         cache: &ModuleStorageAdapter,
-        name_cache: &StructNameCache,
+        type_context: &TypeContext,
     ) -> Result<Self, (PartialVMError, CompiledModule)> {
         let id = module.self_id();
 
@@ -283,7 +282,7 @@ impl Module {
                         .get_struct_type_by_identifier(struct_name, &module_id)?
                         .check_compatibility(struct_handle)?;
                 }
-                struct_idxs.push(name_cache.insert_or_get(StructIdentifier {
+                struct_idxs.push(type_context.get_idx_by_identifier(StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
                 }));
