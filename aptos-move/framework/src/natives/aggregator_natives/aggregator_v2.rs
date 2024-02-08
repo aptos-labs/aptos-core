@@ -4,8 +4,9 @@
 use crate::natives::aggregator_natives::{
     helpers_v2::{
         get_aggregator_max_value, get_aggregator_value, get_aggregator_value_as_id,
-        get_derived_string_snapshot_value, get_snapshot_value, get_snapshot_value_as_id,
-        set_aggregator_value, unbounded_aggregator_max_value,
+        get_derived_string_snapshot_value, get_derived_string_snapshot_value_as_id,
+        get_snapshot_value, get_snapshot_value_as_id, set_aggregator_value,
+        unbounded_aggregator_max_value,
     },
     NativeAggregatorContext,
 };
@@ -28,14 +29,11 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    delayed_values::{
-        derived_string_snapshot::{
-            bytes_and_width_to_derived_string_struct, string_to_bytes, u128_to_u64,
-        },
-        sized_id::SizedID,
+    delayed_values::derived_string_snapshot::{
+        bytes_and_width_to_derived_string_struct, string_to_bytes, u128_to_u64,
     },
     loaded_data::runtime_types::Type,
-    values::{Struct, StructRef, Value},
+    values::{Reference, Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::{cell::RefMut, collections::VecDeque};
@@ -491,11 +489,8 @@ fn native_read_derived_string(
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
-        let id: DelayedFieldID = safely_pop_arg!(args, SizedID).into();
-        resolver
-            .validate_delayed_field_id(&id)
-            .map_err(PartialVMError::from)?;
-
+        let derived_string_snapshot = safely_pop_arg!(args, Reference);
+        let id = get_derived_string_snapshot_value_as_id(derived_string_snapshot, resolver)?;
         delayed_field_data.read_derived(id, resolver)?
     } else {
         let derived_string_snapshot = safely_pop_arg!(args, StructRef);

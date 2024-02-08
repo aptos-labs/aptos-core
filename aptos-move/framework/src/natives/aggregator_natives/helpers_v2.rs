@@ -142,3 +142,19 @@ pub(crate) fn get_derived_string_snapshot_value(
     );
     string_to_bytes(derived_string_snapshot_value).map_err(SafeNativeError::InvariantViolation)
 }
+
+pub(crate) fn get_derived_string_snapshot_value_as_id(
+    derived_string_snapshot: Reference,
+    resolver: &dyn DelayedFieldResolver,
+) -> SafeNativeResult<DelayedFieldID> {
+    let id: DelayedFieldID = derived_string_snapshot
+        .read_ref()
+        .map_err(SafeNativeError::InvariantViolation)?
+        .value_as::<SizedID>()
+        .map_err(SafeNativeError::InvariantViolation)?
+        .into();
+    resolver
+        .validate_delayed_field_id(&id)
+        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
+    Ok(id)
+}
