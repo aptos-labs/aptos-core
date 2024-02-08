@@ -69,12 +69,15 @@ spec aptos_framework::version {
     spec set_for_next_epoch(account: &signer, major: u64) {
         aborts_if !exists<SetVersionCapability>(signer::address_of(account));
         aborts_if !exists<Version>(@aptos_framework);
-        aborts_if global<Version>(@aptos_framework).major < major;
+        aborts_if global<Version>(@aptos_framework).major >= major;
         aborts_if !exists<config_buffer::PendingConfigs>(@aptos_framework);
     }
 
     spec on_new_epoch() {
-        include exists<config_buffer::PendingConfigs>(@aptos_framework) ==> config_buffer::ExtractAbortsIf<Version>;
+        use aptos_std::type_info;
+        let type_name = type_info::type_name<Version>();
+        aborts_if config_buffer::spec_fun_does_exist<Version>(type_name) && !exists<Version>(@aptos_framework);
+        include config_buffer::spec_fun_does_exist<Version>(type_name) ==> config_buffer::ExtractAbortsIf<Version>;
     }
 
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.

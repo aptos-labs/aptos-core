@@ -10,6 +10,17 @@ spec aptos_framework::config_buffer {
 
     spec does_exist<T: store>(): bool {
         aborts_if false;
+        let type_name = type_info::type_name<T>();
+        ensures result == spec_fun_does_exist<T>(type_name);
+    }
+
+    spec fun spec_fun_does_exist<T: store>(type_name: String): bool {
+        if (exists<PendingConfigs>(@aptos_framework)) {
+            let config = global<PendingConfigs>(@aptos_framework);
+            simple_map::spec_contains_key(config.configs, type_name)
+        } else {
+            false
+        }
     }
 
     spec upsert<T: drop + store>(config: T) {
