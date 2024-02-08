@@ -186,7 +186,7 @@ fn count_srcs(code: &[Bytecode]) -> BTreeMap<Label, usize> {
             },
             Bytecode::Label(_, label) => {
                 if code_offset != 0 {
-                    let prev_instr = code.get(code_offset - 1).unwrap();
+                    let prev_instr = code.get(code_offset - 1).expect("instruction");
                     // treat fall-through's to the label
                     if !prev_instr.is_branch() {
                         map_inc(&mut srcs_count, *label)
