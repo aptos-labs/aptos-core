@@ -4,6 +4,12 @@
 //! This pass splits critical edges with empty blocks.
 //! A critical edge is an edge where the source node has multiple successors,
 //! and the target node has multiple predecessors.
+//!
+//! Side effects: clear existing annotations.
+//!
+//! Prerequisites: none.
+//!
+//! Postconditions: no critical edges in the control flow graph.
 
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
@@ -28,6 +34,7 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         }
         let mut transformer = SplitCriticalEdgesTransformation::new(data);
         transformer.transform();
+        transformer.data.annotations.clear();
         transformer.data
     }
 
