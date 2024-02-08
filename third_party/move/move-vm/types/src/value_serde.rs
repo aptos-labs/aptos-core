@@ -135,7 +135,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerializer
     fn custom_serialize<S: Serializer>(
         &self,
         serializer: S,
-        _tag: &IdentifierMappingKind,
+        _kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         sized_id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error> {
@@ -158,7 +158,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserializer
     fn custom_deserialize<'d, D: Deserializer<'d>>(
         &self,
         deserializer: D,
-        tag: &IdentifierMappingKind,
+        kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
     ) -> Result<Value, D::Error> {
         let value = DeserializationSeed {
@@ -168,7 +168,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserializer
         .deserialize(deserializer)?;
         let id = self
             .mapping
-            .value_to_identifier(tag, layout, value)
+            .value_to_identifier(kind, layout, value)
             .map_err(|e| D::Error::custom(format!("{}", e)))?;
         Ok(Value::delayed_value(DelayedFieldID::new_with_width(
             id.extract_unique_index(),

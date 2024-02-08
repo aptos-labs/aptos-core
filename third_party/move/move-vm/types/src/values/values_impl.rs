@@ -3164,7 +3164,7 @@ impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
             (L::Native(kind, layout), ValueImpl::DelayedFieldID { id }) => {
                 match self.custom_serializer {
                     Some(custom_serializer) => {
-                        custom_serializer.custom_serialize(serializer, tag, layout, *id)
+                        custom_serializer.custom_serialize(serializer, kind, layout, *id)
                     },
                     None => {
                         // If no custom serializer, it is not known how the
