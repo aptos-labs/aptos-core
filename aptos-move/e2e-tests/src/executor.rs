@@ -1108,7 +1108,7 @@ impl FakeExecutor {
             resolver,
         )
         .unwrap();
-        let mut session = vm.new_session_with_flush_flag(resolver, SessionId::void(), true);
+        let mut session = vm.new_clean_session(resolver, SessionId::void());
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(

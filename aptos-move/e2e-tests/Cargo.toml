@@ -31,7 +31,7 @@ aptos-native-interface = { workspace = true }
 aptos-proptest-helpers = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
+aptos-vm = { workspace = true, features = ["comparison-testing"] }
 aptos-vm-genesis = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }

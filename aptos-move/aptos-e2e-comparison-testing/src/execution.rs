@@ -3,7 +3,7 @@
 
 use crate::{
     check_aptos_packages_availability, compile_aptos_packages, compile_package,
-    data_stateview::DataStateView, generate_compiled_blob, is_aptos_package, DataManager,
+    data_state_view::DataStateView, generate_compiled_blob, is_aptos_package, DataManager,
     IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
 };
 use anyhow::Result;

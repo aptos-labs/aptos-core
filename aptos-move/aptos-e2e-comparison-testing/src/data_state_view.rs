@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_language_e2e_tests::data_store::FakeDataStore;
@@ -63,7 +62,7 @@ impl TStateView for DataStateView {
         }
         let ret = self.debugger_view.get_state_value(state_key);
         if let Some(reads) = &self.data_read_state_keys {
-            if !state_key.is_aptos_path()
+            if !state_key.is_aptos_code()
                 && !reads.lock().unwrap().contains_key(state_key)
                 && ret.is_ok()
             {
@@ -82,6 +81,6 @@ impl TStateView for DataStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        unimplemented!()
+        unreachable!()
     }
 }

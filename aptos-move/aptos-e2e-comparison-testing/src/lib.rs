@@ -24,7 +24,7 @@ use std::{
 use tempfile::TempDir;
 
 mod data_collection;
-mod data_stateview;
+mod data_state_view;
 mod execution;
 mod online_execution;
 

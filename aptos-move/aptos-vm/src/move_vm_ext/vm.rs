@@ -191,10 +191,19 @@ impl MoveVmExt {
         resolver: &'r S,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.new_session_with_flush_flag(resolver, session_id, false)
+        self.new_session_impl(resolver, session_id, false)
     }
 
-    pub fn new_session_with_flush_flag<'r, S: AptosMoveResolver>(
+    #[cfg(feature = "comparison-testing")]
+    pub fn new_clean_session<'r, S: AptosMoveResolver>(
+        &self,
+        resolver: &'r S,
+        session_id: SessionId,
+    ) -> SessionExt<'r, '_> {
+        self.new_session_impl(resolver, session_id, true)
+    }
+
+    fn new_session_impl<'r, S: AptosMoveResolver>(
         &self,
         resolver: &'r S,
         session_id: SessionId,

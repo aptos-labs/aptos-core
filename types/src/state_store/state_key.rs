@@ -155,12 +155,11 @@ impl StateKey {
         CryptoHash::hash(self).nibble(0)
     }
 
-    pub fn is_aptos_path(&self) -> bool {
-        use move_core_types::{account_address::AccountAddress, language_storage::CODE_TAG};
+    pub fn is_aptos_code(&self) -> bool {
+        use move_core_types::account_address::AccountAddress;
         match self.inner() {
             StateKeyInner::AccessPath(access_path) => {
-                !access_path.path.is_empty()
-                    && access_path.path[0] == CODE_TAG
+                access_path.is_code()
                     && (access_path.address == AccountAddress::ONE
                         || access_path.address == AccountAddress::THREE
                         || access_path.address == AccountAddress::FOUR)
