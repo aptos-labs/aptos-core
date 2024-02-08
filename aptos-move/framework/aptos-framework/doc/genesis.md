@@ -63,6 +63,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="version.md#0x1_version">0x1::version</a>;
 <b>use</b> <a href="vesting.md#0x1_vesting">0x1::vesting</a>;
+<b>use</b> <a href="zkid.md#0x1_zkid">0x1::zkid</a>;
 </code></pre>
 
 
@@ -366,6 +367,7 @@ Genesis step 1: Initialize aptos framework account and core modules on chain.
     <a href="state_storage.md#0x1_state_storage_initialize">state_storage::initialize</a>(&aptos_framework_account);
     <a href="timestamp.md#0x1_timestamp_set_time_has_started">timestamp::set_time_has_started</a>(&aptos_framework_account);
     <a href="jwks.md#0x1_jwks_initialize">jwks::initialize</a>(&aptos_framework_account);
+    <a href="zkid.md#0x1_zkid_initialize">zkid::initialize</a>(&aptos_framework_account, <a href="zkid.md#0x1_zkid_devnet_groth16_vk">zkid::devnet_groth16_vk</a>(), <a href="zkid.md#0x1_zkid_default_devnet_configuration">zkid::default_devnet_configuration</a>());
 }
 </code></pre>
 

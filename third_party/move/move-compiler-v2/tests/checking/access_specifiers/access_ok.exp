@@ -1,3 +1,23 @@
+
+Diagnostics:
+warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
+   ┌─ tests/checking/access_specifiers/access_ok.move:35:12
+   │
+35 │     fun f9(a: address) acquires *(a) {
+   │            ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/access_specifiers/access_ok.move:38:13
+   │
+38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
+   │             ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/access_specifiers/access_ok.move:41:25
+   │
+41 │     fun make_up_address(x: u64): address {
+   │                         ^
+
 // ---- Model Dump
 module 0x42::m {
     struct T {

@@ -119,20 +119,6 @@ static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     .unwrap()
 });
 
-#[cfg(test)]
-mod test {
-    use crate::counters::RANKING_SCORE_BUCKETS;
-
-    #[test]
-    fn generate_ranking_score_buckets() {
-        let buckets: Vec<f64> = (0..21)
-            .map(|n| 100.0 * (10.0_f64.powf(n as f64 / 6.0)))
-            .map(|f| f.round())
-            .collect();
-        assert_eq!(RANKING_SCORE_BUCKETS, &buckets);
-    }
-}
-
 /// Counter tracking size of various indices in core mempool
 pub static CORE_MEMPOOL_INDEX_SIZE: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -627,3 +613,17 @@ pub static MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
         .unwrap(),
     )
 });
+
+#[cfg(test)]
+mod test {
+    use crate::counters::RANKING_SCORE_BUCKETS;
+
+    #[test]
+    fn generate_ranking_score_buckets() {
+        let buckets: Vec<f64> = (0..21)
+            .map(|n| 100.0 * (10.0_f64.powf(n as f64 / 6.0)))
+            .map(|f| f.round())
+            .collect();
+        assert_eq!(RANKING_SCORE_BUCKETS, &buckets);
+    }
+}

@@ -20,6 +20,7 @@ aptos-crypto-derive = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ff = { workspace = true }
+ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 arr_macro = { workspace = true }
 base64 = { workspace = true }
@@ -44,6 +45,7 @@ proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
+serde-big-array = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }

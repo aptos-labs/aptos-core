@@ -17,6 +17,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
+    delayed_fields::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -48,8 +49,6 @@ use std::{
     },
 };
 
-type Result<T, E = StateviewError> = std::result::Result<T, E>;
-
 // Should not be possible to overflow or underflow, as each delta is at most 100 in the tests.
 // TODO: extend to delta failures.
 pub(crate) const STORAGE_AGGREGATOR_VALUE: u128 = 100001;
@@ -69,7 +68,7 @@ where
     type Key = K;
 
     // Contains mock storage value with STORAGE_AGGREGATOR_VALUE.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
         Ok(Some(StateValue::new_legacy(
             serialize(&STORAGE_AGGREGATOR_VALUE).into(),
         )))
@@ -79,7 +78,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -95,7 +94,7 @@ where
     type Key = K;
 
     // Contains mock storage value with a non-empty group (w. value at RESERVED_TAG).
-    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, key: &K) -> Result<Option<StateValue>, StateviewError> {
         if self.group_keys.contains(key) {
             let group: BTreeMap<u32, Bytes> = BTreeMap::from([(RESERVED_TAG, vec![0].into())]);
 
@@ -110,7 +109,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -126,7 +125,7 @@ where
     type Key = K;
 
     /// Gets the state value for a given state key.
-    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>> {
+    fn get_state_value(&self, _: &K) -> Result<Option<StateValue>, StateviewError> {
         Ok(None)
     }
 
@@ -134,7 +133,7 @@ where
         StateViewId::Miscellaneous
     }
 
-    fn get_usage(&self) -> Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         unreachable!("Not used in tests");
     }
 }
@@ -414,7 +413,7 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
     },
     /// Skip the execution of trailing transactions.
-    SkipRest,
+    SkipRest(u64),
     /// Abort the execution.
     Abort,
 }
@@ -440,7 +439,7 @@ impl<K, E> MockTransaction<K, E> {
                 incarnation_behaviors,
                 ..
             } => incarnation_behaviors,
-            Self::SkipRest => unreachable!("SkipRest does not contain incarnation behaviors"),
+            Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
         }
     }
@@ -969,7 +968,11 @@ where
                     total_gas: behavior.gas,
                 })
             },
-            MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
+            MockTransaction::SkipRest(gas) => {
+                let mut mock_output = MockOutput::skip_output();
+                mock_output.total_gas = *gas;
+                ExecutionStatus::SkipRest(mock_output)
+            },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
@@ -1066,7 +1069,7 @@ where
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    // TODO[agg_v2](cleanup) Using the concrete type layout here. Should we find a way to use generics?
     fn resource_group_write_set(
         &self,
     ) -> Vec<(
@@ -1116,10 +1119,11 @@ where
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
+        Ok(())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {

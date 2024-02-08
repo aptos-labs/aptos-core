@@ -654,7 +654,7 @@ impl TransactionGenerator {
         });
         let (tx, rx) = std::sync::mpsc::channel();
         self.worker_pool.scope(move |scope| {
-            for (_, per_worker_jobs) in jobs.into_iter().enumerate() {
+            for per_worker_jobs in jobs.into_iter() {
                 let tx = tx.clone();
                 scope.spawn(move |_| {
                     for (index, job) in per_worker_jobs {

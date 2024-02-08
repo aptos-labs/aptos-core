@@ -14,6 +14,8 @@ pub enum NodeBroadcastHandleError {
     MissingParents,
     #[error("stale round number")]
     StaleRound(Round),
+    #[error("refused to vote")]
+    VoteRefused,
 }
 
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]
