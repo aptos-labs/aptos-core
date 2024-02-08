@@ -966,6 +966,7 @@ where
                     read_group_sizes,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
+                    skipped: false,
                 })
             },
             MockTransaction::SkipRest(gas) => {
@@ -997,6 +998,7 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) read_group_sizes: Vec<(K, u64)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
+    pub(crate) skipped: bool,
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -1100,6 +1102,7 @@ where
             read_group_sizes: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
+            skipped: true,
         }
     }
 

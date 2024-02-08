@@ -365,10 +365,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
                 results.iter().skip(committed).for_each(|output| {
                     // Ensure the transaction is skipped based on the output.
-                    assert!(output.writes.is_empty());
-                    assert!(output.deltas.is_empty());
-                    assert!(output.read_results.is_empty());
-                    assert_eq!(output.total_gas, 0);
+                    assert!(output.skipped);
 
                     // Implies that materialize_delta_writes was never called, as should
                     // be for skipped transactions.
