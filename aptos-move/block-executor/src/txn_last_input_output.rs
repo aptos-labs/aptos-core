@@ -12,8 +12,8 @@ use aptos_aggregator::types::{code_invariant_error, PanicOr};
 use aptos_logger::warn;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
-    write_set::WriteOp,
+    delayed_fields::PanicError, fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -411,7 +411,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         delta_writes: Vec<(T::Key, WriteOp)>,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
@@ -422,12 +422,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     delta_writes,
                     patched_resource_write_set,
                     patched_events,
-                );
+                )?;
             },
             ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+        Ok(())
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {

@@ -253,7 +253,8 @@ macro_rules! assert_invariant_violation {
             // TODO[agg_v2](test): Uniformize errors for write op squashing.
             assert!(
                 err.major_status() == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-                    || err.major_status() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
+                    || err.major_status()
+                        == StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
             );
         };
 
