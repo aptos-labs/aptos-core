@@ -413,7 +413,7 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
     },
     /// Skip the execution of trailing transactions.
-    SkipRest,
+    SkipRest(u64),
     /// Abort the execution.
     Abort,
 }
@@ -439,7 +439,7 @@ impl<K, E> MockTransaction<K, E> {
                 incarnation_behaviors,
                 ..
             } => incarnation_behaviors,
-            Self::SkipRest => unreachable!("SkipRest does not contain incarnation behaviors"),
+            Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
         }
     }
@@ -968,7 +968,11 @@ where
                     total_gas: behavior.gas,
                 })
             },
-            MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
+            MockTransaction::SkipRest(gas) => {
+                let mut mock_output = MockOutput::skip_output();
+                mock_output.total_gas = *gas;
+                ExecutionStatus::SkipRest(mock_output)
+            },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }

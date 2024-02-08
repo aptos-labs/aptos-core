@@ -88,6 +88,37 @@ fn block_output_err_precedence() {
     scenario.teardown();
 }
 
+#[test]
+fn skip_rest_gas_limit() {
+    // The contents of the second txn does not matter, as the first should hit the gas limit and
+    // also skip. But it ensures block is not finished at the first txn (different processing).
+    let transactions = Vec::from([MockTransaction::SkipRest(10), MockTransaction::SkipRest(10)]);
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        ExecutableTestType,
+    >::new(
+        BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
+        executor_thread_pool,
+        None,
+    );
+
+    // Should hit block limit on the skip transaction.
+    let _ = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+}
+
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
 where
@@ -376,7 +407,7 @@ fn early_skips() {
             )));
         }
         // One transaction that triggers an abort
-        transactions.push(MockTransaction::SkipRest)
+        transactions.push(MockTransaction::SkipRest(0))
     }
     run_and_assert(transactions)
 }

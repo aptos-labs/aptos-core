@@ -114,11 +114,14 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     status = BaselineStatus::Aborted;
                     break;
                 },
-                MockTransaction::SkipRest => {
+                MockTransaction::SkipRest(gas) => {
                     // In executor, SkipRest skips from the next index. Test assumes it's an empty
                     // transaction, so create a successful empty reads and deltas.
                     read_values.push(Ok(vec![]));
                     resolved_deltas.push(Ok(HashMap::new()));
+
+                    // gas in SkipRest is used for unit tests for now (can generalize when needed).
+                    assert_eq!(*gas, 0);
 
                     status = BaselineStatus::SkipRest;
                     break;
