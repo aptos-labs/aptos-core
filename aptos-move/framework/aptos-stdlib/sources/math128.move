@@ -41,11 +41,17 @@ module aptos_std::math128 {
 
     /// Return number of significant figures (decimal digits) in `a`.
     public inline fun sig_figs(a: u128): u8 {
-        let count = 1;
-        loop {
-            a = a / 10;
-            if (a == 0) break;
-            count = count + 1
+        let count = 0;
+        if (a != 0) {
+            // Strip trailing zeroes.
+            while (a % 10 == 0) {
+                a = a / 10
+            };
+            // Count all digits, including sandwiched zeroes.
+            while (a > 0) {
+                count = count + 1;
+                a = a / 10
+            };
         };
         count
     }
@@ -206,14 +212,22 @@ module aptos_std::math128 {
 
     #[test]
     fun test_sig_figs() {
-        assert!(sig_figs(0) == 1, 0);
+        assert!(sig_figs(0) == 0, 0);
         assert!(sig_figs(1) == 1, 0);
         assert!(sig_figs(2) == 1, 0);
         assert!(sig_figs(9) == 1, 0);
-        assert!(sig_figs(10) == 2, 0);
+        assert!(sig_figs(10) == 1, 0);
+        assert!(sig_figs(11) == 2, 0);
+        assert!(sig_figs(90) == 1, 0);
         assert!(sig_figs(99) == 2, 0);
-        assert!(sig_figs(100) == 3, 0);
+        assert!(sig_figs(100) == 1, 0);
+        assert!(sig_figs(210) == 2, 0);
+        assert!(sig_figs(32300) == 3, 0);
+        assert!(sig_figs(9110011) == 7, 0);
+        assert!(sig_figs(01110011) == 7, 0);
         assert!(sig_figs(10000000000000001) == 17, 0);
+        assert!(sig_figs(20000000000000010) == 16, 0);
+        assert!(sig_figs(90000000000000000) == 1, 0);
     }
 
     #[test]

@@ -177,11 +177,17 @@ Return number of significant figures (decimal digits) in <code>a</code>.
 
 
 <pre><code><b>public</b> inline <b>fun</b> <a href="math64.md#0x1_math64_sig_figs">sig_figs</a>(a: u64): u8 {
-    <b>let</b> count = 1;
-    <b>loop</b> {
-        a = a / 10;
-        <b>if</b> (a == 0) <b>break</b>;
-        count = count + 1
+    <b>let</b> count = 0;
+    <b>if</b> (a != 0) {
+        // Strip trailing zeroes.
+        <b>while</b> (a % 10 == 0) {
+            a = a / 10
+        };
+        // Count all digits, including sandwiched zeroes.
+        <b>while</b> (a &gt; 0) {
+            count = count + 1;
+            a = a / 10
+        };
     };
     count
 }
