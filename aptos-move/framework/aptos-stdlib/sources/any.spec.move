@@ -20,6 +20,13 @@ spec aptos_std::any {
         ensures result == from_bcs::deserialize<T>(x.data);
     }
 
+    spec schema UnpackAbortsIf<T> {
+        use aptos_std::from_bcs;
+        x: Any;
+        aborts_if type_info::type_name<T>() != x.type_name;
+        aborts_if !from_bcs::deserializable<T>(x.data);
+    }
+
     spec type_name(x: &Any): &String {
         aborts_if false;
         ensures result == x.type_name;
