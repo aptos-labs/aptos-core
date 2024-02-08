@@ -839,7 +839,7 @@ impl GlobalEnv {
         while let Some(boxed_loc) = inlined_from {
             let loc = boxed_loc.as_ref();
             let new_label = Label::secondary(loc.file_id, loc.span)
-                .with_message("in a call inlined at this callsite");
+                .with_message("from a call inlined at this callsite");
             labels.push(new_label);
             inlined_from = &loc.inlined_from_loc;
         }

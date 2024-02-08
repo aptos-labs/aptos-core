@@ -422,7 +422,7 @@ error: cannot drop
    │         ^^^^^^^^^^^^^^^^^^
    ·
 14 │         move_from_no_key<Impotent>(addr);
-   │         -------------------------------- in a call inlined at this callsite
+   │         -------------------------------- from a call inlined at this callsite
 
 error: no key ability
    ┌─ tests/ability-checker/ability_violation.move:4:3
@@ -431,7 +431,7 @@ error: no key ability
    │         ^^^^^^^^^^^^^^^^^^
    ·
 14 │         move_from_no_key<Impotent>(addr);
-   │         -------------------------------- in a call inlined at this callsite
+   │         -------------------------------- from a call inlined at this callsite
 
 error: cannot drop
    ┌─ tests/ability-checker/ability_violation.move:15:3
