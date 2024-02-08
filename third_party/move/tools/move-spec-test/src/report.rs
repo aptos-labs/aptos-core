@@ -83,10 +83,7 @@ impl Report {
                     format!("{}::{}", path.to_string_lossy(), stat.module.clone()),
                     stat.tested.to_string(),
                     stat.killed.to_string(),
-                    format!(
-                        "{:.2}%",
-                        percentage
-                    ),
+                    format!("{percentage:.2}%"),
                 ]);
             }
         }
