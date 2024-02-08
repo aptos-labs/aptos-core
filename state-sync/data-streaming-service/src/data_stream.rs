@@ -393,8 +393,11 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
         pending_client_response
     }
 
-    // TODO(joshlind): this function shouldn't be blocking when trying to send! If there are
-    // multiple streams, a single blocked stream could cause them all to block.
+    // TODO(joshlind): this function shouldn't be blocking when trying to send.
+    // If there are multiple streams, a single blocked stream could cause them
+    // all to block. This is acceptable for now (because there is only ever
+    // a single stream in use by the driver) but it should be fixed if we want
+    // to generalize this for multiple streams.
     async fn send_data_notification(
         &mut self,
         data_notification: DataNotification,

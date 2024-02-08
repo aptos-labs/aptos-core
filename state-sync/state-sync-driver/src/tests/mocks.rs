@@ -475,7 +475,7 @@ mock! {
 
         fn pending_storage_data(&self) -> bool;
 
-        fn save_state_values(
+        async fn save_state_values(
             &mut self,
             notification_id: NotificationId,
             state_value_chunk_with_proof: StateValueChunkWithProof,
