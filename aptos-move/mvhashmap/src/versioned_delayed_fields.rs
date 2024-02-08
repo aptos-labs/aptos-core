@@ -600,7 +600,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
 
                 if let DelayedFieldValue::Snapshot(base) = prev_value {
                     let new_value = formula.apply_to(base);
-                    DelayedFieldValue::Derived(new_value)
+                    DelayedFieldValue::DerivedStringSnapshot(new_value)
                 } else {
                     return Err(CommitError::CodeInvariantError(
                         "Cannot apply delta to non-DelayedField::Aggregator".to_string(),
@@ -759,7 +759,7 @@ mod test {
             VALUE_AGGREGATOR => Some(VersionEntry::Value(DelayedFieldValue::Aggregator(10), None)),
             VALUE_SNAPSHOT => Some(VersionEntry::Value(DelayedFieldValue::Snapshot(13), None)),
             VALUE_DERIVED => Some(VersionEntry::Value(
-                DelayedFieldValue::Derived(vec![70, 80, 90]),
+                DelayedFieldValue::DerivedStringSnapshot(vec![70, 80, 90]),
                 None,
             )),
             APPLY_AGGREGATOR => Some(VersionEntry::Apply(DelayedApplyEntry::AggregatorDelta {
@@ -808,7 +808,7 @@ mod test {
         base_snapshot: DelayedFieldID,
     ) -> VersionEntry<DelayedFieldID> {
         VersionEntry::Value(
-            DelayedFieldValue::Derived(value),
+            DelayedFieldValue::DerivedStringSnapshot(value),
             Some(DelayedApplyEntry::SnapshotDerived {
                 base_snapshot,
                 formula,
@@ -838,7 +838,7 @@ mod test {
         ($cond:expr, $expected:expr) => {
             assert_ok_eq!(
                 $cond,
-                VersionedRead::Value(DelayedFieldValue::Derived($expected))
+                VersionedRead::Value(DelayedFieldValue::DerivedStringSnapshot($expected))
             );
         };
     }
@@ -1113,7 +1113,8 @@ mod test {
 
         {
             // old value shouldn't affect derived computation, as it depends on Snapshot value.
-            let mut v = VersionedValue::new(Some(DelayedFieldValue::Derived(vec![80])));
+            let mut v =
+                VersionedValue::new(Some(DelayedFieldValue::DerivedStringSnapshot(vec![80])));
             v.insert_speculative_value(10, aggregator_entry(APPLY_DERIVED).unwrap())
                 .unwrap();
 

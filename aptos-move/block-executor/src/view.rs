@@ -3234,14 +3234,14 @@ mod test {
         assert!(captured_reads.validate_data_reads(holder.versioned_map.data(), 1));
         let read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields();
 
-        // TODO[agg_v2](fix): This prints
+        // TODO[agg_v2](test): This prints
         // read: (KeyType(4, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         // read: (KeyType(2, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         for read in read_set_with_delayed_fields {
             println!("read: {:?}", read);
         }
 
-        // TODO[agg_v2](fix): This assertion fails.
+        // TODO[agg_v2](test): This assertion fails.
         // let data_read = DataRead::Versioned(Ok((1,0)), Arc::new(TransactionWrite::from_state_value(Some(state_value_4))), Some(Arc::new(layout)));
         // assert!(read_set_with_delayed_fields.any(|x| x == (&KeyType::<u32>(4, false), &data_read)));
     }

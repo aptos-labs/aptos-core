@@ -165,8 +165,8 @@ impl NonPanic for DelayedFieldsSpeculativeError {}
 pub enum DelayedFieldValue {
     Aggregator(u128),
     Snapshot(u128),
-    // TODO[agg_v2](optimize) probably change to Derived(Arc<Vec<u8>>) to make copying predictably costly
-    Derived(Vec<u8>),
+    // TODO[agg_v2](optimize) probably change to DerivedStringSnapshot(Arc<Vec<u8>>) to make copying predictably costly
+    DerivedStringSnapshot(Vec<u8>),
 }
 
 impl DelayedFieldValue {
@@ -176,7 +176,7 @@ impl DelayedFieldValue {
             DelayedFieldValue::Snapshot(_) => Err(code_invariant_error(
                 "Tried calling into_aggregator_value on Snapshot value",
             )),
-            DelayedFieldValue::Derived(_) => Err(code_invariant_error(
+            DelayedFieldValue::DerivedStringSnapshot(_) => Err(code_invariant_error(
                 "Tried calling into_aggregator_value on String SnapshotValue",
             )),
         }
@@ -188,7 +188,7 @@ impl DelayedFieldValue {
             DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling into_snapshot_value on Aggregator value",
             )),
-            DelayedFieldValue::Derived(_) => Err(code_invariant_error(
+            DelayedFieldValue::DerivedStringSnapshot(_) => Err(code_invariant_error(
                 "Tried calling into_snapshot_value on String SnapshotValue",
             )),
         }
@@ -196,7 +196,7 @@ impl DelayedFieldValue {
 
     pub fn into_derived_value(self) -> Result<Vec<u8>, PanicError> {
         match self {
-            DelayedFieldValue::Derived(value) => Ok(value),
+            DelayedFieldValue::DerivedStringSnapshot(value) => Ok(value),
             DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
                 "Tried calling into_derived_value on Aggregator value",
             )),
@@ -229,7 +229,7 @@ impl DelayedFieldValue {
                 }
                 Value::u128(v)
             },
-            (Derived(bytes), layout) if is_derived_string_struct_layout(layout) => {
+            (DerivedStringSnapshot(bytes), layout) if is_derived_string_struct_layout(layout) => {
                 bytes_and_width_to_derived_string_struct(bytes, width as usize)?
             },
             (value, layout) => {
@@ -268,7 +268,7 @@ impl TryFromMoveValue for DelayedFieldValue {
             (K::DerivedString, layout) if is_derived_string_struct_layout(layout) => {
                 let (bytes, width) =
                     derived_string_struct_to_bytes_and_length(value.value_as::<Struct>()?)?;
-                (Derived(bytes), width)
+                (DerivedStringSnapshot(bytes), width)
             },
             _ => {
                 return Err(

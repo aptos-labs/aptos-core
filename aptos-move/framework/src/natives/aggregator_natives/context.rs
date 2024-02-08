@@ -504,7 +504,7 @@ mod test {
 
         assert_some_eq!(
             delayed_field_changes.get(&id_from_fake_idx(3, derived_width)),
-            &DelayedChange::Create(DelayedFieldValue::Derived(
+            &DelayedChange::Create(DelayedFieldValue::DerivedStringSnapshot(
                 "prefix500suffix".as_bytes().to_vec()
             )),
         );

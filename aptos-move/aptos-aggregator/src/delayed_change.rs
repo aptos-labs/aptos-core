@@ -76,9 +76,9 @@ impl<I: Copy + Clone> DelayedApplyChange<I> {
             SnapshotDelta { delta, .. } => {
                 DelayedFieldValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
             },
-            SnapshotDerived { formula, .. } => {
-                DelayedFieldValue::Derived(formula.apply_to(base_value.into_snapshot_value()?))
-            },
+            SnapshotDerived { formula, .. } => DelayedFieldValue::DerivedStringSnapshot(
+                formula.apply_to(base_value.into_snapshot_value()?),
+            ),
         })
     }
 }
@@ -140,7 +140,7 @@ impl<I: Copy + Clone> DelayedChange<I> {
             },
 
             // Snapshots:
-            (Some(Create(Snapshot(_) | Derived(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _) => Err(PanicOr::from(code_invariant_error(
+            (Some(Create(Snapshot(_) | DerivedStringSnapshot(_)) | Apply(SnapshotDelta {..} | SnapshotDerived { .. })), _) => Err(PanicOr::from(code_invariant_error(
                 "Snapshots are immutable, previous change cannot be any of the snapshots type",
             ))),
             (_, Apply(SnapshotDerived { .. })) => Err(PanicOr::from(code_invariant_error(
@@ -241,9 +241,9 @@ impl<I: Copy + Clone> DelayedApplyEntry<I> {
             SnapshotDelta { delta, .. } => {
                 DelayedFieldValue::Snapshot(delta.apply_to(base_value.into_aggregator_value()?)?)
             },
-            SnapshotDerived { formula, .. } => {
-                DelayedFieldValue::Derived(formula.apply_to(base_value.into_snapshot_value()?))
-            },
+            SnapshotDerived { formula, .. } => DelayedFieldValue::DerivedStringSnapshot(
+                formula.apply_to(base_value.into_snapshot_value()?),
+            ),
         })
     }
 }

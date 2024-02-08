@@ -228,7 +228,7 @@ impl DelayedFieldData {
             u32::try_from(calculate_width_for_constant_string(value.len())).map_err(|_| {
                 code_invariant_error("Calculated DerivedStringSnapshot width exceeds u32")
             })?;
-        let change = DelayedChange::Create(DelayedFieldValue::Derived(value));
+        let change = DelayedChange::Create(DelayedFieldValue::DerivedStringSnapshot(value));
         let snapshot_id = resolver.generate_delayed_field_id(width);
 
         self.delayed_fields.insert(snapshot_id, change);
@@ -274,7 +274,9 @@ impl DelayedFieldData {
         let change = match snapshot {
             // If snapshot is in Create state, we don't need to depend on it, and can just take the value.
             Some(DelayedChange::Create(DelayedFieldValue::Snapshot(value))) => {
-                DelayedChange::Create(DelayedFieldValue::Derived(formula.apply_to(*value)))
+                DelayedChange::Create(DelayedFieldValue::DerivedStringSnapshot(
+                    formula.apply_to(*value),
+                ))
             },
             Some(DelayedChange::Apply(DelayedApplyChange::SnapshotDelta { .. })) | None => {
                 DelayedChange::Apply(DelayedApplyChange::SnapshotDerived {

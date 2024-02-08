@@ -16,7 +16,7 @@ use test_case::test_case;
 use DelayedFieldValue as A;
 use IdentifierMappingKind as K;
 
-static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
+static DERIVED_STRING_SNAPSHOT: Lazy<MoveTypeLayout> = Lazy::new(|| {
     Struct(Runtime(vec![
         // String value
         Struct(Runtime(vec![Vector(Box::new(U8))])),
@@ -27,7 +27,7 @@ static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
 
 #[test_case(&U64, 8)]
 #[test_case(&U128, 16)]
-#[test_case(&*DERIVED_STRING, 20)]
+#[test_case(&*DERIVED_STRING_SNAPSHOT, 20)]
 fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: u32) {
     let input = DelayedFieldID::new_with_width(100, width);
     let value = assert_ok!(input.try_into_move_value(layout));
@@ -55,7 +55,7 @@ fn test_aggregator_id_from_value_err(layout: &MoveTypeLayout, value: Value) {
 #[test_case(A::Aggregator(10), &U128, K::Aggregator, 16)]
 #[test_case(A::Snapshot(10), &U64, K::Snapshot, 8)]
 #[test_case(A::Snapshot(10), &U128, K::Snapshot, 16)]
-#[test_case(A::Derived(vec![0, 1]), &*DERIVED_STRING, K::DerivedString, 20)]
+#[test_case(A::DerivedStringSnapshot(vec![0, 1]), &*DERIVED_STRING_SNAPSHOT, K::DerivedString, 20)]
 fn test_aggregator_value_roundtrip_ok(
     aggregator_value: DelayedFieldValue,
     layout: &MoveTypeLayout,
@@ -74,7 +74,9 @@ fn test_aggregator_value_roundtrip_ok(
 fn test_aggregator_value_to_value_err(layout: &MoveTypeLayout, width: u32) {
     assert_err!(DelayedFieldValue::Aggregator(0).try_into_move_value(layout, width));
     assert_err!(DelayedFieldValue::Snapshot(1).try_into_move_value(layout, width));
-    assert_err!(DelayedFieldValue::Derived(vec![3]).try_into_move_value(layout, width));
+    assert_err!(
+        DelayedFieldValue::DerivedStringSnapshot(vec![3]).try_into_move_value(layout, width)
+    );
 }
 
 #[test_case(&U64, Value::u8(1), K::Aggregator)]
@@ -82,7 +84,7 @@ fn test_aggregator_value_to_value_err(layout: &MoveTypeLayout, width: u32) {
 #[test_case(&U8, Value::u8(1), K::Snapshot)]
 #[test_case(&Bool, Value::u8(1), K::Snapshot)]
 #[test_case(&Vector(Box::new(U8)), Value::vector_u8(vec![0, 1]), K::Snapshot)]
-#[test_case(&*DERIVED_STRING, bytes_and_width_to_derived_string_struct(vec![1,2], 20).unwrap(), K::Aggregator)]
+#[test_case(&*DERIVED_STRING_SNAPSHOT, bytes_and_width_to_derived_string_struct(vec![1,2], 20).unwrap(), K::Aggregator)]
 fn test_aggregator_value_from_value_err(
     layout: &MoveTypeLayout,
     value: Value,
