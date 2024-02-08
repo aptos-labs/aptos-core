@@ -21,7 +21,7 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
     delta_change_set::serialize,
-    types::{code_invariant_error, expect_ok, PanicOr},
+    types::{expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error};
@@ -34,7 +34,7 @@ use aptos_mvhashmap::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::TransactionEvent,
-    delayed_fields::PanicError,
+    delayed_fields::{code_invariant_error, PanicError},
     executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::TStateView,

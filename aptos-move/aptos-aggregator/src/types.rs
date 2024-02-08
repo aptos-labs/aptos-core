@@ -2,13 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::bounded_math::SignedU128;
-use aptos_logger::error;
 use aptos_types::delayed_fields::{
-    bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
-    is_derived_string_struct_layout,
-};
-pub use aptos_types::delayed_fields::{
-    DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue,
+    bytes_and_width_to_derived_string_struct, code_invariant_error,
+    derived_string_struct_to_bytes_and_length, is_derived_string_struct_layout, DelayedFieldID,
+    PanicError, TryFromMoveValue,
 };
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
@@ -34,15 +31,6 @@ impl<T: std::fmt::Debug> PanicOr<T> {
             PanicOr::Or(value) => PanicOr::Or(f(value)),
         }
     }
-}
-
-pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
-    let msg = format!(
-        "Delayed materialization code invariant broken (there is a bug in the code), {:?}",
-        message
-    );
-    error!("{}", msg);
-    PanicError::CodeInvariantError(msg)
 }
 
 pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {

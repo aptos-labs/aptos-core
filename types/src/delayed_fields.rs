@@ -216,7 +216,7 @@ impl TryFromMoveValue for DelayedFieldID {
     }
 }
 
-fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
+pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
         "Delayed materialization code invariant broken (there is a bug in the code), {:?}",
         message

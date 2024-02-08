@@ -8,12 +8,14 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::{code_invariant_error, PanicOr};
+use aptos_aggregator::types::PanicOr;
 use aptos_logger::warn;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement,
-    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
+    delayed_fields::{code_invariant_error, PanicError},
+    fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;

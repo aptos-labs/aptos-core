@@ -8,10 +8,11 @@ use aptos_aggregator::{
     delayed_field_extension::DelayedFieldData,
     delta_change_set::DeltaOp,
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
-    types::DelayedFieldID,
 };
 use aptos_types::{
-    delayed_fields::PanicError, state_store::state_key::StateKey, write_set::WriteOp,
+    delayed_fields::{DelayedFieldID, PanicError},
+    state_store::state_key::StateKey,
+    write_set::WriteOp,
 };
 use better_any::{Tid, TidAble};
 use move_core_types::value::MoveTypeLayout;

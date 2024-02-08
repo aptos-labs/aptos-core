@@ -10,10 +10,7 @@ use aptos_aggregator::{
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
 #[cfg(feature = "testing")]
-use aptos_aggregator::{
-    resolver::TDelayedFieldView,
-    types::{DelayedFieldID, DelayedFieldValue},
-};
+use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
@@ -27,7 +24,7 @@ use aptos_types::{
 #[cfg(feature = "testing")]
 use aptos_types::{
     chain_id::ChainId,
-    delayed_fields::PanicError,
+    delayed_fields::{DelayedFieldID, PanicError},
     state_store::{state_key::StateKey, state_value::StateValue},
     write_set::WriteOp,
 };

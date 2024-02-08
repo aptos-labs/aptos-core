@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::helpers_v1::set_aggregator_field;
-use aptos_aggregator::{resolver::DelayedFieldResolver, types::DelayedFieldID};
-use aptos_types::delayed_fields::{from_utf8_bytes, u128_to_u64};
+use aptos_aggregator::resolver::DelayedFieldResolver;
+use aptos_types::delayed_fields::{from_utf8_bytes, u128_to_u64, DelayedFieldID};
 use move_binary_format::errors::PartialVMResult;
 use move_vm_types::values::{StructRef, Value};
 

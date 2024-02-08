@@ -13,12 +13,12 @@ use crate::{
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    delayed_fields::PanicError,
+    delayed_fields::{DelayedFieldID, PanicError},
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
         errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,

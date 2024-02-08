@@ -11,14 +11,11 @@ use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr,
-    },
+    types::{expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_gas_algebra::Fee;
 use aptos_types::{
-    delayed_fields::PanicError,
+    delayed_fields::{code_invariant_error, DelayedFieldID, PanicError},
     state_store::{
         errors::StateviewError,
         state_key::StateKey,

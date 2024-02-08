@@ -3,9 +3,9 @@
 
 use crate::{
     delta_change_set::{DeltaOp, DeltaWithMax},
-    types::{code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
-use aptos_types::delayed_fields::SnapshotToStringFormula;
+use aptos_types::delayed_fields::{code_invariant_error, SnapshotToStringFormula};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DelayedApplyChange<I: Clone> {
@@ -251,7 +251,8 @@ impl<I: Copy + Clone> DelayedApplyEntry<I> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{bounded_math::SignedU128, types::DelayedFieldID};
+    use crate::bounded_math::SignedU128;
+    use aptos_types::delayed_fields::DelayedFieldID;
     use claims::{assert_err, assert_ok};
     use DelayedApplyChange::*;
     use DelayedChange::*;

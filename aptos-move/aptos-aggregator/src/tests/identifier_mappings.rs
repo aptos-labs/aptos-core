@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::{DelayedFieldID, DelayedFieldValue, TryFromMoveValue, TryIntoMoveValue};
-use aptos_types::delayed_fields::bytes_and_width_to_derived_string_struct;
+use crate::types::DelayedFieldValue;
+use aptos_types::delayed_fields::{
+    bytes_and_width_to_derived_string_struct, DelayedFieldID, TryFromMoveValue, TryIntoMoveValue,
+};
 use claims::{assert_err, assert_ok};
 use move_core_types::value::{
     IdentifierMappingKind,

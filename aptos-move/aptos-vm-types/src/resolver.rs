@@ -1,11 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::{
-    resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::DelayedFieldID,
-};
+use aptos_aggregator::resolver::{TAggregatorV1View, TDelayedFieldView};
 use aptos_types::{
+    delayed_fields::DelayedFieldID,
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,

@@ -17,11 +17,10 @@ mod tests {
         bounded_math::SignedU128,
         delayed_change::{DelayedApplyChange, DelayedChange},
         delta_change_set::DeltaWithMax,
-        types::DelayedFieldID,
     };
     use aptos_types::{
         access_path::AccessPath,
-        delayed_fields::{PanicError, SnapshotToStringFormula},
+        delayed_fields::{DelayedFieldID, PanicError, SnapshotToStringFormula},
         state_store::state_key::StateKey,
         transaction::ChangeSet as StorageChangeSet,
         write_set::{WriteOp, WriteSetMut},

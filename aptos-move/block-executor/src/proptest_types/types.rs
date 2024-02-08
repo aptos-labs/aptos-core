@@ -10,14 +10,13 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
-    types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
-    delayed_fields::PanicError,
+    delayed_fields::{DelayedFieldID, PanicError},
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,

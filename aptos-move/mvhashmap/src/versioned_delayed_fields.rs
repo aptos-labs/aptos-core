@@ -4,8 +4,9 @@
 use crate::types::{AtomicTxnIndex, MVDelayedFieldsError, TxnIndex};
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedApplyEntry, DelayedEntry},
-    types::{code_invariant_error, DelayedFieldValue, PanicError, PanicOr, ReadPosition},
+    types::{DelayedFieldValue, PanicOr, ReadPosition},
 };
+use aptos_types::delayed_fields::{code_invariant_error, PanicError};
 use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -711,9 +712,8 @@ mod test {
     use super::*;
     use aptos_aggregator::{
         bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
-        types::DelayedFieldID,
     };
-    use aptos_types::delayed_fields::SnapshotToStringFormula;
+    use aptos_types::delayed_fields::{DelayedFieldID, SnapshotToStringFormula};
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
     use test_case::test_case;
 

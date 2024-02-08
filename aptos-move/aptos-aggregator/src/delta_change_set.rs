@@ -8,10 +8,9 @@
 use crate::{
     bounded_math::{BoundedMath, SignedU128},
     delta_math::{merge_data_and_delta, merge_two_deltas, DeltaHistory},
-    types::{
-        code_invariant_error, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr,
-    },
+    types::{DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr},
 };
+use aptos_types::delayed_fields::code_invariant_error;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct DeltaWithMax {

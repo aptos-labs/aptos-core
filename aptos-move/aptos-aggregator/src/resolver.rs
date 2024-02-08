@@ -6,12 +6,11 @@ use crate::{
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
     types::{
-        code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
-        DeltaApplicationFailureReason, PanicOr,
+        DelayedFieldValue, DelayedFieldsSpeculativeError, DeltaApplicationFailureReason, PanicOr,
     },
 };
 use aptos_types::{
-    delayed_fields::PanicError,
+    delayed_fields::{code_invariant_error, DelayedFieldID, PanicError},
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},

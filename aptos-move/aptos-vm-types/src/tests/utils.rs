@@ -10,11 +10,11 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, DeltaOp},
-    types::DelayedFieldID,
 };
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
+    delayed_fields::DelayedFieldID,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},

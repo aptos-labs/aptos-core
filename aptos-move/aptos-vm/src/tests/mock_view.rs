@@ -1,11 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::types::{
-    DelayedFieldID, DelayedFieldValue, TryFromMoveValue, TryIntoMoveValue,
-};
+use aptos_aggregator::types::DelayedFieldValue;
 use aptos_table_natives::{TableHandle, TableResolver};
-use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
+use aptos_types::{
+    access_path::AccessPath,
+    delayed_fields::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
+    state_store::state_key::StateKey,
+};
 use bytes::Bytes;
 use claims::assert_some;
 use move_binary_format::errors::PartialVMError;

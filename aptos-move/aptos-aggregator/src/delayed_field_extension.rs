@@ -6,14 +6,11 @@ use crate::{
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
     resolver::DelayedFieldResolver,
-    types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr, ReadPosition,
-    },
+    types::{expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, ReadPosition},
 };
 use aptos_types::delayed_fields::{
     calculate_width_for_constant_string, calculate_width_for_integer_embeded_string,
-    SnapshotToStringFormula,
+    code_invariant_error, DelayedFieldID, SnapshotToStringFormula,
 };
 use move_binary_format::errors::PartialVMResult;
 use std::collections::{btree_map::Entry, BTreeMap};

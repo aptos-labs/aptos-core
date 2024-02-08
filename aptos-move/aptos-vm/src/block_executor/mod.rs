@@ -10,7 +10,6 @@ use crate::{
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange, delta_change_set::DeltaOp, resolver::TAggregatorV1View,
-    types::DelayedFieldID,
 };
 use aptos_block_executor::{
     errors::BlockExecutionError, executor::BlockExecutor,
@@ -21,7 +20,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
-    delayed_fields::PanicError,
+    delayed_fields::{DelayedFieldID, PanicError},
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, StateView, StateViewId},

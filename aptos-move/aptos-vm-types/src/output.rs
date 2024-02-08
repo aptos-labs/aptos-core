@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::change_set::VMChangeSet;
-use aptos_aggregator::{resolver::AggregatorV1Resolver, types::code_invariant_error};
+use aptos_aggregator::resolver::AggregatorV1Resolver;
 use aptos_types::{
     contract_event::ContractEvent, //contract_event::ContractEvent,
-    delayed_fields::PanicError,
+    delayed_fields::{code_invariant_error, PanicError},
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionOutput, TransactionStatus},

@@ -5,10 +5,7 @@ use crate::types::InputOutputKey;
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
-    types::{
-        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition,
-    },
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr, ReadPosition},
 };
 use aptos_mvhashmap::{
     types::{
@@ -20,8 +17,10 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+    delayed_fields::{code_invariant_error, PanicError},
+    state_store::state_value::StateValueMetadata,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
 use derivative::Derivative;
@@ -743,8 +742,8 @@ impl<T: Transaction> UnsyncReadSet<T> {
 mod test {
     use super::*;
     use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
-    use aptos_aggregator::types::DelayedFieldID;
     use aptos_mvhashmap::types::StorageVersion;
+    use aptos_types::delayed_fields::DelayedFieldID;
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
     use test_case::test_case;
 
