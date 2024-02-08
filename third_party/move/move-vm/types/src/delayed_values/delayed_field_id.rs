@@ -18,35 +18,35 @@ use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 /// Represents a unique 32-bit identifier used for values which also stores their
 /// serialized size (u32::MAX at most). Can be stored as a single 64-bit unsigned
 /// integer.
-/// TODO[agg_v2](cleanup): consolidate DelayedFiledID and this implementation!
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct SizedID {
-    // Unique identifier for a value.
-    id: u32,
-    // Exact number of bytes a serialized value will take.
-    serialized_size: u32,
+const BITS_FOR_SIZE: usize = 32;
+
+/// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
+/// during execution.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DelayedFieldID {
+    unique_index: u32,
+    // Exact number of bytes serialized delayed field will take.
+    width: u32,
 }
 
-const NUM_BITS_FOR_SERIALIZED_SIZE: usize = 32;
-
-impl SizedID {
-    pub fn new(id: u32, serialized_size: u32) -> Self {
+impl DelayedFieldID {
+    pub fn new_with_width(unique_index: u32, width: u32) -> Self {
         Self {
-            id,
-            serialized_size,
+            unique_index,
+            width,
         }
     }
 
-    pub fn id(&self) -> u32 {
-        self.id
+    pub fn new_for_test_for_u64(unique_index: u32) -> Self {
+        Self::new_with_width(unique_index, 8)
     }
 
-    pub fn serialized_size(&self) -> u32 {
-        self.serialized_size
+    pub fn as_u64(&self) -> u64 {
+        ((self.unique_index as u64) << BITS_FOR_SIZE) | self.width as u64
     }
 
     pub fn into_derived_string_struct(self) -> PartialVMResult<Value> {
-        let width = self.serialized_size() as usize;
+        let width = self.extract_width() as usize;
 
         // we need to create DerivedString struct that serializes to exactly match given `width`.
         // I.e: size_u32_as_uleb128(value.len()) + value.len() + size_u32_as_uleb128(padding.len()) + padding.len() == width
@@ -65,7 +65,7 @@ impl SizedID {
         }
 
         let id_as_string = u64_to_fixed_size_utf8_bytes(
-            self.into(),
+            self.as_u64(),
             // fill the string representation to leave 1 byte for padding and upper bound for it's own length serialization.
             width - value_len_width_upper_bound - 1,
         )?;
@@ -74,21 +74,41 @@ impl SizedID {
     }
 }
 
-impl From<u64> for SizedID {
+// Used for ID generation from exchanged value/exchanges serialized value.
+impl From<u64> for DelayedFieldID {
     fn from(value: u64) -> Self {
-        let id = value >> NUM_BITS_FOR_SERIALIZED_SIZE;
-        let serialized_size = value & ((1u64 << NUM_BITS_FOR_SERIALIZED_SIZE) - 1);
         Self {
-            id: id as u32,
-            serialized_size: serialized_size as u32,
+            unique_index: u32::try_from(value >> BITS_FOR_SIZE).unwrap(),
+            width: u32::try_from(value & ((1u64 << BITS_FOR_SIZE) - 1)).unwrap(),
         }
     }
 }
 
-impl From<SizedID> for u64 {
-    fn from(sized_id: SizedID) -> Self {
-        let id = (sized_id.id as u64) << NUM_BITS_FOR_SERIALIZED_SIZE;
-        id | sized_id.serialized_size as u64
+// Used for ID generation from u32 counter with width.
+impl From<(u32, u32)> for DelayedFieldID {
+    fn from(value: (u32, u32)) -> Self {
+        let (index, width) = value;
+        Self::new_with_width(index, width)
+    }
+}
+
+pub trait ExtractUniqueIndex: Sized {
+    fn extract_unique_index(&self) -> u32;
+}
+
+impl ExtractUniqueIndex for DelayedFieldID {
+    fn extract_unique_index(&self) -> u32 {
+        self.unique_index
+    }
+}
+
+pub trait ExtractWidth: Sized {
+    fn extract_width(&self) -> u32;
+}
+
+impl ExtractWidth for DelayedFieldID {
+    fn extract_width(&self) -> u32 {
+        self.width
     }
 }
 
@@ -112,14 +132,14 @@ pub trait TryFromMoveValue: Sized {
     ) -> Result<(Self, u32), Self::Error>;
 }
 
-impl TryIntoMoveValue for SizedID {
+impl TryIntoMoveValue for DelayedFieldID {
     type Error = PartialVMError;
 
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
         Ok(match layout {
-            MoveTypeLayout::U64 => Value::u64(self.into()),
+            MoveTypeLayout::U64 => Value::u64(self.as_u64()),
             MoveTypeLayout::U128 => {
-                let v: u64 = self.into();
+                let v: u64 = self.as_u64();
                 Value::u128(v as u128)
             },
             layout if is_derived_string_struct_layout(layout) => {
@@ -142,7 +162,7 @@ impl TryIntoMoveValue for SizedID {
     }
 }
 
-impl TryFromMoveValue for SizedID {
+impl TryFromMoveValue for DelayedFieldID {
     type Error = PartialVMError;
     type Hint = ();
 
@@ -179,37 +199,17 @@ impl TryFromMoveValue for SizedID {
                 )))
             },
         };
-        if id.serialized_size() != width {
+        if id.extract_width() != width {
             return Err(
                 PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
                     format!(
                 "Extracted identifier has a wrong width: id={id:?}, width={width}, expected={}",
-                id.serialized_size(),
+                id.extract_width(),
             ),
                 ),
             );
         }
 
         Ok((id, width))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    macro_rules! assert_sized_id_roundtrip {
-        ($start_value:expr) => {
-            let sized_id: SizedID = $start_value.into();
-            let end_value: u64 = sized_id.into();
-            assert_eq!($start_value, end_value)
-        };
-    }
-
-    #[test]
-    fn test_sized_id_from_u64() {
-        assert_sized_id_roundtrip!(0u64);
-        assert_sized_id_roundtrip!(123456789u64);
-        assert_sized_id_roundtrip!(u64::MAX);
     }
 }

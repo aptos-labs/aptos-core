@@ -6,10 +6,9 @@ use crate::natives::aggregator_natives::aggregator_v2::{
 };
 use aptos_aggregator::resolver::DelayedFieldResolver;
 use aptos_native_interface::{safely_get_struct_field_as, SafeNativeError, SafeNativeResult};
-use aptos_types::delayed_fields::DelayedFieldID;
 use move_binary_format::errors::PartialVMError;
 use move_vm_types::{
-    delayed_values::{derived_string_snapshot::string_to_bytes, sized_id::SizedID},
+    delayed_values::{delayed_field_id::DelayedFieldID, derived_string_snapshot::string_to_bytes},
     loaded_data::runtime_types::Type,
     values::{Reference, Struct, StructRef, Value},
 };
@@ -46,15 +45,9 @@ macro_rules! get_value_as_id_impl {
         ) -> SafeNativeResult<DelayedFieldID> {
             let id = match ty {
                 Type::U64 | Type::U128 => {
-                    let sized_id =
-                        safely_get_struct_field_as!(struct_ref, $idx, SizedID);
-                    sized_id.into()
+                    safely_get_struct_field_as!(struct_ref, $idx, DelayedFieldID)
                 },
-                _ => {
-                    return Err(SafeNativeError::Abort {
-                        abort_code: $e,
-                    })
-                },
+                _ => return Err(SafeNativeError::Abort { abort_code: $e }),
             };
 
             // Make sure we validate generated id is correct, i.e. it lies within the
@@ -147,12 +140,11 @@ pub(crate) fn get_derived_string_snapshot_value_as_id(
     derived_string_snapshot: Reference,
     resolver: &dyn DelayedFieldResolver,
 ) -> SafeNativeResult<DelayedFieldID> {
-    let id: DelayedFieldID = derived_string_snapshot
+    let id = derived_string_snapshot
         .read_ref()
         .map_err(SafeNativeError::InvariantViolation)?
-        .value_as::<SizedID>()
-        .map_err(SafeNativeError::InvariantViolation)?
-        .into();
+        .value_as::<DelayedFieldID>()
+        .map_err(SafeNativeError::InvariantViolation)?;
     resolver
         .validate_delayed_field_id(&id)
         .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;

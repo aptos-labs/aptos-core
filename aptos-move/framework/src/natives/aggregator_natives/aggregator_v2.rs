@@ -23,14 +23,17 @@ use aptos_native_interface::{
 };
 use aptos_types::delayed_fields::{
     calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
-    DelayedFieldID, SnapshotToStringFormula,
+    SnapshotToStringFormula,
 };
 use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    delayed_values::derived_string_snapshot::{
-        bytes_and_width_to_derived_string_struct, string_to_bytes, u128_to_u64,
+    delayed_values::{
+        delayed_field_id::DelayedFieldID,
+        derived_string_snapshot::{
+            bytes_and_width_to_derived_string_struct, string_to_bytes, u128_to_u64,
+        },
     },
     loaded_data::runtime_types::Type,
     values::{Reference, Struct, StructRef, Value},
@@ -141,7 +144,7 @@ fn create_aggregator_with_max_value(
         let width = get_width_by_type(aggregator_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
         let id = resolver.generate_delayed_field_id(width);
         delayed_field_data.create_new_aggregator(id);
-        Value::native_value(id.into())
+        Value::native_value(id)
     } else {
         create_value_by_type(aggregator_value_ty, 0, EUNSUPPORTED_AGGREGATOR_TYPE)?
     };
@@ -335,7 +338,7 @@ fn native_snapshot(
         let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
 
         let snapshot_id = delayed_field_data.snapshot(id, max_value, width, resolver)?;
-        Value::native_value(snapshot_id.into())
+        Value::native_value(snapshot_id)
     } else {
         let value = get_aggregator_value(&aggregator, aggregator_value_ty)?;
         create_value_by_type(
@@ -374,7 +377,7 @@ fn native_create_snapshot(
     {
         let width = get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_TYPE)?;
         let snapshot_id = delayed_field_data.create_new_snapshot(value, width, resolver);
-        Value::native_value(snapshot_id.into())
+        Value::native_value(snapshot_id)
     } else {
         create_value_by_type(
             snapshot_value_ty,
@@ -529,7 +532,7 @@ fn native_create_derived_string(
     let derived_string_snapshot =
         if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
             let id = delayed_field_data.create_new_derived(value_bytes, resolver)?;
-            Value::native_value(id.into())
+            Value::native_value(id)
         } else {
             let width = calculate_width_for_constant_string(value_bytes.len());
             bytes_and_width_to_derived_string_struct(value_bytes, width)
@@ -586,7 +589,7 @@ fn native_derive_string_concat(
         let id = get_snapshot_value_as_id(&snapshot, snapshot_value_ty, resolver)?;
         let derived_string_snapshot_id =
             delayed_field_data.derive_string_concat(id, prefix, suffix, resolver)?;
-        Value::native_value(derived_string_snapshot_id.into())
+        Value::native_value(derived_string_snapshot_id)
     } else {
         let snapshot_width =
             get_width_by_type(snapshot_value_ty, EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE)?;

@@ -1,27 +1,24 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    delayed_values::sized_id::SizedID,
-    values::{Container, Value, ValueImpl},
-};
+use crate::values::{Container, Value, ValueImpl};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
-use std::{collections::HashSet, hash::Hash};
+use std::collections::HashSet;
 
 // TODO[agg_v2](cleanup): This is a temporary traversal which collects
 //   identifiers stored in values. We do not use ValueVisitor because
 //   we want to allow for errors. It can be optimized away.
-pub fn find_identifiers_in_value<I: From<SizedID> + Hash + Eq>(
+pub fn find_identifiers_in_value(
     value: &Value,
-    identifiers: &mut HashSet<I>,
+    identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
     find_identifiers_in_value_impl(&value.0, identifiers)
 }
 
-fn find_identifiers_in_value_impl<I: From<SizedID> + Hash + Eq>(
+fn find_identifiers_in_value_impl(
     value: &ValueImpl,
-    identifiers: &mut HashSet<I>,
+    identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
     match value {
         ValueImpl::U8(_)
@@ -62,8 +59,8 @@ fn find_identifiers_in_value_impl<I: From<SizedID> + Hash + Eq>(
             ))
         },
 
-        ValueImpl::Delayed { id } => {
-            if !identifiers.insert(I::from(*id)) {
+        ValueImpl::DelayedFieldID { id } => {
+            if !identifiers.insert(id.as_u64()) {
                 return Err(
                     PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
                         .with_message("Duplicated identifiers for Move value".to_string()),

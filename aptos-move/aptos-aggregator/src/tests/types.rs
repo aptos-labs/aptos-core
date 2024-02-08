@@ -12,12 +12,13 @@ use crate::{
     },
 };
 use aptos_types::{
-    delayed_fields::{ExtractUniqueIndex, PanicError},
+    delayed_fields::PanicError,
     state_store::{state_key::StateKey, state_value::StateValue},
     write_set::WriteOp,
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_vm_types::delayed_values::delayed_field_id::ExtractUniqueIndex;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},

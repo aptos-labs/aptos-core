@@ -5,70 +5,8 @@
 use crate::serde_helper::bcs_utils::bcs_size_of_byte_array;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
-use move_vm_types::delayed_values::sized_id::SizedID;
+use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth};
 use once_cell::sync::Lazy;
-
-const BITS_FOR_SIZE: usize = 32;
-
-/// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
-/// during execution.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct DelayedFieldID {
-    unique_index: u32,
-    // Exact number of bytes serialized delayed field will take.
-    width: u32,
-}
-
-impl DelayedFieldID {
-    pub fn new_with_width(unique_index: u32, width: u32) -> Self {
-        Self {
-            unique_index,
-            width,
-        }
-    }
-
-    pub fn new_for_test_for_u64(unique_index: u32) -> Self {
-        Self::new_with_width(unique_index, 8)
-    }
-
-    pub fn as_u64(&self) -> u64 {
-        ((self.unique_index as u64) << BITS_FOR_SIZE) | self.width as u64
-    }
-
-    pub fn extract_width(&self) -> u32 {
-        self.width
-    }
-}
-
-// Used for ID generation from exchanged value/exchanges serialized value.
-impl From<u64> for DelayedFieldID {
-    fn from(value: u64) -> Self {
-        Self {
-            unique_index: u32::try_from(value >> BITS_FOR_SIZE).unwrap(),
-            width: u32::try_from(value & ((1u64 << BITS_FOR_SIZE) - 1)).unwrap(),
-        }
-    }
-}
-
-// Used for ID generation from u32 counter with width.
-impl From<(u32, u32)> for DelayedFieldID {
-    fn from(value: (u32, u32)) -> Self {
-        let (index, width) = value;
-        Self::new_with_width(index, width)
-    }
-}
-
-impl From<DelayedFieldID> for SizedID {
-    fn from(id: DelayedFieldID) -> Self {
-        Self::new(id.unique_index, id.width)
-    }
-}
-
-impl From<SizedID> for DelayedFieldID {
-    fn from(sized_id: SizedID) -> Self {
-        Self::new_with_width(sized_id.id(), sized_id.serialized_size())
-    }
-}
 
 // Represents something that should never happen - i.e. a code invariant error,
 // which we would generally just panic, but since we are inside of the VM,
@@ -94,16 +32,6 @@ impl From<PanicError> for PartialVMError {
                     .with_message(msg)
             },
         }
-    }
-}
-
-pub trait ExtractUniqueIndex: Sized {
-    fn extract_unique_index(&self) -> u32;
-}
-
-impl ExtractUniqueIndex for DelayedFieldID {
-    fn extract_unique_index(&self) -> u32 {
-        self.unique_index
     }
 }
 
@@ -189,10 +117,8 @@ mod tests {
                     data.clone(),
                     width
                 ));
-                assert_ok!(
-                    SizedID::from(DelayedFieldID::new_with_width(u32::MAX, width as u32))
-                        .into_derived_string_struct()
-                );
+                assert_ok!(DelayedFieldID::new_with_width(u32::MAX, width as u32)
+                    .into_derived_string_struct());
             }
             {
                 let width = assert_ok!(calculate_width_for_integer_embedded_string(
@@ -207,10 +133,8 @@ mod tests {
                     .apply_to(u64::MAX as u128),
                     width
                 ));
-                assert_ok!(
-                    SizedID::from(DelayedFieldID::new_with_width(u32::MAX, width as u32))
-                        .into_derived_string_struct()
-                );
+                assert_ok!(DelayedFieldID::new_with_width(u32::MAX, width as u32)
+                    .into_derived_string_struct());
             }
             {
                 let width = assert_ok!(calculate_width_for_integer_embedded_string(
@@ -225,10 +149,8 @@ mod tests {
                     .apply_to(u128::MAX),
                     width
                 ));
-                assert_ok!(
-                    SizedID::from(DelayedFieldID::new_with_width(u32::MAX, width as u32))
-                        .into_derived_string_struct()
-                );
+                assert_ok!(DelayedFieldID::new_with_width(u32::MAX, width as u32)
+                    .into_derived_string_struct());
             }
         }
     }

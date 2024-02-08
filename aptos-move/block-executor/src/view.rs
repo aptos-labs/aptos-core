@@ -33,7 +33,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::{ExtractUniqueIndex, PanicError},
+    delayed_fields::PanicError,
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -56,7 +56,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    delayed_values::sized_id::{SizedID, TryFromMoveValue},
+    delayed_values::delayed_field_id::{ExtractUniqueIndex, ExtractWidth, TryFromMoveValue},
     value_serde::{
         deserialize_and_allow_native_values, deserialize_and_replace_values_with_ids,
         serialize_and_allow_native_values, serialize_and_replace_ids_with_values,
@@ -1135,7 +1135,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         let mut identifiers = HashSet::new();
         find_identifiers_in_value(&value, &mut identifiers)?;
-        Ok(identifiers)
+        // TODO[agg_v2](cleanup): ugly way of converting delayed ids oto generic type params.
+        Ok(identifiers.into_iter().map(T::Identifier::from).collect())
     }
 
     fn does_value_need_exchange(
@@ -1856,12 +1857,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
     for TemporaryValueToIdentifierMapping<'a, T, S, X>
 {
+    type Identifier = T::Identifier;
+
     fn value_to_identifier(
         &self,
         kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         value: Value,
-    ) -> PartialVMResult<SizedID> {
+    ) -> PartialVMResult<Self::Identifier> {
         let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
         let id = self.generate_delayed_field_id(width);
         match &self.latest_view.latest_view {
@@ -1869,32 +1872,30 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
             ViewState::Unsync(state) => state.set_delayed_field_value(id, base_value),
         };
         self.delayed_field_keys.borrow_mut().insert(id);
-        Ok(id.into())
+        Ok(id)
     }
 
     fn identifier_to_value(
         &self,
         layout: &MoveTypeLayout,
-        identifier: SizedID,
+        identifier: Self::Identifier,
     ) -> PartialVMResult<Value> {
-        self.delayed_field_keys
-            .borrow_mut()
-            .insert(identifier.into());
+        self.delayed_field_keys.borrow_mut().insert(identifier);
         let delayed_field = match &self.latest_view.latest_view {
             ViewState::Sync(state) => state
                 .versioned_map
                 .delayed_fields()
                 .read_latest_committed_value(
-                    &identifier.into(),
+                    &identifier,
                     self.txn_idx,
                     ReadPosition::AfterCurrentTxn,
                 )
                 .expect("Committed value for ID must always exist"),
             ViewState::Unsync(state) => state
-                .read_delayed_field(identifier.into())
+                .read_delayed_field(identifier)
                 .expect("Delayed field value for ID must always exist in sequential execution"),
         };
-        delayed_field.try_into_move_value(layout, identifier.serialized_size())
+        delayed_field.try_into_move_value(layout, identifier.extract_width())
     }
 }
 
@@ -1922,7 +1923,6 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        delayed_fields::DelayedFieldID,
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
@@ -1936,8 +1936,9 @@ mod test {
     use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
     use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
     use move_vm_types::{
-        delayed_values::derived_string_snapshot::{
-            bytes_and_width_to_derived_string_struct, to_utf8_bytes,
+        delayed_values::{
+            delayed_field_id::DelayedFieldID,
+            derived_string_snapshot::{bytes_and_width_to_derived_string_struct, to_utf8_bytes},
         },
         values::{Struct, Value},
     };
@@ -2774,13 +2775,13 @@ mod test {
 
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                SizedID::from(DelayedFieldID::new_with_width(12, 60))
+                DelayedFieldID::new_with_width(12, 60)
                     .into_derived_string_struct()
                     .unwrap(),
-                SizedID::from(DelayedFieldID::new_with_width(13, 55))
+                DelayedFieldID::new_with_width(13, 55)
                     .into_derived_string_struct()
                     .unwrap(),
-                SizedID::from(DelayedFieldID::new_with_width(14, 50))
+                DelayedFieldID::new_with_width(14, 50)
                     .into_derived_string_struct()
                     .unwrap(),
             ])]));

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delayed_values::sized_id::{SizedID, TryFromMoveValue, TryIntoMoveValue},
+    delayed_values::delayed_field_id::{
+        DelayedFieldID, ExtractUniqueIndex, ExtractWidth, TryFromMoveValue, TryIntoMoveValue,
+    },
     values::{DeserializationSeed, SerializationReadyValue, Value},
 };
 use move_binary_format::errors::PartialVMResult;
@@ -28,7 +30,7 @@ pub trait CustomSerialize {
         serializer: S,
         tag: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
-        sized_id: SizedID,
+        sized_id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error>;
 }
 
@@ -46,7 +48,7 @@ impl CustomDeserialize for NativeValueSimpleSerDe {
             layout,
         }
         .deserialize(deserializer)?;
-        let (id, _width) = SizedID::try_from_move_value(layout, value, &())
+        let (id, _width) = DelayedFieldID::try_from_move_value(layout, value, &())
             .map_err(|_| D::Error::custom("Failed deserialization"))?;
         Ok(Value::native_value(id))
     }
@@ -58,7 +60,7 @@ impl CustomSerialize for NativeValueSimpleSerDe {
         serializer: S,
         _tag: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
-        sized_id: SizedID,
+        sized_id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error> {
         let value = sized_id
             .try_into_move_value(layout)
@@ -95,6 +97,8 @@ pub fn serialize_and_allow_native_values(
 }
 
 pub trait ValueToIdentifierMapping {
+    type Identifier;
+
     fn value_to_identifier(
         &self,
         // We need kind to distinguish between aggregators and snapshots
@@ -102,30 +106,33 @@ pub trait ValueToIdentifierMapping {
         kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         value: Value,
-    ) -> PartialVMResult<SizedID>;
+    ) -> PartialVMResult<Self::Identifier>;
 
     fn identifier_to_value(
         &self,
         layout: &MoveTypeLayout,
-        identifier: SizedID,
+        identifier: Self::Identifier,
     ) -> PartialVMResult<Value>;
 }
 
-pub struct NativeValueSerDeWithExchange<'a> {
-    mapping: &'a dyn ValueToIdentifierMapping,
+pub struct NativeValueSerDeWithExchange<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> {
+    mapping: &'a dyn ValueToIdentifierMapping<Identifier = I>,
 }
 
-impl<'a> CustomSerialize for NativeValueSerDeWithExchange<'a> {
+impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerialize
+    for NativeValueSerDeWithExchange<'a, I>
+{
     fn custom_serialize<S: Serializer>(
         &self,
         serializer: S,
         _tag: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
-        sized_id: SizedID,
+        sized_id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error> {
         let value = self
             .mapping
-            .identifier_to_value(layout, sized_id)
+            // FIXME
+            .identifier_to_value(layout, sized_id.as_u64().into())
             .map_err(|e| S::Error::custom(format!("{}", e)))?;
         SerializationReadyValue {
             native_serializer: None::<&NativeValueSimpleSerDe>,
@@ -136,7 +143,9 @@ impl<'a> CustomSerialize for NativeValueSerDeWithExchange<'a> {
     }
 }
 
-impl<'a> CustomDeserialize for NativeValueSerDeWithExchange<'a> {
+impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserialize
+    for NativeValueSerDeWithExchange<'a, I>
+{
     fn custom_deserialize<'d, D: Deserializer<'d>>(
         &self,
         deserializer: D,
@@ -148,18 +157,21 @@ impl<'a> CustomDeserialize for NativeValueSerDeWithExchange<'a> {
             layout,
         }
         .deserialize(deserializer)?;
-        let size_id = self
+        let id = self
             .mapping
             .value_to_identifier(tag, layout, value)
             .map_err(|e| D::Error::custom(format!("{}", e)))?;
-        Ok(Value::native_value(size_id))
+        Ok(Value::native_value(DelayedFieldID::new_with_width(
+            id.extract_unique_index(),
+            id.extract_width(),
+        )))
     }
 }
 
-pub fn deserialize_and_replace_values_with_ids(
+pub fn deserialize_and_replace_values_with_ids<I: From<u64> + ExtractWidth + ExtractUniqueIndex>(
     bytes: &[u8],
     layout: &MoveTypeLayout,
-    mapping: &impl ValueToIdentifierMapping,
+    mapping: &impl ValueToIdentifierMapping<Identifier = I>,
 ) -> Option<Value> {
     let native_deserializer = NativeValueSerDeWithExchange { mapping };
     let seed = DeserializationSeed {
@@ -169,10 +181,10 @@ pub fn deserialize_and_replace_values_with_ids(
     bcs::from_bytes_seed(seed, bytes).ok()
 }
 
-pub fn serialize_and_replace_ids_with_values(
+pub fn serialize_and_replace_ids_with_values<I: From<u64> + ExtractWidth + ExtractUniqueIndex>(
     value: &Value,
     layout: &MoveTypeLayout,
-    mapping: &impl ValueToIdentifierMapping,
+    mapping: &impl ValueToIdentifierMapping<Identifier = I>,
 ) -> Option<Vec<u8>> {
     let native_serializer = NativeValueSerDeWithExchange { mapping };
     let value = SerializationReadyValue {

@@ -229,12 +229,14 @@ fn test_vm_value_vector_u64_casting() {
 #[cfg(test)]
 mod native_values {
     use super::*;
-    use crate::delayed_values::sized_id::SizedID;
+    use crate::delayed_values::delayed_field_id::{
+        DelayedFieldID, ExtractUniqueIndex, ExtractWidth,
+    };
     use claims::{assert_err, assert_ok};
 
     #[test]
     fn test_native_value_equality() {
-        let v = Value::native_value(SizedID::new(0, 8));
+        let v = Value::native_value(DelayedFieldID::new_with_width(0, 8));
 
         // Comparing native to all other values results in error.
 
@@ -269,13 +271,13 @@ mod native_values {
 
         // Comparing native values to other native values, even self, results
         // in error.
-        assert_err!(Value::native_value(SizedID::new(0, 1)).equals(&v));
+        assert_err!(Value::native_value(DelayedFieldID::new_with_width(0, 1)).equals(&v));
         assert_err!(v.equals(&v));
     }
 
     #[test]
     fn test_native_value_borrow() {
-        let delayed_value = Value::native_value(SizedID::new(0, 8));
+        let delayed_value = Value::native_value(DelayedFieldID::new_with_width(0, 8));
         let mut locals = Locals::new(1);
         assert_ok!(locals.store_loc(0, delayed_value, false));
 
@@ -283,8 +285,8 @@ mod native_values {
         let reference = assert_ok!(local.value_as::<Reference>());
         let v = assert_ok!(reference.read_ref());
 
-        let expected_id = assert_ok!(v.value_as::<SizedID>());
-        assert_eq!(expected_id.id(), 0);
-        assert_eq!(expected_id.serialized_size(), 8);
+        let expected_id = assert_ok!(v.value_as::<DelayedFieldID>());
+        assert_eq!(expected_id.extract_unique_index(), 0);
+        assert_eq!(expected_id.extract_width(), 8);
     }
 }

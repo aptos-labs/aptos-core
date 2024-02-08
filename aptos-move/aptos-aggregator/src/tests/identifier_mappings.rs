@@ -11,8 +11,8 @@ use move_core_types::value::{
 };
 use move_vm_types::{
     delayed_values::{
+        delayed_field_id::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
         derived_string_snapshot::bytes_and_width_to_derived_string_struct,
-        sized_id::{SizedID, TryFromMoveValue, TryIntoMoveValue},
     },
     values::Value,
 };
@@ -33,9 +33,9 @@ static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
 #[test_case(&U128, 16)]
 #[test_case(&*DERIVED_STRING, 20)]
 fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: u32) {
-    let input = SizedID::new(100, width);
+    let input = DelayedFieldID::new_with_width(100, width);
     let value = assert_ok!(input.try_into_move_value(layout));
-    let (id, _) = assert_ok!(SizedID::try_from_move_value(layout, value, &()));
+    let (id, _) = assert_ok!(DelayedFieldID::try_from_move_value(layout, value, &()));
     assert_eq!(id, input);
 }
 
@@ -44,7 +44,7 @@ fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: u32) {
 #[test_case(&Address)]
 #[test_case(&Vector(Box::new(U8)))]
 fn test_aggregator_id_to_value_err(layout: &MoveTypeLayout) {
-    assert_err!(SizedID::new(100, 8).try_into_move_value(layout));
+    assert_err!(DelayedFieldID::new_with_width(100, 8).try_into_move_value(layout));
 }
 
 #[test_case(&U64, Value::u8(1))]
@@ -52,7 +52,7 @@ fn test_aggregator_id_to_value_err(layout: &MoveTypeLayout) {
 #[test_case(&Bool, Value::u8(1))]
 #[test_case(&Vector(Box::new(U8)), Value::vector_u8(vec![0, 1]))]
 fn test_aggregator_id_from_value_err(layout: &MoveTypeLayout, value: Value) {
-    assert_err!(SizedID::try_from_move_value(layout, value, &()));
+    assert_err!(DelayedFieldID::try_from_move_value(layout, value, &()));
 }
 #[test_case(A::Aggregator(10), &U64, K::Aggregator, 8)]
 #[test_case(A::Aggregator(10), &U128, K::Aggregator, 16)]
