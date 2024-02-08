@@ -144,7 +144,7 @@ impl IndexerStreamCoordinator {
         let mut tasks = vec![];
         for batch in task_batches {
             let context = self.context.clone();
-            let task = tokio::spawn(async move {
+            let task = tokio::task::spawn_blocking(move || {
                 let raw_txns = batch;
                 let api_txns = Self::convert_to_api_txns(context, raw_txns);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
@@ -187,11 +187,9 @@ impl IndexerStreamCoordinator {
         // Stage 3: send responses to stream
         let sending_start_time = std::time::Instant::now();
         for response in responses {
-            if let Err(err) = self.transactions_sender.send(Ok(response)).await {
-                panic!(
-                    "[Indexer Fullnode] Error sending transaction response to stream: {:?}",
-                    err
-                );
+            if self.transactions_sender.send(Ok(response)).await.is_err() {
+                // Error from closed channel. This means the client has disconnected.
+                return vec![];
             }
         }
         log_grpc_step_fullnode(

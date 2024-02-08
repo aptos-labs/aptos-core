@@ -438,14 +438,18 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+        FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+        FeatureFlag::CONCURRENT_TOKEN_V2,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         FeatureFlag::BN254_STRUCTURES,
+        FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
         // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
-        FeatureFlag::ZK_ID_SIGNATURE,
-        FeatureFlag::OPEN_ID_SIGNATURE,
+        FeatureFlag::ZK_ID_SIGNATURES,
+        FeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
+        FeatureFlag::JWK_CONSENSUS,
     ]
 }
 

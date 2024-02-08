@@ -40,6 +40,7 @@ use crate::{
     pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
     Experiment, Options,
 };
+use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
 use im::ordmap::Entry;
 use itertools::Itertools;
@@ -73,9 +74,10 @@ use std::{
 /// `MemoryLocation`, as well as the children of the node, given by list of `BorrowEdge`s.
 /// The node also has backlinks to its parents, given by a set of `LifetimeLabel`, for
 /// more flexible navigation through the (acyclic) graph.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(AbstractDomain, Clone, Debug, PartialEq, Eq)]
 struct LifetimeNode {
     /// Memory location associated with this node.
+    #[no_join]
     location: MemoryLocation,
     /// Outgoing edges to children.
     children: SetDomain<BorrowEdge>,
@@ -190,14 +192,6 @@ pub struct LifetimeState {
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
     /// Contains the set of variables whose values have been moved to somewhere else.
     moved: SetDomain<TempIndex>,
-}
-
-impl AbstractDomain for LifetimeNode {
-    fn join(&mut self, other: &Self) -> JoinResult {
-        self.children
-            .join(&other.children)
-            .combine(self.parents.join(&other.parents))
-    }
 }
 
 impl AbstractDomain for LifetimeState {

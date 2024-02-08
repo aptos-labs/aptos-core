@@ -29,7 +29,7 @@ impl Signature {
     /// Serialize an Signature. Uses the SEC1 serialization format.
     pub fn to_bytes(&self) -> [u8; SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
-        self.0.to_bytes().try_into().unwrap()
+        self.0.to_bytes().into()
     }
 
     /// Deserialize an P256Signature, without checking for malleability

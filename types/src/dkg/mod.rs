@@ -20,7 +20,6 @@ pub struct DKGTranscriptMetadata {
     pub author: AccountAddress,
 }
 
-/// Reflection of Move type `0x1::dkg::DKGStartEvent`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DKGStartEvent {
     pub session_metadata: DKGSessionMetadata,
@@ -45,6 +44,16 @@ impl DKGTranscript {
         Self {
             metadata: DKGTranscriptMetadata { epoch, author },
             transcript_bytes,
+        }
+    }
+
+    pub fn dummy() -> Self {
+        Self {
+            metadata: DKGTranscriptMetadata {
+                epoch: 0,
+                author: AccountAddress::ZERO,
+            },
+            transcript_bytes: vec![],
         }
     }
 }

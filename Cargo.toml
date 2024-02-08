@@ -269,7 +269,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.74.1"
+rust-version = "1.75.0"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -448,6 +448,7 @@ ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
+ark-groth16 = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
@@ -609,8 +610,8 @@ prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
-prost = "0.12.1"
-prost-types = "0.12.1"
+prost = { version = "0.12.3", features = ["no-recursion-limit"] }
+prost-types = "0.12.3"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
@@ -643,6 +644,7 @@ sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
+serde-big-array = "0.5.1"
 serde_bytes = "0.11.6"
 serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
@@ -674,9 +676,9 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
-tokio = { version = "1.21.0", features = ["full"] }
+tokio = { version = "1.35.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
-tokio-metrics = "0.1.0"
+tokio-metrics = "0.3.1"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }

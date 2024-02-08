@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolver::{
-    size_u32_as_uleb128, ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView,
+use crate::resolver::{ResourceGroupSize, ResourceGroupView, TResourceGroupView, TResourceView};
+use aptos_types::{
+    serde_helper::bcs_utils::bcs_size_of_byte_array, state_store::state_key::StateKey,
 };
-use aptos_types::state_store::state_key::StateKey;
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
@@ -52,8 +52,7 @@ pub fn group_tagged_resource_size<T: Serialize + Clone + Debug>(
             "Tag serialization error for tag {:?}: {:?}",
             tag, e
         ))
-    })? + value_byte_len
-        + size_u32_as_uleb128(value_byte_len)) as u64)
+    })? + bcs_size_of_byte_array(value_byte_len)) as u64)
 }
 
 /// Utility method to compute the size of the group as GroupSizeKind::AsSum.
@@ -125,10 +124,11 @@ impl<'r> ResourceGroupAdapter<'r> {
         gas_feature_version: u64,
         resource_group_charge_as_size_sum_enabled: bool,
     ) -> Self {
-        // TODO[agg_v2](fix) - when is_resource_group_split_in_change_set_capable is false,
+        // when is_resource_group_split_in_change_set_capable is false,
         // but resource_group_charge_as_size_sum_enabled is true, we still don't set
         // group_size_kind to GroupSizeKind::AsSum, meaning that
-        // is_resource_group_split_in_change_set_capable affects gas charging. make sure that is correct
+        // is_resource_group_split_in_change_set_capable affects gas charging.
+        // Onchain execution always needs to go through capable resolvers.
 
         let group_size_kind = GroupSizeKind::from_gas_feature_version(
             gas_feature_version,

@@ -6,10 +6,10 @@
 
 use crate::{
     account_address::AccountAddress,
-    aggregator::{TryFromMoveValue, TryIntoMoveValue},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
+    delayed_fields::{ExtractUniqueIndex, TryFromMoveValue, TryIntoMoveValue},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
@@ -1880,6 +1880,8 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + Debug
         + Copy
         + From<u64>
+        + From<(u32, u32)>
+        + ExtractUniqueIndex
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;
@@ -1887,4 +1889,15 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
 
     /// Size of the user transaction in bytes, 0 otherwise
     fn user_txn_bytes_len(&self) -> usize;
+}
+
+pub struct ViewFunctionOutput {
+    pub values: Result<Vec<Vec<u8>>>,
+    pub gas_used: u64,
+}
+
+impl ViewFunctionOutput {
+    pub fn new(values: Result<Vec<Vec<u8>>>, gas_used: u64) -> Self {
+        Self { values, gas_used }
+    }
 }

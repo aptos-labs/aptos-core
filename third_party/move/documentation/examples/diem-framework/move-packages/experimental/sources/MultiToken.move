@@ -160,7 +160,7 @@ module ExperimentalFramework::MultiToken {
         let len = vector::length(gallery);
         while ({spec {
             invariant i >= 0;
-            invariant i <= len(gallery);
+            invariant i <= ::len(gallery);
             invariant forall k in 0..i: gallery[k].token_id.id != id;
         };(i < len)}) {
             if (guid::eq_id(&vector::borrow(gallery, i).token_id, id)) {
