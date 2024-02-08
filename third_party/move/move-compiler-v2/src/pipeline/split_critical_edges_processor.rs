@@ -73,7 +73,7 @@ impl SplitCriticalEdgesTransformation {
     fn transform_bytecode(&mut self, bytecode: Bytecode) {
         match bytecode {
             Bytecode::Branch(attr_id, l0, l1, t) => self.transform_branch(attr_id, l0, l1, t),
-            // Edge of a `Jump` can never be critical since the source node only have one out edge
+            // Edge of a `Jump` is never critical because the source node only has one out edge.
             _ => self.emit(bytecode),
         }
     }
