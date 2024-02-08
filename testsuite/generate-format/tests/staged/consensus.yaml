@@ -577,6 +577,8 @@ OpenIdSig:
     - epk_blinder: BYTES
     - pepper:
         TYPENAME: Pepper
+    - idc_aud_val:
+        OPTION: STR
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
