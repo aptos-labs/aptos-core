@@ -62,7 +62,7 @@ fn find_identifiers_in_value_impl<I: From<SizedID> + Hash + Eq>(
             ))
         },
 
-        ValueImpl::Native { id } => {
+        ValueImpl::Delayed { id } => {
             if !identifiers.insert(I::from(*id)) {
                 return Err(
                     PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)

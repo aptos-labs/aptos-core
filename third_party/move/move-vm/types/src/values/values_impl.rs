@@ -86,7 +86,7 @@ pub(crate) enum ValueImpl {
     ///     state because they are used purely at runtime. Any attempt to serialize
     ///     a native value, e.g. using `0x1::bcs::to_bytes` results in a runtime
     ///     error.
-    Native {
+    Delayed {
         id: SizedID,
     },
 }
@@ -406,7 +406,7 @@ impl ValueImpl {
 
             // Native values can be copied because this is how read_ref operates,
             // and copying is an internal API.
-            Native { id } => Native { id: *id },
+            Delayed { id } => Delayed { id: *id },
         })
     }
 }
@@ -525,7 +525,7 @@ impl ValueImpl {
             // therefore equality can have different outcomes on different nodes
             // of the network. Note that the error returned here is not an
             // invariant violation.
-            (Native { .. }, Native { .. }) => native_value_error!("cannot compare native values"),
+            (Delayed { .. }, Delayed { .. }) => native_value_error!("cannot compare native values"),
 
             (Invalid, _)
             | (U8(_), _)
@@ -539,7 +539,7 @@ impl ValueImpl {
             | (Container(_), _)
             | (ContainerRef(_), _)
             | (IndexedRef(_), _)
-            | (Native { .. }, _) => {
+            | (Delayed { .. }, _) => {
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                     .with_message(format!("cannot compare values: {:?}, {:?}", self, other)))
             },
@@ -953,7 +953,7 @@ impl ContainerRef {
                     | ValueImpl::U256(_)
                     | ValueImpl::Bool(_)
                     | ValueImpl::Address(_)
-                    | ValueImpl::Native { .. } => ValueImpl::IndexedRef(IndexedRef {
+                    | ValueImpl::Delayed { .. } => ValueImpl::IndexedRef(IndexedRef {
                         idx,
                         container_ref: self.copy_value(),
                     }),
@@ -1016,7 +1016,7 @@ impl Locals {
             | ValueImpl::U256(_)
             | ValueImpl::Bool(_)
             | ValueImpl::Address(_)
-            | ValueImpl::Native { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
+            | ValueImpl::Delayed { .. } => Ok(Value(ValueImpl::IndexedRef(IndexedRef {
                 idx,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
             }))),
@@ -1155,7 +1155,7 @@ impl Locals {
  **************************************************************************************/
 impl Value {
     pub fn native_value(id: SizedID) -> Self {
-        Self(ValueImpl::Native { id })
+        Self(ValueImpl::Delayed { id })
     }
 
     pub fn u8(x: u8) -> Self {
@@ -1309,7 +1309,7 @@ impl_vm_value_cast!(IndexedRef, IndexedRef);
 impl VMValueCast<SizedID> for Value {
     fn cast(self) -> PartialVMResult<SizedID> {
         match self.0 {
-            ValueImpl::Native { id } => Ok(id),
+            ValueImpl::Delayed { id } => Ok(id),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast non-native value {:?} into id", v))),
         }
@@ -2431,7 +2431,7 @@ impl ValueImpl {
             // Legacy size is only used by events natives (which should not even
             // be part of move-stdlib), so we should never see any native values
             // here.
-            Native { .. } => unreachable!("Native values do not have legacy size!"),
+            Delayed { .. } => unreachable!("Native values do not have legacy size!"),
         }
     }
 }
@@ -2694,7 +2694,7 @@ impl Debug for ValueImpl {
             Self::IndexedRef(r) => write!(f, "IndexedRef({:?})", r),
 
             // Allow deterministic debug of native values.
-            Self::Native { .. } => write!(f, "Native(?)"),
+            Self::Delayed { .. } => write!(f, "Native(?)"),
         }
     }
 }
@@ -2728,7 +2728,7 @@ impl Display for ValueImpl {
             Self::IndexedRef(r) => write!(f, "{}", r),
 
             // Allow deterministic display of native values.
-            Self::Native { .. } => write!(f, "Native(?)"),
+            Self::Delayed { .. } => write!(f, "Native(?)"),
         }
     }
 }
@@ -2903,7 +2903,7 @@ pub mod debug {
             ValueImpl::ContainerRef(r) => print_container_ref(buf, r),
             ValueImpl::IndexedRef(r) => print_indexed_ref(buf, r),
 
-            ValueImpl::Native { .. } => print_native_value(buf),
+            ValueImpl::Delayed { .. } => print_native_value(buf),
         }
     }
 
@@ -3167,7 +3167,7 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
 
             // Native values. For their serialization, we must have custom
             // serialization available, otherwise an error is returned.
-            (L::Native(tag, layout), ValueImpl::Native { id }) => {
+            (L::Native(tag, layout), ValueImpl::Delayed { id }) => {
                 match self.native_serializer {
                     Some(native_serializer) => {
                         native_serializer.custom_serialize(serializer, tag, layout, *id)
@@ -3531,7 +3531,7 @@ impl ValueImpl {
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
 
-            Native { id } => visitor.visit_native_value(depth, *id),
+            Delayed { id } => visitor.visit_native_value(depth, *id),
         }
     }
 }
