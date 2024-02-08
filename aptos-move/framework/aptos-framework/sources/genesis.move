@@ -17,6 +17,7 @@ module aptos_framework::genesis {
     use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
+    use aptos_framework::jwks;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::staking_contract;
@@ -28,6 +29,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
     use aptos_framework::vesting;
+    use aptos_framework::zkid;
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
@@ -131,6 +133,7 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
+        zkid::initialize(&aptos_framework_account, zkid::devnet_groth16_vk(), zkid::default_devnet_configuration());
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -382,7 +385,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_framework::jwks;
 
     #[verify_only]
     fun initialize_for_verification(
