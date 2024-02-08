@@ -6,20 +6,16 @@ use crate::move_vm_ext::AptosMoveResolver;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     bn254_circom::{get_public_inputs_hash, Groth16VerificationKey},
+    invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     transaction::authenticator::EphemeralPublicKey,
     vm_status::{StatusCode, VMStatus},
+    zkid,
     zkid::{Configuration, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
-
-macro_rules! invalid_signature {
-    ($message:expr) => {
-        VMStatus::error(StatusCode::INVALID_SIGNATURE, Some($message.to_owned()))
-    };
-}
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {
@@ -136,6 +132,15 @@ pub fn validate_zkid_authenticators(
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
+                    // If an `aud` override was set for account recovery purposes, check that it is
+                    // in the allow-list on-chain.
+                    if proof.override_aud_val.is_some() {
+                        zkid::is_allowed_override_aud(
+                            config,
+                            proof.override_aud_val.as_ref().unwrap(),
+                        )?;
+                    }
+
                     // The training wheels signature is only checked if a training wheels PK is set on chain
                     if training_wheels_pk.is_some() {
                         proof

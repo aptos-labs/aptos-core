@@ -32,6 +32,7 @@ use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::time::Duration;
 
+// TODO(zkid): test the override aud_val path
 // TODO(zkid): These tests are not modular and they lack instructions for how to regenerate the proofs.
 
 #[tokio::test]
@@ -99,6 +100,7 @@ async fn test_zkid_oidc_signature_transaction_submission() {
         uid_key: "sub".to_string(),
         epk_blinder,
         pepper,
+        idc_aud_val: None,
     };
 
     let zk_sig = ZkIdSignature {
@@ -182,6 +184,7 @@ async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification(
         uid_key: "sub".to_string(),
         epk_blinder,
         pepper,
+        idc_aud_val: None,
     };
 
     let zk_sig = ZkIdSignature {
@@ -266,6 +269,7 @@ async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
         uid_key: "sub".to_string(),
         epk_blinder,
         pepper,
+        idc_aud_val: None,
     };
 
     let zk_sig = ZkIdSignature {

@@ -1701,6 +1701,7 @@ mod tests {
             uid_key: "sub".to_string(),
             epk_blinder: vec![0u8; OpenIdSig::EPK_BLINDER_NUM_BYTES],
             pepper,
+            idc_aud_val: None,
         };
 
         let signed_txn = build_signature(

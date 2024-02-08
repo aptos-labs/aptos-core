@@ -2,6 +2,7 @@ module aptos_framework::zkid {
     use std::option;
     use std::option::Option;
     use std::signer;
+    use std::string::String;
     use std::vector;
     use aptos_framework::system_addresses;
 
@@ -29,6 +30,11 @@ module aptos_framework::zkid {
 
     #[resource_group_member(group = aptos_framework::zkid::Group)]
     struct Configuration has key, store {
+        /// An override `aud` for the identity of a recovery service, which will help users recover their zkID accounts
+        /// associated with dapps or wallets that have disappeared.
+        /// IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
+        /// via OAuth in the recovery service in order to allow it to rotate any of that user's zkID accounts.
+        override_aud_vals: vector<String>,
         /// No transaction can have more than this many zkID signatures.
         max_zkid_signatures_per_txn: u16,
         /// How far in the future from the JWT issued at time the EPK expiry can be set.
@@ -73,6 +79,7 @@ module aptos_framework::zkid {
     }
 
     public fun new_configuration(
+        override_aud_val: vector<String>,
         max_zkid_signatures_per_txn: u16,
         max_exp_horizon_secs: u64,
         training_wheels_pubkey: Option<vector<u8>>,
@@ -83,6 +90,7 @@ module aptos_framework::zkid {
         max_jwt_header_b64_bytes: u32
     ): Configuration {
         Configuration {
+            override_aud_vals: override_aud_val,
             max_zkid_signatures_per_txn,
             max_exp_horizon_secs,
             training_wheels_pubkey,
@@ -112,6 +120,7 @@ module aptos_framework::zkid {
     public fun default_devnet_configuration(): Configuration {
         // TODO(zkid): Put reasonable defaults & circuit-specific constants here.
         Configuration {
+            override_aud_vals: vector[],
             max_zkid_signatures_per_txn: 3,
             max_exp_horizon_secs: 100_255_944, // ~1160 days
             training_wheels_pubkey: option::some(x"aa"),
@@ -156,6 +165,7 @@ module aptos_framework::zkid {
 
         if (exists<Configuration>(signer::address_of(fx))) {
             let Configuration {
+                override_aud_vals: _,
                 max_zkid_signatures_per_txn: _,
                 max_exp_horizon_secs: _,
                 training_wheels_pubkey: _,

@@ -21,6 +21,7 @@
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 
@@ -125,6 +126,15 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
 
 
 <dl>
+<dt>
+<code>override_aud_vals: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
+</dt>
+<dd>
+ An override <code>aud</code> for the identity of a recovery service, which will help users recover their zkID accounts
+ associated with dapps or wallets that have disappeared.
+ IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
+ via OAuth in the recovery service in order to allow it to rotate any of that user's zkID accounts.
+</dd>
 <dt>
 <code>max_zkid_signatures_per_txn: u16</code>
 </dt>
@@ -256,7 +266,7 @@ The training wheels PK needs to be 32 bytes long.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16, max_commited_epk_bytes: u16, max_iss_field_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(override_aud_val: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16, max_commited_epk_bytes: u16, max_iss_field_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
 </code></pre>
 
 
@@ -266,6 +276,7 @@ The training wheels PK needs to be 32 bytes long.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(
+    override_aud_val: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;String&gt;,
     max_zkid_signatures_per_txn: u16,
     max_exp_horizon_secs: u64,
     training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
@@ -276,6 +287,7 @@ The training wheels PK needs to be 32 bytes long.
     max_jwt_header_b64_bytes: u32
 ): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
     <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+        override_aud_vals: override_aud_val,
         max_zkid_signatures_per_txn,
         max_exp_horizon_secs,
         training_wheels_pubkey,
@@ -345,6 +357,7 @@ Returns the configuration for our devnet deployment.
 <pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_default_devnet_configuration">default_devnet_configuration</a>(): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
     // TODO(<a href="zkid.md#0x1_zkid">zkid</a>): Put reasonable defaults & circuit-specific constants here.
     <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+        override_aud_vals: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
         max_zkid_signatures_per_txn: 3,
         max_exp_horizon_secs: 100_255_944, // ~1160 days
         training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(x"aa"),
@@ -425,6 +438,7 @@ Returns the configuration for our devnet deployment.
 
     <b>if</b> (<b>exists</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx))) {
         <b>let</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+            override_aud_vals: _,
             max_zkid_signatures_per_txn: _,
             max_exp_horizon_secs: _,
             training_wheels_pubkey: _,

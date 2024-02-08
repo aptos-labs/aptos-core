@@ -18,7 +18,12 @@ use ark_bn254::{self, Bn254, Fr};
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};
 use ark_serialize::CanonicalSerialize;
 use base64::URL_SAFE_NO_PAD;
-use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    move_resource::MoveStructType,
+    vm_status::{StatusCode, VMStatus},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_with::skip_serializing_none;
@@ -28,6 +33,13 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[macro_export]
+macro_rules! invalid_signature {
+    ($message:expr) => {
+        VMStatus::error(StatusCode::INVALID_SIGNATURE, Some($message.to_owned()))
+    };
+}
+
 /// The size of the pepper used to create a _hiding_ identity commitment (IDC) when deriving a zkID
 /// address. This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
 /// hashing with a larger pepper would lead to a different address).
@@ -36,6 +48,7 @@ pub const PEPPER_NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 /// Reflection of aptos_framework::zkid::Configs
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
+    pub override_aud_vals: Vec<String>,
     pub max_zkid_signatures_per_txn: u16,
     pub max_exp_horizon_secs: u64,
     pub training_wheels_pubkey: Option<Vec<u8>>,
@@ -53,10 +66,14 @@ impl MoveStructType for Configuration {
 
 impl Configuration {
     #[cfg(test)]
+    const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
+
+    #[cfg(test)]
     pub fn new_for_testing() -> Configuration {
         const POSEIDON_BYTES_PACKED_PER_SCALAR: u16 = 31;
 
         Configuration {
+            override_aud_vals: vec![Self::OVERRIDE_AUD_FOR_TESTING.to_owned()],
             max_zkid_signatures_per_txn: 3,
             max_exp_horizon_secs: 100_255_944,
             training_wheels_pubkey: None,
@@ -90,6 +107,9 @@ pub struct OpenIdSig {
     pub epk_blinder: Vec<u8>,
     /// The privacy-preserving value used to calculate the identity commitment. It is typically uniquely derived from `(iss, client_id, uid_key, uid_val)`.
     pub pepper: Pepper,
+    /// When an override aud_val is used, the signature needs to contain the aud_val committed in the
+    /// IDC, since the JWT will contain the override.
+    pub idc_aud_val: Option<String>,
 }
 
 impl OpenIdSig {
@@ -102,6 +122,8 @@ impl OpenIdSig {
     ///  2. Check that the iss claim in the ZkIdPublicKey matches the one in the jwt_payload
     ///  3. Check that the identity commitment in the ZkIdPublicKey matches the one constructed from the jwt_payload
     ///  4. Check that the nonce constructed from the ephemeral public key, blinder, and exp_timestamp_secs matches the one in the jwt_payload
+    // TODO(zkid): Refactor to return a `Result<(), VMStatus>` because (1) this is now called in the
+    //  VM and (2) is_override_aud_allowed does.
     pub fn verify_jwt_claims(
         &self,
         exp_timestamp_secs: u64,
@@ -115,6 +137,7 @@ impl OpenIdSig {
         let max_expiration_date =
             seconds_from_epoch(claims.oidc_claims.iat + config.max_exp_horizon_secs);
         let expiration_date: SystemTime = seconds_from_epoch(exp_timestamp_secs);
+
         ensure!(
             expiration_date < max_expiration_date,
             "The ephemeral public key's expiration date is too far into the future"
@@ -131,16 +154,25 @@ impl OpenIdSig {
             "uid_key must be either 'sub' or 'email', was \"{}\"",
             self.uid_key
         );
-        let uid_val = claims.get_uid_val(&self.uid_key)?;
 
+        // When an aud_val override is set, the IDC-committed `aud` is included next to the
+        // OpenID signature.
+        let idc_aud_val = match self.idc_aud_val.as_ref() {
+            None => &claims.oidc_claims.aud,
+            Some(idc_aud_val) => {
+                // If there's an override, check that the override `aud` from the JWT, is allow-listed
+                ensure!(
+                    is_allowed_override_aud(config, &claims.oidc_claims.aud).is_ok(),
+                    "{} is not an allow-listed override aud",
+                    &claims.oidc_claims.aud
+                );
+                idc_aud_val
+            },
+        };
+        let uid_val = claims.get_uid_val(&self.uid_key)?;
         ensure!(
-            IdCommitment::new_from_preimage(
-                &self.pepper,
-                &claims.oidc_claims.aud,
-                &self.uid_key,
-                &uid_val
-            )?
-            .eq(&pk.idc),
+            IdCommitment::new_from_preimage(&self.pepper, idc_aud_val, &self.uid_key, &uid_val)?
+                .eq(&pk.idc),
             "Address IDC verification failed"
         );
 
@@ -546,6 +578,25 @@ fn seconds_from_epoch(secs: u64) -> SystemTime {
     UNIX_EPOCH + Duration::from_secs(secs)
 }
 
+pub fn is_allowed_override_aud(
+    config: &Configuration,
+    override_aud_val: &String,
+) -> Result<(), VMStatus> {
+    let matches = config
+        .override_aud_vals
+        .iter()
+        .filter(|&e| e.eq(override_aud_val))
+        .count();
+
+    if matches == 0 {
+        Err(invalid_signature!(
+            "override aud is not allow-listed in 0x1::zkid"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
@@ -891,6 +942,7 @@ mod test {
             uid_key: uid_key.to_owned(),
             epk_blinder: vec![0u8; OpenIdSig::EPK_BLINDER_NUM_BYTES],
             pepper: Pepper::from_number(pepper),
+            idc_aud_val: None,
         }
     }
 }
