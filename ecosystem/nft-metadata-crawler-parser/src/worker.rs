@@ -361,6 +361,8 @@ impl Worker {
             }
         }
 
+        self.model
+            .set_last_transaction_version(self.last_transaction_version as i64);
         if self.model.get_json_parser_retry_count() > MAX_NUM_PARSE_RETRIES
             || self.model.get_image_optimizer_retry_count() > MAX_NUM_PARSE_RETRIES
             || self.model.get_animation_optimizer_retry_count() > MAX_NUM_PARSE_RETRIES
