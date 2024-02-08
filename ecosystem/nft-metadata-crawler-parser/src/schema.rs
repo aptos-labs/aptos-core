@@ -22,8 +22,12 @@ pub mod nft_metadata_crawler {
             animation_optimizer_retry_count -> Int4,
             inserted_at -> Timestamp,
             do_not_parse -> Bool,
+            last_transaction_version -> Int8,
         }
     }
 
-    diesel::allow_tables_to_appear_in_same_query!(ledger_infos, parsed_asset_uris,);
+    diesel::allow_tables_to_appear_in_same_query!(
+        ledger_infos,
+        parsed_asset_uris,
+    );
 }

@@ -60,12 +60,14 @@ impl Worker {
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
     ) -> Self {
+        let mut model = NFTMetadataCrawlerURIs::new(asset_uri);
+        model.set_last_transaction_version(last_transaction_version as i64);
         let worker = Self {
             config,
             conn,
             gcs_client,
             pubsub_message: pubsub_message.to_string(),
-            model: NFTMetadataCrawlerURIs::new(asset_uri),
+            model,
             asset_data_id: asset_data_id.to_string(),
             asset_uri: asset_uri.to_string(),
             last_transaction_version,
@@ -150,7 +152,7 @@ impl Worker {
                 self.log_info("Writing JSON to GCS");
                 let cdn_json_uri_result = write_json_to_gcs(
                     &self.config.bucket,
-                    &self.asset_data_id,
+                    &self.asset_uri,
                     &json,
                     &self.gcs_client,
                 )
@@ -211,7 +213,7 @@ impl Worker {
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_image_uri", None);
                 PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-                raw_image_uri
+                raw_image_uri.clone()
             });
 
             // Resize and optimize image
@@ -243,7 +245,7 @@ impl Worker {
                 let cdn_image_uri_result = write_image_to_gcs(
                     format,
                     &self.config.bucket,
-                    &self.asset_data_id,
+                    &raw_image_uri,
                     image,
                     &self.gcs_client,
                 )
@@ -304,7 +306,7 @@ impl Worker {
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_animation_uri", None);
                 PARSE_URI_TYPE_COUNT.with_label_values(&["other"]).inc();
-                raw_animation_uri
+                raw_animation_uri.clone()
             });
 
             // Resize and optimize animation
@@ -336,7 +338,7 @@ impl Worker {
                 let cdn_animation_uri_result = write_image_to_gcs(
                     format,
                     &self.config.bucket,
-                    &self.asset_data_id,
+                    &raw_animation_uri,
                     animation,
                     &self.gcs_client,
                 )
