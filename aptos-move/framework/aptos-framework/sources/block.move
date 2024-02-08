@@ -4,6 +4,7 @@ module aptos_framework::block {
     use std::features;
     use std::vector;
     use std::option;
+    use aptos_std::table_with_length::{Self, TableWithLength};
 
     use aptos_framework::account;
     use aptos_framework::event::{Self, EventHandle};
@@ -29,8 +30,15 @@ module aptos_framework::block {
         update_epoch_interval_events: EventHandle<UpdateEpochIntervalEvent>,
     }
 
+    /// Store new block events as a move resource, internally using a circular buffer.
+    struct CommitHistory has key {
+        max_capacity: u32,
+        current_idx: u32,
+        table: TableWithLength<u32, NewBlockEvent>,
+    }
+
     /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
-    struct NewBlockEvent has drop, store {
+    struct NewBlockEvent has copy, drop, store {
         hash: address,
         epoch: u64,
         round: u64,
@@ -59,6 +67,12 @@ module aptos_framework::block {
     public(friend) fun initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(epoch_interval_microsecs > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
+
+        move_to<CommitHistory>(aptos_framework, CommitHistory {
+            max_capacity: 2000,
+            current_idx: 0,
+            table: table_with_length::new(),
+        });
 
         move_to<BlockResource>(
             aptos_framework,
@@ -107,7 +121,7 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
-    ) acquires BlockResource {
+    ) acquires BlockResource, CommitHistory {
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
 
@@ -163,7 +177,16 @@ module aptos_framework::block {
     }
 
     /// Emit the event and update height and global timestamp
-    fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) {
+    fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) acquires CommitHistory {
+        if (exists<CommitHistory>(@aptos_framework)) {
+            let commit_history_ref = borrow_global_mut<CommitHistory>(@aptos_framework);
+            let idx = commit_history_ref.current_idx;
+            if (table_with_length::contains(&commit_history_ref.table, idx)) {
+                table_with_length::remove(&mut commit_history_ref.table, idx);
+            };
+            table_with_length::add(&mut commit_history_ref.table, idx, copy new_block_event);
+            commit_history_ref.current_idx = (idx + 1) % commit_history_ref.max_capacity;
+        };
         timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
         assert!(
             event::counter(event_handle) == new_block_event.height,
@@ -174,7 +197,7 @@ module aptos_framework::block {
 
     /// Emit a `NewBlockEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
-    fun emit_genesis_block_event(vm: signer) acquires BlockResource {
+    fun emit_genesis_block_event(vm: signer) acquires BlockResource, CommitHistory {
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         let genesis_id = @0x0;
         emit_new_block_event(
@@ -195,12 +218,13 @@ module aptos_framework::block {
 
     ///  Emit a `NewBlockEvent` event. This function will be invoked by write set script directly to generate the
     ///  new block event for WriteSetPayload.
-    public fun emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) acquires BlockResource {
+    public fun emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) acquires BlockResource, CommitHistory {
         system_addresses::assert_vm(vm_signer);
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
 
-        event::emit_event<NewBlockEvent>(
+        emit_new_block_event(
+            vm_signer,
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
                 hash: fake_block_hash,
