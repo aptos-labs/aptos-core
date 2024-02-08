@@ -105,17 +105,23 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         let mut read_values = vec![];
         let mut resolved_deltas = vec![];
         let mut group_reads = vec![];
+
+        let has_abort = txns.iter().any(|txn| matches!(txn, MockTransaction::Abort));
+
         for txn in txns.iter() {
             match txn {
                 MockTransaction::Abort => {
                     status = BaselineStatus::Aborted;
                     break;
                 },
-                MockTransaction::SkipRest => {
+                MockTransaction::SkipRest(gas) => {
                     // In executor, SkipRest skips from the next index. Test assumes it's an empty
                     // transaction, so create a successful empty reads and deltas.
                     read_values.push(Ok(vec![]));
                     resolved_deltas.push(Ok(HashMap::new()));
+
+                    // gas in SkipRest is used for unit tests for now (can generalize when needed).
+                    assert_eq!(*gas, 0);
 
                     status = BaselineStatus::SkipRest;
                     break;
@@ -124,11 +130,17 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     incarnation_counter,
                     incarnation_behaviors,
                 } => {
+                    let incarnation = incarnation_counter.load(Ordering::SeqCst);
+                    if incarnation == 0 {
+                        // Must have never executed because an Abort transaction caused a halt.
+                        assert!(has_abort);
+                        break;
+                    }
+
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
                     // the last mock execution, and is >= 1 because there is at least one execution.
-                    let last_incarnation = (incarnation_counter.load(Ordering::SeqCst) - 1)
-                        % incarnation_behaviors.len();
+                    let last_incarnation = (incarnation - 1) % incarnation_behaviors.len();
 
                     match incarnation_behaviors[last_incarnation]
                         .deltas
@@ -255,6 +267,7 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                         .collect();
                     // Test group read results.
                     let read_len = reads.as_ref().unwrap().len();
+
                     assert_eq!(
                         group_read_results.len(),
                         output.read_results.len() - read_len
@@ -352,24 +365,21 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
                 results.iter().skip(committed).for_each(|output| {
                     // Ensure the transaction is skipped based on the output.
-                    assert!(output.writes.is_empty());
-                    assert!(output.deltas.is_empty());
-                    assert!(output.read_results.is_empty());
-                    assert_eq!(output.total_gas, 0);
+                    assert!(output.skipped);
 
                     // Implies that materialize_delta_writes was never called, as should
                     // be for skipped transactions.
                     assert_none!(output.materialized_delta_writes.get());
                 });
             },
-            Err(BlockExecutionError::FatalVMError((idx, executor_idx))) => {
-                assert_eq!(*idx, *executor_idx as usize);
+            Err(BlockExecutionError::FatalVMError(idx)) => {
                 assert_matches!(&self.status, BaselineStatus::Aborted);
                 assert_eq!(*idx, self.read_values.len());
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
-            Err(BlockExecutionError::FallbackToSequential(e)) => {
-                unimplemented!("not tested here FallbackToSequential({:?})", e)
+            Err(BlockExecutionError::FallbackToSequential(_)) => {
+                // Parallel execution currently returns an arbitrary error to fallback.
+                // TODO: adjust the logic to be able to test better.
             },
         }
     }

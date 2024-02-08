@@ -791,18 +791,10 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
 fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config
-        .consensus
-        .max_sending_block_txns_quorum_store_override = 30000;
-    config
-        .consensus
-        .max_receiving_block_txns_quorum_store_override = 40000;
-    config
-        .consensus
-        .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
-    config
-        .consensus
-        .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+    config.consensus.max_sending_block_txns = 30000;
+    config.consensus.max_receiving_block_txns = 40000;
+    config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
+    config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
@@ -2030,12 +2022,7 @@ fn changing_working_quorum_test_helper(
             let block_size = (target_tps / 4) as u64;
 
             config.consensus.max_sending_block_txns = block_size;
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = block_size;
-            config
-                .consensus
-                .max_receiving_block_txns_quorum_store_override = block_size;
+            config.consensus.max_receiving_block_txns = block_size;
             config.consensus.round_initial_timeout_ms = 500;
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
             config.consensus.quorum_store_poll_time_ms = 100;

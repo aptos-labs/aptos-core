@@ -3,12 +3,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    errors::{BlockExecutionError, IntentionalFallbackToSequential},
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
         types::{
             DeltaDataView, KeyType, MockEvent, MockIncarnation, MockOutput, MockTask,
-            MockTransaction, ValueType,
+            MockTransaction, NonEmptyGroupDataView, ValueType,
         },
     },
     scheduler::{
@@ -20,6 +21,7 @@ use aptos_aggregator::{
     bounded_math::SignedU128,
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     delta_math::DeltaHistory,
+    types::PanicOr,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -28,10 +30,212 @@ use aptos_types::{
     executable::{ExecutableTestType, ModulePath},
 };
 use claims::assert_matches;
+use fail::FailScenario;
 use rand::{prelude::*, random};
 use std::{
-    cmp::min, collections::BTreeMap, fmt::Debug, hash::Hash, marker::PhantomData, sync::Arc,
+    cmp::min,
+    collections::{BTreeMap, HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    sync::Arc,
 };
+
+#[test]
+fn resource_group_bcs_fallback() {
+    let no_group_incarnation_1: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
+        vec![KeyType::<u32>(1, false)],
+        vec![(
+            KeyType::<u32>(2, false),
+            ValueType::from_value(vec![5], true),
+        )],
+        vec![],
+        vec![],
+        10,
+    );
+    let no_group_incarnation_2: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
+        vec![KeyType::<u32>(3, false), KeyType::<u32>(4, false)],
+        vec![(
+            KeyType::<u32>(1, false),
+            ValueType::from_value(vec![5], true),
+        )],
+        vec![],
+        vec![],
+        10,
+    );
+    let t_1 = MockTransaction::from_behavior(no_group_incarnation_1);
+    let t_3 = MockTransaction::from_behavior(no_group_incarnation_2);
+
+    let mut group_incarnation: MockIncarnation<KeyType<u32>, MockEvent> =
+        MockIncarnation::new(vec![KeyType::<u32>(1, false)], vec![], vec![], vec![], 10);
+    group_incarnation.group_writes.push((
+        KeyType::<u32>(100, false),
+        HashMap::from([(101, ValueType::from_value(vec![5], true))]),
+    ));
+    let t_2 = MockTransaction::from_behavior(group_incarnation);
+    let transactions = Vec::from([t_1, t_2, t_3]);
+
+    let data_view = NonEmptyGroupDataView::<KeyType<u32>> {
+        group_keys: HashSet::new(),
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        NonEmptyGroupDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        ExecutableTestType,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    // Execute the block normally.
+    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    match output {
+        Ok(block_output) => {
+            let txn_outputs = block_output.into_transaction_outputs_forced();
+            assert_eq!(txn_outputs.len(), 3);
+            assert!(!txn_outputs[0].writes.is_empty());
+            assert!(!txn_outputs[2].writes.is_empty());
+            assert!(!txn_outputs[1].group_writes.is_empty());
+        },
+        Err(_) => unreachable!("Must succeed: failpoint not yet set up"),
+    };
+
+    // Set up and sanity check failpoint.
+    let scenario = FailScenario::setup();
+    assert!(fail::has_failpoints());
+    fail::cfg("fail-point-resource-group-serialization", "return()").unwrap();
+    assert!(!fail::list().is_empty());
+
+    let par_output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    assert_matches!(
+        par_output,
+        Err(PanicOr::Or(
+            IntentionalFallbackToSequential::FallbackFromParallel
+        ))
+    );
+
+    let seq_output =
+        block_executor.execute_transactions_sequential((), &transactions, &data_view, false);
+    assert_matches!(
+        seq_output,
+        Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+            IntentionalFallbackToSequential::ResourceGroupSerializationError
+        )))
+    );
+
+    // Now execute with fallback handling for resource group serialization error:
+    let fallback_output =
+        block_executor.execute_transactions_sequential((), &transactions, &data_view, true);
+    let fallback_output_block = block_executor.execute_block((), &transactions, &data_view);
+    for output in [fallback_output, fallback_output_block] {
+        match output {
+            Ok(block_output) => {
+                let txn_outputs = block_output.into_transaction_outputs_forced();
+                assert_eq!(txn_outputs.len(), 3);
+                assert!(!txn_outputs[0].writes.is_empty());
+                assert!(!txn_outputs[2].writes.is_empty());
+
+                // But now transaction 1 must be skipped.
+                assert!(txn_outputs[1].skipped);
+            },
+            Err(_) => unreachable!("Must succeed: fallback"),
+        };
+    }
+
+    scenario.teardown();
+}
+
+#[test]
+fn block_output_err_precedence() {
+    let incarnation: MockIncarnation<KeyType<u32>, MockEvent> = MockIncarnation::new(
+        vec![KeyType::<u32>(1, false)],
+        vec![(
+            KeyType::<u32>(2, false),
+            ValueType::from_value(vec![5], true),
+        )],
+        vec![],
+        vec![],
+        10,
+    );
+    let txn = MockTransaction::from_behavior(incarnation);
+    let transactions = Vec::from([txn.clone(), txn]);
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        ExecutableTestType,
+    >::new(
+        BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
+        executor_thread_pool,
+        None,
+    );
+
+    let scenario = FailScenario::setup();
+    assert!(fail::has_failpoints());
+    fail::cfg("commit-all-halt-err", "return()").unwrap();
+    assert!(!fail::list().is_empty());
+    // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
+    // Confirm that the fatal VM error is still detected and sequential fallback triggered.
+    let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+    assert_matches!(
+        output,
+        Err(PanicOr::Or(
+            IntentionalFallbackToSequential::FallbackFromParallel
+        ))
+    );
+    scenario.teardown();
+}
+
+#[test]
+fn skip_rest_gas_limit() {
+    // The contents of the second txn does not matter, as the first should hit the gas limit and
+    // also skip. But it ensures block is not finished at the first txn (different processing).
+    let transactions = Vec::from([MockTransaction::SkipRest(10), MockTransaction::SkipRest(10)]);
+
+    let data_view = DeltaDataView::<KeyType<u32>> {
+        phantom: PhantomData,
+    };
+    let executor_thread_pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(num_cpus::get())
+            .build()
+            .unwrap(),
+    );
+    let block_executor = BlockExecutor::<
+        MockTransaction<KeyType<u32>, MockEvent>,
+        MockTask<KeyType<u32>, MockEvent>,
+        DeltaDataView<KeyType<u32>>,
+        NoOpTransactionCommitHook<MockOutput<KeyType<u32>, MockEvent>, usize>,
+        ExecutableTestType,
+    >::new(
+        BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), Some(5)),
+        executor_thread_pool,
+        None,
+    );
+
+    // Should hit block limit on the skip transaction.
+    let _ = block_executor.execute_transactions_parallel((), &transactions, &data_view);
+}
 
 // TODO: add unit test for block gas limit!
 fn run_and_assert<K, E>(transactions: Vec<MockTransaction<K, E>>)
@@ -64,7 +268,7 @@ where
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
-    baseline.assert_output(&output);
+    baseline.assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
 }
 
 fn random_value(delete_value: bool) -> ValueType {
@@ -321,7 +525,7 @@ fn early_skips() {
             )));
         }
         // One transaction that triggers an abort
-        transactions.push(MockTransaction::SkipRest)
+        transactions.push(MockTransaction::SkipRest(0))
     }
     run_and_assert(transactions)
 }

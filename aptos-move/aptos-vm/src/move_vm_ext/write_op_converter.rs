@@ -115,7 +115,7 @@ fn check_size_and_existence_match(
     if exists {
         if size.get() == 0 {
             Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
                     format!(
                         "Group tag count/size shouldn't be 0 for an existing group: {:?}",
                         state_key
@@ -127,7 +127,7 @@ fn check_size_and_existence_match(
         }
     } else if size.get() > 0 {
         Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
                 format!(
                     "Group tag count/size should be 0 for a new group: {:?}",
                     state_key
@@ -244,7 +244,6 @@ impl<'r> WriteOpConverter<'r> {
         // except it encodes the (speculative) size of the group after applying the updates
         // which is used for charging storage fees. Moreover, the metadata computation occurs
         // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
-        // TODO[agg_v2](fix) fix layout for RG
         let metadata_op = if post_group_size.get() == 0 {
             MoveStorageOp::Delete
         } else if pre_group_size.get() == 0 {
@@ -417,7 +416,7 @@ mod tests {
         }
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_delete_modify_ops() {
@@ -475,7 +474,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_new_op() {
@@ -516,7 +515,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_new_group() {
@@ -542,7 +541,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_delete_group() {

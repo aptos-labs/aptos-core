@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    aggregator::DelayedFieldID,
     contract_event::ContractEvent,
+    delayed_fields::DelayedFieldID,
     state_store::state_key::StateKey,
     transaction::{BlockExecutableTransaction, Transaction},
     write_set::WriteOp,

@@ -8,8 +8,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
-    write_set::WriteOp,
+    delayed_fields::PanicError, fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use move_core_types::value::MoveTypeLayout;
@@ -30,8 +30,6 @@ pub enum ExecutionStatus<O, E> {
     /// Transaction was executed successfully, but will skip the execution of the trailing
     /// transactions in the list
     SkipRest(O),
-    /// There is a DirectWriteTransaction with resolver not capable to handle it.
-    DirectWriteSetTransactionNotCapableError,
     /// Transaction detected that it is in inconsistent state due to speculative
     /// reads it did, and needs to be re-executed.
     SpeculativeExecutionAbortError(String),
@@ -181,7 +179,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
             <Self::Txn as Transaction>::Value,
         )>,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    );
+    ) -> Result<(), PanicError>;
 
     fn set_txn_output_for_non_dynamic_change_set(&self);
 

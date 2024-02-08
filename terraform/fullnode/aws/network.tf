@@ -5,14 +5,14 @@ data "aws_route53_zone" "pfn" {
 
 locals {
   dns_prefix = var.workspace_dns ? "${local.workspace_name}.${var.dns_prefix_name}." : "${var.dns_prefix_name}."
-  domain     = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.pfn[0].name}" : null
+  domain     = var.zone_id != "" ? "${local.dns_prefix}${data.aws_route53_zone.pfn[0].name}" : terraform.workspace
 }
 
 resource "aws_acm_certificate" "ingress" {
   count = var.zone_id != "" ? 1 : 0
 
   domain_name               = local.domain
-  subject_alternative_names = concat(["*.${local.domain}"], var.tls_sans)
+  subject_alternative_names = distinct(concat(["*.${local.domain}"], var.tls_sans))
   validation_method         = "DNS"
 
   lifecycle {

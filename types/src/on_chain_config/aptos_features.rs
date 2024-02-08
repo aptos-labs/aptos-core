@@ -44,7 +44,7 @@ pub enum FeatureFlag {
     SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
-    CONCURRENT_ASSETS = 37,
+    CONCURRENT_TOKEN_V2 = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
@@ -56,6 +56,8 @@ pub enum FeatureFlag {
     ZK_ID_SIGNATURES = 46,
     ZK_ID_ZKLESS_SIGNATURE = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    JWK_CONSENSUS = 49,
+    CONCURRENT_FUNGIBLE_ASSETS = 50,
 }
 
 /// Representation of features on chain as a bitset.
@@ -90,14 +92,23 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
-    pub fn enable(&mut self, flag: FeatureFlag) {
+    fn resize_for_flag(&mut self, flag: FeatureFlag) -> (usize, u8) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
         while self.features.len() <= byte_index {
             self.features.push(0);
         }
+        (byte_index, bit_mask)
+    }
 
+    pub fn enable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
         self.features[byte_index] |= bit_mask;
+    }
+
+    pub fn disable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
+        self.features[byte_index] &= !bit_mask;
     }
 
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {

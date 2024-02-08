@@ -1406,17 +1406,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (exp_ty, exp) = self.translate_exp_free(exp);
                 if !ty.is_number() {
                     self.error(&loc, "cast target type must be a number");
-                    self.new_error_exp()
-                } else if !self.subs.is_some_number(&exp_ty) {
+                    return self.new_error_exp();
+                } else if !self.subs.is_some_number(&exp_ty)
+                    && !self.subs.is_free_var_without_constraints(&exp_ty)
+                {
                     self.error(&loc, "operand of cast must be a number");
-                    self.new_error_exp()
-                } else {
-                    ExpData::Call(
-                        self.new_node_id_with_type_loc(&ty, &loc),
-                        Operation::Cast,
-                        vec![exp.into_exp()],
-                    )
+                    return self.new_error_exp();
+                } else if let Type::Var(idx) = exp_ty {
+                    let all_ints = PrimitiveType::all_int_types()
+                        .into_iter()
+                        .collect::<BTreeSet<_>>();
+                    self.subs
+                        .add_constraint(
+                            &self.unification_context,
+                            idx,
+                            loc.clone(),
+                            WideningOrder::LeftToRight,
+                            Constraint::SomeNumber(all_ints),
+                        )
+                        .expect("success on var");
                 }
+                ExpData::Call(
+                    self.new_node_id_with_type_loc(&ty, &loc),
+                    Operation::Cast,
+                    vec![exp.into_exp()],
+                )
             },
             EA::Exp_::Annotate(exp, typ) => {
                 let ty = self.translate_type(typ);
@@ -1942,15 +1956,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             if let EA::ModuleAccess_::Name(n) = &maccess.value {
                 if n.value.as_str() == "update_field" {
                     return Some(self.translate_update_field(expected_type, loc, generics, args));
-                }
-                let builtin_module = self.parent.parent.builtin_module();
-                let full_name = QualifiedSymbol {
-                    module_name: builtin_module,
-                    symbol: self.symbol_pool().make(&n.value),
-                };
-                // For other built-in functions, type check is performed in translate_call
-                if self.parent.parent.spec_fun_table.get(&full_name).is_some() {
-                    return None;
                 }
             }
         }

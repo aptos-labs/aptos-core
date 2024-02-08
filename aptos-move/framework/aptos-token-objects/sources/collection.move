@@ -156,7 +156,7 @@ module aptos_token_objects::collection {
         let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
-        if (features::concurrent_assets_enabled()) {
+        if (features::concurrent_token_v2_enabled()) {
             let supply = ConcurrentSupply {
                 current_supply: aggregator_v2::create_aggregator(max_supply),
                 total_minted: aggregator_v2::create_unbounded_aggregator(),
@@ -205,7 +205,7 @@ module aptos_token_objects::collection {
         let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
-        if (features::concurrent_assets_enabled()) {
+        if (features::concurrent_token_v2_enabled()) {
             let supply = ConcurrentSupply {
                 current_supply: aggregator_v2::create_unbounded_aggregator(),
                 total_minted: aggregator_v2::create_unbounded_aggregator(),
@@ -459,7 +459,7 @@ module aptos_token_objects::collection {
     ) acquires FixedSupply, UnlimitedSupply {
         let metadata_object_address = object::address_from_extend_ref(ref);
         let metadata_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_assets_enabled(), error::invalid_argument(ECONCURRENT_NOT_ENABLED));
+        assert!(features::concurrent_token_v2_enabled(), error::invalid_argument(ECONCURRENT_NOT_ENABLED));
 
         let (supply, current_supply, total_minted, burn_events, mint_events) = if (exists<FixedSupply>(metadata_object_address)) {
             let FixedSupply {

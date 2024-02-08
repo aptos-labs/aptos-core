@@ -165,6 +165,9 @@ pub struct EmitArgs {
     pub max_gas_per_txn: Option<u64>,
 
     #[clap(long)]
+    pub init_max_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
     pub init_gas_price_multiplier: Option<u64>,
 
     #[clap(long)]
@@ -173,8 +176,15 @@ pub struct EmitArgs {
     #[clap(long)]
     pub expected_gas_per_txn: Option<u64>,
 
-    #[clap(long)]
+    #[clap(long, conflicts_with = "num_accounts")]
     pub max_transactions_per_account: Option<usize>,
+
+    #[clap(long, conflicts_with = "max_transactions_per_account")]
+    pub num_accounts: Option<usize>,
+
+    #[clap(long, default_value = "false")]
+    /// Skip minting account during initialization
+    pub skip_minting_accounts: bool,
 
     #[clap(long)]
     pub latency_polling_interval_s: Option<f32>,

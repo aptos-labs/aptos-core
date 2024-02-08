@@ -35,6 +35,17 @@ AccountAuthenticator:
         STRUCT:
           - authenticator:
               TYPENAME: MultiKeyAuthenticator
+AggregateSignature:
+  STRUCT:
+    - validator_bitmask:
+        TYPENAME: BitVec
+    - sig:
+        OPTION:
+          TYPENAME: Signature
+Any:
+  STRUCT:
+    - type_name: STR
+    - data: BYTES
 AnyPublicKey:
   ENUM:
     0:
@@ -168,10 +179,6 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
-DummyValidatorTransaction:
-  STRUCT:
-    - valid: BOOL
-    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -231,12 +238,13 @@ HashValue:
           CONTENT: U8
           SIZE: 32
 IdCommitment:
-  NEWTYPESTRUCT:
-    TUPLEARRAY:
-      CONTENT: U8
-      SIZE: 32
+  NEWTYPESTRUCT: BYTES
 Identifier:
   NEWTYPESTRUCT: STR
+JWKMoveStruct:
+  STRUCT:
+    - variant:
+        TYPENAME: Any
 Module:
   STRUCT:
     - code: BYTES
@@ -288,12 +296,11 @@ OpenIdSig:
     - jwt_sig: STR
     - jwt_payload: STR
     - uid_key: STR
-    - epk_blinder:
-        TUPLEARRAY:
-          CONTENT: U8
-          SIZE: 31
+    - epk_blinder: BYTES
     - pepper:
         TYPENAME: Pepper
+    - idc_aud_val:
+        OPTION: STR
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
@@ -305,6 +312,23 @@ Pepper:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 31
+PrivateKey:
+  NEWTYPESTRUCT: BYTES
+ProviderJWKs:
+  STRUCT:
+    - issuer: BYTES
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
+PublicKey:
+  NEWTYPESTRUCT: BYTES
+QuorumCertifiedUpdate:
+  STRUCT:
+    - update:
+        TYPENAME: ProviderJWKs
+    - multi_sig:
+        TYPENAME: AggregateSignature
 RandMetadata:
   STRUCT:
     - metadata_to_sign:
@@ -354,12 +378,19 @@ Secp256r1EcdsaPublicKey:
   NEWTYPESTRUCT: BYTES
 Secp256r1EcdsaSignature:
   NEWTYPESTRUCT: BYTES
+Signature:
+  NEWTYPESTRUCT: BYTES
 SignedGroth16Zkp:
   STRUCT:
     - proof:
         TYPENAME: Groth16Zkp
     - non_malleability_signature:
         TYPENAME: EphemeralSignature
+    - training_wheels_signature:
+        TYPENAME: EphemeralSignature
+    - extra_field: STR
+    - override_aud_val:
+        OPTION: STR
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -569,17 +600,13 @@ TypeTag:
 ValidatorTransaction:
   ENUM:
     0:
-      DummyTopic1:
-        NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
-    1:
       DKGResult:
         NEWTYPE:
           TYPENAME: DKGTranscript
-    2:
-      DummyTopic2:
+    1:
+      ObservedJWKUpdate:
         NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
+          TYPENAME: QuorumCertifiedUpdate
 WriteOp:
   ENUM:
     0:

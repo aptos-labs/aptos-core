@@ -17,6 +17,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
+    delayed_fields::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -412,7 +413,7 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
     },
     /// Skip the execution of trailing transactions.
-    SkipRest,
+    SkipRest(u64),
     /// Abort the execution.
     Abort,
 }
@@ -438,7 +439,7 @@ impl<K, E> MockTransaction<K, E> {
                 incarnation_behaviors,
                 ..
             } => incarnation_behaviors,
-            Self::SkipRest => unreachable!("SkipRest does not contain incarnation behaviors"),
+            Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
         }
     }
@@ -965,9 +966,14 @@ where
                     read_group_sizes,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
+                    skipped: false,
                 })
             },
-            MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
+            MockTransaction::SkipRest(gas) => {
+                let mut mock_output = MockOutput::skip_output();
+                mock_output.total_gas = *gas;
+                ExecutionStatus::SkipRest(mock_output)
+            },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
@@ -992,6 +998,7 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) read_group_sizes: Vec<(K, u64)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
+    pub(crate) skipped: bool,
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -1064,7 +1071,7 @@ where
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    // TODO[agg_v2](cleanup) Using the concrete type layout here. Should we find a way to use generics?
     fn resource_group_write_set(
         &self,
     ) -> Vec<(
@@ -1095,6 +1102,7 @@ where
             read_group_sizes: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
+            skipped: true,
         }
     }
 
@@ -1114,10 +1122,11 @@ where
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
+        Ok(())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {
