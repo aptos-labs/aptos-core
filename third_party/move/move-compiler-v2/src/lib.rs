@@ -208,7 +208,9 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
-    pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+    if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
+        pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+    }
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
     }
