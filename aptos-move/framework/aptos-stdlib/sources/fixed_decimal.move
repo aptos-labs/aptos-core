@@ -1,6 +1,18 @@
+/// Fixed-point decimal implementation, useful for financial applications where, for example, prices
+/// need to be tracked between assets with disparate market values or decimal amounts.
+///
+/// Fixed-point decimal value are represented as a simple `u128` without a type wrapper, to optimize
+/// performance. This enables, for example, prices to be arranged in total order within a sorted
+/// collection, using simple arithmetic comparators for m-ary search tree traversal or similar.
+///
+/// This implementation provides enough precision such that an integer value of 1 multiplied by
+/// the largest possible fixed-point decimal value (`MAX_DECIMAL_FIXED_u128`) will result in the
+/// largest possible power of of 10 that can fit in a `u64` (`MAX_U64_DECIMAL_u64`). Conversely,
+/// `MAX_U64_DECIMAL_u64` multiplied by the smallest possible fixed-point decimal value (1 encoded
+/// as a `u128`) will have a result of 1. For more, see `scale_int()` and assocated tests.
 module aptos_std::fixed_decimal {
 
-    /// Largest power of 10 that can fit in a `u64`.
+    /// Largest power of 10 that can fit in a `u64`. In Python:
     ///
     /// ```python
     /// import math
@@ -10,10 +22,11 @@ module aptos_std::fixed_decimal {
     const MAX_U64_DECIMAL_u128: u128 = 10_000_000_000_000_000_000;
     const MAX_U64_DECIMAL_u256: u256 = 10_000_000_000_000_000_000;
     const UNITY_u128: u128           = 10_000_000_000_000_000_000;
+    const UNITY_u256: u256           = 10_000_000_000_000_000_000;
     const SCALE_FACTOR_u128: u128    = 10_000_000_000_000_000_000;
     const SCALE_FACTOR_u256: u256    = 10_000_000_000_000_000_000;
 
-    /// Largest power of 10 that can fit in a `u64`, squared.
+    /// Largest power of 10 that can fit in a `u64`, squared. In Python:
     ///
     /// ```python
     /// import math
@@ -37,11 +50,25 @@ module aptos_std::fixed_decimal {
     /// Dividing by zero is not permitted.
     const E_DIVIDE_BY_ZERO: u64 = 6;
 
+    #[view]
+    public fun get_MAX_U64_DECIMAL(): u64 { MAX_U64_DECIMAL_u64 }
+
+    public inline fun get_MAX_U64_DECIMAL_inline(): u64 { 10_000_000_000_000_000_000 }
+
+    #[view]
+    public fun get_MAX_DECIMAL_FIXED(): u128 { MAX_DECIMAL_FIXED_u128 }
+
+    public inline fun get_MAX_DECIMAL_FIXED_inline(): u128 {
+        100_000_000_000_000_000_000_000_000_000_000_000_000
+    }
+
+    #[view]
     public fun from_int(int: u64): u128 {
         assert!(int <= MAX_U64_DECIMAL_u64, E_INT_TOO_LARGE);
         (int as u128) * (SCALE_FACTOR_u128)
     }
 
+    #[view]
     /// Inputs do not necessarily need to be within max representable `u64` value bounds. See tests.
     public fun from_ratio(numerator: u64, denominator: u64): u128 {
         assert!(denominator != 0, E_DIVIDE_BY_ZERO);
@@ -50,6 +77,7 @@ module aptos_std::fixed_decimal {
         (result as u128)
     }
 
+    #[view]
     public fun add(fixed_l: u128, fixed_r: u128): u128 {
         assert!(fixed_l <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_LHS);
         assert!(fixed_r <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_RHS);
@@ -58,6 +86,7 @@ module aptos_std::fixed_decimal {
         result
     }
 
+    #[view]
     public fun subtract(fixed_l: u128, fixed_r: u128): u128 {
         assert!(fixed_l <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_LHS);
         assert!(fixed_r <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_RHS);
@@ -65,6 +94,7 @@ module aptos_std::fixed_decimal {
         fixed_l - fixed_r
     }
 
+    #[view]
     public fun multiply(fixed_l: u128, fixed_r: u128): u128 {
         assert!(fixed_l <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_LHS);
         assert!(fixed_r <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_RHS);
@@ -73,6 +103,7 @@ module aptos_std::fixed_decimal {
         (result as u128)
     }
 
+    #[view]
     public fun divide(fixed_l: u128, fixed_r: u128): u128 {
         assert!(fixed_l <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_LHS);
         assert!(fixed_r <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE_RHS);
@@ -82,12 +113,43 @@ module aptos_std::fixed_decimal {
         (result as u128)
     }
 
+    #[view]
     public fun scale_int(int: u64, fixed: u128): u64 {
         assert!(int <= MAX_U64_DECIMAL_u64, E_INT_TOO_LARGE);
         assert!(fixed <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE);
         let result = ((int as u256) * (fixed as u256)) / SCALE_FACTOR_u256;
         assert!(result <= MAX_U64_DECIMAL_u256, E_OVERFLOW);
         (result as u64)
+    }
+
+    /// For when division by zero will not happen, but overflow might. A performance optimization
+    /// that enables low-cost checks from calling functions.
+    public inline fun from_ratio_optimistic(numerator: u64, denominator: u64): (u256, bool) {
+        let result = (numerator as u256) * (SCALE_FACTOR_u256) / (denominator as u256);
+        (
+            result, // Value before casting back to `u128`.
+            // True if result overflows a fixed decimal.
+            result > MAX_DECIMAL_FIXED_u256,
+        )
+    }
+
+    /// For when integer and fixed decimal inputs are valid, but the result might overflow or
+    /// truncate. A performance optimization that enables low-cost checks from calling functions.
+    public inline fun scale_int_optimistic(int: u64, fixed: u128): (u256, bool) {
+        let result = ((int as u256) * (fixed as u256)) / SCALE_FACTOR_u256;
+        (
+            result, // Value before casting back to `u64`.
+            // True if result exceeds maximum representable power of ten for a `u64`.
+            result > MAX_U64_DECIMAL_u256,
+        )
+    }
+
+    #[test]
+    fun test_constant_getters() {
+        assert!(get_MAX_U64_DECIMAL() == MAX_U64_DECIMAL_u64, 0);
+        assert!(get_MAX_U64_DECIMAL_inline() == MAX_U64_DECIMAL_u64, 0);
+        assert!(get_MAX_DECIMAL_FIXED() == MAX_DECIMAL_FIXED_u128, 0);
+        assert!(get_MAX_DECIMAL_FIXED_inline() == MAX_DECIMAL_FIXED_u128, 0);
     }
 
     #[test]
@@ -121,6 +183,16 @@ module aptos_std::fixed_decimal {
     #[test, expected_failure(abort_code = E_OVERFLOW, location = Self)]
     fun test_from_ratio_overflow() {
         from_ratio(MAX_U64_DECIMAL_u64 + 1, 1);
+    }
+
+    #[test]
+    fun test_from_ratio_optimistic() {
+        let (result, overflows) = from_ratio_optimistic(5, 2);
+        assert!(result == 5 * UNITY_u256 / 2, 0);
+        assert!(!overflows, 0);
+        let (result, overflows) = from_ratio_optimistic(MAX_U64_DECIMAL_u64 + 1, 1);
+        assert!(result == (MAX_U64_DECIMAL_u256 + 1) * SCALE_FACTOR_u256, 0);
+        assert!(overflows, 0);
     }
 
     #[test]
@@ -236,6 +308,16 @@ module aptos_std::fixed_decimal {
     #[test, expected_failure(abort_code = E_OVERFLOW, location = Self)]
     fun test_scale_int_overflow() {
         scale_int(MAX_U64_DECIMAL_u64, MAX_DECIMAL_FIXED_u128);
+    }
+
+    #[test]
+    fun test_scale_int_optmistic() {
+        let (result, overflows) = scale_int_optimistic(1, UNITY_u128);
+        assert!(result == 1, 0);
+        assert!(!overflows, 0);
+        let (result, overflows) = scale_int_optimistic(MAX_U64_DECIMAL_u64, UNITY_u128 * 2);
+        assert!(result == 2 * MAX_U64_DECIMAL_u256, 0);
+        assert!(overflows, 0);
     }
 
 }
