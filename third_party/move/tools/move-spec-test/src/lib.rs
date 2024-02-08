@@ -1,3 +1,4 @@
+mod benchmark;
 pub mod cli;
 mod prover;
 mod report;
@@ -6,6 +7,7 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
+use crate::benchmark::{Benchmark, Benchmarks};
 use crate::prover::prove;
 use anyhow::anyhow;
 use move_package::source_package::layout::SourcePackageLayout;
@@ -47,6 +49,12 @@ pub fn run_spec_test(
 
     info!("Running specification tester with the following options: {options:?} and package path: {package_path:?}");
 
+    // Always create and use benchmarks.
+    // Benchmarks call only time getting functions, so it's safe to use them in any case and
+    // they are not expensive to create (won't hit the performance).
+    let mut benchmarks = Benchmarks::new();
+    benchmarks.spec_test.start();
+
     let prover_conf = cli::generate_prover_options(options)?;
 
     // Setup temporary directory structure.
@@ -58,7 +66,10 @@ pub fn run_spec_test(
     let outdir_mutant = if let Some(mutant_path) = &options.use_generated_mutants {
         mutant_path.clone()
     } else {
-        run_mutator(options, config, &package_path, &outdir)?
+        benchmarks.mutator.start();
+        let outdir_mutant = run_mutator(options, config, &package_path, &outdir)?;
+        benchmarks.mutator.stop();
+        outdir_mutant
     };
 
     let report =
@@ -79,7 +90,13 @@ pub fn run_spec_test(
 
     let mut spec_report = report::Report::new();
 
-    for elem in report.get_mutants() {
+    let mut proving_benchmarks = vec![Benchmark::new(); report.get_mutants().len()];
+    benchmarks.prover.start();
+    for (elem, benchmark) in report
+        .get_mutants()
+        .iter()
+        .zip(proving_benchmarks.iter_mut())
+    {
         let mutant_file = elem.mutant_path();
         // Strip prefix to get the path relative to the package directory (or take that path if it's already relative).
         let original_file = elem
@@ -105,7 +122,9 @@ pub fn run_spec_test(
             ));
         }
 
+        benchmark.start();
         let result = prove(config, &outdir_prove, &prover_conf, &mut error_writer);
+        benchmark.stop();
 
         if let Err(e) = result {
             trace!("Mutant killed! Prover failed with error: {e}");
@@ -120,6 +139,9 @@ pub fn run_spec_test(
         }
     }
 
+    benchmarks.prover.stop();
+    benchmarks.prover_results = proving_benchmarks;
+
     if let Some(outfile) = &options.output {
         spec_report.save_to_json_file(outfile)?;
     }
@@ -127,6 +149,9 @@ pub fn run_spec_test(
     println!("\nTotal mutants tested: {}", spec_report.mutants_tested());
     println!("Total mutants killed: {}\n", spec_report.mutants_killed());
     spec_report.print_table();
+
+    benchmarks.spec_test.stop();
+    benchmarks.display();
 
     Ok(())
 }
