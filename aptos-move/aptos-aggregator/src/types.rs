@@ -7,7 +7,6 @@ use aptos_types::delayed_fields::{
     bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
     is_derived_string_struct_layout,
 };
-// TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
 pub use aptos_types::delayed_fields::{
     DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue,
 };
