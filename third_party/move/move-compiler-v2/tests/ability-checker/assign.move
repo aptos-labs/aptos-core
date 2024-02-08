@@ -1,11 +1,11 @@
 module 0x42::assign {
 
-    struct S has drop {
+    struct S {
         f: u64,
         g: T
     }
 
-    struct T has drop {
+    struct T {
         h: u64
     }
 
