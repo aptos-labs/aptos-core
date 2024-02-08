@@ -342,9 +342,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
 
-            // Should not be reachable.
+            // This layout is only used by MoveVM, so we do not excpect to see it here.
             MoveTypeLayout::Native(..) => {
-                Err(D::Error::custom("Move values do not have a native value"))
+                Err(D::Error::custom("Unsupported layout for Move value"))
             },
         }
     }
@@ -596,9 +596,9 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),
 
-            // Native layout variant is only used at runtime, and so we should
-            // not be able to construct a type tag from it here.
-            MoveTypeLayout::Native(..) => bail!("No type tag exists for native layout"),
+            // Native layout variant is only used by MoveVM, and is irrelevant
+            // for type tags which are used to key resources in the global state.
+            MoveTypeLayout::Native(..) => bail!("Unsupported layout for type tag"),
         })
     }
 }

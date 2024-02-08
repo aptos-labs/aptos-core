@@ -28,7 +28,7 @@ macro_rules! safely_pop_arg {
 #[macro_export]
 macro_rules! safely_get_struct_field_as {
     ($value:expr, $idx:expr, $t:ty) => {{
-        // Note: we remap errors to safe errors in order to avoid implcit
+        // Note: we remap errors to safe errors in order to avoid implicit
         //       conversions via `Into`.
         $value
             .borrow_field($idx)

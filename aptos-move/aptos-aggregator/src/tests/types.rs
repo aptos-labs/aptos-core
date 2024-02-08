@@ -121,13 +121,13 @@ impl TDelayedFieldView for FakeAggregatorView {
     }
 
     fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
-        let id = id.extract_unique_index();
+        let index = id.extract_unique_index();
         let current_counter = *self.counter.borrow();
 
-        if id < self.start_counter || id >= current_counter {
+        if index < self.start_counter || index >= current_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {} (started from {} and reached {})",
-                id, self.start_counter, current_counter
+                "Invalid delayed field id: {:?} with index {} (started from {} and reached {})",
+                id, index, self.start_counter, current_counter
             )));
         }
         Ok(())

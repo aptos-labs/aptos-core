@@ -3533,7 +3533,7 @@ impl ValueImpl {
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
 
-            DelayedFieldID { id } => visitor.visit_native_value(depth, *id),
+            DelayedFieldID { id } => visitor.visit_delayed(depth, *id),
         }
     }
 }
