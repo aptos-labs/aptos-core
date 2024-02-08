@@ -184,7 +184,7 @@ pub struct EmitArgs {
 
     #[clap(long, default_value = "false")]
     /// Skip minting account during initialization
-    pub skip_minting_account: bool,
+    pub skip_minting_accounts: bool,
 
     #[clap(long)]
     pub latency_polling_interval_s: Option<f32>,

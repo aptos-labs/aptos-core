@@ -144,7 +144,7 @@ pub async fn emit_transactions_with_cluster(
             .latency_polling_interval(Duration::from_secs_f32(latency_polling_interval_s));
     }
 
-    if args.skip_minting_account {
+    if args.skip_minting_accounts {
         emit_job_request = emit_job_request.skip_minting_accounts();
     }
 

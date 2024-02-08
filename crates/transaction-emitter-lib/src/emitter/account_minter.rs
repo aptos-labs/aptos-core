@@ -20,7 +20,7 @@ use core::{
     cmp::min,
     result::Result::{Err, Ok},
 };
-use futures::StreamExt;
+use futures::{future::try_join_all, StreamExt};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     path::Path,
@@ -48,11 +48,11 @@ impl<'t> AccountMinter<'t> {
         }
     }
 
-    pub fn get_needed_balance_per_account(&self, req: &EmitJobRequest) -> u64 {
+    pub fn get_needed_balance_per_account(&self, req: &EmitJobRequest, num_accounts: usize) -> u64 {
         if let Some(val) = req.coins_per_account_override {
             val
         } else {
-            (req.expected_max_txns / 100)
+            (req.expected_max_txns / num_accounts as u64)
                 .checked_mul(SEND_AMOUNT + req.expected_gas_per_txn * req.gas_price)
                 .unwrap()
                 .checked_add(
@@ -84,7 +84,7 @@ impl<'t> AccountMinter<'t> {
         let num_accounts = local_accounts.len();
         let expected_num_seed_accounts =
             (num_accounts / 50).clamp(1, (num_accounts as f32).sqrt() as usize + 1);
-        let coins_per_account = self.get_needed_balance_per_account(req);
+        let coins_per_account = self.get_needed_balance_per_account(req, num_accounts);
         let txn_factory = self.txn_factory.clone();
         let expected_children_per_seed_account =
             (num_accounts + expected_num_seed_accounts - 1) / expected_num_seed_accounts;
@@ -477,26 +477,33 @@ pub async fn gen_reusable_accounts<R>(
 where
     R: rand_core::RngCore + ::rand_core::CryptoRng,
 {
-    let mut vasp_accounts = vec![];
+    let mut account_keys = vec![];
+    let mut addresses = vec![];
     let mut i = 0;
     while i < num_accounts {
-        vasp_accounts.push(gen_reusable_account(txn_executor, rng).await?);
+        let account_key = AccountKey::generate(rng);
+        addresses.push(account_key.authentication_key().account_address());
+        account_keys.push(account_key);
         i += 1;
     }
-    Ok(vasp_accounts)
-}
+    let result_futures = addresses
+        .iter()
+        .map(|address| txn_executor.query_sequence_number(*address))
+        .collect::<Vec<_>>();
+    let seq_nums: Vec<_> = try_join_all(result_futures).await?.into_iter().collect();
 
-async fn gen_reusable_account<R>(
-    txn_executor: &dyn ReliableTransactionSubmitter,
-    rng: &mut R,
-) -> Result<LocalAccount>
-where
-    R: ::rand_core::RngCore + ::rand_core::CryptoRng,
-{
-    let account_key = AccountKey::generate(rng);
-    let address = account_key.authentication_key().account_address();
-    let sequence_number = txn_executor.query_sequence_number(address).await?;
-    Ok(LocalAccount::new(address, account_key, sequence_number))
+    let accounts = account_keys
+        .into_iter()
+        .zip(seq_nums.into_iter())
+        .map(|(account_key, sequence_number)| {
+            LocalAccount::new(
+                account_key.authentication_key().account_address(),
+                account_key,
+                sequence_number,
+            )
+        })
+        .collect();
+    Ok(accounts)
 }
 
 pub fn create_and_fund_account_request(

@@ -1088,6 +1088,8 @@ pub async fn create_accounts(
     let mut rng = StdRng::from_seed(seed);
 
     let accounts = gen_reusable_accounts(&txn_executor, num_accounts, &mut rng).await?;
+    info!("Generated re-usable accounts for seed {:?}", seed);
+
     if !skip_minting_accounts {
         let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
         account_minter
@@ -1100,17 +1102,24 @@ pub async fn create_accounts(
         info!("Accounts created and funded");
         Ok(accounts)
     } else {
-        let needed_min_balance = account_minter.get_needed_balance_per_account(req);
-        for account in &accounts {
-            let balance = txn_executor.get_account_balance(account.address()).await?;
-            assert!(
-                balance >= needed_min_balance,
-                "Account {} has balance {} < {}",
-                account.address(),
-                balance,
-                needed_min_balance
-            );
-        }
+        let needed_min_balance = account_minter.get_needed_balance_per_account(req, accounts.len());
+        let balance_futures = accounts
+            .iter()
+            .map(|account| txn_executor.get_account_balance(account.address()));
+        let balances: Vec<_> = try_join_all(balance_futures).await?;
+        accounts
+            .iter()
+            .zip(balances)
+            .for_each(|(account, balance)| {
+                assert!(
+                    balance >= needed_min_balance,
+                    "Account {} has balance {} < needed_min_balance {}",
+                    account.address(),
+                    balance,
+                    needed_min_balance
+                );
+            });
+
         info!("Skipping minting accounts");
         Ok(accounts)
     }
