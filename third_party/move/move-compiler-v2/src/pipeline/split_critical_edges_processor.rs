@@ -185,7 +185,7 @@ fn count_srcs(code: &[Bytecode]) -> BTreeMap<Label, usize> {
                         map_inc(&mut srcs_count, *label)
                     }
                 }
-            }
+            },
             _ => {},
         }
     }
