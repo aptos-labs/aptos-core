@@ -7,7 +7,7 @@
 //!
 //! Side effects: clear existing annotations.
 //!
-//! Prerequisites: none.
+//! Prerequisites: no call instructions have abort actions.
 //!
 //! Postconditions: no critical edges in the control flow graph.
 
