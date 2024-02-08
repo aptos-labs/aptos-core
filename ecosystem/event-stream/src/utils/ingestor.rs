@@ -6,6 +6,7 @@ use std::{
         atomic::{AtomicI64, Ordering},
         Arc,
     },
+    time::Instant,
 };
 
 use crate::utils::{
@@ -20,7 +21,7 @@ use tracing::{error, warn};
 
 #[derive(Clone)]
 pub struct Ingestor {
-    channel: broadcast::Sender<StreamEventMessage>,
+    channel: broadcast::Sender<(StreamEventMessage, Instant)>,
     chain_id: i64,
     num_sec_valid: i64,
     subscription: Subscription,
@@ -28,7 +29,7 @@ pub struct Ingestor {
 
 impl Ingestor {
     pub fn new(
-        channel: broadcast::Sender<StreamEventMessage>,
+        channel: broadcast::Sender<(StreamEventMessage, Instant)>,
         chain_id: i64,
         num_sec_valid: i64,
         subscription: Subscription,
@@ -45,7 +46,7 @@ impl Ingestor {
         let mut stream = self.get_new_subscription_stream().await;
         let received_messages = Arc::new(Mutex::new(HashMap::new()));
         let notify_arc = Arc::new(Notify::new());
-        let expected_version = Arc::new(AtomicI64::new(0));
+        let expected_version = Arc::new(AtomicI64::new(882535932));
 
         while let Some(msg) = stream.next().await {
             TRANSACTION_RECEIVED_COUNT.inc();
@@ -79,15 +80,19 @@ impl Ingestor {
 
             tokio::spawn(async move {
                 let mut received = received.lock().await;
-                received.insert(transaction_version, parsed_message);
+                received.insert(transaction_version, (parsed_message, Instant::now()));
                 notify.notify_waiters();
             });
 
             notify_arc.notified().await;
             let mut received = received_messages.lock().await;
-            while let Some(pubsub_message) =
+            while let Some((pubsub_message, timestamp)) =
                 received.remove(&expected_version.load(Ordering::SeqCst))
             {
+                println!(
+                    "PubSub to Push to Channel Duration: {:?}",
+                    timestamp.elapsed().as_secs_f64()
+                );
                 if let Err(e) = self.validate_pubsub_message(&pubsub_message) {
                     warn!(
                         pubsub_message = pubsub_message.to_string(),
@@ -100,7 +105,7 @@ impl Ingestor {
                 let stream_messages = StreamEventMessage::list_from_pubsub(&pubsub_message);
                 for stream_message in stream_messages {
                     self.channel
-                        .send(stream_message.clone())
+                        .send((stream_message.clone(), Instant::now()))
                         .unwrap_or_else(|e| {
                             error!(
                                 pubsub_message = pubsub_message.to_string(),

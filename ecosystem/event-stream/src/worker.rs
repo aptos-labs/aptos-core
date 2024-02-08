@@ -9,7 +9,7 @@ use crate::utils::{
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use google_cloud_pubsub::client::{Client, ClientConfig};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 use tokio::sync::broadcast;
 use tracing::{error, info};
 use warp::Filter;
@@ -30,7 +30,7 @@ pub struct EventStreamConfig {
 
 #[derive(Clone)]
 pub struct StreamContext {
-    pub channel: broadcast::Sender<StreamEventMessage>,
+    pub channel: broadcast::Sender<(StreamEventMessage, Instant)>,
     pub websocket_alive_duration: u64,
 }
 
@@ -106,7 +106,8 @@ impl RunnableConfig for EventStreamConfig {
         });
 
         // Create Event broadcast channel
-        let (tx, mut rx) = broadcast::channel::<StreamEventMessage>(100);
+        // Can use channel size to help with pubsub lagging
+        let (tx, mut rx) = broadcast::channel::<(StreamEventMessage, Instant)>(100);
 
         // Receive all messages with initial Receiver to keep channel open
         tokio::spawn(async move {

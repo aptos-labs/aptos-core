@@ -2,23 +2,24 @@
 
 use crate::utils::event_message::StreamEventMessage;
 use futures::{stream::SplitSink, SinkExt, StreamExt};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::{sync::broadcast, time};
-use tracing::error;
+use tracing::{error, info};
 use warp::filters::ws::{Message, WebSocket};
 
 pub struct Stream {
     tx: SplitSink<WebSocket, Message>,
-    channel: broadcast::Receiver<StreamEventMessage>,
+    channel: broadcast::Receiver<(StreamEventMessage, Instant)>,
     websocket_alive_duration: u64,
 }
 
 impl Stream {
     pub fn new(
         tx: SplitSink<WebSocket, Message>,
-        channel: broadcast::Receiver<StreamEventMessage>,
+        channel: broadcast::Receiver<(StreamEventMessage, Instant)>,
         websocket_alive_duration: u64,
     ) -> Self {
+        info!("Received WebSocket connection");
         Self {
             tx,
             channel,
@@ -34,13 +35,14 @@ impl Stream {
         loop {
             tokio::select! {
                 msg = self.channel.recv() => {
-                    let msg = msg.unwrap_or_else(|e| {
+                    let (msg, timestamp) = msg.unwrap_or_else(|e| {
                         error!(
                             error = ?e,
                             "[Event Stream] Failed to receive message from channel"
                         );
                         panic!();
                     });
+                    println!("Push to Channel to Pull from Channel Duration: {:?}", timestamp.elapsed().as_secs_f64());
                     self.tx
                         .send(warp::ws::Message::text(msg.to_string()))
                         .await
@@ -56,7 +58,7 @@ impl Stream {
 
 pub async fn spawn_stream(
     ws: WebSocket,
-    channel: broadcast::Sender<StreamEventMessage>,
+    channel: broadcast::Sender<(StreamEventMessage, Instant)>,
     websocket_alive_duration: u64,
 ) {
     let (tx, _) = ws.split();
