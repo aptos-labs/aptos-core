@@ -58,8 +58,8 @@ use move_core_types::{
 use move_vm_types::{
     delayed_values::delayed_field_id::{ExtractUniqueIndex, ExtractWidth, TryFromMoveValue},
     value_serde::{
-        deserialize_and_allow_native_values, deserialize_and_replace_values_with_ids,
-        serialize_and_allow_native_values, serialize_and_replace_ids_with_values,
+        deserialize_and_allow_delayed_values, deserialize_and_replace_values_with_ids,
+        serialize_and_allow_delayed_values, serialize_and_replace_ids_with_values,
         ValueToIdentifierMapping,
     },
     value_traversal::find_identifiers_in_value,
@@ -1083,7 +1083,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                serialize_and_allow_native_values(&patched_value, layout)
+                serialize_and_allow_delayed_values(&patched_value, layout)
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
@@ -1104,7 +1104,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     ) -> anyhow::Result<(Bytes, HashSet<T::Identifier>)> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
-        let value = deserialize_and_allow_native_values(bytes, layout).ok_or_else(|| {
+        let value = deserialize_and_allow_delayed_values(bytes, layout).ok_or_else(|| {
             anyhow::anyhow!(
                 "Failed to deserialize resource during id replacement: {:?}",
                 bytes
@@ -1129,7 +1129,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         //   2) find identifiers to populate the set.
         //   See if can cache identifiers in advance, or combine it with
         //   deserialization.
-        let value = deserialize_and_allow_native_values(bytes, layout).ok_or_else(|| {
+        let value = deserialize_and_allow_delayed_values(bytes, layout).ok_or_else(|| {
             anyhow::anyhow!("Failed to deserialize resource during id replacement")
         })?;
 

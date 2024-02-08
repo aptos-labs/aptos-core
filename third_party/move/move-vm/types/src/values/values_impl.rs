@@ -27,16 +27,6 @@ use std::{
     rc::Rc,
 };
 
-// Native values sometimes cannot be processed by the VM, e.g., failing on
-// equality or serialization.
-macro_rules! native_value_error {
-    ($msg:expr) => {
-        return Err(
-            PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message($msg.to_string())
-        )
-    };
-}
-
 /***************************************************************************************
  *
  * Internal Types
@@ -65,26 +55,28 @@ pub(crate) enum ValueImpl {
     ContainerRef(ContainerRef),
     IndexedRef(IndexedRef),
 
-    /// Native values are values that live outside of MoveVM. The implementation
-    /// stores a unique identifier so that the value can be fetched and processed
-    /// by native functions.
+    /// Delayed values are values that live outside of MoveVM and are processed in
+    /// a delayed (some may it call lazy) fashion, e.g., aggregators or snapshots.
+    /// The implementation stores a unique identifier so that the value can be
+    /// fetched and processed by native functions.
     ///
-    /// Native values are sized, and the variant carries the information about
-    /// the serialized size of the external Move value.
+    /// Delayed values are sized, and the variant carries the information about
+    /// the serialized size of the external Move value. This allows to make sure
+    /// size information is known, e.g. for gas metering purposes.
     ///
-    /// Native values should not be displayed in any way, to ensure we do not
+    /// Delayed values should not be displayed in any way, to ensure we do not
     /// accidentally introduce non-determinism if identifiers are generated at
-    /// random. For that reason, `Debug` is not derived for this enum and
-    /// implemented.
+    /// random. For that reason, `Debug` is not derived for `ValueImpl` enum and
+    /// is implemented directly.
     ///
     /// Semantics:
-    ///   - Native values cannot be compared. An equality check results in a
+    ///   - Delayed values cannot be compared. An equality check results in a
     ///     runtime error. As a result, equality for any Move value that contains
-    ///     a native value stops being reflexive, symmetric and transitive, and
+    ///     a delayed value stops being reflexive, symmetric and transitive, and
     ///     results in a runtime error as well.
-    ///   - Native values cannot be serialized and stored in the global blockchain
+    ///   - Delayed values cannot be serialized and stored in the global blockchain
     ///     state because they are used purely at runtime. Any attempt to serialize
-    ///     a native value, e.g. using `0x1::bcs::to_bytes` results in a runtime
+    ///     a delayed value, e.g. using `0x1::bcs::to_bytes` results in a runtime
     ///     error.
     DelayedFieldID {
         id: DelayedFieldID,
@@ -520,13 +512,13 @@ impl ValueImpl {
             (ContainerRef(l), ContainerRef(r)) => l.equals(r)?,
             (IndexedRef(l), IndexedRef(r)) => l.equals(r)?,
 
-            // Disallow equality for native values. The rationale behind this
+            // Disallow equality for delayed values. The rationale behind this
             // semantics is that identifiers might not be deterministic, and
             // therefore equality can have different outcomes on different nodes
             // of the network. Note that the error returned here is not an
-            // invariant violation.
+            // invariant violation but a runtime error.
             (DelayedFieldID { .. }, DelayedFieldID { .. }) => {
-                native_value_error!("cannot compare native values")
+                return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message("cannot compare delayed values".to_string()))
             },
 
             (Invalid, _)
@@ -1156,7 +1148,7 @@ impl Locals {
  *
  **************************************************************************************/
 impl Value {
-    pub fn native_value(id: DelayedFieldID) -> Self {
+    pub fn delayed_value(id: DelayedFieldID) -> Self {
         Self(ValueImpl::DelayedFieldID { id })
     }
 
@@ -1313,7 +1305,7 @@ impl VMValueCast<DelayedFieldID> for Value {
         match self.0 {
             ValueImpl::DelayedFieldID { id } => Ok(id),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                .with_message(format!("cannot cast non-native value {:?} into id", v))),
+                .with_message(format!("cannot cast non-delayed value {:?} into identifier", v))),
         }
     }
 }
@@ -2430,10 +2422,9 @@ impl ValueImpl {
             // TODO: in case the borrow fails the VM will panic.
             Container(c) => c.legacy_size(),
 
-            // Legacy size is only used by events natives (which should not even
-            // be part of move-stdlib), so we should never see any native values
-            // here.
-            DelayedFieldID { .. } => unreachable!("Native values do not have legacy size!"),
+            // Legacy size is only used by event native functions (which should not even
+            // be part of move-stdlib), so we should never see any delayed values here.
+            DelayedFieldID { .. } => unreachable!("Delayed values do not have legacy size!"),
         }
     }
 }
@@ -2695,8 +2686,9 @@ impl Debug for ValueImpl {
             Self::ContainerRef(r) => write!(f, "ContainerRef({:?})", r),
             Self::IndexedRef(r) => write!(f, "IndexedRef({:?})", r),
 
-            // Allow deterministic debug of native values.
-            Self::DelayedFieldID { .. } => write!(f, "Native(?)"),
+            // Debug information must be deterministic, so we cannot print
+            // inner fields.
+            Self::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
         }
     }
 }
@@ -2729,8 +2721,9 @@ impl Display for ValueImpl {
             Self::ContainerRef(r) => write!(f, "{}", r),
             Self::IndexedRef(r) => write!(f, "{}", r),
 
-            // Allow deterministic display of native values.
-            Self::DelayedFieldID { .. } => write!(f, "Native(?)"),
+            // Display information must be deterministic, so we cannot print
+            // inner fields.
+            Self::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
         }
     }
 }
@@ -2846,8 +2839,7 @@ pub mod debug {
     use super::*;
     use std::fmt::Write;
 
-    // Allow deterministic debug prints of the native values.
-    fn print_native_value<B: Write>(buf: &mut B) -> PartialVMResult<()> {
+    fn print_delayed_value<B: Write>(buf: &mut B) -> PartialVMResult<()> {
         debug_write!(buf, "<?>")
     }
 
@@ -2905,7 +2897,7 @@ pub mod debug {
             ValueImpl::ContainerRef(r) => print_container_ref(buf, r),
             ValueImpl::IndexedRef(r) => print_indexed_ref(buf, r),
 
-            ValueImpl::DelayedFieldID { .. } => print_native_value(buf),
+            ValueImpl::DelayedFieldID { .. } => print_delayed_value(buf),
         }
     }
 
@@ -3030,7 +3022,7 @@ pub mod debug {
  *   is to involve an explicit representation of the type layout.
  *
  **************************************************************************************/
-use crate::value_serde::{CustomDeserialize, CustomSerialize, NativeValueSimpleSerDe};
+use crate::value_serde::{CustomDeserializer, CustomSerializer, RelaxedCustomSerDe};
 use serde::{
     de::Error as DeError,
     ser::{Error as SerError, SerializeSeq, SerializeTuple},
@@ -3040,7 +3032,7 @@ use serde::{
 impl Value {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
         let seed = DeserializationSeed {
-            native_deserializer: None::<&NativeValueSimpleSerDe>,
+            custom_deserializer: None::<&RelaxedCustomSerDe>,
             layout,
         };
         bcs::from_bytes_seed(seed, blob).ok()
@@ -3048,7 +3040,7 @@ impl Value {
 
     pub fn simple_serialize(&self, layout: &MoveTypeLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&SerializationReadyValue {
-            native_serializer: None::<&NativeValueSimpleSerDe>,
+            custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &self.0,
         })
@@ -3059,7 +3051,7 @@ impl Value {
 impl Struct {
     pub fn simple_deserialize(blob: &[u8], layout: &MoveStructLayout) -> Option<Struct> {
         let seed = DeserializationSeed {
-            native_deserializer: None::<&NativeValueSimpleSerDe>,
+            custom_deserializer: None::<&RelaxedCustomSerDe>,
             layout,
         };
         bcs::from_bytes_seed(seed, blob).ok()
@@ -3067,7 +3059,7 @@ impl Struct {
 
     pub fn simple_serialize(&self, layout: &MoveStructLayout) -> Option<Vec<u8>> {
         bcs::to_bytes(&SerializationReadyValue {
-            native_serializer: None::<&NativeValueSimpleSerDe>,
+            custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &self.fields,
         })
@@ -3078,8 +3070,8 @@ impl Struct {
 // Wrapper around value with additional information which can be used by the
 // serializer.
 pub(crate) struct SerializationReadyValue<'c, 'l, 'v, L, V, C> {
-    // Allows to perform a custom serialization for native values.
-    pub(crate) native_serializer: Option<&'c C>,
+    // Allows to perform a custom serialization for delayed values.
+    pub(crate) custom_serializer: Option<&'c C>,
     // Layout for guiding serialization.
     pub(crate) layout: &'l L,
     // Value to serialize.
@@ -3092,7 +3084,7 @@ fn invariant_violation<S: serde::Serializer>(message: String) -> S::Error {
     )
 }
 
-impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
+impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
     for SerializationReadyValue<'c, 'l, 'v, MoveTypeLayout, ValueImpl, C>
 {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -3112,7 +3104,7 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
             // Structs.
             (L::Struct(struct_layout), ValueImpl::Container(Container::Struct(r))) => {
                 (SerializationReadyValue {
-                    native_serializer: self.native_serializer,
+                    custom_serializer: self.custom_serializer,
                     layout: struct_layout,
                     value: &*r.borrow(),
                 })
@@ -3136,7 +3128,7 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
                         let mut t = serializer.serialize_seq(Some(v.len()))?;
                         for value in v.iter() {
                             t.serialize_element(&SerializationReadyValue {
-                                native_serializer: self.native_serializer,
+                                custom_serializer: self.custom_serializer,
                                 layout,
                                 value,
                             })?;
@@ -3160,27 +3152,27 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
                     )));
                 }
                 (SerializationReadyValue {
-                    native_serializer: self.native_serializer,
+                    custom_serializer: self.custom_serializer,
                     layout: &L::Address,
                     value: &v[0],
                 })
                 .serialize(serializer)
             },
 
-            // Native values. For their serialization, we must have custom
+            // Delayed values. For their serialization, we must have custom
             // serialization available, otherwise an error is returned.
-            (L::Native(tag, layout), ValueImpl::DelayedFieldID { id }) => {
-                match self.native_serializer {
-                    Some(native_serializer) => {
-                        native_serializer.custom_serialize(serializer, tag, layout, *id)
+            (L::Native(kind, layout), ValueImpl::DelayedFieldID { id }) => {
+                match self.custom_serializer {
+                    Some(custom_serializer) => {
+                        custom_serializer.custom_serialize(serializer, tag, layout, *id)
                     },
                     None => {
-                        // If no native serializer, it is not known how the
-                        // native value should be serialized. So, just return
+                        // If no custom serializer, it is not known how the
+                        // delayed value should be serialized. So, just return
                         // an error.
                         Err(invariant_violation::<S>(format!(
-                            "no custom serializer for native value ({:?})",
-                            tag
+                            "no custom serializer for delayed value ({:?}) with layout {}",
+                            kind, layout
                         )))
                     },
                 }
@@ -3195,7 +3187,7 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
     }
 }
 
-impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
+impl<'c, 'l, 'v, C: CustomSerializer> serde::Serialize
     for SerializationReadyValue<'c, 'l, 'v, MoveStructLayout, Vec<ValueImpl>, C>
 {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -3210,7 +3202,7 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
         let mut t = serializer.serialize_tuple(values.len())?;
         for (field_layout, value) in fields.iter().zip(values.iter()) {
             t.serialize_element(&SerializationReadyValue {
-                native_serializer: self.native_serializer,
+                custom_serializer: self.custom_serializer,
                 layout: field_layout,
                 value,
             })?;
@@ -3222,14 +3214,14 @@ impl<'c, 'l, 'v, C: CustomSerialize> serde::Serialize
 // Seed used by deserializer to ensure there is information about the value
 // being deserialized.
 pub(crate) struct DeserializationSeed<'c, L, C> {
-    // Allows to deserialize native values in the custom format using external
+    // Allows to deserialize delayed values in the custom format using external
     // deserializer.
-    pub(crate) native_deserializer: Option<&'c C>,
+    pub(crate) custom_deserializer: Option<&'c C>,
     // Layout to guide deserialization.
     pub(crate) layout: L,
 }
 
-impl<'d, 'c, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
+impl<'d, 'c, C: CustomDeserializer> serde::de::DeserializeSeed<'d>
     for DeserializationSeed<'c, &MoveTypeLayout, C>
 {
     type Value = Value;
@@ -3255,7 +3247,7 @@ impl<'d, 'c, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
             // Structs.
             L::Struct(struct_layout) => {
                 let seed = DeserializationSeed {
-                    native_deserializer: self.native_deserializer,
+                    custom_deserializer: self.custom_deserializer,
                     layout: struct_layout,
                 };
                 Ok(Value::struct_(seed.deserialize(deserializer)?))
@@ -3273,7 +3265,7 @@ impl<'d, 'c, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
                 L::Address => Value::vector_address(Vec::deserialize(deserializer)?),
                 layout => {
                     let seed = DeserializationSeed {
-                        native_deserializer: self.native_deserializer,
+                        custom_deserializer: self.custom_deserializer,
                         layout,
                     };
                     let vector = deserializer.deserialize_seq(VectorElementVisitor(seed))?;
@@ -3283,21 +3275,21 @@ impl<'d, 'c, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
                 },
             }),
 
-            // Native values should always use custom deserialization.
-            L::Native(tag, layout) => {
-                match self.native_deserializer {
+            // Delayed values should always use custom deserialization.
+            L::Native(kind, layout) => {
+                match self.custom_deserializer {
                     Some(native_deserializer) => {
-                        native_deserializer.custom_deserialize(deserializer, tag, layout)
+                        native_deserializer.custom_deserialize(deserializer, kind, layout)
                     },
                     None => {
-                        // If no native deserializer, it is not known how the
-                        // native value should be deserialized. Just like with
+                        // If no custom deserializer, it is not known how the
+                        // delayed value should be deserialized. Just like with
                         // serialization, we return an error.
                         Err(D::Error::custom(
                             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                                 .with_message(format!(
-                                    "no custom deserializer for native value ({:?})",
-                                    tag
+                                    "no custom deserializer for native value ({:?}) with layout {}",
+                                    kind, layout
                                 )),
                         ))
                     },
@@ -3307,7 +3299,7 @@ impl<'d, 'c, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
     }
 }
 
-impl<'d, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
+impl<'d, C: CustomDeserializer> serde::de::DeserializeSeed<'d>
     for DeserializationSeed<'_, &MoveStructLayout, C>
 {
     type Value = Struct;
@@ -3319,7 +3311,7 @@ impl<'d, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
         let field_layouts = self.layout.fields();
         let fields = deserializer.deserialize_tuple(
             field_layouts.len(),
-            StructFieldVisitor(self.native_deserializer, field_layouts),
+            StructFieldVisitor(self.custom_deserializer, field_layouts),
         )?;
         Ok(Struct::pack(fields))
     }
@@ -3327,7 +3319,7 @@ impl<'d, C: CustomDeserialize> serde::de::DeserializeSeed<'d>
 
 struct VectorElementVisitor<'c, 'l, C>(DeserializationSeed<'c, &'l MoveTypeLayout, C>);
 
-impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l, C> {
+impl<'d, 'c, 'l, C: CustomDeserializer> serde::de::Visitor<'d> for VectorElementVisitor<'c, 'l, C> {
     type Value = Vec<ValueImpl>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3340,7 +3332,7 @@ impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for VectorElementV
     {
         let mut vals = Vec::new();
         while let Some(elem) = seq.next_element_seed(DeserializationSeed {
-            native_deserializer: self.0.native_deserializer,
+            custom_deserializer: self.0.custom_deserializer,
             layout: self.0.layout,
         })? {
             vals.push(elem.0)
@@ -3351,7 +3343,7 @@ impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for VectorElementV
 
 struct StructFieldVisitor<'c, 'l, C>(Option<&'c C>, &'l [MoveTypeLayout]);
 
-impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l, C> {
+impl<'d, 'c, 'l, C: CustomDeserializer> serde::de::Visitor<'d> for StructFieldVisitor<'c, 'l, C> {
     type Value = Vec<Value>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -3365,7 +3357,7 @@ impl<'d, 'c, 'l, C: CustomDeserialize> serde::de::Visitor<'d> for StructFieldVis
         let mut val = Vec::new();
         for (i, field_layout) in self.1.iter().enumerate() {
             if let Some(elem) = seq.next_element_seed(DeserializationSeed {
-                native_deserializer: self.0,
+                custom_deserializer: self.0,
                 layout: field_layout,
             })? {
                 val.push(elem)
@@ -3786,7 +3778,7 @@ pub mod prop {
                 .boxed(),
 
             // TODO[agg_v2](cleanup): double check what we should do here (i.e. if we should
-            //  even skip these kinds of layouts, or if need to construct a native value)?
+            //  even skip these kinds of layouts, or if need to construct a delayed value)?
             L::Native(_, layout) => value_strategy_with_layout(layout.as_ref()),
         }
     }
@@ -3830,9 +3822,9 @@ impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         use MoveTypeLayout as L;
 
-        // Make sure to strip all tags from the type layout.
-        if let L::Native(_, layout) = layout {
-            return self.as_move_value(layout.as_ref());
+        // Make sure to strip all kinds from the type layout.
+        if let L::Native(kind, layout) = layout {
+            panic!("impossible to get native layout ({:?}) with {}", kind, layout)
         }
 
         match (layout, &self) {
@@ -3892,6 +3884,7 @@ impl ValueImpl {
 }
 
 impl Value {
+    // TODO: Consider removing this API, or at least it should return a Result!
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         self.0.as_move_value(layout)
     }

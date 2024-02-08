@@ -236,9 +236,9 @@ mod native_values {
 
     #[test]
     fn test_native_value_equality() {
-        let v = Value::native_value(DelayedFieldID::new_with_width(0, 8));
+        let v = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
 
-        // Comparing native to all other values results in error.
+        // Comparing delayed values to all other values results in error.
 
         assert_err!(Value::bool(false).equals(&v));
 
@@ -271,13 +271,13 @@ mod native_values {
 
         // Comparing native values to other native values, even self, results
         // in error.
-        assert_err!(Value::native_value(DelayedFieldID::new_with_width(0, 1)).equals(&v));
+        assert_err!(Value::delayed_value(DelayedFieldID::new_with_width(0, 8)).equals(&v));
         assert_err!(v.equals(&v));
     }
 
     #[test]
     fn test_native_value_borrow() {
-        let delayed_value = Value::native_value(DelayedFieldID::new_with_width(0, 8));
+        let delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
         let mut locals = Locals::new(1);
         assert_ok!(locals.store_loc(0, delayed_value, false));
 

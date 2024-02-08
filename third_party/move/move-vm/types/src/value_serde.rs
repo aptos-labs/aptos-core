@@ -15,58 +15,61 @@ use serde::{
     Deserializer, Serialize, Serializer,
 };
 
-pub trait CustomDeserialize {
+pub trait CustomDeserializer {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
         &self,
         deserializer: D,
-        tag: &IdentifierMappingKind,
+        kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
     ) -> Result<Value, D::Error>;
 }
 
-pub trait CustomSerialize {
+pub trait CustomSerializer {
     fn custom_serialize<S: Serializer>(
         &self,
         serializer: S,
-        tag: &IdentifierMappingKind,
+        kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
-        sized_id: DelayedFieldID,
+        id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error>;
 }
 
-pub struct NativeValueSimpleSerDe;
+/// Custom (de)serializer which allows delayed values to be (de)serialized as
+/// is. This means that when a delayed value is serialized, the deserialization
+/// must construct the delayed value back.
+pub struct RelaxedCustomSerDe;
 
-impl CustomDeserialize for NativeValueSimpleSerDe {
+impl CustomDeserializer for RelaxedCustomSerDe {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
         &self,
         deserializer: D,
-        _tag: &IdentifierMappingKind,
+        kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
     ) -> Result<Value, D::Error> {
         let value = DeserializationSeed {
-            native_deserializer: None::<&NativeValueSimpleSerDe>,
+            custom_deserializer: None::<&RelaxedCustomSerDe>,
             layout,
         }
         .deserialize(deserializer)?;
         let (id, _width) = DelayedFieldID::try_from_move_value(layout, value, &())
-            .map_err(|_| D::Error::custom("Failed deserialization"))?;
-        Ok(Value::native_value(id))
+            .map_err(|_| D::Error::custom(format!("Custom deserialization failed for {:?} with layout {}", kind, layout)))?;
+        Ok(Value::delayed_value(id))
     }
 }
 
-impl CustomSerialize for NativeValueSimpleSerDe {
+impl CustomSerializer for RelaxedCustomSerDe {
     fn custom_serialize<S: Serializer>(
         &self,
         serializer: S,
-        _tag: &IdentifierMappingKind,
+        kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
-        sized_id: DelayedFieldID,
+        id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error> {
-        let value = sized_id
+        let value = id
             .try_into_move_value(layout)
-            .map_err(|_| S::Error::custom("Failed serialization"))?;
+            .map_err(|_| S::Error::custom(format!("Custom serialization failed for {:?} with layout {}", kind, layout)))?;
         SerializationReadyValue {
-            native_serializer: None::<&NativeValueSimpleSerDe>,
+            custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &value.0,
         }
@@ -74,28 +77,31 @@ impl CustomSerialize for NativeValueSimpleSerDe {
     }
 }
 
-pub fn deserialize_and_allow_native_values(bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
-    let native_deserializer = NativeValueSimpleSerDe;
+pub fn deserialize_and_allow_delayed_values(bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+    let native_deserializer = RelaxedCustomSerDe;
     let seed = DeserializationSeed {
-        native_deserializer: Some(&native_deserializer),
+        custom_deserializer: Some(&native_deserializer),
         layout,
     };
     bcs::from_bytes_seed(seed, bytes).ok()
 }
 
-pub fn serialize_and_allow_native_values(
+pub fn serialize_and_allow_delayed_values(
     value: &Value,
     layout: &MoveTypeLayout,
 ) -> Option<Vec<u8>> {
-    let native_serializer = NativeValueSimpleSerDe;
+    let native_serializer = RelaxedCustomSerDe;
     let value = SerializationReadyValue {
-        native_serializer: Some(&native_serializer),
+        custom_serializer: Some(&native_serializer),
         layout,
         value: &value.0,
     };
     bcs::to_bytes(&value).ok()
 }
 
+/// Allow conversion between values and identifiers (delayed values). For example,
+/// this trait can be implemented to fetch a concrete Move value from the global
+/// state based on the identifier stored inside a delayed value.
 pub trait ValueToIdentifierMapping {
     type Identifier;
 
@@ -115,12 +121,16 @@ pub trait ValueToIdentifierMapping {
     ) -> PartialVMResult<Value>;
 }
 
-pub struct NativeValueSerDeWithExchange<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> {
+/// Custom (de)serializer such that:
+///   1. when encountering a delayed value, ir uses its id to replace it with a concrete
+///      value instance and serialize it instead;
+///   2. when deserializing, the concrete value instance is replaced with a delayed value.
+pub struct CustomSerDeWithExchange<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> {
     mapping: &'a dyn ValueToIdentifierMapping<Identifier = I>,
 }
 
-impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerialize
-    for NativeValueSerDeWithExchange<'a, I>
+impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerializer
+    for CustomSerDeWithExchange<'a, I>
 {
     fn custom_serialize<S: Serializer>(
         &self,
@@ -131,11 +141,10 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerialize
     ) -> Result<S::Ok, S::Error> {
         let value = self
             .mapping
-            // FIXME
             .identifier_to_value(layout, sized_id.as_u64().into())
             .map_err(|e| S::Error::custom(format!("{}", e)))?;
         SerializationReadyValue {
-            native_serializer: None::<&NativeValueSimpleSerDe>,
+            custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
             value: &value.0,
         }
@@ -143,8 +152,8 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomSerialize
     }
 }
 
-impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserialize
-    for NativeValueSerDeWithExchange<'a, I>
+impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserializer
+    for CustomSerDeWithExchange<'a, I>
 {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
         &self,
@@ -153,7 +162,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserialize
         layout: &MoveTypeLayout,
     ) -> Result<Value, D::Error> {
         let value = DeserializationSeed {
-            native_deserializer: None::<&NativeValueSimpleSerDe>,
+            custom_deserializer: None::<&RelaxedCustomSerDe>,
             layout,
         }
         .deserialize(deserializer)?;
@@ -161,7 +170,7 @@ impl<'a, I: From<u64> + ExtractWidth + ExtractUniqueIndex> CustomDeserialize
             .mapping
             .value_to_identifier(tag, layout, value)
             .map_err(|e| D::Error::custom(format!("{}", e)))?;
-        Ok(Value::native_value(DelayedFieldID::new_with_width(
+        Ok(Value::delayed_value(DelayedFieldID::new_with_width(
             id.extract_unique_index(),
             id.extract_width(),
         )))
@@ -173,9 +182,9 @@ pub fn deserialize_and_replace_values_with_ids<I: From<u64> + ExtractWidth + Ext
     layout: &MoveTypeLayout,
     mapping: &impl ValueToIdentifierMapping<Identifier = I>,
 ) -> Option<Value> {
-    let native_deserializer = NativeValueSerDeWithExchange { mapping };
+    let custom_deserializer = CustomSerDeWithExchange { mapping };
     let seed = DeserializationSeed {
-        native_deserializer: Some(&native_deserializer),
+        custom_deserializer: Some(&custom_deserializer),
         layout,
     };
     bcs::from_bytes_seed(seed, bytes).ok()
@@ -186,9 +195,9 @@ pub fn serialize_and_replace_ids_with_values<I: From<u64> + ExtractWidth + Extra
     layout: &MoveTypeLayout,
     mapping: &impl ValueToIdentifierMapping<Identifier = I>,
 ) -> Option<Vec<u8>> {
-    let native_serializer = NativeValueSerDeWithExchange { mapping };
+    let custom_serializer = CustomSerDeWithExchange { mapping };
     let value = SerializationReadyValue {
-        native_serializer: Some(&native_serializer),
+        custom_serializer: Some(&custom_serializer),
         layout,
         value: &value.0,
     };

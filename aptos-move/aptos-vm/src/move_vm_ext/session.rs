@@ -30,7 +30,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::{value_serde::serialize_and_allow_native_values, values::Value};
+use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -183,7 +183,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // We allow serialization of native values here because we want to
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
-                serialize_and_allow_native_values(&value, &layout)
+                serialize_and_allow_delayed_values(&value, &layout)
                     .map(|bytes| (bytes, Some(Arc::new(layout))))
             } else {
                 // Otherwise, there should ne no native values so ensure

@@ -27,7 +27,7 @@ pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
-    value_serde::{deserialize_and_allow_native_values, serialize_and_allow_native_values},
+    value_serde::{deserialize_and_allow_delayed_values, serialize_and_allow_delayed_values},
     values::{GlobalValue, Reference, StructRef, Value},
 };
 use sha3::{Digest, Sha3_256};
@@ -538,7 +538,7 @@ fn serialize_value(
 ) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
     let serialization_result = if layout_info.has_identifier_mappings {
         // Value contains delayed fields, so we should be able to serialize it.
-        serialize_and_allow_native_values(val, layout_info.layout.as_ref())
+        serialize_and_allow_delayed_values(val, layout_info.layout.as_ref())
             .map(|bytes| (bytes.into(), Some(layout_info.layout.clone())))
     } else {
         // No delayed fields, make sure serialization fails if there are any
@@ -552,7 +552,7 @@ fn serialize_value(
 fn deserialize_value(layout_info: &LayoutInfo, bytes: &[u8]) -> PartialVMResult<Value> {
     let layout = layout_info.layout.as_ref();
     let deserialization_result = if layout_info.has_identifier_mappings {
-        deserialize_and_allow_native_values(bytes, layout)
+        deserialize_and_allow_delayed_values(bytes, layout)
     } else {
         Value::simple_deserialize(bytes, layout)
     };

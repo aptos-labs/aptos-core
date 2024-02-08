@@ -124,8 +124,13 @@ pub enum MoveTypeLayout {
     #[serde(rename(serialize = "u256", deserialize = "u256"))]
     U256,
 
-    // TODO[agg_v2](cleanup): Shift to registry based implementation so
-    //  we do not have to maintain so many enums.
+    /// Represents an extension to layout which can be used by the runtime
+    /// (MoveVM) to allow for custom serialization and deserialization of
+    /// values.
+    // TODO[agg_v2](cleanup): Shift to registry based implementation and
+    //                        come up with a better name.
+    // TODO[agg_v2](?): Do we need a layout here if we have custom serde
+    //                  implementations available?
     Native(IdentifierMappingKind, Box<MoveTypeLayout>),
 }
 
@@ -342,7 +347,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
                 deserializer.deserialize_seq(VectorElementVisitor(layout))?,
             )),
 
-            // This layout is only used by MoveVM, so we do not excpect to see it here.
+            // This layout is only used by MoveVM, so we do not expect to see it here.
             MoveTypeLayout::Native(..) => {
                 Err(D::Error::custom("Unsupported layout for Move value"))
             },
