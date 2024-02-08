@@ -30,7 +30,7 @@ spec aptos_framework::gas_schedule {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = false;
+        pragma verify = true;
         pragma aborts_if_is_strict;
     }
 
@@ -90,5 +90,26 @@ spec aptos_framework::gas_schedule {
         include staking_config::StakingRewardsConfigRequirement;
         aborts_if !exists<StorageGasConfig>(@aptos_framework);
         ensures global<StorageGasConfig>(@aptos_framework) == config;
+    }
+
+    spec set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
+        include config_buffer::SetForNextEpochAbortsIf {
+            account: aptos_framework,
+            config: gas_schedule_blob
+        };
+    }
+
+    spec on_new_epoch() {
+        include config_buffer::OnNewEpochAbortsIf<GasScheduleV2>;
+    }
+
+    spec set_storage_gas_config(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if !exists<storage_gas::StorageGasConfig>(@aptos_framework);
+    }
+
+    spec set_storage_gas_config_for_next_epoch(aptos_framework: &signer, config: storage_gas::StorageGasConfig) {
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if !exists<storage_gas::StorageGasConfig>(@aptos_framework);
     }
 }

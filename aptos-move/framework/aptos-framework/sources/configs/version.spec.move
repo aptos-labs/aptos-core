@@ -74,10 +74,7 @@ spec aptos_framework::version {
     }
 
     spec on_new_epoch() {
-        use aptos_std::type_info;
-        let type_name = type_info::type_name<Version>();
-        aborts_if config_buffer::spec_fun_does_exist<Version>(type_name) && !exists<Version>(@aptos_framework);
-        include config_buffer::spec_fun_does_exist<Version>(type_name) ==> config_buffer::ExtractAbortsIf<Version>;
+        include config_buffer::OnNewEpochAbortsIf<Version>;
     }
 
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.

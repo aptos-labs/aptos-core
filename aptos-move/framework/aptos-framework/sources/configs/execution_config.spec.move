@@ -1,6 +1,6 @@
 spec aptos_framework::execution_config {
     spec module {
-        pragma verify = false;
+        pragma verify = true;
         pragma aborts_if_is_strict;
     }
 
@@ -30,5 +30,13 @@ spec aptos_framework::execution_config {
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
 
         ensures exists<ExecutionConfig>(@aptos_framework);
+    }
+
+    spec set_for_next_epoch(account: &signer, config: vector<u8>) {
+        include config_buffer::SetForNextEpochAbortsIf;
+    }
+
+    spec on_new_epoch() {
+        include config_buffer::OnNewEpochAbortsIf<ExecutionConfig>;
     }
 }

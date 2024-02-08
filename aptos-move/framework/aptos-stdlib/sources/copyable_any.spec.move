@@ -15,9 +15,15 @@ spec aptos_std::copyable_any {
 
     spec unpack<T>(x: Any): T {
         use aptos_std::from_bcs;
+        include UnpackAbortsIf<T>;
+        ensures result == from_bcs::deserialize<T>(x.data);
+    }
+
+    spec schema UnpackAbortsIf<T> {
+        use aptos_std::from_bcs;
+        x: Any;
         aborts_if type_info::type_name<T>() != x.type_name;
         aborts_if !from_bcs::deserializable<T>(x.data);
-        ensures result == from_bcs::deserialize<T>(x.data);
     }
 
     spec type_name(x: &Any): &String {

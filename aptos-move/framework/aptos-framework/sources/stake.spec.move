@@ -41,7 +41,7 @@ spec aptos_framework::stake {
     // Global invariants
     // -----------------
     spec module {
-        pragma verify = false;
+        pragma verify = true;
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
         // After genesis, `AptosCoinCapabilities`, `ValidatorPerformance` and `ValidatorSet` exist.
@@ -150,6 +150,7 @@ spec aptos_framework::stake {
         pool_address: address
     )
     {
+        pragma verify = true;
         // This function casue timeout (property proved)
         // pragma verify_duration_estimate = 120;
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
@@ -157,6 +158,7 @@ spec aptos_framework::stake {
         aborts_if !exists<ValidatorConfig>(pool_address);
         aborts_if !exists<StakingConfig>(@aptos_framework);
         aborts_if !exists<ValidatorSet>(@aptos_framework);
+        aborts_if reconfiguration_state::spec_is_in_progress();
 
         let stake_pool = global<StakePool>(pool_address);
         let validator_set = global<ValidatorSet>(@aptos_framework);
@@ -202,6 +204,7 @@ spec aptos_framework::stake {
         withdraw_amount: u64
     )
     {
+        aborts_if reconfiguration_state::spec_is_in_progress();
         let addr = signer::address_of(owner);
         let ownership_cap = global<OwnerCapability>(addr);
         let pool_address = ownership_cap.pool_address;
@@ -238,8 +241,9 @@ spec aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) {
+        pragma verify = true;
         requires chain_status::is_operating();
-
+        aborts_if reconfiguration_state::spec_is_in_progress();
         let config = staking_config::get();
         aborts_if !staking_config::get_allow_validator_set_change(config);
         aborts_if !exists<StakePool>(pool_address);
@@ -278,9 +282,11 @@ spec aptos_framework::stake {
     }
 
     spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
+        pragma verify = true;
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
+        aborts_if reconfiguration_state::spec_is_in_progress();
         aborts_if amount != 0 && !exists<StakePool>(pool_address);
         modifies global<StakePool>(pool_address);
         include StakedValueNochange;
@@ -316,11 +322,13 @@ spec aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) {
+        pragma verify = true;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         modifies global<ValidatorConfig>(pool_address);
         include StakedValueNochange;
 
+        aborts_if reconfiguration_state::spec_is_in_progress();
         // Only the true operator address can update the network and full node addresses of the validator.
         aborts_if !exists<StakePool>(pool_address);
         aborts_if !exists<ValidatorConfig>(pool_address);
@@ -349,9 +357,11 @@ spec aptos_framework::stake {
     }
 
     spec reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) {
+        pragma verify = true;
         let pool_address = owner_cap.pool_address;
         include StakedValueNochange;
 
+        aborts_if reconfiguration_state::spec_is_in_progress();
         aborts_if !stake_pool_exists(pool_address);
 
         let pre_stake_pool = global<StakePool>(pool_address);
@@ -369,8 +379,10 @@ spec aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) {
+        pragma verify = true;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
+        aborts_if reconfiguration_state::spec_is_in_progress();
         aborts_if !exists<StakePool>(pool_address);
         aborts_if signer::address_of(operator) != pre_stake_pool.operator_address;
         aborts_if !exists<ValidatorConfig>(pool_address);
@@ -610,12 +622,15 @@ spec aptos_framework::stake {
     }
 
     spec add_stake_with_cap {
+        pragma verify = true;
         include ResourceRequirement;
         let amount = coins.value;
+        aborts_if reconfiguration_state::spec_is_in_progress();
         include AddStakeWithCapAbortsIfAndEnsures { amount };
     }
 
     spec add_stake {
+        aborts_if reconfiguration_state::spec_is_in_progress();
         include ResourceRequirement;
         include AddStakeAbortsIfAndEnsures;
     }
@@ -691,6 +706,10 @@ spec aptos_framework::stake {
 
     spec assert_owner_cap_exists(owner: address) {
         aborts_if !exists<OwnerCapability>(owner);
+    }
+
+    spec validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<ValidatorConsensusInfo> {
+        aborts_if false;
     }
 
     // ---------------------------------

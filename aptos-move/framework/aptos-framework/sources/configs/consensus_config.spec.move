@@ -22,7 +22,7 @@ spec aptos_framework::consensus_config {
     /// </high-level-req>
     ///
     spec module {
-        pragma verify = false;
+        pragma verify = true;
         pragma aborts_if_is_strict;
     }
 
@@ -68,4 +68,13 @@ spec aptos_framework::consensus_config {
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         ensures global<ConsensusConfig>(@aptos_framework).config == config;
     }
+
+    spec set_for_next_epoch(account: &signer, config: vector<u8>) {
+        include config_buffer::SetForNextEpochAbortsIf;
+    }
+
+    spec on_new_epoch() {
+        include config_buffer::OnNewEpochAbortsIf<ConsensusConfig>;
+    }
+
 }

@@ -74,4 +74,13 @@ spec std::features {
         aborts_if [abstract] false;
         ensures [abstract] result == spec_module_event_enabled();
     }
+
+    spec on_new_epoch(vm_or_framework: &signer) {
+        let addr = signer::address_of(vm_or_framework);
+        aborts_if addr != @std && addr != @vm;
+        aborts_if exists<PendingFeatures>(@std) && !exists<Features>(@std);
+        let features_pending = global<PendingFeatures>(@std).features;
+        let post features_std = global<Features>(@std).features;
+        ensures exists<PendingFeatures>(@std) ==> features_std == features_pending;
+    }
 }

@@ -15,8 +15,7 @@ spec aptos_std::any {
 
     spec unpack<T>(x: Any): T {
         use aptos_std::from_bcs;
-        aborts_if type_info::type_name<T>() != x.type_name;
-        aborts_if !from_bcs::deserializable<T>(x.data);
+        include UnpackAbortsIf<T>;
         ensures result == from_bcs::deserialize<T>(x.data);
     }
 
