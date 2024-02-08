@@ -7,7 +7,7 @@
 ///
 /// This implementation provides enough precision such that an integer value of 1 multiplied by
 /// the largest possible fixed-point decimal value (`MAX_DECIMAL_FIXED_u128`) will result in the
-/// largest possible power of of 10 that can fit in a `u64` (`MAX_U64_DECIMAL_u64`). Conversely,
+/// largest possible power of 10 that can fit in a `u64` (`MAX_U64_DECIMAL_u64`). Conversely,
 /// `MAX_U64_DECIMAL_u64` multiplied by the smallest possible fixed-point decimal value (1 encoded
 /// as a `u128`) will have a result of 1. For more, see `scale_int()` and assocated tests.
 module aptos_std::fixed_decimal {

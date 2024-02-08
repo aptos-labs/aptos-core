@@ -12,7 +12,7 @@ collection, using simple arithmetic comparators for m-ary search tree traversal 
 
 This implementation provides enough precision such that an integer value of 1 multiplied by
 the largest possible fixed-point decimal value (<code><a href="fixed_decimal.md#0x1_fixed_decimal_MAX_DECIMAL_FIXED_u128">MAX_DECIMAL_FIXED_u128</a></code>) will result in the
-largest possible power of of 10 that can fit in a <code>u64</code> (<code><a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u64">MAX_U64_DECIMAL_u64</a></code>). Conversely,
+largest possible power of 10 that can fit in a <code>u64</code> (<code><a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u64">MAX_U64_DECIMAL_u64</a></code>). Conversely,
 <code><a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u64">MAX_U64_DECIMAL_u64</a></code> multiplied by the smallest possible fixed-point decimal value (1 encoded
 as a <code>u128</code>) will have a result of 1. For more, see <code><a href="fixed_decimal.md#0x1_fixed_decimal_scale_int">scale_int</a>()</code> and assocated tests.
 
