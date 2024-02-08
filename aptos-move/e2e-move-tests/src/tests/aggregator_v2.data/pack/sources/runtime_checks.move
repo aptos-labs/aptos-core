@@ -40,6 +40,8 @@ module 0x1::runtime_checks {
             derived_string_snapshot: aggregator_v2::create_derived_string(string::utf8(str))
         }
     }
+    
+    // TODO[agg_v2](cleanup): Move to aggregator Move file tests when feature flag is enabled.
 
     //
     // Equality.
@@ -49,52 +51,52 @@ module 0x1::runtime_checks {
         let a = with_aggregator<u64>();
         let b = with_aggregator<u64>();
         aggregator_v2::try_add(&mut b.aggregator, 10);
-        assert!(a != b, 0);
+        let _ = a != b;
     }
 
     public entry fun test_equality_with_aggregators_II() {
         let a = with_aggregator<u64>();
         let b = with_aggregator<u64>();
-        assert!(a == b, 0);
+        let _ = a == b;
     }
 
     public entry fun test_equality_with_aggregators_III() {
         let a = with_aggregator<u64>();
-        assert!(&a == &a, 0);
+        let _ = &a == &a;
     }
 
     public entry fun test_equality_with_snapshots_I() {
         let a = with_snapshot<u64>(0);
         let b = with_snapshot<u64>(10);
-        assert!(a != b, 0);
+        let _ = a != b;
     }
 
     public entry fun test_equality_with_snapshots_II() {
         let a = with_snapshot<u64>(0);
         let b = with_snapshot<u64>(0);
-        assert!(a == b, 0);
+        let _ = a == b;
     }
 
     public entry fun test_equality_with_snapshots_III() {
         let a = with_snapshot<u64>(0);
-        assert!(&a == &a, 0);
+        let _ = &a == &a;
     }
 
     public entry fun test_equality_with_derived_string_snapshots_I() {
         let a = with_derived_string_snapshot(b"aaa");
         let b = with_derived_string_snapshot(b"bbb");
-        assert!(a != b, 0);
+        let _ = a != b;
     }
 
     public entry fun test_equality_with_derived_string_snapshots_II() {
         let a = with_derived_string_snapshot(b"aaa");
         let b = with_derived_string_snapshot(b"aaa");
-        assert!(a == b, 0);
+        let _ = a == b;
     }
 
     public entry fun test_equality_with_derived_string_snapshots_III() {
         let a = with_derived_string_snapshot(b"aaa");
-        assert!(&a == &a, 0);
+        let _ = &a == &a;
     }
 
     //
