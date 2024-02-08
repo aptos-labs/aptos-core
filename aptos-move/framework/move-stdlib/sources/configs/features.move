@@ -394,7 +394,7 @@ module std::features {
 
     /// Whether delegators allowlisting for delegation pools is supported.
     /// Lifetime: transient
-    const DELEGATION_POOL_ALLOWLISTING: u64 = 50;
+    const DELEGATION_POOL_ALLOWLISTING: u64 = 51;
 
     public fun get_delegation_pool_allowlisting_feature(): u64 { DELEGATION_POOL_ALLOWLISTING }
 

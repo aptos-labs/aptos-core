@@ -2035,7 +2035,7 @@ module aptos_framework::delegation_pool {
     const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
 
     #[test_only]
-    const DELEGATION_POOL_ALLOWLISTING: u64 = 50;
+    const DELEGATION_POOL_ALLOWLISTING: u64 = 51;
 
     #[test_only]
     public fun end_aptos_epoch() {

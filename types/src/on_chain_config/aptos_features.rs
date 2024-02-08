@@ -58,6 +58,7 @@ pub enum FeatureFlag {
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
+    DELEGATION_POOL_ALLOWLISTING = 51,
 }
 
 /// Representation of features on chain as a bitset.
