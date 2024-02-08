@@ -9,6 +9,8 @@ module 0x42::Test {
     // v1 doen't compile
     fun test1() {
         let _x = Impotent {};
+        // if we simplify the CFG with constant folding
+        // this would compile
         while (true) {
 
         }
