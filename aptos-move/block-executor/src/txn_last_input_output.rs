@@ -225,8 +225,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
-        } else {
-            unreachable!();
         }
     }
 
