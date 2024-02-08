@@ -11,6 +11,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `min`](#0x1_math128_min)
 -  [Function `average`](#0x1_math128_average)
 -  [Function `gcd`](#0x1_math128_gcd)
+-  [Function `sig_figs`](#0x1_math128_sig_figs)
 -  [Function `mul_div`](#0x1_math128_mul_div)
 -  [Function `clamp`](#0x1_math128_clamp)
 -  [Function `pow`](#0x1_math128_pow)
@@ -154,6 +155,37 @@ Return greatest common divisor of <code>a</code> & <code>b</code>, via the Eucli
         large = tmp;
     };
     large
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_math128_sig_figs"></a>
+
+## Function `sig_figs`
+
+Return number of significant figures (decimal digits) in <code>a</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math128.md#0x1_math128_sig_figs">sig_figs</a>(a: u128): u8
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="math128.md#0x1_math128_sig_figs">sig_figs</a>(a: u128): u8 {
+    <b>let</b> count = 1;
+    <b>loop</b> {
+        a = a / 10;
+        <b>if</b> (a == 0) <b>break</b>;
+        count = count + 1
+    };
+    count
 }
 </code></pre>
 

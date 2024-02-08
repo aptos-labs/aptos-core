@@ -39,6 +39,17 @@ module aptos_std::math128 {
         large
     }
 
+    /// Return number of significant figures (decimal digits) in `a`.
+    public inline fun sig_figs(a: u128): u8 {
+        let count = 1;
+        loop {
+            a = a / 10;
+            if (a == 0) break;
+            count = count + 1
+        };
+        count
+    }
+
     /// Returns a * b / c going through u256 to prevent intermediate overflow
     public inline fun mul_div(a: u128, b: u128, c: u128): u128 {
         // Inline functions cannot take constants, as then every module using it needs the constant
@@ -191,6 +202,18 @@ module aptos_std::math128 {
         assert!(gcd(10, 10) == 10, 0);
         assert!(gcd(1071, 462) == 21, 0);
         assert!(gcd(462, 1071) == 21, 0);
+    }
+
+    #[test]
+    fun test_sig_figs() {
+        assert!(sig_figs(0) == 1, 0);
+        assert!(sig_figs(1) == 1, 0);
+        assert!(sig_figs(2) == 1, 0);
+        assert!(sig_figs(9) == 1, 0);
+        assert!(sig_figs(10) == 2, 0);
+        assert!(sig_figs(99) == 2, 0);
+        assert!(sig_figs(100) == 3, 0);
+        assert!(sig_figs(10000000000000001) == 17, 0);
     }
 
     #[test]
