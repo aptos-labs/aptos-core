@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:34:9
    │
 31 │         let c; if (cond) c = freeze(copy inner) else c = &other.s1;
@@ -16,7 +16,7 @@ error: mutable reference in local `inner` requires exclusive access
 37 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:36:9
    │
 31 │         let c; if (cond) c = freeze(copy inner) else c = &other.s1;
@@ -27,7 +27,7 @@ error: mutable reference in local `inner` requires exclusive access
 37 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:43:9
    │
 40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
@@ -46,7 +46,7 @@ error: mutable reference in local `inner` requires exclusive access
 46 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:45:9
    │
 40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
@@ -60,7 +60,7 @@ error: mutable reference in local `inner` requires exclusive access
 46 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:86:9
    │
 83 │         let c; if (cond) c = &inner.f1 else c = &other.s1.f2;
@@ -76,7 +76,7 @@ error: mutable reference in local `inner` requires exclusive access
 89 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:88:9
    │
 83 │         let c; if (cond) c = &inner.f1 else c = &other.s1.f2;
@@ -87,7 +87,7 @@ error: mutable reference in local `inner` requires exclusive access
 89 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:95:9
    │
 92 │         let c; if (cond) c = id(&inner.f1) else c = &other.s1.f2;
@@ -106,7 +106,7 @@ error: mutable reference in local `inner` requires exclusive access
 98 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:97:9
    │
 92 │         let c; if (cond) c = id(&inner.f1) else c = &other.s1.f2;

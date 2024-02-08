@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:34:9
    │
 31 │         let c = freeze(inner);
@@ -16,7 +16,7 @@ error: mutable reference in local `inner` requires exclusive access
 37 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:36:9
    │
 31 │         let c = freeze(inner);
@@ -27,7 +27,7 @@ error: mutable reference in local `inner` requires exclusive access
 37 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:43:9
    │
 40 │         let c = id(freeze(inner));
@@ -46,7 +46,7 @@ error: mutable reference in local `inner` requires exclusive access
 46 │         *c;
    │         -- conflicting reference `c`used here
 
-error: mutable reference in local `inner` requires exclusive access
+error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:45:9
    │
 40 │         let c = id(freeze(inner));

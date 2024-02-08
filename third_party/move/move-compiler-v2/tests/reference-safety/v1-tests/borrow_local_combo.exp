@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot mutably borrow local `s` since immutable references exist
+error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo.move:13:17
    │
 12 │         if (cond) f = &s.f else f = &other.f;
@@ -13,7 +13,7 @@ error: cannot mutably borrow local `s` since immutable references exist
 14 │         *f;
    │         -- requirement enforced here
 
-error: cannot mutably borrow local `s` since immutable references exist
+error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo.move:21:17
    │
 20 │         if (cond) f = &s.f else f = &s.g;

@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Implements memory safety analysis.
@@ -20,7 +19,9 @@
 //! ```
 //!
 //! Borrow graphs do not come into a normalized form, thus different graphs can represent the
-//! same borrow relations. For example, this graph is equivalent to the above:
+//! same borrow relations. For example, this graph is equivalent to the above. It has what
+//! we call an _implicit choice_, that is the choice between alternatives is down
+//! after a borrow step:
 //!
 //! ```ignore
 //!              s
@@ -52,20 +53,35 @@
 //!
 //! 1. A local which is borrowed (i.e. points to a node in the graph) cannot be overwritten.
 //! 2. A local which is borrowed cannot be moved.
-//! 3. A mutable reference which is read from, written too, or passed on to a function
-//!    must be exclusive, that is, no sub-references must exist.
-//! 4. References returned from a function call must be derived from parameters
-//! 5. Before any call to a user function, or before reading or writing a reference,
-//!    the borrow graph must be _safe_ (see below). Notice specifically, that for
+//! 3. References returned from a function call must be derived from parameters
+//! 4. Before any call to a user function, or before reading or writing a reference,
+//!    the borrow graph must be _safe_ w.r.t. the arguments. Notice specifically, that for
 //!    a series of other instructions (loading and moving locals around, borrowing fields)
 //!    safety is not enforced. This is important to allow construction of more complex
 //!    borrow graphs, where the intermediate steps are not safe.
 //!
 //! To understand the concept of a _safe_ borrow graph consider that edges have a notion of being
 //! disjoint. For instance, field selection `s.f` and `s.g` constructs two references into `s` which
-//! can safely co-exist because there is no overlap. Given that, we say a borrow graph is _safe_
-//! if for all of its edges which represent a mutable borrow, all sibling edges are disjoint.
+//! can safely co-exist because there is no overlap. Consider further a path `p` being a sequence
+//! of borrow steps (edges) in the graph from a root to a leaf. For two paths `p1` and `p2`,
+//! _diverging edges_, `(e1, 2) = diverging(p1, p2)`, are a pair of edges where the paths differ
+//! after some non-empty common prefix. There can be more than one of those pairs. A graph is
+//! called *safe w.r.t. a set of locals `locals`* under the following conditions:
 //!
+//! a. Any path which does not end in `nodes(locals)` is safe and considered out of scope,
+//!    where `nodes(locals)` denotes the nodes which are associated with the given `locals`.
+//! b. For any two paths `p` and `q`, `q != p`, and any pair of diverting edges `e1` and `e2`, if
+//!    any of those edges is mut, the other needs to be disjoint. This basically states that one
+//!    cannot have `&x.f` and `&mut x.f` coexist in a safe graph. However, `&x.f` and `&mut x.g`
+//!    is fine.
+//! c. For any path `p`, if the last edge is mut, `p` must not be a prefix of any other path. This
+//!    basically states that mutable reference in `locals` must be exclusive and cannot
+//!    have other borrows.
+//! d. For all identical paths in the graph (recall that because of indirect choices, we can
+//!    have the same path appearing multiple times in the graph), if the last edge is mut, then
+//!    the set of temporaries associated with those paths must be a singleton. This basically
+//!    states that the same mutable reference in `locals` cannot be used twice.
+
 use crate::{
     pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
     Experiment, Options,
@@ -111,8 +127,7 @@ pub struct LifetimeState {
     graph: MapDomain<LifetimeLabel, LifetimeNode>,
     /// A map from locals to labels, for those locals which have an associated node in the graph.
     /// If a local is originally borrowed, it will point from `temp` to a node with the `MemoryLocation::Local(temp)`.
-    /// If a local is a reference derived from another reference, it will point to a node
-    /// with `MemoryLocation::Derived`.
+    /// If a local is a reference derived from a location, it will point to a node with `MemoryLocation::Derived`.
     local_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
     /// A map from globals to labels. Represents root states of the active graph.
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
@@ -170,8 +185,10 @@ enum BorrowEdgeKind {
     BorrowGlobal(bool),
     /// Borrows a field from a reference.
     BorrowField(bool, FieldId),
-    /// Calls an operation, where the incoming references are used to derive outgoing references.
-    Call(bool, Operation),
+    /// Calls an operation, where the incoming references are used to derive outgoing references. Since every
+    /// call outcome can be different, they are is distinguished by code offset -- to call edges are never the
+    /// same.
+    Call(bool, Operation, CodeOffset),
 }
 
 impl BorrowEdgeKind {
@@ -181,7 +198,7 @@ impl BorrowEdgeKind {
             BorrowLocal(is_mut)
             | BorrowGlobal(is_mut)
             | BorrowField(is_mut, _)
-            | Call(is_mut, _) => *is_mut,
+            | Call(is_mut, _, _) => *is_mut,
         }
     }
 }
@@ -612,6 +629,7 @@ impl LifetimeState {
 
     /// Releases graph resources for a reference in temporary.
     fn release_ref(&mut self, temp: TempIndex) {
+        // This assumes that each temp has their own label.
         if let Some(label) = self.local_to_label_map.remove(&temp) {
             if self.is_leaf(&label) {
                 // We can drop the underlying node, as there are no borrows out.
@@ -634,6 +652,21 @@ impl LifetimeState {
             }
         }
         self.check_graph_consistency()
+    }
+
+    /// Returns a reduced lifetime state which only keeps the specified labels.
+    /// The reduced state is used to determine borrow consistency in the context
+    /// of code referring to those labels.
+    #[allow(unused)]
+    fn reduced_state(&self, included: impl Fn(&LifetimeLabel) -> bool) -> LifetimeState {
+        let mut new = self.clone();
+        for (t, l) in &self.local_to_label_map {
+            if !included(l) {
+                new.release_ref(*t)
+            }
+        }
+        // TODO: globals
+        new
     }
 
     /// Replaces a reference in a temporary, as result of an assignment. The current
@@ -819,6 +852,18 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.target().get_local_name_for_error_message(local)
     }
 
+    /// Display a non-empty set of temps. This finds the first printable representative, if any
+    fn display_set(&self, set: &BTreeSet<TempIndex>) -> String {
+        if let Some(temp) = set
+            .iter()
+            .find(|t| self.target().get_local_name_opt(**t).is_some())
+        {
+            self.display(*temp)
+        } else {
+            self.display(*set.first().expect("non empty"))
+        }
+    }
+
     /// Returns "<prefix>`<name>` " if local has name, otherwise empty.
     fn display_name_or_empty(&self, prefix: &str, local: TempIndex) -> String {
         self.target()
@@ -837,7 +882,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.ty(local).is_reference()
     }
 
-    /// Check validness of reading a local. Returns true if read is valid.
+    /// Check validness of reading a local. The read is not allowed if the local is borrowed. Returns true if valid.
     fn check_read_local(&self, local: TempIndex, read_mode: ReadMode) -> bool {
         if self.is_ref(local) {
             // Always valid
@@ -926,31 +971,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Check whether a mutable reference is exclusive, that is has no outgoing edges
-    fn check_mut_ref_exclusive(&self, local: TempIndex) {
-        let ty = self.ty(local);
-        if ty.is_mutable_reference() {
-            if let Some(label) = self.state.label_for_local_with_children(local) {
-                let loc = self.cur_loc();
-                self.error_with_hints(
-                    loc,
-                    format!(
-                        "mutable reference in {} requires exclusive access",
-                        self.display(local)
-                    ),
-                    "requirement enforced here",
-                    self.borrow_info(label, |_| true)
-                        .into_iter()
-                        .chain(self.usage_info(label, |t| t != &local)),
-                )
-            }
-        }
-    }
-
-    /// Check whether the borrow graph is 'safe', that is for any mutable edge, there are no overlapping
-    /// direct or indirect sibling edges. As regards indirect sibling edges, the borrow graph we a sibling
-    /// can be reached via different paths. E.g. the expressions `&mut s.f` and `&mut s.g` both construct
-    /// there own `&mut s` to perform a field selection:
+    /// Check whether the borrow graph is 'safe' w.r.t a set of `locals`. See the discussion of safety at the
+    /// beginning of this file.
+    ///
+    /// To effectively check the path-oriented conditions of safety here, we need to deal with the fact
+    /// that graphs have non-explicit choice nodes, for example:
     ///
     /// ```ignore
     ///                 s
@@ -959,20 +984,30 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ///              r1    r2
     /// ```
     ///
-    /// The siblings `.f` and `.g` are indirect but still need to be compared to decide safety.
-    /// Notice that an alternative implementation could have attempted to normalize the graph to avoid such indirect
-    /// siblings. In the current implementation, we establish the normalized graph on-the-fly via
-    /// a hyper graph. Each hyper node is build from a set of lifetime labels:
+    /// The diverting edges `.f` and `.g` are not directly visible. In order to deal with this, we construct a
+    /// _hyper graph_ on the fly as follows:
     ///
     /// 1. The root nodes are the singleton sets with all the nodes of the borrow graph
     /// 2. The hyper edges are grouped into those of the same edge kind. Hence, two `&mut` edges
     ///    like in the example above become one hyper edge. The successor state of the hyper edge
-    ///    is the union of all the targets of the edges grouped together
+    ///    is the union of all the targets of the edges grouped together.
     ///
     /// If we walk this graph now from the root to the leaves, we can determine safety by directly comparing
     /// hyper edge siblings.
-    fn check_borrow_safety(&mut self) {
-        let leaves = self.state.leaves();
+    fn check_borrow_safety(&mut self, locals: &BTreeSet<TempIndex>) {
+        let leaves = self
+            .state
+            .leaves()
+            .into_iter()
+            .filter_map(|(l, mut temps)| {
+                temps = temps.intersection(locals).cloned().collect();
+                if !temps.is_empty() {
+                    Some((l, temps))
+                } else {
+                    None
+                }
+            })
+            .collect::<BTreeMap<_, _>>();
         // Initialize root hyper nodes
         let mut hyper_nodes: BTreeSet<BTreeSet<LifetimeLabel>> = BTreeSet::new();
         for leaf in leaves.keys() {
@@ -980,29 +1015,55 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 hyper_nodes.insert(iter::once(root).collect());
             }
         }
-        let mut edges_reported = BTreeSet::new();
+        let mut edges_reported: BTreeSet<BTreeSet<&BorrowEdge>> = BTreeSet::new();
         // Continue to process hyper nodes
         while let Some(hyper) = hyper_nodes.pop_first() {
-            // Check 2-wise permutations of hyper edges for issues
             let hyper_edges = self.state.grouped_children(&hyper);
-            for mut perm in hyper_edges.into_iter().permutations(2) {
+            // Check 2-wise permutations of hyper edges for issues. This discovers cases where edges
+            // conflict because of mutability.
+            for mut perm in hyper_edges.iter().permutations(2) {
                 let (kind1, edges1) = perm.pop().unwrap();
                 let (kind2, edges2) = perm.pop().unwrap();
-                if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(&kind2) {
+                if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(kind2) {
                     for (e1, e2) in edges1.iter().cartesian_product(edges2.iter()) {
-                        if e1 == e2 || !edges_reported.insert((*e1, *e2)) {
+                        if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
                             continue;
                         }
                         self.unsafe_edge_error(hyper.first().unwrap(), e1, e2, &leaves)
                     }
                 }
-                hyper_nodes.insert(edges1.into_iter().map(|e| e.target).collect());
-                hyper_nodes.insert(edges2.into_iter().map(|e| e.target).collect());
+            }
+            // No go over each hyper edge and if they target a leaf node check for conditions
+            for (_, edges) in hyper_edges {
+                let mut mapped_temps = BTreeSet::new();
+                let mut targets = BTreeSet::new();
+                for edge in edges {
+                    let target = edge.target;
+                    targets.insert(target);
+                    if edge.kind.is_mut() {
+                        if let Some(temps) = leaves.get(&target) {
+                            let mut inter =
+                                temps.intersection(locals).cloned().collect::<BTreeSet<_>>();
+                            if !inter.is_empty() {
+                                if !self.state.is_leaf(&target) {
+                                    // A mut leaf node must have exclusive access
+                                    self.exclusive_access_borrow_error(&target, &inter)
+                                }
+                                mapped_temps.append(&mut inter)
+                            }
+                        }
+                    }
+                }
+                if mapped_temps.len() > 1 {
+                    // We cannot associate the same mut node with more than one local
+                    self.exclusive_access_dup_error(&hyper, &mapped_temps)
+                }
+                hyper_nodes.insert(targets);
             }
         }
     }
 
-    /// Reports an error about an unsafe edge
+    /// Reports an error about a diverging edge. See condition (a) in the file header documentation.
     fn unsafe_edge_error<'a>(
         &self,
         label: &LifetimeLabel,
@@ -1014,13 +1075,16 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         if edge.loc.cmp(&other_edge.loc) == Ordering::Less {
             (other_edge, edge) = (edge, other_edge)
         }
-        let temp_str = match leaves.get(label) {
-            Some(temps) if !temps.is_empty() => format!(
-                "{} ",
-                self.target()
-                    .get_local_name_for_error_message(*temps.iter().next().unwrap())
+        let (temps, temp_str) = match leaves.get(label) {
+            Some(temps) if !temps.is_empty() => (
+                temps.clone(),
+                format!(
+                    "{} ",
+                    self.target()
+                        .get_local_name_for_error_message(*temps.iter().next().unwrap())
+                ),
             ),
-            _ => "".to_string(),
+            _ => (BTreeSet::new(), "".to_string()),
         };
         let (action, attempt) = if edge.kind.is_mut() {
             ("mutably", "mutable")
@@ -1044,8 +1108,45 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             ),
             format!("{} borrow attempted here", attempt),
             info.into_iter()
-                .chain(self.usage_info(&other_edge.target, |_| true)),
+                .chain(self.usage_info(&other_edge.target, |t| !temps.contains(t))),
         );
+    }
+
+    /// Reports an error about exclusive access requirement for borrows. See
+    /// safety condition (b) in the file header documentation.
+    fn exclusive_access_borrow_error(&self, label: &LifetimeLabel, temps: &BTreeSet<TempIndex>) {
+        self.error_with_hints(
+            self.cur_loc(),
+            format!(
+                "mutable reference in {} requires exclusive access but is borrowed",
+                self.display_set(temps)
+            ),
+            "requirement enforced here",
+            self.borrow_info(label, |_| true)
+                .into_iter()
+                .chain(self.usage_info(label, |t| !temps.contains(t))),
+        )
+    }
+
+    /// Reports an error about exclusive access requirement for duplicate usgae. See safety
+    /// condition (c) in the file header documentation.
+    fn exclusive_access_dup_error(
+        &self,
+        labels: &BTreeSet<LifetimeLabel>,
+        temps: &BTreeSet<TempIndex>,
+    ) {
+        debug_assert!(temps.len() > 1);
+        let ts = temps.iter().take(2).collect_vec();
+        self.error_with_hints(
+            self.cur_loc(),
+            format!(
+                "same mutable reference in {} is also used in other {} in same argument list",
+                self.display(*ts[0]),
+                self.display(*ts[1])
+            ),
+            "requirement enforced here",
+            labels.iter().flat_map(|l| self.borrow_info(l, |_| true)),
+        )
     }
 
     /// Reports an error together with hints
@@ -1262,7 +1363,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         // Check validness of arguments
         for src in srcs {
             self.check_read_local(*src, ReadMode::Argument);
-            self.check_mut_ref_exclusive(*src)
         }
         // Next check whether we can assign to the destinations.
         for dest in dests {
@@ -1295,7 +1395,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                         self.state.add_edge(
                             label,
                             BorrowEdge::new(
-                                BorrowEdgeKind::Call(dest_ty.is_mutable_reference(), oper.clone()),
+                                BorrowEdgeKind::Call(
+                                    dest_ty.is_mutable_reference(),
+                                    oper.clone(),
+                                    self.code_offset,
+                                ),
                                 loc.clone(),
                                 *child,
                             ),
@@ -1333,8 +1437,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     fn return_(&mut self, srcs: &[TempIndex]) {
         for src in srcs {
             if self.ty(*src).is_reference() {
-                // Check exclusivity
-                self.check_mut_ref_exclusive(*src);
                 // Need to check whether this reference is derived from a local which is not a
                 // a parameter
                 if let Some(label) = self.state.label_for_local(*src) {
@@ -1379,7 +1481,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         debug_assert!(self.is_ref(src));
         self.check_write_local(dest);
         self.check_read_local(src, ReadMode::Argument);
-        self.check_mut_ref_exclusive(src);
         self.state.moved.remove(&dest);
     }
 
@@ -1435,13 +1536,18 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         // Check borrow safety of the currently active borrow graph for read ref, write ref, and function calls.
         #[allow(clippy::single_match)]
         match instr {
-            Call(_, _, oper, ..) => match oper {
+            Call(_, _, oper, srcs, ..) => match oper {
                 Operation::ReadRef | Operation::WriteRef | Operation::Function(..) => {
-                    step.check_borrow_safety()
+                    let exclusive_refs =
+                        srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
+                    step.check_borrow_safety(&exclusive_refs)
                 },
                 _ => {},
             },
-            Ret(..) => step.check_borrow_safety(),
+            Ret(_, srcs) => {
+                let exclusive_refs = srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
+                step.check_borrow_safety(&exclusive_refs)
+            },
             _ => {},
         }
         match instr {
@@ -1638,7 +1744,7 @@ impl<'a> Display for BorrowEdgeDisplay<'a> {
             BorrowLocal(is_mut) => write!(f, "borrow({})", is_mut),
             BorrowGlobal(is_mut) => write!(f, "borrow_global({})", is_mut),
             BorrowField(is_mut, _) => write!(f, "borrow_field({})", is_mut),
-            Call(is_mut, _) => write!(f, "call({})", is_mut),
+            Call(is_mut, _, _) => write!(f, "call({})", is_mut),
         })?;
         if display_child {
             write!(f, " -> {}", edge.target)

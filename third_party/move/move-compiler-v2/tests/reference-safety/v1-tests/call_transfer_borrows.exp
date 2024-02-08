@@ -14,7 +14,7 @@ error: cannot move local `x` which is still borrowed
 18 │         *r = 1;
    │         ------ conflicting reference `r`used here
 
-error: mutable reference in local `y_ref` requires exclusive access
+error: mutable reference in local `y_ref` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows.move:29:9
    │
 26 │         let r = take_imm_mut_give_imm(x_ref, y_ref);
