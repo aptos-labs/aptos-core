@@ -166,7 +166,6 @@ pub trait TDelayedFieldView {
     /// new aggregator V2.
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier;
 
-    /// Validate that delayed field identifier is valid.
     fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError>;
 
     /// Returns the list of resources that satisfy all the following conditions:
@@ -252,7 +251,7 @@ where
     }
 
     fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
-        unimplemented!("get_and_validate_delayed_field_id not implemented")
+        unimplemented!()
     }
 
     fn get_reads_needing_exchange(
