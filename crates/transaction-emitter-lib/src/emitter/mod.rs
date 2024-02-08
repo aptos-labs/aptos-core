@@ -955,7 +955,10 @@ fn update_seq_num_and_get_num_expired(
         .map(
             |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
                 Some(count) => {
-                    assert!(*count <= *end_seq_num);
+                    assert!(
+                        *count <= *end_seq_num,
+                        "{address} :: {count} > {end_seq_num}"
+                    );
                     if *count >= *start_seq_num {
                         (
                             (*count - *start_seq_num) as usize,
