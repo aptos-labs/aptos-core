@@ -21,6 +21,7 @@ use aptos_infallible::Mutex;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     contract_event::ContractEvent,
+    delayed_fields::PanicError,
     executable::ExecutableTestType,
     fee_statement::FeeStatement,
     state_store::{state_key::StateKey, StateView, StateViewId},
@@ -272,7 +273,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         patched_resource_write_set: Vec<(StateKey, WriteOp)>,
         patched_events: Vec<ContractEvent>,
-    ) {
+    ) -> Result<(), PanicError> {
         assert!(
             self.committed_output
                 .set(
@@ -284,13 +285,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                             aggregator_v1_writes,
                             patched_resource_write_set,
                             patched_events,
-                        )
-                        // TODO[agg_v2](fix) - propagate issued to block executor.
-                        .expect("Materialization must not fail"),
+                        )?,
                 )
                 .is_ok(),
             "Could not combine VMOutput with the patched resource and event data"
         );
+        Ok(())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {
@@ -432,7 +432,7 @@ impl BlockAptosVM {
                     e
                 )
             },
-            Err(BlockExecutionError::FatalVMError((err, _))) => Err(err),
+            Err(BlockExecutionError::FatalVMError(err)) => Err(err),
         }
     }
 }

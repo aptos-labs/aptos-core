@@ -415,6 +415,8 @@ struct GasMeasurement {
     pub approx_block_output: f64,
 
     pub gas_count: u64,
+
+    pub speculative_abort_count: u64,
 }
 
 impl GasMeasurement {
@@ -453,6 +455,8 @@ impl GasMeasurement {
                 .with_label_values(&[block_executor_counters::Mode::PARALLEL])
                 .get_sample_sum();
 
+        let speculative_abort_count = block_executor_counters::SPECULATIVE_ABORT_COUNT.get();
+
         Self {
             gas,
             effective_block_gas,
@@ -460,6 +464,7 @@ impl GasMeasurement {
             execution_gas,
             approx_block_output,
             gas_count,
+            speculative_abort_count,
         }
     }
 
@@ -473,6 +478,7 @@ impl GasMeasurement {
             execution_gas: end.execution_gas - self.execution_gas,
             approx_block_output: end.approx_block_output - self.approx_block_output,
             gas_count: end.gas_count - self.gas_count,
+            speculative_abort_count: end.speculative_abort_count - self.speculative_abort_count,
         }
     }
 }
@@ -601,6 +607,13 @@ impl OverallMeasuring {
             delta_gas.effective_block_gas / elapsed,
             delta_gas.effective_block_gas,
             elapsed
+        );
+        info!(
+            "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
+            prefix,
+            delta_gas.speculative_abort_count as f64 / num_txns,
+            delta_gas.speculative_abort_count,
+            num_txns
         );
         info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
         info!(
@@ -746,7 +759,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ModifyGlobalResourceAggV2),
+            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
             true,
         );
     }

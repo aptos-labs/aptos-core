@@ -17,6 +17,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
+    delayed_fields::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -1064,7 +1065,7 @@ where
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    // TODO[agg_v2](cleanup) Using the concrete type layout here. Should we find a way to use generics?
     fn resource_group_write_set(
         &self,
     ) -> Vec<(
@@ -1114,10 +1115,11 @@ where
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
+        Ok(())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {

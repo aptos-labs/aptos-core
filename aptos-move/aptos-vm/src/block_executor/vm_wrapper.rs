@@ -78,7 +78,8 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         vm_status.message().cloned().unwrap_or_default(),
                     )
-                } else if vm_status.status_code() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
+                } else if vm_status.status_code()
+                    == StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
                 {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         vm_status.message().cloned().unwrap_or_default(),
@@ -104,7 +105,9 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
                     ExecutionStatus::SpeculativeExecutionAbortError(
                         err.message().cloned().unwrap_or_default(),
                     )
-                } else if err.status_code() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR {
+                } else if err.status_code()
+                    == StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+                {
                     ExecutionStatus::DelayedFieldsCodeInvariantError(
                         err.message().cloned().unwrap_or_default(),
                     )

@@ -12,7 +12,7 @@ use std::time::Duration;
 use utils::constants::MAX_HEAD_REQUEST_RETRY_SECONDS;
 
 /// HEAD request to get MIME type and size of content
-pub async fn get_uri_metadata(url: String) -> anyhow::Result<(String, u32)> {
+pub async fn get_uri_metadata(url: &str) -> anyhow::Result<(String, u32)> {
     let client = Client::builder()
         .timeout(Duration::from_secs(MAX_HEAD_REQUEST_RETRY_SECONDS))
         .build()

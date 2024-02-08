@@ -30,14 +30,15 @@ use diesel::{
 use google_cloud_storage::client::Client as GCSClient;
 use image::ImageFormat;
 use serde_json::Value;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 use url::Url;
 
 /// Stuct that represents a parser for a single entry from queue
 pub struct Worker {
-    config: ParserConfig,
+    config: Arc<ParserConfig>,
     conn: PooledConnection<ConnectionManager<PgConnection>>,
-    gcs_client: GCSClient,
+    gcs_client: Arc<GCSClient>,
     pubsub_message: String,
     model: NFTMetadataCrawlerURIs,
     asset_data_id: String,
@@ -49,12 +50,12 @@ pub struct Worker {
 
 impl Worker {
     pub fn new(
-        config: ParserConfig,
+        config: Arc<ParserConfig>,
         conn: PooledConnection<ConnectionManager<PgConnection>>,
-        gcs_client: GCSClient,
-        pubsub_message: String,
-        asset_data_id: String,
-        asset_uri: String,
+        gcs_client: Arc<GCSClient>,
+        pubsub_message: &str,
+        asset_data_id: &str,
+        asset_uri: &str,
         last_transaction_version: i32,
         last_transaction_timestamp: chrono::NaiveDateTime,
         force: bool,
@@ -63,10 +64,10 @@ impl Worker {
             config,
             conn,
             gcs_client,
-            pubsub_message,
-            model: NFTMetadataCrawlerURIs::new(asset_uri.clone()),
-            asset_data_id,
-            asset_uri,
+            pubsub_message: pubsub_message.to_string(),
+            model: NFTMetadataCrawlerURIs::new(asset_uri),
+            asset_data_id: asset_data_id.to_string(),
+            asset_uri: asset_uri.to_string(),
             last_transaction_version,
             last_transaction_timestamp,
             force,
@@ -80,7 +81,7 @@ impl Worker {
         // Deduplicate asset_uri
         // Exit if not force or if asset_uri has already been parsed
         let prev_model =
-            NFTMetadataCrawlerURIsQuery::get_by_asset_uri(self.asset_uri.clone(), &mut self.conn);
+            NFTMetadataCrawlerURIsQuery::get_by_asset_uri(&self.asset_uri, &mut self.conn);
         if let Some(pm) = prev_model {
             DUPLICATE_ASSET_URI_COUNT.inc();
             if !self.force && pm.do_not_parse {
@@ -92,7 +93,7 @@ impl Worker {
         }
 
         // Skip if asset_uri contains any of the uris in URI_SKIP_LIST
-        if let Some(blacklist) = self.config.uri_blacklist.clone() {
+        if let Some(blacklist) = &self.config.uri_blacklist {
             if blacklist.iter().any(|uri| self.asset_uri.contains(uri)) {
                 self.log_info("Found match in URI skip list, skipping parse");
                 SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
@@ -115,9 +116,9 @@ impl Worker {
             // Parse asset_uri
             self.log_info("Parsing asset_uri");
             let json_uri = URIParser::parse(
-                self.config.ipfs_prefix.clone(),
-                self.model.get_asset_uri(),
-                self.config.ipfs_auth_key.clone(),
+                &self.config.ipfs_prefix,
+                &self.model.get_asset_uri(),
+                self.config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse asset_uri", None);
@@ -148,8 +149,8 @@ impl Worker {
             if json != Value::Null {
                 self.log_info("Writing JSON to GCS");
                 let cdn_json_uri_result = write_json_to_gcs(
-                    self.config.bucket.clone(),
-                    self.asset_data_id.clone(),
+                    &self.config.bucket,
+                    &self.asset_data_id,
                     &json,
                     &self.gcs_client,
                 )
@@ -182,8 +183,8 @@ impl Worker {
             && (self.model.get_cdn_image_uri().is_some()
                 || self.model.get_raw_image_uri().map_or(true, |uri_option| {
                     match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
-                        self.asset_uri.clone(),
-                        uri_option,
+                        &self.asset_uri,
+                        &uri_option,
                         &mut self.conn,
                     ) {
                         Some(uris) => {
@@ -203,9 +204,9 @@ impl Worker {
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_asset_uri());
             let img_uri = URIParser::parse(
-                self.config.ipfs_prefix.clone(),
-                raw_image_uri.clone(),
-                self.config.ipfs_auth_key.clone(),
+                &self.config.ipfs_prefix,
+                &raw_image_uri,
+                self.config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_image_uri", None);
@@ -219,7 +220,7 @@ impl Worker {
                 .with_label_values(&["image"])
                 .inc();
             let (image, format) = ImageOptimizer::optimize(
-                img_uri,
+                &img_uri,
                 self.config
                     .max_file_size_bytes
                     .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
@@ -236,23 +237,13 @@ impl Worker {
                 (vec![], ImageFormat::Png)
             });
 
-            if image.is_empty() {
-                self.log_info("Image is empty, skipping parse");
-                self.model.set_do_not_parse(true);
-                SKIP_URI_COUNT.with_label_values(&["empty"]).inc();
-                if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
-                    self.log_error("Commit to Postgres failed", &e);
-                }
-                return Ok(());
-            }
-
             // Save resized and optimized image to GCS
             if !image.is_empty() {
                 self.log_info("Writing image to GCS");
                 let cdn_image_uri_result = write_image_to_gcs(
                     format,
-                    self.config.bucket.clone(),
-                    self.asset_data_id.clone(),
+                    &self.config.bucket,
+                    &self.asset_data_id,
                     image,
                     &self.gcs_client,
                 )
@@ -285,8 +276,8 @@ impl Worker {
             || !self.force
                 && raw_animation_uri_option.clone().map_or(true, |uri| {
                     match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
-                        self.asset_uri.clone(),
-                        uri,
+                        &self.asset_uri,
+                        &uri,
                         &mut self.conn,
                     ) {
                         Some(uris) => {
@@ -306,9 +297,9 @@ impl Worker {
         if let Some(raw_animation_uri) = raw_animation_uri_option {
             self.log_info("Starting animation optimization");
             let animation_uri = URIParser::parse(
-                self.config.ipfs_prefix.clone(),
-                raw_animation_uri.clone(),
-                self.config.ipfs_auth_key.clone(),
+                &self.config.ipfs_prefix,
+                &raw_animation_uri,
+                self.config.ipfs_auth_key.as_deref(),
             )
             .unwrap_or_else(|_| {
                 self.log_warn("Failed to parse raw_animation_uri", None);
@@ -322,7 +313,7 @@ impl Worker {
                 .with_label_values(&["animation"])
                 .inc();
             let (animation, format) = ImageOptimizer::optimize(
-                animation_uri,
+                &animation_uri,
                 self.config
                     .max_file_size_bytes
                     .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
@@ -344,8 +335,8 @@ impl Worker {
                 self.log_info("Writing animation to GCS");
                 let cdn_animation_uri_result = write_image_to_gcs(
                     format,
-                    self.config.bucket.clone(),
-                    self.asset_data_id.clone(),
+                    &self.config.bucket,
+                    &self.asset_data_id,
                     animation,
                     &self.gcs_client,
                 )

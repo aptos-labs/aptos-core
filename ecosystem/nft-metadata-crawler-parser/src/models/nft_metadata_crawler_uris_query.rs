@@ -31,12 +31,12 @@ pub struct NFTMetadataCrawlerURIsQuery {
 
 impl NFTMetadataCrawlerURIsQuery {
     pub fn get_by_asset_uri(
-        asset_uri: String,
+        asset_uri: &str,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Option<Self> {
         let mut op = || {
             parsed_asset_uris::table
-                .find(asset_uri.clone())
+                .find(asset_uri)
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -54,14 +54,15 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_image_uri(
-        asset_uri: String,
-        raw_image_uri: String,
+        asset_uri: &str,
+        raw_image_uri: &str,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Option<Self> {
         let mut op = || {
             parsed_asset_uris::table
-                .filter(parsed_asset_uris::raw_image_uri.eq(raw_image_uri.clone()))
-                .filter(parsed_asset_uris::asset_uri.ne(asset_uri.clone()))
+                .filter(parsed_asset_uris::raw_image_uri.eq(raw_image_uri))
+                .filter(parsed_asset_uris::asset_uri.ne(asset_uri))
+                .filter(parsed_asset_uris::cdn_image_uri.is_not_null())
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
@@ -79,14 +80,15 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_animation_uri(
-        asset_uri: String,
-        raw_animation_uri: String,
+        asset_uri: &str,
+        raw_animation_uri: &str,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Option<Self> {
         let mut op = || {
             parsed_asset_uris::table
-                .filter(parsed_asset_uris::raw_animation_uri.eq(raw_animation_uri.clone()))
-                .filter(parsed_asset_uris::asset_uri.ne(asset_uri.clone()))
+                .filter(parsed_asset_uris::raw_animation_uri.eq(raw_animation_uri))
+                .filter(parsed_asset_uris::asset_uri.ne(asset_uri))
+                .filter(parsed_asset_uris::cdn_animation_uri.is_not_null())
                 .first::<NFTMetadataCrawlerURIsQuery>(conn)
                 .optional()
                 .map_err(Into::into)
