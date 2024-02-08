@@ -100,6 +100,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -115,6 +116,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x0d000000",
@@ -436,6 +439,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -451,6 +455,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x0e000000",
@@ -772,6 +778,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -787,6 +794,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x0f000000",
@@ -1108,6 +1117,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -1123,6 +1133,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x10000000",
@@ -1444,6 +1456,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -1459,6 +1472,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x11000000",
@@ -1780,6 +1795,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -1795,6 +1811,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x12000000",
@@ -2116,6 +2134,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -2131,6 +2150,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x13000000",
@@ -2452,6 +2473,7 @@
         "type": "write_resource"
       },
       {
+<<<<<<< HEAD
         "address": "0x1",
         "state_key_hash": "",
         "data": {
@@ -2467,6 +2489,8 @@
         "type": "write_resource"
       },
       {
+=======
+>>>>>>> dce9106dd7 ([dag] commit history resource group)
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x14000000",
