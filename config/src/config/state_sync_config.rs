@@ -136,7 +136,7 @@ impl Default for StateSyncDriverConfig {
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 100,
+            max_pending_data_chunks: 50,
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -219,9 +219,7 @@ pub struct DataStreamingServiceConfig {
     /// Maximum number of concurrent data client requests (per stream) for state keys/values.
     pub max_concurrent_state_requests: u64,
 
-    /// Maximum channel sizes for each data stream listener. If messages are not
-    /// consumed, they will be dropped (oldest messages first). The remaining
-    /// messages will be retrieved using FIFO ordering.
+    /// Maximum channel sizes for each data stream listener (per stream).
     pub max_data_stream_channel_sizes: u64,
 
     /// Maximum number of notification ID to response context mappings held in
@@ -256,7 +254,7 @@ impl Default for DataStreamingServiceConfig {
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
-            max_data_stream_channel_sizes: 300,
+            max_data_stream_channel_sizes: 50,
             max_notification_id_mappings: 300,
             max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
             max_pending_requests: 50,
@@ -297,7 +295,7 @@ impl Default for DynamicPrefetchingConfig {
         Self {
             enable_dynamic_prefetching: true,
             initial_prefetching_value: 3,
-            max_prefetching_value: 50,
+            max_prefetching_value: 30,
             min_prefetching_value: 3,
             prefetching_value_increase: 1,
             prefetching_value_decrease: 2,
