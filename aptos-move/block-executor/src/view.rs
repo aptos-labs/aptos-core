@@ -1751,9 +1751,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Unsync(state) => *state.counter.borrow(),
         };
 
-        // We increment counter before we create an identifier from it, so
-        // its value must be at most the current value.
-        if unique_index < start_counter || unique_index > current_counter {
+        // We read the counter to create an identifier from it, and only after
+        // increment. So its value must be < the current value.
+        if unique_index < start_counter || unique_index >= current_counter {
             return Err(code_invariant_error(format!(
                 "Invalid delayed field id: {:?} with index: {} (started from {} and reached {})",
                 id, unique_index, start_counter, current_counter
