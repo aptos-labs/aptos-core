@@ -33,8 +33,9 @@ pub const EXP_EXT: &str = "exp";
 /// Configuration for a set of tests.
 #[derive(Default)]
 struct TestConfig {
-    /// Whether stackless bytecode passes should be skipped.
-    skip_bytecode_passes: bool,
+    /// Whether compilation should stop before generating stackless bytecode,
+    /// also skipping the bytecode pipeline and file format generation.
+    stop_before_generating_bytecode: bool,
     /// Whether we should dump the AST after successful type check.
     dump_ast: bool,
     /// A sequence of bytecode processors to run for this test.
@@ -97,7 +98,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -112,7 +113,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -125,7 +126,7 @@ impl TestConfig {
             }));
             options.testing = true;
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -134,7 +135,7 @@ impl TestConfig {
             }
         } else if path.contains("/checking/") || path.contains("/parser/") {
             Self {
-                skip_bytecode_passes: true,
+                stop_before_generating_bytecode: true,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -143,7 +144,7 @@ impl TestConfig {
             }
         } else if path.contains("/bytecode-generator/") {
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: true,
                 pipeline,
                 generate_file_format: false,
@@ -155,7 +156,7 @@ impl TestConfig {
                 with_copy_inference: true,
             }));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: true,
@@ -164,7 +165,7 @@ impl TestConfig {
             }
         } else if path.contains("/visibility-checker/") {
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -176,7 +177,7 @@ impl TestConfig {
                 with_copy_inference: true,
             }));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -189,7 +190,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: verbose,
                 pipeline,
                 generate_file_format: false,
@@ -203,7 +204,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: verbose,
                 pipeline,
                 generate_file_format: false,
@@ -229,7 +230,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -247,7 +248,7 @@ impl TestConfig {
                 with_copy_inference: false,
             }));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -258,7 +259,7 @@ impl TestConfig {
         } else if path.contains("/uninit-use-checker/") {
             pipeline.add_processor(Box::new(UninitializedUseChecker {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -269,7 +270,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
             pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
             Self {
-                skip_bytecode_passes: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -348,7 +349,7 @@ impl TestConfig {
             out.push_str(&env.dump_env());
             out.push('\n');
         }
-        if ok && !self.skip_bytecode_passes {
+        if ok && !self.stop_before_generating_bytecode {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);

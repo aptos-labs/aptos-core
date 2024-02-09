@@ -463,7 +463,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         );
         et.parent.parent.define_struct(
             et.to_loc(&def.loc),
-            // et.to_loc(&name.loc()),
             attrs,
             qsym,
             et.parent.module_id,

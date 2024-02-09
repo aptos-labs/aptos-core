@@ -59,8 +59,8 @@ pub fn check_for_function_typed_parameters(env: &mut GlobalEnv) {
 /// For all function in target modules:
 ///
 /// If `before_inlining`, then
-/// - check that all function calls involving inline funcitons are accessible;
-/// - warn about any unused functions
+/// - check that all function calls involving inline functions are accessible;
+/// - warn about unused private functions
 /// Otherwise  (`!before_inlining`):
 /// - check that all function calls *not* involving inline functions are accessible.
 pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
@@ -74,47 +74,48 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
     for caller_module in env.get_modules() {
         if caller_module.is_target() {
             let caller_module_id = caller_module.get_id();
-            let caller_module_name = caller_module.get_name();
             let caller_module_has_friends = !caller_module.has_no_friends();
             let caller_module_is_script = caller_module.get_name().is_script();
             for caller_func in caller_module.get_functions() {
                 let caller_qfid = caller_func.get_qualified_id();
 
-                match caller_func.visibility() {
-                    Visibility::Public => {},
-                    Visibility::Friend => {
-                        if !caller_module_has_friends {
-                            // Function is essentially private
+                // During first pass, record private functions for later
+                if before_inlining {
+                    match caller_func.visibility() {
+                        Visibility::Public => {},
+                        Visibility::Friend => {
+                            if !caller_module_has_friends {
+                                // Function is essentially private
+                                private_funcs.insert(caller_qfid);
+                            }
+                        },
+                        Visibility::Private => {
                             private_funcs.insert(caller_qfid);
-                        }
-                    },
-                    Visibility::Private => {
-                        private_funcs.insert(caller_qfid);
-                    },
-                };
+                        },
+                    };
+                }
 
                 // Check that functions being called are accessible.
                 if let Some(def) = caller_func.get_def() {
                     let callees_with_sites = def.called_funs_with_callsites();
                     for (callee, sites) in &callees_with_sites {
-                        let callee_env = env.get_function(*callee);
+                        let callee_func = env.get_function(*callee);
                         // Check visibility.
 
                         // Same module is always visible
-                        let same_module = callee_env.module_env.get_id() == caller_module_id;
+                        let same_module = callee_func.module_env.get_id() == caller_module_id;
                         let call_involves_inline_function =
-                            callee_env.is_inline() || caller_func.is_inline();
+                            callee_func.is_inline() || caller_func.is_inline();
 
                         // SKIP check if same_module or
-                        // if before inlining and the call doesn't involve inline function
-                        // OR if after inlining and call *does* involve an inline function
+                        // if before inlining and the call doesn't involve inline function.
                         let skip_check =
-                            same_module || (before_inlining != call_involves_inline_function);
+                            same_module || (before_inlining && !call_involves_inline_function);
 
                         let callee_is_accessible = if skip_check {
                             true
                         } else {
-                            match callee_env.visibility() {
+                            match callee_func.visibility() {
                                 Visibility::Public => true,
                                 _ if caller_module_is_script => {
                                     // Only public functions are visible from scripts.
@@ -123,31 +124,20 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                         "a script",
                                         "it is not public",
                                         sites,
-                                        &callee_env,
+                                        &callee_func,
                                     );
                                     false
                                 },
                                 Visibility::Friend => {
-                                    if callee_env.module_env.has_friend(&caller_module_id) {
+                                    if callee_func.module_env.has_friend(&caller_module_id) {
                                         true
                                     } else {
-                                        let why = format!(
-                                            "module `{}` is not a `friend` of `{}`",
-                                            caller_module_name.display_full(env),
-                                            callee_env.module_env.get_full_name_str()
-                                        );
-                                        cannot_call_error(
-                                            env,
-                                            &why,
-                                            sites,
-                                            &caller_func,
-                                            &callee_env,
-                                        );
+                                        not_a_friend_error(env, sites, &caller_func, &callee_func);
                                         false
                                     }
                                 },
                                 Visibility::Private => {
-                                    private_to_module_error(env, sites, &caller_func, &callee_env);
+                                    private_to_module_error(env, sites, &caller_func, &callee_func);
                                     false
                                 },
                             }
@@ -176,24 +166,24 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
             for callee in private_funcs {
                 if !functions_with_callers.contains(&callee) {
                     // We saw no uses of private/friendless function `callee`.
-                    let callee_env = env.get_function(callee);
-                    let callee_loc = callee_env.get_id_loc();
-                    let callee_is_script = callee_env.module_env.get_name().is_script();
+                    let callee_func = env.get_function(callee);
+                    let callee_loc = callee_func.get_id_loc();
+                    let callee_is_script = callee_func.module_env.get_name().is_script();
 
                     // Entry functions in a script don't need any uses.
                     // Check others which are private.
                     if !callee_is_script {
-                        let is_private = matches!(callee_env.visibility(), Visibility::Private);
+                        let is_private = matches!(callee_func.visibility(), Visibility::Private);
                         if functions_with_inaccessible_callers.contains(&callee) {
                             let msg = format!(
                                 "Function `{}` may be unused: it has callers, but none with access.",
-                                callee_env.get_full_name_with_address(),
+                                callee_func.get_full_name_with_address(),
                             );
                             env.diag(Severity::Warning, &callee_loc, &msg);
                         } else {
                             let msg = format!(
                                 "Function `{}` is unused: it has no current callers and {}.",
-                                callee_env.get_full_name_with_address(),
+                                callee_func.get_full_name_with_address(),
                                 if is_private {
                                     "is private to its module"
                                 } else {
@@ -261,6 +251,20 @@ fn private_to_module_error(
 ) {
     let why = format!(
         "it is private to module `{}`",
+        callee.module_env.get_full_name_str()
+    );
+    cannot_call_error(env, &why, sites, caller, callee);
+}
+
+fn not_a_friend_error(
+    env: &GlobalEnv,
+    sites: &BTreeSet<NodeId>,
+    caller: &FunctionEnv,
+    callee: &FunctionEnv,
+) {
+    let why = format!(
+        "module `{}` is not a `friend` of `{}`",
+        caller.module_env.get_full_name_str(),
         callee.module_env.get_full_name_str()
     );
     cannot_call_error(env, &why, sites, caller, callee);
