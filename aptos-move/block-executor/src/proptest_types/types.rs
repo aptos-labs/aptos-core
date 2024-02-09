@@ -1043,7 +1043,11 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        StateValueMetadata,
+        Arc<MoveTypeLayout>,
+    )> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         Vec::new()
     }

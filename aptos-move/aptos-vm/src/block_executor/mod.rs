@@ -213,7 +213,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    fn reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
+    fn reads_needing_delayed_field_exchange(
+        &self,
+    ) -> Vec<(StateKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -274,8 +276,8 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     fn incorporate_materialized_txn_output(
         &self,
         aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
-        patched_resource_write_set: Vec<(StateKey, WriteOp)>,
-        patched_events: Vec<ContractEvent>,
+        materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
+        materialized_events: Vec<ContractEvent>,
     ) -> Result<(), PanicError> {
         assert!(
             self.committed_output
@@ -286,12 +288,12 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .expect("Output must be set to incorporate materialized data")
                         .into_transaction_output_with_materialized_write_set(
                             aggregator_v1_writes,
-                            patched_resource_write_set,
-                            patched_events,
+                            materialized_resource_write_set,
+                            materialized_events,
                         )?,
                 )
                 .is_ok(),
-            "Could not combine VMOutput with the patched resource and event data"
+            "Could not combine VMOutput with the materialized resource and event data"
         );
         Ok(())
     }
@@ -308,7 +310,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                         .expect("We should be able to always convert to transaction output"),
                 )
                 .is_ok(),
-            "Could not combine VMOutput with the patched resource and event data"
+            "Could not combine VMOutput with the materialized resource and event data"
         );
     }
 

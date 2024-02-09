@@ -398,9 +398,9 @@ impl VMChangeSet {
     // Called by `into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_resource_write_set(
         &mut self,
-        patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        materialized_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) -> Result<(), PanicError> {
-        for (key, new_write) in patched_resource_writes {
+        for (key, new_write) in materialized_resource_writes {
             let abstract_write = self.resource_write_set.get_mut(&key).ok_or_else(|| {
                 code_invariant_error(format!(
                     "Cannot patch a resource which does not exist, for: {:?}.",
@@ -429,8 +429,8 @@ impl VMChangeSet {
     }
 
     /// The events are set to the input events.
-    pub(crate) fn set_events(&mut self, patched_events: impl Iterator<Item = ContractEvent>) {
-        self.events = patched_events
+    pub(crate) fn set_events(&mut self, materialized_events: impl Iterator<Item = ContractEvent>) {
+        self.events = materialized_events
             .map(|event| (event, None))
             .collect::<Vec<_>>();
     }

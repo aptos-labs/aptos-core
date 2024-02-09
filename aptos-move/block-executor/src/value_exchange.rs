@@ -37,7 +37,7 @@ pub(crate) struct TemporaryValueToIdentifierMapping<
     txn_idx: TxnIndex,
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
-    delayed_field_ids: RefCell<HashSet<T::Identifier>>,
+    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
 }
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
@@ -47,7 +47,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
         Self {
             latest_view,
             txn_idx,
-            delayed_field_ids: RefCell::new(HashSet::new()),
+            delayed_field_keys: RefCell::new(HashSet::new()),
         }
     }
 
@@ -56,7 +56,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
     }
 
     pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_ids.into_inner()
+        self.delayed_field_keys.into_inner()
     }
 }
 
@@ -80,7 +80,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
                 state.set_delayed_field_value(id, base_value);
             },
         };
-        self.delayed_field_ids.borrow_mut().insert(id);
+        self.delayed_field_keys.borrow_mut().insert(id);
         id.try_into_move_value(layout)
             .map_err(|e| TransformationError(format!("{:?}", e)))
     }
@@ -92,7 +92,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
     ) -> TransformationResult<Value> {
         let (id, width) = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_ids.borrow_mut().insert(id);
+        self.delayed_field_keys.borrow_mut().insert(id);
         Ok(match &self.latest_view.latest_view {
             ViewState::Sync(state) => state
                 .versioned_map
@@ -110,18 +110,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIden
 struct TemporaryExtractIdentifiersMapping<T: Transaction> {
     // These are the delayed field keys that were touched when utilizing this mapping
     // to replace ids with values or values with ids
-    delayed_field_ids: RefCell<HashSet<T::Identifier>>,
+    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
 }
 
 impl<T: Transaction> TemporaryExtractIdentifiersMapping<T> {
     pub fn new() -> Self {
         Self {
-            delayed_field_ids: RefCell::new(HashSet::new()),
+            delayed_field_keys: RefCell::new(HashSet::new()),
         }
     }
 
     pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_ids.into_inner()
+        self.delayed_field_keys.into_inner()
     }
 }
 
@@ -134,7 +134,7 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
     ) -> TransformationResult<Value> {
         let (id, _) = T::Identifier::try_from_move_value(layout, value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_ids.borrow_mut().insert(id);
+        self.delayed_field_keys.borrow_mut().insert(id);
         id.try_into_move_value(layout)
             .map_err(|e| TransformationError(format!("{:?}", e)))
     }
@@ -146,7 +146,7 @@ impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMap
     ) -> TransformationResult<Value> {
         let (id, _) = T::Identifier::try_from_move_value(layout, identifier_value, &())
             .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_ids.borrow_mut().insert(id);
+        self.delayed_field_keys.borrow_mut().insert(id);
         id.try_into_move_value(layout)
             .map_err(|e| TransformationError(format!("{:?}", e)))
     }

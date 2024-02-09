@@ -179,14 +179,9 @@ impl AggV2TestHarness {
             .harness
             .run_block_in_parts_and_check(block_split, txn_block.clone());
 
-        for (idx, (h, name)) in self.comparison_harnesses.iter_mut().enumerate() {
+        for (h, name) in self.comparison_harnesses.iter_mut() {
             let new_result = h.run_block_in_parts_and_check(block_split, txn_block.clone());
-            assert_outputs_equal(
-                &result,
-                "baseline",
-                &new_result,
-                name,
-            );
+            assert_outputs_equal(&result, "baseline", &new_result, name);
         }
     }
 

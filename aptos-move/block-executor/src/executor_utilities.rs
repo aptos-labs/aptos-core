@@ -4,7 +4,7 @@
 use crate::{errors::*, view::LatestView};
 use aptos_aggregator::types::{code_invariant_error, PanicOr};
 use aptos_logger::error;
-use aptos_mvhashmap::types::ValueWithLayout;
+use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     contract_event::TransactionEvent, delayed_fields::PanicError, executable::Executable,
     state_store::TStateView, transaction::BlockExecutableTransaction as Transaction,
@@ -12,6 +12,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{alert, prelude::*};
 use bytes::Bytes;
+use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
 use std::{
@@ -42,7 +43,7 @@ macro_rules! groups_to_finalize {
 //
 // Since reads needing exchange also do not contain deletions (see 'does_value_need_exchange')
 // logic in value_exchange.rs, it is guaranteed that no returned values is a deletion.
-macro_rules! resource_writes_to_exchange {
+macro_rules! resource_writes_to_materialize {
     ($writes:expr, $outputs:expr, $data_source:expr, $($txn_idx:expr),*) => {{
 	$outputs
             .reads_needing_delayed_field_exchange($($txn_idx),*)
@@ -50,26 +51,29 @@ macro_rules! resource_writes_to_exchange {
 	    .map(|(key, metadata, layout)| {
 		match $data_source.fetch_exchanged_data(&key, $($txn_idx),*) {
 		    Some((value, existing_layout)) => {
-                randomly_check_layout_matches(
-                    Some(&existing_layout),
-                    Some(layout.as_ref()),
-                )?;
-                let new_value = Arc::new(TransactionWrite::from_state_value(Some(StateValue::new_with_metadata(value.bytes().cloned().unwrap_or_else(Bytes::new), metadata))));
-                Ok((key, new_value, layout))
+			randomly_check_layout_matches(
+			    Some(&existing_layout),
+			    Some(layout.as_ref()),
+			)?;
+			let new_value = Arc::new(TransactionWrite::from_state_value(Some(
+			    StateValue::new_with_metadata(
+				value.bytes().cloned().unwrap_or_else(Bytes::new), metadata)
+			    )));
+			Ok((key, new_value, layout))
 		    },
 		    None => {
-                Err(code_invariant_error(
-                    "Read value needing exchange not in Exchanged format".to_string()
-                ))
+			Err(code_invariant_error(
+			    "Read value needing exchange not in Exchanged format".to_string()
+			))
 		    }
 		}}).chain(
 		$writes.into_iter().filter_map(|(key, value, maybe_layout)| {
 		    // layout is Some(_) if it contains a delayed field
 		    if let Some(layout) = maybe_layout {
-                // No need to exchange anything if a resource with delayed field is deleted.
-                if !value.is_deletion() {
-                    return Some(Ok((key, value, layout)))
-                }
+			// No need to exchange anything if a resource with delayed field is deleted.
+			if !value.is_deletion() {
+			    return Some(Ok((key, value, layout)))
+			}
 		    }
 		    None
 		})).collect::<std::result::Result<Vec<_>, _>>()
@@ -77,7 +81,7 @@ macro_rules! resource_writes_to_exchange {
 }
 
 pub(crate) use groups_to_finalize;
-pub(crate) use resource_writes_to_exchange;
+pub(crate) use resource_writes_to_materialize;
 
 pub(crate) fn map_finalized_group<T: Transaction>(
     group_key: T::Key,

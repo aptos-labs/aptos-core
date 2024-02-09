@@ -41,7 +41,7 @@ use aptos_types::{
     transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
     write_set::{TransactionWrite, WriteOp},
 };
-use aptos_vm_logging::{clear_speculative_txn_logs, init_speculative_logs};
+use aptos_vm_logging::{alert, clear_speculative_txn_logs, init_speculative_logs, prelude::*};
 use aptos_vm_types::change_set::randomly_check_layout_matches;
 use bytes::Bytes;
 use claims::assert_none;
@@ -52,7 +52,7 @@ use num_cpus;
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     marker::{PhantomData, Sync},
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -526,7 +526,7 @@ where
                 }
             }
 
-            groups_to_finalize!(last_input_output, txn_idx)
+            let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
                 .map(|((group_key, metadata_op), is_read_needing_exchange)| {
                     // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
                     // TODO[agg_v2]: have a test that fails if we don't do the if.
@@ -546,12 +546,9 @@ where
                         is_read_needing_exchange,
                     )
                 })
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| e.into())
-                .and_then(|finalized_groups| {
-                    last_input_output.record_finalized_group(txn_idx, finalized_groups);
-                    last_input_output.module_rw_intersection_ok()
-                })?;
+                .collect::<Result<Vec<_>, _>>()?;
+
+            last_input_output.record_finalized_group(txn_idx, finalized_groups);
 
             // While the above propagate errors and lead to eventually halting parallel execution,
             // below we may halt the execution without an error in cases when:
@@ -654,22 +651,22 @@ where
         );
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
-        let exchanged_finalized_groups =
+        let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-        let serialized_groups = serialize_groups::<T>(exchanged_finalized_groups)?;
+        let serialized_groups = serialize_groups::<T>(materialized_finalized_groups, txn_idx)?;
 
         let resource_write_set = last_input_output.take_resource_write_set(txn_idx);
-        let resource_writes_to_exchange = resource_writes_to_exchange!(
+        let resource_writes_to_materialize = resource_writes_to_materialize!(
             resource_write_set,
             last_input_output,
             versioned_cache.data(),
             txn_idx
         )?;
-        let exchanged_resource_write_set =
-            map_id_to_values_in_write_set(resource_writes_to_exchange, &latest_view)?;
+        let materialized_resource_write_set =
+            map_id_to_values_in_write_set(resource_writes_to_materialize, &latest_view)?;
 
         let events = last_input_output.events(txn_idx);
-        let exchanged_events = map_id_to_values_events(events, &latest_view)?;
+        let materialized_events = map_id_to_values_events(events, &latest_view)?;
         let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
             txn_idx,
             last_input_output,
@@ -680,11 +677,11 @@ where
         last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
-            exchanged_resource_write_set
+            materialized_resource_write_set
                 .into_iter()
                 .chain(serialized_groups)
                 .collect(),
-            exchanged_events,
+            materialized_events,
         )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
@@ -1177,25 +1174,28 @@ where
                                 )
                             })
                             .collect::<Result<Vec<_>, _>>()?;
-                        let exchanged_finalized_groups =
+                        let materialized_finalized_groups =
                             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
                         let serialized_groups =
-                            serialize_groups::<T>(exchanged_finalized_groups, idx as TxnIndex)
+                            serialize_groups::<T>(materialized_finalized_groups, idx as TxnIndex)
                                 .map_err(BlockExecutionError::FallbackToSequential)?;
 
-                        let resource_writes_to_exchange =
-                            resource_writes_to_exchange!(resource_write_set, output, unsync_map,)?;
+                        let resource_writes_to_materialize = resource_writes_to_materialize!(
+                            resource_write_set,
+                            output,
+                            unsync_map,
+                        )?;
                         // Replace delayed field id with values in resource write set and read set.
-                        let exchanged_resource_write_set = map_id_to_values_in_write_set(
-                            resource_writes_to_exchange,
+                        let materialized_resource_write_set = map_id_to_values_in_write_set(
+                            resource_writes_to_materialize,
                             &latest_view,
                         )?;
 
                         // Replace delayed field id with values in events
-                        let exchanged_events = map_id_to_values_events(
+                        let materialized_events = map_id_to_values_events(
                             Box::new(output.get_events().into_iter()),
                             &latest_view,
-                        );
+                        )?;
 
                         output
                             .incorporate_materialized_txn_output(
@@ -1203,11 +1203,11 @@ where
                                 // They are already handled because we passed materialize_deltas=true
                                 // to execute_transaction.
                                 vec![],
-                                patched_resource_write_set
+                                materialized_resource_write_set
                                     .into_iter()
                                     .chain(serialized_groups.into_iter())
                                     .collect(),
-                                exchanged_events,
+                                materialized_events,
                             )
                             .map_err(PanicOr::from)
                             .map_err(BlockExecutionError::FallbackToSequential)?;

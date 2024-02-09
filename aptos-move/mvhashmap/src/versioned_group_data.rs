@@ -246,7 +246,11 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     }
 
     // Records the latest committed op for each tag in the group (removed tags ar excluded).
-    fn commit_idx(&mut self, shifted_idx: ShiftedTxnIndex, allow_new_modification: bool) -> anyhow::Result<()> {
+    fn commit_idx(
+        &mut self,
+        shifted_idx: ShiftedTxnIndex,
+        allow_new_modification: bool,
+    ) -> anyhow::Result<()> {
         use std::collections::hash_map::Entry::*;
         use WriteOpKind::*;
 
@@ -262,8 +266,10 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 (Occupied(mut entry), Modification) => {
                     entry.insert(v.clone());
                 },
-                (Vacant(entry), Creation)
-                | (Vacant(entry), Modification) if allow_new_modification => {
+                (Vacant(entry), Creation) => {
+                    entry.insert(v.clone());
+                },
+                (Vacant(entry), Modification) if allow_new_modification => {
                     entry.insert(v.clone());
                 },
                 (Occupied(mut entry), Creation) if entry.get().write_op_kind() == Deletion => {

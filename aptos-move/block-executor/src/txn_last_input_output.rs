@@ -11,7 +11,7 @@ use crate::{
 use aptos_aggregator::types::{code_invariant_error, PanicOr};
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement, fee_statement::FeeStatement,
+    delayed_fields::PanicError, fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };

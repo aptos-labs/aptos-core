@@ -8,7 +8,7 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement, fee_statement::FeeStatement,
+    delayed_fields::PanicError, fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
@@ -121,7 +121,11 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata, Arc<MoveTypeLayout>)>;
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        StateValueMetadata,
+        Arc<MoveTypeLayout>,
+    )>;
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
