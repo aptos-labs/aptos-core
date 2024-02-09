@@ -7,7 +7,7 @@ module module_owner::dice {
         rolls: vector<u64>,
     }
 
-    public entry fun roll(account: signer) acquires DiceRollHistory {
+    entry fun roll(account: signer) acquires DiceRollHistory {
         let addr = address_of(&account);
         let roll_history = if (exists<DiceRollHistory>(addr)) {
             move_from<DiceRollHistory>(addr)
