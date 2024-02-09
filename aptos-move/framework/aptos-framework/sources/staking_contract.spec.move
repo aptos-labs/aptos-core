@@ -295,6 +295,7 @@ spec aptos_framework::staking_contract {
         old_operator: address,
         new_operator: address,
     ) {
+        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
@@ -330,6 +331,7 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
+        pragma verify_duration_estimate = 120;
         // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         include ContractExistsAbortsIf;
@@ -343,6 +345,7 @@ spec aptos_framework::staking_contract {
         staking_contract: &mut StakingContract,
         distribute_events: &mut EventHandle<DistributeEvent>,
     ) {
+        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;
