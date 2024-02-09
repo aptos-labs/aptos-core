@@ -61,7 +61,15 @@ pub fn run_move_mutator(
 
     trace!("Mutator configuration: {mutator_configuration:?}");
 
-    let (files, ast) = generate_ast(&mutator_configuration, config, package_path)?;
+    let (files, ast) = generate_ast(
+        &mutator_configuration,
+        config,
+        mutator_configuration
+            .project_path
+            .as_ref()
+            .unwrap_or(&package_path.to_owned())
+            .as_path(),
+    )?;
 
     trace!("Generated AST: {ast:?}");
 
@@ -97,6 +105,16 @@ pub fn run_move_mutator(
             }
 
             for mutated in mutated_sources {
+                if let Some(mutation_conf) = &mutator_configuration.mutation {
+                    if !mutation_conf.operators.is_empty()
+                        && !mutation_conf
+                            .operators
+                            .contains(&mutated.mutation.get_operator_name().to_owned())
+                    {
+                        continue;
+                    }
+                }
+
                 if mutator_configuration.project.verify_mutants {
                     let res = verify_mutant(config, &mutated.mutated_source, path);
 

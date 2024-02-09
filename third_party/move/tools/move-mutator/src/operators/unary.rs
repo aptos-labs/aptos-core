@@ -4,6 +4,9 @@ use move_command_line_common::files::FileHash;
 use move_compiler::parser::ast::UnaryOp;
 use std::fmt;
 
+pub const OPERATOR_NAME: &str = "unary_operator_replacement";
+
+/// Represents a unary operator mutation.
 #[derive(Debug, Copy, Clone)]
 pub struct Unary {
     op: UnaryOp,
@@ -42,6 +45,10 @@ impl MutationOperator for Unary {
 
     fn get_file_hash(&self) -> FileHash {
         self.op.loc.file_hash()
+    }
+
+    fn name(&self) -> String {
+        OPERATOR_NAME.to_string()
     }
 }
 

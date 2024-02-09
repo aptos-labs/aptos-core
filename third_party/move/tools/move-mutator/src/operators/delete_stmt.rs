@@ -7,6 +7,8 @@ use move_compiler::typing::ast::BuiltinFunction_;
 use std::fmt;
 use std::fmt::Debug;
 
+pub const OPERATOR_NAME: &str = "delete_statement";
+
 /// Statement delete operator.
 /// Deletes statements which can be potentially deleted, still allowing the code to compile
 /// properly.
@@ -55,7 +57,7 @@ impl MutationOperator for DeleteStmt {
                     mutated_source,
                     Mutation::new(
                         Range::new(start, end),
-                        "delete_stmt_replacement".to_string(),
+                        OPERATOR_NAME.to_string(),
                         cur_op.to_string(),
                         op.to_string(),
                     ),
@@ -66,6 +68,10 @@ impl MutationOperator for DeleteStmt {
 
     fn get_file_hash(&self) -> FileHash {
         self.operation.exp.loc.file_hash()
+    }
+
+    fn name(&self) -> String {
+        OPERATOR_NAME.to_string()
     }
 }
 
