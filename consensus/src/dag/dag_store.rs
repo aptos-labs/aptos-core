@@ -28,8 +28,8 @@ use std::{
 pub enum NodeStatus {
     Unordered {
         node: Arc<CertifiedNode>,
-        votes_culumative_voting_power: u128,
-        links_cumulative_voting_power: u128,
+        aggregated_weak_voting_power: u128,
+        aggregated_strong_voting_power: u128,
     },
     Ordered(Arc<CertifiedNode>),
 }
@@ -116,8 +116,8 @@ impl InMemDag {
         ensure!(round_ref.is_none(), "race during insertion");
         *round_ref = Some(NodeStatus::Unordered {
             node: node.clone(),
-            votes_culumative_voting_power: 0,
-            links_cumulative_voting_power: 0,
+            aggregated_weak_voting_power: 0,
+            aggregated_strong_voting_power: 0,
         });
         self.update_votes(&node, true);
         Ok(())
@@ -166,25 +166,26 @@ impl InMemDag {
             return;
         }
 
+        let voting_power = self
+            .epoch_state
+            .verifier
+            .get_voting_power(node.author())
+            .expect("must exist");
+
         for parent in node.parents_metadata() {
-            let voting_power = self
-                .epoch_state
-                .verifier
-                .get_voting_power(node.author())
-                .expect("must exist");
             let node_status = self
                 .get_node_ref_mut(parent.round(), parent.author())
                 .expect("must exist");
             match node_status {
                 Some(NodeStatus::Unordered {
-                    votes_culumative_voting_power,
-                    links_cumulative_voting_power,
+                    aggregated_weak_voting_power,
+                    aggregated_strong_voting_power,
                     ..
                 }) => {
                     if update_link_power {
-                        *links_cumulative_voting_power += voting_power as u128;
+                        *aggregated_strong_voting_power += voting_power as u128;
                     } else {
-                        *votes_culumative_voting_power += voting_power as u128;
+                        *aggregated_weak_voting_power += voting_power as u128;
                     }
                 },
                 Some(NodeStatus::Ordered(_)) => {},
@@ -263,15 +264,15 @@ impl InMemDag {
         self.get_node_ref_by_metadata(metadata)
             .map(|node_status| match node_status {
                 NodeStatus::Unordered {
-                    votes_culumative_voting_power,
-                    links_cumulative_voting_power,
+                    aggregated_weak_voting_power,
+                    aggregated_strong_voting_power,
                     ..
                 } => {
                     validator_verifier
-                        .check_aggregated_voting_power(*votes_culumative_voting_power, true)
+                        .check_aggregated_voting_power(*aggregated_weak_voting_power, true)
                         .is_ok()
                         || validator_verifier
-                            .check_aggregated_voting_power(*links_cumulative_voting_power, false)
+                            .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
                             .is_ok()
                 },
                 NodeStatus::Ordered(_) => {

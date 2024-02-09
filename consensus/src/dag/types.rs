@@ -558,6 +558,9 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
     type Message = Node;
     type Response = Vote;
 
+    /// Processes the [Vote]s received for a given [Node]. Once a supermajority voting power
+    /// is reached, this method sends [NodeCertificate] into a channel. It will only return
+    /// successfully when [Vote]s are received from all the peers.
     fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
         ensure!(self.metadata == ack.metadata, "Digest mismatch");
         ack.verify(peer, &self.epoch_state.verifier)?;
