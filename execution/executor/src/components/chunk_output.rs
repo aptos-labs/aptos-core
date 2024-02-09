@@ -389,7 +389,11 @@ pub fn update_counters_for_processed_chunk<T, O>(
                 },
 
                 // Deprecated.
-                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {},
+                aptos_types::transaction::TransactionPayload::ModuleBundle(_) => {
+                    metrics::APTOS_PROCESSED_USER_TRANSACTIONS_PAYLOAD_TYPE
+                        .with_label_values(&[process_type, "deprecated_module_bundle", state])
+                        .inc();
+                },
             }
         }
 
