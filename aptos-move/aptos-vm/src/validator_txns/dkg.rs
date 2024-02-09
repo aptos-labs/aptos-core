@@ -90,12 +90,8 @@ impl AptosVM {
         let config_resource = ConfigurationResource::fetch_config(resolver)
             .ok_or_else(|| Expected(MissingResourceConfiguration))?;
         let DKGState { in_progress, .. } = dkg_state;
-
-        let mut in_progress_session_state =
+        let in_progress_session_state =
             in_progress.ok_or_else(|| Expected(MissingResourceInprogressDKGSession))?;
-
-        // Temp adjust session so it is current.
-        in_progress_session_state.metadata.dealer_epoch = config_resource.epoch();
 
         // Check epoch number.
         if dkg_node.metadata.epoch != config_resource.epoch() {
