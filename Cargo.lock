@@ -10634,6 +10634,7 @@ dependencies = [
  "bytes",
  "fail 0.4.0",
  "hex",
+ "lru 0.7.8",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-compiler",

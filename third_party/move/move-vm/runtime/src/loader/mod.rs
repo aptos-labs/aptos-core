@@ -33,6 +33,7 @@ use move_vm_types::loaded_data::runtime_types::{
 use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 use sha3::{Digest, Sha3_256};
 use std::{
+    cell::RefCell,
     collections::{btree_map, BTreeMap, BTreeSet, HashMap},
     hash::Hash,
     sync::Arc,
@@ -81,6 +82,15 @@ where
         let index = self.id_map.get(key)?;
         self.binaries.get(*index)
     }
+}
+
+// Max number of modules that can skip re-verification.
+// 8 threads * (32 bytes + 2*16 for entries) * 100_000 < 80MB. Should be a reasonable memory consumption.
+const VERIFIED_CACHE_SIZE: usize = 100_000;
+
+// Cache for already verified modules
+thread_local! {
+    static VERIFIED_MODULES: RefCell<lru::LruCache<[u8; 32], ()>> = RefCell::new(lru::LruCache::new(VERIFIED_CACHE_SIZE));
 }
 
 // A script cache is a map from the hash value of a script and the `Script` itself.
@@ -912,9 +922,25 @@ impl Loader {
             );
         }
 
-        // bytecode verifier checks that can be performed with the module itself
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
-            .map_err(expect_no_verification_errors)?;
+        // Verify the module if it hasn't been verified before.
+        let mut sha3_256 = Sha3_256::new();
+        sha3_256.update(bytes);
+        let hash_value: [u8; 32] = sha3_256.finalize().into();
+
+        VERIFIED_MODULES.with(|cell| {
+            let mut cache = cell.borrow_mut();
+            if cache.get(&hash_value).is_none() {
+                // bytecode verifier checks that can be performed with the module itself
+                move_bytecode_verifier::verify_module_with_config(
+                    &self.vm_config.verifier,
+                    &module,
+                )
+                .map_err(expect_no_verification_errors)?;
+                cache.put(hash_value, ());
+            }
+            Ok(())
+        })?;
+
         self.check_natives(&module)
             .map_err(expect_no_verification_errors)?;
         Ok(module)
