@@ -1299,10 +1299,13 @@ where
                             unsync_map
                                 .finalize_group(&group_key)
                                 .map(|(resource_tag, value_with_layout)| {
+                                    let value = match value_with_layout {
+                                        ValueWithLayout::RawFromStorage(value)
+                                        | ValueWithLayout::Exchanged(value, _) => value,
+                                    };
                                     (
                                         resource_tag,
-                                        value_with_layout
-                                            .extract_value_no_layout()
+                                        value
                                             .extract_raw_bytes()
                                             .expect("Deletions should already be applied"),
                                     )
@@ -1523,16 +1526,16 @@ where
             )
         };
 
-        let resource_group_bcs_fallback = matches!(
+        let mut resource_group_bcs_fallback = matches!(
             ret,
             Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
                 IntentionalFallbackToSequential::ResourceGroupSerializationError
             )))
         );
 
-        if self.config.local.concurrency_level > 1 || resource_group_bcs_fallback {
+        if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
             // Sequential execution fallback, only worth doing if we did a different pass before,
-            // i.e. parallel, or without resource group serialization fallback configured.
+            // i.e. parallel. This fallback does not handle resource group serialization issues.
 
             if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
                 // Any error logs are already written at appropriate levels.
@@ -1546,10 +1549,26 @@ where
                     executor_arguments,
                     signature_verified_block,
                     base_view,
-                    // Always enable resource group serialization handling in fallback.
-                    true,
+                    false,
+                );
+                resource_group_bcs_fallback = matches!(
+                    ret,
+                    Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                        IntentionalFallbackToSequential::ResourceGroupSerializationError
+                    )))
                 );
             }
+        }
+
+        if resource_group_bcs_fallback {
+            alert!("Resource group serialization fallback");
+            init_speculative_logs(signature_verified_block.len());
+            ret = self.execute_transactions_sequential(
+                executor_arguments,
+                signature_verified_block,
+                base_view,
+                true,
+            );
         }
 
         // If after trying available fallbacks, we still are askign to do a fallback,
