@@ -763,6 +763,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-collections"
+version = "0.1.0"
+
+[[package]]
 name = "aptos-comparison-testing"
 version = "0.1.0"
 dependencies = [
@@ -867,6 +871,7 @@ dependencies = [
  "aptos-bounded-executor",
  "aptos-cached-packages",
  "aptos-channels",
+ "aptos-collections",
  "aptos-config",
  "aptos-consensus-notifications",
  "aptos-consensus-types",

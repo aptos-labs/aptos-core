@@ -24,6 +24,7 @@ use crate::{
     payload_client::PayloadClient,
 };
 use anyhow::{bail, ensure};
+use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
@@ -39,11 +40,7 @@ use futures::{
     future::{AbortHandle, Abortable},
     FutureExt,
 };
-use std::{
-    collections::{vec_deque, HashSet, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
@@ -357,40 +354,5 @@ impl RpcHandler for DagDriver {
             .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
-    }
-}
-
-struct BoundedVecDeque<T> {
-    inner: VecDeque<T>,
-    capacity: usize,
-}
-
-impl<T> BoundedVecDeque<T> {
-    fn new(capacity: usize) -> Self {
-        assert!(capacity > 0);
-        Self {
-            inner: VecDeque::with_capacity(capacity),
-            capacity,
-        }
-    }
-
-    fn is_full(&self) -> bool {
-        self.inner.len() == self.capacity
-    }
-
-    fn push_back(&mut self, item: T) -> Option<T> {
-        let oldest = if self.is_full() {
-            self.inner.pop_front()
-        } else {
-            None
-        };
-
-        self.inner.push_back(item);
-        assert!(self.inner.len() <= self.capacity);
-        oldest
-    }
-
-    fn iter(&self) -> vec_deque::Iter<'_, T> {
-        self.inner.iter()
     }
 }
