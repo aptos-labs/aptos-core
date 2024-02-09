@@ -24,12 +24,13 @@ use crate::{
     payload_client::PayloadClient,
 };
 use anyhow::{bail, ensure};
+use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use aptos_validator_transaction_pool as vtxn_pool;
@@ -49,7 +50,7 @@ pub(crate) struct DagDriver {
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
-    rb_abort_handle: Mutex<Option<(AbortHandle, u64)>>,
+    rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64)>>,
     storage: Arc<dyn DAGStorage>,
     order_rule: Mutex<OrderRule>,
     fetch_requester: Arc<dyn TFetchRequester>,
@@ -93,7 +94,7 @@ impl DagDriver {
             payload_client,
             reliable_broadcast,
             time_service,
-            rb_abort_handle: Mutex::new(None),
+            rb_handles: Mutex::new(BoundedVecDeque::new(window_size_config as usize)),
             storage,
             order_rule: Mutex::new(order_rule),
             fetch_requester,
@@ -319,13 +320,13 @@ impl DagDriver {
             debug!("Finish reliable broadcast for round {}", round);
         };
         tokio::spawn(Abortable::new(task, abort_registration));
-        if let Some((prev_handle, prev_round_timestamp)) = self
-            .rb_abort_handle
+        if let Some((_handle, prev_round_timestamp)) = self
+            .rb_handles
             .lock()
-            .replace((abort_handle, timestamp))
+            .push_back((DropGuard::new(abort_handle), timestamp))
         {
+            // TODO: this observation is inaccurate.
             observe_round(prev_round_timestamp, RoundStage::Finished);
-            prev_handle.abort();
         }
     }
 }
@@ -353,13 +354,5 @@ impl RpcHandler for DagDriver {
             .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
-    }
-}
-
-impl Drop for DagDriver {
-    fn drop(&mut self) {
-        if let Some((handle, _)) = self.rb_abort_handle.lock().as_ref() {
-            handle.abort()
-        }
     }
 }
