@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::health::HealthBackoff;
+use super::{dag_store::DagStore, health::HealthBackoff};
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
         dag_network::RpcHandler,
-        dag_store::Dag,
         errors::NodeBroadcastHandleError,
         observability::{
             logging::{LogEvent, LogSchema},
@@ -21,7 +20,6 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState,
@@ -33,7 +31,7 @@ use async_trait::async_trait;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<DagStore>,
     votes_by_round_peer: BTreeMap<Round, BTreeMap<Author, Vote>>,
     signer: Arc<ValidatorSigner>,
     epoch_state: Arc<EpochState>,
@@ -47,7 +45,7 @@ pub(crate) struct NodeBroadcastHandler {
 
 impl NodeBroadcastHandler {
     pub fn new(
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<DagStore>,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,

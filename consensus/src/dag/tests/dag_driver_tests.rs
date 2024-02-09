@@ -7,7 +7,7 @@ use crate::{
         dag_driver::DagDriver,
         dag_fetcher::TFetchRequester,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
-        dag_store::Dag,
+        dag_store::DagStore,
         errors::DagDriverError,
         health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
         order_rule::OrderRule,
@@ -25,7 +25,6 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -122,13 +121,13 @@ fn setup(
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
     let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
-    let dag = Arc::new(RwLock::new(Dag::new(
+    let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
-    )));
+    ));
 
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),

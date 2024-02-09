@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::health::HealthBackoff;
+use super::{dag_store::DagStore, health::HealthBackoff};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
-        dag_store::Dag,
         errors::DagDriverError,
         observability::{
             counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
@@ -24,11 +23,10 @@ use crate::{
     },
     payload_client::PayloadClient,
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
-use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -46,7 +44,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<DagStore>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
@@ -67,7 +65,7 @@ impl DagDriver {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<DagStore>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
@@ -127,23 +125,35 @@ impl DagDriver {
 
     async fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         let (highest_strong_link_round, strong_links) = {
-            let mut dag_writer = self.dag.write();
+            {
+                let dag_reader = self.dag.read();
 
-            if !dag_writer.all_exists(node.parents_metadata()) {
-                if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
-                    error!("request to fetch failed: {}", err);
+                // Ensure the window hasn't moved, so we don't request fetch unnecessarily.
+                ensure!(node.round() >= dag_reader.lowest_round(), "stale node");
+
+                if !dag_reader.all_exists(node.parents_metadata()) {
+                    if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                        error!("request to fetch failed: {}", err);
+                    }
+                    bail!(DagDriverError::MissingParents);
                 }
-                bail!(DagDriverError::MissingParents);
             }
 
-            dag_writer.add_node(node)?;
+            // Note on concurrency: it is possible that a prune operation kicks in here and
+            // moves the window forward making the `node` stale, but we guarantee that the
+            // order rule only visits `window` length rounds, so having node around should
+            // be fine. Any stale node inserted due to this race will be cleaned up with
+            // the next prune operation.
 
+            self.dag.add_node(node)?;
+
+            let dag_reader = self.dag.read();
             let highest_strong_links_round =
-                dag_writer.highest_strong_links_round(&self.epoch_state.verifier);
+                dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
             (
                 highest_strong_links_round,
                 // unwrap is for round 0
-                dag_writer
+                dag_reader
                     .get_strong_links_for_round(
                         highest_strong_links_round,
                         &self.epoch_state.verifier,
@@ -320,12 +330,10 @@ impl RpcHandler for DagDriver {
         debug!(LogSchema::new(LogEvent::ReceiveCertifiedNode)
             .remote_peer(*certified_node.author())
             .round(certified_node.round()));
-        {
-            let dag_reader = self.dag.read();
-            if dag_reader.exists(certified_node.metadata()) {
-                return Ok(CertifiedAck::new(epoch));
-            }
+        if self.dag.read().exists(certified_node.metadata()) {
+            return Ok(CertifiedAck::new(epoch));
         }
+
         observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
         NUM_TXNS_PER_NODE.observe(certified_node.payload().len() as f64);
         NODE_PAYLOAD_SIZE.observe(certified_node.payload().size() as f64);
