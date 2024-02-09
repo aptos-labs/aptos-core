@@ -117,6 +117,7 @@ impl NetworkHandler {
                 });
             }
         });
+        defer!(handle.abort());
 
         let mut futures = FuturesUnordered::new();
         // A separate executor to ensure the message verification sender (above) and receiver (below) are
@@ -148,8 +149,7 @@ impl NetworkHandler {
                     futures.push(f);
                 },
                 Some(status) = futures.next() => {
-                    if let Some(status) = status.expect("must finish") {
-                        handle.abort();
+                    if let Some(status) = status.expect("future must not panic") {
                         return status;
                     }
                 },
