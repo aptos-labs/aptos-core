@@ -4486,7 +4486,11 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
+<<<<<<< HEAD
 <pre><code><b>aborts_if</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>();
+=======
+<pre><code><b>pragma</b> aborts_if_is_partial;
+>>>>>>> 5e4dd90557 (migrate optional)
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="stake.md#0x1_stake_AddStakeAbortsIfAndEnsures">AddStakeAbortsIfAndEnsures</a>;
 </code></pre>
@@ -4706,7 +4710,11 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
+<<<<<<< HEAD
 <pre><code><b>aborts_if</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>();
+=======
+<pre><code><b>pragma</b> verify = <b>false</b>;
+>>>>>>> 5e4dd90557 (migrate optional)
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
 <b>let</b> ownership_cap = <b>global</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(addr);
 <b>let</b> pool_address = ownership_cap.pool_address;

@@ -160,7 +160,33 @@ module aptos_framework::aptos_coin {
 
     // This is particularly useful if the aggregator_factory is already initialized via another call path.
     #[test_only]
-    public fun initialize_for_test_without_aggregator_factory(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+    public fun initialize_for_test_without_aggregator_factory(
+        aptos_framework: &signer
+    ): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         initialize(aptos_framework)
+    }
+
+    #[test_only]
+    use aptos_framework::fungible_asset::Metadata;
+    #[test_only]
+    use aptos_framework::primary_fungible_store;
+    #[test_only]
+    use aptos_framework::object;
+
+    #[test(aptos_framework = @aptos_framework)]
+    fun test_apt_setup_and_mint(aptos_framework: &signer) {
+        let (burn_cap, mint_cap) = initialize_for_test(aptos_framework);
+        let coin = coin::mint(100, &mint_cap);
+        let fa = coin::coin_to_fungible_asset(coin);
+        primary_fungible_store::deposit(@aptos_framework, fa);
+        assert!(
+            primary_fungible_store::balance(
+                @aptos_framework,
+                object::address_to_object<Metadata>(@aptos_framework)
+            ) == 100,
+            0
+        );
+        coin::destroy_mint_cap(mint_cap);
+        coin::destroy_burn_cap(burn_cap);
     }
 }

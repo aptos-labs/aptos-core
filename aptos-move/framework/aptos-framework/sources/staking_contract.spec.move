@@ -76,6 +76,7 @@ spec aptos_framework::staking_contract {
         include ContractExistsAbortsIf;
         let staking_contracts = global<Store>(staker).staking_contracts;
         ensures result == simple_map::spec_get(staking_contracts, operator).pool_address;
+
     }
 
     /// Staking_contract exists the stacker/operator pair.
