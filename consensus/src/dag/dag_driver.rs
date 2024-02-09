@@ -40,11 +40,7 @@ use futures::{
     future::{join, AbortHandle, Abortable},
 };
 use futures_channel::oneshot;
-use std::{
-    collections::{vec_deque, HashSet, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {

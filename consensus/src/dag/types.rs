@@ -578,7 +578,7 @@ impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
             let aggregated_signature = self
                 .epoch_state
                 .verifier
-                .aggregate_signatures(&partial_signatures)
+                .aggregate_signatures(partial_signatures)
                 .expect("Signature aggregation should succeed");
             observe_node(self.metadata.timestamp(), NodeStage::CertAggregated);
             let certificate = NodeCertificate::new(self.metadata.clone(), aggregated_signature);

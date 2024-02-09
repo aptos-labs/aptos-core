@@ -110,7 +110,7 @@ impl NodeBroadcastHandler {
             node.epoch(),
             self.epoch_state.epoch
         );
-        
+
         let num_vtxns = node.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
         for vtxn in node.validator_txns() {

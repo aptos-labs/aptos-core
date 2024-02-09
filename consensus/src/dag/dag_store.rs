@@ -3,7 +3,7 @@
 
 use super::{
     types::{DagSnapshotBitmask, NodeMetadata},
-    Node, NodeId,
+    Node,
 };
 use crate::{
     dag::{
@@ -19,7 +19,7 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
