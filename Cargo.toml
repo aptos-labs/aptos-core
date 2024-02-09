@@ -168,8 +168,6 @@ members = [
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
-    "testsuite/aptos-fuzzer",
-    "testsuite/aptos-fuzzer/fuzz",
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
@@ -327,7 +325,6 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
-aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
