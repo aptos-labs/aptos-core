@@ -1,5 +1,9 @@
-use std::collections::{vec_deque, VecDeque};
+use std::collections::{
+    vec_deque::{IntoIter, Iter},
+    VecDeque,
+};
 
+#[derive(Clone)]
 pub struct BoundedVecDeque<T> {
     inner: VecDeque<T>,
     capacity: usize,
@@ -30,8 +34,29 @@ impl<T> BoundedVecDeque<T> {
         oldest
     }
 
-    pub fn iter(&self) -> vec_deque::Iter<'_, T> {
+    pub fn push_front(&mut self, item: T) -> Option<T> {
+        let oldest = if self.is_full() {
+            self.inner.pop_back()
+        } else {
+            None
+        };
+
+        self.inner.push_front(item);
+        assert!(self.inner.len() <= self.capacity);
+        oldest
+    }
+
+    pub fn iter(&self) -> Iter<'_, T> {
         self.inner.iter()
+    }
+}
+
+impl<T> IntoIterator for BoundedVecDeque<T> {
+    type IntoIter = IntoIter<T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
     }
 }
 
@@ -50,6 +75,8 @@ mod tests {
         assert!(queue.is_full());
 
         assert_eq!(queue.push_back(capacity), Some(0));
+
+        assert_eq!(queue.push_front(0), Some(capacity));
     }
 
     #[test]
@@ -62,6 +89,10 @@ mod tests {
 
         for (i, item) in queue.iter().enumerate() {
             assert_eq!(i, *item);
+        }
+
+        for (i, item) in queue.into_iter().enumerate() {
+            assert_eq!(i, item);
         }
     }
 }
