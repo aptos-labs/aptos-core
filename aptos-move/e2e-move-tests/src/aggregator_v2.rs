@@ -21,7 +21,7 @@ pub fn initialize(
     aggregator_execution_enabled: bool,
     txns: usize,
 ) -> AggV2TestHarness {
-    let (harness, account) = initialize_harness(mode, aggregator_execution_enabled, path);
+    let (harness, account) = initialize_harness(mode, aggregator_execution_enabled, path.clone());
 
     let mut result = AggV2TestHarness {
         harness,
@@ -29,6 +29,7 @@ pub fn initialize(
         account,
         txn_accounts: vec![],
         txn_index: 0,
+        path,
     };
 
     result.initialize_issuer_accounts(txns);
@@ -41,7 +42,7 @@ pub fn initialize_enabled_disabled_comparison(
     txns: usize,
 ) -> AggV2TestHarness {
     let (harness_base, account_base) = initialize_harness(mode, false, path.clone());
-    let (harness_comp, _account_comp) = initialize_harness(mode, true, path);
+    let (harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
 
     let mut agg_harness = AggV2TestHarness {
         harness: harness_base,
@@ -49,6 +50,7 @@ pub fn initialize_enabled_disabled_comparison(
         account: account_base,
         txn_accounts: vec![],
         txn_index: 0,
+        path,
     };
 
     agg_harness.initialize_issuer_accounts(txns);
@@ -91,6 +93,7 @@ pub struct AggV2TestHarness {
     pub account: Account,
     pub txn_accounts: Vec<Account>,
     pub txn_index: usize,
+    pub path: PathBuf,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -224,6 +227,12 @@ impl AggV2TestHarness {
             vec![element_type.get_type_tag()],
             vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
         )
+    }
+
+    pub fn republish(
+        &mut self,
+    ) -> SignedTransaction {
+        self.harness.create_publish_package_cache_building(&self.account, &self.path, |_| {})
     }
 
     fn create_entry_agg_func_with_args(

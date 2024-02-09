@@ -383,6 +383,28 @@ proptest! {
     }
 
     #[test]
+    fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
+        println!("Testing test_aggregator_overflow {:?}", test_env);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 600, 400)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+            (SUCCESS, h.republish()),
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 200)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
     fn test_aggregator_materialize_overflow(test_env in arb_test_env(3)) {
         println!("Testing test_aggregator_materialize_overflow {:?}", test_env);
         let element_type = ElementType::U64;
