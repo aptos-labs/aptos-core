@@ -3001,6 +3001,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha256",
  "tokio",
  "tracing",
  "url",
