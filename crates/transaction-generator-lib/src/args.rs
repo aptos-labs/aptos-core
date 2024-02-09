@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind};
+use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind, WorkflowProgress};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -380,8 +380,8 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::Econia => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia { num_users: 100000 },
+                progress_type: WorkflowProgress::MoveByPhases,
                 num_modules: module_working_set_size,
-                move_stages_by_phase: true,
                 use_account_pool: sender_use_account_pool,
             },
         }
