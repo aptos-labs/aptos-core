@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use std::collections::{
     vec_deque::{IntoIter, Iter},
     VecDeque,
