@@ -6,6 +6,7 @@ use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     native_functions::NativeFunctions, session::LoadedFunctionInstantiation,
 };
+use lazy_static::lazy_static;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     errors::{verification_error, Location, PartialVMError, PartialVMResult, VMResult},
@@ -29,7 +30,7 @@ use move_core_types::{
 use move_vm_types::loaded_data::runtime_types::{
     AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
 };
-use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
+use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use sha3::{Digest, Sha3_256};
 use std::{
     collections::{btree_map, BTreeMap, BTreeSet, HashMap},
@@ -82,6 +83,15 @@ where
         let index = self.id_map.get(key)?;
         self.binaries.get(*index)
     }
+}
+
+// Max number of modules that can skip re-verification.
+const VERIFIED_CACHE_SIZE: usize = 100_000;
+
+// Cache for already verified modules
+lazy_static! {
+    static ref VERIFIED_MODULES: Mutex<lru::LruCache<[u8; 32], ()>> =
+        Mutex::new(lru::LruCache::new(VERIFIED_CACHE_SIZE));
 }
 
 pub(crate) struct StructNameCache {
@@ -866,9 +876,18 @@ impl Loader {
             );
         }
 
-        // bytecode verifier checks that can be performed with the module itself
-        move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
-            .map_err(expect_no_verification_errors)?;
+        // Verify the module if it hasn't been verified before.
+        let mut sha3_256 = Sha3_256::new();
+        sha3_256.update(bytes);
+        let hash_value: [u8; 32] = sha3_256.finalize().into();
+
+        if VERIFIED_MODULES.lock().get(&hash_value).is_none() {
+            move_bytecode_verifier::verify_module_with_config(&self.vm_config.verifier, &module)
+                .map_err(expect_no_verification_errors)?;
+
+            VERIFIED_MODULES.lock().put(hash_value, ());
+        }
+
         self.check_natives(&module)
             .map_err(expect_no_verification_errors)?;
         Ok(module)
