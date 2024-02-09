@@ -11,6 +11,8 @@ use move_compiler::expansion::ast::Value_;
 use std::fmt;
 use std::fmt::Debug;
 
+pub const OPERATOR_NAME: &str = "literal_replacement";
+
 /// Literal replacement mutation operator.
 /// Replaces literal statements with other ones but withing the same type.
 #[derive(Debug, Clone)]
@@ -100,7 +102,7 @@ impl MutationOperator for Literal {
                     mutated_source,
                     Mutation::new(
                         Range::new(start, end),
-                        "literal_replacement".to_string(),
+                        OPERATOR_NAME.to_string(),
                         cur_op.to_string(),
                         op.to_string(),
                     ),
@@ -111,6 +113,10 @@ impl MutationOperator for Literal {
 
     fn get_file_hash(&self) -> FileHash {
         self.operation.loc.file_hash()
+    }
+
+    fn name(&self) -> String {
+        OPERATOR_NAME.to_string()
     }
 }
 

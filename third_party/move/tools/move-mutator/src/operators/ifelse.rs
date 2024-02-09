@@ -6,6 +6,8 @@ use move_compiler::typing::ast::UnannotatedExp_;
 use std::fmt;
 use std::fmt::Debug;
 
+pub const OPERATOR_NAME: &str = "if_else_replacement";
+
 /// IfElse mutation operator.
 /// Replaces expressions under the if/else statements with literals.
 #[derive(Debug, Clone)]
@@ -51,7 +53,7 @@ impl MutationOperator for IfElse {
                     mutated_source,
                     Mutation::new(
                         Range::new(start, end),
-                        "if_else_replacement".to_string(),
+                        OPERATOR_NAME.to_string(),
                         cur_op.to_string(),
                         op.to_string(),
                     ),
@@ -62,6 +64,10 @@ impl MutationOperator for IfElse {
 
     fn get_file_hash(&self) -> FileHash {
         self.operation.exp.loc.file_hash()
+    }
+
+    fn name(&self) -> String {
+        OPERATOR_NAME.to_string()
     }
 }
 
