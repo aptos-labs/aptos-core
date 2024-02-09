@@ -65,10 +65,10 @@ impl MoveStructType for Configuration {
 }
 
 impl Configuration {
-    #[cfg(test)]
-    const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
+    /// Should only be used for testing.
+    pub const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
 
-    #[cfg(test)]
+    // TODO(zkid): Rename & set this to be the default devnet config.
     pub fn new_for_testing() -> Configuration {
         const POSEIDON_BYTES_PACKED_PER_SCALAR: u16 = 31;
 
@@ -292,11 +292,18 @@ pub struct Groth16Zkp {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
-    /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
+    /// A signature on the proof (via the ephemeral SK) to prevent malleability attacks.
     pub non_malleability_signature: EphemeralSignature,
+    /// A signature on the proof (via the training wheels SK) to mitigate against flaws in our circuit
     pub training_wheels_signature: EphemeralSignature,
+    /// An extra field (e.g., `"<name>":"<val>") that will be matched publicly in the JWT
     pub extra_field: String,
+    /// Will be set to the override `aud` value that the circuit should match, instead of the `aud` in the IDC.
+    /// This will allow users to recover their zkID accounts derived by an application that is no longer online.
     pub override_aud_val: Option<String>,
+    /// The expiration horizon that the circuit should enforce on the expiration date committed in the nonce.
+    /// This must be <= `Configuration::max_expiration_horizon_secs`.
+    pub exp_horizon_secs: u64,
 }
 
 impl SignedGroth16Zkp {
@@ -664,6 +671,7 @@ mod test {
 
         let proof_sig = sender.sign(&proof).unwrap();
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
+        let config = Configuration::new_for_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
@@ -673,6 +681,7 @@ mod test {
                 ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
                 override_aud_val: None,
+                exp_horizon_secs: config.max_exp_horizon_secs,
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
@@ -702,7 +711,7 @@ mod test {
         };
 
         let public_inputs_hash =
-            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, &Configuration::new_for_testing())
+            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, config.max_exp_horizon_secs, &config)
                 .unwrap();
 
         proof

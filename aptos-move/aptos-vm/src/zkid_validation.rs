@@ -132,6 +132,10 @@ pub fn validate_zkid_authenticators(
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
+                    if proof.exp_horizon_secs > config.max_exp_horizon_secs {
+                        return Err(invalid_signature!("The expiration horizon is too long"));
+                    }
+
                     // If an `aud` override was set for account recovery purposes, check that it is
                     // in the allow-list on-chain.
                     if proof.override_aud_val.is_some() {
@@ -150,10 +154,14 @@ pub fn validate_zkid_authenticators(
                             })?;
                     }
 
-                    let public_inputs_hash =
-                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, config).map_err(
-                            |_| invalid_signature!("Could not compute public inputs hash"),
-                        )?;
+                    let public_inputs_hash = get_public_inputs_hash(
+                        zkid_sig,
+                        zkid_pub_key,
+                        &rsa_jwk,
+                        proof.exp_horizon_secs,
+                        config,
+                    )
+                    .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
                     proof
                         .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;

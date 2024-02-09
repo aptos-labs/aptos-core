@@ -322,6 +322,7 @@ pub fn get_public_inputs_hash(
     sig: &ZkIdSignature,
     pk: &ZkIdPublicKey,
     jwk: &RSA_JWK,
+    exp_horizon_secs: u64,
     config: &Configuration,
 ) -> anyhow::Result<Fr> {
     let extra_field_hashed;
@@ -360,7 +361,7 @@ pub fn get_public_inputs_hash(
     frs.push(Fr::from(sig.exp_timestamp_secs));
 
     // Add the epk lifespan as a scalar
-    frs.push(Fr::from(config.max_exp_horizon_secs));
+    frs.push(Fr::from(exp_horizon_secs));
 
     // Add the hash of the iss (formatted key-value pair string).
     let formatted_iss = format!("\"iss\":\"{}\",", pk.iss);

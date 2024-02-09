@@ -24,8 +24,8 @@ use aptos_types::{
         SignedTransaction,
     },
     zkid::{
-        Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
-        ZkIdSignature, ZkpOrOpenIdSig,
+        Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp,
+        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -378,6 +378,7 @@ async fn test_zkid_groth16_verifies() {
 
     // TODO(zkid): Refactor tests to be modular and add test for bad training wheels signature (commented out below).
     //let bad_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+    let config = Configuration::new_for_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
@@ -386,6 +387,7 @@ async fn test_zkid_groth16_verifies() {
             //training_wheels_signature: EphemeralSignature::ed25519(bad_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
             override_aud_val: None,
+            exp_horizon_secs: config.max_exp_horizon_secs,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -485,6 +487,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
 
+    let config = Configuration::new_for_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
@@ -492,6 +495,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
             training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
             override_aud_val: None,
+            exp_horizon_secs: config.max_exp_horizon_secs,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
