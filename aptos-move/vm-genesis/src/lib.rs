@@ -532,9 +532,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
 }
 
 fn initialize_zkid(session: &mut SessionExt) {
-    println!("GENESIS Initializing zkID in genesis");
     let config = zkid::Configuration::new_for_devnet_and_testing();
-    println!("GENESIS zkid::update_configuration... begin");
     exec_function(
         session,
         ZKID_MODULE_NAME,
@@ -545,9 +543,6 @@ fn initialize_zkid(session: &mut SessionExt) {
             config.as_move_value(),
         ]),
     );
-    println!("GENESIS zkid::update_configuration... end");
-
-    println!("GENESIS zkid::update_groth16_verification_key... begin");
     let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
     exec_function(
         session,
@@ -559,7 +554,6 @@ fn initialize_zkid(session: &mut SessionExt) {
             vk.as_move_value(),
         ]),
     );
-    println!("GENESIS zkid::update_groth16_verification_key... end");
 }
 
 fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {

@@ -14,15 +14,42 @@ use aptos_types::{
     zkid,
     zkid::{Configuration, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
+use move_binary_format::errors::Location;
+use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+use serde::Deserialize;
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {{
-        println!("Something went wrong during deserialization: {}", $message);
         VMStatus::error(
             StatusCode::VALUE_DESERIALIZATION_ERROR,
             Some($message.to_owned()),
         )
     }};
+}
+
+fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
+    resolver: &impl AptosMoveResolver,
+) -> anyhow::Result<T, VMStatus> {
+    let bytes = resolver
+        .get_resource(&CORE_CODE_ADDRESS, &T::struct_tag())
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .ok_or_else(|| {
+            value_deserialization_error!(format!(
+                "get_resource failed on {}::{}::{}",
+                CORE_CODE_ADDRESS.to_hex_literal(),
+                T::struct_tag().module,
+                T::struct_tag().name
+            ))
+        })?;
+    let obj = bcs::from_bytes::<T>(&bytes).map_err(|_| {
+        value_deserialization_error!(format!(
+            "could not deserialize {}::{}::{}",
+            CORE_CODE_ADDRESS.to_hex_literal(),
+            T::struct_tag().module,
+            T::struct_tag().name
+        ))
+    })?;
+    Ok(obj)
 }
 
 fn get_current_time_onchain(
@@ -41,15 +68,13 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
 fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    Groth16VerificationKey::fetch_config(resolver)
-        .ok_or_else(|| value_deserialization_error!("could not deserialize Groth16 VK"))
+    get_resource_on_chain::<Groth16VerificationKey>(resolver)
 }
 
 fn get_configs_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Configuration, VMStatus> {
-    Configuration::fetch_config(resolver)
-        .ok_or_else(|| value_deserialization_error!("could not deserialize zkID configuration "))
+    get_resource_on_chain::<Configuration>(resolver)
 }
 
 fn get_jwk_for_zkid_authenticator(

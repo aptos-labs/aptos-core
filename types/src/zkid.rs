@@ -4,7 +4,7 @@ use crate::{
     bn254_circom::{G1Bytes, G2Bytes},
     jwks::rsa::RSA_JWK,
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
+    on_chain_config::CurrentTimeMicroseconds,
     transaction::{
         authenticator::{
             AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
@@ -20,6 +20,9 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};
 use ark_serialize::CanonicalSerialize;
 use base64::URL_SAFE_NO_PAD;
 use move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    move_resource::MoveStructType,
     value::{MoveStruct, MoveValue},
     vm_status::{StatusCode, VMStatus},
 };
@@ -74,9 +77,11 @@ impl AsMoveValue for Configuration {
     }
 }
 
-impl OnChainConfig for Configuration {
-    const MODULE_IDENTIFIER: &'static str = "zkid";
-    const TYPE_IDENTIFIER: &'static str = "Configuration";
+/// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
+/// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
+impl MoveStructType for Configuration {
+    const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 
 impl Configuration {

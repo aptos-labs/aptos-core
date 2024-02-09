@@ -3,7 +3,6 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
     zkid::{Configuration, IdCommitment, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use anyhow::bail;
@@ -12,7 +11,12 @@ use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projecti
 use ark_ff::PrimeField;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use move_core_types::value::{MoveStruct, MoveValue};
+use move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    move_resource::MoveStructType,
+    value::{MoveStruct, MoveValue},
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -54,9 +58,11 @@ impl AsMoveValue for Groth16VerificationKey {
     }
 }
 
-impl OnChainConfig for Groth16VerificationKey {
-    const MODULE_IDENTIFIER: &'static str = "zkid";
-    const TYPE_IDENTIFIER: &'static str = "Groth16VerificationKey";
+/// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
+/// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
+impl MoveStructType for Groth16VerificationKey {
+    const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
 }
 
 impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
