@@ -152,8 +152,6 @@ spec aptos_framework::coin {
     }
 
     spec is_account_registered<CoinType>(account_addr: address): bool {
-        /// [high-level-req-5]
-        /// [high-level-req-7.2]
         aborts_if false;
     }
 
