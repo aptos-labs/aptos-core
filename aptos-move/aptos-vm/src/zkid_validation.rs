@@ -16,14 +16,40 @@ use aptos_types::{
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+use serde::Deserialize;
 
 macro_rules! value_deserialization_error {
-    ($message:expr) => {
+    ($message:expr) => {{
         VMStatus::error(
             StatusCode::VALUE_DESERIALIZATION_ERROR,
             Some($message.to_owned()),
         )
-    };
+    }};
+}
+
+fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
+    resolver: &impl AptosMoveResolver,
+) -> anyhow::Result<T, VMStatus> {
+    let bytes = resolver
+        .get_resource(&CORE_CODE_ADDRESS, &T::struct_tag())
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
+        .ok_or_else(|| {
+            value_deserialization_error!(format!(
+                "get_resource failed on {}::{}::{}",
+                CORE_CODE_ADDRESS.to_hex_literal(),
+                T::struct_tag().module,
+                T::struct_tag().name
+            ))
+        })?;
+    let obj = bcs::from_bytes::<T>(&bytes).map_err(|_| {
+        value_deserialization_error!(format!(
+            "could not deserialize {}::{}::{}",
+            CORE_CODE_ADDRESS.to_hex_literal(),
+            T::struct_tag().module,
+            T::struct_tag().name
+        ))
+    })?;
+    Ok(obj)
 }
 
 fn get_current_time_onchain(
@@ -35,37 +61,20 @@ fn get_current_time_onchain(
 }
 
 fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
-    let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| value_deserialization_error!("get_resource failed on PatchedJWKs"))?;
-    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes)
-        .map_err(|_| value_deserialization_error!("could not deserialize PatchedJWKs"))?;
-    Ok(jwks)
+    PatchedJWKs::fetch_config(resolver)
+        .ok_or_else(|| value_deserialization_error!("could not deserialize PatchedJWKs"))
 }
 
 fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &Groth16VerificationKey::struct_tag())
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| value_deserialization_error!("get_resource failed on Groth16 VK"))?;
-    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes)
-        .map_err(|_| value_deserialization_error!("could not deserialize Groth16 VK"))?;
-    Ok(vk)
+    get_resource_on_chain::<Groth16VerificationKey>(resolver)
 }
 
 fn get_configs_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Configuration, VMStatus> {
-    let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &Configuration::struct_tag())
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| value_deserialization_error!("get_resource failed on zkID configuration"))?;
-    let configs = bcs::from_bytes::<Configuration>(&bytes)
-        .map_err(|_| value_deserialization_error!("could not deserialize zkID configuration"))?;
-    Ok(configs)
+    get_resource_on_chain::<Configuration>(resolver)
 }
 
 fn get_jwk_for_zkid_authenticator(
@@ -132,6 +141,10 @@ pub fn validate_zkid_authenticators(
         match &zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
+                    if proof.exp_horizon_secs > config.max_exp_horizon_secs {
+                        return Err(invalid_signature!("The expiration horizon is too long"));
+                    }
+
                     // If an `aud` override was set for account recovery purposes, check that it is
                     // in the allow-list on-chain.
                     if proof.override_aud_val.is_some() {
@@ -150,10 +163,14 @@ pub fn validate_zkid_authenticators(
                             })?;
                     }
 
-                    let public_inputs_hash =
-                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, config).map_err(
-                            |_| invalid_signature!("Could not compute public inputs hash"),
-                        )?;
+                    let public_inputs_hash = get_public_inputs_hash(
+                        zkid_sig,
+                        zkid_pub_key,
+                        &rsa_jwk,
+                        proof.exp_horizon_secs,
+                        config,
+                    )
+                    .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
                     proof
                         .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;

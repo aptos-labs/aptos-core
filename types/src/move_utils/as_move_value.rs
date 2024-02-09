@@ -39,6 +39,18 @@ impl AsMoveValue for u8 {
     }
 }
 
+impl AsMoveValue for u16 {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::U16(*self)
+    }
+}
+
+impl AsMoveValue for u32 {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::U32(*self)
+    }
+}
+
 impl AsMoveValue for u64 {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::U64(*self)

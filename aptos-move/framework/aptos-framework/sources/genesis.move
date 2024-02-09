@@ -29,7 +29,6 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
     use aptos_framework::vesting;
-    use aptos_framework::zkid;
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
@@ -133,7 +132,6 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
-        zkid::initialize(&aptos_framework_account, zkid::devnet_groth16_vk(), zkid::default_devnet_configuration());
     }
 
     /// Genesis step 2: Initialize Aptos coin.

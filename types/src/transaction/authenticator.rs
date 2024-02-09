@@ -1126,7 +1126,7 @@ mod tests {
     use crate::{
         bn254_circom::{G1Bytes, G2Bytes},
         transaction::{webauthn::AssertionSignature, SignedTransaction},
-        zkid::{Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp},
+        zkid::{Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp},
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -1797,6 +1797,7 @@ mod tests {
         let proof_sig = sender.sign(&proof).unwrap();
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
         ephem_proof_sig.verify(&proof, &epk).unwrap();
+        let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
@@ -1806,6 +1807,7 @@ mod tests {
                 ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
                 override_aud_val: None,
+                exp_horizon_secs: config.max_exp_horizon_secs,
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,

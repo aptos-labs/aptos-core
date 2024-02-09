@@ -13,7 +13,7 @@ use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::{
-    bn254_circom::{G1Bytes, G2Bytes},
+    bn254_circom::{G1Bytes, G2Bytes, Groth16VerificationKey},
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         rsa::RSA_JWK,
@@ -24,8 +24,8 @@ use aptos_types::{
         SignedTransaction,
     },
     zkid::{
-        Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
-        ZkIdSignature, ZkpOrOpenIdSig,
+        Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp,
+        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -378,6 +378,7 @@ async fn test_zkid_groth16_verifies() {
 
     // TODO(zkid): Refactor tests to be modular and add test for bad training wheels signature (commented out below).
     //let bad_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+    let config = Configuration::new_for_devnet_and_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
@@ -386,6 +387,7 @@ async fn test_zkid_groth16_verifies() {
             //training_wheels_signature: EphemeralSignature::ed25519(bad_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
             override_aud_val: None,
+            exp_horizon_secs: config.max_exp_horizon_secs,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -396,10 +398,14 @@ async fn test_zkid_groth16_verifies() {
     let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
 
     info!("Submit zero knowledge transaction");
-    info.client()
+    let result = info
+        .client()
         .submit_without_serializing_response(&signed_txn)
-        .await
-        .unwrap();
+        .await;
+
+    if let Err(e) = result {
+        panic!("Error with Groth16 TXN verification: {:?}", e)
+    }
 }
 
 #[tokio::test]
@@ -485,6 +491,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
 
+    let config = Configuration::new_for_devnet_and_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
@@ -492,6 +499,7 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
             training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
             override_aud_val: None,
+            exp_horizon_secs: config.max_exp_horizon_secs,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -518,6 +526,21 @@ async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) -> Ed255
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(60))
         .await
         .expect("Epoch 2 taking too long to come!");
+
+    let maybe_response = client
+        .get_account_resource_bcs::<Groth16VerificationKey>(
+            AccountAddress::ONE,
+            "0x1::zkid::Groth16VerificationKey",
+        )
+        .await;
+    let vk = maybe_response.unwrap().into_inner();
+    println!("Groth16 VK: {:?}", vk);
+
+    let maybe_response = client
+        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::zkid::Configuration")
+        .await;
+    let config = maybe_response.unwrap().into_inner();
+    println!("zkID configuration: {:?}", config);
 
     let iss = "https://accounts.google.com";
     let jwk = RSA_JWK {
