@@ -5,8 +5,8 @@
 mod db;
 pub mod db_ops;
 pub mod db_v2;
-pub mod metadata;
-pub mod schema;
+mod metadata;
+mod schema;
 pub mod table_info_reader;
 
 use crate::{

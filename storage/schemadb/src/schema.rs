@@ -69,7 +69,7 @@ use std::fmt::Debug;
 macro_rules! define_schema {
     ($schema_type:ident, $key_type:ty, $value_type:ty, $cf_name:expr) => {
         #[derive(Debug)]
-        pub struct $schema_type;
+        pub(crate) struct $schema_type;
 
         impl $crate::schema::Schema for $schema_type {
             type Key = $key_type;

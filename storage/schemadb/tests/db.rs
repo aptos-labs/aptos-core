@@ -20,7 +20,7 @@ define_schema!(TestSchema1, TestField, TestField, "TestCF1");
 define_schema!(TestSchema2, TestField, TestField, "TestCF2");
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct TestField(u32);
+struct TestField(u32);
 
 impl TestField {
     fn to_bytes(&self) -> Vec<u8> {
