@@ -59,7 +59,6 @@ use aptos_types::{
         ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -1365,30 +1364,9 @@ impl AptosVM {
             ));
         }
 
-        // zkID feature gating
-        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction);
-        match &authenticators {
-            Ok(authenticators) => {
-                for (_, sig) in authenticators {
-                    if !self.features().is_zkid_enabled()
-                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
-                    {
-                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-                    }
-                    if (!self.features().is_zkid_enabled()
-                        || !self.features().is_zkid_zkless_enabled())
-                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
-                    {
-                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-                    }
-                }
-            },
-            Err(_) => {
-                return Err(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
-            },
-        }
-
-        zkid_validation::validate_zkid_authenticators(&authenticators.unwrap(), resolver)?;
+        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction)
+            .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
+        zkid_validation::validate_zkid_authenticators(&authenticators, self.features(), resolver)?;
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
@@ -1846,7 +1824,7 @@ impl AptosVM {
         };
 
         let mut session = vm.new_session(&resolver, SessionId::Void);
-        match Self::execute_view_function_in_vm(
+        let execution_result = Self::execute_view_function_in_vm(
             &mut session,
             &vm,
             module_id,
@@ -1854,14 +1832,11 @@ impl AptosVM {
             type_args,
             arguments,
             &mut gas_meter,
-        ) {
-            Ok(result) => ViewFunctionOutput::new(
-                Ok(result),
-                Self::gas_used(max_gas_amount.into(), &gas_meter),
-            ),
-            Err(e) => {
-                ViewFunctionOutput::new(Err(e), Self::gas_used(max_gas_amount.into(), &gas_meter))
-            },
+        );
+        let gas_used = Self::gas_used(max_gas_amount.into(), &gas_meter);
+        match execution_result {
+            Ok(result) => ViewFunctionOutput::new(Ok(result), gas_used),
+            Err(e) => ViewFunctionOutput::new(Err(e), gas_used),
         }
     }
 
