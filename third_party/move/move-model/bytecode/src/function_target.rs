@@ -7,7 +7,7 @@ use crate::{
     borrow_analysis,
     function_target_pipeline::FunctionVariant,
     livevar_analysis, reaching_def_analysis,
-    stackless_bytecode::{AttrId, Bytecode, Label},
+    stackless_bytecode::{AttrId, Bytecode, Label, Operation},
 };
 use itertools::Itertools;
 use move_binary_format::file_format::{CodeOffset, Visibility};
@@ -379,6 +379,21 @@ impl<'env> FunctionTarget<'env> {
             }
         }
         res
+    }
+
+    /// Get the set of locals that have been borrowed in the function.
+    pub fn get_borrowed_locals(&self) -> BTreeSet<TempIndex> {
+        self.get_bytecode()
+            .iter()
+            .filter_map(|bc| {
+                if let Bytecode::Call(_, _, Operation::BorrowLoc, srcs, _) = bc {
+                    // BorrowLoc should have only one source.
+                    srcs.first().cloned()
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Pretty print a bytecode instruction with offset, comments, annotations, and VC information.

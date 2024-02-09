@@ -15,7 +15,8 @@ use move_compiler_v2::{
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
-        unreachable_code_remover::UnreachableCodeRemover,
+        unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+       
     },
     run_bytecode_verifier, run_file_format_gen, Options,
 };
@@ -277,6 +278,19 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: true,
                 dump_annotated_targets: false,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/variable-coalescing/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: false,
+            }));
+            pipeline.add_processor(Box::new(VariableCoalescing {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
                 dump_for_only_some_stages: None,
             }
         } else {

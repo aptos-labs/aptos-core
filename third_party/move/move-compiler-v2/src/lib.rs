@@ -21,7 +21,8 @@ use crate::pipeline::{
     split_critical_edges_processor::SplitCriticalEdgesProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor,
-    unreachable_code_remover::UnreachableCodeRemover,
+    unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+   
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -243,6 +244,9 @@ fn add_default_optimization_pipeline(options: &Options, pipeline: &mut FunctionT
         pipeline.add_processor(Box::new(DeadStoreElimination {}));
         pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
         pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+        // Live var analysis is needed by variable coalescing.
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+        pipeline.add_processor(Box::new(VariableCoalescing {}));
     }
 }
 

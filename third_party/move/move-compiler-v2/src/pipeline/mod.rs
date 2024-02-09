@@ -23,6 +23,7 @@ pub mod split_critical_edges_processor;
 pub mod uninitialized_use_checker;
 pub mod unreachable_code_analysis;
 pub mod unreachable_code_remover;
+pub mod variable_coalescing;
 pub mod visibility_checker;
 
 /// Function to register all annotation formatters in the pipeline. Those are used
