@@ -128,20 +128,34 @@ module aptos_std::fixed_decimal {
         let result = (numerator as u256) * (SCALE_FACTOR_u256) / (denominator as u256);
         (
             result, // Value before casting back to `u128`.
-            // True if result overflows a fixed decimal.
-            result > MAX_DECIMAL_FIXED_u256,
+            result > MAX_DECIMAL_FIXED_u256, // True if result overflows a fixed decimal.
         )
     }
 
-    /// For when integer and fixed decimal inputs are valid, but the result might overflow or
-    /// truncate. A performance optimization that enables low-cost checks from calling functions.
+    /// For when integer and fixed decimal inputs are valid, but the result might overflow. A
+    /// performance optimization that enables low-cost checks from calling functions.
     public inline fun scale_int_optimistic(int: u64, fixed: u128): (u256, bool) {
         let result = ((int as u256) * (fixed as u256)) / SCALE_FACTOR_u256;
         (
             result, // Value before casting back to `u64`.
-            // True if result exceeds maximum representable power of ten for a `u64`.
-            result > MAX_U64_DECIMAL_u256,
+            result > MAX_U64_DECIMAL_u256, // True if result overflows max power of ten in `u64`.
         )
+    }
+
+    /// For fixed decimal inputs that are known to be valid, but the result might overflow. A
+    /// performance optimization that enables low-cost checks from calling functions.
+    public inline fun multiply_optimistic(fixed_l: u128, fixed_r: u128): (u256, bool) {
+        let result = (fixed_l as u256) * (fixed_r as u256) / (SCALE_FACTOR_u256);
+        (
+            result, // Value before casting back to `u128`.
+            result > MAX_DECIMAL_FIXED_u256 // True if result overflows a fixed decimal.
+        )
+    }
+
+    /// For fixed decimal inputs that are known to be valid, where `fixed_r` >= `UNITY_u128`. A
+    /// performance optimization that enables low-cost invocation from calling functions.
+    public inline fun divide_optimistic(fixed_l: u128, fixed_r: u128): u128 {
+        ((fixed_l as u256) * SCALE_FACTOR_u256 / (fixed_r as u256) as u128)
     }
 
     #[test]
@@ -318,6 +332,32 @@ module aptos_std::fixed_decimal {
         let (result, overflows) = scale_int_optimistic(MAX_U64_DECIMAL_u64, UNITY_u128 * 2);
         assert!(result == 2 * MAX_U64_DECIMAL_u256, 0);
         assert!(overflows, 0);
+    }
+
+    #[test]
+    fun test_multiply_optimistic() {
+        let (result, overflows) = multiply_optimistic(UNITY_u128, UNITY_u128);
+        assert!(result == (UNITY_u128 as u256), 0);
+        assert!(!overflows, 0);
+        let (result, overflows) = multiply_optimistic(MAX_DECIMAL_FIXED_u128, 1);
+        assert!(result == (UNITY_u128 as u256), 0);
+        assert!(!overflows, 0);
+        let (result, overflows) = multiply_optimistic(1, MAX_DECIMAL_FIXED_u128);
+        assert!(result == (UNITY_u128 as u256), 0);
+        assert!(!overflows, 0);
+        let (result, overflows) = multiply_optimistic(MAX_DECIMAL_FIXED_u128, 2 * UNITY_u128);
+        assert!(result == (2 * MAX_DECIMAL_FIXED_u128 as u256), 0);
+        assert!(overflows, 0);
+    }
+
+    #[test]
+    fun test_divide_optimistic() {
+        assert!(divide_optimistic(UNITY_u128, 1) == MAX_DECIMAL_FIXED_u128, 0);
+        assert!(divide_optimistic(UNITY_u128, UNITY_u128) == UNITY_u128, 0);
+        assert!(divide_optimistic(0, UNITY_u128) == 0, 0);
+        assert!(divide_optimistic(1, UNITY_u128) == 1, 0);
+        assert!(divide_optimistic(MAX_DECIMAL_FIXED_u128, MAX_DECIMAL_FIXED_u128) == UNITY_u128, 0);
+        assert!(divide_optimistic(MAX_DECIMAL_FIXED_u128, UNITY_u128) == MAX_DECIMAL_FIXED_u128, 0);
     }
 
 }

@@ -31,6 +31,8 @@ as a <code>u128</code>) will have a result of 1. For more, see <code><a href="fi
 -  [Function `scale_int`](#0x1_fixed_decimal_scale_int)
 -  [Function `from_ratio_optimistic`](#0x1_fixed_decimal_from_ratio_optimistic)
 -  [Function `scale_int_optimistic`](#0x1_fixed_decimal_scale_int_optimistic)
+-  [Function `multiply_optimistic`](#0x1_fixed_decimal_multiply_optimistic)
+-  [Function `divide_optimistic`](#0x1_fixed_decimal_divide_optimistic)
 
 
 <pre><code></code></pre>
@@ -518,8 +520,7 @@ that enables low-cost checks from calling functions.
     <b>let</b> result = (numerator <b>as</b> u256) * (<a href="fixed_decimal.md#0x1_fixed_decimal_SCALE_FACTOR_u256">SCALE_FACTOR_u256</a>) / (denominator <b>as</b> u256);
     (
         result, // Value before casting back <b>to</b> `u128`.
-        // True <b>if</b> result overflows a fixed decimal.
-        result &gt; <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_DECIMAL_FIXED_u256">MAX_DECIMAL_FIXED_u256</a>,
+        result &gt; <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_DECIMAL_FIXED_u256">MAX_DECIMAL_FIXED_u256</a>, // True <b>if</b> result overflows a fixed decimal.
     )
 }
 </code></pre>
@@ -532,8 +533,8 @@ that enables low-cost checks from calling functions.
 
 ## Function `scale_int_optimistic`
 
-For when integer and fixed decimal inputs are valid, but the result might overflow or
-truncate. A performance optimization that enables low-cost checks from calling functions.
+For when integer and fixed decimal inputs are valid, but the result might overflow. A
+performance optimization that enables low-cost checks from calling functions.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_scale_int_optimistic">scale_int_optimistic</a>(int: u64, fixed: u128): (u256, bool)
@@ -549,9 +550,64 @@ truncate. A performance optimization that enables low-cost checks from calling f
     <b>let</b> result = ((int <b>as</b> u256) * (fixed <b>as</b> u256)) / <a href="fixed_decimal.md#0x1_fixed_decimal_SCALE_FACTOR_u256">SCALE_FACTOR_u256</a>;
     (
         result, // Value before casting back <b>to</b> `u64`.
-        // True <b>if</b> result exceeds maximum representable power of ten for a `u64`.
-        result &gt; <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u256">MAX_U64_DECIMAL_u256</a>,
+        result &gt; <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u256">MAX_U64_DECIMAL_u256</a>, // True <b>if</b> result overflows max power of ten in `u64`.
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fixed_decimal_multiply_optimistic"></a>
+
+## Function `multiply_optimistic`
+
+For fixed decimal inputs that are known to be valid, but the result might overflow. A
+performance optimization that enables low-cost checks from calling functions.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_multiply_optimistic">multiply_optimistic</a>(fixed_l: u128, fixed_r: u128): (u256, bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_multiply_optimistic">multiply_optimistic</a>(fixed_l: u128, fixed_r: u128): (u256, bool) {
+    <b>let</b> result = (fixed_l <b>as</b> u256) * (fixed_r <b>as</b> u256) / (<a href="fixed_decimal.md#0x1_fixed_decimal_SCALE_FACTOR_u256">SCALE_FACTOR_u256</a>);
+    (
+        result, // Value before casting back <b>to</b> `u128`.
+        result &gt; <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_DECIMAL_FIXED_u256">MAX_DECIMAL_FIXED_u256</a> // True <b>if</b> result overflows a fixed decimal.
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fixed_decimal_divide_optimistic"></a>
+
+## Function `divide_optimistic`
+
+For fixed decimal inputs that are known to be valid, where <code>fixed_r</code> >= <code><a href="fixed_decimal.md#0x1_fixed_decimal_UNITY_u128">UNITY_u128</a></code>. A
+performance optimization that enables low-cost invocation from calling functions.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_divide_optimistic">divide_optimistic</a>(fixed_l: u128, fixed_r: u128): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_divide_optimistic">divide_optimistic</a>(fixed_l: u128, fixed_r: u128): u128 {
+    ((fixed_l <b>as</b> u256) * <a href="fixed_decimal.md#0x1_fixed_decimal_SCALE_FACTOR_u256">SCALE_FACTOR_u256</a> / (fixed_r <b>as</b> u256) <b>as</b> u128)
 }
 </code></pre>
 
