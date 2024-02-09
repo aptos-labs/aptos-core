@@ -68,7 +68,7 @@ async fn test_node_broadcast_receiver_succeed() {
 
     assert_ne!(wellformed_node.digest(), equivocating_node.digest());
 
-    let mut rb_receiver = NodeBroadcastHandler::new(
+    let rb_receiver = NodeBroadcastHandler::new(
         dag,
         signers[3].clone(),
         epoch_state.clone(),
@@ -205,7 +205,7 @@ async fn test_node_broadcast_receiver_storage() {
 
     let node = new_node(1, 10, signers[0].author(), vec![]);
 
-    let mut rb_receiver = NodeBroadcastHandler::new(
+    let rb_receiver = NodeBroadcastHandler::new(
         dag.clone(),
         signers[3].clone(),
         epoch_state.clone(),
@@ -227,7 +227,7 @@ async fn test_node_broadcast_receiver_storage() {
         sig
     )],);
 
-    let mut rb_receiver = NodeBroadcastHandler::new(
+    let rb_receiver = NodeBroadcastHandler::new(
         dag,
         signers[3].clone(),
         epoch_state.clone(),

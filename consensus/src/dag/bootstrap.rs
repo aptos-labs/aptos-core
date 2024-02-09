@@ -581,8 +581,7 @@ impl DagBootstrapper {
                 self.config.fetcher_config.clone(),
             );
         let fetch_requester = Arc::new(fetch_requester);
-        let (new_round_tx, new_round_rx) =
-            tokio::sync::mpsc::channel(round_state_config.round_event_channel_size);
+        let (new_round_tx, new_round_rx) = tokio::sync::mpsc::unbounded_channel();
         let round_state = RoundState::new(
             new_round_tx.clone(),
             Box::new(AdaptiveResponsive::new(

@@ -155,7 +155,7 @@ fn setup(
     let ledger_info_provider = Arc::new(MockLedgerInfoProvider {
         latest_ledger_info: mock_ledger_info,
     });
-    let (round_tx, _round_rx) = tokio::sync::mpsc::channel(10);
+    let (round_tx, _round_rx) = tokio::sync::mpsc::unbounded_channel();
     let round_state = RoundState::new(
         round_tx.clone(),
         Box::new(OptimisticResponsive::new(round_tx)),
@@ -190,7 +190,7 @@ async fn test_certified_node_handler() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: None,
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
@@ -215,7 +215,7 @@ async fn test_dag_driver_drop() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: Some(tx),
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     driver.enter_new_round(1).await;
 
