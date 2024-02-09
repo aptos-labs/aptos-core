@@ -735,6 +735,17 @@ impl MoveHarness {
         )
     }
 
+    pub fn read_resource_metadata(
+        &self,
+        addr: &AccountAddress,
+        struct_tag: StructTag,
+    ) -> Option<StateValueMetadata> {
+        self.read_state_value(&StateKey::access_path(
+            AccessPath::resource_access_path(*addr, struct_tag).expect("access path in test"),
+        ))
+        .map(StateValue::into_metadata)
+    }
+
     pub fn read_resource_group_metadata(
         &self,
         addr: &AccountAddress,

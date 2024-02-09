@@ -130,6 +130,7 @@ fn assert_coin_balance(
             vec![move_core_types::language_storage::TypeTag::from_str(struct_tag_string).unwrap()],
             vec![address.to_vec()],
         )
+        .values
         .unwrap()
         .pop()
         .unwrap();

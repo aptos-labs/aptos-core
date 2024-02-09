@@ -59,8 +59,8 @@ fn test_vote() {
     );
 
     // Enable partial governance voting. In production it requires governance.
-    let core_resources = harness
-        .new_account_with_balance_at(AccountAddress::from_hex_literal("0xA550C18").unwrap(), 0);
+    let core_resources =
+        harness.new_account_at(AccountAddress::from_hex_literal("0xA550C18").unwrap());
     let script_code = PROPOSAL_SCRIPTS
         .get("enable_partial_governance_voting")
         .expect("proposal script should be built");
