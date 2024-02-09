@@ -151,6 +151,36 @@ impl SessionId {
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
+
+    pub(crate) fn into_script_hash(self) -> Vec<u8> {
+        match self {
+            Self::Txn {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::Prologue {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::Epilogue {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::RunOnAbort {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::ValidatorTxn { script_hash } => script_hash,
+            Self::BlockMeta { id: _ }
+            | Self::Genesis { id: _ }
+            | Self::Void
+            | Self::BlockMetaExt { id: _ } => vec![],
+        }
+    }
 }
 
 pub struct SessionExt<'r, 'l> {

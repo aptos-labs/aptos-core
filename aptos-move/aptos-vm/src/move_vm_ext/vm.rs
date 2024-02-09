@@ -200,30 +200,9 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
-
-        let script_hash = match session_id {
-            SessionId::Txn {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | SessionId::Prologue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | SessionId::Epilogue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            } => script_hash,
-            SessionId::ValidatorTxn { script_hash } => script_hash,
-            _ => vec![],
-        };
-
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
-            script_hash,
+            session_id.into_script_hash(),
             self.chain_id,
         ));
         extensions.add(NativeCodeContext::default());
