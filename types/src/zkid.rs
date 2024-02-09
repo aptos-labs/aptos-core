@@ -3,7 +3,8 @@
 use crate::{
     bn254_circom::{G1Bytes, G2Bytes},
     jwks::rsa::RSA_JWK,
-    on_chain_config::CurrentTimeMicroseconds,
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     transaction::{
         authenticator::{
             AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
@@ -19,9 +20,7 @@ use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};
 use ark_serialize::CanonicalSerialize;
 use base64::URL_SAFE_NO_PAD;
 use move_core_types::{
-    ident_str,
-    identifier::IdentStr,
-    move_resource::MoveStructType,
+    value::{MoveStruct, MoveValue},
     vm_status::{StatusCode, VMStatus},
 };
 use serde::{Deserialize, Serialize};
@@ -59,17 +58,32 @@ pub struct Configuration {
     pub max_jwt_header_b64_bytes: u32,
 }
 
-impl MoveStructType for Configuration {
-    const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
+impl AsMoveValue for Configuration {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            self.override_aud_vals.as_move_value(),
+            self.max_zkid_signatures_per_txn.as_move_value(),
+            self.max_exp_horizon_secs.as_move_value(),
+            self.training_wheels_pubkey.as_move_value(),
+            self.nonce_commitment_num_bytes.as_move_value(),
+            self.max_commited_epk_bytes.as_move_value(),
+            self.max_iss_field_bytes.as_move_value(),
+            self.max_extra_field_bytes.as_move_value(),
+            self.max_jwt_header_b64_bytes.as_move_value(),
+        ]))
+    }
+}
+
+impl OnChainConfig for Configuration {
+    const MODULE_IDENTIFIER: &'static str = "zkid";
+    const TYPE_IDENTIFIER: &'static str = "Configuration";
 }
 
 impl Configuration {
     /// Should only be used for testing.
     pub const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
 
-    // TODO(zkid): Rename & set this to be the default devnet config.
-    pub fn new_for_testing() -> Configuration {
+    pub fn new_for_devnet_and_testing() -> Configuration {
         const POSEIDON_BYTES_PACKED_PER_SCALAR: u16 = 31;
 
         Configuration {
@@ -671,7 +685,7 @@ mod test {
 
         let proof_sig = sender.sign(&proof).unwrap();
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
-        let config = Configuration::new_for_testing();
+        let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
@@ -768,7 +782,7 @@ mod test {
         let uid_key = "sub";
         let uid_val = "248289761001";
         let exp_timestamp_secs = 1311281970;
-        let config = Configuration::new_for_testing();
+        let config = Configuration::new_for_devnet_and_testing();
         let pepper = 76;
 
         let zkid_pk = ZkIdPublicKey {

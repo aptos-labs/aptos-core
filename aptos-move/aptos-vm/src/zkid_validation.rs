@@ -14,16 +14,15 @@ use aptos_types::{
     zkid,
     zkid::{Configuration, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
-use move_binary_format::errors::Location;
-use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 
 macro_rules! value_deserialization_error {
-    ($message:expr) => {
+    ($message:expr) => {{
+        println!("Something went wrong during deserialization: {}", $message);
         VMStatus::error(
             StatusCode::VALUE_DESERIALIZATION_ERROR,
             Some($message.to_owned()),
         )
-    };
+    }};
 }
 
 fn get_current_time_onchain(
@@ -35,37 +34,22 @@ fn get_current_time_onchain(
 }
 
 fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<PatchedJWKs, VMStatus> {
-    let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &PatchedJWKs::struct_tag())
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| value_deserialization_error!("get_resource failed on PatchedJWKs"))?;
-    let jwks = bcs::from_bytes::<PatchedJWKs>(&bytes)
-        .map_err(|_| value_deserialization_error!("could not deserialize PatchedJWKs"))?;
-    Ok(jwks)
+    PatchedJWKs::fetch_config(resolver)
+        .ok_or_else(|| value_deserialization_error!("could not deserialize PatchedJWKs"))
 }
 
 fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &Groth16VerificationKey::struct_tag())
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| value_deserialization_error!("get_resource failed on Groth16 VK"))?;
-    let vk = bcs::from_bytes::<Groth16VerificationKey>(&bytes)
-        .map_err(|_| value_deserialization_error!("could not deserialize Groth16 VK"))?;
-    Ok(vk)
+    Groth16VerificationKey::fetch_config(resolver)
+        .ok_or_else(|| value_deserialization_error!("could not deserialize Groth16 VK"))
 }
 
 fn get_configs_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Configuration, VMStatus> {
-    let bytes = resolver
-        .get_resource(&CORE_CODE_ADDRESS, &Configuration::struct_tag())
-        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
-        .ok_or_else(|| value_deserialization_error!("get_resource failed on zkID configuration"))?;
-    let configs = bcs::from_bytes::<Configuration>(&bytes)
-        .map_err(|_| value_deserialization_error!("could not deserialize zkID configuration"))?;
-    Ok(configs)
+    Configuration::fetch_config(resolver)
+        .ok_or_else(|| value_deserialization_error!("could not deserialize zkID configuration "))
 }
 
 fn get_jwk_for_zkid_authenticator(

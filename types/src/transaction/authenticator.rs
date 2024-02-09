@@ -1797,7 +1797,7 @@ mod tests {
         let proof_sig = sender.sign(&proof).unwrap();
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
         ephem_proof_sig.verify(&proof, &epk).unwrap();
-        let config = Configuration::new_for_testing();
+        let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
