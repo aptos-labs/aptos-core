@@ -326,7 +326,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Vec<(T::Key, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(T::Key, StateValueMetadata, Arc<MoveTypeLayout>)> {
         forward_on_success_or_skip_rest!(self, txn_idx, reads_needing_delayed_field_exchange)
     }
 

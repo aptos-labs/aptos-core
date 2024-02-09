@@ -213,7 +213,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .clone()
     }
 
-    fn reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, Arc<MoveTypeLayout>)> {
+    fn reads_needing_delayed_field_exchange(&self) -> Vec<(StateKey, StateValueMetadata, Arc<MoveTypeLayout>)> {
         self.vm_output
             .lock()
             .as_ref()
@@ -223,7 +223,7 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
             .iter()
             .flat_map(|(key, write)| {
                 if let AbstractResourceWriteOp::InPlaceDelayedFieldChange(change) = write {
-                    Some((key.clone(), change.layout.clone()))
+                    Some((key.clone(), change.metadata.clone(), change.layout.clone()))
                 } else {
                     None
                 }

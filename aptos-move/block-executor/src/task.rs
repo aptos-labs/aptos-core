@@ -121,7 +121,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)>;
+    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata, Arc<MoveTypeLayout>)>;
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
