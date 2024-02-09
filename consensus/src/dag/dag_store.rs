@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::types::{DagSnapshotBitmask, NodeMetadata};
+use super::{
+    types::{DagSnapshotBitmask, NodeMetadata},
+    Node,
+};
 use crate::{
     dag::{
         storage::DAGStorage,
@@ -23,19 +26,23 @@ use std::{
 
 #[derive(Clone)]
 pub enum NodeStatus {
-    Unordered(Arc<CertifiedNode>),
+    Unordered {
+        node: Arc<CertifiedNode>,
+        aggregated_weak_voting_power: u128,
+        aggregated_strong_voting_power: u128,
+    },
     Ordered(Arc<CertifiedNode>),
 }
 
 impl NodeStatus {
     pub fn as_node(&self) -> &Arc<CertifiedNode> {
         match self {
-            NodeStatus::Unordered(node) | NodeStatus::Ordered(node) => node,
+            NodeStatus::Unordered { node, .. } | NodeStatus::Ordered(node) => node,
         }
     }
 
     pub fn mark_as_ordered(&mut self) {
-        assert!(matches!(self, NodeStatus::Unordered(_)));
+        assert!(matches!(self, NodeStatus::Unordered { .. }));
         *self = NodeStatus::Ordered(self.as_node().clone());
     }
 }
@@ -107,7 +114,12 @@ impl InMemDag {
             .get_node_ref_mut(node.round(), node.author())
             .expect("must be present");
         ensure!(round_ref.is_none(), "race during insertion");
-        *round_ref = Some(NodeStatus::Unordered(node.clone()));
+        *round_ref = Some(NodeStatus::Unordered {
+            node: node.clone(),
+            aggregated_weak_voting_power: 0,
+            aggregated_strong_voting_power: 0,
+        });
+        self.update_votes(&node, true);
         Ok(())
     }
 
@@ -147,6 +159,39 @@ impl InMemDag {
             .or_insert_with(|| vec![None; self.author_to_index.len()]);
         ensure!(round_ref[index].is_none(), "duplicate node");
         Ok(())
+    }
+
+    pub fn update_votes(&mut self, node: &Node, update_link_power: bool) {
+        if node.round() <= self.lowest_round() {
+            return;
+        }
+
+        let voting_power = self
+            .epoch_state
+            .verifier
+            .get_voting_power(node.author())
+            .expect("must exist");
+
+        for parent in node.parents_metadata() {
+            let node_status = self
+                .get_node_ref_mut(parent.round(), parent.author())
+                .expect("must exist");
+            match node_status {
+                Some(NodeStatus::Unordered {
+                    aggregated_weak_voting_power,
+                    aggregated_strong_voting_power,
+                    ..
+                }) => {
+                    if update_link_power {
+                        *aggregated_strong_voting_power += voting_power as u128;
+                    } else {
+                        *aggregated_weak_voting_power += voting_power as u128;
+                    }
+                },
+                Some(NodeStatus::Ordered(_)) => {},
+                None => unreachable!("parents must exist before voting for a node"),
+            }
+        }
     }
 
     pub fn exists(&self, metadata: &NodeMetadata) -> bool {
@@ -211,24 +256,29 @@ impl InMemDag {
             .map(|node_status| node_status.as_node())
     }
 
-    // TODO: I think we can cache votes in the NodeStatus::Unordered
     pub fn check_votes_for_node(
         &self,
         metadata: &NodeMetadata,
         validator_verifier: &ValidatorVerifier,
     ) -> bool {
-        self.get_round_iter(metadata.round() + 1)
-            .map(|next_round_iter| {
-                let votes = next_round_iter
-                    .filter(|node_status| {
-                        node_status
-                            .as_node()
-                            .parents()
-                            .iter()
-                            .any(|cert| cert.metadata() == metadata)
-                    })
-                    .map(|node_status| node_status.as_node().author());
-                validator_verifier.check_voting_power(votes, false).is_ok()
+        self.get_node_ref_by_metadata(metadata)
+            .map(|node_status| match node_status {
+                NodeStatus::Unordered {
+                    aggregated_weak_voting_power,
+                    aggregated_strong_voting_power,
+                    ..
+                } => {
+                    validator_verifier
+                        .check_aggregated_voting_power(*aggregated_weak_voting_power, true)
+                        .is_ok()
+                        || validator_verifier
+                            .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
+                            .is_ok()
+                },
+                NodeStatus::Ordered(_) => {
+                    error!("checking voting power for Ordered node");
+                    true
+                },
             })
             .unwrap_or(false)
     }
@@ -260,7 +310,7 @@ impl InMemDag {
             .flat_map(|(_, round_ref)| round_ref.iter_mut())
             .flatten()
             .filter(move |node_status| {
-                matches!(node_status, NodeStatus::Unordered(_))
+                matches!(node_status, NodeStatus::Unordered { .. })
                     && reachable_filter(node_status.as_node())
             })
     }
