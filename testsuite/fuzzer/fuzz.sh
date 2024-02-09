@@ -16,11 +16,13 @@ function error() {
 }
 
 function cargo_fuzz() {
-    rustup install nightly
+    # Workaround for build failures on oss-fuzz caused by dependencie incompatible with 1.78.0
+    # Owner: @zi0Black
+    rustup install nightly-2024-01-01
     if [ -z "$1" ]; then
         error "error using cargo()"
     fi
-    cargo_fuzz_cmd="cargo +nightly fuzz $1"
+    cargo_fuzz_cmd="cargo +nightly-2024-01-01-x86_64-unknown-linux-gnu fuzz $1"
     shift
     $cargo_fuzz_cmd $EXTRAFLAGS $@
 }
@@ -38,7 +40,10 @@ function usage() {
             ;;
         "debug")
             echo "Usage: $0 debug <fuzz_target> <testcase>"
-            ;;    
+            ;;
+        "flamegraph")
+            echo "Usage: $0 flamegraph <fuzz_target> <testcase>"
+            ;;
         "list")
             echo "Usage: $0 list"
             ;;
@@ -53,9 +58,10 @@ function usage() {
             echo "    add               adds a new fuzz target"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
+            echo "    debug             debugs a fuzz target with a testcase"
+            echo "    flamegraph        generates a flamegraph for a fuzz target with a testcase"
             echo "    list              lists existing fuzz targets"
             echo "    run               runs a fuzz target"
-            echo "    debug             debugs a fuzz target with a testcase"
             echo "    test              tests all fuzz targets"
             ;;
     esac
@@ -74,7 +80,7 @@ function build() {
     info "Target directory: $target_dir"
     mkdir -p $target_dir
     info "Building $fuzz_target"
-    cargo_fuzz build --verbose -O --target-dir $target_dir $fuzz_target
+    cargo_fuzz build --sanitizer none --verbose -O --target-dir $target_dir $fuzz_target
 }
 
 function build-oss-fuzz() {
@@ -137,6 +143,30 @@ function debug() {
     export LSAN_OPTIONS=verbosity=1:log_threads=1
     export RUST_BACKTRACE=1 
     rust-gdb --args $binary $testcase -- -runs=1
+}
+
+# use cargo-flamegraph to generate a flamegraph for a fuzz target with a testcase
+function flamegraph() {
+    if [ -z "$1" ]; then
+        usage flamegraph
+    fi
+    fuzz_target=$1
+    testcase=$2
+    if [ -z "$testcase" ]; then
+        error "No testcase provided"
+    fi
+    if [ ! -f "$testcase" ]; then
+        error "$testcase does not exist"
+    fi
+    info "Generating flamegraph for $fuzz_target with $testcase"
+    # find the binary
+    binary=$(find ./target -name $fuzz_target -type f -executable)
+    if [ -z "$binary" ]; then
+        error "Could not find binary for $fuzz_target"
+    fi
+    # run the binary with cargo-flamegraph
+    time=$(date +%s)
+    cargo flamegraph -o "${fuzz_target}_${time}.svg" --bin "$binary" "$testcase -- -runs=1"
 }
 
 function run() {
@@ -237,6 +267,10 @@ case "$1" in
   "debug")
     shift
     debug "$@"
+    ;;
+   "flamegraph")
+    shift
+    flamegraph "$@"
     ;;
    "list")
     shift
