@@ -147,6 +147,11 @@ impl Mutation {
             new_value,
         }
     }
+
+    /// Returns the operator name.
+    pub fn get_operator_name(&self) -> &str {
+        &self.operator_name
+    }
 }
 
 /// The `MutationReport` struct represents an entry in a report.

@@ -4,6 +4,8 @@ use move_command_line_common::files::FileHash;
 use move_compiler::parser::ast::{BinOp, BinOp_};
 use std::fmt;
 
+pub const OPERATOR_NAME: &str = "binary_operator_replacement";
+
 /// The binary mutation operator.
 #[derive(Debug, Copy, Clone)]
 pub struct Binary {
@@ -54,7 +56,7 @@ impl MutationOperator for Binary {
                     mutated_source,
                     Mutation::new(
                         Range::new(start, end),
-                        "binary_operator_replacement".to_string(),
+                        OPERATOR_NAME.to_string(),
                         cur_op.to_string(),
                         op.to_string(),
                     ),
@@ -65,6 +67,10 @@ impl MutationOperator for Binary {
 
     fn get_file_hash(&self) -> FileHash {
         self.operation.loc.file_hash()
+    }
+
+    fn name(&self) -> String {
+        OPERATOR_NAME.to_string()
     }
 }
 
