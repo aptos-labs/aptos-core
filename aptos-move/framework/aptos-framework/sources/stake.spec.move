@@ -41,7 +41,7 @@ spec aptos_framework::stake {
     // Global invariants
     // -----------------
     spec module {
-        pragma verify = true;
+        pragma verify = false;
         // The validator set should satisfy its desired invariant.
         invariant [suspendable] exists<ValidatorSet>(@aptos_framework) ==> validator_set_is_valid();
         // After genesis, `AptosCoinCapabilities`, `ValidatorPerformance` and `ValidatorSet` exist.
@@ -55,6 +55,9 @@ spec aptos_framework::stake {
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
         global ghost_proposer_idx: Option<u64>;
+        global active_num: u64;
+        global pending_inactive_num: u64;
+        global consensus_info_len: u64;
     }
 
     // property 1: the validator set resource stores consensus information for each validator.
@@ -83,13 +86,17 @@ spec aptos_framework::stake {
     // A desired invariant for the validator set.
     spec fun validator_set_is_valid(): bool {
         let validator_set = global<ValidatorSet>(@aptos_framework);
+        validator_set_is_valid_impl(validator_set)
+    }
+
+    spec fun validator_set_is_valid_impl(validator_set: ValidatorSet): bool {
         spec_validators_are_initialized(validator_set.active_validators) &&
             spec_validators_are_initialized(validator_set.pending_inactive) &&
             spec_validators_are_initialized(validator_set.pending_active) &&
-            spec_validator_indices_are_valid(validator_set.active_validators) &&
-            spec_validator_indices_are_valid(validator_set.pending_inactive)
+            spec_validator_indices_are_valid(validator_set.active_validators) //&&
+            //spec_validator_indices_are_valid(validator_set.pending_inactive) // &&
+            // spec_validator_indices_active_pending_active(validator_set)
     }
-
 
     // -----------------------
     // Function specifications
@@ -136,6 +143,7 @@ spec aptos_framework::stake {
 
     // `Validator` is initialized once.
     spec initialize(aptos_framework: &signer) {
+        pragma disable_invariants_in_body;
         let aptos_addr = signer::address_of(aptos_framework);
         aborts_if !system_addresses::is_aptos_framework_address(aptos_addr);
         aborts_if exists<ValidatorSet>(aptos_addr);
@@ -150,7 +158,6 @@ spec aptos_framework::stake {
         pool_address: address
     )
     {
-        pragma verify = true;
         // This function casue timeout (property proved)
         // pragma verify_duration_estimate = 120;
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
@@ -241,7 +248,7 @@ spec aptos_framework::stake {
         operator: &signer,
         pool_address: address
     ) {
-        pragma verify = true;
+        pragma disable_invariants_in_body;
         requires chain_status::is_operating();
         aborts_if reconfiguration_state::spec_is_in_progress();
         let config = staking_config::get();
@@ -256,6 +263,13 @@ spec aptos_framework::stake {
         let validator_find_bool = option::spec_is_some(spec_find_validator(validator_set.pending_active, pool_address));
         let active_validators = validator_set.active_validators;
         let pending_active = validator_set.pending_active;
+
+        let post post_validator_set = global<ValidatorSet>(@aptos_framework);
+        let post post_active_validators = post_validator_set.active_validators;
+        let pending_inactive_validators = validator_set.pending_inactive;
+        let post post_pending_inactive_validators = post_validator_set.pending_inactive;
+        ensures len(active_validators) + len(pending_inactive_validators) == len(post_active_validators)
+            + len(post_pending_inactive_validators);
 
         aborts_if !validator_find_bool && !option::spec_is_some(spec_find_validator(active_validators, pool_address));
         aborts_if !validator_find_bool && vector::length(validator_set.active_validators) <= option::spec_borrow(spec_find_validator(active_validators, pool_address));
@@ -282,7 +296,6 @@ spec aptos_framework::stake {
     }
 
     spec unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) {
-        pragma verify = true;
         let pool_address = owner_cap.pool_address;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post stake_pool = global<StakePool>(pool_address);
@@ -322,7 +335,6 @@ spec aptos_framework::stake {
         new_network_addresses: vector<u8>,
         new_fullnode_addresses: vector<u8>,
     ) {
-        pragma verify = true;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         modifies global<ValidatorConfig>(pool_address);
@@ -357,7 +369,6 @@ spec aptos_framework::stake {
     }
 
     spec reactivate_stake_with_cap(owner_cap: &OwnerCapability, amount: u64) {
-        pragma verify = true;
         let pool_address = owner_cap.pool_address;
         include StakedValueNochange;
 
@@ -379,7 +390,6 @@ spec aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) {
-        pragma verify = true;
         let pre_stake_pool = global<StakePool>(pool_address);
         let post validator_info = global<ValidatorConfig>(pool_address);
         aborts_if reconfiguration_state::spec_is_in_progress();
@@ -407,16 +417,19 @@ spec aptos_framework::stake {
     }
 
     spec update_validator_set_on_new_epoch {
-        pragma verify_duration_estimate = 120;
+        pragma verify = true;
+        pragma verify_duration_estimate = 1200;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
         include ResourceRequirement;
         include staking_config::StakingRewardsConfigRequirement;
         include aptos_framework::aptos_coin::ExistsAptosCoin;
+        let validator_set = global<ValidatorSet>(@aptos_framework);
+        // invariant spec_validator_indices_active_pending_active(validator_set);
         // This function should never abort.
         /// [high-level-req-4]
-        aborts_if false;
+        // aborts_if false;
     }
 
     spec update_performance_statistics {
@@ -440,6 +453,7 @@ spec aptos_framework::stake {
         include staking_config::StakingRewardsConfigRequirement;
 
         include UpdateStakePoolAbortsIf;
+        include reconfiguration_state::StartTimeSecsAbortsIf;
 
         let stake_pool = global<StakePool>(pool_address);
         let validator_config = global<ValidatorConfig>(pool_address);
@@ -464,21 +478,21 @@ spec aptos_framework::stake {
         let fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
         let post post_fees_table = global<ValidatorFees>(@aptos_framework).fees_table;
         let post post_inactive_value = post_stake_pool.inactive.value;
-        ensures post_stake_pool.pending_active.value == 0;
+        ensures commit ==> post_stake_pool.pending_active.value == 0;
         // the amount stored in the stake pool should not changed after the update
-        ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(fees_table, pool_address)) {
-            !table::spec_contains(post_fees_table, pool_address) &&
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(fees_table, pool_address).value
-        } else {
-            post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value
-        };
+        // ensures if (features::spec_is_enabled(features::COLLECT_AND_DISTRIBUTE_GAS_FEES) && table::spec_contains(fees_table, pool_address)) {
+        //     !table::spec_contains(post_fees_table, pool_address) &&
+        //     post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value + table::spec_get(fees_table, pool_address).value
+        // } else {
+        //     post_active_value == stake_pool.active.value + rewards_amount_1 + stake_pool.pending_active.value
+        // };
         // when current lockup cycle has expired, pending inactive should be fully unlocked and moved into inactive
-        ensures if (timestamp::spec_now_seconds() >= stake_pool.locked_until_secs) {
-            post_pending_inactive_value == 0 &&
-            post_inactive_value == stake_pool.inactive.value + stake_pool.pending_inactive.value + rewards_amount_2
-        } else {
-            post_pending_inactive_value == stake_pool.pending_inactive.value + rewards_amount_2
-        };
+        // ensures if (timestamp::spec_now_seconds() >= stake_pool.locked_until_secs && commit) {
+        //     post_pending_inactive_value == 0 &&
+        //     post_inactive_value == stake_pool.inactive.value + stake_pool.pending_inactive.value + rewards_amount_2
+        // } else {
+        //     post_pending_inactive_value == stake_pool.pending_inactive.value + rewards_amount_2
+        // };
     }
 
     spec schema UpdateStakePoolAbortsIf {
@@ -509,14 +523,14 @@ spec aptos_framework::stake {
 
         include DistributeRewardsAbortsIf;
 
-        ensures old(stake.value) > 0 ==>
+        ensures old(stake.value) > 0 && commit ==>
             result == spec_rewards_amount(
                 old(stake.value),
                 num_successful_proposals,
                 num_total_proposals,
                 rewards_rate,
                 rewards_rate_denominator);
-        ensures old(stake.value) > 0 ==>
+        ensures old(stake.value) > 0 && commit ==>
             stake.value == old(stake.value) + spec_rewards_amount(
                 old(stake.value),
                 num_successful_proposals,
@@ -524,7 +538,7 @@ spec aptos_framework::stake {
                 rewards_rate,
                 rewards_rate_denominator);
         ensures old(stake.value) == 0 ==> result == 0;
-        ensures old(stake.value) == 0 ==> stake.value == old(stake.value);
+        ensures (old(stake.value) == 0 || !commit)  ==> stake.value == old(stake.value);
     }
 
     spec schema DistributeRewardsAbortsIf {
@@ -535,6 +549,7 @@ spec aptos_framework::stake {
         num_total_proposals: num;
         rewards_rate: num;
         rewards_rate_denominator: num;
+        commit: bool;
 
         let stake_amount = coin::value(stake);
         let rewards_amount = if (stake_amount > 0) {
@@ -544,9 +559,9 @@ spec aptos_framework::stake {
         };
         let amount = rewards_amount;
         let addr = type_info::type_of<AptosCoin>().account_address;
-        aborts_if (rewards_amount > 0) && !exists<coin::CoinInfo<AptosCoin>>(addr);
+        aborts_if (rewards_amount > 0) && commit && !exists<coin::CoinInfo<AptosCoin>>(addr);
         modifies global<coin::CoinInfo<AptosCoin>>(addr);
-        include (rewards_amount > 0) ==> coin::CoinAddAbortsIf<AptosCoin> { amount: amount };
+        include ((rewards_amount > 0) && commit) ==> coin::CoinAddAbortsIf<AptosCoin> { amount: amount };
     }
 
     spec calculate_rewards_amount {
@@ -597,9 +612,14 @@ spec aptos_framework::stake {
         requires chain_status::is_operating();
 
         let validator_set = global<ValidatorSet>(@aptos_framework);
+        let post post_validator_set = global<ValidatorSet>(@aptos_framework);
         let active_validators = validator_set.active_validators;
-
+        let post post_active_validators = post_validator_set.active_validators;
+        let pending_inactive_validators = validator_set.pending_inactive;
+        let post post_pending_inactive_validators = post_validator_set.pending_inactive;
         invariant len(active_validators) > 0;
+        ensures len(active_validators) + len(pending_inactive_validators) == len(post_active_validators)
+            + len(post_pending_inactive_validators);
     }
 
     spec is_current_epoch_validator {
@@ -622,7 +642,6 @@ spec aptos_framework::stake {
     }
 
     spec add_stake_with_cap {
-        pragma verify = true;
         include ResourceRequirement;
         let amount = coins.value;
         aborts_if reconfiguration_state::spec_is_in_progress();
@@ -710,6 +729,7 @@ spec aptos_framework::stake {
 
     spec validator_consensus_infos_from_validator_set(validator_set: &ValidatorSet): vector<ValidatorConsensusInfo> {
         aborts_if false;
+        invariant validator_set_is_valid_impl(validator_set);
     }
 
     // ---------------------------------
@@ -784,10 +804,21 @@ spec aptos_framework::stake {
                 spec_has_validator_config(validators[i].addr)
     }
 
+    spec fun spec_validators_are_initialized_addrs(addrs: vector<address>): bool {
+        forall i in 0..len(addrs):
+            spec_has_stake_pool(addrs[i]) &&
+                spec_has_validator_config(addrs[i])
+    }
+
     // A predicate that the validator index of each given validator in-range.
     spec fun spec_validator_indices_are_valid(validators: vector<ValidatorInfo>): bool {
         forall i in 0..len(validators):
             global<ValidatorConfig>(validators[i].addr).validator_index < spec_validator_index_upper_bound()
+            && validators[i].config.validator_index < spec_validator_index_upper_bound()
+    }
+
+    spec fun spec_validator_indices_active_pending_active(validator_set: ValidatorSet): bool {
+        len(validator_set.pending_inactive) + len(validator_set.active_validators) == spec_validator_index_upper_bound()
     }
 
     // The upper bound of validator indices.

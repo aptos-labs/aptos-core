@@ -16,6 +16,12 @@ Reconfiguration meta-state resources and util functions.
 -  [Function `try_mark_as_in_progress`](#0x1_reconfiguration_state_try_mark_as_in_progress)
 -  [Function `start_time_secs`](#0x1_reconfiguration_state_start_time_secs)
 -  [Function `mark_as_completed`](#0x1_reconfiguration_state_mark_as_completed)
+-  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `initialize_for_testing`](#@Specification_1_initialize_for_testing)
+    -  [Function `is_in_progress`](#@Specification_1_is_in_progress)
+    -  [Function `try_mark_as_in_progress`](#@Specification_1_try_mark_as_in_progress)
+    -  [Function `start_time_secs`](#@Specification_1_start_time_secs)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
@@ -308,6 +314,130 @@ Abort if the current state is not "in progress".
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize">initialize</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx) != @aptos_framework;
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize_for_testing"></a>
+
+### Function `initialize_for_testing`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_initialize_for_testing">initialize_for_testing</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx) != @aptos_framework;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_in_progress"></a>
+
+### Function `is_in_progress`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_is_in_progress">is_in_progress</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_reconfiguration_state_spec_is_in_progress"></a>
+
+
+<pre><code><b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">spec_is_in_progress</a>(): bool {
+   <b>if</b> (!<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework)) {
+       <b>false</b>
+   } <b>else</b> {
+       <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(<b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework).variant).bytes == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">0x1::reconfiguration_state::StateActive</a>"
+   }
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_try_mark_as_in_progress"></a>
+
+### Function `try_mark_as_in_progress`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_try_mark_as_in_progress">try_mark_as_in_progress</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_TryMarkAsInProgressAbortsIf">TryMarkAsInProgressAbortsIf</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_reconfiguration_state_TryMarkAsInProgressAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_TryMarkAsInProgressAbortsIf">TryMarkAsInProgressAbortsIf</a> {
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(<b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework).variant).bytes
+        == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">0x1::reconfiguration_state::StateInactive</a>" && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_start_time_secs"></a>
+
+### Function `start_time_secs`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_start_time_secs">start_time_secs</a>(): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
+<b>include</b>  <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(<b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework).variant).bytes
+    == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">0x1::reconfiguration_state::StateActive</a>" ==&gt;
+ <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_UnpackAbortsIf">copyable_any::UnpackAbortsIf</a>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">StateActive</a>&gt; {
+    x:  <b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework).variant
+};
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(<b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework).variant).bytes
+    != b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">0x1::reconfiguration_state::StateActive</a>";
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

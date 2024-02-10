@@ -38,10 +38,14 @@ spec aptos_framework::reconfiguration_state {
     }
 
     spec start_time_secs(): u64 {
-        aborts_if !eqxists<State>(@aptos_framework);
+        include StartTimeSecsAbortsIf;
+    }
+
+    spec schema StartTimeSecsAbortsIf {
+        aborts_if !exists<State>(@aptos_framework);
         include  copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
             == b"0x1::reconfiguration_state::StateActive" ==>
-         copyable_any::UnpackAbortsIf<StateActive> {
+        copyable_any::UnpackAbortsIf<StateActive> {
             x:  global<State>(@aptos_framework).variant
         };
         aborts_if copyable_any::type_name(global<State>(@aptos_framework).variant).bytes

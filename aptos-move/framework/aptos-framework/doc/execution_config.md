@@ -14,6 +14,8 @@ Reconfiguration, and may be updated by root.
 -  [Function `on_new_epoch`](#0x1_execution_config_on_new_epoch)
 -  [Specification](#@Specification_1)
     -  [Function `set`](#@Specification_1_set)
+    -  [Function `set_for_next_epoch`](#@Specification_1_set_for_next_epoch)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -174,7 +176,7 @@ Only used in reconfiguration with DKG.
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
@@ -205,6 +207,38 @@ When setting now time must be later than last_reconfiguration_time.
 <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(addr);
 <b>requires</b> <a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
 <b>ensures</b> <b>exists</b>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_set_for_next_epoch"></a>
+
+### Function `set_for_next_epoch`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="execution_config.md#0x1_execution_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="execution_config.md#0x1_execution_config_on_new_epoch">on_new_epoch</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochAbortsIf">config_buffer::OnNewEpochAbortsIf</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">ExecutionConfig</a>&gt;;
 </code></pre>
 
 

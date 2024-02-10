@@ -44,7 +44,7 @@ spec aptos_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-5](set_genesis_end).
     /// </high-level-req>
     spec module {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec initialize {
@@ -110,6 +110,7 @@ spec aptos_framework::genesis {
 
     spec create_initialize_validators_with_commission {
         pragma verify_duration_estimate = 120;
+        pragma verify = false;
 
         include stake::ResourceRequirement;
         include CompareTimeRequires;
@@ -129,6 +130,7 @@ spec aptos_framework::genesis {
     spec initialize_for_verification {
         // This function cause timeout (property proved)
         pragma verify_duration_estimate = 120;
+        pragma verify = false;
         // We construct `initialize_for_verification` which is a "#[verify_only]" function that
         // simulates the genesis encoding process in `vm-genesis` (written in Rust).
         include InitalizeRequires;

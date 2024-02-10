@@ -22,6 +22,11 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 -  [Function `does_exist`](#0x1_config_buffer_does_exist)
 -  [Function `upsert`](#0x1_config_buffer_upsert)
 -  [Function `extract`](#0x1_config_buffer_extract)
+-  [Specification](#@Specification_1)
+    -  [Function `initialize`](#@Specification_1_initialize)
+    -  [Function `does_exist`](#@Specification_1_does_exist)
+    -  [Function `upsert`](#@Specification_1_upsert)
+    -  [Function `extract`](#@Specification_1_extract)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">0x1::any</a>;
@@ -191,6 +196,114 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
+</code></pre>
+
+
+
+<a id="@Specification_1_does_exist"></a>
+
+### Function `does_exist`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_does_exist">does_exist</a>&lt;T: store&gt;(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>let</b> type_name = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
+<b>ensures</b> result == <a href="config_buffer.md#0x1_config_buffer_spec_fun_does_exist">spec_fun_does_exist</a>&lt;T&gt;(type_name);
+</code></pre>
+
+
+
+
+<a id="0x1_config_buffer_spec_fun_does_exist"></a>
+
+
+<pre><code><b>fun</b> <a href="config_buffer.md#0x1_config_buffer_spec_fun_does_exist">spec_fun_does_exist</a>&lt;T: store&gt;(type_name: String): bool {
+   <b>if</b> (<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework)) {
+       <b>let</b> config = <b>global</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+       <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(config.configs, type_name)
+   } <b>else</b> {
+       <b>false</b>
+   }
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_upsert"></a>
+
+### Function `upsert`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_upsert">upsert</a>&lt;T: drop, store&gt;(config: T)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
+<a id="@Specification_1_extract"></a>
+
+### Function `extract`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_extract">extract</a>&lt;T: store&gt;(): T
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_ExtractAbortsIf">ExtractAbortsIf</a>&lt;T&gt;;
+</code></pre>
+
+
+
+
+<a id="0x1_config_buffer_ExtractAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="config_buffer.md#0x1_config_buffer_ExtractAbortsIf">ExtractAbortsIf</a>&lt;T&gt; {
+    <b>let</b> configs = <b>global</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework);
+    <b>let</b> key = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;T&gt;();
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(configs.configs, key);
+    <b>include</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any_UnpackAbortsIf">any::UnpackAbortsIf</a>&lt;T&gt; {
+        x: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(configs.configs, key)
+    };
+}
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

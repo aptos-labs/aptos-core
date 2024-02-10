@@ -9,6 +9,9 @@ On-chain randomness utils.
 -  [Resource `PerBlockRandomness`](#0x1_randomness_PerBlockRandomness)
 -  [Function `initialize`](#0x1_randomness_initialize)
 -  [Function `on_new_block`](#0x1_randomness_on_new_block)
+-  [Specification](#@Specification_0)
+    -  [Function `initialize`](#@Specification_0_initialize)
+    -  [Function `on_new_block`](#@Specification_0_on_new_block)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -99,6 +102,46 @@ Invoked in block prologues to update the block-level randomness seed.
 
 
 </details>
+
+<a id="@Specification_0"></a>
+
+## Specification
+
+
+<a id="@Specification_0_initialize"></a>
+
+### Function `initialize`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> framework_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(framework);
+<b>aborts_if</b> framework_addr != @aptos_framework;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(framework_addr);
+<b>ensures</b> <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(framework_addr).seed == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;();
+</code></pre>
+
+
+
+<a id="@Specification_0_on_new_block"></a>
+
+### Function `on_new_block`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seed_for_new_block: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(vm) != @vm;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+<b>ensures</b> <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework).seed == seed_for_new_block;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -198,7 +198,7 @@ Get <code><a href="types.md#0x1_types_ValidatorConsensusInfo">ValidatorConsensus
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 </code></pre>
 
 
