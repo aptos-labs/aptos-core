@@ -20,9 +20,12 @@ pub fn initialize(
     mode: ExecutorMode,
     aggregator_execution_enabled: bool,
     txns: usize,
+    allow_block_executor_fallback: bool,
 ) -> AggV2TestHarness {
-    let (harness, account) = initialize_harness(mode, aggregator_execution_enabled, path.clone());
-
+    let (mut harness, account) = initialize_harness(mode, aggregator_execution_enabled, path.clone());
+    if !allow_block_executor_fallback {
+        harness.executor.disable_block_executor_fallback();
+    }
     let mut result = AggV2TestHarness {
         harness,
         comparison_harnesses: vec![],
@@ -40,10 +43,14 @@ pub fn initialize_enabled_disabled_comparison(
     path: PathBuf,
     mode: ExecutorMode,
     txns: usize,
+    allow_block_executor_fallback: bool,
 ) -> AggV2TestHarness {
-    let (harness_base, account_base) = initialize_harness(mode, false, path.clone());
-    let (harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
-
+    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone());
+    let (mut harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
+    if !allow_block_executor_fallback {
+        harness_base.executor.disable_block_executor_fallback();
+        harness_comp.executor.disable_block_executor_fallback();
+    }
     let mut agg_harness = AggV2TestHarness {
         harness: harness_base,
         comparison_harnesses: vec![(harness_comp, "aggregator_execution_enabled".to_string())],

@@ -128,6 +128,7 @@ pub struct FakeExecutor {
     executor_mode: Option<ExecutorMode>,
     features: Features,
     chain_id: u8,
+    allow_block_executor_fallback: bool,
 }
 
 pub enum GasMeterType {
@@ -155,6 +156,7 @@ impl FakeExecutor {
             executor_mode: None,
             features: Features::default(),
             chain_id: chain_id.id(),
+            allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
         // As a set effect, also allow module bundle txns. TODO: Remove
@@ -177,6 +179,10 @@ impl FakeExecutor {
     /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
     pub fn set_parallel(self) -> Self {
         self.set_executor_mode(ExecutorMode::BothComparison)
+    }
+
+    pub fn disable_block_executor_fallback(&mut self) {
+        self.allow_block_executor_fallback = false;
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
@@ -236,6 +242,7 @@ impl FakeExecutor {
             executor_mode: None,
             features: Features::default(),
             chain_id: ChainId::test().id(),
+            allow_block_executor_fallback: true,
         }
     }
 
@@ -482,6 +489,7 @@ impl FakeExecutor {
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: usize::min(4, num_cpus::get()),
+                    allow_fallback: self.allow_block_executor_fallback,
                 },
                 onchain: onchain_config,
             },

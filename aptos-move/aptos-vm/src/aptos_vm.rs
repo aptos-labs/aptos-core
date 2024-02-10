@@ -2193,6 +2193,7 @@ impl VMExecutor for AptosVM {
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: Self::get_concurrency_level(),
+                    allow_fallback: true,
                 },
                 onchain: onchain_config,
             },
