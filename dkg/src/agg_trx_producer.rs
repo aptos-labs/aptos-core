@@ -64,12 +64,15 @@ impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProdu
             info!(
                 epoch = epoch,
                 my_addr = my_addr,
-                "DKG transcript request RB finished."
+                "[DKG] aggregated transcript locally"
             );
-            info!("has_agg_trx_tx={}", agg_trx_tx.is_some());
-            if let Some(tx) = agg_trx_tx {
-                let push_result = tx.push((), agg_trx); // If the `DKGManager` was dropped, this send will fail by design.
-                info!("push_result={:?}", push_result);
+            if let Err(e) = agg_trx_tx.expect("[DKG] agg_trx_tx should be available").push((), agg_trx) {
+                // If the `DKGManager` was dropped, this send will fail by design.
+                info!(
+                    epoch = epoch,
+                    my_addr = my_addr,
+                    "[DKG] Failed to send aggregated transcript to DKGManager, maybe DKGManager stopped and channel dropped: {:?}", e
+                );
             }
         };
         let (abort_handle, abort_registration) = AbortHandle::new_pair();

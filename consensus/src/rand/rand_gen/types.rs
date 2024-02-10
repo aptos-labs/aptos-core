@@ -435,7 +435,7 @@ impl CertifiedAugDataAck {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct RandConfig {
     pub author: Author,
     pub epoch: u64,
@@ -446,6 +446,12 @@ pub struct RandConfig {
     pub keys: Arc<RandKeys>,
     // weighted config for weighted VUF
     pub wconfig: WeightedConfig,
+}
+
+impl Debug for RandConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RandConfig {{ epoch: {}, author: {}, wconfig: {:?} }}", self.epoch, self.author, self.wconfig)
+    }
 }
 
 impl RandConfig {

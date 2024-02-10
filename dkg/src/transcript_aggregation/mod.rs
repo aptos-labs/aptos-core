@@ -72,20 +72,20 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         } = dkg_transcript;
         ensure!(
             metadata.epoch == self.epoch_state.epoch,
-            "adding dkg node failed with invalid node epoch",
+            "[DKG] adding peer transcript failed with invalid node epoch",
         );
 
         let peer_power = self.epoch_state.verifier.get_voting_power(&sender);
         ensure!(
             peer_power.is_some(),
-            "adding dkg node failed with illegal dealer"
+            "[DKG] adding peer transcript failed with illegal dealer"
         );
         ensure!(
             metadata.author == sender,
-            "adding dkg node failed with node author mismatch"
+            "[DKG] adding peer transcript failed with node author mismatch"
         );
         let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e| {
-            anyhow!("transcript_aggregation::add failed with trx deserialization error: {e}")
+            anyhow!("[DKG] adding peer transcript failed with trx deserialization error: {e}")
         })?;
         let mut trx_aggregator = self.trx_aggregator.lock();
         if trx_aggregator.contributors.contains(&metadata.author) {
@@ -93,7 +93,7 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         }
 
         S::verify_transcript(&self.dkg_pub_params, &transcript).map_err(|e| {
-            anyhow!("transcript_aggregation::add failed with trx verification failure: {e}")
+            anyhow!("[DKG] adding peer transcript failed with trx verification failure: {e}")
         })?;
 
         // All checks passed. Aggregating.
@@ -136,7 +136,7 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             new_total_power = new_total_power,
             threshold = threshold,
             threshold_exceeded = maybe_aggregated.is_some(),
-            "Peer transcript aggregated."
+            "[DKG] added transcript from validator {}, {} out of {} aggregated.", self.epoch_state.verifier.address_to_validator_index().get(&sender).unwrap(), new_total_power.unwrap_or(0), threshold
         );
         Ok(maybe_aggregated)
     }
