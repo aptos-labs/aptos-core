@@ -12,4 +12,8 @@ impl ConflictKey<SignedTransaction> for TxnSenderKey {
     fn extract_from(txn: &SignedTransaction) -> Self {
         TxnSenderKey(txn.sender())
     }
+
+    fn conflict_exempt(&self) -> bool {
+        false
+    }
 }

@@ -134,6 +134,10 @@ impl ConflictKey<FakeTxn> for FakeSenderKey {
     fn extract_from(txn: &FakeTxn) -> Self {
         Self { id: txn.sender.id }
     }
+
+    fn conflict_exempt(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Eq, Hash, PartialEq)]

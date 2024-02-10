@@ -28,10 +28,10 @@ mod tests;
 type TxnIdx = usize;
 
 #[derive(Debug)]
-struct FairnessShuffler {
-    sender_conflict_window_size: usize,
-    module_conflict_window_size: usize,
-    entry_fun_conflict_window_size: usize,
+pub struct FairnessShuffler {
+    pub sender_conflict_window_size: usize,
+    pub module_conflict_window_size: usize,
+    pub entry_fun_conflict_window_size: usize,
 }
 
 impl FairnessShuffler {

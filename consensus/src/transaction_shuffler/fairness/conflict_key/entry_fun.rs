@@ -18,14 +18,18 @@ impl ConflictKey<SignedTransaction> for EntryFunKey {
     fn extract_from(txn: &SignedTransaction) -> Self {
         match txn.payload() {
             TransactionPayload::EntryFunction(entry_fun) => {
-                // FIXME(aldenhu): exempt framework modules
-                // n.b. Generics ignored.
-                Self::EntryFun {
-                    module: entry_fun.module().clone(),
-                    function: entry_fun.function().to_owned(),
+                let module_id = entry_fun.module();
+                if module_id.address().is_special() {
+                    // Exempt framework modules
+                    Self::Exempt
+                } else {
+                    // n.b. Generics ignored.
+                    Self::EntryFun {
+                        module: module_id.clone(),
+                        function: entry_fun.function().to_owned(),
+                    }
                 }
             },
-            // FIXME(aldenhu): deal with multisig
             TransactionPayload::Multisig(_)
             | TransactionPayload::Script(_)
             | TransactionPayload::ModuleBundle(_) => Self::Exempt,

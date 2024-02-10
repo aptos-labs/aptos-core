@@ -21,9 +21,7 @@ pub(crate) mod test_utils;
 pub(crate) trait ConflictKey<Txn>: Eq + Hash + PartialEq {
     fn extract_from(txn: &Txn) -> Self;
 
-    fn conflict_exempt(&self) -> bool {
-        false
-    }
+    fn conflict_exempt(&self) -> bool;
 }
 
 #[derive(Clone, Copy, Debug)]
