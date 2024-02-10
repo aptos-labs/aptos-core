@@ -70,7 +70,7 @@
 //!
 //! a. Any path which does not end in `nodes(locals)` is safe and considered out of scope,
 //!    where `nodes(locals)` denotes the nodes which are associated with the given `locals`.
-//! b. For any two paths `p` and `q`, `q != p`, and any pair of diverting edges `e1` and `e2`, if
+//! b. For any two paths `p` and `q`, `q != p`, and any pair of diverging edges `e1` and `e2`, if
 //!    any of those edges is mut, the other needs to be disjoint. This basically states that one
 //!    cannot have `&x.f` and `&mut x.f` coexist in a safe graph. However, `&x.f` and `&mut x.g`
 //!    is fine.
@@ -984,7 +984,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ///              r1    r2
     /// ```
     ///
-    /// The diverting edges `.f` and `.g` are not directly visible. In order to deal with this, we construct a
+    /// The diverging edges `.f` and `.g` are not directly visible. In order to deal with this, we construct a
     /// _hyper graph_ on the fly as follows:
     ///
     /// 1. The root nodes are the singleton sets with all the nodes of the borrow graph
@@ -1029,7 +1029,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
                             continue;
                         }
-                        self.unsafe_edge_error(hyper.first().unwrap(), e1, e2, &leaves)
+                        self.diverging_edge_error(hyper.first().unwrap(), e1, e2, &leaves)
                     }
                 }
             }
@@ -1063,8 +1063,8 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Reports an error about a diverging edge. See condition (a) in the file header documentation.
-    fn unsafe_edge_error<'a>(
+    /// Reports an error about a diverging edge. See condition (b) in the file header documentation.
+    fn diverging_edge_error<'a>(
         &self,
         label: &LifetimeLabel,
         mut edge: &'a BorrowEdge,
@@ -1113,7 +1113,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     }
 
     /// Reports an error about exclusive access requirement for borrows. See
-    /// safety condition (b) in the file header documentation.
+    /// safety condition (c) in the file header documentation.
     fn exclusive_access_borrow_error(&self, label: &LifetimeLabel, temps: &BTreeSet<TempIndex>) {
         self.error_with_hints(
             self.cur_loc(),
@@ -1129,7 +1129,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     }
 
     /// Reports an error about exclusive access requirement for duplicate usgae. See safety
-    /// condition (c) in the file header documentation.
+    /// condition (d) in the file header documentation.
     fn exclusive_access_dup_error(
         &self,
         labels: &BTreeSet<LifetimeLabel>,
