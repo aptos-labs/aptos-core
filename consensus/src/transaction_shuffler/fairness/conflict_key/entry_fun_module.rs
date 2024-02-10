@@ -8,8 +8,7 @@ use move_core_types::language_storage::ModuleId;
 #[derive(Eq, Hash, PartialEq)]
 pub enum EntryFunModuleKey {
     Module(ModuleId),
-    AnyScriptOrModuleBundle,
-    AnyMultiSig,
+    AnyScriptOrMultiSig,
     Exempt,
 }
 
@@ -17,21 +16,24 @@ impl ConflictKey<SignedTransaction> for EntryFunModuleKey {
     fn extract_from(txn: &SignedTransaction) -> Self {
         match txn.payload() {
             TransactionPayload::EntryFunction(entry_fun) => {
-                // FIXME(aldenhu): exempt framework modules
-                Self::Module(entry_fun.module().clone())
+                let module_id = entry_fun.module();
+
+                if module_id.address().is_special() {
+                    Self::Exempt
+                } else {
+                    Self::Module(module_id.clone())
+                }
             },
-            // FIXME(aldenhu): deal with multisig
-            TransactionPayload::Multisig(..) => Self::AnyMultiSig,
-            TransactionPayload::Script(_) | TransactionPayload::ModuleBundle(_) => {
-                Self::AnyScriptOrModuleBundle
-            },
+            TransactionPayload::Multisig(..)
+            | TransactionPayload::Script(_)
+            | TransactionPayload::ModuleBundle(_) => Self::AnyScriptOrMultiSig,
         }
     }
 
     fn conflict_exempt(&self) -> bool {
         match self {
             Self::Exempt => true,
-            Self::Module(..) | Self::AnyScriptOrModuleBundle | Self::AnyMultiSig => false,
+            Self::Module(..) | Self::AnyScriptOrMultiSig => false,
         }
     }
 }

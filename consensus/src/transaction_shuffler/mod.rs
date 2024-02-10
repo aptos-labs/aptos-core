@@ -48,5 +48,22 @@ pub fn create_transaction_shuffler(
             );
             Arc::new(SenderAwareShuffler::new(conflict_window_size as usize))
         },
+        TransactionShufflerType::Fairness {
+            sender_conflict_window_size,
+            module_conflict_window_size,
+            entry_fun_conflict_window_size,
+        } => {
+            info!(
+                "Using fairness transaction shuffling with conflict window sizes: sender {}, module {}, entry fun {}",
+                sender_conflict_window_size,
+                module_conflict_window_size,
+                entry_fun_conflict_window_size
+            );
+            Arc::new(fairness::FairnessShuffler {
+                sender_conflict_window_size: sender_conflict_window_size as usize,
+                module_conflict_window_size: module_conflict_window_size as usize,
+                entry_fun_conflict_window_size: entry_fun_conflict_window_size as usize,
+            })
+        },
     }
 }

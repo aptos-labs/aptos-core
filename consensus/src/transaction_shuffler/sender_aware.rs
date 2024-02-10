@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    counters::{NUM_SENDERS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
-    transaction_shuffler::TransactionShuffler,
-};
+use crate::{counters::NUM_SENDERS_IN_BLOCK, transaction_shuffler::TransactionShuffler};
 use aptos_types::transaction::SignedTransaction;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{HashMap, VecDeque};
@@ -39,8 +36,6 @@ pub struct SenderAwareShuffler {
 
 impl TransactionShuffler for SenderAwareShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        let _timer = TXN_SHUFFLE_SECONDS.start_timer();
-
         // Early return for performance reason if there are no transactions to shuffle
         if txns.is_empty() {
             return txns;
