@@ -116,8 +116,7 @@ mod test_cases {
     }
 }
 
-#[allow(dead_code)]
-fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
+pub fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
     (0..3)
         .prop_flat_map(move |enum_type| {
             // making running a test with a full block likely

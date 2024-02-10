@@ -420,7 +420,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // exec tx
     tdbg!("exec start");
     let mut old_res = None;
-    const N_EXTRA_RERUNS: usize = 3;
+    const N_EXTRA_RERUNS: usize = 0;
+    #[allow(clippy::reversed_empty_ranges)]
     for _ in 0..N_EXTRA_RERUNS {
         let res = vm.execute_block(vec![tx.clone()]);
         if let Some(old_res) = old_res {

@@ -28,7 +28,7 @@ use aptos_types::{
         webauthn::PartialAuthenticatorAssertionResponse,
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
-    zkid::{MAX_ZK_PUBLIC_KEY_BYTES, MAX_ZK_SIGNATURE_BYTES},
+    zkid,
 };
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
@@ -1205,18 +1205,17 @@ impl VerifyInput for ZkIdSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > MAX_ZK_PUBLIC_KEY_BYTES {
+        if public_key_len > zkid::ZkIdPublicKey::MAX_LEN {
             bail!(
-                "ZKID public key length is greater than the maximum number of {} bytes: found {} bytes",
-                MAX_ZK_PUBLIC_KEY_BYTES, public_key_len
+                "zkID public key length is greater than the maximum number of {} bytes: found {} bytes",
+                zkid::ZkIdPublicKey::MAX_LEN, public_key_len
             )
-        } else if signature_len > MAX_ZK_SIGNATURE_BYTES {
+        } else if signature_len > zkid::ZkIdSignature::MAX_LEN {
             bail!(
-                "ZKID signature length is greater than the maximum number of {} bytes: found {} bytes",
-                MAX_ZK_SIGNATURE_BYTES, signature_len
+                "zkID signature length is greater than the maximum number of {} bytes: found {} bytes",
+                zkid::ZkIdSignature::MAX_LEN, signature_len
             )
         } else {
-            // TODO(zkid): Any other checks we can do here?
             Ok(())
         }
     }

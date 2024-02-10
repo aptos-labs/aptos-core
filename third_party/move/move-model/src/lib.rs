@@ -496,7 +496,7 @@ fn collect_related_modules_recursive<'a>(
     }
 }
 
-fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
+pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
     let mk_label = |is_primary: bool, (loc, msg): (move_ir_types::location::Loc, String)| {
         let style = if is_primary {
             LabelStyle::Primary

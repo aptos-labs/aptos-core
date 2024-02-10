@@ -19,14 +19,18 @@ use aptos_gas_schedule::{
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
+    bn254_circom,
+    bn254_circom::Groth16VerificationKey,
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
+    move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
+    zkid,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -51,6 +55,7 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
+const ZKID_MODULE_NAME: &str = "zkid";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -249,6 +254,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
+    initialize_zkid(&mut session);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -438,9 +444,12 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
         FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
         FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+        FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+        FeatureFlag::CONCURRENT_TOKEN_V2,
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         FeatureFlag::BN254_STRUCTURES,
+        FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
         // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
@@ -518,6 +527,31 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
             MoveValue::U128(genesis_config.min_voting_threshold),
             MoveValue::U64(genesis_config.required_proposer_stake),
             MoveValue::U64(genesis_config.voting_duration_secs),
+        ]),
+    );
+}
+
+fn initialize_zkid(session: &mut SessionExt) {
+    let config = zkid::Configuration::new_for_devnet_and_testing();
+    exec_function(
+        session,
+        ZKID_MODULE_NAME,
+        "update_configuration",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            config.as_move_value(),
+        ]),
+    );
+    let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
+    exec_function(
+        session,
+        ZKID_MODULE_NAME,
+        "update_groth16_verification_key",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            vk.as_move_value(),
         ]),
     );
 }

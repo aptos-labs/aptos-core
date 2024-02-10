@@ -57,6 +57,7 @@ pub struct JWKObserver {
 
 impl JWKObserver {
     pub fn spawn(
+        epoch: u64,
         my_addr: AccountAddress,
         issuer: Issuer,
         config_url: Vec<u8>,
@@ -73,9 +74,10 @@ impl JWKObserver {
             close_rx,
         ));
         info!(
-            "[JWK] observer spawned, issuer={:?}, config_url={:?}",
-            String::from_utf8(issuer),
-            String::from_utf8(config_url)
+            epoch = epoch,
+            issuer = String::from_utf8(issuer).ok(),
+            config_url = String::from_utf8(config_url).ok(),
+            "JWKObserver spawned."
         );
         Self {
             close_tx,

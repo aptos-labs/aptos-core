@@ -11,22 +11,17 @@ use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub(crate) const MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE: u64 = 4000;
+pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 2500;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusConfig {
     // length of inbound queue of messages
     pub max_network_channel_size: usize,
-    // Use getters to read the correct value with/without quorum store.
     pub max_sending_block_txns: u64,
-    pub max_sending_block_txns_quorum_store_override: u64,
     pub max_sending_block_bytes: u64,
-    pub max_sending_block_bytes_quorum_store_override: u64,
     pub max_receiving_block_txns: u64,
-    pub max_receiving_block_txns_quorum_store_override: u64,
     pub max_receiving_block_bytes: u64,
-    pub max_receiving_block_bytes_quorum_store_override: u64,
     pub max_pruned_blocks_in_mem: usize,
     // Timeout for consensus to get an ack from mempool for executed transactions (in milliseconds)
     pub mempool_executed_txn_timeout_ms: u64,
@@ -128,6 +123,7 @@ pub struct PipelineBackpressureValues {
     // If we want to dynamically increase it beyond quorum_store_poll_time,
     // we need to adjust timeouts other nodes use for the backpressured round.
     pub backpressure_proposal_delay_ms: u64,
+    pub max_txns_from_block_to_execute: Option<usize>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -144,18 +140,10 @@ impl Default for ConsensusConfig {
     fn default() -> ConsensusConfig {
         ConsensusConfig {
             max_network_channel_size: 1024,
-            max_sending_block_txns: 2500,
-            max_sending_block_txns_quorum_store_override:
-                MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE,
-            // defaulting to under 0.5s to broadcast the proposal to 100 validators
-            // over 1gbps link
-            max_sending_block_bytes: 600 * 1024, // 600 KB
-            max_sending_block_bytes_quorum_store_override: 5 * 1024 * 1024, // 5MB
-            max_receiving_block_txns: 10000,
-            max_receiving_block_txns_quorum_store_override: 10000
-                .max(2 * MAX_SENDING_BLOCK_TXNS_QUORUM_STORE_OVERRIDE),
-            max_receiving_block_bytes: 3 * 1024 * 1024, // 3MB
-            max_receiving_block_bytes_quorum_store_override: 6 * 1024 * 1024, // 6MB
+            max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
+            max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
+            max_receiving_block_txns: 10000.max(2 * MAX_SENDING_BLOCK_TXNS),
+            max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
@@ -193,36 +181,42 @@ impl Default for ConsensusConfig {
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1100,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1400,
                     max_sending_block_txns_override: 2000,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 300,
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1700,
                     max_sending_block_txns_override: 1000,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 400,
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
                     max_sending_block_txns_override: 600,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2300,
                     max_sending_block_txns_override: 400,
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2600,
@@ -235,6 +229,7 @@ impl Default for ConsensusConfig {
                     // stop reducing size, so 1MB transactions can still go through
                     max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
                     backpressure_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: None,
                 },
             ],
             window_for_chain_health: 100,
@@ -308,38 +303,6 @@ impl ConsensusConfig {
         }
     }
 
-    pub fn max_sending_block_txns(&self, quorum_store_enabled: bool) -> u64 {
-        if quorum_store_enabled {
-            self.max_sending_block_txns_quorum_store_override
-        } else {
-            self.max_sending_block_txns
-        }
-    }
-
-    pub fn max_sending_block_bytes(&self, quorum_store_enabled: bool) -> u64 {
-        if quorum_store_enabled {
-            self.max_sending_block_bytes_quorum_store_override
-        } else {
-            self.max_sending_block_bytes
-        }
-    }
-
-    pub fn max_receiving_block_txns(&self, quorum_store_enabled: bool) -> u64 {
-        if quorum_store_enabled {
-            self.max_receiving_block_txns_quorum_store_override
-        } else {
-            self.max_receiving_block_txns
-        }
-    }
-
-    pub fn max_receiving_block_bytes(&self, quorum_store_enabled: bool) -> u64 {
-        if quorum_store_enabled {
-            self.max_receiving_block_bytes_quorum_store_override
-        } else {
-            self.max_receiving_block_bytes
-        }
-    }
-
     fn sanitize_send_recv_block_limits(
         sanitizer_name: &str,
         config: &ConsensusConfig,
@@ -354,16 +317,6 @@ impl ConsensusConfig {
                 config.max_sending_block_bytes,
                 config.max_receiving_block_bytes,
                 "bytes",
-            ),
-            (
-                config.max_sending_block_txns_quorum_store_override,
-                config.max_receiving_block_txns_quorum_store_override,
-                "txns_quorum_store_override",
-            ),
-            (
-                config.max_sending_block_bytes_quorum_store_override,
-                config.max_receiving_block_bytes_quorum_store_override,
-                "bytes_quorum_store_override",
             ),
         ];
         for (send, recv, label) in &send_recv_pairs {
@@ -385,12 +338,12 @@ impl ConsensusConfig {
         let mut recv_batch_send_block_pairs = vec![
             (
                 config.quorum_store.receiver_max_batch_txns as u64,
-                config.max_sending_block_txns_quorum_store_override,
+                config.max_sending_block_txns,
                 "txns".to_string(),
             ),
             (
                 config.quorum_store.receiver_max_batch_bytes as u64,
-                config.max_sending_block_bytes_quorum_store_override,
+                config.max_sending_block_bytes,
                 "bytes".to_string(),
             ),
         ];
@@ -543,12 +496,12 @@ mod test {
     }
 
     #[test]
-    fn test_send_recv_quorum_store_block_txn_override() {
+    fn test_send_recv_block_txn_override() {
         // Create a node config with invalid block txn limits
         let node_config = NodeConfig {
             consensus: ConsensusConfig {
-                max_sending_block_txns_quorum_store_override: 100,
-                max_receiving_block_txns_quorum_store_override: 50,
+                max_sending_block_txns: 100,
+                max_receiving_block_txns: 50,
                 ..Default::default()
             },
             ..Default::default()
@@ -565,12 +518,12 @@ mod test {
     }
 
     #[test]
-    fn test_send_recv_quorum_store_block_byte_override() {
+    fn test_send_recv_block_byte_override() {
         // Create a node config with invalid block byte limits
         let node_config = NodeConfig {
             consensus: ConsensusConfig {
-                max_sending_block_bytes_quorum_store_override: 100,
-                max_receiving_block_bytes_quorum_store_override: 50,
+                max_sending_block_bytes: 100,
+                max_receiving_block_bytes: 50,
                 ..Default::default()
             },
             ..Default::default()
@@ -591,7 +544,7 @@ mod test {
         // Create a node config with invalid batch txn limits
         let node_config = NodeConfig {
             consensus: ConsensusConfig {
-                max_sending_block_txns_quorum_store_override: 100,
+                max_sending_block_txns: 100,
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_txns: 101,
                     ..Default::default()
@@ -612,7 +565,7 @@ mod test {
         // Create a node config with invalid batch byte limits
         let node_config = NodeConfig {
             consensus: ConsensusConfig {
-                max_sending_block_bytes_quorum_store_override: 100,
+                max_sending_block_bytes: 100,
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_bytes: 101,
                     ..Default::default()
@@ -638,6 +591,7 @@ mod test {
                     max_sending_block_txns_override: 350,
                     max_sending_block_bytes_override: 0,
                     backpressure_proposal_delay_ms: 0,
+                    max_txns_from_block_to_execute: None,
                 }],
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_txns: 250,
@@ -668,6 +622,7 @@ mod test {
                     max_sending_block_txns_override: 251,
                     max_sending_block_bytes_override: 100,
                     backpressure_proposal_delay_ms: 0,
+                    max_txns_from_block_to_execute: None,
                 }],
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_bytes: 2_000_000,

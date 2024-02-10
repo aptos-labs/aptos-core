@@ -6,11 +6,13 @@ use crate::types::{
 use anyhow::{anyhow, ensure};
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
+use aptos_logger::info;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     epoch_state::EpochState,
     jwks::{ProviderJWKs, QuorumCertifiedUpdate},
+    validator_verifier::VerifyError,
 };
 use move_core_types::account_address::AccountAddress;
 use std::{collections::BTreeSet, sync::Arc};
@@ -58,6 +60,13 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
             "adding peer observation failed with mismatched author",
         );
 
+        let peer_power = self.epoch_state.verifier.get_voting_power(&author);
+        ensure!(
+            peer_power.is_some(),
+            "adding peer observation failed with illegal signer"
+        );
+        let peer_power = peer_power.unwrap();
+
         let mut partial_sigs = self.inner_state.lock();
         if partial_sigs.contains_voter(&sender) {
             return Ok(None);
@@ -76,12 +85,28 @@ impl BroadcastStatus<JWKConsensusMsg> for Arc<ObservationAggregationState> {
         // All checks passed. Aggregating.
         partial_sigs.add_signature(sender, signature);
         let voters: BTreeSet<AccountAddress> = partial_sigs.signatures().keys().copied().collect();
-        if self
+        let power_check_result = self
             .epoch_state
             .verifier
-            .check_voting_power(voters.iter(), true)
-            .is_err()
-        {
+            .check_voting_power(voters.iter(), true);
+        let new_total_power = match &power_check_result {
+            Ok(x) => Some(*x),
+            Err(VerifyError::TooLittleVotingPower { voting_power, .. }) => Some(*voting_power),
+            _ => None,
+        };
+
+        info!(
+            epoch = self.epoch_state.epoch,
+            peer = sender,
+            issuer = String::from_utf8(self.local_view.issuer.clone()).ok(),
+            peer_power = peer_power,
+            new_total_power = new_total_power,
+            threshold = self.epoch_state.verifier.quorum_voting_power(),
+            threshold_exceeded = power_check_result.is_ok(),
+            "Peer vote aggregated."
+        );
+
+        if power_check_result.is_err() {
             return Ok(None);
         }
         let multi_sig = self.epoch_state.verifier.aggregate_signatures(&partial_sigs).map_err(|e|anyhow!("adding peer observation failed with partial-to-aggregated conversion error: {e}"))?;

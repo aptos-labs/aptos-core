@@ -54,6 +54,7 @@ members = [
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
+    "crates/aptos-collections",
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
@@ -167,8 +168,6 @@ members = [
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
-    "testsuite/aptos-fuzzer",
-    "testsuite/aptos-fuzzer/fuzz",
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
@@ -291,6 +290,7 @@ aptos-build-info = { path = "crates/aptos-build-info" }
 aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
 aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
+aptos-collections = { path = "crates/aptos-collections" }
 aptos-compression = { path = "crates/aptos-compression" }
 aptos-consensus = { path = "consensus" }
 aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
@@ -325,7 +325,6 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
-aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
@@ -486,7 +485,10 @@ claims = "0.7"
 clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
-cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
+cloud-storage = { version = "0.11.1", features = [
+    "global-client",
+    "rustls-tls",
+], default-features = false }
 codespan-reporting = "0.11.1"
 concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
@@ -610,15 +612,19 @@ prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
-prost = "0.12.1"
-prost-types = "0.12.1"
+prost = { version = "0.12.3", features = ["no-recursion-limit"] }
+prost-types = "0.12.3"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 random_word = "0.3.0"
 rayon = "1.5.2"
-redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
+redis = { version = "0.22.3", features = [
+    "tokio-comp",
+    "script",
+    "connection-manager",
+] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [
@@ -632,7 +638,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
-rstack-self =  { version = "0.3.0", features = ["dw"], default_features = false }
+rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
@@ -646,7 +652,10 @@ siphasher = "0.3.10"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
 serde-big-array = "0.5.1"
 serde_bytes = "0.11.6"
-serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
+serde_json = { version = "1.0.81", features = [
+    "preserve_order",
+    "arbitrary_precision",
+] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"

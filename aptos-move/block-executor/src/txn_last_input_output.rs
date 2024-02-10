@@ -8,11 +8,11 @@ use crate::{
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::PanicOr;
+use aptos_aggregator::types::{code_invariant_error, PanicOr};
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
-    write_set::WriteOp,
+    delayed_fields::PanicError, fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -22,10 +22,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
     iter::{empty, Iterator},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
 };
 
 type TxnInput<T> = CapturedReads<T>;
@@ -70,8 +67,6 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     // Move-VM loader cache - see 'record' function comment for more information.
     module_writes: DashSet<T::Key>,
     module_reads: DashSet<T::Key>,
-
-    module_read_write_intersection: AtomicBool,
 }
 
 impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
@@ -90,7 +85,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .collect(),
             module_writes: DashSet::new(),
             module_reads: DashSet::new(),
-            module_read_write_intersection: AtomicBool::new(false),
         }
     }
 
@@ -154,19 +148,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         module_reads_keys: impl Iterator<Item = &'a T::Key>,
         module_writes_keys: impl Iterator<Item = &'a T::Key>,
     ) -> bool {
-        if self.module_read_write_intersection.load(Ordering::Relaxed) {
-            return true;
-        }
-
         // Check if adding new read & write modules leads to intersections.
-        if Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
+        Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
             || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
-        {
-            self.module_read_write_intersection
-                .store(true, Ordering::Release);
-            return true;
-        }
-        false
     }
 
     pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
@@ -211,40 +195,47 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn module_rw_intersection_ok(
-        &self,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
-        if self.module_read_write_intersection.load(Ordering::Acquire) {
-            Err(PanicOr::Or(
-                IntentionalFallbackToSequential::ModulePathReadWrite,
-            ))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub(crate) fn aborted_execution_status(
+    pub(crate) fn check_execution_status_during_commit(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<BlockExecutionError<E>> {
-        if let ExecutionStatus::Abort(err) = &self.outputs[txn_idx as usize]
-            .load_full()
-            .expect("[BlockSTM]: Execution output must be recorded after execution")
-            .output_status
-        {
-            Some(err.clone())
+    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+        if let Some(status) = self.outputs[txn_idx as usize].load_full() {
+            match &status.output_status {
+                ExecutionStatus::Success(_) | ExecutionStatus::SkipRest(_) => Ok(()),
+                // Transaction cannot be committed with below statuses, as:
+                // - Speculative error must have failed validation.
+                // - Execution w. delayed field code error propagates the error directly,
+                // does not finish execution. Similar for FatalVMError / abort.
+                ExecutionStatus::Abort(_) => {
+                    Err(code_invariant_error("Abort status cannot be committed").into())
+                },
+                ExecutionStatus::SpeculativeExecutionAbortError(_) => {
+                    Err(code_invariant_error("Speculative error status cannot be committed").into())
+                },
+                ExecutionStatus::DelayedFieldsCodeInvariantError(_) => Err(code_invariant_error(
+                    "Delayed field invariant error cannot be committed",
+                )
+                .into()),
+            }
         } else {
-            None
+            Err(code_invariant_error("Recorded output not found during commit").into())
         }
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+        if self.block_skips_rest_at_idx(txn_idx) {
+            // Already skipping.
+            return;
+        }
+
+        // check_execution_status_during_commit must be used for checks re:status.
+        // Hence, since the status is not SkipRest, it must be Success.
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
-            unreachable!();
+            unreachable!("Unexpected status");
         }
     }
 
@@ -424,7 +415,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         delta_writes: Vec<(T::Key, WriteOp)>,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
@@ -435,12 +426,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     delta_writes,
                     patched_resource_write_set,
                     patched_events,
-                );
+                )?;
             },
             ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+        Ok(())
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {

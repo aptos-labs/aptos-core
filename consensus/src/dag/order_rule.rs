@@ -1,15 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::dag_store::DagStore;
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::AnchorElection,
-    dag_store::{Dag, NodeStatus},
+    dag_store::NodeStatus,
     observability::{
         logging::{LogEvent, LogSchema},
         tracing::{observe_node, NodeStage},
     },
-    storage::{CommitEvent, DAGStorage},
+    storage::CommitEvent,
     types::NodeMetadata,
     CertifiedNode,
 };
@@ -24,10 +25,9 @@ pub struct OrderRule {
     epoch_state: Arc<EpochState>,
     // TODO: try to share order rule, instead of this Arc.
     lowest_unordered_anchor_round: Arc<RwLock<Round>>,
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<DagStore>,
     anchor_election: Arc<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
-    storage: Arc<dyn DAGStorage>,
     dag_window_size_config: Round,
 }
 
@@ -35,32 +35,31 @@ impl OrderRule {
     pub fn new(
         epoch_state: Arc<EpochState>,
         lowest_unordered_anchor_round: Round,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<DagStore>,
         anchor_election: Arc<dyn AnchorElection>,
         notifier: Arc<dyn OrderedNotifier>,
-        storage: Arc<dyn DAGStorage>,
         dag_window_size_config: Round,
+        commit_events: Option<Vec<CommitEvent>>,
     ) -> Self {
-        let commit_events = storage
-            .get_latest_k_committed_events(10 * epoch_state.verifier.len() as u64)
-            .expect("Failed to read commit events from storage");
-        // make sure it's sorted
-        assert!(commit_events
-            .windows(2)
-            .all(|w| (w[0].epoch(), w[0].round()) < (w[1].epoch(), w[1].round())));
-        for event in commit_events {
-            if event.epoch() == epoch_state.epoch {
-                let maybe_anchor = dag
-                    .read()
-                    .get_node_by_round_author(event.round(), event.author())
-                    .cloned();
-                if let Some(anchor) = maybe_anchor {
-                    dag.write()
-                        .reachable_mut(&anchor, None)
-                        .for_each(|node_status| node_status.mark_as_ordered());
+        if let Some(commit_events) = commit_events {
+            // make sure it's sorted
+            assert!(commit_events
+                .windows(2)
+                .all(|w| (w[0].epoch(), w[0].round()) < (w[1].epoch(), w[1].round())));
+            for event in commit_events {
+                if event.epoch() == epoch_state.epoch {
+                    let maybe_anchor = dag
+                        .read()
+                        .get_node_by_round_author(event.round(), event.author())
+                        .cloned();
+                    if let Some(anchor) = maybe_anchor {
+                        dag.write()
+                            .reachable_mut(&anchor, None)
+                            .for_each(|node_status| node_status.mark_as_ordered());
+                    }
                 }
+                anchor_election.update_reputation(event);
             }
-            anchor_election.update_reputation(event);
         }
         let mut order_rule = Self {
             epoch_state,
@@ -68,7 +67,6 @@ impl OrderRule {
             dag,
             anchor_election,
             notifier,
-            storage,
             dag_window_size_config,
         };
         // re-check if anything can be ordered to recover pending anchors
@@ -83,7 +81,7 @@ impl OrderRule {
 
     /// Find if there's anchors that can be ordered start from `start_round` until `round`,
     /// if so find next one until nothing can be ordered.
-    fn check_ordering_between(&mut self, mut start_round: Round, round: Round) {
+    fn check_ordering_between(&self, mut start_round: Round, round: Round) {
         while start_round <= round {
             if let Some(direct_anchor) =
                 self.find_first_anchor_with_enough_votes(start_round, round)
@@ -138,7 +136,7 @@ impl OrderRule {
             .reachable(
                 Some(current_anchor.metadata().clone()).iter(),
                 Some(*self.lowest_unordered_anchor_round.read()),
-                |node_status| matches!(node_status, NodeStatus::Unordered(_)),
+                |node_status| matches!(node_status, NodeStatus::Unordered { .. }),
             )
             // skip the current anchor itself
             .skip(1)
@@ -151,7 +149,7 @@ impl OrderRule {
     }
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
-    fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
+    fn finalize_order(&self, anchor: Arc<CertifiedNode>) {
         let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
 
         // Check we're in the expected instance
@@ -208,7 +206,7 @@ impl OrderRule {
             id = anchor.id(),
             lowest_unordered_anchor_round = lowest_unordered_anchor_round,
             "Reached round {} with {} nodes",
-            lowest_round_to_reach,
+            lowest_anchor_round,
             ordered_nodes.len()
         );
 
@@ -218,7 +216,7 @@ impl OrderRule {
     }
 
     /// Check if this node can trigger anchors to be ordered
-    pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
+    pub fn process_new_node(&self, node_metadata: &NodeMetadata) {
         let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
 
         let round = node_metadata.round();

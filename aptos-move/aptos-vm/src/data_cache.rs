@@ -117,12 +117,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
-            // TODO[agg_v2](fix) pass the layout to resource groups
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
                 resource_group.clone(),
@@ -383,7 +381,7 @@ pub(crate) mod tests {
         };
 
         let group_adapter = ResourceGroupAdapter::new(
-            // TODO[agg_v2](fix) add a converter for StateView for tests that implements ResourceGroupView
+            // TODO[agg_v2](test) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,
