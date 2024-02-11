@@ -268,7 +268,7 @@ case "$1" in
     shift
     debug "$@"
     ;;
-   "flamegraph")
+  "flamegraph")
     shift
     flamegraph "$@"
     ;;
