@@ -18,7 +18,7 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
+    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
 };
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
@@ -179,23 +179,20 @@ fn check_for_invariant_violation(e: VMStatus) {
     }
 }
 
-fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
-    tdbg!(&input);
-    AptosVM::set_concurrency_level_once(2);
-    let mut vm = FakeExecutor::from_genesis(&VM, ChainId::mainnet()).set_not_parallel();
-
+// filter modules
+fn filter_modules(input: RunnableState) -> Result<(), Corpus> {
     // reject any TypeParameter exceeds the maximum allowed value (Avoid known Ivariant Violation)
-    let max_type_parameter_value: u16 = 64 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
+    const MAX_TYPE_PARAMETER_VALUE: u16 = 64 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
     if let ExecVariant::Script { script, .. } = input.exec_variant.clone() {
         for signature in script.signatures {
             for sign_token in signature.0.iter() {
-                if let move_binary_format::file_format::SignatureToken::TypeParameter(idx) = sign_token {
-                    if *idx > max_type_parameter_value {
+                if let SignatureToken::TypeParameter(idx) = sign_token {
+                    if *idx > MAX_TYPE_PARAMETER_VALUE {
                         return Err(Corpus::Reject);
                     }
-                } else if let move_binary_format::file_format::SignatureToken::Vector(inner) = sign_token {
-                    if let move_binary_format::file_format::SignatureToken::TypeParameter(idx) = inner.as_ref() {
-                        if *idx > max_type_parameter_value {
+                } else if let SignatureToken::Vector(inner) = sign_token {
+                    if let SignatureToken::TypeParameter(idx) = inner.as_ref() {
+                        if *idx > MAX_TYPE_PARAMETER_VALUE {
                             return Err(Corpus::Reject);
                         }
                     }
@@ -203,6 +200,16 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             }
         }
     }
+    Ok(())
+}
+
+fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
+    tdbg!(&input);
+    AptosVM::set_concurrency_level_once(2);
+    let mut vm = FakeExecutor::from_genesis(&VM, ChainId::mainnet()).set_not_parallel();
+
+    // filter modules
+    filter_modules(input.clone())?;
 
     for m in input.dep_modules.iter_mut() {
         // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata

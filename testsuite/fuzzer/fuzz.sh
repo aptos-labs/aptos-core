@@ -16,13 +16,13 @@ function error() {
 }
 
 function cargo_fuzz() {
-    # Workaround for build failures on oss-fuzz caused by dependencie incompatible with 1.78.0
-    # Owner: @zi0Black
-    rustup install nightly-2024-01-01
+    # Nightly version control
+    NIGHTLY_VERSION="nightly-2024-01-01"
+    rustup install $NIGHTLY_VERSION
     if [ -z "$1" ]; then
         error "error using cargo()"
     fi
-    cargo_fuzz_cmd="cargo +nightly-2024-01-01-x86_64-unknown-linux-gnu fuzz $1"
+    cargo_fuzz_cmd="cargo "+$NIGHTLY_VERSION-x86_64-unknown-linux-gnu" fuzz $1"
     shift
     $cargo_fuzz_cmd $EXTRAFLAGS $@
 }
