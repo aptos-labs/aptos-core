@@ -8,7 +8,7 @@ Go to https://github.com/aptos-labs/aptos-core/security/advisories and open a vu
 
 For security reasons, DO NOT include attachments or provide detail sufficient for exploitation regarding the security issue in this email. Instead, wait for the advisory to be created, and **provide any sensitive details in the private GitHub advisory**.
 
-If you haven't done so already, please **enable two-factor authentation** in your GitHub account.
+If you haven't done so already, please **enable two-factor authentication** in your GitHub account.
 
 Send the email from an email domain that is less likely to get flagged for spam by gmail.
 
