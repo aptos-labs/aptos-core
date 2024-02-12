@@ -450,7 +450,11 @@ pub struct RandConfig {
 
 impl Debug for RandConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RandConfig {{ epoch: {}, author: {}, wconfig: {:?} }}", self.epoch, self.author, self.wconfig)
+        write!(
+            f,
+            "RandConfig {{ epoch: {}, author: {}, wconfig: {:?} }}",
+            self.epoch, self.author, self.wconfig
+        )
     }
 }
 

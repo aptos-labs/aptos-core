@@ -72,7 +72,10 @@ pub fn build_dkg_pvss_config(
         RECONSTRUCT_THRESHOLD,
     );
 
-    println!("[Randomness] rounding: epoch {} starts {:?}", cur_epoch, dkg_rounding.profile);
+    println!(
+        "[Randomness] rounding: epoch {} starts {:?}",
+        cur_epoch, dkg_rounding.profile
+    );
 
     let validator_consensus_keys: Vec<bls12381::PublicKey> = next_validators
         .iter()

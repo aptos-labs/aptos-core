@@ -65,7 +65,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
-            1024 * 1024
+            512 * 1024
         ],
         [
             gas_unit_scaling_factor: GasScalingFactor,

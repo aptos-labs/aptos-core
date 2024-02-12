@@ -136,7 +136,14 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             new_total_power = new_total_power,
             threshold = threshold,
             threshold_exceeded = maybe_aggregated.is_some(),
-            "[DKG] added transcript from validator {}, {} out of {} aggregated.", self.epoch_state.verifier.address_to_validator_index().get(&sender).unwrap(), new_total_power.unwrap_or(0), threshold
+            "[DKG] added transcript from validator {}, {} out of {} aggregated.",
+            self.epoch_state
+                .verifier
+                .address_to_validator_index()
+                .get(&sender)
+                .unwrap(),
+            new_total_power.unwrap_or(0),
+            threshold
         );
         Ok(maybe_aggregated)
     }

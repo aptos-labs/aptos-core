@@ -66,7 +66,10 @@ impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProdu
                 my_addr = my_addr,
                 "[DKG] aggregated transcript locally"
             );
-            if let Err(e) = agg_trx_tx.expect("[DKG] agg_trx_tx should be available").push((), agg_trx) {
+            if let Err(e) = agg_trx_tx
+                .expect("[DKG] agg_trx_tx should be available")
+                .push((), agg_trx)
+            {
                 // If the `DKGManager` was dropped, this send will fail by design.
                 info!(
                     epoch = epoch,
