@@ -26,6 +26,7 @@ use tokio::{
     sync::{mpsc::Receiver, oneshot as TokioOneshot},
     time,
 };
+use tokio::time::sleep;
 
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
@@ -324,6 +325,7 @@ impl ProofCoordinator {
                             }
                             if !proofs.is_empty() {
                                 if self.broadcast_proofs {
+                                    sleep(Duration::from_millis(100)).await;
                                     network_sender.broadcast_proof_of_store_msg(proofs).await;
                                 } else {
                                     network_sender.send_proof_of_store_msg_to_self(proofs).await;
