@@ -2207,8 +2207,8 @@ enum Access {
     Term,
 }
 
-#[derive(Clone, Copy)]
-enum DeprecatedMemberKind {}
+// #[derive(Clone, Copy)]
+// enum DeprecatedMemberKind {}
 
 fn name_access_chain(
     context: &mut Context,
