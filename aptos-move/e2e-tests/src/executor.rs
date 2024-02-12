@@ -57,7 +57,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
-    verifier, AptosVM, VMExecutor, VMValidator,
+    verifier, AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -477,22 +477,28 @@ impl FakeExecutor {
         }
     }
 
-    pub fn execute_transaction_block_parallel(
+    fn execute_transaction_block_impl(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
         onchain_config: BlockExecutorConfigFromOnchain,
+        sequential: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let config = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level: if sequential {
+                    1
+                } else {
+                    usize::min(4, num_cpus::get())
+                },
+                allow_fallback: self.allow_block_executor_fallback,
+            },
+            onchain: onchain_config,
+        };
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
-            BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: usize::min(4, num_cpus::get()),
-                    allow_fallback: self.allow_block_executor_fallback,
-                },
-                onchain: onchain_config,
-            },
+            config,
             None,
         ).map(BlockOutput::into_transaction_outputs_forced)
     }
@@ -528,20 +534,17 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(
-                AptosVM::execute_block(
-                    &sig_verified_block,
-                    &self.data_store,
-                    onchain_config.clone(),
-                )
-                .map(BlockOutput::into_transaction_outputs_forced),
-            )
+            Some(self.execute_transaction_block_impl(
+                &sig_verified_block,
+                onchain_config.clone(),
+                true,
+            ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block, onchain_config))
+            Some(self.execute_transaction_block_impl(&sig_verified_block, onchain_config, false))
         } else {
             None
         };

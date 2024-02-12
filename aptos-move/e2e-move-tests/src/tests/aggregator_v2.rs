@@ -27,11 +27,26 @@ fn _setup(
 ) -> AggV2TestHarness {
     let path = common::test_dir_path("aggregator_v2.data/pack");
     match aggregator_execution_mode {
-        AggregatorMode::EnabledOnly => initialize(path, executor_mode, true, txns, allow_block_executor_fallback),
-        AggregatorMode::DisabledOnly => initialize(path, executor_mode, false, txns, allow_block_executor_fallback),
-        AggregatorMode::BothComparison => {
-            initialize_enabled_disabled_comparison(path, executor_mode, txns, allow_block_executor_fallback)
-        },
+        AggregatorMode::EnabledOnly => initialize(
+            path,
+            executor_mode,
+            true,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::DisabledOnly => initialize(
+            path,
+            executor_mode,
+            false,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::BothComparison => initialize_enabled_disabled_comparison(
+            path,
+            executor_mode,
+            txns,
+            allow_block_executor_fallback,
+        ),
     }
 }
 

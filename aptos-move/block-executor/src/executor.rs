@@ -1340,12 +1340,10 @@ where
                 // this error often when something that should never happen goes wrong
                 panic!("Sequential execution failed with {:?}", e);
             }
-        } else {
-            if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
-                // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
-                // this error often when something that should never happen goes wrong
-                panic!("Fallback disabled, execution failed due to {:?}", e);
-            }
+        } else if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
+            // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
+            // this error often when something that should never happen goes wrong
+            panic!("Fallback disabled, execution failed due to {:?}", e);
         }
 
         ret

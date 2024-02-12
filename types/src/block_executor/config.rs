@@ -63,7 +63,10 @@ pub struct BlockExecutorConfig {
 impl BlockExecutorConfig {
     pub fn new_no_block_limit(concurrency_level: usize) -> Self {
         Self {
-            local: BlockExecutorLocalConfig { concurrency_level, allow_fallback: true },
+            local: BlockExecutorLocalConfig {
+                concurrency_level,
+                allow_fallback: true,
+            },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
     }
@@ -73,7 +76,10 @@ impl BlockExecutorConfig {
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         Self {
-            local: BlockExecutorLocalConfig { concurrency_level, allow_fallback: true },
+            local: BlockExecutorLocalConfig {
+                concurrency_level,
+                allow_fallback: true,
+            },
             onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }
     }

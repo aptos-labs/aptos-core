@@ -22,7 +22,8 @@ pub fn initialize(
     txns: usize,
     allow_block_executor_fallback: bool,
 ) -> AggV2TestHarness {
-    let (mut harness, account) = initialize_harness(mode, aggregator_execution_enabled, path.clone());
+    let (mut harness, account) =
+        initialize_harness(mode, aggregator_execution_enabled, path.clone());
     if !allow_block_executor_fallback {
         harness.executor.disable_block_executor_fallback();
     }
@@ -236,10 +237,9 @@ impl AggV2TestHarness {
         )
     }
 
-    pub fn republish(
-        &mut self,
-    ) -> SignedTransaction {
-        self.harness.create_publish_package_cache_building(&self.account, &self.path, |_| {})
+    pub fn republish(&mut self) -> SignedTransaction {
+        self.harness
+            .create_publish_package_cache_building(&self.account, &self.path, |_| {})
     }
 
     fn create_entry_agg_func_with_args(
