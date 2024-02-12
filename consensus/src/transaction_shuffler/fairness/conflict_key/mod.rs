@@ -15,6 +15,13 @@ mod txn_sender;
 #[cfg(test)]
 pub(crate) mod test_utils;
 
+/// `ConflictKey::extract_from(txn)` extracts a key from a transaction. For example,
+/// `TxnSenderKey::extract_from(txn)` returns the transaction sender's address. The key is used by
+/// the shuffler to determine whether two close by transactions conflict with each other.
+///
+/// `ConflictKey::conflict_exempt(&key)` returns if this specific key is exempt from conflict.
+/// For example, we can exempt transaction sender 0x1, so that consecutive transactions sent by
+/// 0x1 are not seen as a conflict by the shuffler.
 pub(crate) trait ConflictKey<Txn>: Eq + Hash + PartialEq {
     fn extract_from(txn: &Txn) -> Self;
 
@@ -32,12 +39,21 @@ impl ConflictKeyId {
     }
 }
 
+/// `ConflictKeyRegistry::build::<K: ConflictKey>()` goes through a block of transactions and
+/// extract the conflict keys from each transaction. In that process, each unique conflict key is
+/// assigned a unique `ConflictKeyId`, essentially a sequence number, and the registry remembers which
+/// key was extracted from each transaction. After that, we can query the registry to get the key
+/// represented by the id, which is 1. cheaper than calling `ConflictKey::extract_from(txn)` again;
+/// 2. enables vector based `MapByKeyId` which is cheaper than a `HashMap`; and 3. eliminates the typing
+/// information and easier to use in the shuffler.
 #[derive(Debug)]
 pub(crate) struct ConflictKeyRegistry {
     id_by_txn: Vec<ConflictKeyId>,
     is_exempt_by_id: Vec<bool>,
 }
 
+// Provided `ConflictKeyId`s managed by `ConflictKeyRegistry`s are consecutive integers starting
+// from 0, a map can be implemented based on a vector, which is cheapter than a hash map.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct MapByKeyId<T> {
     inner: Vec<T>,

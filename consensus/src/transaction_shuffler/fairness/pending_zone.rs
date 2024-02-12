@@ -7,6 +7,7 @@ use crate::transaction_shuffler::fairness::{
 };
 use std::collections::VecDeque;
 
+/// A queue for each confclit Key, represented by `ConflictKeyId`s managed by `ConflictKeyRegistry`.
 #[derive(Debug)]
 pub(crate) struct PendingZone<'a> {
     key_registry: &'a ConflictKeyRegistry,
@@ -22,7 +23,7 @@ impl<'a> PendingZone<'a> {
             .map(Self::new)
             .collect::<Vec<_>>()
             .try_into()
-            .expect("Impossible to fail.")
+            .expect("key_registries and the return type must have the same length.")
     }
 
     fn new(key_registry: &'a ConflictKeyRegistry) -> Self {
