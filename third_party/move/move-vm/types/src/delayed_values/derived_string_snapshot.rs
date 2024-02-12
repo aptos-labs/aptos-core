@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delayed_values::bcs_utils,
+    delayed_values::error::code_invariant_error,
     values::{Struct, Value},
 };
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_binary_format::{
+    errors::PartialVMResult,
+    file_format_common::{bcs_size_of_byte_array, size_u32_as_uleb128},
+};
+use move_core_types::value::MoveTypeLayout;
 use std::str::FromStr;
 
 fn is_string_layout(layout: &MoveTypeLayout) -> bool {
@@ -40,23 +43,14 @@ pub fn to_utf8_bytes(value: impl ToString) -> Vec<u8> {
 }
 
 pub fn u128_to_u64(value: u128) -> PartialVMResult<u64> {
-    u64::try_from(value).map_err(|_| {
-        PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
-            .with_message("Cannot cast u128 into u64".to_string())
-    })
+    u64::try_from(value).map_err(|_| code_invariant_error("Cannot cast u128 into u64".to_string()))
 }
 
 pub fn from_utf8_bytes<T: FromStr>(bytes: Vec<u8>) -> PartialVMResult<T> {
     String::from_utf8(bytes)
-        .map_err(|e| {
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
-                .with_message(format!("Unable to convert bytes to string: {}", e))
-        })?
+        .map_err(|e| code_invariant_error(format!("Unable to convert bytes to string: {}", e)))?
         .parse::<T>()
-        .map_err(|_| {
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
-                .with_message("Unable to parse string".to_string())
-        })
+        .map_err(|_| code_invariant_error("Unable to parse string".to_string()))
 }
 
 pub fn u64_to_fixed_size_utf8_bytes(value: u64, length: usize) -> PartialVMResult<Vec<u8>> {
@@ -64,7 +58,7 @@ pub fn u64_to_fixed_size_utf8_bytes(value: u64, length: usize) -> PartialVMResul
         .to_string()
         .into_bytes();
     if result.len() != length {
-        return Err(PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!(
+        return Err(code_invariant_error(format!(
             "u64_to_fixed_size_utf8_bytes: width mismatch: value: {value}, length: {length}, result: {result:?}"
         )));
     }
@@ -81,10 +75,10 @@ pub fn bytes_and_width_to_derived_string_struct(
 ) -> PartialVMResult<Value> {
     // We need to create DerivedStringSnapshot struct that serializes to exactly match given `width`.
 
-    let value_width = bcs_utils::bcs_size_of_byte_array(bytes.len());
+    let value_width = bcs_size_of_byte_array(bytes.len());
     // padding field takes at list 1 byte (empty vector)
     if value_width + 1 > width {
-        return Err(PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!(
+        return Err(code_invariant_error(format!(
             "DerivedStringSnapshot size issue: no space left for padding: value_width: {value_width}, width: {width}"
         )));
     }
@@ -93,8 +87,8 @@ pub fn bytes_and_width_to_derived_string_struct(
     // (otherwise it complicates the logic to fill until the exact width, as padding can never be serialized into 129 bytes
     // (vec[0; 127] serializes into 128 bytes, and vec[0; 128] serializes into 130 bytes))
     let padding_len = width - value_width - 1;
-    if bcs_utils::size_u32_as_uleb128(padding_len) > 1 {
-        return Err(PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!(
+    if size_u32_as_uleb128(padding_len) > 1 {
+        return Err(code_invariant_error(format!(
             "DerivedStringSnapshot size issue: padding expected to be too large: value_width: {value_width}, width: {width}, padding_len: {padding_len}"
         )));
     }
@@ -110,24 +104,17 @@ pub fn string_to_bytes(value: Struct) -> PartialVMResult<Vec<u8>> {
         .unpack()?
         .collect::<Vec<Value>>()
         .pop()
-        .ok_or_else(|| {
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
-                .with_message("Unable to extract bytes from String".to_string())
-        })?
+        .ok_or_else(|| code_invariant_error("Unable to extract bytes from String".to_string()))?
         .value_as::<Vec<u8>>()
 }
 
 pub fn derived_string_struct_to_bytes_and_length(value: Struct) -> PartialVMResult<(Vec<u8>, u32)> {
     let mut fields = value.unpack()?.collect::<Vec<Value>>();
     if fields.len() != 2 {
-        return Err(
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
-                format!(
-                    "DerivedStringSnapshot has wrong number of fields: {:?}",
-                    fields.len()
-                ),
-            ),
-        );
+        return Err(code_invariant_error(format!(
+            "DerivedStringSnapshot has wrong number of fields: {:?}",
+            fields.len()
+        )));
     }
     let padding = fields.pop().unwrap().value_as::<Vec<u8>>()?;
     let value = fields.pop().unwrap();
@@ -135,17 +122,12 @@ pub fn derived_string_struct_to_bytes_and_length(value: Struct) -> PartialVMResu
     let string_len = string_bytes.len();
     Ok((
         string_bytes,
-        u32::try_from(
-            bcs_utils::bcs_size_of_byte_array(string_len)
-                + bcs_utils::bcs_size_of_byte_array(padding.len()),
-        )
-        .map_err(|_| {
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
-                format!(
+        u32::try_from(bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len()))
+            .map_err(|_| {
+            code_invariant_error(format!(
                 "DerivedStringSnapshot size exceeds u32: string_len: {string_len}, padding_len: {}",
                 padding.len()
-            ),
-            )
+            ))
         })?,
     ))
 }

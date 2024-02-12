@@ -30,6 +30,7 @@ static DERIVED_STRING: Lazy<MoveTypeLayout> = Lazy::new(|| {
     ]))
 });
 
+#[test_case(&U64, 8)]
 #[test_case(&U128, 16)]
 #[test_case(&*DERIVED_STRING, 20)]
 fn test_aggregator_id_roundtrip_ok(layout: &MoveTypeLayout, width: u32) {
@@ -54,6 +55,7 @@ fn test_aggregator_id_to_value_err(layout: &MoveTypeLayout) {
 fn test_aggregator_id_from_value_err(layout: &MoveTypeLayout, value: Value) {
     assert_err!(DelayedFieldID::try_from_move_value(layout, value, &()));
 }
+
 #[test_case(A::Aggregator(10), &U64, K::Aggregator, 8)]
 #[test_case(A::Aggregator(10), &U128, K::Aggregator, 16)]
 #[test_case(A::Snapshot(10), &U64, K::Snapshot, 8)]

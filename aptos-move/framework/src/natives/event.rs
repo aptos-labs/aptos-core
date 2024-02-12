@@ -20,7 +20,8 @@ use move_vm_types::value_serde::deserialize_and_allow_delayed_values;
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
-    loaded_data::runtime_types::Type, value_serde::serialize_and_allow_delayed_values, values::Value,
+    loaded_data::runtime_types::Type, value_serde::serialize_and_allow_delayed_values,
+    values::Value,
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;

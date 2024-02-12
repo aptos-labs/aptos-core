@@ -22,9 +22,9 @@ macro_rules! safely_pop_arg {
     }};
 }
 
-/// Returns a field value of the specified type from a struct. If field access
-/// is out of bounds, or type is incorrect, a `SafeNativeError::InvariantViolation`
-/// is returned.
+/// Returns a field value of the specified type from a struct at a given index.
+/// If the field access is out of bounds, or type is incorrect, a
+/// `SafeNativeError::InvariantViolation` is returned.
 #[macro_export]
 macro_rules! safely_get_struct_field_as {
     ($value:expr, $idx:expr, $t:ty) => {{

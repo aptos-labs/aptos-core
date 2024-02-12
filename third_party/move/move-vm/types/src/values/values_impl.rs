@@ -518,7 +518,8 @@ impl ValueImpl {
             // of the network. Note that the error returned here is not an
             // invariant violation but a runtime error.
             (DelayedFieldID { .. }, DelayedFieldID { .. }) => {
-                return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message("cannot compare delayed values".to_string()))
+                return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                    .with_message("cannot compare delayed values".to_string()))
             },
 
             (Invalid, _)
@@ -1304,8 +1305,12 @@ impl VMValueCast<DelayedFieldID> for Value {
     fn cast(self) -> PartialVMResult<DelayedFieldID> {
         match self.0 {
             ValueImpl::DelayedFieldID { id } => Ok(id),
-            v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                .with_message(format!("cannot cast non-delayed value {:?} into identifier", v))),
+            v => Err(
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                    "cannot cast non-delayed value {:?} into identifier",
+                    v
+                )),
+            ),
         }
     }
 }
@@ -3822,9 +3827,11 @@ impl ValueImpl {
     pub fn as_move_value(&self, layout: &MoveTypeLayout) -> MoveValue {
         use MoveTypeLayout as L;
 
-        // Make sure to strip all kinds from the type layout.
         if let L::Native(kind, layout) = layout {
-            panic!("impossible to get native layout ({:?}) with {}", kind, layout)
+            panic!(
+                "impossible to get native layout ({:?}) with {}",
+                kind, layout
+            )
         }
 
         match (layout, &self) {

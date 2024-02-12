@@ -11364,6 +11364,7 @@ dependencies = [
  "move-core-types",
  "once_cell",
  "proptest",
+ "rand 0.8.5",
  "serde",
  "smallbitvec",
  "smallvec",

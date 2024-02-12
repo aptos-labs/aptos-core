@@ -51,8 +51,13 @@ impl CustomDeserializer for RelaxedCustomSerDe {
             layout,
         }
         .deserialize(deserializer)?;
-        let (id, _width) = DelayedFieldID::try_from_move_value(layout, value, &())
-            .map_err(|_| D::Error::custom(format!("Custom deserialization failed for {:?} with layout {}", kind, layout)))?;
+        let (id, _width) =
+            DelayedFieldID::try_from_move_value(layout, value, &()).map_err(|_| {
+                D::Error::custom(format!(
+                    "Custom deserialization failed for {:?} with layout {}",
+                    kind, layout
+                ))
+            })?;
         Ok(Value::delayed_value(id))
     }
 }
@@ -65,9 +70,12 @@ impl CustomSerializer for RelaxedCustomSerDe {
         layout: &MoveTypeLayout,
         id: DelayedFieldID,
     ) -> Result<S::Ok, S::Error> {
-        let value = id
-            .try_into_move_value(layout)
-            .map_err(|_| S::Error::custom(format!("Custom serialization failed for {:?} with layout {}", kind, layout)))?;
+        let value = id.try_into_move_value(layout).map_err(|_| {
+            S::Error::custom(format!(
+                "Custom serialization failed for {:?} with layout {}",
+                kind, layout
+            ))
+        })?;
         SerializationReadyValue {
             custom_serializer: None::<&RelaxedCustomSerDe>,
             layout,
@@ -77,7 +85,10 @@ impl CustomSerializer for RelaxedCustomSerDe {
     }
 }
 
-pub fn deserialize_and_allow_delayed_values(bytes: &[u8], layout: &MoveTypeLayout) -> Option<Value> {
+pub fn deserialize_and_allow_delayed_values(
+    bytes: &[u8],
+    layout: &MoveTypeLayout,
+) -> Option<Value> {
     let native_deserializer = RelaxedCustomSerDe;
     let seed = DeserializationSeed {
         custom_deserializer: Some(&native_deserializer),

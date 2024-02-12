@@ -184,18 +184,18 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                 // temporarily store native values (via encoding to ensure deterministic
                 // gas charging) in block storage.
                 serialize_and_allow_delayed_values(&value, &layout)
-                    .map(|bytes| (bytes, Some(Arc::new(layout))))
+                    .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
             } else {
-                // Otherwise, there should ne no native values so ensure
-                // serialization fails here.
-                value.simple_serialize(&layout).map(|bytes| (bytes, None))
+                // Otherwise, there should be no native values so ensure
+                // serialization fails here if there are any.
+                value
+                    .simple_serialize(&layout)
+                    .map(|bytes| (bytes.into(), None))
             };
-            serialization_result
-                .map(|(bytes, maybe_layout)| (bytes.into(), maybe_layout))
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
-                })
+            serialization_result.ok_or_else(|| {
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("Error when serializing resource {}.", value))
+            })
         };
 
         let (change_set, mut extensions) = self

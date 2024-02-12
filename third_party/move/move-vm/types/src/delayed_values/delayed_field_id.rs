@@ -2,25 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delayed_values::{
-        bcs_utils,
-        derived_string_snapshot::{
-            bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
-            from_utf8_bytes, is_derived_string_struct_layout, u128_to_u64,
-            u64_to_fixed_size_utf8_bytes,
-        },
+    delayed_values::derived_string_snapshot::{
+        bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
+        from_utf8_bytes, is_derived_string_struct_layout, u128_to_u64,
+        u64_to_fixed_size_utf8_bytes,
     },
     values::{Struct, Value},
 };
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    file_format_common::size_u32_as_uleb128,
+};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 
-/// Represents a unique 32-bit identifier used for values which also stores their
-/// serialized size (u32::MAX at most). Can be stored as a single 64-bit unsigned
-/// integer.
 const BITS_FOR_SIZE: usize = 32;
 
-/// Ephemeral identifier type used by delayed fields (aggregators, snapshots)
+/// Ephemeral identifier type used by delayed fields (e.g., aggregators, snapshots)
 /// during execution.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct DelayedFieldID {
@@ -55,7 +52,7 @@ impl DelayedFieldID {
         // for string due to variable encoding of string length.
 
         // So we will over-estimate the serialized length of the value a bit.
-        let value_len_width_upper_bound = bcs_utils::size_u32_as_uleb128(width - 2); // we subtract 2 because uleb sizes (for both value and padding fields) are at least 1 byte.
+        let value_len_width_upper_bound = size_u32_as_uleb128(width - 2); // we subtract 2 because uleb sizes (for both value and padding fields) are at least 1 byte.
 
         // If we don't even have enough space to store the length of the value, we cannot proceed
         if width <= value_len_width_upper_bound + 1 {
@@ -211,5 +208,49 @@ impl TryFromMoveValue for DelayedFieldID {
         }
 
         Ok((id, width))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
+
+    macro_rules! assert_delayed_field_id_roundtrip_u64 {
+        ($v:expr) => {
+            let id = DelayedFieldID::from($v);
+            let v: u64 = id.as_u64();
+            assert_eq!($v, v);
+        };
+    }
+
+    macro_rules! assert_delayed_field_id_roundtrip_u32_u32 {
+        ($a:expr, $b:expr) => {
+            let id = DelayedFieldID::from(($a, $b));
+            let a = id.extract_unique_index();
+            let b = id.extract_width();
+            assert_eq!($a, a);
+            assert_eq!($b, b);
+        };
+    }
+
+    #[test]
+    fn test_delayed_field_id_from_u64() {
+        assert_delayed_field_id_roundtrip_u64!(0u64);
+        assert_delayed_field_id_roundtrip_u64!(123456789u64);
+        assert_delayed_field_id_roundtrip_u64!(u64::MAX);
+
+        let mut rng = StdRng::seed_from_u64(123);
+        assert_delayed_field_id_roundtrip_u64!(rng.next_u64());
+    }
+
+    #[test]
+    fn test_delayed_field_id_from_u32_u32() {
+        assert_delayed_field_id_roundtrip_u32_u32!(0u32, 8u32);
+        assert_delayed_field_id_roundtrip_u32_u32!(123456789u32, 123456789u32);
+        assert_delayed_field_id_roundtrip_u32_u32!(u32::MAX, u32::MAX);
+
+        let mut rng = StdRng::seed_from_u64(456);
+        assert_delayed_field_id_roundtrip_u32_u32!(rng.next_u32(), rng.next_u32());
     }
 }

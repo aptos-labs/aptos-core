@@ -1135,7 +1135,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
 
         let mut identifiers = HashSet::new();
         find_identifiers_in_value(&value, &mut identifiers)?;
-        // TODO[agg_v2](cleanup): ugly way of converting delayed ids oto generic type params.
+        // TODO[agg_v2](cleanup): ugly way of converting delayed ids to generic type params.
         Ok(identifiers.into_iter().map(T::Identifier::from).collect())
     }
 

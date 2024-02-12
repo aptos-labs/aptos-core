@@ -36,6 +36,24 @@ macro_rules! get_value_impl {
     };
 }
 
+get_value_impl!(
+    get_aggregator_max_value,
+    AGGREGATOR_MAX_VALUE_FIELD_INDEX,
+    EUNSUPPORTED_AGGREGATOR_TYPE
+);
+
+get_value_impl!(
+    get_aggregator_value,
+    AGGREGATOR_VALUE_FIELD_INDEX,
+    EUNSUPPORTED_AGGREGATOR_TYPE
+);
+
+get_value_impl!(
+    get_snapshot_value,
+    AGGREGATOR_SNAPSHOT_VALUE_FIELD_INDEX,
+    EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE
+);
+
 macro_rules! get_value_as_id_impl {
     ($func_name:ident, $idx:expr, $e:expr) => {
         pub(crate) fn $func_name(
@@ -60,16 +78,16 @@ macro_rules! get_value_as_id_impl {
     };
 }
 
-get_value_impl!(
-    get_aggregator_value,
+get_value_as_id_impl!(
+    get_aggregator_value_as_id,
     AGGREGATOR_VALUE_FIELD_INDEX,
     EUNSUPPORTED_AGGREGATOR_TYPE
 );
 
 get_value_as_id_impl!(
-    get_aggregator_value_as_id,
-    AGGREGATOR_VALUE_FIELD_INDEX,
-    EUNSUPPORTED_AGGREGATOR_TYPE
+    get_snapshot_value_as_id,
+    AGGREGATOR_SNAPSHOT_VALUE_FIELD_INDEX,
+    EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE
 );
 
 pub(crate) fn set_aggregator_value(aggregator: &StructRef, value: Value) -> SafeNativeResult<()> {
@@ -80,25 +98,6 @@ pub(crate) fn set_aggregator_value(aggregator: &StructRef, value: Value) -> Safe
         .map_err(SafeNativeError::InvariantViolation)?
         .write_ref(value)
         .map_err(SafeNativeError::InvariantViolation)
-}
-
-pub(crate) fn get_aggregator_max_value(
-    aggregator: &StructRef,
-    ty: &Type,
-) -> SafeNativeResult<u128> {
-    Ok(match ty {
-        Type::U128 => {
-            safely_get_struct_field_as!(aggregator, AGGREGATOR_MAX_VALUE_FIELD_INDEX, u128)
-        },
-        Type::U64 => {
-            safely_get_struct_field_as!(aggregator, AGGREGATOR_MAX_VALUE_FIELD_INDEX, u64) as u128
-        },
-        _ => {
-            return Err(SafeNativeError::Abort {
-                abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,
-            })
-        },
-    })
 }
 
 pub(crate) fn unbounded_aggregator_max_value(ty: &Type) -> SafeNativeResult<u128> {
@@ -112,18 +111,6 @@ pub(crate) fn unbounded_aggregator_max_value(ty: &Type) -> SafeNativeResult<u128
         },
     })
 }
-
-get_value_impl!(
-    get_snapshot_value,
-    AGGREGATOR_SNAPSHOT_VALUE_FIELD_INDEX,
-    EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE
-);
-
-get_value_as_id_impl!(
-    get_snapshot_value_as_id,
-    AGGREGATOR_SNAPSHOT_VALUE_FIELD_INDEX,
-    EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE
-);
 
 pub(crate) fn get_derived_string_snapshot_value(
     derived_string_snapshot: &StructRef,

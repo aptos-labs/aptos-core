@@ -70,3 +70,63 @@ fn find_identifiers_in_value_impl(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::Struct};
+    use claims::{assert_err, assert_ok, assert_some};
+    use move_core_types::account_address::AccountAddress;
+
+    #[test]
+    fn test_traversal_in_invalid_value() {
+        let a = Value::signer_reference(AccountAddress::random());
+        assert_err!(find_identifiers_in_value(&a, &mut HashSet::new()));
+    }
+
+    #[test]
+    fn test_traversal_in_value_without_delayed_fields() {
+        let a = Value::u64(10);
+        let b = Value::vector_u32(vec![1, 2, 3, 4]);
+        let c = Value::struct_(Struct::pack(vec![a, b]));
+        let d = Value::u128(20);
+        let e = Value::struct_(Struct::pack(vec![c, d]));
+
+        let mut ids = HashSet::new();
+        assert_ok!(find_identifiers_in_value(&e, &mut ids));
+        assert!(ids.is_empty())
+    }
+
+    #[test]
+    fn test_traversal_in_value_with_delayed_fields() {
+        let a = Value::delayed_value(DelayedFieldID::from(0));
+        let b = Value::vector_u32(vec![1, 2, 3, 4]);
+        let c = Value::struct_(Struct::pack(vec![a, b]));
+
+        let x = Value::delayed_value(DelayedFieldID::from(1));
+        let y = Value::delayed_value(DelayedFieldID::from(2));
+        let z = Value::delayed_value(DelayedFieldID::from(3));
+        let d = Value::vector_for_testing_only(vec![x, y, z]);
+
+        let e = Value::struct_(Struct::pack(vec![c, d]));
+
+        let mut ids = HashSet::new();
+        assert_ok!(find_identifiers_in_value(&e, &mut ids));
+        assert_eq!(ids.len(), 4);
+
+        assert_some!(ids.get(&0));
+        assert_some!(ids.get(&1));
+        assert_some!(ids.get(&2));
+        assert_some!(ids.get(&3));
+    }
+
+    #[test]
+    fn test_duplicated_ids() {
+        let a = Value::delayed_value(DelayedFieldID::from(0));
+        let b = Value::delayed_value(DelayedFieldID::from(0));
+        let c = Value::struct_(Struct::pack(vec![a, b]));
+
+        let mut ids = HashSet::new();
+        assert_err!(find_identifiers_in_value(&c, &mut ids));
+    }
+}

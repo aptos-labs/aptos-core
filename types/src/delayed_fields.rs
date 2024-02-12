@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::serde_helper::bcs_utils::bcs_size_of_byte_array;
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
-use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractWidth};
+use move_vm_types::delayed_values::{
+    delayed_field_id::{DelayedFieldID, ExtractWidth},
+    error::code_invariant_error,
+};
 use once_cell::sync::Lazy;
 
 // Represents something that should never happen - i.e. a code invariant error,
@@ -35,17 +38,6 @@ impl From<PanicError> for PartialVMError {
     }
 }
 
-fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
-    let msg = format!(
-        "Delayed logic code invariant broken (there is a bug in the code), {:?}",
-        message
-    );
-    println!("ERROR: {}", msg);
-    // cannot link aptos_logger in aptos-types crate
-    // error!("{}", msg);
-    PanicError::CodeInvariantError(msg)
-}
-
 static U64_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u64::MAX.to_string().len());
 static U128_MAX_DIGITS: Lazy<usize> = Lazy::new(|| u128::MAX.to_string().len());
 
@@ -59,7 +51,7 @@ pub fn calculate_width_for_constant_string(byte_len: usize) -> usize {
 pub fn calculate_width_for_integer_embedded_string(
     rest_byte_len: usize,
     snapshot_id: DelayedFieldID,
-) -> Result<usize, PanicError> {
+) -> PartialVMResult<usize> {
     // we need to translate byte width into string character width.
     let max_snapshot_string_width = match snapshot_id.extract_width() {
         8 => *U64_MAX_DIGITS,

@@ -1,15 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::natives::aggregator_natives::{
-    helpers_v2::{
-        get_aggregator_max_value, get_aggregator_value, get_aggregator_value_as_id,
-        get_derived_string_snapshot_value, get_derived_string_snapshot_value_as_id,
-        get_snapshot_value, get_snapshot_value_as_id, set_aggregator_value,
-        unbounded_aggregator_max_value,
-    },
-    NativeAggregatorContext,
-};
+use crate::natives::aggregator_natives::{helpers_v2::*, NativeAggregatorContext};
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_field_extension::DelayedFieldData,
@@ -62,7 +54,7 @@ pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 /// If we want to increase this, we need to modify BITS_FOR_SIZE in types/src/delayed_fields.rs.
 pub const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 1024;
 
-macro_rules! abort_if_not_enabled {
+macro_rules! abort_if_aggregator_api_not_enabled {
     ($context:expr) => {
         if !$context.aggregator_v2_api_enabled() {
             return Err(SafeNativeError::Abort {
@@ -165,7 +157,7 @@ fn native_create_aggregator(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
     debug_assert_eq!(ty_args.len(), 1);
@@ -184,7 +176,7 @@ fn native_create_unbounded_aggregator(
     ty_args: Vec<Type>,
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 0);
     debug_assert_eq!(ty_args.len(), 1);
@@ -202,7 +194,7 @@ fn native_try_add(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
@@ -244,7 +236,7 @@ fn native_try_sub(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
@@ -287,7 +279,7 @@ fn native_read(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
     debug_assert_eq!(ty_args.len(), 1);
@@ -323,7 +315,7 @@ fn native_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(args.len(), 1);
     debug_assert_eq!(ty_args.len(), 1);
@@ -360,7 +352,7 @@ fn native_create_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
@@ -400,7 +392,7 @@ fn native_copy_snapshot(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     Err(SafeNativeError::Abort {
         abort_code: EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED,
@@ -436,7 +428,7 @@ fn native_read_snapshot(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
@@ -467,7 +459,7 @@ fn native_string_concat(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     // Deprecated function in favor of `derive_string_concat`.
 
@@ -485,7 +477,7 @@ fn native_read_derived_string(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(ty_args.len(), 0);
     debug_assert_eq!(args.len(), 1);
@@ -512,7 +504,7 @@ fn native_create_derived_string(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(ty_args.len(), 0);
     debug_assert_eq!(args.len(), 1);
@@ -555,7 +547,7 @@ fn native_derive_string_concat(
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    abort_if_not_enabled!(context);
+    abort_if_aggregator_api_not_enabled!(context);
 
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 3);
@@ -597,7 +589,7 @@ fn native_derive_string_concat(
             prefix.len() + suffix.len(),
             DelayedFieldID::new_with_width(0, snapshot_width),
         )
-        .map_err(|e| SafeNativeError::InvariantViolation(PartialVMError::from(e)))?;
+        .map_err(SafeNativeError::InvariantViolation)?;
 
         let snapshot_value = get_snapshot_value(&snapshot, snapshot_value_ty)?;
         let output = SnapshotToStringFormula::Concat { prefix, suffix }.apply_to(snapshot_value);

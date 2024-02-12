@@ -26,6 +26,7 @@ move-core-types = { path = "../../move-core/types" }
 [dev-dependencies]
 claims = "0.7"
 proptest = "1.0.0"
+rand = "0.8.5"
 
 [features]
 default = []

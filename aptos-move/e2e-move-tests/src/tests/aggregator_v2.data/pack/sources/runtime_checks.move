@@ -1,6 +1,6 @@
-/// Aggregators and other structs that use delayed fields have certain
-/// restrictions imposed by runtime, e.g. they cannot be compared, serialized,
-/// etc.
+/// Aggregators and other structs that use delayed fields have certain restrictions
+/// imposed by runtime, e.g. they cannot be compared, serialized, etc. because delayed
+/// field values get exchanged with unique identifiers at runtime.
 module 0x1::runtime_checks {
     use std::bcs;
     use std::string;
