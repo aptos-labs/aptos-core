@@ -115,6 +115,11 @@ impl OrderRule {
                 {
                     return Some(anchor_node.clone());
                 }
+            } else {
+                debug!(
+                    anchor = anchor_author,
+                    "Anchor not found for round {}", start_round
+                );
             }
             start_round += 2;
         }
@@ -218,8 +223,13 @@ impl OrderRule {
     /// Check if this node can trigger anchors to be ordered
     pub fn process_new_node(&self, node_metadata: &NodeMetadata) {
         let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
-
         let round = node_metadata.round();
+
+        debug!(
+            lowest_unordered_round = lowest_unordered_anchor_round,
+            node_round = round,
+            "Trigger Ordering"
+        );
         // If the node comes from the proposal round in the current instance, it can't trigger any ordering
         if round <= lowest_unordered_anchor_round
             || Self::check_parity(round, lowest_unordered_anchor_round)
