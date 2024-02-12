@@ -142,6 +142,8 @@ macro_rules! tdbg {
     };
 }
 
+const MAX_TYPE_PARAMETER_VALUE: u16 = 64 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
+
 // used for ordering modules topologically
 fn sort_by_deps(
     map: &BTreeMap<ModuleId, CompiledModule>,
@@ -180,9 +182,8 @@ fn check_for_invariant_violation(e: VMStatus) {
 }
 
 // filter modules
-fn filter_modules(input: RunnableState) -> Result<(), Corpus> {
+fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
     // reject any TypeParameter exceeds the maximum allowed value (Avoid known Ivariant Violation)
-    const MAX_TYPE_PARAMETER_VALUE: u16 = 64 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
     if let ExecVariant::Script { script, .. } = input.exec_variant.clone() {
         for signature in script.signatures {
             for sign_token in signature.0.iter() {
@@ -209,7 +210,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let mut vm = FakeExecutor::from_genesis(&VM, ChainId::mainnet()).set_not_parallel();
 
     // filter modules
-    filter_modules(input.clone())?;
+    filter_modules(&input)?;
 
     for m in input.dep_modules.iter_mut() {
         // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
