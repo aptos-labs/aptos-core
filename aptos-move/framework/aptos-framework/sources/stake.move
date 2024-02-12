@@ -1191,6 +1191,7 @@ module aptos_framework::stake {
         let num_cur_pending_actives = vector::length(&cur_validator_set.pending_active);
         let num_candidates = num_cur_actives + num_cur_pending_actives;
         while (candidate_idx < num_candidates) {
+            let candidate_in_current_validator_set = candidate_idx < num_cur_actives;
             let candidate = if (candidate_idx < num_cur_actives) {
                 vector::borrow(&cur_validator_set.active_validators, candidate_idx)
             } else {
@@ -1201,8 +1202,8 @@ module aptos_framework::stake {
             let cur_pending_active = coin::value(&stake_pool.pending_active);
             let cur_pending_inactive = coin::value(&stake_pool.pending_inactive);
 
-            let cur_perf = vector::borrow(&validator_perf.validators, candidate.config.validator_index);
-            let cur_reward = if (cur_active > 0) {
+            let cur_reward = if (candidate_in_current_validator_set && cur_active > 0) {
+                let cur_perf = vector::borrow(&validator_perf.validators, candidate.config.validator_index);
                 calculate_rewards_amount(cur_active, cur_perf.successful_proposals, cur_perf.successful_proposals + cur_perf.failed_proposals, rewards_rate, rewards_rate_denominator)
             } else {
                 0
