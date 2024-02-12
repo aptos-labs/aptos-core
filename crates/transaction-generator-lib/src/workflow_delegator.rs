@@ -331,7 +331,7 @@ impl WorkflowTxnGeneratorCreator {
                     )
                     .await;
 
-                let econia_place_orders_worker = if flow_type == EconiaFlowType::Basic {
+                let econia_place_orders_worker = if EconiaFlowType::Basic == flow_type {
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
                         root_account,
@@ -341,7 +341,7 @@ impl WorkflowTxnGeneratorCreator {
                             entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
                         },
                     )
-                    .await;
+                    .await
                 } else {
                     CustomModulesDelegationGeneratorCreator::create_worker(
                         init_txn_factory.clone(),
@@ -352,7 +352,7 @@ impl WorkflowTxnGeneratorCreator {
                             entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
                         },
                     )
-                    .await;
+                    .await
                 };
 
                 let packages = Arc::new(packages);
