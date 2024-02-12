@@ -28,6 +28,7 @@ aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
 aptos-data-streaming-service = { workspace = true }
 aptos-db = { workspace = true }
+aptos-db-indexer = { workspace = true }
 aptos-dkg-runtime = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
