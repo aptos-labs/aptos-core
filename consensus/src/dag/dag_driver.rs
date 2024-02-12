@@ -336,6 +336,10 @@ impl DagDriver {
             observe_round(prev_round_timestamp, RoundStage::Finished);
         }
     }
+
+    pub fn try_order_all(&self) {
+        self.order_rule.lock().process_all();
+    }
 }
 
 #[async_trait]
