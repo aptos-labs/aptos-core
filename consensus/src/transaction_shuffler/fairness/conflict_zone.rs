@@ -3,7 +3,7 @@
 
 use crate::transaction_shuffler::fairness::{
     conflict_key::{ConflictKeyId, ConflictKeyRegistry, MapByKeyId},
-    TxnIdx, NUM_CONFLICT_ZONES,
+    TxnIdx,
 };
 use std::collections::VecDeque;
 
@@ -20,7 +20,7 @@ pub(crate) struct ConflictZone<'a> {
 }
 
 impl<'a> ConflictZone<'a> {
-    pub fn build_zones(
+    pub fn build_zones<const NUM_CONFLICT_ZONES: usize>(
         key_registries: &'a [ConflictKeyRegistry; NUM_CONFLICT_ZONES],
         window_sizes: [usize; NUM_CONFLICT_ZONES],
     ) -> [Self; NUM_CONFLICT_ZONES] {

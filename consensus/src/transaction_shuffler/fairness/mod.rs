@@ -22,8 +22,6 @@ mod tests;
 
 type TxnIdx = usize;
 
-const NUM_CONFLICT_ZONES: usize = 3;
-
 #[derive(Debug)]
 struct FairnessShuffler {
     sender_conflict_window_size: usize,
@@ -31,20 +29,32 @@ struct FairnessShuffler {
     entry_fun_conflict_window_size: usize,
 }
 
+impl FairnessShuffler {
+    fn window_sizes(&self) -> [usize; 3] {
+        [
+            self.sender_conflict_window_size,
+            self.module_conflict_window_size,
+            self.entry_fun_conflict_window_size,
+        ]
+    }
+}
+
 impl TransactionShuffler for FairnessShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        let conflict_key_registries = ConflictKeyRegistry::build_registries(&txns);
-        let order = FairnessShufflerImpl::new(self, &conflict_key_registries).shuffle();
+        let conflict_key_registries = ConflictKeyRegistry::registries_for_fairness_shuffler(&txns);
+
+        let order =
+            FairnessShufflerImpl::new(&conflict_key_registries, self.window_sizes()).shuffle();
         reorder(txns, &order)
     }
 }
 
-fn reorder<T: Clone>(txns: Vec<T>, order: &[TxnIdx]) -> Vec<T> {
+pub(crate) fn reorder<T: Clone>(txns: Vec<T>, order: &[TxnIdx]) -> Vec<T> {
     assert_eq!(txns.len(), order.len());
     order.iter().map(|idx| txns[*idx].clone()).collect()
 }
 
-struct FairnessShufflerImpl<'a> {
+pub(crate) struct FairnessShufflerImpl<'a, const NUM_CONFLICT_ZONES: usize> {
     conflict_key_registries: &'a [ConflictKeyRegistry; NUM_CONFLICT_ZONES],
     conflict_zones: [ConflictZone<'a>; NUM_CONFLICT_ZONES],
     pending_zones: [PendingZone<'a>; NUM_CONFLICT_ZONES],
@@ -52,10 +62,10 @@ struct FairnessShufflerImpl<'a> {
     selection_tracker: SelectionTracker,
 }
 
-impl<'a> FairnessShufflerImpl<'a> {
+impl<'a, const NUM_CONFLICT_ZONES: usize> FairnessShufflerImpl<'a, NUM_CONFLICT_ZONES> {
     pub fn new(
-        shuffler: &FairnessShuffler,
         conflict_key_registries: &'a [ConflictKeyRegistry; NUM_CONFLICT_ZONES],
+        window_sizes: [usize; NUM_CONFLICT_ZONES],
     ) -> Self {
         let num_txns = conflict_key_registries[0].num_txns();
         assert!(conflict_key_registries
@@ -67,11 +77,7 @@ impl<'a> FairnessShufflerImpl<'a> {
             conflict_key_registries,
             selected_order: Vec::with_capacity(num_txns),
             selection_tracker: SelectionTracker::new(num_txns),
-            conflict_zones: ConflictZone::build_zones(conflict_key_registries, [
-                shuffler.sender_conflict_window_size,
-                shuffler.module_conflict_window_size,
-                shuffler.entry_fun_conflict_window_size,
-            ]),
+            conflict_zones: ConflictZone::build_zones(conflict_key_registries, window_sizes),
             pending_zones: PendingZone::build_zones(conflict_key_registries),
         }
     }

@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::fairness::{TxnIdx, NUM_CONFLICT_ZONES};
+use crate::transaction_shuffler::fairness::TxnIdx;
 use aptos_types::transaction::SignedTransaction;
 use entry_fun::EntryFunKey;
 use entry_fun_module::EntryFunModuleKey;
@@ -77,12 +77,16 @@ impl<T: Default> MapByKeyId<T> {
 }
 
 impl ConflictKeyRegistry {
-    pub fn build_registries(txns: &[SignedTransaction]) -> [Self; NUM_CONFLICT_ZONES] {
+    pub fn registries_for_fairness_shuffler(txns: &[SignedTransaction]) -> [Self; 3] {
         [
-            Self::build::<TxnSenderKey, SignedTransaction>(txns),
-            Self::build::<EntryFunModuleKey, SignedTransaction>(txns),
-            Self::build::<EntryFunKey, SignedTransaction>(txns),
+            ConflictKeyRegistry::build::<TxnSenderKey, SignedTransaction>(txns),
+            ConflictKeyRegistry::build::<EntryFunModuleKey, SignedTransaction>(txns),
+            ConflictKeyRegistry::build::<EntryFunKey, SignedTransaction>(txns),
         ]
+    }
+
+    pub fn registries_for_sender_aware_shuffler(txns: &[SignedTransaction]) -> [Self; 1] {
+        [ConflictKeyRegistry::build::<TxnSenderKey, SignedTransaction>(txns)]
     }
 
     pub fn build<K: ConflictKey<Txn>, Txn>(txns: &[Txn]) -> Self

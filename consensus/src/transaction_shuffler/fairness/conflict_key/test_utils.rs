@@ -1,9 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction_shuffler::fairness::{
-    conflict_key::{ConflictKey, ConflictKeyId, ConflictKeyRegistry},
-    NUM_CONFLICT_ZONES,
+use crate::transaction_shuffler::fairness::conflict_key::{
+    ConflictKey, ConflictKeyId, ConflictKeyRegistry,
 };
 use proptest::prelude::*;
 use std::hash::Hash;
@@ -187,7 +186,7 @@ impl ConflictKey<FakeTxn> for EntryFunKey {
 }
 
 impl ConflictKeyRegistry {
-    pub fn build_fake_registries(txns: &[FakeTxn]) -> [Self; NUM_CONFLICT_ZONES] {
+    pub fn registries_for_fairness_shuffler_tests(txns: &[FakeTxn]) -> [Self; 3] {
         [
             Self::build::<SenderKey, FakeTxn>(txns),
             Self::build::<EntryFunModuleKey, FakeTxn>(txns),

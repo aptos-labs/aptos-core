@@ -83,8 +83,8 @@ proptest! {
         txns in vec(any::<FakeTxn>(), 0..1000),
         shuffler in any::<FairnessShuffler>(),
     ) {
-        let registries = ConflictKeyRegistry::build_fake_registries(&txns);
-        let order = FairnessShufflerImpl::new(&shuffler, &registries).shuffle();
+        let registries = ConflictKeyRegistry::registries_for_fairness_shuffler_tests(&txns);
+        let order = FairnessShufflerImpl::new(&registries, shuffler.window_sizes()).shuffle();
 
         for registry in &registries {
             assert_invariants(&txns, order.clone(), registry);

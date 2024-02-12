@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_shuffler::fairness::{
-    conflict_key::ConflictKeyRegistry, FairnessShuffler, FairnessShufflerImpl, NUM_CONFLICT_ZONES,
+    conflict_key::ConflictKeyRegistry, FairnessShuffler, FairnessShufflerImpl,
 };
 
 struct TestCase {
     shuffler: FairnessShuffler,
-    conflict_key_registries: [ConflictKeyRegistry; NUM_CONFLICT_ZONES],
+    conflict_key_registries: [ConflictKeyRegistry; 3],
     expected_order: Vec<usize>,
 }
 
@@ -19,7 +19,8 @@ impl TestCase {
             expected_order,
         } = self;
 
-        let order = FairnessShufflerImpl::new(&shuffler, &conflict_key_registries).shuffle();
+        let order =
+            FairnessShufflerImpl::new(&conflict_key_registries, shuffler.window_sizes()).shuffle();
         assert_eq!(order, expected_order);
     }
 }
