@@ -23,7 +23,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
-    ) -> Option<SignedTransaction>
+    ) -> Vec<SignedTransaction>
     + Send
     + Sync;
 
