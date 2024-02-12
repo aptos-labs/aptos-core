@@ -483,6 +483,9 @@ where
                 scheduler.add_to_commit_queue(txn_idx);
             }
 
+            // An invariant check on the recorded outputs.
+            last_input_output.check_execution_status_during_commit(txn_idx)?;
+
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
                 let approx_output_size = block_gas_limit_type.block_output_limit().and_then(|_| {
                     last_input_output
@@ -574,13 +577,6 @@ where
                     }
                 }
             }
-
-            // Note that module read/write intersection would be detected on record, and directly
-            // propagated as an error. Similarly, an unrecoverable VM failure, would also be
-            // directly propagated as error even from a speculative transaction execution.
-
-            // An additional invariant check on the recorded outputs.
-            last_input_output.check_execution_status_during_commit(txn_idx)?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
 
@@ -780,6 +776,14 @@ where
         finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
         txn_idx: TxnIndex,
     ) -> Result<Vec<(T::Key, T::Value)>, PanicOr<IntentionalFallbackToSequential>> {
+        fail_point!(
+            "fail-point-resource-group-serialization",
+            !finalized_groups.is_empty(),
+            |_| Err(PanicOr::Or(
+                IntentionalFallbackToSequential::ResourceGroupSerializationError
+            ))
+        );
+
         finalized_groups
             .into_iter()
             .map(|(group_key, mut metadata_op, finalized_group)| {
@@ -810,9 +814,6 @@ where
 
                 if res.is_err() {
                     alert!("Failed to serialize resource group");
-                    // Alert first, then log an error with actual btree, to make sure
-                    // printing it can't possibly fail during alert.
-                    error!("Failed to serialize resource group BTreeMap {:?}", btree);
                 }
 
                 res
@@ -887,7 +888,7 @@ where
                 .chain(serialized_groups)
                 .collect(),
             patched_events,
-        );
+        )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
             let execution_status = txn_output.output_status();
@@ -1118,11 +1119,7 @@ where
         (!shared_maybe_error.load(Ordering::SeqCst))
             .then(|| BlockOutput::new(final_results.into_inner()))
             .ok_or(PanicOr::Or(
-                // All errors (if more than one) have been logged, and here any error
-                // leads to a sequential fallback. We use serialization error for now
-                // to be defensive and avoid any scenarios where the fallback would not
-                // have the specialized logic enabled. TODO: refactor.
-                IntentionalFallbackToSequential::ResourceGroupSerializationError,
+                IntentionalFallbackToSequential::FallbackFromParallel,
             ))
     }
 
@@ -1209,6 +1206,7 @@ where
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
+        resource_group_bcs_fallback: bool,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
@@ -1292,6 +1290,72 @@ where
                         "Sequential execution must materialize deltas"
                     );
 
+                    if resource_group_bcs_fallback {
+                        // Dynamic change set optimizations are enabled, and resource group serialization
+                        // previously failed in bcs serialization for preparing final transaction outputs.
+                        // TODO: remove this fallback when txn errors can be created from block executor.
+
+                        let finalize = |group_key| -> BTreeMap<_, _> {
+                            unsync_map
+                                .finalize_group(&group_key)
+                                .map(|(resource_tag, value_with_layout)| {
+                                    let value = match value_with_layout {
+                                        ValueWithLayout::RawFromStorage(value)
+                                        | ValueWithLayout::Exchanged(value, _) => value,
+                                    };
+                                    (
+                                        resource_tag,
+                                        value
+                                            .extract_raw_bytes()
+                                            .expect("Deletions should already be applied"),
+                                    )
+                                })
+                                .collect()
+                        };
+
+                        // The IDs are not exchanged but it doesn't change the types (Bytes) or size.
+                        let serialization_error = output
+                            .group_reads_needing_delayed_field_exchange()
+                            .iter()
+                            .any(|(group_key, _)| {
+                                fail_point!("fail-point-resource-group-serialization", |_| {
+                                    true
+                                });
+
+                                let finalized_group = finalize(group_key.clone());
+                                bcs::to_bytes(&finalized_group).is_err()
+                            })
+                            || output.resource_group_write_set().into_iter().any(
+                                |(group_key, _, group_ops)| {
+                                    fail_point!("fail-point-resource-group-serialization", |_| {
+                                        true
+                                    });
+
+                                    let mut finalized_group = finalize(group_key);
+                                    for (value_tag, (group_op, _)) in group_ops {
+                                        if group_op.is_deletion() {
+                                            finalized_group.remove(&value_tag);
+                                        } else {
+                                            finalized_group.insert(
+                                                value_tag,
+                                                group_op
+                                                    .extract_raw_bytes()
+                                                    .expect("Not a deletion"),
+                                            );
+                                        }
+                                    }
+                                    bcs::to_bytes(&finalized_group).is_err()
+                                },
+                            );
+
+                        if serialization_error {
+                            // The corresponding error / alert must already be triggered, the goal in sequential
+                            // fallback is to just skip any transactions that would cause such serialization errors.
+                            ret.push(E::Output::skip_output());
+                            continue;
+                        }
+                    };
+
                     // Apply the writes.
                     // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
                     Self::apply_output_sequential(&unsync_map, &output)?;
@@ -1301,7 +1365,8 @@ where
                         let group_metadata_ops = output.resource_group_metadata_ops();
                         let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
                         for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
-                            let finalized_group = unsync_map.finalize_group(&group_key);
+                            let finalized_group: Vec<_> =
+                                unsync_map.finalize_group(&group_key).collect();
                             if finalized_group.is_empty() != group_metadata_op.is_deletion() {
                                 // TODO[agg_v2](fix): code invariant error if dynamic change set optimizations disabled.
                                 // TODO[agg_v2](fix): make sure this cannot be triggered by an user transaction
@@ -1317,7 +1382,8 @@ where
                         for (group_key, group_metadata_op) in
                             output.group_reads_needing_delayed_field_exchange()
                         {
-                            let finalized_group = unsync_map.finalize_group(&group_key);
+                            let finalized_group: Vec<_> =
+                                unsync_map.finalize_group(&group_key).collect();
                             if finalized_group.is_empty() != group_metadata_op.is_deletion() {
                                 return Err(code_invariant_error(format!(
                                     "Group is empty = {} but op is deletion = {} in sequential execution",
@@ -1370,18 +1436,20 @@ where
                             Self::serialize_groups(patched_finalized_groups, idx as TxnIndex)
                                 .map_err(BlockExecutionError::FallbackToSequential)?;
 
-                        // TODO[agg_v2] patch resources in groups and provide explicitly
-                        output.incorporate_materialized_txn_output(
-                            // No aggregator v1 delta writes are needed for sequential execution.
-                            // They are already handled because we passed materialize_deltas=true
-                            // to execute_transaction.
-                            vec![],
-                            patched_resource_write_set
-                                .into_iter()
-                                .chain(serialized_groups.into_iter())
-                                .collect(),
-                            patched_events,
-                        );
+                        output
+                            .incorporate_materialized_txn_output(
+                                // No aggregator v1 delta writes are needed for sequential execution.
+                                // They are already handled because we passed materialize_deltas=true
+                                // to execute_transaction.
+                                vec![],
+                                patched_resource_write_set
+                                    .into_iter()
+                                    .chain(serialized_groups.into_iter())
+                                    .collect(),
+                                patched_events,
+                            )
+                            .map_err(PanicOr::from)
+                            .map_err(BlockExecutionError::FallbackToSequential)?;
                     }
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
@@ -1454,12 +1522,21 @@ where
                 executor_arguments,
                 signature_verified_block,
                 base_view,
+                false,
             )
         };
 
-        // Sequential execution fallback
-        // Only worth doing if we did parallel before, i.e. if we did a different pass.
-        if self.config.local.concurrency_level > 1 {
+        let mut resource_group_bcs_fallback = matches!(
+            ret,
+            Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                IntentionalFallbackToSequential::ResourceGroupSerializationError
+            )))
+        );
+
+        if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
+            // Sequential execution fallback, only worth doing if we did a different pass before,
+            // i.e. parallel. This fallback does not handle resource group serialization issues.
+
             if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
                 // Any error logs are already written at appropriate levels.
                 debug!("Sequential_fallback occurred");
@@ -1472,8 +1549,26 @@ where
                     executor_arguments,
                     signature_verified_block,
                     base_view,
+                    false,
+                );
+                resource_group_bcs_fallback = matches!(
+                    ret,
+                    Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                        IntentionalFallbackToSequential::ResourceGroupSerializationError
+                    )))
                 );
             }
+        }
+
+        if resource_group_bcs_fallback {
+            alert!("Resource group serialization fallback");
+            init_speculative_logs(signature_verified_block.len());
+            ret = self.execute_transactions_sequential(
+                executor_arguments,
+                signature_verified_block,
+                base_view,
+                true,
+            );
         }
 
         // If after trying available fallbacks, we still are askign to do a fallback,

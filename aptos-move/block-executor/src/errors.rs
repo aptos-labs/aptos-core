@@ -19,6 +19,10 @@ pub enum IntentionalFallbackToSequential {
     // This is not PanicError because we need to match the error variant to provide a specialized
     // fallback logic if a resource group serialization error occurs.
     ResourceGroupSerializationError,
+    // If multiple workers encounter conditions that qualify for a sequential fallback during parallel
+    // execution, it is not clear what is the "right" one to fallback with. Instead, we use the
+    // variant below. TODO: pass a vector of all encountered conditions (mainly for tests).
+    FallbackFromParallel,
 }
 
 impl IntentionalFallbackToSequential {

@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS nft_metadata_crawler.parsed_asset_uris DROP COLUMN last_transaction_version;

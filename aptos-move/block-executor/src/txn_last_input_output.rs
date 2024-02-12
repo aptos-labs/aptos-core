@@ -9,11 +9,10 @@ use crate::{
     types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_aggregator::types::{code_invariant_error, PanicOr};
-use aptos_logger::warn;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    fee_statement::FeeStatement, transaction::BlockExecutableTransaction as Transaction,
-    write_set::WriteOp,
+    delayed_fields::PanicError, fee_statement::FeeStatement,
+    transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -219,19 +218,24 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .into()),
             }
         } else {
-            // TODO: check carefully if such a case is possible due to early halts.
-            warn!("Possible to not find committed output (halted?)");
-            Ok(())
+            Err(code_invariant_error("Recorded output not found during commit").into())
         }
     }
 
     pub(crate) fn update_to_skip_rest(&self, txn_idx: TxnIndex) {
+        if self.block_skips_rest_at_idx(txn_idx) {
+            // Already skipping.
+            return;
+        }
+
+        // check_execution_status_during_commit must be used for checks re:status.
+        // Hence, since the status is not SkipRest, it must be Success.
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
             self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
                 output_status: ExecutionStatus::SkipRest(output),
             })));
         } else {
-            unreachable!();
+            unreachable!("Unexpected status");
         }
     }
 
@@ -411,7 +415,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         delta_writes: Vec<(T::Key, WriteOp)>,
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         match &self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
@@ -422,12 +426,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                     delta_writes,
                     patched_resource_write_set,
                     patched_events,
-                );
+                )?;
             },
             ExecutionStatus::Abort(_)
             | ExecutionStatus::SpeculativeExecutionAbortError(_)
             | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => {},
         };
+        Ok(())
     }
 
     pub(crate) fn get_txn_read_write_summary(&self, txn_idx: TxnIndex) -> ReadWriteSummary<T> {

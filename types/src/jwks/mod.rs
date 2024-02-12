@@ -184,9 +184,9 @@ impl PatchedJWKs {
     }
 }
 
-impl MoveStructType for PatchedJWKs {
-    const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("PatchedJWKs");
+impl OnChainConfig for PatchedJWKs {
+    const MODULE_IDENTIFIER: &'static str = "jwks";
+    const TYPE_IDENTIFIER: &'static str = "PatchedJWKs";
 }
 
 /// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.

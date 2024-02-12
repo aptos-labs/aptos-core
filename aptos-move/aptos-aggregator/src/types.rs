@@ -39,7 +39,7 @@ impl<T: std::fmt::Debug> PanicOr<T> {
 
 pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
-        "Delayed field / resource group code invariant broken (a bug in the code), {:?}",
+        "Delayed materialization code invariant broken (there is a bug in the code), {:?}",
         message
     );
     error!("{}", msg);
@@ -75,7 +75,9 @@ impl From<DelayedFieldsSpeculativeError> for PartialVMError {
 impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
     fn from(err: &PanicOr<T>) -> Self {
         match err {
-            PanicOr::CodeInvariantError(_) => StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            PanicOr::CodeInvariantError(_) => {
+                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+            },
             PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
         }
     }
@@ -85,7 +87,7 @@ impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
     fn from(err: PanicOr<T>) -> Self {
         match err {
             PanicOr::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
+                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
             },
             PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)

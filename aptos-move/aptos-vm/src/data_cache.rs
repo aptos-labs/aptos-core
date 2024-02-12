@@ -381,7 +381,7 @@ pub(crate) mod tests {
         };
 
         let group_adapter = ResourceGroupAdapter::new(
-            // TODO[agg_v2](fix) add a converter for StateView for tests that implements ResourceGroupView
+            // TODO[agg_v2](test) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,

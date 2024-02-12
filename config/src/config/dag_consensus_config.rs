@@ -122,14 +122,12 @@ impl Default for ReliableBroadcastConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagRoundStateConfig {
-    pub round_event_channel_size: usize,
     pub adaptive_responsive_minimum_wait_time_ms: u64,
 }
 
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
-            round_event_channel_size: 1024,
             adaptive_responsive_minimum_wait_time_ms: 500,
         }
     }

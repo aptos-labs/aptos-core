@@ -18,6 +18,7 @@ move-command-line-common = { path = "../move-command-line-common" }
 #move-package = { path = "../tools/move-package" }
 move-compiler = { path = "../move-compiler" }
 move-core-types = { path = "../move-core/types" }
+move-disassembler = { path = "../tools/move-disassembler" }
 move-ir-types = { path = "../move-ir/types" }
 move-model = { path = "../move-model" }
 move-stackless-bytecode = { path = "../move-model/bytecode" }
@@ -42,7 +43,6 @@ serde = { version = "1.0.124", features = ["derive"] }
 anyhow = "1.0.52"
 datatest-stable = "0.1.1"
 move-command-line-common = { path = "../move-command-line-common" }
-move-disassembler = { path = "../tools/move-disassembler" }
 move-ir-types = { path = "../move-ir/types" }
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 move-stdlib = { path = "../move-stdlib" }

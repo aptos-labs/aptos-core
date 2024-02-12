@@ -107,7 +107,7 @@ impl From<PanicError> for PartialVMError {
     fn from(err: PanicError) -> Self {
         match err {
             PanicError::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
+                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
             },
         }
@@ -218,7 +218,7 @@ impl TryFromMoveValue for DelayedFieldID {
 
 fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
-        "Delayed logic code invariant broken (there is a bug in the code), {:?}",
+        "Delayed materialization code invariant broken (there is a bug in the code), {:?}",
         message
     );
     println!("ERROR: {}", msg);
@@ -333,12 +333,11 @@ pub fn derived_string_struct_to_bytes_and_length(value: Struct) -> PartialVMResu
     let mut fields = value.unpack()?.collect::<Vec<Value>>();
     if fields.len() != 2 {
         return Err(
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
-                format!(
+            PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
+                .with_message(format!(
                     "DerivedStringSnapshot has wrong number of fields: {:?}",
                     fields.len()
-                ),
-            ),
+                )),
         );
     }
     let padding = fields.pop().unwrap().value_as::<Vec<u8>>()?;
@@ -349,12 +348,11 @@ pub fn derived_string_struct_to_bytes_and_length(value: Struct) -> PartialVMResu
         string_bytes,
         u32::try_from(bcs_size_of_byte_array(string_len) + bcs_size_of_byte_array(padding.len()))
             .map_err(|_| {
-            PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
-                format!(
+            PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
+                .with_message(format!(
                 "DerivedStringSnapshot size exceeds u32: string_len: {string_len}, padding_len: {}",
                 padding.len()
-            ),
-            )
+            ))
         })?,
     ))
 }
