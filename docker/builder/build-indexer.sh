@@ -15,6 +15,7 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
     -p aptos-indexer-grpc-data-service \
+    -p aptos-indexer-grpc-gcs-migration \
     -p aptos-nft-metadata-crawler-parser \
     "$@"
 
@@ -23,6 +24,7 @@ BINS=(
     aptos-indexer-grpc-cache-worker
     aptos-indexer-grpc-file-store
     aptos-indexer-grpc-data-service
+    aptos-indexer-grpc-gcs-migration
     aptos-nft-metadata-crawler-parser
 )
 

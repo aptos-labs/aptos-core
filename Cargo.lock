@@ -2194,6 +2194,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-gcs-migration"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "aptos-metrics-core",
+ "aptos-runtimes",
+ "async-trait",
+ "backtrace",
+ "clap 4.3.21",
+ "futures",
+ "prometheus",
+ "serde",
+ "serde_yaml 0.8.26",
+ "tempfile",
+ "tokio",
+ "toml 0.7.4",
+ "tracing",
+ "tracing-subscriber",
+ "warp",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-integration-tests"
 version = "0.1.0"
 dependencies = [
@@ -2330,11 +2354,11 @@ dependencies = [
  "chrono",
  "clap 4.3.21",
  "cloud-storage",
- "flate2",
  "futures",
  "futures-core",
  "futures-util",
  "itertools 0.10.5",
+ "lz4",
  "once_cell",
  "prometheus",
  "prost 0.12.3",
