@@ -750,6 +750,7 @@ SignedGroth16Zkp:
     - extra_field: STR
     - override_aud_val:
         OPTION: STR
+    - exp_horizon_secs: U64
 SignedTransaction:
   STRUCT:
     - raw_txn:

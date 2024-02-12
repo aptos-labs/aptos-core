@@ -278,6 +278,18 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
+    /// Entry function-only rotation key function that allows the signer update their authentication_key.
+    entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account, OriginatingAddress {
+        let addr = signer::address_of(account);
+        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
+        assert!(
+            vector::length(&new_auth_key) == 32,
+            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+        );
+        let account_resource = borrow_global_mut<Account>(addr);
+        update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
+    }
+
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
     /// To authorize the rotation, we need two signatures:
     /// - the first signature `cap_rotate_key` refers to the signature by the account owner's current key on a valid `RotationProofChallenge`,
@@ -1322,6 +1334,28 @@ module aptos_framework::account {
         assert!(*expected_originating_address == alice_addr, 0);
         assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
     }
+
+
+    #[test(account = @aptos_framework)]
+    public entry fun test_simple_rotation(account: &signer) acquires Account, OriginatingAddress {
+        initialize(account);
+
+        let alice_addr = @0x1234;
+        let alice = create_account_unchecked(alice_addr);
+
+        let (_new_sk, new_pk) = ed25519::generate_keys();
+        let new_pk_unvalidated = ed25519::public_key_to_unvalidated(&new_pk);
+        let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk_unvalidated);
+        let new_addr = from_bcs::to_address(new_auth_key);
+
+        rotate_authentication_key_call(&alice, new_auth_key);
+
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        let expected_originating_address = table::borrow(address_map, new_addr);
+        assert!(*expected_originating_address == alice_addr, 0);
+        assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
+    }
+
 
     #[test(account = @aptos_framework)]
     #[expected_failure(abort_code = 0x20014, location = Self)]

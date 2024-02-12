@@ -53,22 +53,20 @@ module aptos_framework::zkid {
         max_jwt_header_b64_bytes: u32,
     }
 
-    // genesis.move needs to initialize the devnet VK
-    friend aptos_framework::genesis;
-
-    public(friend) fun initialize(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
+    #[test_only]
+    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
         system_addresses::assert_aptos_framework(fx);
 
         move_to(fx, vk);
         move_to(fx, constants);
     }
 
-    #[test_only]
-    public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
-        initialize(fx, vk, constants)
-    }
-
-    public fun new_groth16_verification_key(alpha_g1: vector<u8>, beta_g2: vector<u8>, gamma_g2: vector<u8>, delta_g2: vector<u8>, gamma_abc_g1: vector<vector<u8>>): Groth16VerificationKey {
+    public fun new_groth16_verification_key(alpha_g1: vector<u8>,
+                                            beta_g2: vector<u8>,
+                                            gamma_g2: vector<u8>,
+                                            delta_g2: vector<u8>,
+                                            gamma_abc_g1: vector<vector<u8>>
+    ): Groth16VerificationKey {
         Groth16VerificationKey {
             alpha_g1,
             beta_g2,
@@ -102,46 +100,9 @@ module aptos_framework::zkid {
         }
     }
 
-    /// Returns the Groth16 VK for our devnet deployment.
-    public fun devnet_groth16_vk(): Groth16VerificationKey {
-        Groth16VerificationKey {
-            alpha_g1: x"6d1c152d2705e35fe7a07a66eb8a10a7f42f1e38c412fbbc3ac7f9affc25dc24",
-            beta_g2: x"e20a834c55ae6e2fcbd66636e09322727f317aff8957dd342afa11f936ef7c02cfdc8c9862849a0442bcaa4e03f45343e8bf261ef4ab58cead2efc17100a3b16",
-            gamma_g2: x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19",
-            delta_g2: x"edf692d95cbdde46ddda5ef7d422436779445c5e66006a42761e1f12efde0018c212f3aeb785e49712e7a9353349aaf1255dfb31b7bf60723a480d9293938e19",
-            gamma_abc_g1: vector[
-                x"9aae6580d6040e77969d70e748e861664228e3567e77aa99822f8a4a19c29101",
-                x"e38ad8b845e3ef599232b43af2a64a73ada04d5f0e73f1848e6631e17a247415",
-            ],
-        }
-    }
-
-    /// Returns the configuration for our devnet deployment.
-    public fun default_devnet_configuration(): Configuration {
-        // TODO(zkid): Put reasonable defaults & circuit-specific constants here.
-        Configuration {
-            override_aud_vals: vector[],
-            max_zkid_signatures_per_txn: 3,
-            max_exp_horizon_secs: 100_255_944, // ~1160 days
-            training_wheels_pubkey: option::some(x"aa"),
-            // The commitment is using the Poseidon-BN254 hash function, hence the 254-bit (32 byte) size.
-            nonce_commitment_num_bytes: 32,
-            max_commited_epk_bytes: 3 * 31,
-            max_iss_field_bytes: 126,
-            max_extra_field_bytes:  350,
-            max_jwt_header_b64_bytes: 300,
-        }
-    }
-
     // Sets the zkID Groth16 verification key, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
-    public fun update_groth16_verification_key(fx: &signer,
-                                               alpha_g1: vector<u8>,
-                                               beta_g2: vector<u8>,
-                                               gamma_g2: vector<u8>,
-                                               delta_g2: vector<u8>,
-                                               gamma_abc_g1: vector<vector<u8>>,
-    ) acquires Groth16VerificationKey {
+    public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) acquires Groth16VerificationKey {
         system_addresses::assert_aptos_framework(fx);
 
         if (exists<Groth16VerificationKey>(signer::address_of(fx))) {
@@ -154,7 +115,6 @@ module aptos_framework::zkid {
             } = move_from<Groth16VerificationKey>(signer::address_of(fx));
         };
 
-        let vk = new_groth16_verification_key(alpha_g1, beta_g2, gamma_g2, delta_g2, gamma_abc_g1);
         move_to(fx, vk);
     }
 
@@ -190,5 +150,24 @@ module aptos_framework::zkid {
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
         config.training_wheels_pubkey = pk;
+    }
+
+    // Convenience method to append to clear the set of zkID override `aud`'s, only callable via governance proposal.
+    // WARNING: When no override `aud` is set, recovery of zkID accounts associated with applications that disappeared
+    // is no longer possible.
+    public fun remove_all_override_auds(fx: &signer) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.override_aud_vals = vector[];
+    }
+
+    // Convenience method to append to the set of zkID override `aud`'s, only callable via governance proposal.
+    // WARNING: If a malicious override `aud` is set, this would lead to stolen funds.
+    public fun add_override_aud(fx: &signer, aud: String) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        vector::push_back(&mut config.override_aud_vals, aud);
     }
 }
