@@ -251,6 +251,9 @@ impl ProofCoordinator {
     fn update_counters_on_expire(state: &IncrementalProofState) {
         counters::BATCH_RECEIVED_REPLIES_COUNT.observe(state.aggregated_signature.len() as f64);
         counters::BATCH_RECEIVED_REPLIES_VOTING_POWER.observe(state.aggregated_voting_power as f64);
+        if !state.completed {
+            counters::BATCH_SUCCESSFUL_CREATION.observe(0.0);
+        }
     }
 
     async fn expire(&mut self) {
@@ -269,10 +272,8 @@ impl ProofCoordinator {
 
                 if !state.completed {
                     counters::TIMEOUT_BATCHES_COUNT.inc();
-                }
-                if !state.completed {
                     info!(
-                        LogSchema::new(LogEvent::ProofOfStoreInit),
+                        LogSchema::new(LogEvent::IncrementalProofExpired),
                         digest = signed_batch_info_info.digest(),
                         self_voted = state.self_voted,
                     );
@@ -315,10 +316,11 @@ impl ProofCoordinator {
                                 if let Entry::Occupied(existing_proof) = self.digest_to_proof.entry(*digest) {
                                     if batch == *existing_proof.get().batch_info() {
                                         let incremental_proof = existing_proof.get();
-                                        if !incremental_proof.completed {
+                                        if incremental_proof.completed {
+                                            counters::BATCH_SUCCESSFUL_CREATION.observe(1.0);
+                                        } else {
                                             warn!("QS: received commit notification for batch that did not complete: {}, self_voted: {}", digest, incremental_proof.self_voted);
                                         }
-                                        counters::BATCH_SUCCESSFUL_CREATION.observe(if incremental_proof.completed { 1.0 } else { 0.0 });
                                         let committed_proof = existing_proof.remove();
                                         self.committed_batches.insert(batch, committed_proof);
                                     }
