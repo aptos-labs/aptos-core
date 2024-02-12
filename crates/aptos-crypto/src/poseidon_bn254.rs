@@ -28,7 +28,7 @@ pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 pub const MAX_NUM_INPUT_BYTES: usize = MAX_NUM_INPUT_SCALARS * BYTES_PACKED_PER_SCALAR;
 
 /// Apparently, creating this object is rather slow, so we make it a global.
-const HASHER: Lazy<Poseidon> = Lazy::new(|| Poseidon::new());
+static HASHER: Lazy<Poseidon> = Lazy::new(Poseidon::new);
 
 /// Given an array of up to `MAX_NUM_INPUT_SCALARS` field elements (in the BN254 scalar field), hashes
 /// them using Poseidon-BN254 into a single field element.
