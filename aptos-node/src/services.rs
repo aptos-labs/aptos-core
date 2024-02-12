@@ -11,6 +11,7 @@ use aptos_consensus::{
 };
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::client::AptosDataClient;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_indexer_grpc_table_info::runtime::bootstrap as bootstrap_indexer_table_info;
@@ -52,20 +53,28 @@ pub fn bootstrap_api_and_indexer(
     let (mempool_client_sender, mempool_client_receiver) =
         mpsc::channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let indexer_table_info = bootstrap_indexer_table_info(
+    let (indexer_table_info_runtime, indexer_async_v2) = match bootstrap_indexer_table_info(
         node_config,
         chain_id,
         db_rw.clone(),
         mempool_client_sender.clone(),
-    );
+    ) {
+        Some((runtime, indexer_v2)) => (Some(runtime), Some(indexer_v2)),
+        None => (None, None),
+    };
 
     // Create the API runtime
+    let table_info_reader: Option<Arc<dyn TableInfoReader>> = indexer_async_v2.map(|arc| {
+        let trait_object: Arc<dyn TableInfoReader> = arc;
+        trait_object
+    });
     let api_runtime = if node_config.api.enabled {
         Some(bootstrap_api(
             node_config,
             chain_id,
             db_rw.reader.clone(),
             mempool_client_sender.clone(),
+            table_info_reader.clone(),
         )?)
     } else {
         None
@@ -77,6 +86,7 @@ pub fn bootstrap_api_and_indexer(
         chain_id,
         db_rw.reader.clone(),
         mempool_client_sender.clone(),
+        table_info_reader,
     );
 
     // Create the indexer runtime
@@ -90,7 +100,7 @@ pub fn bootstrap_api_and_indexer(
     Ok((
         mempool_client_receiver,
         api_runtime,
-        indexer_table_info,
+        indexer_table_info_runtime,
         indexer_runtime,
         indexer_grpc,
     ))

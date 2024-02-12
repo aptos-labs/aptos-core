@@ -18,6 +18,7 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_logger::{error, info, warn, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -76,6 +77,7 @@ pub struct Context {
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
+    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -90,6 +92,7 @@ impl Context {
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         let (view_function_stats, simulate_txn_stats) = {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
@@ -126,6 +129,7 @@ impl Context {
             })),
             view_function_stats,
             simulate_txn_stats,
+            table_info_reader,
         }
     }
 
@@ -661,7 +665,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -692,7 +696,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
