@@ -504,7 +504,7 @@ impl VMRuntime {
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
-    ) -> VMResult<SerializedReturnValues> {
+    ) -> VMResult<()> {
         // load the script, perform verification
         let (
             func,
@@ -527,7 +527,8 @@ impl VMRuntime {
             module_store,
             gas_meter,
             extensions,
-        )
+        )?;
+        Ok(())
     }
 
     pub(crate) fn loader(&self) -> &Loader {

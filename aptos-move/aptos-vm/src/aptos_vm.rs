@@ -89,7 +89,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{logging::expect_no_verification_errors, session::SerializedReturnValues};
+use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
@@ -641,7 +641,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         senders: Vec<AccountAddress>,
         script_fn: &EntryFunction,
-    ) -> Result<SerializedReturnValues, VMStatus> {
+    ) -> Result<(), VMStatus> {
         let function = session.load_function(
             script_fn.module(),
             script_fn.function(),
@@ -655,13 +655,14 @@ impl AptosVM {
             &function,
             struct_constructors,
         )?;
-        Ok(session.execute_entry_function(
+        session.execute_entry_function(
             script_fn.module(),
             script_fn.function(),
             script_fn.ty_args().to_vec(),
             args,
             gas_meter,
-        )?)
+        )?;
+        Ok(())
     }
 
     fn execute_script_or_entry_function(

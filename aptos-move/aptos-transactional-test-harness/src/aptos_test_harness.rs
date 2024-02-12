@@ -718,7 +718,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Result<Option<String>> {
         let signer0 = self.compiled_state().resolve_address(&signers[0]);
 
         if gas_budget.is_some() {
@@ -783,14 +783,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         } else {
             None
         };
-
-        //TODO: replace this dummy value with actual txn return value
-        let a = SerializedReturnValues {
-            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
-            return_values: vec![(vec![0], MoveTypeLayout::U8)],
-        };
-
-        Ok((output, a))
+        Ok(output)
     }
 
     fn call_function(
