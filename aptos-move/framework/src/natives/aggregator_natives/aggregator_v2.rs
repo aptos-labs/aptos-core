@@ -6,6 +6,7 @@ use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_field_extension::DelayedFieldData,
     resolver::DelayedFieldResolver,
+    types::code_invariant_error,
 };
 use aptos_gas_algebra::NumBytes;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
@@ -18,7 +19,6 @@ use aptos_types::delayed_fields::{
     SnapshotToStringFormula,
 };
 use move_binary_format::errors::PartialVMError;
-use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     delayed_values::{
@@ -298,8 +298,10 @@ fn native_read(
     // Paranoid check to make sure read result makes sense.
     let max_value = get_aggregator_max_value(&aggregator, aggregator_value_ty)?;
     if value > max_value {
-        let error = PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!("Aggregator read returned the value greater than maximum possible value: {value} > {max_value}"));
-        return Err(SafeNativeError::InvariantViolation(error));
+        let error = code_invariant_error(format!("Aggregator read returned the value greater than maximum possible value: {value} > {max_value}"));
+        return Err(SafeNativeError::InvariantViolation(PartialVMError::from(
+            error,
+        )));
     };
 
     let value = create_value_by_type(aggregator_value_ty, value, EUNSUPPORTED_AGGREGATOR_TYPE)?;

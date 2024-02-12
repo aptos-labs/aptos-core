@@ -2,10 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delayed_values::derived_string_snapshot::{
-        bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
-        from_utf8_bytes, is_derived_string_struct_layout, u128_to_u64,
-        u64_to_fixed_size_utf8_bytes,
+    delayed_values::{
+        derived_string_snapshot::{
+            bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
+            from_utf8_bytes, is_derived_string_struct_layout, u128_to_u64,
+            u64_to_fixed_size_utf8_bytes,
+        },
+        error::{code_invariant_error, expect_ok},
     },
     values::{Struct, Value},
 };
@@ -13,7 +16,7 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format_common::size_u32_as_uleb128,
 };
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::value::MoveTypeLayout;
 
 const BITS_FOR_SIZE: usize = 32;
 
@@ -56,7 +59,7 @@ impl DelayedFieldID {
 
         // If we don't even have enough space to store the length of the value, we cannot proceed
         if width <= value_len_width_upper_bound + 1 {
-            return Err(PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!(
+            return Err(code_invariant_error(format!(
                 "DerivedStringSnapshot size issue for id {self:?}: width: {width}, value_width_upper_bound: {value_len_width_upper_bound}"
             )));
         }
@@ -135,10 +138,7 @@ impl TryIntoMoveValue for DelayedFieldID {
     fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
         Ok(match layout {
             MoveTypeLayout::U64 => Value::u64(self.as_u64()),
-            MoveTypeLayout::U128 => {
-                let v: u64 = self.as_u64();
-                Value::u128(v as u128)
-            },
+            MoveTypeLayout::U128 => Value::u128(self.as_u64() as u128),
             layout if is_derived_string_struct_layout(layout) => {
                 // Here, we make sure we convert identifiers to fixed-size Move
                 // values. This is needed because we charge gas based on the resource
@@ -147,13 +147,10 @@ impl TryIntoMoveValue for DelayedFieldID {
                 self.into_derived_string_struct()?
             },
             _ => {
-                return Err(
-                    PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
-                        .with_message(format!(
-                            "Failed to convert {:?} into a Move value with {} layout",
-                            self, layout
-                        )),
-                )
+                return Err(code_invariant_error(format!(
+                    "Failed to convert {:?} into a Move value with {} layout",
+                    self, layout
+                )))
             },
         })
     }
@@ -171,9 +168,9 @@ impl TryFromMoveValue for DelayedFieldID {
         // Since we put the value there, we should be able to read it back,
         // unless there is a bug in the code - so we expect_ok() throughout.
         let (id, width) = match layout {
-            MoveTypeLayout::U64 => (value.value_as::<u64>().map(Self::from)?, 8),
+            MoveTypeLayout::U64 => (expect_ok(value.value_as::<u64>()).map(Self::from)?, 8),
             MoveTypeLayout::U128 => (
-                value.value_as::<u128>().and_then(u128_to_u64).map(Self::from)?,
+                expect_ok(value.value_as::<u128>()).and_then(u128_to_u64).map(Self::from)?,
                 16,
             ),
             layout if is_derived_string_struct_layout(layout) => {
@@ -181,7 +178,7 @@ impl TryFromMoveValue for DelayedFieldID {
                     .value_as::<Struct>()
                     .and_then(derived_string_struct_to_bytes_and_length)
                     .map_err(|e| {
-                        PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!(
+                        code_invariant_error(format!(
                             "couldn't extract derived string struct: {:?}",
                             e
                         ))
@@ -191,20 +188,16 @@ impl TryFromMoveValue for DelayedFieldID {
             },
             // We use value to ID conversion in serialization.
             _ => {
-                return Err(PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(format!(
+                return Err(code_invariant_error(format!(
                     "Failed to convert a Move value with {layout} layout into an identifier, tagged with {hint:?}, with value {value:?}",
                 )))
             },
         };
         if id.extract_width() != width {
-            return Err(
-                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(
-                    format!(
+            return Err(code_invariant_error(format!(
                 "Extracted identifier has a wrong width: id={id:?}, width={width}, expected={}",
                 id.extract_width(),
-            ),
-                ),
-            );
+            )));
         }
 
         Ok((id, width))

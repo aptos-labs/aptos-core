@@ -1,7 +1,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::{Container, Value, ValueImpl};
+use crate::{
+    delayed_values::error::code_invariant_error,
+    values::{Container, Value, ValueImpl},
+};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
 use std::collections::HashSet;
@@ -61,10 +64,9 @@ fn find_identifiers_in_value_impl(
 
         ValueImpl::DelayedFieldID { id } => {
             if !identifiers.insert(id.as_u64()) {
-                return Err(
-                    PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
-                        .with_message("Duplicated identifiers for Move value".to_string()),
-                );
+                return Err(code_invariant_error(
+                    "Duplicated identifiers for Move value".to_string(),
+                ));
             }
         },
     }

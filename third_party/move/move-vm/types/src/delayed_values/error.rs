@@ -1,5 +1,9 @@
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
+
+pub(crate) fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> PartialVMResult<V> {
+    value.map_err(code_invariant_error)
+}
 
 pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PartialVMError {
     let msg = format!(
@@ -7,5 +11,5 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PartialVMError {
         message
     );
     println!("ERROR: {}", msg);
-    PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR).with_message(msg)
+    PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR).with_message(msg)
 }

@@ -40,7 +40,7 @@ module 0x1::runtime_checks {
             derived_string_snapshot: aggregator_v2::create_derived_string(string::utf8(str))
         }
     }
-    
+
     // TODO[agg_v2](cleanup): Move to aggregator Move file tests when feature flag is enabled.
 
     //

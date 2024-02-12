@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    delayed_values::error::code_invariant_error,
+    delayed_values::error::{code_invariant_error, expect_ok},
     values::{Struct, Value},
 };
 use move_binary_format::{
@@ -100,12 +100,13 @@ pub fn bytes_and_width_to_derived_string_struct(
 }
 
 pub fn string_to_bytes(value: Struct) -> PartialVMResult<Vec<u8>> {
-    value
-        .unpack()?
+    expect_ok(value.unpack())?
         .collect::<Vec<Value>>()
         .pop()
-        .ok_or_else(|| code_invariant_error("Unable to extract bytes from String".to_string()))?
-        .value_as::<Vec<u8>>()
+        .map_or_else(
+            || Err(code_invariant_error("Unable to extract bytes from String")),
+            |v| expect_ok(v.value_as::<Vec<u8>>()),
+        )
 }
 
 pub fn derived_string_struct_to_bytes_and_length(value: Struct) -> PartialVMResult<(Vec<u8>, u32)> {
