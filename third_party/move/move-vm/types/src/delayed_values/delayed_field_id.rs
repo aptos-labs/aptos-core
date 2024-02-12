@@ -234,7 +234,8 @@ mod test {
         assert_delayed_field_id_roundtrip_u64!(u64::MAX);
 
         let mut rng = StdRng::seed_from_u64(123);
-        assert_delayed_field_id_roundtrip_u64!(rng.next_u64());
+        let v = rng.next_u64();
+        assert_delayed_field_id_roundtrip_u64!(v);
     }
 
     #[test]
@@ -244,6 +245,8 @@ mod test {
         assert_delayed_field_id_roundtrip_u32_u32!(u32::MAX, u32::MAX);
 
         let mut rng = StdRng::seed_from_u64(456);
-        assert_delayed_field_id_roundtrip_u32_u32!(rng.next_u32(), rng.next_u32());
+        let a = rng.next_u32();
+        let b = rng.next_u32();
+        assert_delayed_field_id_roundtrip_u32_u32!(a, b);
     }
 }
