@@ -43,16 +43,15 @@ module econia::txn_generator_utils {
     }
 
     public entry fun deposit_coins(user: &signer, publisher: &signer) {
-        user::deposit_coins<QC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<QC>(publisher, 1000));
-        user::deposit_coins<BC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<BC>(publisher, 1000));
-    }
-    
-    public entry fun place_bid_limit_order(user: &signer, price: u64) {
-        market::place_limit_order_user<BC, QC>(user, MARKET_ID_COIN, @econia, BID, 5, price, 2, CANCEL_MAKER);
+        user::deposit_coins<QC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<QC>(publisher, 100000));
+        user::deposit_coins<BC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<BC>(publisher, 100000));
     }
 
-    public entry fun place_ask_limit_order(user: &signer, price: u64) {
-        market::place_limit_order_user<BC, QC>(user, MARKET_ID_COIN, @econia, ASK, 5, price, 2, CANCEL_MAKER);
+    public entry fun place_bid_limit_order(user: &signer, size: u64, price: u64) {
+        market::place_limit_order_user<BC, QC>(user, MARKET_ID_COIN, @econia, BID, size, price, 2, CANCEL_MAKER);
+    }
+
+    public entry fun place_ask_limit_order(user: &signer, size: u64, price: u64) {
+        market::place_limit_order_user<BC, QC>(user, MARKET_ID_COIN, @econia, ASK, size, price, 2, CANCEL_MAKER);
     }
 }
-    

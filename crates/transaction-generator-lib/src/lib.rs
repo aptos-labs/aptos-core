@@ -86,10 +86,23 @@ pub enum TransactionType {
     },
 }
 
+pub enum EconiaFlowType {
+    Simple,
+    Advanced,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateThenMint { count: usize, creation_balance: u64 },
-    Econia { num_users: usize },
+    // Places bid and ask limit orders at random price
+    Econia {
+        num_users: usize,
+        flow_type: EconiaFlowType,
+        // Places `num_limit_orders_per_market` bid limit orders and
+        // `num_limit_orders_per_market` ask limit orders
+        num_limit_orders_per_market: usize,
+        num_markets: usize
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
