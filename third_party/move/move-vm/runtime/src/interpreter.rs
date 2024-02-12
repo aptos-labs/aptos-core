@@ -1122,15 +1122,14 @@ struct Frame {
 
 #[derive(Default)]
 struct FrameTypeCache {
-    /// Field types of an instantiated struct
-    struct_field_instantiation: BTreeMap<StructDefInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
-    /// Type of an instantiated struct
-    struct_def_instantiation: BTreeMap<StructDefInstantiationIndex, (Type, NumTypeNodes)>,
-    /// Type of a field and its defining instantiated struct
+    struct_field_type_instantiation:
+        BTreeMap<StructDefInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
+    struct_def_instantiation_type: BTreeMap<StructDefInstantiationIndex, (Type, NumTypeNodes)>,
+    /// For a given field instantiation, the:
+    ///    ((Type of the field, size of the field type) and (Type of its defining struct, size of its defining struct)
     field_instantiation:
         BTreeMap<FieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
-    /// Type of an instantiated SignatureToken
-    single_sig_token: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
+    single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
 }
 
 /// An `ExitCode` from `execute_code_unit`.
@@ -1179,7 +1178,7 @@ impl FrameTypeCache {
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
-        let ((field_type, field_type_count), (struct_ty, struct_type_count)) =
+        let ((field_ty, field_type_count), (struct_ty, struct_type_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
                 let struct_type_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
@@ -1191,7 +1190,7 @@ impl FrameTypeCache {
                 ))
             })?;
         Ok((
-            (field_type, *field_type_count),
+            (field_ty, *field_type_count),
             (struct_ty, *struct_type_count),
         ))
     }
@@ -1203,7 +1202,7 @@ impl FrameTypeCache {
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
-        let (ty, ty_count) = Self::get_or(&mut self.struct_def_instantiation, idx, |idx| {
+        let (ty, ty_count) = Self::get_or(&mut self.struct_def_instantiation_type, idx, |idx| {
             let ty = resolver.get_struct_type_generic(idx, ty_args)?;
             let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
             Ok((ty, ty_count))
@@ -1212,14 +1211,14 @@ impl FrameTypeCache {
     }
 
     #[inline(always)]
-    fn get_struct_fields(
+    fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<&[(Type, NumTypeNodes)]> {
         Ok(Self::get_or(
-            &mut self.struct_field_instantiation,
+            &mut self.struct_field_type_instantiation,
             idx,
             |idx| {
                 Ok(resolver
@@ -1241,7 +1240,7 @@ impl FrameTypeCache {
         resolver: &Resolver,
         ty_args: &[Type],
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
-        let (ty, ty_count) = Self::get_or(&mut self.single_sig_token, idx, |idx| {
+        let (ty, ty_count) = Self::get_or(&mut self.single_sig_token_type, idx, |idx| {
             let ty = resolver.instantiate_single_type(idx, ty_args)?;
             let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
             Ok((ty, ty_count))
@@ -1392,7 +1391,7 @@ impl Frame {
         ty_args: &[Type],
         resolver: &Resolver,
         interpreter: &mut Interpreter,
-        frame_cache: &mut FrameTypeCache,
+        ty_cache: &mut FrameTypeCache,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
         match instruction {
@@ -1466,7 +1465,7 @@ impl Frame {
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
-                    frame_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                    ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_ref_eq(expected_struct_ty)?;
                 interpreter
@@ -1475,7 +1474,7 @@ impl Frame {
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
-                    frame_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
+                    ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_eq(&Type::MutableReference(Box::new(
                     expected_struct_ty.clone(),
@@ -1522,11 +1521,8 @@ impl Frame {
             },
             Bytecode::PackGeneric(idx) => {
                 let field_count = resolver.field_instantiation_count(*idx);
-                let output_ty = frame_cache
-                    .get_struct_type(*idx, resolver, ty_args)?
-                    .0
-                    .clone();
-                let args_ty = frame_cache.get_struct_fields(*idx, resolver, ty_args)?;
+                let output_ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
+                let args_ty = ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
                 let ability = output_ty.abilities()?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
@@ -1570,10 +1566,11 @@ impl Frame {
             Bytecode::UnpackGeneric(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
 
-                struct_ty.check_eq(frame_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
+                struct_ty.check_eq(ty_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
 
-                let struct_fields = frame_cache.get_struct_fields(*idx, resolver, ty_args)?;
-                for (ty, _) in struct_fields {
+                let struct_fields_types =
+                    ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
+                for (ty, _) in struct_fields_types {
                     interpreter.operand_stack.push_ty(ty.clone())?;
                 }
             },
@@ -1710,10 +1707,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = frame_cache
-                    .get_struct_type(*idx, resolver, ty_args)?
-                    .0
-                    .clone();
+                let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
@@ -1724,10 +1718,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = frame_cache
-                    .get_struct_type(*idx, resolver, ty_args)?
-                    .0
-                    .clone();
+                let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
@@ -1755,7 +1746,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
-                ty.check_eq(frame_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
+                ty.check_eq(ty_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
                 check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveFrom(idx) => {
@@ -1772,10 +1763,7 @@ impl Frame {
                     .operand_stack
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
-                let ty = frame_cache
-                    .get_struct_type(*idx, resolver, ty_args)?
-                    .0
-                    .clone();
+                let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
@@ -1798,7 +1786,7 @@ impl Frame {
                 interpreter.operand_stack.push_ty(Type::Bool)?;
             },
             Bytecode::VecPack(si, num) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 let elem_tys = interpreter.operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
                     elem_ty.check_eq(ty)?;
@@ -1808,7 +1796,7 @@ impl Frame {
                     .push_ty(Type::Vector(triomphe::Arc::new(ty.clone())))?;
             },
             Bytecode::VecLen(si) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
@@ -1816,7 +1804,7 @@ impl Frame {
                 interpreter.operand_stack.push_ty(Type::U64)?;
             },
             Bytecode::VecImmBorrow(si) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
                 let inner_ty = interpreter
                     .operand_stack
@@ -1827,7 +1815,7 @@ impl Frame {
                     .push_ty(Type::Reference(Box::new(inner_ty)))?;
             },
             Bytecode::VecMutBorrow(si) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
                 let inner_ty = interpreter
                     .operand_stack
@@ -1838,7 +1826,7 @@ impl Frame {
                     .push_ty(Type::MutableReference(Box::new(inner_ty)))?;
             },
             Bytecode::VecPushBack(si) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(ty)?;
                 interpreter
                     .operand_stack
@@ -1846,7 +1834,7 @@ impl Frame {
                     .check_vec_ref(ty, true)?;
             },
             Bytecode::VecPopBack(si) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 let inner_ty = interpreter
                     .operand_stack
                     .pop_ty()?
@@ -1854,7 +1842,7 @@ impl Frame {
                 interpreter.operand_stack.push_ty(inner_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 let vec_ty = interpreter.operand_stack.pop_ty()?;
                 match vec_ty {
                     Type::Vector(v) => {
@@ -1872,7 +1860,7 @@ impl Frame {
                 };
             },
             Bytecode::VecSwap(si) => {
-                let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
                 interpreter
@@ -2131,9 +2119,11 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let field_tys =
-                            self.ty_cache
-                                .get_struct_fields(*si_idx, resolver, &self.ty_args)?;
+                        let field_tys = self.ty_cache.get_struct_fields_types(
+                            *si_idx,
+                            resolver,
+                            &self.ty_args,
+                        )?;
 
                         for (_, ty_count) in field_tys {
                             gas_meter.charge_create_ty(*ty_count)?;
@@ -2170,9 +2160,11 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ty_and_field_counts =
-                            self.ty_cache
-                                .get_struct_fields(*si_idx, resolver, &self.ty_args)?;
+                        let ty_and_field_counts = self.ty_cache.get_struct_fields_types(
+                            *si_idx,
+                            resolver,
+                            &self.ty_args,
+                        )?;
                         for (_, ty_count) in ty_and_field_counts {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
