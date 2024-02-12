@@ -7,10 +7,14 @@ use crate::transaction_shuffler::fairness::{
 };
 use std::collections::VecDeque;
 
+/// A sliding window of transactions (TxnIds), represented by `ConflictKeyId`s extracted from a
+/// specific `ConflictKey`, managed by a specific `ConflictKeyRegistry`.
 #[derive(Debug)]
 pub(crate) struct ConflictZone<'a> {
     sliding_window_size: usize,
     sliding_window: VecDeque<ConflictKeyId>,
+    /// Number of transactions in the sliding window for each key_id. `ConflictZone::is_conflict(key)`
+    /// returns true is the count for `key` is greater than 0, unless the key is exempt from conflict.
     counts_by_id: MapByKeyId<usize>,
     key_registry: &'a ConflictKeyRegistry,
 }
@@ -24,7 +28,7 @@ impl<'a> ConflictZone<'a> {
             .map(|(registry, window_size)| Self::new(registry, window_size))
             .collect::<Vec<_>>()
             .try_into()
-            .expect("Impossible to fail.")
+            .expect("key_registries and window_sizes must have the same length.")
     }
 
     fn new(key_registry: &'a ConflictKeyRegistry, sliding_window_size: usize) -> Self {
