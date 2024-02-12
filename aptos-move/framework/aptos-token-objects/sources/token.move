@@ -44,14 +44,14 @@ module aptos_token_objects::token {
         /// The collection from which this token resides.
         collection: Object<Collection>,
         /// Deprecated in favor of `index` inside TokenIdentifiers.
-        /// Will be populated until concurrent_assets_enabled feature flag is enabled.
+        /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
         index: u64, // DEPRECATED
         /// A brief description of the token.
         description: String,
         /// Deprecated in favor of `name` inside TokenIdentifiers.
-        /// Will be populated until concurrent_assets_enabled feature flag is enabled.
+        /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
         ///
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
@@ -133,7 +133,7 @@ module aptos_token_objects::token {
         // Flag which controls whether any functions from aggregator_v2 module can be called.
         let aggregator_api_enabled = features::aggregator_v2_api_enabled();
         // Flag which controls whether we are going to still continue writing to deprecated fields.
-        let concurrent_assets_enabled = features::concurrent_assets_enabled();
+        let concurrent_token_v2_enabled = features::concurrent_token_v2_enabled();
 
         let (deprecated_index, deprecated_name) = if (aggregator_api_enabled) {
             let index = option::destroy_with_default(
@@ -148,15 +148,15 @@ module aptos_token_objects::token {
                 aggregator_v2::create_derived_string(name_prefix)
             };
 
-            // Until concurrent_assets_enabled is enabled, we still need to write to deprecated fields.
+            // Until concurrent_token_v2_enabled is enabled, we still need to write to deprecated fields.
             // Otherwise we put empty values there.
             // (we need to do these calls before creating token_concurrent, to avoid copying objects)
-            let deprecated_index = if (concurrent_assets_enabled) {
+            let deprecated_index = if (concurrent_token_v2_enabled) {
                 0
             } else {
                 aggregator_v2::read_snapshot(&index)
             };
-            let deprecated_name = if (concurrent_assets_enabled) {
+            let deprecated_name = if (concurrent_token_v2_enabled) {
                 string::utf8(b"")
             } else {
                 aggregator_v2::read_derived_string(&name)
@@ -223,7 +223,7 @@ module aptos_token_objects::token {
     /// Creates a new token object with a unique address and returns the ConstructorRef
     /// for additional specialization.
     /// The name is created by concatenating the (name_prefix, index, name_suffix).
-    /// After flag concurrent_assets_enabled is enabled, this function will allow
+    /// After flag concurrent_token_v2_enabled is enabled, this function will allow
     /// creating tokens in parallel, from the same collection, while providing sequential names.
     public fun create_numbered_token(
         creator: &signer,
@@ -775,7 +775,7 @@ module aptos_token_objects::token {
     fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, TokenIdentifiers {
         use std::debug;
 
-        let feature = features::get_concurrent_assets_feature();
+        let feature = features::get_concurrent_token_v2_feature();
         let agg_feature = features::get_aggregator_v2_api_feature();
         let auid_feature = features::get_auids();
         let module_event_feature = features::get_module_event_feature();

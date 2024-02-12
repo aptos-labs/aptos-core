@@ -48,6 +48,10 @@ AggregateSignatureWithRounds:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
+Any:
+  STRUCT:
+    - type_name: STR
+    - data: BYTES
 AnyPublicKey:
   ENUM:
     0:
@@ -420,10 +424,6 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
-DummyValidatorTransaction:
-  STRUCT:
-    - valid: BOOL
-    - payload: BYTES
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -498,12 +498,13 @@ HashValue:
           CONTENT: U8
           SIZE: 32
 IdCommitment:
-  NEWTYPESTRUCT:
-    TUPLEARRAY:
-      CONTENT: U8
-      SIZE: 32
+  NEWTYPESTRUCT: BYTES
 Identifier:
   NEWTYPESTRUCT: STR
+JWKMoveStruct:
+  STRUCT:
+    - variant:
+        TYPENAME: Any
 LedgerInfo:
   STRUCT:
     - commit_info:
@@ -573,12 +574,11 @@ OpenIdSig:
     - jwt_sig: STR
     - jwt_payload: STR
     - uid_key: STR
-    - epk_blinder:
-        TUPLEARRAY:
-          CONTENT: U8
-          SIZE: 31
+    - epk_blinder: BYTES
     - pepper:
         TYPENAME: Pepper
+    - idc_aud_val:
+        OPTION: STR
 PartialAuthenticatorAssertionResponse:
   STRUCT:
     - signature:
@@ -596,6 +596,10 @@ Payload:
       InQuorumStore:
         NEWTYPE:
           TYPENAME: ProofWithData
+    2:
+      InQuorumStoreWithLimit:
+        NEWTYPE:
+          TYPENAME: ProofWithDataWithTxnLimit
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -617,6 +621,12 @@ ProofWithData:
     - proofs:
         SEQ:
           TYPENAME: ProofOfStore
+ProofWithDataWithTxnLimit:
+  STRUCT:
+    - proof_with_data:
+        TYPENAME: ProofWithData
+    - max_txns_to_execute:
+        OPTION: U64
 ProposalExt:
   ENUM:
     0:
@@ -640,6 +650,13 @@ ProposalMsg:
         TYPENAME: Block
     - sync_info:
         TYPENAME: SyncInfo
+ProviderJWKs:
+  STRUCT:
+    - issuer: BYTES
+    - version: U64
+    - jwks:
+        SEQ:
+          TYPENAME: JWKMoveStruct
 PublicKey:
   NEWTYPESTRUCT: BYTES
 QuorumCert:
@@ -648,6 +665,12 @@ QuorumCert:
         TYPENAME: VoteData
     - signed_ledger_info:
         TYPENAME: LedgerInfoWithSignatures
+QuorumCertifiedUpdate:
+  STRUCT:
+    - update:
+        TYPENAME: ProviderJWKs
+    - multi_sig:
+        TYPENAME: AggregateSignature
 RandGenMessage:
   STRUCT:
     - epoch: U64
@@ -722,6 +745,12 @@ SignedGroth16Zkp:
         TYPENAME: Groth16Zkp
     - non_malleability_signature:
         TYPENAME: EphemeralSignature
+    - training_wheels_signature:
+        TYPENAME: EphemeralSignature
+    - extra_field: STR
+    - override_aud_val:
+        OPTION: STR
+    - exp_horizon_secs: U64
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -962,17 +991,13 @@ ValidatorConsensusInfo:
 ValidatorTransaction:
   ENUM:
     0:
-      DummyTopic1:
-        NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
-    1:
       DKGResult:
         NEWTYPE:
           TYPENAME: DKGTranscript
-    2:
-      DummyTopic2:
+    1:
+      ObservedJWKUpdate:
         NEWTYPE:
-          TYPENAME: DummyValidatorTransaction
+          TYPENAME: QuorumCertifiedUpdate
 ValidatorVerifier:
   STRUCT:
     - validator_infos:

@@ -2,42 +2,156 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    zkid::{
-        ZkIdPublicKey, ZkIdSignature, MAX_EPK_BYTES, MAX_EXPIRY_HORIZON_SECS, MAX_ISS_BYTES,
-        MAX_JWT_HEADER_BYTES,
-    },
+    move_utils::as_move_value::AsMoveValue,
+    zkid::{Configuration, IdCommitment, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
-use ark_bn254::{Fq, Fq2};
+use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    move_resource::MoveStructType,
+    value::{MoveStruct, MoveValue},
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
+use std::fmt::{Display, Formatter};
 
 // TODO(zkid): Some of this stuff, if not all, belongs to the aptos-crypto crate
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
 
-pub static DEVNET_VERIFYING_KEY: Lazy<PreparedVerifyingKey<ark_bn254::Bn254>> =
-    Lazy::new(devnet_pvk);
+/// Useful macro for arkworks serialization!
+macro_rules! serialize {
+    ($obj:expr) => {{
+        let mut buf = vec![];
+        $obj.serialize_compressed(&mut buf).unwrap();
+        buf
+    }};
+}
+
+/// Reflection of aptos_framework::zkid::Groth16PreparedVerificationKey
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Groth16VerificationKey {
+    pub alpha_g1: Vec<u8>,
+    pub beta_g2: Vec<u8>,
+    pub gamma_g2: Vec<u8>,
+    pub delta_g2: Vec<u8>,
+    pub gamma_abc_g1: Vec<Vec<u8>>,
+}
+
+impl AsMoveValue for Groth16VerificationKey {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            self.alpha_g1.as_move_value(),
+            self.beta_g2.as_move_value(),
+            self.gamma_g2.as_move_value(),
+            self.delta_g2.as_move_value(),
+            self.gamma_abc_g1.as_move_value(),
+        ]))
+    }
+}
+
+/// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
+/// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
+impl MoveStructType for Groth16VerificationKey {
+    const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
+}
+
+impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
+    type Error = CryptoMaterialError;
+
+    fn try_from(vk: Groth16VerificationKey) -> Result<Self, Self::Error> {
+        if vk.gamma_abc_g1.len() != 2 {
+            return Err(CryptoMaterialError::DeserializationError);
+        }
+
+        Ok(Self::from(VerifyingKey {
+            alpha_g1: G1Affine::deserialize_compressed(vk.alpha_g1.as_slice())
+                .map_err(|_| CryptoMaterialError::DeserializationError)?,
+            beta_g2: G2Affine::deserialize_compressed(vk.beta_g2.as_slice())
+                .map_err(|_| CryptoMaterialError::DeserializationError)?,
+            gamma_g2: G2Affine::deserialize_compressed(vk.gamma_g2.as_slice())
+                .map_err(|_| CryptoMaterialError::DeserializationError)?,
+            delta_g2: G2Affine::deserialize_compressed(vk.delta_g2.as_slice())
+                .map_err(|_| CryptoMaterialError::DeserializationError)?,
+            gamma_abc_g1: vec![
+                G1Affine::deserialize_compressed(vk.gamma_abc_g1[0].as_slice())
+                    .map_err(|_| CryptoMaterialError::DeserializationError)?,
+                G1Affine::deserialize_compressed(vk.gamma_abc_g1[1].as_slice())
+                    .map_err(|_| CryptoMaterialError::DeserializationError)?,
+            ],
+        }))
+    }
+}
+
+impl From<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
+    fn from(pvk: PreparedVerifyingKey<Bn254>) -> Self {
+        let PreparedVerifyingKey {
+            vk:
+                VerifyingKey {
+                    alpha_g1,
+                    beta_g2,
+                    gamma_g2,
+                    delta_g2,
+                    gamma_abc_g1,
+                },
+            alpha_g1_beta_g2: _alpha_g1_beta_g2, // unnecessary for Move
+            gamma_g2_neg_pc: _gamma_g2_neg_pc,   // unnecessary for Move
+            delta_g2_neg_pc: _delta_g2_neg_pc,   // unnecessary for Move
+        } = pvk;
+
+        let mut gamma_abc_g1_bytes = Vec::with_capacity(gamma_abc_g1.len());
+        for e in gamma_abc_g1.iter() {
+            gamma_abc_g1_bytes.push(serialize!(e));
+        }
+
+        Groth16VerificationKey {
+            alpha_g1: serialize!(alpha_g1),
+            beta_g2: serialize!(beta_g2),
+            gamma_g2: serialize!(gamma_g2),
+            delta_g2: serialize!(delta_g2),
+            gamma_abc_g1: gamma_abc_g1_bytes,
+        }
+    }
+}
+
+impl Display for Groth16VerificationKey {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "alpha_g1: {}", hex::encode(&self.alpha_g1))?;
+        write!(f, "beta_g2: {}", hex::encode(&self.beta_g2))?;
+        write!(f, "gamma_g2: {}", hex::encode(&self.gamma_g2))?;
+        write!(f, "delta_g2: {}", hex::encode(&self.delta_g2))?;
+        for (i, e) in self.gamma_abc_g1.iter().enumerate() {
+            write!(f, "gamma_abc_g1[{i}]: {}", hex::encode(serialize!(e)))?;
+        }
+        Ok(())
+    }
+}
+
+pub static DEVNET_VERIFYING_KEY: Lazy<PreparedVerifyingKey<Bn254>> = Lazy::new(devnet_pvk);
 
 /// This will do the proper subgroup membership checks.
-fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<ark_bn254::G1Affine> {
+fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
     let g1_affine = G1Bytes::new_unchecked(x, y)?.deserialize_into_affine()?;
     Ok(g1_affine)
 }
 
 /// This will do the proper subgroup membership checks.
-fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<ark_bn254::G2Affine> {
+fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<G2Affine> {
     let g2_affine = G2Bytes::new_unchecked(x, y)?.to_affine()?;
     Ok(g2_affine)
 }
 
-fn devnet_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
+/// This function uses the decimal uncompressed point serialization which is outputted by circom.
+fn devnet_pvk() -> PreparedVerifyingKey<Bn254> {
     // Convert the projective points to affine.
     let alpha_g1 = g1_projective_str_to_affine(
         "16672231080302629756836614130913173861541009360974119524782950408048375831661",
@@ -71,12 +185,12 @@ fn devnet_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
 
     let delta_g2 = g2_projective_str_to_affine(
         [
-            "19799867077440075892798570892827678991452882191483986973420950266983588147526",
-            "7261406229996412667156189606964369006242293247396567701023787052439810543589",
+            "10857046999023057135944570762232829481370756359578518086990519993285655852781",
+            "11559732032986387107991004021392285783925812861821192530917403151452391805634",
         ],
         [
-            "15618356441847575237880159451782511420373837463064250522093342825487687558812",
-            "20490123502151072560031041764173142979409281632225526952209676367033524880945",
+            "8495653923123431417604973247489272438418190587263600148770280649306958101930",
+            "4082367875863433681332203403145435568316851327593401208105741076214120093531",
         ],
     )
     .unwrap();
@@ -84,13 +198,13 @@ fn devnet_pvk() -> PreparedVerifyingKey<ark_bn254::Bn254> {
     let mut gamma_abc_g1 = Vec::new();
     for points in [
         g1_projective_str_to_affine(
-            "16119992548622948701752093197035559180088659648245261797962160821523395857787",
-            "10895012769720065848112628781322097989082134121307195027616506940584635557433",
+            "709845293616032000883655261014820428774807602111296273992483611119383326362",
+            "645961711055726048875381920095150798755926517220714963239815637182963128467",
         )
         .unwrap(),
         g1_projective_str_to_affine(
-            "12743680909720798417558674763081930985009983383780261525309863653205478749832",
-            "10808093222645961212778297519773755506856954740368509958745099866520706196565",
+            "9703775855460452449287141941638080366156266996878046656846622159120386001635",
+            "1903615495723998350630869740881559921229604803173196414121492346747062004184",
         )
         .unwrap(),
     ] {
@@ -126,7 +240,7 @@ pub struct G1Bytes(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
 impl G1Bytes {
     pub fn new_unchecked(x: &str, y: &str) -> anyhow::Result<Self> {
-        let g1 = ark_bn254::G1Projective::new_unchecked(
+        let g1 = G1Projective::new_unchecked(
             parse_field_element(x)?,
             parse_field_element(y)?,
             parse_field_element("1")?,
@@ -136,6 +250,7 @@ impl G1Bytes {
         Self::new_from_vec(bytes)
     }
 
+    /// Used internall or for testing.
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G1_PROJECTIVE_COMPRESSED_NUM_BYTES {
             let mut bytes = [0; G1_PROJECTIVE_COMPRESSED_NUM_BYTES];
@@ -149,25 +264,25 @@ impl G1Bytes {
         }
     }
 
-    pub fn deserialize_into_affine(&self) -> Result<ark_bn254::G1Affine, CryptoMaterialError> {
+    pub fn deserialize_into_affine(&self) -> Result<G1Affine, CryptoMaterialError> {
         self.try_into()
     }
 }
 
-impl TryInto<ark_bn254::G1Projective> for &G1Bytes {
+impl TryInto<G1Projective> for &G1Bytes {
     type Error = CryptoMaterialError;
 
-    fn try_into(self) -> Result<ark_bn254::G1Projective, CryptoMaterialError> {
-        ark_bn254::G1Projective::deserialize_compressed(self.0.as_slice())
+    fn try_into(self) -> Result<G1Projective, CryptoMaterialError> {
+        G1Projective::deserialize_compressed(self.0.as_slice())
             .map_err(|_| CryptoMaterialError::DeserializationError)
     }
 }
 
-impl TryInto<ark_bn254::G1Affine> for &G1Bytes {
+impl TryInto<G1Affine> for &G1Bytes {
     type Error = CryptoMaterialError;
 
-    fn try_into(self) -> Result<ark_bn254::G1Affine, CryptoMaterialError> {
-        let g1_projective: ark_bn254::G1Projective = self.try_into()?;
+    fn try_into(self) -> Result<G1Affine, CryptoMaterialError> {
+        let g1_projective: G1Projective = self.try_into()?;
         Ok(g1_projective.into())
     }
 }
@@ -177,7 +292,7 @@ pub struct G2Bytes(#[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COM
 
 impl G2Bytes {
     pub fn new_unchecked(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
-        let g2 = ark_bn254::G2Projective::new_unchecked(
+        let g2 = G2Projective::new_unchecked(
             Fq2::new(parse_field_element(x[0])?, parse_field_element(x[1])?),
             Fq2::new(parse_field_element(y[0])?, parse_field_element(y[1])?),
             Fq2::new(parse_field_element("1")?, parse_field_element("0")?),
@@ -200,25 +315,25 @@ impl G2Bytes {
         }
     }
 
-    pub fn to_affine(&self) -> Result<ark_bn254::G2Affine, CryptoMaterialError> {
+    pub fn to_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
         self.try_into()
     }
 }
 
-impl TryInto<ark_bn254::G2Projective> for &G2Bytes {
+impl TryInto<G2Projective> for &G2Bytes {
     type Error = CryptoMaterialError;
 
-    fn try_into(self) -> Result<ark_bn254::G2Projective, CryptoMaterialError> {
-        ark_bn254::G2Projective::deserialize_compressed(self.0.as_slice())
+    fn try_into(self) -> Result<G2Projective, CryptoMaterialError> {
+        G2Projective::deserialize_compressed(self.0.as_slice())
             .map_err(|_| CryptoMaterialError::DeserializationError)
     }
 }
 
-impl TryInto<ark_bn254::G2Affine> for &G2Bytes {
+impl TryInto<G2Affine> for &G2Bytes {
     type Error = CryptoMaterialError;
 
-    fn try_into(self) -> Result<ark_bn254::G2Affine, CryptoMaterialError> {
-        let g2_projective: ark_bn254::G2Projective = self.try_into()?;
+    fn try_into(self) -> Result<G2Affine, CryptoMaterialError> {
+        let g2_projective: G2Projective = self.try_into()?;
         Ok(g2_projective.into())
     }
 }
@@ -227,37 +342,68 @@ pub fn get_public_inputs_hash(
     sig: &ZkIdSignature,
     pk: &ZkIdPublicKey,
     jwk: &RSA_JWK,
-) -> anyhow::Result<ark_bn254::Fr> {
+    exp_horizon_secs: u64,
+    config: &Configuration,
+) -> anyhow::Result<Fr> {
+    let extra_field_hashed;
+    let override_aud_val_hashed;
+    let use_override_aud;
+    if let ZkpOrOpenIdSig::Groth16Zkp(proof) = &sig.sig {
+        extra_field_hashed = poseidon_bn254::pad_and_hash_string(
+            &proof.extra_field,
+            config.max_extra_field_bytes as usize,
+        )?;
+        if let Some(override_aud_val) = &proof.override_aud_val {
+            use_override_aud = ark_bn254::Fr::from(1);
+            override_aud_val_hashed = poseidon_bn254::pad_and_hash_string(
+                override_aud_val,
+                IdCommitment::MAX_AUD_VAL_BYTES,
+            )?;
+        } else {
+            use_override_aud = ark_bn254::Fr::from(0);
+            override_aud_val_hashed =
+                poseidon_bn254::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?;
+        }
+    } else {
+        bail!("Cannot get_public_inputs_hash for ZkIdSignature")
+    }
+
     // Add the epk as padded and packed scalars
     let mut frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
         sig.ephemeral_pubkey.to_bytes().as_slice(),
-        MAX_EPK_BYTES,
+        config.max_commited_epk_bytes as usize,
     )?;
 
     // Add the id_commitment as a scalar
-    frs.push(ark_bn254::Fr::from_le_bytes_mod_order(&pk.idc.0));
+    frs.push(Fr::from_le_bytes_mod_order(&pk.idc.0));
 
     // Add the exp_timestamp_secs as a scalar
-    frs.push(ark_bn254::Fr::from(sig.exp_timestamp_secs));
+    frs.push(Fr::from(sig.exp_timestamp_secs));
 
     // Add the epk lifespan as a scalar
-    frs.push(ark_bn254::Fr::from(MAX_EXPIRY_HORIZON_SECS));
+    frs.push(Fr::from(exp_horizon_secs));
 
     // Add the hash of the iss (formatted key-value pair string).
     let formatted_iss = format!("\"iss\":\"{}\",", pk.iss);
     frs.push(poseidon_bn254::pad_and_hash_string(
         &formatted_iss,
-        MAX_ISS_BYTES,
+        config.max_iss_field_bytes as usize,
     )?);
+
+    frs.push(extra_field_hashed);
 
     // Add the hash of the jwt_header with the "." separator appended
     let jwt_header_with_separator = format!("{}.", sig.jwt_header);
     frs.push(poseidon_bn254::pad_and_hash_string(
         &jwt_header_with_separator,
-        MAX_JWT_HEADER_BYTES,
+        config.max_jwt_header_b64_bytes as usize,
     )?);
 
     frs.push(jwk.to_poseidon_scalar()?);
+
+    frs.push(override_aud_val_hashed);
+
+    frs.push(use_override_aud);
 
     poseidon_bn254::hash_scalars(frs)
 }
@@ -265,8 +411,11 @@ pub fn get_public_inputs_hash(
 #[cfg(test)]
 mod test {
     use crate::bn254_circom::{
-        G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
+        devnet_pvk, G1Bytes, G2Bytes, Groth16VerificationKey, G1_PROJECTIVE_COMPRESSED_NUM_BYTES,
+        G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
     };
+    use ark_bn254::Bn254;
+    use ark_groth16::PreparedVerifyingKey;
 
     #[test]
     pub fn test_bn254_serialized_sizes() {
@@ -293,5 +442,15 @@ mod test {
 
         let g2_bytes = bcs::to_bytes(&g2).unwrap();
         assert_eq!(g2_bytes.len(), G2_PROJECTIVE_COMPRESSED_NUM_BYTES);
+    }
+
+    #[test]
+    // Tests conversion between the devnet ark_groth16::PreparedVerificationKey and our Move
+    // representation of it.
+    fn print_groth16_pvk() {
+        let groth16_vk: Groth16VerificationKey = devnet_pvk().into();
+        let same_pvk: PreparedVerifyingKey<Bn254> = groth16_vk.try_into().unwrap();
+
+        assert_eq!(same_pvk, devnet_pvk());
     }
 }

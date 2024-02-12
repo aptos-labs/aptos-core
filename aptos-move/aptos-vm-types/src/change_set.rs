@@ -179,7 +179,7 @@ impl VMChangeSet {
                                             .write_len()
                                             .ok_or_else(|| {
                                                 PartialVMError::new(
-                                                    StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                                                    StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                                                 )
                                                 .with_message(
                                                     "Read with exchange cannot be a delete."
@@ -211,7 +211,7 @@ impl VMChangeSet {
                         let (key, value) = element?;
                         if acc.insert(key, value).is_some() {
                             Err(PartialVMError::new(
-                                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                             )
                             .with_message(
                                 "Found duplicate key across resource change sets.".to_string(),

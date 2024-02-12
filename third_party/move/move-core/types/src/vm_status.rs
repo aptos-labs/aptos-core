@@ -729,11 +729,12 @@ pub enum StatusCode {
     // Failed to resolve type due to linking being broken after verification
     TYPE_RESOLUTION_FAILURE = 2021,
     DUPLICATE_NATIVE_FUNCTION = 2022,
-    // code invariant error while handling delayed fields, should never happen,
+    // code invariant error while handling delayed materialization, should never happen,
     // always indicates a code bug.
+    // Delayed materialization includes handling of Resource Groups and Delayed Fields.
     // Unlike regular CODE_INVARIANT_ERROR, this is a signal to BlockSTM,
     // which it might do something about (i.e. fallback to sequential execution)
-    DELAYED_FIELDS_CODE_INVARIANT_ERROR = 2023,
+    DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR = 2023,
     // Speculative error means that there was an issue because of speculative
     // reads provided to the transaction, and the transaction needs to
     // be re-executed.

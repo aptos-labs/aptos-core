@@ -57,6 +57,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::version`](version.md#0x1_version)
 -  [`0x1::vesting`](vesting.md#0x1_vesting)
 -  [`0x1::voting`](voting.md#0x1_voting)
+-  [`0x1::zkid`](zkid.md#0x1_zkid)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -22,7 +22,7 @@ pub trait RpcHandler {
     type Request;
     type Response;
 
-    async fn process(&mut self, message: Self::Request) -> anyhow::Result<Self::Response>;
+    async fn process(&self, message: Self::Request) -> anyhow::Result<Self::Response>;
 }
 
 #[async_trait]

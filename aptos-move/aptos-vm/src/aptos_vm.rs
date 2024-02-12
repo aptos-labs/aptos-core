@@ -1408,11 +1408,7 @@ impl AptosVM {
             },
         }
 
-        zkid_validation::validate_zkid_authenticators(
-            &authenticators.unwrap(),
-            resolver,
-            self.move_vm.get_chain_id(),
-        )?;
+        zkid_validation::validate_zkid_authenticators(&authenticators.unwrap(), resolver)?;
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and

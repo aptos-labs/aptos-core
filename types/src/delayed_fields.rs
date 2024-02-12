@@ -31,7 +31,7 @@ impl From<PanicError> for PartialVMError {
     fn from(err: PanicError) -> Self {
         match err {
             PanicError::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
+                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
             },
         }
