@@ -32,12 +32,14 @@ impl GroupSizeKind {
         gas_feature_version: u64,
         resource_group_charge_as_size_sum_enabled: bool,
     ) -> Self {
-        if resource_group_charge_as_size_sum_enabled {
-            GroupSizeKind::AsSum
-        } else if gas_feature_version >= 9 {
-            // Keep old caching behavior for replay.
-            GroupSizeKind::AsBlob
+        if gas_feature_version >= 9 {
+            if resource_group_charge_as_size_sum_enabled {
+                GroupSizeKind::AsSum
+            } else {
+                GroupSizeKind::AsBlob
+            }
         } else {
+            // Keep old caching behavior for replay.
             GroupSizeKind::None
         }
     }

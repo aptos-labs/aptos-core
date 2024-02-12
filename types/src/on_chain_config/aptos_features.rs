@@ -158,7 +158,8 @@ impl Features {
     }
 
     pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+        true
+        // self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 
     /// Whether the zkID feature is enabled, specifically the ZK path with ZKP-based signatures.
