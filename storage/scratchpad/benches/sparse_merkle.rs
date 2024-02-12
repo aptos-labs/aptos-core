@@ -2,10 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::Result;
 use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
 use aptos_scratchpad::{
     test_utils::{naive_smt::NaiveSmt, proof_reader::ProofReader},
-    SparseMerkleTree,
+    SmtAncestors, SparseMerkleTree,
 };
 use aptos_types::state_store::{state_storage_usage::StateStorageUsage, state_value::StateValue};
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
@@ -32,6 +33,7 @@ impl Block {
 struct Group {
     name: String,
     blocks: Vec<Block>,
+    smt_ancestors: SmtAncestors<StateValue>,
 }
 
 impl Group {
@@ -47,12 +49,13 @@ impl Group {
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
                     || one_large_batch.clone(),
-                    // return the resulting smt so the cost of Dropping it is not counted
-                    |one_large_batch| -> SparseMerkleTree<StateValue> {
-                        block
+                    |one_large_batch| -> Result<()> {
+                        let new_root = block
                             .smt
                             .batch_update(one_large_batch, &block.proof_reader)
-                            .unwrap()
+                            .unwrap();
+                        self.smt_ancestors.add(new_root);
+                        Ok(())
                     },
                     BatchSize::LargeInput,
                 )
@@ -80,19 +83,21 @@ impl Benches {
             .collect::<Vec<_>>();
 
         // group: insert to an empty SMT
+        let base_smt = SparseMerkleTree::new(
+            *SPARSE_MERKLE_PLACEHOLDER_HASH,
+            StateStorageUsage::new_untracked(),
+        );
         let base_empty = Group {
             name: "insert to empty".into(),
             blocks: block_sizes
                 .iter()
                 .map(|block_size| Block {
-                    smt: SparseMerkleTree::new(
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        StateStorageUsage::new_untracked(),
-                    ),
+                    smt: base_smt.clone(),
                     updates: Self::gen_updates(&mut rng, &keys, *block_size),
                     proof_reader: ProofReader::new(Vec::new()),
                 })
                 .collect(),
+            smt_ancestors: SmtAncestors::new(base_smt),
         };
 
         // all addresses with an existing value
@@ -103,8 +108,11 @@ impl Benches {
             .filter_map(|(key, value)| value.as_ref().map(|v| (*key, v)))
             .collect::<Vec<_>>();
         let mut naive_base_smt = NaiveSmt::new(&existing_state);
-
-        // group: insert to a committed SMT ("unknown" root)
+        let smt = SparseMerkleTree::new(
+            naive_base_smt.get_root_hash(),
+            StateStorageUsage::new_untracked(),
+        );
+        // group: insert to a committed SMT ("unknown" root). Here, proof_reader is mocked to simulating fetching proof from storage.
         let base_committed = Group {
             name: "insert to committed base".into(),
             blocks: block_sizes
@@ -113,18 +121,18 @@ impl Benches {
                     let updates = Self::gen_updates(&mut rng, &keys, *block_size);
                     let proof_reader = Self::gen_proof_reader(&mut naive_base_smt, &updates);
                     Block {
-                        smt: SparseMerkleTree::new(
-                            naive_base_smt.get_root_hash(),
-                            StateStorageUsage::new_untracked(),
-                        ),
+                        smt: smt.clone(),
                         updates,
                         proof_reader,
                     }
                 })
                 .collect(),
+            smt_ancestors: SmtAncestors::new(smt),
         };
 
         // group: insert to an uncommitted SMT (some structures in mem)
+        // Here, the SMT is guaranteed to be in mem from previous 'unknown' state.
+        let uncommitted_smt = base_committed.blocks[0].smt.clone();
         let base_uncommitted = Group {
             name: "insert to uncommitted base".into(),
             blocks: base_committed
@@ -145,6 +153,7 @@ impl Benches {
                     }
                 })
                 .collect(),
+            smt_ancestors: SmtAncestors::new(uncommitted_smt),
         };
 
         Self {
