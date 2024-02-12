@@ -7,4 +7,4 @@ std = "0x1"
 NamedAddr = "0xCAFE"
 
 [dependencies]
-MoveStdlib = { local = "../../../../move-stdlib" }
+MoveStdlib = { local = "../../../move-stdlib" }

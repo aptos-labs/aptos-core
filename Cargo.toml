@@ -199,6 +199,7 @@ members = [
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
+    "third_party/move/move-examples",
     "third_party/move/move-ir-compiler",
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode",
