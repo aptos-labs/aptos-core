@@ -56,6 +56,7 @@ const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
 const ZKID_MODULE_NAME: &str = "zkid";
+const JWKS_MODULE_NAME: &str = "jwks";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -254,7 +255,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_zkid(&mut session);
+    initialize_zkid(&mut session, chain_id);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -531,7 +532,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
     );
 }
 
-fn initialize_zkid(session: &mut SessionExt) {
+fn initialize_zkid(session: &mut SessionExt, chain_id: ChainId) {
     let config = zkid::Configuration::new_for_devnet_and_testing();
     exec_function(
         session,
@@ -543,15 +544,30 @@ fn initialize_zkid(session: &mut SessionExt) {
             config.as_move_value(),
         ]),
     );
-    let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
+    if !chain_id.is_mainnet() {
+        let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
+        exec_function(
+            session,
+            ZKID_MODULE_NAME,
+            "update_groth16_verification_key",
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(CORE_CODE_ADDRESS),
+                vk.as_move_value(),
+            ]),
+        );
+    }
     exec_function(
         session,
-        ZKID_MODULE_NAME,
-        "update_groth16_verification_key",
+        JWKS_MODULE_NAME,
+        "upsert_oidc_provider",
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            vk.as_move_value(),
+            "https://accounts.google.com".to_string().as_move_value(),
+            "https://accounts.google.com/.well-known/openid-configuration"
+                .to_string()
+                .as_move_value(),
         ]),
     );
 }
