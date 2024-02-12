@@ -3241,6 +3241,7 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
     <b>let</b> num_cur_pending_actives = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&cur_validator_set.pending_active);
     <b>let</b> num_candidates = num_cur_actives + num_cur_pending_actives;
     <b>while</b> (candidate_idx &lt; num_candidates) {
+        <b>let</b> candidate_in_current_validator_set = candidate_idx &lt; num_cur_actives;
         <b>let</b> candidate = <b>if</b> (candidate_idx &lt; num_cur_actives) {
             <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&cur_validator_set.active_validators, candidate_idx)
         } <b>else</b> {
@@ -3251,8 +3252,8 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         <b>let</b> cur_pending_active = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_active);
         <b>let</b> cur_pending_inactive = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_inactive);
 
-        <b>let</b> cur_perf = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&validator_perf.validators, candidate.config.validator_index);
-        <b>let</b> cur_reward = <b>if</b> (cur_active &gt; 0) {
+        <b>let</b> cur_reward = <b>if</b> (candidate_in_current_validator_set && cur_active &gt; 0) {
+            <b>let</b> cur_perf = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(&validator_perf.validators, candidate.config.validator_index);
             <a href="stake.md#0x1_stake_calculate_rewards_amount">calculate_rewards_amount</a>(cur_active, cur_perf.successful_proposals, cur_perf.successful_proposals + cur_perf.failed_proposals, rewards_rate, rewards_rate_denominator)
         } <b>else</b> {
             0
