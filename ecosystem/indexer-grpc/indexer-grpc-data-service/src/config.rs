@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::service::RawDataServerWrapper;
+use crate::{service::RawDataServerWrapper, transactions_buffer::TransactionsBuffer};
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
@@ -13,7 +13,7 @@ use aptos_protos::{
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr};
+use std::{collections::HashSet, net::SocketAddr, sync::Arc};
 use tonic::{
     codec::CompressionEncoding,
     codegen::InterceptedService,
@@ -161,12 +161,22 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         } else {
             StorageFormat::Base64UncompressedProto
         };
+        let transactions_buffer = Arc::new(tokio::sync::RwLock::new(TransactionsBuffer::new()));
+        let transactions_buffer_clone = transactions_buffer.clone();
+        let redis_read_replica_address = self.redis_read_replica_address.clone();
+        let transactions_buffer_processing_task = tokio::spawn({
+            let transactions_buffer_clone = transactions_buffer_clone.clone();
+            async move {
+                transactions_buffer_processing(transactions_buffer_clone, redis_read_replica_address).await
+            }
+        });
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
             cache_storage_format,
+            transactions_buffer_clone,
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
@@ -220,6 +230,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             return Err(anyhow::anyhow!("No grpc config provided"));
         }
 
+        tasks.push(transactions_buffer_processing_task);
         futures::future::try_join_all(tasks).await?;
         Ok(())
     }
@@ -236,4 +247,12 @@ pub fn build_auth_token_set(whitelisted_auth_tokens: Vec<String>) -> HashSet<Met
         .map(|token| token.parse::<MetadataValue<Ascii>>())
         .filter_map(Result::ok)
         .collect::<HashSet<_>>()
+}
+
+/// Fill the buffer with transactions.
+async fn transactions_buffer_processing(
+    _buffer: Arc<tokio::sync::RwLock<TransactionsBuffer>>,
+    _redis_address: RedisUrl,
+) -> Result<()> {
+    Ok(())
 }

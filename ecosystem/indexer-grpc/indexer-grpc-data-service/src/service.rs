@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::metrics::{
+use crate::{metrics::{
     BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
     LATEST_PROCESSED_VERSION as LATEST_PROCESSED_VERSION_OLD, PROCESSED_BATCH_SIZE,
     PROCESSED_LATENCY_IN_SECS, PROCESSED_LATENCY_IN_SECS_ALL, PROCESSED_VERSIONS_COUNT,
     SHORT_CONNECTION_COUNT,
-};
+}, transactions_buffer::{BufferGetStatus, TransactionsBuffer}};
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
     cache_operator::{CacheBatchGetStatus, CacheCoverageStatus, CacheOperator},
@@ -38,6 +38,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc::{channel, error::SendTimeoutError};
+use tokio::sync::RwLock;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
@@ -46,6 +47,7 @@ use uuid::Uuid;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
+const AHEAD_OF_BUFFER_RETRY_SLEEP_DURATION_MS: u64 = 10;
 // When trying to fetch beyond the current head of cache, the server will retry after this duration.
 const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // When error happens when fetching data from cache and file store, the server will retry after this duration.
@@ -80,6 +82,7 @@ pub struct RawDataServerWrapper {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
     pub cache_storage_format: StorageFormat,
+    pub transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
 }
 
 impl RawDataServerWrapper {
@@ -88,6 +91,7 @@ impl RawDataServerWrapper {
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
         cache_storage_format: StorageFormat,
+        transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -98,6 +102,7 @@ impl RawDataServerWrapper {
             file_store_config,
             data_service_response_channel_size,
             cache_storage_format,
+            transactions_buffer,
         })
     }
 }
@@ -172,6 +177,7 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
+        let transactions_buffer = self.transactions_buffer.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -183,6 +189,7 @@ impl RawData for RawDataServerWrapper {
                     transactions_count,
                     tx,
                     current_version,
+                    transactions_buffer,
                 )
                 .await;
             }
@@ -214,6 +221,7 @@ async fn get_data_with_tasks(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
+    _transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
 ) -> DataFetchSubTaskResult {
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
@@ -341,6 +349,7 @@ async fn data_fetcher_task(
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     mut current_version: u64,
+    transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
 ) {
     let mut connection_start_time = Some(std::time::Instant::now());
     let mut transactions_count = transactions_count;
@@ -423,8 +432,8 @@ async fn data_fetcher_task(
 
     // Data service metrics.
     let mut tps_calculator = MovingAverage::new(MOVING_AVERAGE_WINDOW_SIZE);
-
     loop {
+        let transactions_buffer = transactions_buffer.clone();
         // 1. Fetch data from cache and file store.
         let transaction_data = match get_data_with_tasks(
             current_version,
@@ -434,6 +443,7 @@ async fn data_fetcher_task(
             file_store_operator.clone(),
             request_metadata.clone(),
             cache_storage_format,
+            transactions_buffer,
         )
         .await
         {
