@@ -124,10 +124,11 @@ impl<'r> ResourceGroupAdapter<'r> {
         gas_feature_version: u64,
         resource_group_charge_as_size_sum_enabled: bool,
     ) -> Self {
-        // TODO[agg_v2](fix) - when is_resource_group_split_in_change_set_capable is false,
+        // when is_resource_group_split_in_change_set_capable is false,
         // but resource_group_charge_as_size_sum_enabled is true, we still don't set
         // group_size_kind to GroupSizeKind::AsSum, meaning that
-        // is_resource_group_split_in_change_set_capable affects gas charging. make sure that is correct
+        // is_resource_group_split_in_change_set_capable affects gas charging.
+        // Onchain execution always needs to go through capable resolvers.
 
         let group_size_kind = GroupSizeKind::from_gas_feature_version(
             gas_feature_version,
