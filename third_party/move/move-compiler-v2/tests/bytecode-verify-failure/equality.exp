@@ -1,0 +1,49 @@
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: Ty0)
+	1: MoveLoc[1](Arg1: Ty0)
+	2: Eq
+	3: Ret
+}
+}
+Diagnostics:
+bug: BYTECODE VERIFICATION FAILED
+  ┌─ tests/bytecode-verify-failure/equality.move:1:1
+  │
+1 │ ╭ module 0xc0ffee::m {
+2 │ │   fun equality<T>(x: T, y: T): bool {
+3 │ │         x == y
+4 │ │     }
+5 │ │ }
+  │ ╰─^ ICE failed bytecode verifier: VMError {
+    major_status: EQUALITY_OP_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    message: None,
+    exec_state: None,
+    location: Module(
+        ModuleId {
+            address: 0000000000000000000000000000000000000000000000000000000000c0ffee,
+            name: Identifier(
+                "m",
+            ),
+        },
+    ),
+    indices: [
+        (
+            FunctionDefinition,
+            0,
+        ),
+    ],
+    offsets: [
+        (
+            FunctionDefinitionIndex(0),
+            2,
+        ),
+    ],
+}

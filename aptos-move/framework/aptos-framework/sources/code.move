@@ -72,6 +72,7 @@ module aptos_framework::code {
     /// Event emitted when code is published to an address.
     struct PublishPackage has drop, store {
         code_address: address,
+        is_upgrade: bool,
     }
 
     /// Package contains duplicate module names with existing modules publised in other packages on this address
@@ -100,6 +101,9 @@ module aptos_framework::code {
 
     /// Not the owner of the package registry.
     const ENOT_PACKAGE_OWNER: u64 = 0x9;
+
+    /// `code_object` does not exist.
+    const ECODE_OBJECT_DOES_NOT_EXIST: u64 = 0xA;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
     /// publication mode should only be used for modules which aren't shared with user others.
@@ -187,7 +191,10 @@ module aptos_framework::code {
             vector::push_back(packages, pack)
         };
 
-        event::emit(PublishPackage { code_address: addr });
+        event::emit(PublishPackage {
+            code_address: addr,
+            is_upgrade: upgrade_number > 0
+        });
 
         // Request publish
         if (features::code_dependency_check_enabled())
@@ -198,15 +205,15 @@ module aptos_framework::code {
             request_publish(addr, module_names, code, policy.policy)
     }
 
-    public fun freeze_package_registry(publisher: &signer, registry: Object<PackageRegistry>) acquires PackageRegistry {
-        let registry_addr = object::object_address(&registry);
-        assert!(exists<PackageRegistry>(registry_addr), error::not_found(EPACKAGE_DEP_MISSING));
+    public fun freeze_code_object(publisher: &signer, code_object: Object<PackageRegistry>) acquires PackageRegistry {
+        let code_object_addr = object::object_address(&code_object);
+        assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
         assert!(
-            object::is_owner(registry, signer::address_of(publisher)),
+            object::is_owner(code_object, signer::address_of(publisher)),
             error::permission_denied(ENOT_PACKAGE_OWNER)
         );
 
-        let registry = borrow_global_mut<PackageRegistry>(registry_addr);
+        let registry = borrow_global_mut<PackageRegistry>(code_object_addr);
         vector::for_each_mut<PackageMetadata>(&mut registry.packages, |pack| {
             let package: &mut PackageMetadata = pack;
             package.upgrade_policy = upgrade_policy_immutable();

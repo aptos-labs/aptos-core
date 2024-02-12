@@ -3,13 +3,17 @@
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType, SigningKey};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    encoding_type::EncodingType,
+    SigningKey, Uniform,
+};
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::{
-    bn254_circom::{G1Bytes, G2Bytes},
+    bn254_circom::{G1Bytes, G2Bytes, Groth16VerificationKey},
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         rsa::RSA_JWK,
@@ -20,20 +24,24 @@ use aptos_types::{
         SignedTransaction,
     },
     zkid::{
-        Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
-        ZkIdSignature, ZkpOrOpenIdSig,
+        Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp,
+        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
     },
 };
 use move_core_types::account_address::AccountAddress;
+use rand::thread_rng;
 use std::time::Duration;
 
+// TODO(zkid): test the override aud_val path
+// TODO(zkid): These tests are not modular and they lack instructions for how to regenerate the proofs.
+
 #[tokio::test]
-async fn test_openid_signature_transaction_submission() {
+async fn test_zkid_oidc_signature_transaction_submission() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let _ = test_setup(&mut swarm, &mut cli).await;
 
     let mut info = swarm.aptos_public_info();
 
@@ -81,7 +89,7 @@ async fn test_openid_signature_transaction_submission() {
     let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
-    let epk_blinder: [u8; 31] = [0u8; 31];
+    let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
     let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
     let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
@@ -92,6 +100,7 @@ async fn test_openid_signature_transaction_submission() {
         uid_key: "sub".to_string(),
         epk_blinder,
         pepper,
+        idc_aud_val: None,
     };
 
     let zk_sig = ZkIdSignature {
@@ -112,12 +121,12 @@ async fn test_openid_signature_transaction_submission() {
 }
 
 #[tokio::test]
-async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
+async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let _ = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::new([0u8; 31]);
@@ -164,7 +173,7 @@ async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
     let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
-    let epk_blinder: [u8; 31] = [0u8; 31];
+    let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
     let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
     let jwt_sig = "bad_signature".to_string();
@@ -175,6 +184,7 @@ async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
         uid_key: "sub".to_string(),
         epk_blinder,
         pepper,
+        idc_aud_val: None,
     };
 
     let zk_sig = ZkIdSignature {
@@ -196,12 +206,12 @@ async fn test_openid_signature_transaction_submission_fails_jwt_verification() {
 }
 
 #[tokio::test]
-async fn test_openid_signature_transaction_submission_epk_expired() {
+async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let _ = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::new([0u8; 31]);
@@ -248,7 +258,7 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
     let sender_sig = ephemeral_account.private_key().sign(&raw_txn).unwrap();
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
-    let epk_blinder: [u8; 31] = [0u8; 31];
+    let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
     let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
     let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
@@ -259,6 +269,7 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
         uid_key: "sub".to_string(),
         epk_blinder,
         pepper,
+        idc_aud_val: None,
     };
 
     let zk_sig = ZkIdSignature {
@@ -280,12 +291,12 @@ async fn test_openid_signature_transaction_submission_epk_expired() {
 }
 
 #[tokio::test]
-async fn test_groth16_signature_transaction_submission() {
+async fn test_zkid_groth16_verifies() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let tw_sk = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::from_number(76);
@@ -338,24 +349,24 @@ async fn test_groth16_signature_transaction_submission() {
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
     let a = G1Bytes::new_unchecked(
-        "11685701338011120485255682535216931952523490513574344095859176729155974193429",
-        "19570000702948951151001315672614758851000529478920585316943681012227747910337",
+        "20534193224874816823038374805971256353897254359389549519579800571198905682623",
+        "3128047629776327625062258700337193014005673411952335683536865294076478098678",
     )
     .unwrap();
     let b = G2Bytes::new_unchecked(
         [
-            "10039243553158378944380740968043887743081233734014916979736214569065002261361",
-            "4926621746570487391149084476602889692047252928870676314074045787488022393462",
+            "11831059544281359959902363827760224027191828999098259913907764686593049260801",
+            "14933419822301565783764657928814181728459886670248956535955133596731082875810",
         ],
         [
-            "8151326214925440719229499872086146990795191649649968979609056373308460653969",
-            "12483309147304635788397060225283577172417980480151834869358925058077916828359",
+            "16616167200367085072660100259194052934821478809307596510515652443339946625933",
+            "1103855954970567341442645156173756328940907403537523212700521414512165362008",
         ],
     )
     .unwrap();
     let c = G1Bytes::new_unchecked(
-        "17509024307642709963307435885289611077932619305068428354097243520217914637634",
-        "17824783754604065652634030354434350582834434348663254057492956883323214722668",
+        "296457556259014920933232985275282694032456344171046224944953719399946325676",
+        "10314488872240559867545387237625153841351761679810222583912967187658678987385",
     )
     .unwrap();
     let proof = Groth16Zkp::new(a, b, c);
@@ -365,10 +376,18 @@ async fn test_groth16_signature_transaction_submission() {
     let proof_sig = ephemeral_account.private_key().sign(&proof).unwrap();
     let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
 
+    // TODO(zkid): Refactor tests to be modular and add test for bad training wheels signature (commented out below).
+    //let bad_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+    let config = Configuration::new_for_devnet_and_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephem_proof_sig,
+            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
+            //training_wheels_signature: EphemeralSignature::ed25519(bad_sk.sign(&proof).unwrap()),
+            extra_field: "\"family_name\":\"Straka\",".to_string(),
+            override_aud_val: None,
+            exp_horizon_secs: config.max_exp_horizon_secs,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -379,19 +398,23 @@ async fn test_groth16_signature_transaction_submission() {
     let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
 
     info!("Submit zero knowledge transaction");
-    info.client()
+    let result = info
+        .client()
         .submit_without_serializing_response(&signed_txn)
-        .await
-        .unwrap();
+        .await;
+
+    if let Err(e) = result {
+        panic!("Error with Groth16 TXN verification: {:?}", e)
+    }
 }
 
 #[tokio::test]
-async fn test_groth16_signature_transaction_submission_proof_signature_check_fails() {
+async fn test_zkid_groth16_signature_transaction_submission_proof_signature_check_fails() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
-    test_setup(&mut swarm, &mut cli).await;
+    let tw_sk = test_setup(&mut swarm, &mut cli).await;
     let mut info = swarm.aptos_public_info();
 
     let pepper = Pepper::from_number(76);
@@ -444,34 +467,39 @@ async fn test_groth16_signature_transaction_submission_proof_signature_check_fai
     let ephemeral_signature = EphemeralSignature::ed25519(sender_sig);
 
     let a = G1Bytes::new_unchecked(
-        "11685701338011120485255682535216931952523490513574344095859176729155974193429",
-        "19570000702948951151001315672614758851000529478920585316943681012227747910337",
+        "20534193224874816823038374805971256353897254359389549519579800571198905682623",
+        "3128047629776327625062258700337193014005673411952335683536865294076478098678",
     )
     .unwrap();
     let b = G2Bytes::new_unchecked(
         [
-            "10039243553158378944380740968043887743081233734014916979736214569065002261361",
-            "4926621746570487391149084476602889692047252928870676314074045787488022393462",
+            "11831059544281359959902363827760224027191828999098259913907764686593049260801",
+            "14933419822301565783764657928814181728459886670248956535955133596731082875810",
         ],
         [
-            "8151326214925440719229499872086146990795191649649968979609056373308460653969",
-            "12483309147304635788397060225283577172417980480151834869358925058077916828359",
+            "16616167200367085072660100259194052934821478809307596510515652443339946625933",
+            "1103855954970567341442645156173756328940907403537523212700521414512165362008",
         ],
     )
     .unwrap();
     let c = G1Bytes::new_unchecked(
-        "17509024307642709963307435885289611077932619305068428354097243520217914637634",
-        "17824783754604065652634030354434350582834434348663254057492956883323214722668",
+        "296457556259014920933232985275282694032456344171046224944953719399946325676",
+        "10314488872240559867545387237625153841351761679810222583912967187658678987385",
     )
     .unwrap();
     let proof = Groth16Zkp::new(a, b, c);
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
 
+    let config = Configuration::new_for_devnet_and_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephemeral_signature.clone(), // Wrong signature
+            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
+            extra_field: "\"family_name\":\"Straka\",".to_string(),
+            override_aud_val: None,
+            exp_horizon_secs: config.max_exp_horizon_secs,
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -488,7 +516,7 @@ async fn test_groth16_signature_transaction_submission_proof_signature_check_fai
         .unwrap_err();
 }
 
-async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
+async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) -> Ed25519PrivateKey {
     let client = swarm.validators().next().unwrap().rest_client();
     let root_idx = cli.add_account_with_address_to_cli(
         swarm.root_key(),
@@ -499,6 +527,21 @@ async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
         .await
         .expect("Epoch 2 taking too long to come!");
 
+    let maybe_response = client
+        .get_account_resource_bcs::<Groth16VerificationKey>(
+            AccountAddress::ONE,
+            "0x1::zkid::Groth16VerificationKey",
+        )
+        .await;
+    let vk = maybe_response.unwrap().into_inner();
+    println!("Groth16 VK: {:?}", vk);
+
+    let maybe_response = client
+        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::zkid::Configuration")
+        .await;
+    let config = maybe_response.unwrap().into_inner();
+    println!("zkID configuration: {:?}", config);
+
     let iss = "https://accounts.google.com";
     let jwk = RSA_JWK {
         kid:"test_jwk".to_owned(),
@@ -508,13 +551,18 @@ async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
         n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
     };
 
+    let training_wheels_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+    let training_wheels_pk = Ed25519PublicKey::from(&training_wheels_sk);
+
     info!("Insert a JWK.");
     let jwk_patch_script = format!(
         r#"
 script {{
 use aptos_framework::jwks;
+use aptos_framework::zkid;
 use aptos_framework::aptos_governance;
 use std::string::utf8;
+use std::option;
 fun main(core_resources: &signer) {{
     let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
     let google_jwk_0 = jwks::new_rsa_jwk(
@@ -528,10 +576,15 @@ fun main(core_resources: &signer) {{
         jwks::new_patch_upsert_jwk(b"{}", google_jwk_0),
     ];
     jwks::set_patches(&framework_signer, patches);
+
+    zkid::update_training_wheels(&framework_signer, option::some(x"{}"));
 }}
 }}
 "#,
-        jwk.kid, jwk.n, iss
+        jwk.kid,
+        jwk.n,
+        iss,
+        hex::encode(training_wheels_pk.to_bytes())
     );
 
     let txn_summary = cli.run_script(root_idx, &jwk_patch_script).await.unwrap();
@@ -554,6 +607,8 @@ fun main(core_resources: &signer) {{
 
     // Increment sequence number since we patched a JWK
     info.root_account().increment_sequence_number();
+
+    training_wheels_sk
 }
 
 async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {

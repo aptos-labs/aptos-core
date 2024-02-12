@@ -66,8 +66,8 @@ pub fn object_code_deployment_upgrade(
 
 /// Temporary workaround as `Object<T>` as a function argument is not recognised
 /// when auto generating move transaction payloads. Will address in separate PR.
-pub fn object_code_deployment_freeze_package_registry(
-    package_registry: AccountAddress,
+pub fn object_code_deployment_freeze_code_object(
+    code_object: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -77,8 +77,8 @@ pub fn object_code_deployment_freeze_package_registry(
             ]),
             ident_str!("object_code_deployment").to_owned(),
         ),
-        ident_str!("freeze_package_registry").to_owned(),
+        ident_str!("freeze_code_object").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&package_registry).unwrap()],
+        vec![bcs::to_bytes(&code_object).unwrap()],
     ))
 }

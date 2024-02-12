@@ -1050,7 +1050,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         );
                         self.mark_incorrect_use();
                         return Err(PartialVMError::new(
-                            StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                            StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                         )
                         .with_message(format!("{}", err)));
                     },

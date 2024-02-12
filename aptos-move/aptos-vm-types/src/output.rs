@@ -108,7 +108,7 @@ impl VMOutput {
         self.try_materialize(resolver)?;
         Self::convert_to_transaction_output(self).map_err(|e| {
             VMStatus::error(
-                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
             )
         })
@@ -120,7 +120,7 @@ impl VMOutput {
         let output = VMOutput::new(change_set, fee_statement, status);
         Self::convert_to_transaction_output(output).map_err(|e| {
             VMStatus::error(
-                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                 Some(e.to_string()),
             )
         })

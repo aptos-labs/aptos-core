@@ -89,7 +89,7 @@ impl TestContext {
             ),
             ObjectCodeAction::Freeze => self
                 .harness
-                .object_code_freeze_package_registry(account, self.object_address),
+                .object_code_freeze_code_object(account, self.object_address),
         }
     }
 
@@ -120,7 +120,7 @@ impl TestContext {
 const MODULE_ADDRESS_NAME: &str = "object";
 const PACKAGE_REGISTRY_ACCESS_PATH: &str = "0x1::code::PackageRegistry";
 const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: &str = "EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED";
-const ENOT_PUBLISHER_REF_OWNER: &str = "ENOT_PUBLISHER_REF_OWNER";
+const ENOT_CODE_OBJECT_OWNER: &str = "ENOT_CODE_OBJECT_OWNER";
 const ENOT_PACKAGE_OWNER: &str = "ENOT_PACKAGE_OWNER";
 
 /// Tests the `publish` object code deployment function with feature flags enabled/disabled.
@@ -236,7 +236,7 @@ fn object_code_deployment_upgrade_fail_when_not_owner() {
         "object_code_deployment.data/pack_upgrade_compat",
         ObjectCodeAction::Upgrade,
     );
-    context.assert_feature_flag_error(status, ENOT_PUBLISHER_REF_OWNER);
+    context.assert_feature_flag_error(status, ENOT_CODE_OBJECT_OWNER);
 }
 
 #[test]
@@ -317,9 +317,9 @@ fn object_code_deployment_upgrade_fail_overlapping_module() {
     assert_abort!(status, _);
 }
 
-/// Tests the `freeze_package_registry` object code deployment function.
+/// Tests the `freeze_code_object` object code deployment function.
 #[test]
-fn object_code_deployment_freeze_package_registry() {
+fn object_code_deployment_freeze_code_object() {
     let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
@@ -343,7 +343,7 @@ fn object_code_deployment_freeze_package_registry() {
 }
 
 #[test]
-fn freeze_package_registry_fail_when_not_owner() {
+fn freeze_code_object_fail_when_not_owner() {
     let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
@@ -363,11 +363,11 @@ fn freeze_package_registry_fail_when_not_owner() {
 }
 
 #[test]
-fn freeze_package_registry_fail_when_package_registry_does_not_exist() {
+fn freeze_code_object_fail_when_package_registry_does_not_exist() {
     let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
-    // We should not be able to `freeze_package_registry` as `PackageRegistry` does not exist.
+    // We should not be able to `freeze_code_object` as `PackageRegistry` does not exist.
     // `PackageRegistry` is only created when calling `publish` first, i.e. deploying a package.
     let status = context.execute_object_code_action(&acc, "", ObjectCodeAction::Freeze);
     assert_abort!(status, _);

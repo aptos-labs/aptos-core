@@ -14,36 +14,36 @@ The functionalities of this module are as follows.
 Publishing modules flow:
 1. Create a new object with the address derived from the publisher address and the object seed.
 2. Publish the module passed in the function via <code>metadata_serialized</code> and <code><a href="code.md#0x1_code">code</a></code> to the newly created object.
-3. Emits 'PublishObjectCode' event with the address of the newly created object.
+3. Emits 'Publish' event with the address of the newly created object.
 4. Create a <code><a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a></code> which stores the extend ref of the newly created object.
 Note: This is needed to upgrade the code as the signer must be generated to upgrade the existing code in an object.
 
 Upgrading modules flow:
-1. Assert the <code>publisher_ref</code> passed in the function is owned by the <code>publisher</code>.
-2. Assert the <code>publisher_ref</code> passed in the function exists in global storage.
-2. Retrieve the <code>ExtendRef</code> from the <code>publisher_ref</code> and generate the signer from this.
+1. Assert the <code>code_object</code> passed in the function is owned by the <code>publisher</code>.
+2. Assert the <code>code_object</code> passed in the function exists in global storage.
+2. Retrieve the <code>ExtendRef</code> from the <code>code_object</code> and generate the signer from this.
 3. Upgrade the module with the <code>metadata_serialized</code> and <code><a href="code.md#0x1_code">code</a></code> passed in the function.
-4. Emits 'UpgradeObjectCode' event with the address of the object with the upgraded code.
+4. Emits 'Upgrade' event with the address of the object with the upgraded code.
 Note: If the modules were deployed as immutable when calling <code>publish</code>, the upgrade will fail.
 
 Freezing modules flow:
-1. Assert the <code>package_registry</code> passed in the function exists in global storage.
-2. Assert the <code>package_registry</code> passed in the function is owned by the <code>publisher</code>.
-3. Mark all the modules in the <code>package_registry</code> as immutable.
-4. Emits 'FreezeObjectCode' event with the address of the object with the frozen code.
+1. Assert the <code>code_object</code> passed in the function exists in global storage.
+2. Assert the <code>code_object</code> passed in the function is owned by the <code>publisher</code>.
+3. Mark all the modules in the <code>code_object</code> as immutable.
+4. Emits 'Freeze' event with the address of the object with the frozen code.
 Note: There is no unfreeze function as this gives no benefit if the user can freeze/unfreeze modules at will.
 Once modules are marked as immutable, they cannot be made mutable again.
 
 
 -  [Resource `PublisherRef`](#0x1_object_code_deployment_PublisherRef)
--  [Struct `PublishObjectCode`](#0x1_object_code_deployment_PublishObjectCode)
--  [Struct `UpgradeObjectCode`](#0x1_object_code_deployment_UpgradeObjectCode)
--  [Struct `FreezeObjectCode`](#0x1_object_code_deployment_FreezeObjectCode)
+-  [Struct `Publish`](#0x1_object_code_deployment_Publish)
+-  [Struct `Upgrade`](#0x1_object_code_deployment_Upgrade)
+-  [Struct `Freeze`](#0x1_object_code_deployment_Freeze)
 -  [Constants](#@Constants_0)
 -  [Function `publish`](#0x1_object_code_deployment_publish)
 -  [Function `object_seed`](#0x1_object_code_deployment_object_seed)
 -  [Function `upgrade`](#0x1_object_code_deployment_upgrade)
--  [Function `freeze_package_registry`](#0x1_object_code_deployment_freeze_package_registry)
+-  [Function `freeze_code_object`](#0x1_object_code_deployment_freeze_code_object)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -63,6 +63,7 @@ Once modules are marked as immutable, they cannot be made mutable again.
 
 ## Resource `PublisherRef`
 
+Object which contains the code deployed, along with the extend ref to upgrade the code.
 
 
 <pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
@@ -87,15 +88,15 @@ Once modules are marked as immutable, they cannot be made mutable again.
 
 </details>
 
-<a id="0x1_object_code_deployment_PublishObjectCode"></a>
+<a id="0x1_object_code_deployment_Publish"></a>
 
-## Struct `PublishObjectCode`
+## Struct `Publish`
 
 Event emitted when code is published to an object.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_PublishObjectCode">PublishObjectCode</a> <b>has</b> drop, store
+<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_Publish">Publish</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -116,15 +117,15 @@ Event emitted when code is published to an object.
 
 </details>
 
-<a id="0x1_object_code_deployment_UpgradeObjectCode"></a>
+<a id="0x1_object_code_deployment_Upgrade"></a>
 
-## Struct `UpgradeObjectCode`
+## Struct `Upgrade`
 
 Event emitted when code in an existing object is upgraded.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_UpgradeObjectCode">UpgradeObjectCode</a> <b>has</b> drop, store
+<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_Upgrade">Upgrade</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -145,15 +146,15 @@ Event emitted when code in an existing object is upgraded.
 
 </details>
 
-<a id="0x1_object_code_deployment_FreezeObjectCode"></a>
+<a id="0x1_object_code_deployment_Freeze"></a>
 
-## Struct `FreezeObjectCode`
+## Struct `Freeze`
 
 Event emitted when code in an existing object is made immutable.
 
 
 <pre><code>#[<a href="event.md#0x1_event">event</a>]
-<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_FreezeObjectCode">FreezeObjectCode</a> <b>has</b> drop, store
+<b>struct</b> <a href="object_code_deployment.md#0x1_object_code_deployment_Freeze">Freeze</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -179,12 +180,22 @@ Event emitted when code in an existing object is made immutable.
 ## Constants
 
 
-<a id="0x1_object_code_deployment_ENOT_PUBLISHER_REF_OWNER"></a>
+<a id="0x1_object_code_deployment_ECODE_OBJECT_DOES_NOT_EXIST"></a>
 
-Not the owner of the <code><a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a></code>
+<code>code_object</code> does not exist.
 
 
-<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_PUBLISHER_REF_OWNER">ENOT_PUBLISHER_REF_OWNER</a>: u64 = 2;
+<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>: u64 = 3;
+</code></pre>
+
+
+
+<a id="0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER"></a>
+
+Not the owner of the <code>code_object</code>
+
+
+<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER">ENOT_CODE_OBJECT_OWNER</a>: u64 = 2;
 </code></pre>
 
 
@@ -195,16 +206,6 @@ Object code deployment feature not supported.
 
 
 <pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED">EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x1_object_code_deployment_EPUBLISHER_REF_DOES_NOT_EXIST"></a>
-
-<code><a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a></code> does not exist.
-
-
-<pre><code><b>const</b> <a href="object_code_deployment.md#0x1_object_code_deployment_EPUBLISHER_REF_DOES_NOT_EXIST">EPUBLISHER_REF_DOES_NOT_EXIST</a>: u64 = 3;
 </code></pre>
 
 
@@ -253,9 +254,7 @@ the code to be published via <code><a href="code.md#0x1_code">code</a></code>. T
     <b>let</b> code_signer = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(constructor_ref);
     <a href="code.md#0x1_code_publish_package_txn">code::publish_package_txn</a>(code_signer, metadata_serialized, <a href="code.md#0x1_code">code</a>);
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_PublishObjectCode">PublishObjectCode</a> {
-        object_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(code_signer),
-    });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_Publish">Publish</a> { object_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(code_signer), });
 
     <b>move_to</b>(code_signer, <a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a> {
         extend_ref: <a href="object.md#0x1_object_generate_extend_ref">object::generate_extend_ref</a>(constructor_ref),
@@ -299,13 +298,13 @@ the code to be published via <code><a href="code.md#0x1_code">code</a></code>. T
 
 ## Function `upgrade`
 
-Upgrades the existing modules at the <code>publisher_ref</code> address with the new modules passed in <code><a href="code.md#0x1_code">code</a></code>,
+Upgrades the existing modules at the <code>code_object</code> address with the new modules passed in <code><a href="code.md#0x1_code">code</a></code>,
 along with the metadata <code>metadata_serialized</code>.
 Note: If the modules were deployed as immutable when calling <code>publish</code>, the upgrade will fail.
-Requires the publisher to be the owner of the <code><a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a></code> object.
+Requires the publisher to be the owner of the <code>code_object</code>.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_upgrade">upgrade</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, publisher_ref: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">object_code_deployment::PublisherRef</a>&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_upgrade">upgrade</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">object_code_deployment::PublisherRef</a>&gt;)
 </code></pre>
 
 
@@ -318,24 +317,22 @@ Requires the publisher to be the owner of the <code><a href="object_code_deploym
     publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     metadata_serialized: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     <a href="code.md#0x1_code">code</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-    publisher_ref: Object&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a>&gt;,
+    code_object: Object&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a>&gt;,
 ) <b>acquires</b> <a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a> {
     <b>let</b> publisher_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher);
     <b>assert</b>!(
-        <a href="object.md#0x1_object_is_owner">object::is_owner</a>(publisher_ref, publisher_address),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_PUBLISHER_REF_OWNER">ENOT_PUBLISHER_REF_OWNER</a>),
+        <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, publisher_address),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ENOT_CODE_OBJECT_OWNER">ENOT_CODE_OBJECT_OWNER</a>),
     );
 
-    <b>let</b> publisher_ref_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&publisher_ref);
-    <b>assert</b>!(<b>exists</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a>&gt;(publisher_ref_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_EPUBLISHER_REF_DOES_NOT_EXIST">EPUBLISHER_REF_DOES_NOT_EXIST</a>));
+    <b>let</b> code_object_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a>&gt;(code_object_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
 
-    <b>let</b> extend_ref = &<b>borrow_global</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a>&gt;(publisher_ref_address).extend_ref;
+    <b>let</b> extend_ref = &<b>borrow_global</b>&lt;<a href="object_code_deployment.md#0x1_object_code_deployment_PublisherRef">PublisherRef</a>&gt;(code_object_address).extend_ref;
     <b>let</b> code_signer = &<a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(extend_ref);
     <a href="code.md#0x1_code_publish_package_txn">code::publish_package_txn</a>(code_signer, metadata_serialized, <a href="code.md#0x1_code">code</a>);
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_UpgradeObjectCode">UpgradeObjectCode</a> {
-        object_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(code_signer),
-    });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_Upgrade">Upgrade</a> { object_address: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(code_signer), });
 }
 </code></pre>
 
@@ -343,15 +340,16 @@ Requires the publisher to be the owner of the <code><a href="object_code_deploym
 
 </details>
 
-<a id="0x1_object_code_deployment_freeze_package_registry"></a>
+<a id="0x1_object_code_deployment_freeze_code_object"></a>
 
-## Function `freeze_package_registry`
+## Function `freeze_code_object`
 
 Make an existing upgradable package immutable. Once this is called, the package cannot be made upgradable again.
-Requires the <code>publisher</code> to be the owner of the <code>package_registry</code> object.
+Each <code>code_object</code> should only have one package, as one package is deployed per object in this module.
+Requires the <code>publisher</code> to be the owner of the <code>code_object</code>.
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_freeze_package_registry">freeze_package_registry</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, package_registry: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
 </code></pre>
 
 
@@ -360,12 +358,10 @@ Requires the <code>publisher</code> to be the owner of the <code>package_registr
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_freeze_package_registry">freeze_package_registry</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, package_registry: Object&lt;PackageRegistry&gt;) {
-    <a href="code.md#0x1_code_freeze_package_registry">code::freeze_package_registry</a>(publisher, package_registry);
+<pre><code><b>public</b> entry <b>fun</b> <a href="object_code_deployment.md#0x1_object_code_deployment_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: Object&lt;PackageRegistry&gt;) {
+    <a href="code.md#0x1_code_freeze_code_object">code::freeze_code_object</a>(publisher, code_object);
 
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_FreezeObjectCode">FreezeObjectCode</a> {
-        object_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&package_registry),
-    });
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="object_code_deployment.md#0x1_object_code_deployment_Freeze">Freeze</a> { object_address: <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object), });
 }
 </code></pre>
 

@@ -380,15 +380,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // TODO[agg_v2](fix): Revisit this error whether it should be invariant violation
-                    //                    or a panic/fallback.
-                    Some(Err(PartialVMError::new(
-                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    )
-                    .with_message(
-                        "Non-ResourceGroup write found for key in get_resource_from_group call"
-                            .to_string(),
-                    )))
+                    // There should be no colisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
                 },
             })
             .transpose()?

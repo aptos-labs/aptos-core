@@ -61,7 +61,7 @@ pub(crate) enum DataRead<V> {
         // (version implies value equality, but not vice versa). TODO: when
         // comparing the instances of V is cheaper, compare those instead.
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
-        Option<Arc<MoveTypeLayout>>,
+        #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<Arc<MoveTypeLayout>>,
     ),
     Metadata(Option<StateValueMetadata>),
     Exists(bool),

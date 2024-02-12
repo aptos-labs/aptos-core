@@ -1,12 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::anchor_election::TChainHealthBackoff;
+use super::{dag_store::DagStore, health::HealthBackoff};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
-        dag_store::Dag,
         errors::DagDriverError,
         observability::{
             counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
@@ -24,41 +23,42 @@ use crate::{
     },
     payload_client::PayloadClient,
 };
-use anyhow::bail;
+use anyhow::{bail, ensure};
+use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
-use aptos_infallible::RwLock;
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
-use aptos_reliable_broadcast::ReliableBroadcast;
+use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use aptos_validator_transaction_pool as vtxn_pool;
 use async_trait::async_trait;
 use futures::{
     executor::block_on,
-    future::{AbortHandle, Abortable},
-    FutureExt,
+    future::{join, AbortHandle, Abortable},
 };
+use futures_channel::oneshot;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<DagStore>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
-    rb_abort_handle: Option<(AbortHandle, u64)>,
+    rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64)>>,
     storage: Arc<dyn DAGStorage>,
-    order_rule: OrderRule,
+    order_rule: Mutex<OrderRule>,
     fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
     window_size_config: Round,
     payload_config: DagPayloadConfig,
-    chain_backoff: Arc<dyn TChainHealthBackoff>,
+    health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
 }
 
@@ -67,7 +67,7 @@ impl DagDriver {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<DagStore>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
@@ -78,7 +78,7 @@ impl DagDriver {
         round_state: RoundState,
         window_size_config: Round,
         payload_config: DagPayloadConfig,
-        chain_backoff: Arc<dyn TChainHealthBackoff>,
+        health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
     ) -> Self {
         let pending_node = storage
@@ -87,22 +87,22 @@ impl DagDriver {
         let highest_strong_links_round =
             dag.read().highest_strong_links_round(&epoch_state.verifier);
 
-        let mut driver = Self {
+        let driver = Self {
             author,
             epoch_state,
             dag,
             payload_client,
             reliable_broadcast,
             time_service,
-            rb_abort_handle: None,
+            rb_handles: Mutex::new(BoundedVecDeque::new(window_size_config as usize)),
             storage,
-            order_rule,
+            order_rule: Mutex::new(order_rule),
             fetch_requester,
             ledger_info_provider,
             round_state,
             window_size_config,
             payload_config,
-            chain_backoff,
+            health_backoff,
             quorum_store_enabled,
         };
 
@@ -114,7 +114,10 @@ impl DagDriver {
                 LogSchema::new(LogEvent::NewRound).round(node.round()),
                 "Resume round"
             );
-            driver.round_state.set_current_round(node.round());
+            driver
+                .round_state
+                .set_current_round(node.round())
+                .expect("must succeed");
             driver.broadcast_node(node);
         } else {
             // kick start a new round
@@ -125,25 +128,37 @@ impl DagDriver {
         driver
     }
 
-    async fn add_node(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+    fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
         let (highest_strong_link_round, strong_links) = {
-            let mut dag_writer = self.dag.write();
+            {
+                let dag_reader = self.dag.read();
 
-            if !dag_writer.all_exists(node.parents_metadata()) {
-                if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
-                    error!("request to fetch failed: {}", err);
+                // Ensure the window hasn't moved, so we don't request fetch unnecessarily.
+                ensure!(node.round() >= dag_reader.lowest_round(), "stale node");
+
+                if !dag_reader.all_exists(node.parents_metadata()) {
+                    if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                        error!("request to fetch failed: {}", err);
+                    }
+                    bail!(DagDriverError::MissingParents);
                 }
-                bail!(DagDriverError::MissingParents);
             }
 
-            dag_writer.add_node(node)?;
+            // Note on concurrency: it is possible that a prune operation kicks in here and
+            // moves the window forward making the `node` stale, but we guarantee that the
+            // order rule only visits `window` length rounds, so having node around should
+            // be fine. Any stale node inserted due to this race will be cleaned up with
+            // the next prune operation.
 
+            self.dag.add_node(node)?;
+
+            let dag_reader = self.dag.read();
             let highest_strong_links_round =
-                dag_writer.highest_strong_links_round(&self.epoch_state.verifier);
+                dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
             (
                 highest_strong_links_round,
                 // unwrap is for round 0
-                dag_writer
+                dag_reader
                     .get_strong_links_for_round(
                         highest_strong_links_round,
                         &self.epoch_state.verifier,
@@ -151,19 +166,26 @@ impl DagDriver {
                     .unwrap_or_default(),
             )
         };
-        self.round_state
-            .check_for_new_round(highest_strong_link_round, strong_links)
-            .await;
+
+        let minimum_delay = self
+            .health_backoff
+            .backoff_duration(highest_strong_link_round + 1);
+        self.round_state.check_for_new_round(
+            highest_strong_link_round,
+            strong_links,
+            minimum_delay,
+        );
         Ok(())
     }
 
-    pub async fn enter_new_round(&mut self, new_round: Round) {
-        if self.round_state.current_round() >= new_round {
+    pub async fn enter_new_round(&self, new_round: Round) {
+        if let Err(e) = self.round_state.set_current_round(new_round) {
+            debug!(error=?e, "cannot enter round");
             return;
         }
         debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
-        self.round_state.set_current_round(new_round);
         counters::CURRENT_ROUND.set(new_round as i64);
+
         let strong_links = self
             .dag
             .read()
@@ -206,7 +228,9 @@ impl DagDriver {
             (validator_payload_filter, payload_filter)
         };
 
-        let (max_txns, max_size_bytes) = self.calculate_payload_limits(new_round);
+        let (max_txns, max_size_bytes) = self
+            .health_backoff
+            .calculate_payload_limits(new_round, &self.payload_config);
 
         let (validator_txns, payload) = match self
             .payload_client
@@ -256,12 +280,13 @@ impl DagDriver {
         self.broadcast_node(new_node);
     }
 
-    fn broadcast_node(&mut self, node: Node) {
+    fn broadcast_node(&self, node: Node) {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
+        let (tx, rx) = oneshot::channel();
         let signature_builder =
-            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone());
+            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone(), tx);
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.clone();
 
@@ -274,7 +299,12 @@ impl DagDriver {
             defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
             rb.broadcast(node, signature_builder).await
         };
-        let core_task = node_broadcast.then(move |certificate| {
+        let certified_broadcast = async move {
+            let Ok(certificate) = rx.await else {
+                error!("channel closed before receiving ceritifcate");
+                return;
+            };
+
             debug!(
                 LogSchema::new(LogEvent::BroadcastCertifiedNode),
                 id = node_clone.id()
@@ -287,63 +317,24 @@ impl DagDriver {
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set)
-        });
+            rb2.broadcast(certified_node_msg, cert_ack_set).await
+        };
+        let core_task = join(node_broadcast, certified_broadcast);
+        let author = self.author;
         let task = async move {
-            debug!("Start reliable broadcast for round {}", round);
+            debug!("{} Start reliable broadcast for round {}", author, round);
             core_task.await;
             debug!("Finish reliable broadcast for round {}", round);
         };
         tokio::spawn(Abortable::new(task, abort_registration));
-        if let Some((prev_handle, prev_round_timestamp)) =
-            self.rb_abort_handle.replace((abort_handle, timestamp))
+        if let Some((_handle, prev_round_timestamp)) = self
+            .rb_handles
+            .lock()
+            .push_back((DropGuard::new(abort_handle), timestamp))
         {
+            // TODO: this observation is inaccurate.
             observe_round(prev_round_timestamp, RoundStage::Finished);
-            prev_handle.abort();
         }
-    }
-
-    fn calculate_payload_limits(&self, round: Round) -> (u64, u64) {
-        let (voting_power_ratio, maybe_backoff_limits) =
-            self.chain_backoff.get_round_payload_limits(round);
-        debug!(
-            "calculate_payload_limits voting_power_ratio {}",
-            voting_power_ratio
-        );
-        let (max_txns_per_round, max_size_per_round_bytes) = {
-            if let Some((backoff_max_txns, backoff_max_size_bytes)) = maybe_backoff_limits {
-                (
-                    self.payload_config
-                        .max_sending_txns_per_round
-                        .min(backoff_max_txns),
-                    self.payload_config
-                        .max_sending_size_per_round_bytes
-                        .min(backoff_max_size_bytes),
-                )
-            } else {
-                (
-                    self.payload_config.max_sending_txns_per_round,
-                    self.payload_config.max_sending_size_per_round_bytes,
-                )
-            }
-        };
-        // TODO: warn/panic if division yields 0 txns
-        let max_txns = max_txns_per_round
-            .saturating_div(
-                (self.epoch_state.verifier.len() as f64 * voting_power_ratio)
-                    .ceil()
-                    .max(1.0) as u64,
-            )
-            .max(1);
-        let max_txn_size_bytes = max_size_per_round_bytes
-            .saturating_div(
-                (self.epoch_state.verifier.len() as f64 * voting_power_ratio)
-                    .ceil()
-                    .max(1.0) as u64,
-            )
-            .max(1024);
-
-        (max_txns, max_txn_size_bytes)
     }
 }
 
@@ -352,34 +343,23 @@ impl RpcHandler for DagDriver {
     type Request = CertifiedNode;
     type Response = CertifiedAck;
 
-    async fn process(&mut self, certified_node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&self, certified_node: Self::Request) -> anyhow::Result<Self::Response> {
         let epoch = certified_node.metadata().epoch();
         debug!(LogSchema::new(LogEvent::ReceiveCertifiedNode)
             .remote_peer(*certified_node.author())
             .round(certified_node.round()));
-        {
-            let dag_reader = self.dag.read();
-            if dag_reader.exists(certified_node.metadata()) {
-                return Ok(CertifiedAck::new(epoch));
-            }
+        if self.dag.read().exists(certified_node.metadata()) {
+            return Ok(CertifiedAck::new(epoch));
         }
+
         observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
         NUM_TXNS_PER_NODE.observe(certified_node.payload().len() as f64);
         NODE_PAYLOAD_SIZE.observe(certified_node.payload().size() as f64);
 
         let node_metadata = certified_node.metadata().clone();
         self.add_node(certified_node)
-            .await
-            .map(|_| self.order_rule.process_new_node(&node_metadata))?;
+            .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
-    }
-}
-
-impl Drop for DagDriver {
-    fn drop(&mut self) {
-        if let Some((handle, _)) = &self.rb_abort_handle {
-            handle.abort()
-        }
     }
 }

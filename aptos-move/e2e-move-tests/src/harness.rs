@@ -538,15 +538,15 @@ impl MoveHarness {
         self.run(txn)
     }
 
-    /// Marks all the packages in the `package_registry` as immutable.
-    pub fn object_code_freeze_package_registry(
+    /// Marks all the packages in the `code_object` as immutable.
+    pub fn object_code_freeze_code_object(
         &mut self,
         account: &Account,
-        package_registry: AccountAddress,
+        code_object: AccountAddress,
     ) -> TransactionStatus {
         let txn = self.create_transaction_payload(
             account,
-            aptos_stdlib::object_code_deployment_freeze_package_registry(package_registry),
+            aptos_stdlib::object_code_deployment_freeze_code_object(code_object),
         );
         self.run(txn)
     }

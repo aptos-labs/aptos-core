@@ -77,6 +77,20 @@ Note that `Arbitrary` must be implemented (or derived) for all types used in the
 #### Implementing the fuzz logic
 The `fuzz_target!` macro receives data from the fuzzer. Implement logic to convert the fuzzer input into a format that the targeted function or module can process. Check existing fuzz targets for examples.
 
+### OSS-Fuzz Corpus
+Create a `.zip` archive containing your fuzzer's corpus and name it according to the following format: `[fuzzer_name]_seed_corpus.zip` (e.g., `move_aptosvm_publish_and_run_seed_corpus.zip`). Follow these steps for hosting and integrating the archive:
+
+1. **Upload to Public Hosting:** If you choose Google Drive, ensure the archive is publicly accessible via a shared link.
+
+2. **(GDrive Only) Modify the URL:** Replace `FILEID` in the URL template with your file's ID. The template URL is: 
+   ```
+   https://docs.google.com/uc?export=download&id=FILEID
+   ```
+
+3. **Update `fuzz.sh`:** Insert the modified URL into the `CORPUS_ZIPS` array within the "fuzz.sh" script.
+
+When building in the OSS-Fuzz environment, `fuzz.sh` will place the corpus archive correctly alongside your fuzzer's binary. OSS-Fuzz then selects the proper archive, using its contents to feed the fuzzer.
+
 ### Best Practices for Writing Fuzz Targets
 - **Focus on Target Functionality:** Choose functions or modules critical to your application's functionality and security.
 - **Handle Diverse Inputs:** Ensure that the harness can handle a wide range of input formats and sizes.

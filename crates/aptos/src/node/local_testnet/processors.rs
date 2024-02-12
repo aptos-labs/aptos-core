@@ -82,6 +82,12 @@ impl ProcessorManager {
             },
             ProcessorName::TokenV2Processor => ProcessorConfig::TokenV2Processor,
             ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
+            ProcessorName::MonitoringProcessor => {
+                bail!("Monitoring processor is not supported in the local testnet")
+            },
+            ProcessorName::ObjectsProcessor => {
+                bail!("Objects processor is not supported in the local testnet")
+            },
         };
         let config = IndexerGrpcProcessorConfig {
             processor_config,
