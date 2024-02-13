@@ -1259,6 +1259,7 @@ dependencies = [
  "aptos-crypto-derive",
  "bcs 0.1.4",
  "bellman",
+ "blst",
  "blstrs",
  "criterion",
  "ff 0.13.0",

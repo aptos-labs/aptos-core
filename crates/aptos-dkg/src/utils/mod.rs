@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::utils::random::random_scalar_from_uniform_bytes;
+use crate::utils::{
+    parallel_multi_pairing::parallel_multi_miller_loop_and_final_exp,
+    random::random_scalar_from_uniform_bytes,
+};
 use blstrs::{
     pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
 };
@@ -10,6 +13,7 @@ use sha3::Digest;
 use std::ops::Mul;
 
 pub(crate) mod biguint;
+pub mod parallel_multi_pairing;
 pub mod random;
 pub mod serialization;
 
@@ -95,6 +99,22 @@ where
     );
 
     res.final_exponentiation()
+}
+
+pub fn parallel_multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
+where
+    I1: Iterator<Item = &'a G1Projective>,
+    I2: Iterator<Item = &'a G2Projective>,
+{
+    parallel_multi_miller_loop_and_final_exp(
+        lhs.zip(rhs)
+            .map(|(g1, g2)| (g1.to_affine(), g2.to_affine()))
+            .collect::<Vec<(G1Affine, G2Affine)>>()
+            .iter()
+            .map(|(g1, g2)| (g1, g2))
+            .collect::<Vec<(&G1Affine, &G2Affine)>>()
+            .as_slice(),
+    )
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).

@@ -10,6 +10,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 bcs =  { workspace = true }
 bellman = { workspace = true }
+blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
 ff = { workspace = true }

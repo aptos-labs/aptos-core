@@ -4,7 +4,10 @@ use aptos_dkg::{
     algebra::polynomials::{
         poly_eval, poly_mul_fft, poly_mul_less_slow, poly_mul_slow, poly_xnmul,
     },
-    utils::random::{random_g2_point, random_scalar, random_scalars},
+    utils::{
+        multi_pairing, parallel_multi_pairing,
+        random::{random_g1_point, random_g2_point, random_scalar, random_scalars},
+    },
 };
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
@@ -167,5 +170,24 @@ fn test_crypto_poly_shift() {
 
             assert_eq!(shifted1, shifted2);
         }
+    }
+}
+
+#[test]
+fn test_parallel_multi_pairing() {
+    let mut rng = thread_rng();
+
+    let r1 = [random_g1_point(&mut rng), random_g1_point(&mut rng)];
+    let r2 = [random_g2_point(&mut rng), random_g2_point(&mut rng)];
+
+    for (g1, g2) in vec![
+        ([G1Projective::identity(), r1[0]], r2.clone()),
+        (r1.clone(), r2.clone()),
+        (r1.clone(), [G2Projective::identity(), r2[0]])
+    ] {
+        let res1 = multi_pairing(g1.iter(), g2.iter());
+        let res2 = parallel_multi_pairing(g1.iter(), g2.iter());
+
+        assert_eq!(res1, res2);
     }
 }
