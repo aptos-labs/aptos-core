@@ -90,7 +90,7 @@ script {{
     }}
 }}
 "#, config_bytes);
-
+    println!("enable_vtxn_script={}", enable_vtxn_script);
     let txn_summary = cli
         .run_script(root_idx, enable_vtxn_script.as_str())
         .await

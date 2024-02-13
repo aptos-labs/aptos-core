@@ -52,4 +52,11 @@ module aptos_framework::consensus_config {
             *borrow_global_mut<ConsensusConfig>(@aptos_framework) = config_buffer::extract();
         }
     }
+
+    public fun validator_txn_enabled(): bool acquires ConsensusConfig {
+        let config_bytes = borrow_global<ConsensusConfig>(@aptos_framework).config;
+        validator_txn_enabled_internal(config_bytes)
+    }
+
+    native fun validator_txn_enabled_internal(config_bytes: vector<u8>): bool;
 }
