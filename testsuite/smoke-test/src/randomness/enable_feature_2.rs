@@ -12,11 +12,9 @@ use aptos_types::on_chain_config::{FeatureFlag, OnChainConsensusConfig};
 use aptos_vm_genesis::default_features_resource_for_genesis;
 use crate::utils::get_current_consensus_config;
 
-/// Enable on-chain randomness in the following steps.
-/// - Enable validator transactions in consensus config in epoch `e`.
-/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e + 1`.
+/// Enable on-chain randomness by enabling validator transactions and feature `RECONFIGURE_WITH_DKG` simultaneously.
 #[tokio::test]
-async fn enable_feature_1() {
+async fn enable_feature_2() {
     let epoch_duration_secs = 20;
     let estimated_dkg_latency_secs = 40;
 
@@ -54,82 +52,59 @@ async fn enable_feature_1() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Enabling validator transactions.");
+    info!("Now in epoch 3. Enabling features.");
     let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
     let config_bytes = bcs::to_bytes(&config).unwrap();
-    let enable_vtxn_script = format!(r#"
+    let script = format!(r#"
 script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
+    use std::features;
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
         let config_bytes = vector{:?};
         consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
+        let dkg_feature_id: u64 = features::get_reconfigure_with_dkg_feature();
+        features::change_feature_flags_for_next_epoch(&framework_signer, vector[dkg_feature_id], vector[]);
         aptos_governance::reconfigure(&framework_signer);
     }}
 }}
 "#, config_bytes);
 
-    debug!("enable_vtxn_script={}", enable_vtxn_script);
+    debug!("script={}", script);
     let txn_summary = cli
-        .run_script(root_idx, enable_vtxn_script.as_str())
+        .run_script(root_idx, script.as_str())
         .await
         .expect("Txn execution error.");
-    debug!("enabling_vtxn_summary={:?}", txn_summary);
+    debug!("txn_summary={:?}", txn_summary);
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
         .await
         .expect("Waited too long for epoch 4.");
 
-    info!("Now in epoch 4. Enabling feature RECONFIGURE_WITH_DKG.");
-    let enable_dkg_script = r#"
-script {
-    use aptos_framework::aptos_governance;
-    fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = std::features::get_reconfigure_with_dkg_feature();
-        aptos_governance::toggle_features(&framework_signer, vector[dkg_feature_id], vector[]);
-    }
-}
-"#;
-
-    let txn_summary = cli
-        .run_script(root_idx, enable_dkg_script)
-        .await
-        .expect("Txn execution error.");
-    debug!("enabling_dkg_summary={:?}", txn_summary);
-
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(
-            5,
-            Duration::from_secs(epoch_duration_secs * 2),
-        )
-        .await
-        .expect("Waited too long for epoch 5.");
-
-    info!("Now in epoch 5. Both DKG and vtxn are enabled. There should be no randomness since DKG did not happen at the end of last epoch.");
+    info!("Now in epoch 4. Both DKG and vtxn are enabled. There should be no randomness since DKG did not happen at the end of last epoch.");
     let maybe_last_complete = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed;
     assert!(
-        maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch() != 5
+        maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch() != 4
     );
 
-    info!("Waiting for epoch 6.");
+    info!("Waiting for epoch 5.");
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(
-            6,
+            5,
             Duration::from_secs(epoch_duration_secs + estimated_dkg_latency_secs),
         )
         .await
-        .expect("Waited too long for epoch 6.");
+        .expect("Waited too long for epoch 5.");
 
     let dkg_session = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed
         .expect("dkg result for epoch 6 should be present");
-    assert_eq!(6, dkg_session.target_epoch());
+    assert_eq!(5, dkg_session.target_epoch());
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
 }

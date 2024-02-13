@@ -113,7 +113,7 @@ script {{
         .await
         .last_completed;
     assert!(
-        maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch() != 4
+        maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch() != 5
     );
 
     info!("Waiting for epoch 6.");

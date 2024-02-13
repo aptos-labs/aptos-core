@@ -21,6 +21,7 @@ use tokio::time::Instant;
 mod dkg_basic;
 mod enable_feature_0;
 mod enable_feature_1;
+mod enable_feature_2;
 mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
 mod e2e_basic_consumption;
