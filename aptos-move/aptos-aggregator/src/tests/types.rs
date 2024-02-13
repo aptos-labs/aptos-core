@@ -20,6 +20,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_vm_types::delayed_values::delayed_field_id::ExtractUniqueIndex;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -120,26 +121,17 @@ impl TDelayedFieldView for FakeAggregatorView {
         DelayedFieldID::new_with_width(id, width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        if id < self.start_counter as u64 {
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let index = id.extract_unique_index();
+        let current_counter = *self.counter.borrow();
+
+        if index < self.start_counter || index >= current_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've started from {}",
-                id, self.start_counter
+                "Invalid delayed field id: {:?} with index {} (started from {} and reached {})",
+                id, index, self.start_counter, current_counter
             )));
         }
-
-        let current = *self.counter.borrow();
-        if id > current as u64 {
-            return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've only reached to {}",
-                id, current
-            )));
-        }
-
-        Ok(Self::Identifier::from(id))
+        Ok(())
     }
 
     fn get_reads_needing_exchange(

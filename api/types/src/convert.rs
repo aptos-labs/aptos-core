@@ -5,9 +5,8 @@
 use crate::{
     transaction::{
         DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
-        ModuleBundlePayload, MultisigPayload, MultisigTransactionPayload,
-        StateCheckpointTransaction, UserTransactionRequestInner, WriteModule, WriteResource,
-        WriteTableItem,
+        MultisigPayload, MultisigTransactionPayload, StateCheckpointTransaction,
+        UserTransactionRequestInner, WriteModule, WriteResource, WriteTableItem,
     },
     view::{ViewFunction, ViewRequest},
     Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
@@ -29,8 +28,7 @@ use aptos_types::{
         table::{TableHandle, TableInfo},
     },
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
-        SignedTransaction,
+        EntryFunction, ExecutionStatus, Multisig, RawTransaction, Script, SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -42,7 +40,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::ModuleResolver,
-    value::{LayoutTag, MoveStructLayout, MoveTypeLayout},
+    value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
@@ -269,13 +267,8 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 })
             },
 
-            // Deprecated. Will be removed in the future.
-            ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
-                modules: modules
-                    .into_iter()
-                    .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
-                    .collect::<Result<Vec<_>>>()?,
-            }),
+            // Deprecated.
+            ModuleBundle(_) => bail!("Module bundle payload has been removed"),
         };
         Ok(ret)
     }
@@ -701,15 +694,9 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 })
             },
 
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundlePayload(payload) => {
-                Target::ModuleBundle(ModuleBundle::new(
-                    payload
-                        .modules
-                        .into_iter()
-                        .map(|m| m.bytecode.into())
-                        .collect(),
-                ))
+            // Deprecated.
+            TransactionPayload::ModuleBundlePayload(_) => {
+                bail!("Module bundle payload has been removed")
             },
         };
         Ok(ret)
@@ -805,13 +792,12 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
-            MoveTypeLayout::Signer => {
+
+            // Some values, e.g., signer or ones with custom serialization
+            // (native), are not stored to storage and so we do not expect
+            // to see them here.
+            MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
-            },
-            MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
-                LayoutTag::IdentifierMapping(_) => {
-                    self.try_into_vm_value_from_layout(inner_layout, val)?
-                },
             },
         })
     }

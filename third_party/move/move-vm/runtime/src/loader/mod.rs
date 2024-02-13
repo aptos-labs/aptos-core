@@ -23,7 +23,7 @@ use move_core_types::{
     ident_str,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
-    value::{IdentifierMappingKind, LayoutTag, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
+    value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
@@ -1748,18 +1748,15 @@ impl Loader {
         let field_node_count = *count - count_before;
         let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
             // For DerivedString, the whole object should be lifted.
-            MoveTypeLayout::Tagged(
-                LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
+            MoveTypeLayout::Native(
+                IdentifierMappingKind::DerivedString,
                 Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))),
             )
         } else {
             // For aggregators / snapshots, the first field should be lifted.
             if let Some(kind) = &maybe_mapping {
                 if let Some(l) = field_layouts.first_mut() {
-                    *l = MoveTypeLayout::Tagged(
-                        LayoutTag::IdentifierMapping(kind.clone()),
-                        Box::new(l.clone()),
-                    );
+                    *l = MoveTypeLayout::Native(kind.clone(), Box::new(l.clone()));
                 }
             }
             MoveTypeLayout::Struct(MoveStructLayout::new(field_layouts))

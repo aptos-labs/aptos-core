@@ -161,7 +161,7 @@ mod test {
         types::DelayedFieldValue, FakeAggregatorView,
     };
     use aptos_types::delayed_fields::{
-        calculate_width_for_integer_embeded_string, SnapshotToStringFormula,
+        calculate_width_for_integer_embedded_string, SnapshotToStringFormula,
     };
     use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
@@ -412,7 +412,7 @@ mod test {
             id_from_fake_idx(2, 8)
         );
 
-        let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
+        let derived_width = assert_ok!(calculate_width_for_integer_embedded_string(
             "prefixsuffix".as_bytes().len(),
             id_from_fake_idx(0, 8)
         )) as u32;
@@ -498,7 +498,7 @@ mod test {
             &DelayedChange::Create(DelayedFieldValue::Snapshot(500)),
         );
 
-        let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
+        let derived_width = assert_ok!(calculate_width_for_integer_embedded_string(
             "prefixsuffix".as_bytes().len(),
             id_from_fake_idx(0, 8)
         )) as u32;

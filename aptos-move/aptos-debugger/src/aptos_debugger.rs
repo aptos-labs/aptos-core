@@ -80,6 +80,11 @@ impl AptosDebugger {
         let resolver = state_view.as_move_resolver();
         let vm = AptosVM::new(&resolver);
 
+        // Module bundle is deprecated!
+        if let TransactionPayload::ModuleBundle(_) = txn.payload() {
+            anyhow::bail!("Module bundle payload has been removed")
+        }
+
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
             &txn,
@@ -100,8 +105,12 @@ impl AptosDebugger {
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has already been checked")
+                    },
                 };
                 Ok(gas_profiler)
             },

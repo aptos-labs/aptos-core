@@ -771,7 +771,7 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
-    #[test(fx = @aptos_framework, creator = @0x123, trader = @0x456)]
+    #[test(fx = @aptos_framework, creator = @0x123)]
     fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, TokenIdentifiers {
         use std::debug;
 
