@@ -35,6 +35,8 @@ pub mod publish_modules;
 pub mod publishing;
 mod transaction_mix_generator;
 mod workflow_delegator;
+pub mod econia_order_generator;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,

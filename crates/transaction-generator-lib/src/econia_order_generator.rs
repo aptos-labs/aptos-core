@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{ObjectPool, call_custom_modules::{UserModuleTransactionGenerator, TransactionGeneratorWorker}, publishing::publish_util::Package, ReliableTransactionSubmitter};
+use crate::{call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, econia_order_generator, publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter};
 use aptos_sdk::{
     bcs,
     move_types::account_address::AccountAddress,
@@ -13,56 +13,82 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, Rng};
+
 use std::sync::Arc;
+// use aptos_infallible::RwLock;
 
-/// Starts new round in the tournament and divides all the players into games.
-pub fn start_new_round(
+/// Placeas a bid limit order.
+pub fn place_bid_limit_order(
     module_id: ModuleId,
+    size: u64,
+    price: u64
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
-        ident_str!("start_new_round").to_owned(),
-        vec![],
-        vec![],
-    ))
-}
-
-pub fn move_players_to_round(
-    module_id: ModuleId,
-    player_accounts: Vec<AccountAddress>,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        module_id,
-        ident_str!("move_players_to_round").to_owned(),
+        ident_str!("place_bid_limit_order").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&player_accounts).unwrap()
+            bcs::to_bytes(&size).unwrap(),
+            bcs::to_bytes(&price).unwrap()
         ],
     ))
 }
 
-pub fn handle_games_end(
+/// Placeas an ask limit order.
+pub fn place_ask_limit_order(
     module_id: ModuleId,
-    player_accounts: Vec<AccountAddress>,
+    size: u64,
+    price: u64
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
-        ident_str!("handle_games_end").to_owned(),
+        ident_str!("place_ask_limit_order").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&player_accounts).unwrap()
+            bcs::to_bytes(&size).unwrap(),
+            bcs::to_bytes(&price).unwrap()
         ],
     ))
 }
 
-pub struct EconiaOrderTransactionGenerator {
+/// Placeas a bid market order.
+pub fn place_bid_market_order(
+    module_id: ModuleId,
+    size: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        ident_str!("place_bid_market_order").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&size).unwrap(),
+        ],
+    ))
+}
+
+/// Placeas an ask market order.
+pub fn place_ask_market_order(
+    module_id: ModuleId,
+    size: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        ident_str!("place_ask_market_order").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&size).unwrap(),
+        ],
+    ))
+}
+
+pub struct EconiaLimitOrderTransactionGenerator {
     to_setup: Arc<ObjectPool<LocalAccount>>,
     done: Arc<ObjectPool<LocalAccount>>,
-    num_orders_placed: Arc<RwLock<usize>>,
+    num_base_orders_placed: usize,
 }
 
-impl EconiaOrderTransactionGenerator {
+impl EconiaLimitOrderTransactionGenerator {
     pub fn new(
         to_setup: Arc<ObjectPool<LocalAccount>>,
         done: Arc<ObjectPool<LocalAccount>>,
@@ -70,13 +96,13 @@ impl EconiaOrderTransactionGenerator {
         Self {
             to_setup,
             done,
-            num_orders_placed: Arc::new(RwLock::new(0)),
+            num_base_orders_placed: 0,
         }
     }
 }
 
 #[async_trait]
-impl UserModuleTransactionGenerator for EconiaOrderTransactionGenerator {
+impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     fn initialize_package(
         &mut self,
         _package: &Package,
@@ -88,95 +114,53 @@ impl UserModuleTransactionGenerator for EconiaOrderTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &self,
+        &mut self,
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
-        _rng: &mut StdRng,
+        rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let to_setup = self.to_setup.clone();
         let done = self.done.clone();
-        Arc::new(move |account, package, publisher, txn_factory, rng| {
-            let batch = to_setup.take_from_pool(usize::MAX, true, rng);
+        self.num_base_orders_placed += 1;
+        if self.num_base_orders_placed <= 100 || self.num_base_orders_placed % 2 == 0 {
+            Arc::new(move |account, package, publisher, txn_factory, rng| {
+                let batch = to_setup.take_from_pool(1, true, rng);
+                if batch.is_empty() {
+                    return vec![];
+                }
+                done.add_to_pool(batch);
+                let bid_size = rng.gen_range(2, 10);
+                let ask_size = rng.gen_range(2, 10);
 
-            if batch.is_empty() {
-                return None;
-            }
-            // let addresses: Vec<_> = batch.iter().map(|a| a.address()).collect();
-            let builder = txn_factory.payload(start_new_round(package.get_module_id("rps_utils")));
-            done.add_to_pool(batch);
-            vec![account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)]
-        })
+                let bid_price = rng.gen_range(1, 200);
+                let ask_price = rng.gen_range(201, 400);
+
+                let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price));
+                let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price));
+                vec![
+                    account.sign_with_transaction_builder(bid_builder),
+                    account.sign_with_transaction_builder(ask_builder)
+                ]
+            })
+        } else {
+            Arc::new(move |account, package, publisher, txn_factory, rng| {
+                let batch = to_setup.take_from_pool(1, true, rng);
+                if batch.is_empty() {
+                    return vec![];
+                }
+                done.add_to_pool(batch);
+
+                let bid_size = rng.gen_range(2, 10);
+                let ask_size = rng.gen_range(2, 10);
+
+                let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size));
+                let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size));
+                vec![
+                    account.sign_with_transaction_builder(bid_builder),
+                    account.sign_with_transaction_builder(ask_builder)
+                ]
+            })
+        }
     }
 }
-
-// #[derive(Clone, Debug)]
-// pub enum TournamentBatchMoveType {
-//     ToRound,
-//     GameEnd,
-// }
-
-// pub struct TournamentMovePlayersInBatchesTransactionGenerator {
-//     from: Arc<ObjectPool<LocalAccount>>,
-//     to: Arc<ObjectPool<LocalAccount>>,
-//     batch_size: usize,
-//     move_type: TournamentBatchMoveType,
-// }
-
-// impl TournamentMovePlayersInBatchesTransactionGenerator {
-//     pub fn new(
-//         from: Arc<ObjectPool<LocalAccount>>,
-//         to: Arc<ObjectPool<LocalAccount>>,
-//         batch_size: usize,
-//         move_type: TournamentBatchMoveType,
-//     ) -> Self {
-//         Self {
-//             from,
-//             to,
-//             batch_size,
-//             move_type,
-//         }
-//     }
-// }
-
-// #[async_trait]
-// impl UserModuleTransactionGenerator for TournamentMovePlayersInBatchesTransactionGenerator {
-//     fn initialize_package(
-//         &mut self,
-//         _package: &Package,
-//         _publisher: &mut LocalAccount,
-//         _txn_factory: &TransactionFactory,
-//         _rng: &mut StdRng,
-//     ) -> Vec<SignedTransaction> {
-//         vec![]
-//     }
-
-//     async fn create_generator_fn(
-//         &self,
-//         _root_account: &mut LocalAccount,
-//         _txn_factory: &TransactionFactory,
-//         _txn_executor: &dyn ReliableTransactionSubmitter,
-//         _rng: &mut StdRng,
-//     ) -> Arc<TransactionGeneratorWorker> {
-//         let batch_size = self.batch_size;
-//         let from = self.from.clone();
-//         let to = self.to.clone();
-//         let move_type = self.move_type.clone();
-
-
-//         Arc::new(move |account, package, publisher, txn_factory, rng| {
-//             let batch = from.take_from_pool(batch_size, true, rng);
-
-//             if batch.is_empty() {
-//                 return None;
-//             }
-//             let addresses = batch.iter().map(|a| a.address()).collect();
-//             let builder = txn_factory.payload(match move_type {
-//                 TournamentBatchMoveType::ToRound => move_players_to_round(package.get_module_id("rps_utils"), addresses),
-//                 TournamentBatchMoveType::GameEnd => handle_games_end(package.get_module_id("rps_utils"), addresses),
-//             });
-//             to.add_to_pool(batch);
-//             Some(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))
-//         })
-//     }
-// }
