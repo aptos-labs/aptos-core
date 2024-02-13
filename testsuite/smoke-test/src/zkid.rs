@@ -13,7 +13,7 @@ use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::{
-    bn254_circom::{G1Bytes, G2Bytes},
+    bn254_circom::{G1Bytes, G2Bytes, Groth16VerificationKey},
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         rsa::RSA_JWK,
@@ -24,8 +24,8 @@ use aptos_types::{
         SignedTransaction,
     },
     zkid::{
-        Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp, ZkIdPublicKey,
-        ZkIdSignature, ZkpOrOpenIdSig,
+        Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp,
+        ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -91,8 +91,8 @@ async fn test_zkid_oidc_signature_transaction_submission() {
 
     let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJHRTJSNWtpSjN1QUZORGNVLTdFZWlRUVE2ZzhITXlTX3VFSERuV0V4NndJIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcyNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "VjBhIlbIP7SmF-ra7GMgcWNghU1Ew8U7ZeGBukJ7NHUfjQkPsG2cMfZD_WwZoLJBk3HjjZJyItVq67XIUqdbIM30pVem-QPDX-bjaGEyRlHUkHonKT8JjOMUtKN9NQA9ikqd-DJCxT5UfpotJ_9n7D4kf2cO9wpITyVFHT_BP8yJoJEWT61bvqIzVuNNE3umMwL29lICnvnUa20KjDIyk2BOlUOvNJfjPdJHPuzFDuqjv8cRSTJqjd2N-E31-R7VvCtQ75WNfWu1mPY3IDfu7uiS5zqXNJzWq1GLe8K3o2_BP9_xP7loDyCYAcmX-gFSNCEc4gbpYEq_5vBYfwG7Vg".to_string();
 
     let openid_signature = OpenIdSig {
         jwt_sig,
@@ -106,7 +106,7 @@ async fn test_zkid_oidc_signature_transaction_submission() {
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
         jwt_header,
-        exp_timestamp_secs: 1707812836,
+        exp_timestamp_secs: 1727812836,
         ephemeral_pubkey: ephemeral_public_key,
         ephemeral_signature,
     };
@@ -175,7 +175,7 @@ async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification(
 
     let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJHRTJSNWtpSjN1QUZORGNVLTdFZWlRUVE2ZzhITXlTX3VFSERuV0V4NndJIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcyNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
     let jwt_sig = "bad_signature".to_string();
 
     let openid_signature = OpenIdSig {
@@ -190,7 +190,7 @@ async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification(
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
         jwt_header,
-        exp_timestamp_secs: 1707812836,
+        exp_timestamp_secs: 1727812836,
         ephemeral_pubkey: ephemeral_public_key,
         ephemeral_signature,
     };
@@ -260,8 +260,8 @@ async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
 
     let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJHRTJSNWtpSjN1QUZORGNVLTdFZWlRUVE2ZzhITXlTX3VFSERuV0V4NndJIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcyNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "VjBhIlbIP7SmF-ra7GMgcWNghU1Ew8U7ZeGBukJ7NHUfjQkPsG2cMfZD_WwZoLJBk3HjjZJyItVq67XIUqdbIM30pVem-QPDX-bjaGEyRlHUkHonKT8JjOMUtKN9NQA9ikqd-DJCxT5UfpotJ_9n7D4kf2cO9wpITyVFHT_BP8yJoJEWT61bvqIzVuNNE3umMwL29lICnvnUa20KjDIyk2BOlUOvNJfjPdJHPuzFDuqjv8cRSTJqjd2N-E31-R7VvCtQ75WNfWu1mPY3IDfu7uiS5zqXNJzWq1GLe8K3o2_BP9_xP7loDyCYAcmX-gFSNCEc4gbpYEq_5vBYfwG7Vg".to_string();
 
     let openid_signature = OpenIdSig {
         jwt_sig,
@@ -275,7 +275,7 @@ async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
         jwt_header,
-        exp_timestamp_secs: 1704909236,
+        exp_timestamp_secs: 1, // Expired timestamp
         ephemeral_pubkey: ephemeral_public_key,
         ephemeral_signature,
     };
@@ -378,14 +378,17 @@ async fn test_zkid_groth16_verifies() {
 
     // TODO(zkid): Refactor tests to be modular and add test for bad training wheels signature (commented out below).
     //let bad_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+    let config = Configuration::new_for_devnet_and_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephem_proof_sig,
-            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
-            //training_wheels_signature: EphemeralSignature::ed25519(bad_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
+            exp_horizon_secs: config.max_exp_horizon_secs,
             override_aud_val: None,
+            training_wheels_signature: Some(EphemeralSignature::ed25519(
+                tw_sk.sign(&proof).unwrap(),
+            )),
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -396,10 +399,14 @@ async fn test_zkid_groth16_verifies() {
     let signed_txn = SignedTransaction::new_zkid(raw_txn, sender_zkid_public_key, zk_sig);
 
     info!("Submit zero knowledge transaction");
-    info.client()
+    let result = info
+        .client()
         .submit_without_serializing_response(&signed_txn)
-        .await
-        .unwrap();
+        .await;
+
+    if let Err(e) = result {
+        panic!("Error with Groth16 TXN verification: {:?}", e)
+    }
 }
 
 #[tokio::test]
@@ -485,13 +492,17 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
 
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
 
+    let config = Configuration::new_for_devnet_and_testing();
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephemeral_signature.clone(), // Wrong signature
-            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
+            exp_horizon_secs: config.max_exp_horizon_secs,
             override_aud_val: None,
+            training_wheels_signature: Some(EphemeralSignature::ed25519(
+                tw_sk.sign(&proof).unwrap(),
+            )),
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -518,6 +529,21 @@ async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) -> Ed255
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(60))
         .await
         .expect("Epoch 2 taking too long to come!");
+
+    let maybe_response = client
+        .get_account_resource_bcs::<Groth16VerificationKey>(
+            AccountAddress::ONE,
+            "0x1::zkid::Groth16VerificationKey",
+        )
+        .await;
+    let vk = maybe_response.unwrap().into_inner();
+    println!("Groth16 VK: {:?}", vk);
+
+    let maybe_response = client
+        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::zkid::Configuration")
+        .await;
+    let config = maybe_response.unwrap().into_inner();
+    println!("zkID configuration: {:?}", config);
 
     let iss = "https://accounts.google.com";
     let jwk = RSA_JWK {

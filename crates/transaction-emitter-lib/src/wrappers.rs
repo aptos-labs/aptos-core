@@ -176,6 +176,7 @@ pub async fn create_accounts_command(
             .init_gas_price_multiplier(1)
             .expected_gas_per_txn(create_accounts_args.max_gas_per_txn)
             .max_gas_per_txn(create_accounts_args.max_gas_per_txn)
+            .init_max_gas_per_txn(create_accounts_args.max_gas_per_txn)
             .coins_per_account_override(0)
             .expected_max_txns(0)
             .prompt_before_spending();

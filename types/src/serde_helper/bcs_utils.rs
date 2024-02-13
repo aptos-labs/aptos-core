@@ -1,18 +1,10 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-pub fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
-}
+pub use move_binary_format::file_format_common::{bcs_size_of_byte_array, size_u32_as_uleb128};
 
-pub fn bcs_size_of_byte_array(length: usize) -> usize {
-    size_u32_as_uleb128(length) + length
-}
+// TODO[agg_v2](cleanup): check if tests need to go to move_binary_format and
+//                        if we need pub use here.
 
 #[test]
 fn test_size_u32_as_uleb128() {

@@ -2,6 +2,7 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
+    move_utils::as_move_value::AsMoveValue,
     zkid::{Configuration, IdCommitment, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use anyhow::bail;
@@ -10,7 +11,12 @@ use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projecti
 use ark_ff::PrimeField;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    move_resource::MoveStructType,
+    value::{MoveStruct, MoveValue},
+};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
@@ -33,13 +39,27 @@ macro_rules! serialize {
 /// Reflection of aptos_framework::zkid::Groth16PreparedVerificationKey
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Groth16VerificationKey {
-    alpha_g1: Vec<u8>,
-    beta_g2: Vec<u8>,
-    gamma_g2: Vec<u8>,
-    delta_g2: Vec<u8>,
-    gamma_abc_g1: Vec<Vec<u8>>,
+    pub alpha_g1: Vec<u8>,
+    pub beta_g2: Vec<u8>,
+    pub gamma_g2: Vec<u8>,
+    pub delta_g2: Vec<u8>,
+    pub gamma_abc_g1: Vec<Vec<u8>>,
 }
 
+impl AsMoveValue for Groth16VerificationKey {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            self.alpha_g1.as_move_value(),
+            self.beta_g2.as_move_value(),
+            self.gamma_g2.as_move_value(),
+            self.delta_g2.as_move_value(),
+            self.gamma_abc_g1.as_move_value(),
+        ]))
+    }
+}
+
+/// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
+/// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
 impl MoveStructType for Groth16VerificationKey {
     const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
     const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
@@ -322,6 +342,7 @@ pub fn get_public_inputs_hash(
     sig: &ZkIdSignature,
     pk: &ZkIdPublicKey,
     jwk: &RSA_JWK,
+    exp_horizon_secs: u64,
     config: &Configuration,
 ) -> anyhow::Result<Fr> {
     let extra_field_hashed;
@@ -360,7 +381,7 @@ pub fn get_public_inputs_hash(
     frs.push(Fr::from(sig.exp_timestamp_secs));
 
     // Add the epk lifespan as a scalar
-    frs.push(Fr::from(config.max_exp_horizon_secs));
+    frs.push(Fr::from(exp_horizon_secs));
 
     // Add the hash of the iss (formatted key-value pair string).
     let formatted_iss = format!("\"iss\":\"{}\",", pk.iss);

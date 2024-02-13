@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::MAX_TXNS_FROM_BLOCK_TO_EXECUTE, payload_manager::PayloadManager,
-    transaction_deduper::TransactionDeduper, transaction_filter::TransactionFilter,
+    counters::{MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
+    payload_manager::PayloadManager,
+    transaction_deduper::TransactionDeduper,
+    transaction_filter::TransactionFilter,
     transaction_shuffler::TransactionShuffler,
 };
 use aptos_consensus_types::block::Block;
@@ -45,7 +47,11 @@ impl BlockPreparer {
         tokio::task::spawn_blocking(move || {
             let filtered_txns = txn_filter.filter(block_id, block_timestamp_usecs, txns);
             let deduped_txns = txn_deduper.dedup(filtered_txns);
-            let mut shuffled_txns = txn_shuffler.shuffle(deduped_txns);
+            let mut shuffled_txns = {
+                let _timer = TXN_SHUFFLE_SECONDS.start_timer();
+
+                txn_shuffler.shuffle(deduped_txns)
+            };
 
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
                 shuffled_txns.truncate(max_txns_from_block_to_execute);

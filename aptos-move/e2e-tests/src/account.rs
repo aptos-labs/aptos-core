@@ -15,8 +15,8 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, Module, ModuleBundle, RawTransaction,
-        Script, SignedTransaction, TransactionPayload,
+        authenticator::AuthenticationKey, EntryFunction, RawTransaction, Script, SignedTransaction,
+        TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -214,11 +214,6 @@ impl TransactionBuilder {
 
     pub fn entry_function(mut self, f: EntryFunction) -> Self {
         self.program = Some(TransactionPayload::EntryFunction(f));
-        self
-    }
-
-    pub fn module(mut self, m: Module) -> Self {
-        self.program = Some(TransactionPayload::ModuleBundle(ModuleBundle::from(m)));
         self
     }
 

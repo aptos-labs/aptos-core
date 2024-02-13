@@ -28,8 +28,10 @@ use aptos_types::{
 use aptos_types::{
     chain_id::ChainId,
     delayed_fields::PanicError,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    write_set::WriteOp,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
@@ -81,7 +83,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         false
@@ -108,10 +109,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         unreachable!()
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        _id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
+    fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
         unreachable!()
     }
 
@@ -119,8 +117,10 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unreachable!()
     }
 
@@ -128,7 +128,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         unimplemented!()
     }
 }

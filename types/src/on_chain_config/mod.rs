@@ -161,6 +161,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
         Self::deserialize_default_impl(bytes)
     }
 
+    /// TODO: This does not work if `T`'s reflection on the Move side is using resource groups.
     fn fetch_config<T>(storage: &T) -> Option<Self>
     where
         T: ConfigStorage + ?Sized,
