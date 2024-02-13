@@ -1287,57 +1287,63 @@ where
             )
         };
 
-        let mut resource_group_bcs_fallback = matches!(
-            ret,
-            Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-                IntentionalFallbackToSequential::ResourceGroupSerializationError
-            )))
-        );
+        if self.config.local.allow_fallback {
+            let mut resource_group_bcs_fallback = matches!(
+                ret,
+                Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                    IntentionalFallbackToSequential::ResourceGroupSerializationError
+                )))
+            );
 
-        if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
-            // Sequential execution fallback, only worth doing if we did a different pass before,
-            // i.e. parallel. This fallback does not handle resource group serialization issues.
+            if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
+                // Sequential execution fallback, only worth doing if we did a different pass before,
+                // i.e. parallel. This fallback does not handle resource group serialization issues.
 
-            if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
-                // Any error logs are already written at appropriate levels.
-                debug!("Sequential_fallback occurred");
+                if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
+                    // Any error logs are already written at appropriate levels.
+                    debug!("Sequential_fallback occurred");
 
-                // All logs from the parallel execution should be cleared and not reported.
-                // Clear by re-initializing the speculative logs.
+                    // All logs from the parallel execution should be cleared and not reported.
+                    // Clear by re-initializing the speculative logs.
+                    init_speculative_logs(signature_verified_block.len());
+
+                    ret = self.execute_transactions_sequential(
+                        executor_arguments,
+                        signature_verified_block,
+                        base_view,
+                        false,
+                    );
+                    resource_group_bcs_fallback = matches!(
+                        ret,
+                        Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                            IntentionalFallbackToSequential::ResourceGroupSerializationError
+                        )))
+                    );
+                }
+            }
+
+            if resource_group_bcs_fallback {
+                alert!("Resource group serialization fallback");
                 init_speculative_logs(signature_verified_block.len());
-
                 ret = self.execute_transactions_sequential(
                     executor_arguments,
                     signature_verified_block,
                     base_view,
-                    false,
-                );
-                resource_group_bcs_fallback = matches!(
-                    ret,
-                    Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-                        IntentionalFallbackToSequential::ResourceGroupSerializationError
-                    )))
+                    true,
                 );
             }
-        }
 
-        if resource_group_bcs_fallback {
-            alert!("Resource group serialization fallback");
-            init_speculative_logs(signature_verified_block.len());
-            ret = self.execute_transactions_sequential(
-                executor_arguments,
-                signature_verified_block,
-                base_view,
-                true,
-            );
-        }
-
-        // If after trying available fallbacks, we still are askign to do a fallback,
-        // something unrecoverable went wrong.
-        if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
+            // If after trying available fallbacks, we still are askign to do a fallback,
+            // something unrecoverable went wrong.
+            if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
+                // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
+                // this error often when something that should never happen goes wrong
+                panic!("Sequential execution failed with {:?}", e);
+            }
+        } else if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
             // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
             // this error often when something that should never happen goes wrong
-            panic!("Sequential execution failed with {:?}", e);
+            panic!("Fallback disabled, execution failed due to {:?}", e);
         }
 
         ret
