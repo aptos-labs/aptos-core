@@ -327,7 +327,8 @@ pub struct SignedGroth16Zkp {
 
 impl SignedGroth16Zkp {
     pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
-        self.non_malleability_signature.verify_arbitrary_msg(&self.proof.to_bytes(), pub_key)
+        self.non_malleability_signature
+            .verify_arbitrary_msg(&self.proof.to_bytes(), pub_key)
     }
 
     pub fn verify_training_wheels_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {

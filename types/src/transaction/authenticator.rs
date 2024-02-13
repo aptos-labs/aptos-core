@@ -1097,7 +1097,6 @@ impl EphemeralSignature {
             },
         }
     }
-
 }
 
 impl TryFrom<&[u8]> for EphemeralSignature {
@@ -1809,7 +1808,9 @@ mod tests {
 
         let proof_sig = sender.sign_arbitrary_message(&proof.to_bytes());
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
-        ephem_proof_sig.verify_arbitrary_msg(&proof.to_bytes(), &epk).unwrap();
+        ephem_proof_sig
+            .verify_arbitrary_msg(&proof.to_bytes(), &epk)
+            .unwrap();
         let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
