@@ -6,6 +6,7 @@ use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
     compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig, types::RedisUrl,
+    cache_operator::CacheOperator,
 };
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
@@ -13,7 +14,7 @@ use aptos_protos::{
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr, sync::Arc};
+use std::{collections::HashSet, net::SocketAddr};
 use tonic::{
     codec::CompressionEncoding,
     codegen::InterceptedService,
@@ -161,15 +162,20 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         } else {
             StorageFormat::Base64UncompressedProto
         };
-        let transactions_buffer = Arc::new(tokio::sync::RwLock::new(TransactionsBuffer::new()));
+        let transactions_buffer = TransactionsBuffer::new();
         let transactions_buffer_clone = transactions_buffer.clone();
         let redis_read_replica_address = self.redis_read_replica_address.clone();
         let transactions_buffer_processing_task = tokio::spawn({
             let transactions_buffer_clone = transactions_buffer_clone.clone();
+            let cache_storage_format_clone = cache_storage_format;
             async move {
-                transactions_buffer_processing(transactions_buffer_clone, redis_read_replica_address).await
+                transactions_buffer_processing(transactions_buffer_clone, redis_read_replica_address, cache_storage_format_clone).await
             }
         });
+
+        // Give some time for the buffer to be warmed up.
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
@@ -251,8 +257,18 @@ pub fn build_auth_token_set(whitelisted_auth_tokens: Vec<String>) -> HashSet<Met
 
 /// Fill the buffer with transactions.
 async fn transactions_buffer_processing(
-    _buffer: Arc<tokio::sync::RwLock<TransactionsBuffer>>,
-    _redis_address: RedisUrl,
+    buffer: TransactionsBuffer,
+    redis_address: RedisUrl,
+    storage_format: StorageFormat,
 ) -> Result<()> {
+    let redis_client = redis::Client::open(redis_address.0).expect("Failed to open redis client in buffer processing");
+    let conn = redis_client
+                .get_tokio_connection_manager()
+                .await
+                .expect("Get redis connection failed.");
+    let mut cache_operator = CacheOperator::new(conn, storage_format);
+    let latest_version = cache_operator.get_latest_version().await?;
+
+    // TODO: finish the implementation.
     Ok(())
 }

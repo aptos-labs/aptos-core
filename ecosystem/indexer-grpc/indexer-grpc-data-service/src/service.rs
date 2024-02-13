@@ -38,7 +38,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc::{channel, error::SendTimeoutError};
-use tokio::sync::RwLock;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
@@ -47,7 +46,6 @@ use uuid::Uuid;
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
 const MOVING_AVERAGE_WINDOW_SIZE: u64 = 10_000;
-const AHEAD_OF_BUFFER_RETRY_SLEEP_DURATION_MS: u64 = 10;
 // When trying to fetch beyond the current head of cache, the server will retry after this duration.
 const AHEAD_OF_CACHE_RETRY_SLEEP_DURATION_MS: u64 = 50;
 // When error happens when fetching data from cache and file store, the server will retry after this duration.
@@ -82,7 +80,7 @@ pub struct RawDataServerWrapper {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
     pub cache_storage_format: StorageFormat,
-    pub transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
+    pub transactions_buffer: TransactionsBuffer,
 }
 
 impl RawDataServerWrapper {
@@ -91,7 +89,7 @@ impl RawDataServerWrapper {
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
         cache_storage_format: StorageFormat,
-        transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
+        transactions_buffer: TransactionsBuffer,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -221,8 +219,18 @@ async fn get_data_with_tasks(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
-    _transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
+    transactions_buffer: TransactionsBuffer,
 ) -> DataFetchSubTaskResult {
+    let transactions_buffer = transactions_buffer;
+    match transactions_buffer.get_transactions(start_version).await {
+        BufferGetStatus::AheadOfBuffer => return DataFetchSubTaskResult::NoResults,
+        BufferGetStatus::InBuffer(transactions) => {
+            let result = transactions.into_iter().map(|t| (*t).clone()).collect();
+            return DataFetchSubTaskResult::Success(result);
+        },
+        _=> {},
+    }
+
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
         .await;
@@ -349,7 +357,7 @@ async fn data_fetcher_task(
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     mut current_version: u64,
-    transactions_buffer: Arc<RwLock<TransactionsBuffer>>,
+    transactions_buffer: TransactionsBuffer,
 ) {
     let mut connection_start_time = Some(std::time::Instant::now());
     let mut transactions_count = transactions_count;
