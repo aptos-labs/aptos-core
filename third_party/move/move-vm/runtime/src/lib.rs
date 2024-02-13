@@ -17,6 +17,7 @@ pub mod logging;
 pub mod move_vm;
 pub mod native_extensions;
 pub mod native_functions;
+pub mod native_types;
 mod runtime;
 pub mod session;
 #[macro_use]

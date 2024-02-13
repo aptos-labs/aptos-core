@@ -9,6 +9,7 @@ use crate::{
     loader::{Function, LoadedFunction, Loader, ModuleCache, ModuleStorage, ModuleStorageAdapter},
     native_extensions::NativeContextExtensions,
     native_functions::{NativeFunction, NativeFunctions},
+    native_types::NativeTypes,
     session::{LoadedFunctionInstantiation, SerializedReturnValues},
 };
 use move_binary_format::{
@@ -23,12 +24,12 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    value::MoveTypeLayout,
+    value::{LayoutTag, MoveTypeLayout},
     vm_status::StatusCode,
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{StructIdentifier, Type},
     values::{Locals, Reference, VMValueCast, Value},
 };
 use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
@@ -54,7 +55,26 @@ impl VMRuntime {
         vm_config: VMConfig,
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {
-            loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
+            loader: Loader::new(
+                NativeFunctions::new(natives)?,
+                NativeTypes::empty(),
+                vm_config,
+            ),
+            module_cache: Arc::new(ModuleCache::new()),
+        })
+    }
+
+    pub(crate) fn new_with_native_types(
+        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        native_types: impl IntoIterator<Item = (StructIdentifier, LayoutTag)>,
+        vm_config: VMConfig,
+    ) -> PartialVMResult<Self> {
+        Ok(VMRuntime {
+            loader: Loader::new(
+                NativeFunctions::new(natives)?,
+                NativeTypes::new(native_types),
+                vm_config,
+            ),
             module_cache: Arc::new(ModuleCache::new()),
         })
     }

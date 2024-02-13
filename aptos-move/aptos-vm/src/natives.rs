@@ -37,9 +37,16 @@ use aptos_types::{
 use bytes::Bytes;
 #[cfg(feature = "testing")]
 use move_binary_format::errors::PartialVMResult;
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    language_storage::ModuleId,
+    value::{IdentifierMappingKind, LayoutTag},
+};
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
+use move_vm_types::loaded_data::runtime_types::StructIdentifier;
 #[cfg(feature = "testing")]
 use std::{
     collections::{BTreeMap, HashSet},
@@ -184,6 +191,43 @@ pub fn aptos_natives_with_builder(builder: &mut SafeNativeBuilder) -> NativeFunc
             builder,
         ))
         .collect()
+}
+
+macro_rules! register_identifier_mapping {
+    ($native_types:ident, $module:expr, $struct_name:expr, $kind:ident) => {
+        let struct_identifier = StructIdentifier {
+            module: ModuleId::new(AccountAddress::ONE, ident_str!($module).to_owned()),
+            name: ident_str!($struct_name).to_owned(),
+        };
+        $native_types.push((
+            struct_identifier,
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::$kind),
+        ));
+    };
+}
+
+pub fn aptos_native_types(features: &Features) -> Vec<(StructIdentifier, LayoutTag)> {
+    let mut native_types = vec![];
+
+    // If aggregator execution is enabled, we need to tag aggregator_v2 types,
+    // so they can be exchanged with identifiers during VM execution.
+    if features.is_aggregator_v2_delayed_fields_enabled() {
+        register_identifier_mapping!(native_types, "aggregator_v2", "Aggregator", Aggregator);
+        register_identifier_mapping!(
+            native_types,
+            "aggregator_v2",
+            "AggregatorSnapshot",
+            Snapshot
+        );
+        register_identifier_mapping!(
+            native_types,
+            "aggregator_v2",
+            "DerivedStringSnapshot",
+            DerivedString
+        );
+    }
+
+    native_types
 }
 
 pub fn assert_no_test_natives(err_msg: &str) {
