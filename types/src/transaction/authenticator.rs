@@ -1085,6 +1085,19 @@ impl EphemeralSignature {
             },
         }
     }
+
+    pub fn verify_arbitrary_msg(
+        &self,
+        message: &[u8],
+        public_key: &EphemeralPublicKey,
+    ) -> Result<()> {
+        match (self, public_key) {
+            (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
+                signature.verify_arbitrary_msg(message, public_key)
+            },
+        }
+    }
+
 }
 
 impl TryFrom<&[u8]> for EphemeralSignature {
@@ -1794,9 +1807,9 @@ mod tests {
         let epk = EphemeralPublicKey::ed25519(sender.public_key());
         let es = EphemeralSignature::ed25519(sender_sig);
 
-        let proof_sig = sender.sign(&proof).unwrap();
+        let proof_sig = sender.sign_arbitrary_message(&proof.to_bytes());
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
-        ephem_proof_sig.verify(&proof, &epk).unwrap();
+        ephem_proof_sig.verify_arbitrary_msg(&proof.to_bytes(), &epk).unwrap();
         let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
@@ -1816,7 +1829,7 @@ mod tests {
         };
 
         let pepper = Pepper::from_number(76);
-        let addr_seed = IdCommitment::new_from_preimage(
+        let idc = IdCommitment::new_from_preimage(
             &pepper,
             "407408718192.apps.googleusercontent.com",
             "sub",
@@ -1826,7 +1839,7 @@ mod tests {
 
         let zk_pk = ZkIdPublicKey {
             iss: "https://accounts.google.com".to_owned(),
-            idc: addr_seed,
+            idc,
         };
 
         let sk_auth =

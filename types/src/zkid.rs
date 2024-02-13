@@ -327,12 +327,12 @@ pub struct SignedGroth16Zkp {
 
 impl SignedGroth16Zkp {
     pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
-        self.non_malleability_signature.verify(&self.proof, pub_key)
+        self.non_malleability_signature.verify_arbitrary_msg(&self.proof.to_bytes(), pub_key)
     }
 
     pub fn verify_training_wheels_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
         if let Some(training_wheels_signature) = &self.training_wheels_signature {
-            training_wheels_signature.verify(&self.proof, pub_key)
+            training_wheels_signature.verify_arbitrary_msg(&self.proof.to_bytes(), pub_key)
         } else {
             bail!("No training_wheels_signature found")
         }
@@ -352,6 +352,12 @@ impl TryFrom<&[u8]> for Groth16Zkp {
 
     fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
         bcs::from_bytes::<Groth16Zkp>(bytes).map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+impl ValidCryptoMaterial for Groth16Zkp {
+    fn to_bytes(&self) -> Vec<u8> {
+        bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
 }
 
@@ -640,7 +646,7 @@ mod test {
     };
     use aptos_crypto::{
         ed25519::{Ed25519PrivateKey, Ed25519Signature},
-        PrivateKey, SigningKey, Uniform,
+        PrivateKey, SigningKey, Uniform, ValidCryptoMaterial,
     };
     use std::ops::Deref;
 
@@ -692,7 +698,7 @@ mod test {
         let epk = EphemeralPublicKey::ed25519(sender.public_key());
         let es = EphemeralSignature::ed25519(sender_sig);
 
-        let proof_sig = sender.sign(&proof).unwrap();
+        let proof_sig = sender.sign_arbitrary_message(&proof.to_bytes());
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
         let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
@@ -713,7 +719,7 @@ mod test {
         };
 
         let pepper = Pepper::from_number(76);
-        let addr_seed = IdCommitment::new_from_preimage(
+        let idc = IdCommitment::new_from_preimage(
             &pepper,
             "407408718192.apps.googleusercontent.com",
             "sub",
@@ -723,7 +729,7 @@ mod test {
 
         let zk_pk = ZkIdPublicKey {
             iss: "https://accounts.google.com".to_owned(),
-            idc: addr_seed,
+            idc,
         };
         let jwk = RSA_JWK {
             kid:"1".to_owned(),
