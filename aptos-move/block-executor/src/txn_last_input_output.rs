@@ -78,6 +78,8 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
     // Cache to avoid expensive clones of data.
+    // TODO(clean-up): be consistent with naming resource writes: here it means specifically
+    // individual writes, but in some contexts it refers to all writes (e.g. including group writes)
     arced_resource_writes: Vec<
         CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
     >,

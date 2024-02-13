@@ -15,11 +15,10 @@ use bytes::Bytes;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use rand::{thread_rng, Rng};
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
+// TODO(clean-up): refactor & replace these macros with functions for code clarity. Currently
+// not possible due to type & API mismatch.
 macro_rules! groups_to_finalize {
     ($outputs:expr, $($txn_idx:expr),*) => {{
 	let group_write_ops = $outputs.resource_group_metadata_ops($($txn_idx),*);
@@ -213,28 +212,15 @@ pub(crate) fn map_id_to_values_in_write_set<
     resource_write_set: Vec<(T::Key, Arc<T::Value>, Arc<MoveTypeLayout>)>,
     latest_view: &LatestView<T, S, X>,
 ) -> Result<Vec<(T::Key, T::Value)>, PanicError> {
-    // Note: can remove or debug-only & be less defensive in the future / check elsewhere.
-    let mut duplication_checker = HashSet::new();
-
-    let ret: Vec<_> = resource_write_set
+    resource_write_set
         .into_iter()
         .map(|(key, write_op, layout)| {
-            duplication_checker.insert(key.clone());
-
             Ok::<_, PanicError>((
                 key,
                 replace_ids_with_values(&write_op, &layout, latest_view)?,
             ))
         })
-        .collect::<std::result::Result<_, PanicError>>()?;
-
-    if duplication_checker.len() != ret.len() {
-        Err(code_invariant_error(
-            "reads_needing_delayed_field_exchange already in the write set for key".to_string(),
-        ))
-    } else {
-        Ok(ret)
-    }
+        .collect::<std::result::Result<_, PanicError>>()
 }
 
 // For each delayed field in the event, replace delayed field identifier with value.
