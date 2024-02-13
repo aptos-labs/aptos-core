@@ -7,6 +7,7 @@ use anyhow::{format_err, Result};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::on_chain_config::ConsensusAlgorithmConfig::Jolteon;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ConsensusAlgorithmConfig {
@@ -240,6 +241,36 @@ impl OnChainConsensusConfig {
 
     pub fn is_vtxn_enabled(&self) -> bool {
         self.effective_validator_txn_config().enabled()
+    }
+
+    pub fn disable_validator_txns(&mut self) {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
+                // vtxn not supported. No-op.
+            }
+            OnChainConsensusConfig::V3 { vtxn, .. } => {
+                *vtxn = ValidatorTxnConfig::V0;
+            }
+        }
+    }
+
+    pub fn enable_validator_txns(&mut self) {
+        let new_self = match std::mem::take(self) {
+            OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V3 {
+                alg: Jolteon { main: config, quorum_store_enabled: false },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V2(config) => OnChainConsensusConfig::V3 {
+                alg: Jolteon { main: config, quorum_store_enabled: true },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V3 { vtxn: ValidatorTxnConfig::V0, alg } => OnChainConsensusConfig::V3 {
+                alg,
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            item @ OnChainConsensusConfig::V3 { vtxn: ValidatorTxnConfig::V1 {..}, .. } => item,
+        };
+        *self = new_self;
     }
 }
 

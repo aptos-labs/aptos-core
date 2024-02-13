@@ -136,9 +136,22 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                 metadata,
                 ..
             } = session_state;
-            self.setup_deal_broadcast(start_time_us, &metadata)
-                .await
-                .expect("[DKG] setup_deal_broadcast() should be infallible");
+
+            if metadata.dealer_epoch == self.epoch_state.epoch {
+                info!(
+                    epoch = self.epoch_state.epoch,
+                    "Found unfinished and current DKG session. Continuing it."
+                );
+                self.setup_deal_broadcast(start_time_us, &metadata)
+                    .await
+                    .expect("[DKG] setup_deal_broadcast() should be infallible");
+            } else {
+                info!(
+                    cur_epoch = self.epoch_state.epoch,
+                    dealer_epoch = metadata.dealer_epoch,
+                    "Found unfinished but stale DKG session. Ignoring it."
+                );
+            }
         }
 
         let mut close_rx = close_rx.into_stream();
