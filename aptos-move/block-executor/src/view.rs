@@ -56,14 +56,11 @@ use claims::assert_ok;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::{
-    delayed_values::delayed_field_id::{ExtractUniqueIndex, ExtractWidth, TryFromMoveValue},
+    delayed_values::delayed_field_id::ExtractUniqueIndex,
     value_serde::{
         deserialize_and_allow_delayed_values, deserialize_and_replace_values_with_ids,
         serialize_and_allow_delayed_values, serialize_and_replace_ids_with_values,
-        ValueToIdentifierMapping,
     },
-    value_traversal::find_identifiers_in_value,
-    values::Value,
 };
 use std::{
     cell::RefCell,
