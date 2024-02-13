@@ -1,12 +1,10 @@
 // Copyright © Aptos Foundation
 
-use criterion::Criterion;
-use criterion::criterion_main;
-use criterion::criterion_group;
 use aptos_executor_types::should_forward_to_subscription_service;
 #[cfg(feature = "bench")]
 use aptos_executor_types::should_forward_to_subscription_service_old;
 use aptos_types::contract_event::ContractEvent;
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn default_targets(c: &mut Criterion) {
     let mut group = c.benchmark_group("should_forward_to_subscription_service");
@@ -14,19 +12,25 @@ fn default_targets(c: &mut Criterion) {
     #[cfg(feature = "bench")]
     group.bench_function("v0", move |b| {
         b.iter_with_setup(
-            || ContractEvent::new_v2_with_type_tag_str("0x1::jwks::QuorumCertifiedUpdate", vec![0xff; 256]),
-            |event| {
-                should_forward_to_subscription_service_old(&event)
+            || {
+                ContractEvent::new_v2_with_type_tag_str(
+                    "0x1::jwks::QuorumCertifiedUpdate",
+                    vec![0xFF; 256],
+                )
             },
+            |event| should_forward_to_subscription_service_old(&event),
         )
     });
 
     group.bench_function("v1", move |b| {
         b.iter_with_setup(
-            || ContractEvent::new_v2_with_type_tag_str("0x1::jwks::QuorumCertifiedUpdate", vec![0xff; 256]),
-            |event| {
-                should_forward_to_subscription_service(&event)
+            || {
+                ContractEvent::new_v2_with_type_tag_str(
+                    "0x1::jwks::QuorumCertifiedUpdate",
+                    vec![0xFF; 256],
+                )
             },
+            |event| should_forward_to_subscription_service(&event),
         )
     });
 }

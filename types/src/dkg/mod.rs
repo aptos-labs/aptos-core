@@ -8,14 +8,13 @@ use anyhow::Result;
 use aptos_crypto::Uniform;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
+    move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug};
-use std::str::FromStr;
-use once_cell::sync::Lazy;
-use move_core_types::language_storage::TypeTag;
+use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {
@@ -34,9 +33,8 @@ impl MoveStructType for DKGStartEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
 }
 
-pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(||{
-    TypeTag::from_str(DKGStartEvent::struct_tag().to_string().as_str()).unwrap()
-});
+pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::from_str(DKGStartEvent::struct_tag().to_string().as_str()).unwrap());
 
 /// DKG transcript and its metadata.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]

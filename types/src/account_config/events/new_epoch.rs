@@ -7,9 +7,9 @@ use anyhow::Result;
 use move_core_types::{
     ident_str, identifier::IdentStr, language_storage::TypeTag, move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use once_cell::sync::Lazy;
 
 /// Struct that represents a NewEpochEvent.
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,6 +50,5 @@ impl MoveStructType for NewEpochEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewEpochEvent");
 }
 
-pub static NEW_EPOCH_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(||{
-    TypeTag::from_str(NewEpochEvent::struct_tag().to_string().as_str()).unwrap()
-});
+pub static NEW_EPOCH_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::from_str(NewEpochEvent::struct_tag().to_string().as_str()).unwrap());

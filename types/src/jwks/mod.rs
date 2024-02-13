@@ -11,17 +11,17 @@ use jwk::JWKMoveStruct;
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
+    language_storage::TypeTag,
     move_resource::MoveStructType,
     value::{MoveStruct, MoveValue},
 };
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
+    str::FromStr,
 };
-use std::str::FromStr;
-use once_cell::sync::Lazy;
-use move_core_types::language_storage::TypeTag;
 
 pub mod jwk;
 pub mod rsa;
@@ -222,6 +222,6 @@ impl MoveStructType for ObservedJWKsUpdated {
     const STRUCT_NAME: &'static IdentStr = ident_str!("ObservedJWKsUpdated");
 }
 
-pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(||{
+pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::from_str(ObservedJWKsUpdated::struct_tag().to_string().as_str()).unwrap()
 });
