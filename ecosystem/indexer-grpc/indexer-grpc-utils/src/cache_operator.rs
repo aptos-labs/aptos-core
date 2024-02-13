@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::Arc;
+
 use crate::{constants::BLOB_STORAGE_SIZE, EncodedTransactionWithVersion};
 use anyhow::Context;
 use redis::{AsyncCommands, RedisError, RedisResult};
+use mini_moka::sync::Cache;
 
 // Configurations for cache.
 // Cache entries that are present.
@@ -94,11 +97,12 @@ pub fn get_ttl_in_seconds(timestamp_in_seconds: u64) -> u64 {
 #[derive(Clone)]
 pub struct CacheOperator<T: redis::aio::ConnectionLike + Send> {
     conn: T,
+    read_through_cache: Option<Cache<u64, String>>,
 }
 
 impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
-    pub fn new(conn: T) -> Self {
-        Self { conn }
+    pub fn new(conn: T, read_through_cache: Option<Cache<u64, String>>) -> Self {
+        Self { conn, read_through_cache }
     }
 
     // Set up the cache if needed.
@@ -260,13 +264,34 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
         let cache_coverage_status = self.check_cache_coverage_status(start_version).await;
         match cache_coverage_status {
             Ok(CacheCoverageStatus::CacheHit(v)) => {
+                if let Some(cache) = self.read_through_cache.clone() {
+                    let keys = start_version..start_version + v;
+                    let mut results = vec![];
+                    for key in keys {
+                        if let Some(value) = cache.get(&key) {
+                            results.push(value);
+                        } else {
+                            break;
+                        }
+                    }
+                    if results.len() == v as usize {
+                        return Ok(CacheBatchGetStatus::Ok(results));
+                    }
+                }
                 let versions = (start_version..start_version + v)
                     .map(|e| e.to_string())
                     .collect::<Vec<String>>();
                 let encoded_transactions: Result<Vec<String>, RedisError> =
                     self.conn.mget(versions).await;
                 match encoded_transactions {
-                    Ok(v) => Ok(CacheBatchGetStatus::Ok(v)),
+                    Ok(v) => {
+                        if let Some(cache) = self.read_through_cache.clone() {
+                            for (i, txn) in v.iter().enumerate() {
+                                cache.insert(start_version + i as u64, txn.clone());
+                            }
+                        }
+                        Ok(CacheBatchGetStatus::Ok(v))
+                    },
                     Err(err) => Err(err.into()),
                 }
             },
@@ -314,7 +339,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert!(cache_operator.cache_setup_if_needed().await.unwrap());
     }
@@ -330,7 +355,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert!(!cache_operator.cache_setup_if_needed().await.unwrap());
     }
@@ -343,7 +368,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator
@@ -362,7 +387,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator.check_cache_coverage_status(1).await.unwrap(),
@@ -378,7 +403,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         // Transactions are 100..123, thus 23 transactions are cached.
         assert_eq!(
@@ -398,7 +423,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator
@@ -426,7 +451,7 @@ mod tests {
         ];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator
@@ -451,7 +476,7 @@ mod tests {
         ];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator
@@ -470,7 +495,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator
@@ -489,7 +514,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator
@@ -511,7 +536,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(cache_operator.get_chain_id().await.unwrap(), Some(123));
     }
@@ -526,7 +551,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
 
         assert_eq!(
             cache_operator.get_latest_version().await.unwrap(),
@@ -552,7 +577,7 @@ mod tests {
         )];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
         assert!(cache_operator
             .update_cache_transactions(transactions)
             .await
@@ -579,7 +604,7 @@ mod tests {
         let cmds = vec![MockCmd::new(redis_pipeline, Ok("ok"))];
         let mock_connection = MockRedisConnection::new(cmds);
         let mut cache_operator: CacheOperator<MockRedisConnection> =
-            CacheOperator::new(mock_connection);
+            CacheOperator::new(mock_connection, None);
         assert!(cache_operator
             .update_cache_transactions(transactions)
             .await

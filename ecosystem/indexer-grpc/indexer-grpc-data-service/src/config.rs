@@ -7,9 +7,10 @@ use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{config::IndexerGrpcFileStoreConfig, types::RedisUrl};
 use aptos_protos::{
     indexer::v1::FILE_DESCRIPTOR_SET as INDEXER_V1_FILE_DESCRIPTOR_SET,
-    transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+    transaction::v1::{Transaction, FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET},
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
+use mini_moka::sync::Cache as MiniMokaSyncCache;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr};
 use tonic::{
@@ -24,6 +25,8 @@ pub const SERVER_NAME: &str = "idxdatasvc";
 
 // Default max response channel size.
 const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
+const READ_THROUGH_CACHE_SIZE: u64 = 10_000;
+const CACHE_ENTRY_TTL_IN_SECONDS: u64 = 10;
 
 // HTTP2 ping interval and timeout.
 // This can help server to garbage collect dead connections.
@@ -144,12 +147,18 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?;
-
+        
+        // Read through cache for raw data.
+        let read_through_cache: MiniMokaSyncCache<u64, Transaction> = MiniMokaSyncCache::builder()
+            .max_capacity(READ_THROUGH_CACHE_SIZE)
+            .time_to_live(std::time::Duration::from_secs(CACHE_ENTRY_TTL_IN_SECONDS))
+            .build();
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
+            read_through_cache,
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)

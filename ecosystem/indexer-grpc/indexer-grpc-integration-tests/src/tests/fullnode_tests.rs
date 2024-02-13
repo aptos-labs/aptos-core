@@ -62,7 +62,7 @@ async fn reset_redis() -> Result<()> {
         .get_async_connection()
         .await
         .expect("Create redis connection failed.");
-    let mut cache_operator = CacheOperator::new(conn);
+    let mut cache_operator = CacheOperator::new(conn, None);
     match cache_operator.get_latest_version().await {
         Ok(x) => {
             bail!(
@@ -250,7 +250,7 @@ async fn test_cold_start_cache_worker_progress() {
     let tries = check_cache_secs / check_cache_frequency_secs;
 
     // check that the cache was written to
-    let mut cache_operator = CacheOperator::new(conn);
+    let mut cache_operator = CacheOperator::new(conn, None);
     let mut chain_id = 0;
     for _ in 0..tries {
         match cache_operator.get_chain_id().await {

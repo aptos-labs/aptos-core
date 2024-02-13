@@ -352,7 +352,7 @@ async fn process_streaming_response(
             bail!("[Indexer Cache] Streaming error: no response.");
         },
     };
-    let mut cache_operator = CacheOperator::new(conn);
+    let mut cache_operator = CacheOperator::new(conn, None);
 
     let (fullnode_chain_id, starting_version) =
         verify_fullnode_init_signal(&mut cache_operator, init_signal, file_store_metadata)

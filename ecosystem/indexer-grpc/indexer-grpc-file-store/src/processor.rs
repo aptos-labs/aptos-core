@@ -54,7 +54,7 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?;
-        let mut cache_operator = CacheOperator::new(conn);
+        let mut cache_operator = CacheOperator::new(conn, None);
 
         let mut file_store_operator: Box<dyn FileStoreOperator> = match &file_store_config {
             IndexerGrpcFileStoreConfig::GcsFileStore(gcs_file_store) => {

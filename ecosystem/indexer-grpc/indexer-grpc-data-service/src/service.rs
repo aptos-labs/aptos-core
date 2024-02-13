@@ -28,6 +28,7 @@ use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     transaction::v1::Transaction,
 };
+use mini_moka::sync::Cache;
 use futures::Stream;
 use prost::Message;
 use std::{
@@ -70,6 +71,7 @@ pub struct RawDataServerWrapper {
     pub redis_client: Arc<redis::Client>,
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
+    read_through_cache: Cache<u64, String>,
 }
 
 impl RawDataServerWrapper {
@@ -77,6 +79,7 @@ impl RawDataServerWrapper {
         redis_address: RedisUrl,
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
+        read_through_cache: Cache<u64, String>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -86,6 +89,7 @@ impl RawDataServerWrapper {
             ),
             file_store_config,
             data_service_response_channel_size,
+            read_through_cache,
         })
     }
 }
@@ -200,7 +204,7 @@ impl RawData for RawDataServerWrapper {
                         return;
                     },
                 };
-                let mut cache_operator = CacheOperator::new(conn);
+                let mut cache_operator = CacheOperator::new(conn, Some(self.read_through_cache.clone()));
 
                 // Validate chain id
                 let mut metadata = file_store_operator.get_file_store_metadata().await;
