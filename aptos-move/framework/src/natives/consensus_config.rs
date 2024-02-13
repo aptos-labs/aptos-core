@@ -11,7 +11,7 @@ use move_vm_types::values::Value;
 pub fn validator_txn_enabled(
     _context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
-    args: VecDeque<Value>,
+    mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let config_bytes = safely_pop_arg!(args, Vec<u8>);
     let config = bcs::from_bytes::<OnChainConsensusConfig>(&config_bytes).unwrap_or_default();
