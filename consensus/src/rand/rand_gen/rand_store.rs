@@ -32,9 +32,7 @@ impl<S: TShare> ShareAggregator<S> {
     }
 
     pub fn add_share(&mut self, weight: u64, share: RandShare<S>) {
-        let timestamp = share.metadata().timestamp;
         if self.shares.insert(*share.author(), share).is_none() {
-            observe_block(timestamp, BlockStage::RAND_ADD_SHARE);
             self.total_weight += weight;
         }
     }
@@ -48,6 +46,8 @@ impl<S: TShare> ShareAggregator<S> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
+        // timestamp records the time when the block is created
+        observe_block(rand_metadata.timestamp, BlockStage::RAND_ADD_ENOUGH_SHARE);
         let rand_config = rand_config.clone();
         let self_share = self
             .get_self_share()
