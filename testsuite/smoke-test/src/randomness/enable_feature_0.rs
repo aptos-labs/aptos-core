@@ -9,6 +9,7 @@ use aptos_types::dkg::DKGState;
 use std::{sync::Arc, time::Duration};
 use aptos_types::on_chain_config::{FeatureFlag, OnChainConsensusConfig};
 use aptos_vm_genesis::default_features_resource_for_genesis;
+use crate::utils::get_current_consensus_config;
 
 /// Enable on-chain randomness by first enabling feature `RECONFIGURE_WITH_DKG`
 /// then enabling validator transactions in consensus config.
@@ -74,7 +75,7 @@ script {
         .expect("Waited too long for epoch 3.");
 
     println!("Now in epoch 3. There should be no DKG result since vtxn has not been enabled. Now enabling vtxn in ConsensusConfig.");
-    let mut config = get_on_chain_resource::<OnChainConsensusConfig>(&client).await;
+    let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
     let config_bytes = bcs::to_bytes(&config).unwrap();
     let enable_vtxn_script = format!(r#"
