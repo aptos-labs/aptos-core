@@ -3,12 +3,12 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    errors::{BlockExecutionError, IntentionalFallbackToSequential},
+    errors::BlockExecutionError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::{code_invariant_error, PanicOr};
+use aptos_aggregator::types::code_invariant_error;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
@@ -225,7 +225,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn check_execution_status_during_commit(
         &self,
         txn_idx: TxnIndex,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<(), PanicError> {
         if let Some(status) = self.outputs[txn_idx as usize].load_full() {
             match &status.output_status {
                 ExecutionStatus::Success(_) | ExecutionStatus::SkipRest(_) => Ok(()),
@@ -234,18 +234,17 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 // - Execution w. delayed field code error propagates the error directly,
                 // does not finish execution. Similar for FatalVMError / abort.
                 ExecutionStatus::Abort(_) => {
-                    Err(code_invariant_error("Abort status cannot be committed").into())
+                    Err(code_invariant_error("Abort status cannot be committed"))
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(_) => {
-                    Err(code_invariant_error("Speculative error status cannot be committed").into())
+                    Err(code_invariant_error("Speculative error status cannot be committed"))
                 },
                 ExecutionStatus::DelayedFieldsCodeInvariantError(_) => Err(code_invariant_error(
                     "Delayed field invariant error cannot be committed",
-                )
-                .into()),
+                )),
             }
         } else {
-            Err(code_invariant_error("Recorded output not found during commit").into())
+            Err(code_invariant_error("Recorded output not found during commit"))
         }
     }
 

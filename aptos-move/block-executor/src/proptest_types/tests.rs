@@ -86,7 +86,7 @@ fn run_transactions<K, V, E>(
         .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
-            assert_matches!(output, Err(PanicOr::Or(_)));
+            assert_matches!(output, Err(()));
             continue;
         }
 

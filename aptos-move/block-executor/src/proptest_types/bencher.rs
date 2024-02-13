@@ -14,6 +14,7 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
+use aptos_aggregator::types::code_invariant_error;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     executable::ExecutableTestType,
@@ -140,6 +141,6 @@ where
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
         self.baseline_output
-            .assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+            .assert_output(&output.map_err(|err| BlockExecutionError::FatalBlockExecutorError(code_invariant_error(""))));
     }
 }

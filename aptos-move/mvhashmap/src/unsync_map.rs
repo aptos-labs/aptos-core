@@ -5,11 +5,10 @@ use crate::{
     types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
     utils::module_hash,
 };
-use aptos_aggregator::types::DelayedFieldValue;
+use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
-    executable::{Executable, ExecutableDescriptor, ModulePath},
-    write_set::TransactionWrite,
+    delayed_fields::PanicError, executable::{Executable, ExecutableDescriptor, ModulePath}, write_set::TransactionWrite
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_binary_format::errors::PartialVMResult;
@@ -150,8 +149,7 @@ impl<
         value_tag: T,
         v: V,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
-    ) -> anyhow::Result<()> {
-        use anyhow::bail;
+    ) -> Result<(), PanicError> {
         use aptos_types::write_set::WriteOpKind::*;
         use std::collections::hash_map::Entry::*;
         match (
@@ -174,11 +172,11 @@ impl<
             },
             (l, r) => {
                 println!("WriteOp kind {:?} not consistent with previous value at tag {:?}. l: {:?}, r: {:?}", v.write_op_kind(), value_tag, l, r);
-                bail!(
+                return Err(code_invariant_error(format!(
                     "WriteOp kind {:?} not consistent with previous value at tag {:?}",
                     v.write_op_kind(),
                     value_tag
-                );
+                )));
             },
         }
 
