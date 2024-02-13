@@ -62,6 +62,7 @@ use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
+use suites::dag::get_dag_test;
 use std::{
     env,
     num::NonZeroUsize,
@@ -76,6 +77,8 @@ use std::{
 };
 use tokio::{runtime::Runtime, select};
 use url::Url;
+
+mod suites;
 
 // Useful constants
 const KILOBYTE: usize = 1000;
@@ -518,6 +521,8 @@ fn get_test_suite(
         return Ok(test_suite);
     } else if let Some(test_suite) = get_state_sync_test(test_name) {
         return Ok(test_suite);
+    } else if let Some(test_suite) = get_dag_test(test_name, duration, test_cmd) {
+        return Ok(test_suite)
     }
 
     // Otherwise, check the test name against the ungrouped test suites
