@@ -12,7 +12,7 @@ resource "aws_eks_cluster" "aptos" {
   tags                      = local.default_tags
 
   vpc_config {
-    subnet_ids              = concat(aws_subnet.public.*.id, aws_subnet.private.*.id)
+    subnet_ids              = concat(aws_subnet.public[*].id, aws_subnet.private[*].id)
     public_access_cidrs     = var.k8s_api_sources
     endpoint_private_access = true
     security_group_ids      = [aws_security_group.cluster.id]
@@ -218,11 +218,17 @@ data "aws_iam_policy_document" "cluster-autoscaler" {
   statement {
     sid = "DescribeAutoscaling"
     actions = [
-      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeLaunchConfigurations",
       "autoscaling:DescribeAutoScalingGroups",
-      "ec2:DescribeLaunchTemplateVersions",
+      "autoscaling:DescribeAutoScalingInstances",
+      "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeScalingActivities",
       "autoscaling:DescribeTags",
-      "autoscaling:DescribeLaunchConfigurations"
+      "ec2:DescribeInstanceTypes",
+      "ec2:DescribeLaunchTemplateVersions",
+      "ec2:DescribeImages",
+      "ec2:GetInstanceTypesFromInstanceRequirements",
+      "eks:DescribeNodegroup"
     ]
     resources = ["*"]
   }

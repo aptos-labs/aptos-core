@@ -44,6 +44,8 @@ mod txn_broadcast;
 mod txn_emitter;
 #[cfg(test)]
 mod upgrade;
+#[cfg(test)]
+mod zkid;
 
 #[cfg(test)]
 mod smoke_test_environment;
@@ -52,4 +54,10 @@ mod smoke_test_environment;
 mod test_utils;
 
 #[cfg(test)]
+mod validator_txns;
+
+#[cfg(test)]
 mod workspace_builder;
+
+#[cfg(test)]
+pub(crate) mod utils;

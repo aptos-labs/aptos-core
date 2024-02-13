@@ -18,7 +18,7 @@ use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Author,
 };
-use aptos_types::validator_signer::ValidatorSigner;
+use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_signer::ValidatorSigner};
 use futures::{future::BoxFuture, FutureExt};
 use std::{sync::Arc, time::Duration};
 
@@ -42,7 +42,7 @@ async fn test_proposal_generation_empty_tree() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        false,
+        ValidatorTxnConfig::default_disabled(),
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -83,7 +83,7 @@ async fn test_proposal_generation_parent() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        false,
+        ValidatorTxnConfig::default_disabled(),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -156,7 +156,7 @@ async fn test_old_proposal_generation() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        false,
+        ValidatorTxnConfig::default_disabled(),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -194,7 +194,7 @@ async fn test_correct_failed_authors() {
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
-        false,
+        ValidatorTxnConfig::default_disabled(),
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![author, peer1, peer2],

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, build_package, AptosPackageHooks};
-use anyhow::Error;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
@@ -26,7 +25,7 @@ use aptos_types::{
     },
     transaction::{
         EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        TransactionPayload, TransactionStatus, ViewFunctionOutput,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -715,7 +714,7 @@ impl MoveHarness {
         fun: MemberId,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> ViewFunctionOutput {
         self.executor
             .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
     }

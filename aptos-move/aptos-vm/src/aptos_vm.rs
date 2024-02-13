@@ -15,7 +15,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -37,6 +37,7 @@ use aptos_types::{
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     fee_statement::FeeStatement,
     on_chain_config::{
@@ -54,10 +55,10 @@ use aptos_types::{
             UserTransaction,
         },
         TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        WriteSetPayload,
+        ViewFunctionOutput, WriteSetPayload,
     },
-    validator_txn::ValidatorTransaction,
     vm_status::{AbortLocation, StatusCode, VMStatus},
+    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -74,7 +75,7 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{verification_error, Location, PartialVMError, VMError, VMResult},
+    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMError, VMResult},
     file_format_common::{IDENTIFIER_SIZE_MAX, LEGACY_IDENTIFIER_SIZE_MAX},
     CompiledModule, IndexKind,
 };
@@ -138,7 +139,7 @@ macro_rules! unwrap_or_discard {
     };
 }
 
-fn get_transaction_output(
+pub(crate) fn get_transaction_output(
     session: SessionExt,
     fee_statement: FeeStatement,
     status: ExecutionStatus,
@@ -168,7 +169,7 @@ pub struct AptosVM {
     move_vm: MoveVmExt,
     gas_feature_version: u64,
     gas_params: Result<AptosGasParameters, String>,
-    storage_gas_params: Result<StorageGasParameters, String>,
+    pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     features: Features,
     timed_features: TimedFeatures,
 }
@@ -1385,6 +1386,33 @@ impl AptosVM {
             ));
         }
 
+        // zkID feature gating
+        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction);
+        match &authenticators {
+            Ok(authenticators) => {
+                for (_, sig) in authenticators {
+                    if !self.features.is_zkid_enabled()
+                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
+                    {
+                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                    }
+                    if (!self.features.is_zkid_enabled() || !self.features.is_zkid_zkless_enabled())
+                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+                    {
+                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                    }
+                }
+            },
+            Err(_) => {
+                return Err(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
+            },
+        }
+
+        zkid_validation::validate_zkid_authenticators(&authenticators.unwrap(), resolver)?;
+
+        // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
+        // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
+        // end up skipping validation.
         self.run_prologue_with_payload(
             session,
             resolver,
@@ -1433,18 +1461,6 @@ impl AptosVM {
                 &storage_gas_params.change_set_configs,
             )
         }
-    }
-
-    fn process_validator_transaction(
-        &self,
-        _resolver: &impl AptosMoveResolver,
-        _txn: ValidatorTransaction,
-        _log_context: &AdapterLogSchema,
-    ) -> (VMStatus, VMOutput) {
-        (
-            VMStatus::Executed,
-            VMOutput::empty_with_status(TransactionStatus::Keep(ExecutionStatus::Success)),
-        )
     }
 
     fn execute_user_transaction_impl(
@@ -1628,12 +1644,29 @@ impl AptosVM {
             ChangeSetConfigs::unlimited_at_gas_feature_version(self.gas_feature_version);
 
         match write_set_payload {
-            WriteSetPayload::Direct(change_set) => VMChangeSet::try_from_storage_change_set(
-                change_set.clone(),
-                &change_set_configs,
-                resolver.is_delayed_field_optimization_capable(),
-            )
-            .map_err(|e| e.into_vm_status()),
+            WriteSetPayload::Direct(change_set) => {
+                // this transaction is never delayed field capable.
+                // it requires restarting execution afterwards,
+                // which allows it to be used as last transaction in delayed_field_enabled context.
+                let change = VMChangeSet::try_from_storage_change_set_with_delayed_field_optimization_disabled(
+                    change_set.clone(),
+                    &change_set_configs,
+                )
+                .map_err(|e| e.into_vm_status())?;
+
+                // validate_waypoint_change_set checks that this is true, so we only log here.
+                if !Self::should_restart_execution(&change) {
+                    // This invariant needs to hold irrespectively, so we log error always.
+                    // but if we are in delayed_field_optimization_capable context, we cannot execute any transaction after this.
+                    // as transaction afterwards would be executed assuming delayed fields are exchanged and
+                    // resource groups are split, but WriteSetPayload::Direct has materialized writes,
+                    // and so after executing this transaction versioned state is inconsistent.
+                    error!(
+                        "[aptos_vm] direct write set finished without requiring should_restart_execution");
+                }
+
+                Ok(change)
+            },
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.new_session(resolver, session_id);
                 let senders = match txn_sender {
@@ -1668,7 +1701,7 @@ impl AptosVM {
         executor_view: &dyn ExecutorView,
         resource_group_view: &dyn ResourceGroupView,
         change_set: &VMChangeSet,
-    ) -> Result<(), VMStatus> {
+    ) -> PartialVMResult<()> {
         assert!(
             change_set.aggregator_v1_write_set().is_empty(),
             "Waypoint change set should not have any aggregator writes."
@@ -1677,19 +1710,17 @@ impl AptosVM {
         // All Move executions satisfy the read-before-write property. Thus we need to read each
         // access path that the write set is going to update.
         for state_key in change_set.module_write_set().keys() {
-            executor_view
-                .get_module_state_value(state_key)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            executor_view.get_module_state_value(state_key)?;
         }
         for (state_key, write_op) in change_set.resource_write_set().iter() {
-            executor_view
-                .get_resource_state_value(state_key, None)
-                .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+            executor_view.get_resource_state_value(state_key, None)?;
             if let AbstractResourceWriteOp::WriteResourceGroup(group_write) = write_op {
                 for (tag, (_, maybe_layout)) in group_write.inner_ops() {
-                    resource_group_view
-                        .get_resource_from_group(state_key, tag, maybe_layout.as_deref())
-                        .map_err(|_| VMStatus::error(StatusCode::STORAGE_ERROR, None))?;
+                    resource_group_view.get_resource_from_group(
+                        state_key,
+                        tag,
+                        maybe_layout.as_deref(),
+                    )?;
                 }
             }
         }
@@ -1740,7 +1771,8 @@ impl AptosVM {
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
             &change_set,
-        )?;
+        )
+        .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
@@ -1790,6 +1822,47 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
+    pub(crate) fn process_block_prologue_ext(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        block_metadata_ext: BlockMetadataExt,
+        log_context: &AdapterLogSchema,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        fail_point!("move_adapter::process_block_prologue_ext", |_| {
+            Err(VMStatus::error(
+                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                None,
+            ))
+        });
+
+        let mut gas_meter = UnmeteredGasMeter;
+        let mut session =
+            self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
+
+        let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args());
+        session
+            .execute_function_bypass_visibility(
+                &BLOCK_MODULE,
+                BLOCK_PROLOGUE_EXT,
+                vec![],
+                args,
+                &mut gas_meter,
+            )
+            .map(|_return_vals| ())
+            .or_else(|e| {
+                expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
+            })?;
+        SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let output = get_transaction_output(
+            session,
+            FeeStatement::zero(),
+            ExecutionStatus::Success,
+            &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
+        )?;
+        Ok((VMStatus::Executed, output))
+    }
+
     fn extract_module_metadata(&self, module: &ModuleId) -> Option<Arc<RuntimeModuleMetadataV1>> {
         if self.features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V6) {
             aptos_framework::get_vm_metadata(&self.move_vm, module)
@@ -1805,26 +1878,71 @@ impl AptosVM {
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
         gas_budget: u64,
-    ) -> Result<Vec<Vec<u8>>> {
+    ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
         let vm = AptosVM::new(&resolver);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
-        let mut gas_meter =
-            MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
-                vm.gas_feature_version,
-                get_or_vm_startup_failure(&vm.gas_params, &log_context)?
-                    .vm
-                    .clone(),
-                get_or_vm_startup_failure(&vm.storage_gas_params, &log_context)?.clone(),
-                gas_budget,
-            )));
+        let mut gas_meter = match Self::memory_tracked_gas_meter(&vm, &log_context, gas_budget) {
+            Ok(gas_meter) => gas_meter,
+            Err(e) => return ViewFunctionOutput::new(Err(e), 0),
+        };
 
         let mut session = vm.new_session(&resolver, SessionId::Void);
+        match Self::execute_view_function_in_vm(
+            &mut session,
+            &vm,
+            module_id,
+            func_name,
+            type_args,
+            arguments,
+            &mut gas_meter,
+        ) {
+            Ok(result) => {
+                ViewFunctionOutput::new(Ok(result), Self::gas_used(gas_budget, &gas_meter))
+            },
+            Err(e) => ViewFunctionOutput::new(Err(e), Self::gas_used(gas_budget, &gas_meter)),
+        }
+    }
 
+    fn memory_tracked_gas_meter(
+        vm: &AptosVM,
+        log_context: &AdapterLogSchema,
+        gas_budget: u64,
+    ) -> Result<MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>> {
+        let gas_meter = MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+            vm.gas_feature_version,
+            get_or_vm_startup_failure(&vm.gas_params, log_context)?
+                .vm
+                .clone(),
+            get_or_vm_startup_failure(&vm.storage_gas_params, log_context)?.clone(),
+            gas_budget,
+        )));
+        Ok(gas_meter)
+    }
+
+    fn gas_used(
+        gas_budget: u64,
+        gas_meter: &MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>,
+    ) -> u64 {
+        GasQuantity::new(gas_budget)
+            .checked_sub(gas_meter.balance())
+            .expect("Balance should always be less than or equal to max gas amount")
+            .into()
+    }
+
+    fn execute_view_function_in_vm(
+        session: &mut SessionExt,
+        vm: &AptosVM,
+        module_id: ModuleId,
+        func_name: Identifier,
+        type_args: Vec<TypeTag>,
+        arguments: Vec<Vec<u8>>,
+        gas_meter: &mut MemoryTrackedGasMeter<StandardGasMeter<StandardGasAlgebra>>,
+    ) -> Result<Vec<Vec<u8>>> {
         let func_inst = session.load_function(&module_id, &func_name, &type_args)?;
         let metadata = vm.extract_module_metadata(&module_id);
         let arguments = verifier::view_function::validate_view_function(
-            &mut session,
+            session,
             arguments,
             func_name.as_ident_str(),
             &func_inst,
@@ -1838,7 +1956,7 @@ impl AptosVM {
                 func_name.as_ident_str(),
                 type_args,
                 arguments,
-                &mut gas_meter,
+                gas_meter,
             )
             .map_err(|err| anyhow!("Failed to execute function: {:?}", err))?
             .return_values
@@ -1901,10 +2019,9 @@ impl AptosVM {
         }
     }
 
-    pub fn should_restart_execution(vm_output: &VMOutput) -> bool {
+    pub fn should_restart_execution(vm_change_set: &VMChangeSet) -> bool {
         let new_epoch_event_key = new_epoch_event_key();
-        vm_output
-            .change_set()
+        vm_change_set
             .events()
             .iter()
             .any(|(event, _)| event.event_key() == Some(&new_epoch_event_key))
@@ -1933,6 +2050,15 @@ impl AptosVM {
                 let (vm_status, output) =
                     self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
                 (vm_status, output, Some("block_prologue".to_string()))
+            },
+            Transaction::BlockMetadataExt(block_metadata_ext) => {
+                fail_point!("aptos_vm::execution::block_metadata_ext");
+                let (vm_status, output) = self.process_block_prologue_ext(
+                    resolver,
+                    block_metadata_ext.clone(),
+                    log_context,
+                )?;
+                (vm_status, output, Some("block_prologue_ext".to_string()))
             },
             GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
@@ -1992,9 +2118,6 @@ impl AptosVM {
                             },
                         // Ignore DelayedFields speculative errors as it can be intentionally triggered by parallel execution.
                         StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR => (),
-                        // Ignore Storage Error as currently it sometimes wraps speculative errors
-                        // TODO[agg_v2](fix) propagate SPECULATIVE_EXECUTION_ABORT_ERROR correctly, and remove storage from valid errors here.
-                        StatusCode::STORAGE_ERROR => (),
                         // We will log the rest of invariant violation directly with regular logger as they shouldn't happen.
                         //
                         // TODO: Add different counters for the error categories here.
@@ -2026,9 +2149,8 @@ impl AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
-                fail_point!("aptos_vm::execution::validator_transaction");
                 let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context);
+                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
                 (vm_status, output, Some("validator_transaction".to_string()))
             },
         })
@@ -2071,6 +2193,7 @@ impl VMExecutor for AptosVM {
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: Self::get_concurrency_level(),
+                    allow_fallback: true,
                 },
                 onchain: onchain_config,
             },

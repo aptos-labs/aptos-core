@@ -14,7 +14,6 @@ cargo build --locked --profile=$PROFILE \
     -p aptos \
     -p aptos-backup-cli \
     -p aptos-faucet-service \
-    -p aptos-forge-cli \
     -p aptos-fn-check-client \
     -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
@@ -33,7 +32,6 @@ BINS=(
     aptos-telemetry-service
     aptos-fn-check-client
     aptos-debugger
-    forge
     aptos-transaction-emitter
     aptos-api-tester
 )

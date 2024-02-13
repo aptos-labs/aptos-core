@@ -6,12 +6,10 @@
 use crate::{
     gas::get_gas_config_from_storage,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, AsExecutorView,
-        AsResourceGroupView, ResourceGroupResolver,
+        get_max_binary_format_version, get_max_identifier_size, resource_state_key,
+        AptosMoveResolver, AsExecutorView, AsResourceGroupView, ResourceGroupResolver,
     },
 };
-#[allow(unused_imports)]
-use anyhow::{bail, Error};
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
@@ -20,20 +18,19 @@ use aptos_aggregator::{
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
+        errors::StateviewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateView, StateViewId,
     },
-    write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
-        StateValueMetadataResolver, TResourceGroupView,
+        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TResourceGroupView,
     },
     resource_group_adapter::ResourceGroupAdapter,
 };
@@ -45,7 +42,6 @@ use move_core_types::{
     metadata::Metadata,
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
-    vm_status::StatusCode,
 };
 use std::{
     cell::RefCell,
@@ -123,33 +119,21 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
-            // TODO[agg_v2](fix) pass the layout to resource groups
-
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
                 resource_group.clone(),
             ));
+            let buf =
+                self.resource_group_view
+                    .get_resource_from_group(&key, struct_tag, maybe_layout)?;
 
             let first_access = self.accessed_groups.borrow_mut().insert(key.clone());
-            let common_error = |e| -> PartialVMError {
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("{}", e))
-            };
-
-            let buf = self
-                .resource_group_view
-                .get_resource_from_group(&key, struct_tag, maybe_layout)
-                .map_err(common_error)?;
             let group_size = if first_access {
-                self.resource_group_view
-                    .resource_group_size(&key)
-                    .map_err(common_error)?
-                    .get()
+                self.resource_group_view.resource_group_size(&key)?.get()
             } else {
                 0
             };
@@ -157,13 +141,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size + group_size as usize))
         } else {
-            let access_path = AccessPath::resource_access_path(*address, struct_tag.clone())
-                .map_err(|_| PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES))?;
-
+            let state_key = resource_state_key(*address, struct_tag.clone())?;
             let buf = self
                 .executor_view
-                .get_resource_bytes(&StateKey::access_path(access_path), maybe_layout)
-                .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))?;
+                .get_resource_bytes(&state_key, maybe_layout)?;
             let buf_size = resource_size(&buf);
             Ok((buf, buf_size))
         }
@@ -177,7 +158,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         self.resource_group_view.release_group_cache()
     }
 
-    fn resource_group_size(&self, group_key: &StateKey) -> anyhow::Result<ResourceGroupSize> {
+    fn resource_group_size(&self, group_key: &StateKey) -> PartialVMResult<ResourceGroupSize> {
         self.resource_group_view.resource_group_size(group_key)
     }
 
@@ -185,7 +166,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<usize> {
+    ) -> PartialVMResult<usize> {
         self.resource_group_view
             .resource_size_in_group(group_key, resource_tag)
     }
@@ -194,7 +175,7 @@ impl<'e, E: ExecutorView> ResourceGroupResolver for StorageAdapter<'e, E> {
         &self,
         group_key: &StateKey,
         resource_tag: &StructTag,
-    ) -> anyhow::Result<bool> {
+    ) -> PartialVMResult<bool> {
         self.resource_group_view
             .resource_exists_in_group(group_key, resource_tag)
     }
@@ -237,7 +218,6 @@ impl<'e, E: ExecutorView> ModuleResolver for StorageAdapter<'e, E> {
         let access_path = AccessPath::from(module_id);
         self.executor_view
             .get_module_bytes(&StateKey::access_path(access_path))
-            .map_err(|_| PartialVMError::new(StatusCode::STORAGE_ERROR))
     }
 }
 
@@ -246,17 +226,11 @@ impl<'e, E: ExecutorView> TableResolver for StorageAdapter<'e, E> {
         &self,
         handle: &TableHandle,
         key: &[u8],
-        layout: Option<&MoveTypeLayout>,
+        maybe_layout: Option<&MoveTypeLayout>,
     ) -> Result<Option<Bytes>, PartialVMError> {
+        let state_key = StateKey::table_item((*handle).into(), key.to_vec());
         self.executor_view
-            .get_resource_bytes(
-                &StateKey::table_item((*handle).into(), key.to_vec()),
-                layout,
-            )
-            .map_err(|e| {
-                PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
-                    .with_message(format!("remote table resolver failure: {}", e))
-            })
+            .get_resource_bytes(&state_key, maybe_layout)
     }
 }
 
@@ -266,7 +240,7 @@ impl<'e, E: ExecutorView> TAggregatorV1View for StorageAdapter<'e, E> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         self.executor_view.get_aggregator_v1_state_value(id)
     }
 }
@@ -275,7 +249,6 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -299,8 +272,8 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
             .delayed_field_try_add_delta_outcome(id, base_delta, delta, max_value)
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        self.executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(
@@ -314,8 +287,10 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -324,7 +299,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -370,26 +345,8 @@ impl<'e, E: ExecutorView> StateStorageView for StorageAdapter<'e, E> {
         self.executor_view.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.executor_view.get_usage()
-    }
-}
-
-impl<'e, E: ExecutorView> StateValueMetadataResolver for StorageAdapter<'e, E> {
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
-        self.executor_view
-            .get_module_state_value_metadata(state_key)
-    }
-
-    fn get_resource_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
-        self.executor_view
-            .get_resource_state_value_metadata(state_key)
     }
 }
 
@@ -427,7 +384,7 @@ pub(crate) mod tests {
         };
 
         let group_adapter = ResourceGroupAdapter::new(
-            // TODO[agg_v2](fix) add a converter for StateView for tests that implements ResourceGroupView
+            // TODO[agg_v2](test) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,

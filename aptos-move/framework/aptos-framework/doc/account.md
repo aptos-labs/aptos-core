@@ -5,6 +5,7 @@
 
 
 
+-  [Struct `KeyRotation`](#0x1_account_KeyRotation)
 -  [Resource `Account`](#0x1_account_Account)
 -  [Struct `KeyRotationEvent`](#0x1_account_KeyRotationEvent)
 -  [Struct `CoinRegisterEvent`](#0x1_account_CoinRegisterEvent)
@@ -28,6 +29,7 @@
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
+-  [Function `rotate_authentication_key_call`](#0x1_account_rotate_authentication_key_call)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
 -  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
@@ -65,6 +67,7 @@
     -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
     -  [Function `get_authentication_key`](#@Specification_1_get_authentication_key)
     -  [Function `rotate_authentication_key_internal`](#@Specification_1_rotate_authentication_key_internal)
+    -  [Function `rotate_authentication_key_call`](#@Specification_1_rotate_authentication_key_call)
     -  [Function `rotate_authentication_key`](#@Specification_1_rotate_authentication_key)
     -  [Function `rotate_authentication_key_with_rotation_capability`](#@Specification_1_rotate_authentication_key_with_rotation_capability)
     -  [Function `offer_rotation_capability`](#@Specification_1_offer_rotation_capability)
@@ -109,6 +112,46 @@
 </code></pre>
 
 
+
+<a id="0x1_account_KeyRotation"></a>
+
+## Struct `KeyRotation`
+
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="account.md#0x1_account_KeyRotation">KeyRotation</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>old_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>new_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
 
 <a id="0x1_account_Account"></a>
 
@@ -1129,6 +1172,38 @@ the resource account.
 
 </details>
 
+<a id="0x1_account_rotate_authentication_key_call"></a>
+
+## Function `rotate_authentication_key_call`
+
+Entry function-only rotation key function that allows the signer update their authentication_key.
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a>, <a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a> {
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>assert</b>!(<a href="account.md#0x1_account_exists_at">exists_at</a>(addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&new_auth_key) == 32,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EMALFORMED_AUTHENTICATION_KEY">EMALFORMED_AUTHENTICATION_KEY</a>)
+    );
+    <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+    <a href="account.md#0x1_account_update_auth_key_and_originating_address_table">update_auth_key_and_originating_address_table</a>(addr, account_resource, new_auth_key);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_account_rotate_authentication_key"></a>
 
 ## Function `rotate_authentication_key`
@@ -1744,6 +1819,11 @@ in the event of key recovery.
     <b>let</b> new_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(new_auth_key_vector);
     <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(address_map, new_auth_key, originating_addr);
 
+    <a href="event.md#0x1_event_emit">event::emit</a>&lt;<a href="account.md#0x1_account_KeyRotation">KeyRotation</a>&gt;(<a href="account.md#0x1_account_KeyRotation">KeyRotation</a> {
+        <a href="account.md#0x1_account">account</a>: originating_addr,
+        old_authentication_key: account_resource.authentication_key,
+        new_authentication_key: new_auth_key_vector,
+    });
     <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a>&gt;(
         &<b>mut</b> account_resource.key_rotation_events,
         <a href="account.md#0x1_account_KeyRotationEvent">KeyRotationEvent</a> {
@@ -2433,6 +2513,42 @@ The length of new_auth_key is 32.
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
 <b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
 <b>ensures</b> account_resource.authentication_key == new_auth_key;
+</code></pre>
+
+
+
+<a id="@Specification_1_rotate_authentication_key_call"></a>
+
+### Function `rotate_authentication_key_call`
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+The Account existed under the signer before the call.
+The length of new_auth_key is 32.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
+<b>let</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>let</b> curr_auth_key = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(account_resource.authentication_key);
+<b>let</b> originating_addr = addr;
+<b>let</b> address_map = <b>global</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework).address_map;
+<b>let</b> new_auth_key_addr = <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;<b>address</b>&gt;(new_auth_key);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;<b>address</b>&gt;(account_resource.authentication_key);
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(address_map, curr_auth_key) &&
+    <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(address_map, curr_auth_key) != originating_addr;
+<b>aborts_if</b> curr_auth_key != new_auth_key_addr && <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(address_map, new_auth_key_addr);
+<b>include</b> <a href="account.md#0x1_account_UpdateAuthKeyAndOriginatingAddressTableAbortsIf">UpdateAuthKeyAndOriginatingAddressTableAbortsIf</a> {
+    originating_addr: addr,
+    new_auth_key_vector: new_auth_key,
+};
+<b>let</b> <b>post</b> auth_key = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr).authentication_key;
+<b>ensures</b> auth_key == new_auth_key;
 </code></pre>
 
 

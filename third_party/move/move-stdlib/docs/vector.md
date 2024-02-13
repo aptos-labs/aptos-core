@@ -316,7 +316,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_reverse">reverse</a>&lt;Element&gt;(v: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
     <b>let</b> len = <a href="vector.md#0x1_vector_length">length</a>(v);
-    <b>if</b> (len == 0) <b>return</b> ();
+    <b>if</b> (len == 0) <b>return</b>;
 
     <b>let</b> front_index = 0;
     <b>let</b> back_index = len -1;

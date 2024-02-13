@@ -18,27 +18,18 @@ proptest! {
     #[test]
     fn test_put_get(
         universe in any_with::<AccountInfoUniverse>(3),
-        gens_and_write_sets in vec(
-            ((any::<Index>(), any::<SignatureCheckedTransactionGen>()), any::<WriteSet>()),
+        gens in vec(
+            (any::<Index>(), any::<SignatureCheckedTransactionGen>()),
             1..10
         ),
     ) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.transaction_store;
-        let (gens, write_sets):(Vec<_>, Vec<_>) = gens_and_write_sets.into_iter().unzip();
         let txns = init_db(universe, gens, db.ledger_db.transaction_db());
 
-        // write sets
-        let batch = SchemaBatch::new();
-        for (ver, ws) in write_sets.iter().enumerate() {
-            store.put_write_set(ver as Version, ws, &batch).unwrap();
-        }
-        store.ledger_db.write_set_db().write_schemas(batch).unwrap();
-        assert_eq!(store.get_write_sets(0, write_sets.len() as Version).unwrap(), write_sets);
-
         let ledger_version = txns.len() as Version - 1;
-        for (ver, (txn, write_set)) in itertools::zip_eq(txns.iter(), write_sets.iter()).enumerate() {
+        for (ver, txn) in txns.iter().enumerate() {
             let user_txn = txn
                 .try_as_signed_user_txn()
                 .expect("All should be user transactions here.");
@@ -52,10 +43,7 @@ proptest! {
                     .unwrap(),
                 Some(ver as Version)
             );
-            prop_assert_eq!(store.get_write_set(ver as Version).unwrap(), write_set.clone());
         }
-
-        prop_assert!(store.get_write_set(ledger_version + 1).is_err());
     }
 
     #[test]

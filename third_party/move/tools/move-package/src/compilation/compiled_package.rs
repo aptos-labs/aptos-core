@@ -675,6 +675,8 @@ impl CompiledPackage {
                         .into_iter()
                         .map(|(k, v)| format!("{}={}", k, v))
                         .collect(),
+                    skip_attribute_checks,
+                    known_attributes: known_attributes.clone(),
                     ..Default::default()
                 };
                 compiler_driver_v2(options)?

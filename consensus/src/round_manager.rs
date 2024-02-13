@@ -23,6 +23,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
+    util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
@@ -46,8 +47,10 @@ use aptos_logger::prelude::*;
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
-    validator_verifier::ValidatorVerifier, PeerId,
+    epoch_state::EpochState,
+    on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
+    validator_verifier::ValidatorVerifier,
+    PeerId,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -182,8 +185,10 @@ pub struct RoundManager {
     network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
+    vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
+    features: Features,
 }
 
 impl RoundManager {
@@ -199,6 +204,7 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
+        features: Features,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -208,6 +214,8 @@ impl RoundManager {
         counters::OP_COUNTERS
             .gauge("decoupled_execution")
             .set(onchain_config.decoupled_execution() as i64);
+        let vtxn_config = onchain_config.effective_validator_txn_config();
+        debug!("vtxn_config={:?}", vtxn_config);
         Self {
             epoch_state,
             block_store,
@@ -218,8 +226,10 @@ impl RoundManager {
             network,
             storage,
             onchain_config,
+            vtxn_config,
             buffered_proposal_tx,
             local_config,
+            features,
         }
     }
 
@@ -636,7 +646,7 @@ impl RoundManager {
             .author()
             .expect("Proposal should be verified having an author");
 
-        if !self.onchain_config.validator_txn_enabled()
+        if !self.vtxn_config.enabled()
             && matches!(
                 proposal.block_data().block_type(),
                 BlockType::ProposalExt(_)
@@ -646,35 +656,51 @@ impl RoundManager {
             bail!("ProposalExt unexpected while the feature is disabled.");
         }
 
+        if let Some(vtxns) = proposal.validator_txns() {
+            for vtxn in vtxns {
+                ensure!(
+                    is_vtxn_expected(&self.features, vtxn),
+                    "unexpected validator txn: {:?}",
+                    vtxn.topic()
+                );
+            }
+        }
+
         let (num_validator_txns, validator_txns_total_bytes): (usize, usize) =
             proposal.validator_txns().map_or((0, 0), |txns| {
                 txns.iter().fold((0, 0), |(count_acc, size_acc), txn| {
                     (count_acc + 1, size_acc + txn.size_in_bytes())
                 })
             });
-
+        let num_validator_txns = num_validator_txns as u64;
+        let validator_txns_total_bytes = validator_txns_total_bytes as u64;
+        ensure!(
+            num_validator_txns <= self.vtxn_config.per_block_limit_txn_count(),
+            "process_proposal failed with per-block vtxn count limit exceeded: limit={}, actual={}",
+            self.vtxn_config.per_block_limit_txn_count(),
+            num_validator_txns
+        );
+        ensure!(
+            validator_txns_total_bytes <= self.vtxn_config.per_block_limit_total_bytes(),
+            "process_proposal failed with per-block vtxn bytes limit exceeded: limit={}, actual={}",
+            self.vtxn_config.per_block_limit_total_bytes(),
+            validator_txns_total_bytes
+        );
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            num_validator_txns as u64 + payload_len as u64
-                <= self
-                    .local_config
-                    .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
+            num_validator_txns + payload_len as u64 <= self.local_config.max_receiving_block_txns,
             "Payload len {} exceeds the limit {}",
             payload_len,
-            self.local_config
-                .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
+            self.local_config.max_receiving_block_txns,
         );
 
         ensure!(
-            validator_txns_total_bytes as u64 + payload_size as u64
-                <= self
-                    .local_config
-                    .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
+            validator_txns_total_bytes + payload_size as u64
+                <= self.local_config.max_receiving_block_bytes,
             "Payload size {} exceeds the limit {}",
             payload_size,
-            self.local_config
-                .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
+            self.local_config.max_receiving_block_bytes,
         );
 
         ensure!(

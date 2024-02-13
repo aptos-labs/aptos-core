@@ -11,13 +11,13 @@ use aptos_consensus_types::{
     common::{Author, Round},
     executed_block::ExecutedBlock,
     quorum_cert::QuorumCert,
-    randomness::RandMetadata,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    randomness::RandMetadata,
 };
 
 pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {

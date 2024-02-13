@@ -6,7 +6,9 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_types::{
+    serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
+        errors::StateviewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
@@ -15,7 +17,8 @@ use aptos_types::{
     write_set::WriteOp,
 };
 use bytes::Bytes;
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use std::collections::{BTreeMap, HashMap};
 
 /// Allows to query resources from the state.
@@ -31,13 +34,13 @@ pub trait TResourceView {
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>>;
+    ) -> PartialVMResult<Option<StateValue>>;
 
     fn get_resource_bytes(
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let maybe_state_value = self.get_resource_state_value(state_key, maybe_layout)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
@@ -45,13 +48,13 @@ pub trait TResourceView {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         // For metadata, layouts are not important.
         self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         // For existence, layouts are not important.
         self.get_resource_state_value(state_key, None)
             .map(|maybe_state_value| maybe_state_value.is_some())
@@ -67,7 +70,7 @@ pub trait TResourceGroupView {
     type Layout;
 
     /// Some resolvers might not be capable of the optimization, and should return false.
-    /// Others might return based on the config or the run paramaters.
+    /// Others might return based on the config or the run parameters.
     fn is_resource_group_split_in_change_set_capable(&self) -> bool {
         false
     }
@@ -85,14 +88,15 @@ pub trait TResourceGroupView {
     /// the parallel execution setting, as a wrong value will be (later) caught by validation.
     /// Thus, R/W conflicts are avoided, as long as the estimates are correct (e.g. updating
     /// struct members of a fixed size).
-    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<ResourceGroupSize>;
+    fn resource_group_size(&self, group_key: &Self::GroupKey)
+        -> PartialVMResult<ResourceGroupSize>;
 
     fn get_resource_from_group(
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>>;
+    ) -> PartialVMResult<Option<Bytes>>;
 
     /// Needed for charging storage fees for a resource group write, as that requires knowing
     /// the size of the resource group AFTER the changeset of the transaction is applied (while
@@ -103,7 +107,7 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<usize> {
+    ) -> PartialVMResult<usize> {
         Ok(self
             .get_resource_from_group(group_key, resource_tag, None)?
             .map_or(0, |bytes| bytes.len()))
@@ -123,7 +127,7 @@ pub trait TResourceGroupView {
         &self,
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<bool> {
+    ) -> PartialVMResult<bool> {
         self.get_resource_from_group(group_key, resource_tag, None)
             .map(|maybe_bytes| maybe_bytes.is_some())
     }
@@ -141,9 +145,9 @@ pub trait TModuleView {
     ///   -  Ok(None)         if the module is not in storage,
     ///   -  Ok(Some(...))    if the module exists in storage,
     ///   -  Err(...)         otherwise (e.g. storage error).
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>>;
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>>;
 
-    fn get_module_bytes(&self, state_key: &Self::Key) -> anyhow::Result<Option<Bytes>> {
+    fn get_module_bytes(&self, state_key: &Self::Key) -> PartialVMResult<Option<Bytes>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(|state_value| state_value.bytes().clone()))
     }
@@ -151,12 +155,12 @@ pub trait TModuleView {
     fn get_module_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
-    fn module_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         self.get_module_state_value(state_key)
             .map(|maybe_state_value| maybe_state_value.is_some())
     }
@@ -166,7 +170,7 @@ pub trait TModuleView {
 pub trait StateStorageView {
     fn id(&self) -> StateViewId;
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage>;
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError>;
 }
 
 /// A fine-grained view of the state during execution.
@@ -190,7 +194,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
-    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
+    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
 {
 }
@@ -199,7 +203,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
-        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
+        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
 {
 }
@@ -236,8 +240,13 @@ where
         &self,
         state_key: &Self::Key,
         _maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
-        self.get_state_value(state_key)
+    ) -> PartialVMResult<Option<StateValue>> {
+        self.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for resource at {:?}: {:?}",
+                state_key, e
+            ))
+        })
     }
 }
 
@@ -247,8 +256,13 @@ where
 {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
-        self.get_state_value(state_key)
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
+        self.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for module at {:?}: {:?}",
+                state_key, e
+            ))
+        })
     }
 }
 
@@ -260,28 +274,9 @@ where
         self.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        self.get_usage()
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+        self.get_usage().map_err(Into::into)
     }
-}
-
-/// Allows to query storage metadata in the VM session. Needed for storage refunds.
-/// - Result being Err means storage error or some incostistency (e.g. during speculation,
-/// needing to abort/halt the transaction with an error status).
-/// - Ok(None) means that the corresponding data does not exist / was deleted.
-/// - Ok(Some(_ : MetadataKind)) may be internally None (within Kind) if the metadata was
-/// not previously provided (e.g. Legacy WriteOps).
-pub trait StateValueMetadataResolver {
-    fn get_module_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>>;
-
-    /// Can also be used to get the metadata of a resource group at a provided group key.
-    fn get_resource_state_value_metadata(
-        &self,
-        state_key: &StateKey,
-    ) -> anyhow::Result<Option<StateValueMetadata>>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -299,16 +294,6 @@ pub enum ResourceGroupSize {
         num_tagged_resources: usize,
         all_tagged_resources_size: u64,
     },
-}
-
-pub fn size_u32_as_uleb128(mut value: usize) -> usize {
-    let mut len = 1;
-    while value >= 0x80 {
-        // 7 (lowest) bits of data get written in a single byte.
-        len += 1;
-        value >>= 7;
-    }
-    len
 }
 
 impl ResourceGroupSize {
@@ -338,13 +323,4 @@ impl ResourceGroupSize {
             },
         }
     }
-}
-
-#[test]
-fn test_size_u32_as_uleb128() {
-    assert_eq!(size_u32_as_uleb128(0), 1);
-    assert_eq!(size_u32_as_uleb128(127), 1);
-    assert_eq!(size_u32_as_uleb128(128), 2);
-    assert_eq!(size_u32_as_uleb128(128 * 128 - 1), 2);
-    assert_eq!(size_u32_as_uleb128(128 * 128), 3);
 }

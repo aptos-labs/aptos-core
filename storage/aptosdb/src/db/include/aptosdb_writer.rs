@@ -113,7 +113,7 @@ impl DbWriter for AptosDB {
                 .ledger_info_to_transaction_infos_proof
                 .left_siblings();
             restore_utils::confirm_or_save_frozen_subtrees(
-                self.ledger_db.transaction_accumulator_db(),
+                self.ledger_db.transaction_accumulator_db_raw(),
                 version,
                 frozen_subtrees,
                 None,
@@ -141,8 +141,6 @@ impl DbWriter for AptosDB {
             let transaction_infos = output_with_proof.proof.transaction_infos;
             // We should not save the key value since the value is already recovered for this version
             restore_utils::save_transactions(
-                self.ledger_store.clone(),
-                self.transaction_store.clone(),
                 self.state_store.clone(),
                 self.ledger_db.clone(),
                 version,
@@ -161,7 +159,6 @@ impl DbWriter for AptosDB {
             // Save the epoch ending ledger infos
             restore_utils::save_ledger_infos(
                 self.ledger_db.metadata_db(),
-                self.ledger_store.clone(),
                 ledger_infos,
                 Some(&mut ledger_db_batch.ledger_metadata_db_batches),
             )?;
@@ -195,51 +192,10 @@ impl DbWriter for AptosDB {
                 .state_kv_pruner
                 .save_min_readable_version(version)?;
 
-            restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
+            restore_utils::update_latest_ledger_info(self.ledger_db.metadata_db(), ledger_infos)?;
             self.state_store.reset();
 
             Ok(())
-        })
-    }
-
-    /// Open up dbwriter for table info indexing on indexer async v2 rocksdb
-    fn index_table_info(
-        &self,
-        db_reader: Arc<dyn DbReader>,
-        first_version: Version,
-        write_sets: &[&WriteSet],
-        end_early_if_pending_on_empty: bool,
-    ) -> Result<()> {
-        gauged_api("index_table_info", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| {
-                    indexer.index_table_info(
-                        db_reader,
-                        first_version,
-                        write_sets,
-                        end_early_if_pending_on_empty,
-                    )
-                })
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn cleanup_pending_on_items(&self) -> Result<()> {
-        gauged_api("cleanup_pending_on_items", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.cleanup_pending_on_items())
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn update_next_version(&self, end_version: u64) -> Result<()> {
-        gauged_api("update_next_version", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.update_next_version(end_version))
-                .unwrap_or(Ok(()))
         })
     }
 }
@@ -333,7 +289,9 @@ impl AptosDB {
                     .unwrap()
             });
             s.spawn(|_| {
-                self.commit_write_sets(txns_to_commit, first_version)
+                self.ledger_db
+                    .write_set_db()
+                    .commit_write_sets(txns_to_commit, first_version)
                     .unwrap()
             });
             s.spawn(|_| {
@@ -411,26 +369,11 @@ impl AptosDB {
                     if let Some(event_key) = event.event_key() {
                         if *event_key == new_block_event_key() {
                             let version = first_version + i as Version;
-                            let new_block_event =
-                                NewBlockEvent::try_from_bytes(event.event_data())?;
-                            let block_height = new_block_event.height();
-                            let id = new_block_event.hash()?;
-                            let epoch = new_block_event.epoch();
-                            let round = new_block_event.round();
-                            let proposer = new_block_event.proposer();
-                            let block_timestamp_usecs = new_block_event.proposed_time();
-                            let block_info = BlockInfo::V0(BlockInfoV0::new(
-                                id,
-                                epoch,
-                                round,
-                                proposer,
-                                block_timestamp_usecs,
+                            LedgerMetadataDb::put_block_info(
                                 version,
-                            ));
-                            ledger_metadata_batch
-                                .put::<BlockInfoSchema>(&block_height, &block_info)?;
-                            ledger_metadata_batch
-                                .put::<BlockByVersionSchema>(&version, &block_height)?;
+                                event,
+                                &ledger_metadata_batch,
+                            )?;
                         }
                     }
                 }
@@ -510,9 +453,17 @@ impl AptosDB {
             .start_timer();
 
         let batch = SchemaBatch::new();
-        let root_hash =
-            self.ledger_store
-                .put_transaction_accumulator(first_version, txns_to_commit, &batch)?;
+        let root_hash = self
+            .ledger_db
+            .transaction_accumulator_db()
+            .put_transaction_accumulator(
+                first_version,
+                &txns_to_commit
+                    .iter()
+                    .map(|txn_to_commit| txn_to_commit.transaction_info())
+                    .collect::<Vec<_>>(),
+                &batch,
+            )?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_accumulator___commit"])
@@ -540,7 +491,7 @@ impl AptosDB {
             .enumerate()
             .try_for_each(|(i, txn_to_commit)| -> Result<()> {
                 let version = first_version + i as u64;
-                self.ledger_store.put_transaction_info(
+                TransactionInfoDb::put_transaction_info(
                     version,
                     txn_to_commit.transaction_info(),
                     &batch,
@@ -553,35 +504,6 @@ impl AptosDB {
             .with_label_values(&["commit_transaction_infos___commit"])
             .start_timer();
         self.ledger_db.transaction_info_db().write_schemas(batch)
-    }
-
-    fn commit_write_sets(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets"])
-            .start_timer();
-        let batch = SchemaBatch::new();
-        let num_txns = txns_to_commit.len();
-        txns_to_commit
-            .par_iter()
-            .with_min_len(optimal_min_len(num_txns, 128))
-            .enumerate()
-            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
-                self.transaction_store.put_write_set(
-                    first_version + i as u64,
-                    txn_to_commit.write_set(),
-                    &batch,
-                )?;
-
-                Ok(())
-            })?;
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_write_sets___commit"])
-            .start_timer();
-        self.ledger_db.write_set_db().write_schemas(batch)
     }
 
     fn commit_ledger_info(
@@ -606,7 +528,8 @@ impl AptosDB {
                 expected_root_hash,
             );
             let current_epoch = self
-                .ledger_store
+                .ledger_db
+                .metadata_db()
                 .get_latest_ledger_info_option()
                 .map_or(0, |li| li.ledger_info().next_block_epoch());
             ensure!(
@@ -616,7 +539,9 @@ impl AptosDB {
                 current_epoch,
             );
 
-            self.ledger_store.put_ledger_info(x, &ledger_batch)?;
+            self.ledger_db
+                .metadata_db()
+                .put_ledger_info(x, &ledger_batch)?;
         }
 
         ledger_batch.put::<DbMetadataSchema>(
@@ -661,7 +586,9 @@ impl AptosDB {
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.
         if let Some(x) = ledger_info_with_sigs {
-            self.ledger_store.set_latest_ledger_info(x.clone());
+            self.ledger_db
+                .metadata_db()
+                .set_latest_ledger_info(x.clone());
 
             LEDGER_VERSION.set(x.ledger_info().version() as i64);
             NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);

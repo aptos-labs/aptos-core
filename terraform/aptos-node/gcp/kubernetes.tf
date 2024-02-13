@@ -25,8 +25,6 @@ provider "helm" {
 
 locals {
   # helm chart paths
-  monitoring_helm_chart_path = "${path.module}/../../helm/monitoring"
-  logger_helm_chart_path     = "${path.module}/../../helm/logger"
   aptos_node_helm_chart_path = var.helm_chart != "" ? var.helm_chart : "${path.module}/../../helm/aptos-node"
 
   # override the helm release name if an override exists, otherwise adopt the workspace name
@@ -55,9 +53,9 @@ resource "helm_release" "validator" {
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
         }
-        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
-          "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
-        }
+        nodeSelector = var.validator_instance_enable_taint ? {
+          "cloud.google.com/gke-nodepool" = "validators"
+        } : {}
         tolerations = [{
           key    = "aptos.org/nodepool"
           value  = "validators"
@@ -68,9 +66,9 @@ resource "helm_release" "validator" {
         storage = {
           class = kubernetes_storage_class.ssd.metadata[0].name
         }
-        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
-          "cloud.google.com/gke-nodepool" = google_container_node_pool.validators.name
-        }
+        nodeSelector = var.validator_instance_enable_taint ? {
+          "cloud.google.com/gke-nodepool" = "validators"
+        } : {}
         tolerations = [{
           key    = "aptos.org/nodepool"
           value  = "validators"
@@ -78,9 +76,14 @@ resource "helm_release" "validator" {
         }]
       }
       haproxy = {
-        nodeSelector = var.gke_enable_node_autoprovisioning ? {} : {
-          "cloud.google.com/gke-nodepool" = google_container_node_pool.utilities.name
-        }
+        nodeSelector = var.utility_instance_enable_taint ? {
+          "cloud.google.com/gke-nodepool" = "utilities"
+        } : {}
+        tolerations = [{
+          key    = "aptos.org/nodepool"
+          value  = "utilities"
+          effect = "NoExecute"
+        }]
       }
       service = {
         domain = local.domain
@@ -98,83 +101,4 @@ resource "helm_release" "validator" {
       value = sha1(join("", [for f in fileset(local.aptos_node_helm_chart_path, "**") : filesha1("${local.aptos_node_helm_chart_path}/${f}")]))
     }
   }
-}
-
-resource "helm_release" "logger" {
-  count       = var.enable_logger ? 1 : 0
-  name        = "${local.helm_release_name}-log"
-  chart       = local.logger_helm_chart_path
-  max_history = 10
-  wait        = false
-
-  values = [
-    jsonencode({
-      logger = {
-        name = "aptos-logger"
-      }
-      chain = {
-        name = var.chain_name
-      }
-      serviceAccount = {
-        create = false
-        # this name must match the serviceaccount created by the aptos-node helm chart
-      name = local.helm_release_name == "aptos-node" ? "aptos-node-validator" : "${local.helm_release_name}-aptos-node-validator" }
-    }),
-    jsonencode(var.logger_helm_values),
-  ]
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.logger_helm_chart_path, "**") : filesha1("${local.logger_helm_chart_path}/${f}")]))
-  }
-}
-
-resource "helm_release" "monitoring" {
-  count       = var.enable_monitoring ? 1 : 0
-  name        = "${local.helm_release_name}-mon"
-  chart       = local.monitoring_helm_chart_path
-  max_history = 10
-  wait        = false
-
-  values = [
-    jsonencode({
-      chain = {
-        name = var.chain_name
-      }
-      validator = {
-        name = var.validator_name
-      }
-      monitoring = {
-        prometheus = {
-          storage = {
-            class = kubernetes_storage_class.ssd.metadata[0].name
-          }
-        }
-      }
-    }),
-    jsonencode(var.monitoring_helm_values),
-  ]
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.monitoring_helm_chart_path, "**") : filesha1("${local.monitoring_helm_chart_path}/${f}")]))
-  }
-}
-
-resource "helm_release" "node_exporter" {
-  count       = var.enable_node_exporter ? 1 : 0
-  name        = "prometheus-node-exporter"
-  repository  = "https://prometheus-community.github.io/helm-charts"
-  chart       = "prometheus-node-exporter"
-  version     = "4.0.0"
-  namespace   = "kube-system"
-  max_history = 5
-  wait        = false
-
-  values = [
-    jsonencode({}),
-    jsonencode(var.node_exporter_helm_values),
-  ]
 }

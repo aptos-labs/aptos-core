@@ -96,6 +96,11 @@ impl ConfigOptimizer for NodeConfig {
         node_type: NodeType,
         chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
+        // If config optimization is disabled, don't do anything!
+        if node_config.node_startup.skip_config_optimizer {
+            return Ok(false);
+        }
+
         // Optimize only the relevant sub-configs
         let mut optimizers_with_modifications = vec![];
         if IndexerConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
@@ -288,8 +293,46 @@ fn build_seed_peer(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::NetworkConfig, network_id::NetworkId};
+    use crate::{
+        config::{node_startup_config::NodeStartupConfig, NetworkConfig},
+        network_id::NetworkId,
+    };
     use aptos_types::account_address::AccountAddress;
+
+    #[test]
+    fn test_disable_optimizer() {
+        // Create a default node config (with optimization enabled)
+        let mut node_config = NodeConfig::default();
+
+        // Optimize the node config for mainnet VFNs and verify modifications are made
+        let modified_config = NodeConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::ValidatorFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Create a node config with the optimizer disabled
+        let mut node_config = NodeConfig {
+            node_startup: NodeStartupConfig {
+                skip_config_optimizer: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Optimize the node config for mainnet VFNs and verify no modifications are made
+        let modified_config = NodeConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config
+            NodeType::ValidatorFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(!modified_config);
+    }
 
     #[test]
     fn test_optimize_public_network_config_mainnet() {

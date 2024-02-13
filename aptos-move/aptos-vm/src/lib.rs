@@ -118,7 +118,9 @@ pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;
 mod transaction_validation;
+pub mod validator_txns;
 pub mod verifier;
+mod zkid_validation;
 
 pub use crate::aptos_vm::{AptosSimulationVM, AptosVM};
 use crate::sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor};

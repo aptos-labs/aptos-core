@@ -26,15 +26,17 @@ use aptos_types::{
 };
 #[cfg(feature = "testing")]
 use aptos_types::{
-    aggregator::PanicError,
     chain_id::ChainId,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    write_set::WriteOp,
+    delayed_fields::PanicError,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
 #[cfg(feature = "testing")]
 use bytes::Bytes;
 #[cfg(feature = "testing")]
-use move_binary_format::errors::PartialVMError;
+use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -71,7 +73,7 @@ impl TAggregatorV1View for AptosBlankStorage {
     fn get_aggregator_v1_state_value(
         &self,
         _id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         Ok(None)
     }
 }
@@ -81,7 +83,6 @@ impl TDelayedFieldView for AptosBlankStorage {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         false
@@ -104,7 +105,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         unreachable!()
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
         unreachable!()
     }
 
@@ -119,8 +120,10 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unreachable!()
     }
 
@@ -128,7 +131,7 @@ impl TDelayedFieldView for AptosBlankStorage {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         unimplemented!()
     }
 }
@@ -140,7 +143,7 @@ impl TableResolver for AptosBlankStorage {
         _handle: &TableHandle,
         _key: &[u8],
         _layout: Option<&MoveTypeLayout>,
-    ) -> Result<Option<Bytes>, PartialVMError> {
+    ) -> PartialVMResult<Option<Bytes>> {
         Ok(None)
     }
 }

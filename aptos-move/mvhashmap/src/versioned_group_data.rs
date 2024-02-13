@@ -197,7 +197,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
 
         if at_base_version {
             // base version is from storage and final - immediately treat as committed.
-            self.commit_idx(zero_idx)
+            self.commit_idx(zero_idx, true)
                 .expect("Marking storage version as committed must succeed");
         }
 
@@ -246,7 +246,11 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
     }
 
     // Records the latest committed op for each tag in the group (removed tags ar excluded).
-    fn commit_idx(&mut self, shifted_idx: ShiftedTxnIndex) -> anyhow::Result<()> {
+    fn commit_idx(
+        &mut self,
+        shifted_idx: ShiftedTxnIndex,
+        allow_new_modification: bool,
+    ) -> anyhow::Result<()> {
         use std::collections::hash_map::Entry::*;
         use WriteOpKind::*;
 
@@ -265,14 +269,16 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                 (Vacant(entry), Creation) => {
                     entry.insert(v.clone());
                 },
+                (Vacant(entry), Modification) if allow_new_modification => {
+                    entry.insert(v.clone());
+                },
                 (Occupied(mut entry), Creation) if entry.get().write_op_kind() == Deletion => {
                     entry.insert(v.clone());
                 },
-                (_, _) => {
+                (e, _) => {
                     bail!(
-                        "WriteOp kind {:?} not consistent with previous value at tag {:?}",
+                        "[{shifted_idx:?}] WriteOp kind {:?} not consistent with previous value at tag {tag:?}, value: {e:?}",
                         v.write_op_kind(),
-                        tag
                     );
                 },
             }
@@ -355,7 +361,7 @@ impl<T: Hash + Clone + Debug + Eq + Serialize, V: TransactionWrite> VersionedGro
                     })
             })
             .collect::<Result<Vec<_>, MVGroupError>>()?;
-        group_size_as_sum(sizes.into_iter()).map_err(|_| MVGroupError::TagSerializationError)
+        group_size_as_sum(sizes.into_iter()).map_err(MVGroupError::TagSerializationError)
     }
 }
 
@@ -436,7 +442,7 @@ impl<
         key: &K,
         tag: &T,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<(Version, ValueWithLayout<V>), MVGroupError> {
+    ) -> Result<(Version, ValueWithLayout<V>), MVGroupError> {
         match self.group_values.get(key) {
             Some(g) => g.get_latest_tagged_value(tag, txn_idx),
             None => Err(MVGroupError::Uninitialized),
@@ -479,7 +485,7 @@ impl<
     ) -> anyhow::Result<Vec<(T, ValueWithLayout<V>)>> {
         let mut v = self.group_values.get_mut(key).expect("Path must exist");
 
-        v.commit_idx(ShiftedTxnIndex::new(txn_idx))?;
+        v.commit_idx(ShiftedTxnIndex::new(txn_idx), false)?;
         Ok(v.get_committed_group())
     }
 

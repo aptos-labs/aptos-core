@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
     pub concurrency_level: usize,
+    pub allow_fallback: bool,
 }
 
 /// Configuration from on-chain configuration, that is
@@ -40,7 +41,7 @@ impl BlockExecutorConfigFromOnchain {
                     io_gas_effective_multiplier: 1,
                     block_output_limit: Some(1_000_000_000_000),
                     conflict_penalty_window: 8,
-                    use_module_publishing_block_conflict: false,
+                    use_module_publishing_block_conflict: true,
                     include_user_txn_size_in_block_output: true,
                     add_block_limit_outcome_onchain: false,
                     use_granular_resource_group_conflicts: false,
@@ -62,7 +63,10 @@ pub struct BlockExecutorConfig {
 impl BlockExecutorConfig {
     pub fn new_no_block_limit(concurrency_level: usize) -> Self {
         Self {
-            local: BlockExecutorLocalConfig { concurrency_level },
+            local: BlockExecutorLocalConfig {
+                concurrency_level,
+                allow_fallback: true,
+            },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
     }
@@ -72,7 +76,10 @@ impl BlockExecutorConfig {
         maybe_block_gas_limit: Option<u64>,
     ) -> Self {
         Self {
-            local: BlockExecutorLocalConfig { concurrency_level },
+            local: BlockExecutorLocalConfig {
+                concurrency_level,
+                allow_fallback: true,
+            },
             onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }
     }

@@ -4,7 +4,7 @@
 use crate::{
     db::{
         get_first_seq_num_and_limit, test_helper,
-        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
+        test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_infos},
         AptosDB,
     },
     pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
@@ -128,14 +128,14 @@ fn test_error_if_version_pruned() {
         db.error_if_state_merkle_pruned("State", 4)
             .unwrap_err()
             .to_string(),
-        "Version 4 is not epoch ending."
+        "AptosDB Other Error: Version 4 is not epoch ending."
     );
     assert!(db.error_if_state_merkle_pruned("State", 5).is_ok());
     assert_eq!(
         db.error_if_ledger_pruned("Transaction", 9)
             .unwrap_err()
             .to_string(),
-        "Transaction at version 9 is pruned, min available version is 10."
+        "AptosDB Other Error: Transaction at version 9 is pruned, min available version is 10."
     );
     assert!(db.error_if_ledger_pruned("Transaction", 10).is_ok());
 }
@@ -162,7 +162,7 @@ fn test_get_latest_executed_trees() {
         0,
         ExecutionStatus::MiscellaneousError(None),
     );
-    put_transaction_info(&db, 0, &txn_info);
+    put_transaction_infos(&db, 0, &[txn_info.clone()]);
 
     let bootstrapped = db.get_latest_executed_trees().unwrap();
     assert!(
@@ -205,7 +205,6 @@ pub fn test_state_merkle_pruning_impl(
         false, /* enable_indexer */
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-        false, /* enable_indexer_async_v2 */
     )
     .unwrap();
 

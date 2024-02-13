@@ -19,7 +19,7 @@ pub const UPBL: &str = "UPBL";
 pub const UB: &str = "UB";
 
 /// Env variable to enable compiler v2 in tests
-pub const ENABLE_V2: &str = "ENABLE_V2";
+pub const MOVE_COMPILER_V2: &str = "MOVE_COMPILER_V2";
 
 pub const PRETTY: &str = "PRETTY";
 pub const FILTER: &str = "FILTER";

@@ -3,38 +3,61 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::types::PanicOr;
-use aptos_types::aggregator::PanicError;
+use aptos_logger::{debug, error};
+use aptos_mvhashmap::types::TxnIndex;
+use aptos_types::delayed_fields::PanicError;
+use aptos_vm_logging::{alert, prelude::*};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// Logging is bottlenecked in constructors.
 pub enum IntentionalFallbackToSequential {
-    /// The same module access path for module was both read & written during speculative executions.
-    /// This may trigger a race due to the Move-VM loader cache implementation, and mitigation requires
-    /// aborting the parallel execution pipeline and falling back to the sequential execution.
-    /// TODO: (short-mid term) relax the limitation, and (mid-long term) provide proper multi-versioning
-    /// for code (like data) for the cache.
+    // The same module access path for module was both read & written during speculative executions.
+    // This may trigger a race due to the Move-VM loader cache implementation, and mitigation requires
+    // aborting the parallel execution pipeline and falling back to the sequential execution.
+    // TODO: provide proper multi-versioning for code (like data) for the cache.
     ModulePathReadWrite,
-    /// We defensively check certain resource group related invariant violations.
-    ResourceGroupError(String),
+    // This is not PanicError because we need to match the error variant to provide a specialized
+    // fallback logic if a resource group serialization error occurs.
+    ResourceGroupSerializationError,
+    // If multiple workers encounter conditions that qualify for a sequential fallback during parallel
+    // execution, it is not clear what is the "right" one to fallback with. Instead, we use the
+    // variant below. TODO: pass a vector of all encountered conditions (mainly for tests).
+    FallbackFromParallel,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Error<E> {
-    FallbackToSequential(PanicOr<IntentionalFallbackToSequential>),
-    /// Execution of a thread yields a non-recoverable error, such error will be propagated back to
-    /// the caller (leading to the block execution getting aborted). TODO: revisit name (UserError).
-    UserError(E),
-}
+impl IntentionalFallbackToSequential {
+    pub(crate) fn module_path_read_write(error_msg: String, txn_idx: TxnIndex) -> Self {
+        // Module R/W is an expected fallback behavior, no alert is required.
+        debug!("[Execution] At txn {}, {:?}", txn_idx, error_msg);
 
-pub type Result<T, E> = ::std::result::Result<T, Error<E>>;
+        IntentionalFallbackToSequential::ModulePathReadWrite
+    }
 
-impl<E> From<PanicOr<IntentionalFallbackToSequential>> for Error<E> {
-    fn from(err: PanicOr<IntentionalFallbackToSequential>) -> Self {
-        Error::FallbackToSequential(err)
+    pub(crate) fn resource_group_serialization_error(error_msg: String, txn_idx: TxnIndex) -> Self {
+        alert!("[Execution] At txn {}, {:?}", txn_idx, error_msg);
+
+        IntentionalFallbackToSequential::ResourceGroupSerializationError
     }
 }
 
-impl<E> From<PanicError> for Error<E> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum BlockExecutionError<E> {
+    FallbackToSequential(PanicOr<IntentionalFallbackToSequential>),
+    /// If the unrecoverable VM error occurs during sequential execution (e.g. fallback),
+    /// the error is propagated back to the caller (block execution is aborted).
+    FatalVMError(E),
+}
+
+pub type BlockExecutionResult<T, E> = Result<T, BlockExecutionError<E>>;
+
+impl<E> From<PanicOr<IntentionalFallbackToSequential>> for BlockExecutionError<E> {
+    fn from(err: PanicOr<IntentionalFallbackToSequential>) -> Self {
+        BlockExecutionError::FallbackToSequential(err)
+    }
+}
+
+impl<E> From<PanicError> for BlockExecutionError<E> {
     fn from(err: PanicError) -> Self {
-        Error::FallbackToSequential(err.into())
+        BlockExecutionError::FallbackToSequential(err.into())
     }
 }

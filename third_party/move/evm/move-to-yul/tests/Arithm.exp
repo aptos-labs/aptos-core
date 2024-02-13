@@ -502,8 +502,8 @@ object "test_A2_M_test_add_two_number_overflow" {
             $t1 := 1
             // ($t2, $t3) := M::add_two_number($t0, $t1)
             $t2, $t3 := A2_M_add_two_number($t0, $t1)
-            // destroy($t3)
-            // destroy($t2)
+            // drop($t3)
+            // drop($t2)
             // return ()
         }
 
@@ -1229,8 +1229,8 @@ object "test_A2_M_test_div_by_zero" {
             $t1 := 0
             // ($t2, $t3) := M::div($t0, $t1)
             $t2, $t3 := A2_M_div($t0, $t1)
-            // destroy($t3)
-            // destroy($t2)
+            // drop($t3)
+            // drop($t2)
             // return ()
         }
 
@@ -1559,7 +1559,7 @@ object "test_A2_M_test_underflow" {
             let $t0
             // $t0 := M::underflow()
             $t0 := A2_M_underflow()
-            // destroy($t0)
+            // drop($t0)
             // return ()
         }
 

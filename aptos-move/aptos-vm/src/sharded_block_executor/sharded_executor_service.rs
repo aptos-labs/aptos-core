@@ -142,7 +142,10 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
                     &signature_verified_transactions,
                     aggr_overridden_state_view.as_ref(),
                     BlockExecutorConfig {
-                        local: BlockExecutorLocalConfig { concurrency_level },
+                        local: BlockExecutorLocalConfig {
+                            concurrency_level,
+                            allow_fallback: true,
+                        },
                         onchain: onchain_config,
                     },
                     cross_shard_commit_sender,

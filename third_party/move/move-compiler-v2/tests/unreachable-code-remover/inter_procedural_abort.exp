@@ -1,0 +1,93 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::always_abort() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+  2: return ()
+}
+
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: m::always_abort()
+  1: $t2 := 0
+  2: $t1 := infer($t2)
+  3: $t4 := 1
+  4: $t3 := +($t1, $t4)
+  5: $t1 := infer($t3)
+  6: $t0 := infer($t1)
+  7: return $t0
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::always_abort() {
+     var $t0: u64
+     # maybe
+  0: $t0 := 0
+     # maybe
+  1: abort($t0)
+     # no
+  2: return ()
+}
+
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # maybe
+  0: m::always_abort()
+     # maybe
+  1: $t2 := 0
+     # maybe
+  2: $t1 := infer($t2)
+     # maybe
+  3: $t4 := 1
+     # maybe
+  4: $t3 := +($t1, $t4)
+     # maybe
+  5: $t1 := infer($t3)
+     # maybe
+  6: $t0 := infer($t1)
+     # maybe
+  7: return $t0
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::always_abort() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+}
+
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: m::always_abort()
+  1: $t2 := 0
+  2: $t1 := infer($t2)
+  3: $t4 := 1
+  4: $t3 := +($t1, $t4)
+  5: $t1 := infer($t3)
+  6: $t0 := infer($t1)
+  7: return $t0
+}

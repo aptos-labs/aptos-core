@@ -7,6 +7,7 @@ edition = "2021"
 license = "Apache-2.0"
 
 [dependencies]
+abstract-domain-derive = { path = "../../move-model/bytecode/abstract_domain_derive" }
 anyhow = "1.0.52"
 move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }

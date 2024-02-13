@@ -12,10 +12,13 @@ use crate::{
     },
 };
 use aptos_types::{
-    aggregator::PanicError,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    write_set::WriteOp,
+    delayed_fields::PanicError,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use std::{
     cell::RefCell,
@@ -73,7 +76,7 @@ impl TAggregatorV1View for FakeAggregatorView {
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         Ok(self.v1_store.get(state_key).cloned())
     }
 }
@@ -82,7 +85,6 @@ impl TDelayedFieldView for FakeAggregatorView {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         true
@@ -111,11 +113,11 @@ impl TDelayedFieldView for FakeAggregatorView {
         Ok(math.unsigned_add_delta(base, delta).is_ok())
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
         let mut counter = self.counter.borrow_mut();
-        let id = Self::Identifier::new(*counter as u64);
+        let id = *counter;
         *counter += 1;
-        id
+        DelayedFieldID::new_with_width(id, width)
     }
 
     fn validate_and_convert_delayed_field_id(
@@ -137,15 +139,17 @@ impl TDelayedFieldView for FakeAggregatorView {
             )));
         }
 
-        Ok(Self::Identifier::new(id))
+        Ok(Self::Identifier::from(id))
     }
 
     fn get_reads_needing_exchange(
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unimplemented!();
     }
 
@@ -153,7 +157,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         unimplemented!();
     }
 }
