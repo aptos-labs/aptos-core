@@ -22,6 +22,7 @@ aptos-secure-net = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
+criterion = { workspace = true }
 dashmap = { workspace = true }
 itertools = { workspace = true }
 once_cell = { workspace = true }
@@ -34,3 +35,7 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 [features]
 default = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
+
+[[bench]]
+name = "bench1"
+harness = false

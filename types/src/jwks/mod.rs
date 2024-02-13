@@ -19,6 +19,9 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
 };
+use std::str::FromStr;
+use once_cell::sync::Lazy;
+use move_core_types::language_storage::TypeTag;
 
 pub mod jwk;
 pub mod rsa;
@@ -218,3 +221,7 @@ impl MoveStructType for ObservedJWKsUpdated {
     const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ObservedJWKsUpdated");
 }
+
+pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(||{
+    TypeTag::from_str(ObservedJWKsUpdated::struct_tag().to_string().as_str()).unwrap()
+});

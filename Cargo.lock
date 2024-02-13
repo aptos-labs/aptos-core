@@ -1538,6 +1538,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
+ "criterion",
  "dashmap",
  "itertools 0.10.5",
  "once_cell",

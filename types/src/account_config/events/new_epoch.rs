@@ -9,6 +9,7 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+use once_cell::sync::Lazy;
 
 /// Struct that represents a NewEpochEvent.
 #[derive(Debug, Serialize, Deserialize)]
@@ -48,3 +49,7 @@ impl MoveStructType for NewEpochEvent {
     const MODULE_NAME: &'static IdentStr = ident_str!("reconfiguration");
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewEpochEvent");
 }
+
+pub static NEW_EPOCH_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(||{
+    TypeTag::from_str(NewEpochEvent::struct_tag().to_string().as_str()).unwrap()
+});

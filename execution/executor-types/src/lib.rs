@@ -37,6 +37,10 @@ use std::{
         Arc,
     },
 };
+use std::ops::Deref;
+use aptos_types::account_config::NEW_EPOCH_EVENT_MOVE_TYPE_TAG;
+use aptos_types::dkg::DKG_START_EVENT_MOVE_TYPE_TAG;
+use aptos_types::jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG;
 
 mod error;
 mod executed_chunk;
@@ -530,6 +534,12 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
         event.type_tag().to_string().as_str(),
         "0x1::reconfiguration::NewEpochEvent"
             | "0x1::dkg::DKGStartEvent"
-            | "0x1::jwks::ObservedJWKsUpdated"
+            | "\
+            0x1::jwks::ObservedJWKsUpdated"
     )
+}
+
+pub fn should_forward_to_subscription_service_v2(event: &ContractEvent) -> bool {
+    let type_tag = event.type_tag();
+    type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref() || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref() || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
 }
