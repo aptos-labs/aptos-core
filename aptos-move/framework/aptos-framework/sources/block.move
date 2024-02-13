@@ -33,7 +33,7 @@ module aptos_framework::block {
     /// Store new block events as a move resource, internally using a circular buffer.
     struct CommitHistory has key {
         max_capacity: u32,
-        current_idx: u32,
+        next_idx: u32,
         table: TableWithLength<u32, NewBlockEvent>,
     }
 
@@ -70,7 +70,7 @@ module aptos_framework::block {
 
         move_to<CommitHistory>(aptos_framework, CommitHistory {
             max_capacity: 2000,
-            current_idx: 0,
+            next_idx: 0,
             table: table_with_length::new(),
         });
 
@@ -180,12 +180,12 @@ module aptos_framework::block {
     fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) acquires CommitHistory {
         if (exists<CommitHistory>(@aptos_framework)) {
             let commit_history_ref = borrow_global_mut<CommitHistory>(@aptos_framework);
-            let idx = commit_history_ref.current_idx;
+            let idx = commit_history_ref.next_idx;
             if (table_with_length::contains(&commit_history_ref.table, idx)) {
                 table_with_length::remove(&mut commit_history_ref.table, idx);
             };
             table_with_length::add(&mut commit_history_ref.table, idx, copy new_block_event);
-            commit_history_ref.current_idx = (idx + 1) % commit_history_ref.max_capacity;
+            commit_history_ref.next_idx = (idx + 1) % commit_history_ref.max_capacity;
         };
         timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
         assert!(
