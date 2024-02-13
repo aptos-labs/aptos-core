@@ -9,7 +9,7 @@ use aptos_dkg::{
         polynomials,
     },
     utils::{
-        g1_multi_exp, g2_multi_exp, hash_to_scalar,
+        g1_multi_exp, g2_multi_exp, hash_to_scalar, multi_pairing, parallel_multi_pairing,
         random::{
             insecure_random_gt_point, insecure_random_gt_points, random_g1_point, random_g1_points,
             random_g2_point, random_g2_points, random_scalar, random_scalars,
@@ -47,6 +47,12 @@ pub fn crypto_group(c: &mut Criterion) {
 
         accumulator_poly(thresh, &mut group);
         accumulator_poly_slow(thresh, &mut group);
+    }
+
+    const AVG_CASE: usize = 74;
+    for n in [1, 2, 4, 8, 16, 32, 64, AVG_CASE, 128] {
+        multipairing(n, &mut group);
+        parallel_multipairing(n, &mut group);
     }
 
     random_scalars_and_points_benches(&mut group);
@@ -377,6 +383,46 @@ fn accumulator_poly_scheduled<M: Measurement>(
                     naive_thresh,
                     fft_thresh,
                 );
+            },
+        )
+    });
+}
+
+fn multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("multipairing", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let r1 = random_g1_points(n, &mut rng);
+                let r2 = random_g2_points(n, &mut rng);
+
+                (r1, r2)
+            },
+            |(r1, r2)| {
+                multi_pairing(r1.iter(), r2.iter());
+            },
+        )
+    });
+}
+
+fn parallel_multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+    let mut rng = thread_rng();
+
+    g.throughput(Throughput::Elements(n as u64));
+
+    g.bench_function(BenchmarkId::new("parallel_multipairing", n), move |b| {
+        b.iter_with_setup(
+            || {
+                let r1 = random_g1_points(n, &mut rng);
+                let r2 = random_g2_points(n, &mut rng);
+
+                (r1, r2)
+            },
+            |(r1, r2)| {
+                parallel_multi_pairing(r1.iter(), r2.iter());
             },
         )
     });

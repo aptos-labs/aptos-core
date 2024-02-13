@@ -183,7 +183,7 @@ fn test_parallel_multi_pairing() {
     for (g1, g2) in vec![
         ([G1Projective::identity(), r1[0]], r2.clone()),
         (r1.clone(), r2.clone()),
-        (r1.clone(), [G2Projective::identity(), r2[0]])
+        (r1.clone(), [G2Projective::identity(), r2[0]]),
     ] {
         let res1 = multi_pairing(g1.iter(), g2.iter());
         let res2 = parallel_multi_pairing(g1.iter(), g2.iter());

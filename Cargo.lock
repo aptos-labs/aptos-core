@@ -1274,6 +1274,7 @@ dependencies = [
  "pairing",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "rayon",
  "serde",
  "serde_bytes",
  "sha3 0.9.1",
