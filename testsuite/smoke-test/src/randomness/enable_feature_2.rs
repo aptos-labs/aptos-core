@@ -3,14 +3,13 @@
 use crate::{
     randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
     smoke_test_environment::SwarmBuilder,
+    utils::get_current_consensus_config,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
-use aptos_types::dkg::DKGState;
-use std::{sync::Arc, time::Duration};
 use aptos_logger::{debug, info};
-use aptos_types::on_chain_config::{FeatureFlag, OnChainConsensusConfig};
+use aptos_types::{dkg::DKGState, on_chain_config::FeatureFlag};
 use aptos_vm_genesis::default_features_resource_for_genesis;
-use crate::utils::get_current_consensus_config;
+use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness by enabling validator transactions and feature `RECONFIGURE_WITH_DKG` simultaneously.
 #[tokio::test]
@@ -37,10 +36,7 @@ async fn enable_feature_2() {
         .await;
 
     let root_addr = swarm.chain_info().root_account().address();
-    let root_idx = cli.add_account_with_address_to_cli(
-        swarm.root_key(),
-        root_addr,
-    );
+    let root_idx = cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
     let decrypt_key_map = decrypt_key_map(&swarm);
 
@@ -56,7 +52,8 @@ async fn enable_feature_2() {
     let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
     let config_bytes = bcs::to_bytes(&config).unwrap();
-    let script = format!(r#"
+    let script = format!(
+        r#"
 script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
@@ -70,7 +67,9 @@ script {{
         aptos_governance::reconfigure(&framework_signer);
     }}
 }}
-"#, config_bytes);
+"#,
+        config_bytes
+    );
 
     debug!("script={}", script);
     let txn_summary = cli
