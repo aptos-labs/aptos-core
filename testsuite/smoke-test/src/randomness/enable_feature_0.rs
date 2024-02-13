@@ -52,7 +52,6 @@ async fn enable_feature_0() {
         .await
         .expect("Waited too long for epoch 2.");
     println!("Enabling the feature.");
-    swarm.aptos_public_info().mint(root_addr, 999999999999999).await.unwrap();
     let enable_dkg_script = r#"
 script {
     use aptos_framework::aptos_governance;
