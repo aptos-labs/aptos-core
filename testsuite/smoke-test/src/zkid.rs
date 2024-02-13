@@ -37,7 +37,7 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn test_zkid_oidc_signature_transaction_submission() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_aptos()
         .build_with_cli(0)
         .await;
