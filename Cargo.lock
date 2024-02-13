@@ -399,6 +399,7 @@ dependencies = [
  "aptos-cached-packages",
  "aptos-config",
  "aptos-crypto",
+ "aptos-db-indexer",
  "aptos-framework",
  "aptos-gas-meter",
  "aptos-gas-schedule",
@@ -517,6 +518,7 @@ dependencies = [
  "anyhow",
  "aptos-config",
  "aptos-crypto",
+ "aptos-db-indexer",
  "aptos-framework",
  "aptos-logger",
  "aptos-openapi",
@@ -763,6 +765,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-collections"
+version = "0.1.0"
+
+[[package]]
 name = "aptos-comparison-testing"
 version = "0.1.0"
 dependencies = [
@@ -867,6 +873,7 @@ dependencies = [
  "aptos-bounded-executor",
  "aptos-cached-packages",
  "aptos-channels",
+ "aptos-collections",
  "aptos-config",
  "aptos-consensus-notifications",
  "aptos-consensus-types",
@@ -1851,54 +1858,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-fuzz"
-version = "0.1.0"
-dependencies = [
- "aptos-fuzzer",
- "libfuzzer-sys",
- "once_cell",
-]
-
-[[package]]
-name = "aptos-fuzzer"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-accumulator",
- "aptos-consensus",
- "aptos-consensus-types",
- "aptos-crypto",
- "aptos-db",
- "aptos-executor",
- "aptos-executor-types",
- "aptos-jellyfish-merkle",
- "aptos-language-e2e-tests",
- "aptos-mempool",
- "aptos-network",
- "aptos-proptest-helpers",
- "aptos-safety-rules",
- "aptos-scratchpad",
- "aptos-storage-interface",
- "aptos-types",
- "aptos-vault-client",
- "bcs 0.1.4",
- "byteorder",
- "clap 4.4.14",
- "datatest-stable",
- "hex",
- "move-binary-format",
- "move-core-types",
- "move-vm-types",
- "once_cell",
- "proptest",
- "proptest-derive 0.4.0",
- "rand 0.7.3",
- "rusty-fork",
- "sha-1",
- "stats_alloc",
-]
-
-[[package]]
 name = "aptos-gas-algebra"
 version = "0.0.1"
 dependencies = [
@@ -2226,6 +2185,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-db",
+ "aptos-db-indexer",
  "aptos-executor",
  "aptos-executor-types",
  "aptos-framework",
@@ -2342,50 +2302,31 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-api",
- "aptos-api-test-context",
  "aptos-api-types",
  "aptos-bitvec",
  "aptos-config",
- "aptos-crypto",
  "aptos-db",
- "aptos-executor",
- "aptos-executor-types",
- "aptos-framework",
- "aptos-genesis",
- "aptos-global-constants",
+ "aptos-db-indexer",
  "aptos-indexer-grpc-fullnode",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-mempool",
- "aptos-mempool-notifications",
  "aptos-metrics-core",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-proptest-helpers",
  "aptos-protos 1.1.2",
  "aptos-rocksdb-options",
  "aptos-runtimes",
- "aptos-sdk",
- "aptos-secure-storage",
+ "aptos-schemadb",
  "aptos-storage-interface",
- "aptos-temppath",
  "aptos-types",
- "aptos-vm",
- "aptos-vm-validator",
  "base64 0.13.1",
  "bytes",
  "chrono",
  "fail 0.5.1",
  "futures",
- "goldenfile",
  "hex",
  "hyper",
- "move-binary-format",
- "move-core-types",
- "move-package",
  "move-resource-viewer",
  "once_cell",
- "rand 0.7.3",
- "regex",
  "serde",
  "serde_json",
  "tokio",
@@ -3044,6 +2985,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha256",
  "tokio",
  "tracing",
  "url",
@@ -3069,6 +3011,7 @@ dependencies = [
  "aptos-data-client",
  "aptos-data-streaming-service",
  "aptos-db",
+ "aptos-db-indexer",
  "aptos-dkg-runtime",
  "aptos-event-notifications",
  "aptos-executor",
@@ -7479,7 +7422,7 @@ dependencies = [
  "fixed-hash 0.8.0",
  "impl-codec 0.6.0",
  "impl-rlp",
- "scale-info 2.10.0",
+ "scale-info 1.0.0",
  "tiny-keccak",
 ]
 
@@ -7560,7 +7503,7 @@ dependencies = [
  "impl-codec 0.6.0",
  "impl-rlp",
  "primitive-types 0.12.2",
- "scale-info 2.10.0",
+ "scale-info 1.0.0",
  "uint",
 ]
 
@@ -10812,6 +10755,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-examples"
+version = "0.1.1"
+dependencies = [
+ "move-cli",
+]
+
+[[package]]
 name = "move-explain"
 version = "0.1.0"
 dependencies = [
@@ -12879,7 +12829,7 @@ dependencies = [
  "fixed-hash 0.8.0",
  "impl-codec 0.6.0",
  "impl-rlp",
- "scale-info 2.10.0",
+ "scale-info 1.0.0",
  "uint",
 ]
 
@@ -14562,17 +14512,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha-1"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5058ada175748e33390e40e872bd0fe59a19f265d0158daa551c5a88a76009c"
-dependencies = [
- "cfg-if",
- "cpufeatures",
- "digest 0.10.7",
-]
-
-[[package]]
 name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15052,12 +14991,6 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
-
-[[package]]
-name = "stats_alloc"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c0e04424e733e69714ca1bbb9204c1a57f09f5493439520f9f68c132ad25eec"
 
 [[package]]
 name = "status-line"

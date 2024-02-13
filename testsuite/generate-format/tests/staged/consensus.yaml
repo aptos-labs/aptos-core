@@ -740,11 +740,13 @@ SignedGroth16Zkp:
         TYPENAME: Groth16Zkp
     - non_malleability_signature:
         TYPENAME: EphemeralSignature
-    - training_wheels_signature:
-        TYPENAME: EphemeralSignature
+    - exp_horizon_secs: U64
     - extra_field: STR
     - override_aud_val:
         OPTION: STR
+    - training_wheels_signature:
+        OPTION:
+          TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:

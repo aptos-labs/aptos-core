@@ -16,7 +16,9 @@ pub fn initialize(
     resource_group_charge_as_sum_enabled: bool,
     txns: usize,
 ) -> ResourceGroupsTestHarness {
-    let (harness, account) = initialize_harness(mode, resource_group_charge_as_sum_enabled, path);
+    let (mut harness, account) =
+        initialize_harness(mode, resource_group_charge_as_sum_enabled, path);
+    harness.executor.disable_block_executor_fallback();
 
     let mut rg_harness = ResourceGroupsTestHarness {
         harness,

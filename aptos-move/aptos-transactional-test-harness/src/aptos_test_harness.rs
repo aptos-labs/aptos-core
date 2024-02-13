@@ -899,7 +899,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             },
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
                 let resolver = self.storage.as_move_resolver();
-                let converter = resolver.as_converter(Arc::new(FakeDbReader {}));
+                let converter = resolver.as_converter(Arc::new(FakeDbReader {}), None);
 
                 let vm_key = converter
                     .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)

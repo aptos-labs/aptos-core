@@ -3,6 +3,7 @@
 use crate::{
     bn254_circom::{G1Bytes, G2Bytes},
     jwks::rsa::RSA_JWK,
+    move_utils::as_move_value::AsMoveValue,
     on_chain_config::CurrentTimeMicroseconds,
     transaction::{
         authenticator::{
@@ -22,6 +23,7 @@ use move_core_types::{
     ident_str,
     identifier::IdentStr,
     move_resource::MoveStructType,
+    value::{MoveStruct, MoveValue},
     vm_status::{StatusCode, VMStatus},
 };
 use serde::{Deserialize, Serialize};
@@ -59,17 +61,34 @@ pub struct Configuration {
     pub max_jwt_header_b64_bytes: u32,
 }
 
+impl AsMoveValue for Configuration {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            self.override_aud_vals.as_move_value(),
+            self.max_zkid_signatures_per_txn.as_move_value(),
+            self.max_exp_horizon_secs.as_move_value(),
+            self.training_wheels_pubkey.as_move_value(),
+            self.nonce_commitment_num_bytes.as_move_value(),
+            self.max_commited_epk_bytes.as_move_value(),
+            self.max_iss_field_bytes.as_move_value(),
+            self.max_extra_field_bytes.as_move_value(),
+            self.max_jwt_header_b64_bytes.as_move_value(),
+        ]))
+    }
+}
+
+/// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
+/// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
 impl MoveStructType for Configuration {
     const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
     const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 
 impl Configuration {
-    #[cfg(test)]
-    const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
+    /// Should only be used for testing.
+    pub const OVERRIDE_AUD_FOR_TESTING: &'static str = "some_override_aud";
 
-    #[cfg(test)]
-    pub fn new_for_testing() -> Configuration {
+    pub fn new_for_devnet_and_testing() -> Configuration {
         const POSEIDON_BYTES_PACKED_PER_SCALAR: u16 = 31;
 
         Configuration {
@@ -292,11 +311,18 @@ pub struct Groth16Zkp {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
-    /// The signature of the proof signed by the private key of the `ephemeral_pubkey`.
+    /// A signature on the proof (via the ephemeral SK) to prevent malleability attacks.
     pub non_malleability_signature: EphemeralSignature,
-    pub training_wheels_signature: EphemeralSignature,
+    /// The expiration horizon that the circuit should enforce on the expiration date committed in the nonce.
+    /// This must be <= `Configuration::max_expiration_horizon_secs`.
+    pub exp_horizon_secs: u64,
+    /// An extra field (e.g., `"<name>":"<val>") that will be matched publicly in the JWT
     pub extra_field: String,
+    /// Will be set to the override `aud` value that the circuit should match, instead of the `aud` in the IDC.
+    /// This will allow users to recover their zkID accounts derived by an application that is no longer online.
     pub override_aud_val: Option<String>,
+    /// A signature on the proof (via the training wheels SK) to mitigate against flaws in our circuit
+    pub training_wheels_signature: Option<EphemeralSignature>,
 }
 
 impl SignedGroth16Zkp {
@@ -305,7 +331,11 @@ impl SignedGroth16Zkp {
     }
 
     pub fn verify_training_wheels_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
-        self.training_wheels_signature.verify(&self.proof, pub_key)
+        if let Some(training_wheels_signature) = &self.training_wheels_signature {
+            training_wheels_signature.verify(&self.proof, pub_key)
+        } else {
+            bail!("No training_wheels_signature found")
+        }
     }
 
     pub fn verify_proof(
@@ -664,15 +694,17 @@ mod test {
 
         let proof_sig = sender.sign(&proof).unwrap();
         let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
+        let config = Configuration::new_for_devnet_and_testing();
         let zk_sig = ZkIdSignature {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
                 non_malleability_signature: ephem_proof_sig,
-                training_wheels_signature: EphemeralSignature::ed25519(
-                    Ed25519Signature::dummy_signature(),
-                ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
+                exp_horizon_secs: config.max_exp_horizon_secs,
                 override_aud_val: None,
+                training_wheels_signature: Some(EphemeralSignature::ed25519(
+                    Ed25519Signature::dummy_signature(),
+                )),
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
@@ -702,7 +734,7 @@ mod test {
         };
 
         let public_inputs_hash =
-            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, &Configuration::new_for_testing())
+            get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, config.max_exp_horizon_secs, &config)
                 .unwrap();
 
         proof
@@ -759,7 +791,7 @@ mod test {
         let uid_key = "sub";
         let uid_val = "248289761001";
         let exp_timestamp_secs = 1311281970;
-        let config = Configuration::new_for_testing();
+        let config = Configuration::new_for_devnet_and_testing();
         let pepper = 76;
 
         let zkid_pk = ZkIdPublicKey {

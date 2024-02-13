@@ -9,6 +9,7 @@ use aptos_aggregator::{
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
+    state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -95,10 +96,8 @@ pub trait TransactionOutput: Send + Sync + Debug {
         &self,
     ) -> Vec<(
         <Self::Txn as Transaction>::Key,
-        (
-            <Self::Txn as Transaction>::Value,
-            Option<Arc<MoveTypeLayout>>,
-        ),
+        Arc<<Self::Txn as Transaction>::Value>,
+        Option<Arc<MoveTypeLayout>>,
     )>;
 
     fn module_write_set(
@@ -110,7 +109,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     ) -> BTreeMap<<Self::Txn as Transaction>::Key, <Self::Txn as Transaction>::Value>;
 
     /// Get the aggregator V1 deltas of a transaction from its output.
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<<Self::Txn as Transaction>::Key, DeltaOp>;
+    fn aggregator_v1_delta_set(&self) -> Vec<(<Self::Txn as Transaction>::Key, DeltaOp)>;
 
     /// Get the delayed field changes of a transaction from its output.
     fn delayed_field_change_set(
@@ -122,14 +121,15 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)>;
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        StateValueMetadata,
+        Arc<MoveTypeLayout>,
+    )>;
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )>;
+    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)>;
 
     /// Get the events of a transaction from its output.
     fn get_events(&self) -> Vec<(<Self::Txn as Transaction>::Event, Option<MoveTypeLayout>)>;

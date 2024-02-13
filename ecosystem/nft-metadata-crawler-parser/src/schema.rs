@@ -22,6 +22,7 @@ pub mod nft_metadata_crawler {
             animation_optimizer_retry_count -> Int4,
             inserted_at -> Timestamp,
             do_not_parse -> Bool,
+            last_transaction_version -> Int8,
         }
     }
 
