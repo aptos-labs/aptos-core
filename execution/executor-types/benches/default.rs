@@ -3,11 +3,15 @@
 use criterion::Criterion;
 use criterion::criterion_main;
 use criterion::criterion_group;
-use aptos_executor_types::{should_forward_to_subscription_service, should_forward_to_subscription_service_old};
+use aptos_executor_types::should_forward_to_subscription_service;
+#[cfg(feature = "bench")]
+use aptos_executor_types::should_forward_to_subscription_service_old;
 use aptos_types::contract_event::ContractEvent;
 
 fn default_targets(c: &mut Criterion) {
     let mut group = c.benchmark_group("should_forward_to_subscription_service");
+
+    #[cfg(feature = "bench")]
     group.bench_function("v0", move |b| {
         b.iter_with_setup(
             || ContractEvent::new_v2_with_type_tag_str("0x1::jwks::QuorumCertifiedUpdate", vec![0xff; 256]),

@@ -534,7 +534,7 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
     type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref() || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref() || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
 }
 
-#[cfg(test)]
+#[cfg(feature = "bench")]
 pub fn should_forward_to_subscription_service_old(event: &ContractEvent) -> bool {
     matches!(
         event.type_tag().to_string().as_str(),
