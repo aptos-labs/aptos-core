@@ -45,7 +45,7 @@ pub fn initialize_enabled_disabled_comparison(
 
     let mut agg_harness = AggV2TestHarness {
         harness: harness_base,
-        comparison_harnesses: vec![harness_comp],
+        comparison_harnesses: vec![(harness_comp, "aggregator_execution_enabled".to_string())],
         account: account_base,
         txn_accounts: vec![],
         txn_index: 0,
@@ -87,7 +87,7 @@ fn initialize_harness(
 
 pub struct AggV2TestHarness {
     pub harness: MoveHarness,
-    pub comparison_harnesses: Vec<MoveHarness>,
+    pub comparison_harnesses: Vec<(MoveHarness, String)>,
     pub account: Account,
     pub txn_accounts: Vec<Account>,
     pub txn_index: usize,
@@ -179,14 +179,9 @@ impl AggV2TestHarness {
             .harness
             .run_block_in_parts_and_check(block_split, txn_block.clone());
 
-        for (idx, h) in self.comparison_harnesses.iter_mut().enumerate() {
+        for (h, name) in self.comparison_harnesses.iter_mut() {
             let new_result = h.run_block_in_parts_and_check(block_split, txn_block.clone());
-            assert_outputs_equal(
-                &result,
-                "baseline",
-                &new_result,
-                &format!("comparison {}", idx),
-            );
+            assert_outputs_equal(&result, "baseline", &new_result, name);
         }
     }
 
@@ -204,7 +199,7 @@ impl AggV2TestHarness {
 
         let result = self.harness.store_and_fund_account(&acc, balance, seq_num);
 
-        for h in self.comparison_harnesses.iter_mut() {
+        for (h, _name) in self.comparison_harnesses.iter_mut() {
             h.store_and_fund_account(&acc, balance, seq_num);
         }
 

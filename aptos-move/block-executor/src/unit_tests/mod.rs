@@ -106,7 +106,7 @@ fn resource_group_bcs_fallback() {
             assert!(!txn_outputs[2].writes.is_empty());
             assert!(!txn_outputs[1].group_writes.is_empty());
         },
-        Err(_) => unreachable!("Must succeed: failpoint not yet set up"),
+        Err(e) => unreachable!("Must succeed, but {:?}: failpoint not yet set up", e),
     };
 
     // Set up and sanity check failpoint.

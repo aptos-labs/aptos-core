@@ -13,8 +13,10 @@ use crate::{
 };
 use aptos_types::{
     delayed_fields::PanicError,
-    state_store::{state_key::StateKey, state_value::StateValue},
-    write_set::WriteOp,
+    state_store::{
+        state_key::StateKey,
+        state_value::{StateValue, StateValueMetadata},
+    },
 };
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
@@ -83,7 +85,6 @@ impl TDelayedFieldView for FakeAggregatorView {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         true
@@ -145,8 +146,10 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unimplemented!();
     }
 
@@ -154,7 +157,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         &self,
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         unimplemented!();
     }
 }

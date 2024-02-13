@@ -297,13 +297,6 @@ impl TransactionWrite for ValueType {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.bytes = bytes.into();
     }
-
-    fn convert_read_to_modification(&self) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        Some(self.clone())
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -1011,12 +1004,12 @@ where
     // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
     // That means, the resources do not have any DelayedFields embedded in them.
     // Change it to test resources with DelayedFields as well.
-    fn resource_write_set(&self) -> Vec<(K, (ValueType, Option<Arc<MoveTypeLayout>>))> {
+    fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
             .cloned()
-            .map(|(k, v)| (k, (v, None)))
+            .map(|(k, v)| (k, Arc::new(v), None))
             .collect()
     }
 
@@ -1034,8 +1027,8 @@ where
         BTreeMap::new()
     }
 
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<K, DeltaOp> {
-        self.deltas.iter().cloned().collect()
+    fn aggregator_v1_delta_set(&self) -> Vec<(K, DeltaOp)> {
+        self.deltas.clone()
     }
 
     fn delayed_field_change_set(
@@ -1050,17 +1043,18 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        StateValueMetadata,
+        Arc<MoveTypeLayout>,
+    )> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         Vec::new()
     }
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )> {
+    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         Vec::new()
     }

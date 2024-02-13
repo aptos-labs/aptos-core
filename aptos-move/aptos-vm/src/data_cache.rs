@@ -21,10 +21,12 @@ use aptos_types::{
     delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateView, StateViewId,
+        errors::StateviewError,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
     },
-    write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
@@ -247,7 +249,6 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -286,8 +287,10 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -296,7 +299,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
