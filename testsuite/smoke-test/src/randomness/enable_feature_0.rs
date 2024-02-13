@@ -36,10 +36,12 @@ async fn enable_feature_0() {
         .build_with_cli(0)
         .await;
 
+    let root_addr = swarm.chain_info().root_account().address();
     let root_idx = cli.add_account_with_address_to_cli(
         swarm.root_key(),
-        swarm.chain_info().root_account().address(),
+        root_addr,
     );
+    swarm.aptos_public_info().mint(root_addr, 999999999999999).await.unwrap();
 
     let decrypt_key_map = decrypt_key_map(&swarm);
 
@@ -50,7 +52,6 @@ async fn enable_feature_0() {
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
         .await
         .expect("Waited too long for epoch 2.");
-
     println!("Enabling the feature.");
     let enable_dkg_script = r#"
 script {
