@@ -167,7 +167,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                         )))
                     },
                 } {
-                    // TODO[agg_v2](fix): handle invalidation when we change read_estimate_deltas
+                    // TODO[agg_v2](optimize): See if we want to invalidate, when we change read_estimate_deltas
                     self.read_estimate_deltas = false;
                 }
                 o.insert(CachePadded::new(entry));

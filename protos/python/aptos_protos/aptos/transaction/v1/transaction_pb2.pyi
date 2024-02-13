@@ -557,7 +557,6 @@ class TransactionPayload(_message.Message):
         "type",
         "entry_function_payload",
         "script_payload",
-        "module_bundle_payload",
         "write_set_payload",
         "multisig_payload",
     ]
@@ -567,25 +566,21 @@ class TransactionPayload(_message.Message):
         TYPE_UNSPECIFIED: _ClassVar[TransactionPayload.Type]
         TYPE_ENTRY_FUNCTION_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_SCRIPT_PAYLOAD: _ClassVar[TransactionPayload.Type]
-        TYPE_MODULE_BUNDLE_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_WRITE_SET_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_MULTISIG_PAYLOAD: _ClassVar[TransactionPayload.Type]
     TYPE_UNSPECIFIED: TransactionPayload.Type
     TYPE_ENTRY_FUNCTION_PAYLOAD: TransactionPayload.Type
     TYPE_SCRIPT_PAYLOAD: TransactionPayload.Type
-    TYPE_MODULE_BUNDLE_PAYLOAD: TransactionPayload.Type
     TYPE_WRITE_SET_PAYLOAD: TransactionPayload.Type
     TYPE_MULTISIG_PAYLOAD: TransactionPayload.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ENTRY_FUNCTION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
-    MODULE_BUNDLE_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     WRITE_SET_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     MULTISIG_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     type: TransactionPayload.Type
     entry_function_payload: EntryFunctionPayload
     script_payload: ScriptPayload
-    module_bundle_payload: ModuleBundlePayload
     write_set_payload: WriteSetPayload
     multisig_payload: MultisigPayload
     def __init__(
@@ -593,7 +588,6 @@ class TransactionPayload(_message.Message):
         type: _Optional[_Union[TransactionPayload.Type, str]] = ...,
         entry_function_payload: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
         script_payload: _Optional[_Union[ScriptPayload, _Mapping]] = ...,
-        module_bundle_payload: _Optional[_Union[ModuleBundlePayload, _Mapping]] = ...,
         write_set_payload: _Optional[_Union[WriteSetPayload, _Mapping]] = ...,
         multisig_payload: _Optional[_Union[MultisigPayload, _Mapping]] = ...,
     ) -> None: ...
@@ -674,14 +668,6 @@ class MultisigTransactionPayload(_message.Message):
         self,
         type: _Optional[_Union[MultisigTransactionPayload.Type, str]] = ...,
         entry_function_payload: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
-    ) -> None: ...
-
-class ModuleBundlePayload(_message.Message):
-    __slots__ = ["modules"]
-    MODULES_FIELD_NUMBER: _ClassVar[int]
-    modules: _containers.RepeatedCompositeFieldContainer[MoveModuleBytecode]
-    def __init__(
-        self, modules: _Optional[_Iterable[_Union[MoveModuleBytecode, _Mapping]]] = ...
     ) -> None: ...
 
 class MoveModuleBytecode(_message.Message):

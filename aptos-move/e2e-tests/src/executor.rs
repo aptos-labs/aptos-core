@@ -57,7 +57,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
-    verifier, AptosVM, VMExecutor, VMValidator,
+    verifier, AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -128,6 +128,7 @@ pub struct FakeExecutor {
     executor_mode: Option<ExecutorMode>,
     features: Features,
     chain_id: u8,
+    allow_block_executor_fallback: bool,
 }
 
 pub enum GasMeterType {
@@ -155,10 +156,9 @@ impl FakeExecutor {
             executor_mode: None,
             features: Features::default(),
             chain_id: chain_id.id(),
+            allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
-        // As a set effect, also allow module bundle txns. TODO: Remove
-        aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
     }
 
@@ -177,6 +177,10 @@ impl FakeExecutor {
     /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
     pub fn set_parallel(self) -> Self {
         self.set_executor_mode(ExecutorMode::BothComparison)
+    }
+
+    pub fn disable_block_executor_fallback(&mut self) {
+        self.allow_block_executor_fallback = false;
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
@@ -236,6 +240,7 @@ impl FakeExecutor {
             executor_mode: None,
             features: Features::default(),
             chain_id: ChainId::test().id(),
+            allow_block_executor_fallback: true,
         }
     }
 
@@ -470,21 +475,28 @@ impl FakeExecutor {
         }
     }
 
-    pub fn execute_transaction_block_parallel(
+    fn execute_transaction_block_impl(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
         onchain_config: BlockExecutorConfigFromOnchain,
+        sequential: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let config = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level: if sequential {
+                    1
+                } else {
+                    usize::min(4, num_cpus::get())
+                },
+                allow_fallback: self.allow_block_executor_fallback,
+            },
+            onchain: onchain_config,
+        };
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
-            BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: usize::min(4, num_cpus::get()),
-                },
-                onchain: onchain_config,
-            },
+            config,
             None,
         ).map(BlockOutput::into_transaction_outputs_forced)
     }
@@ -520,20 +532,17 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(
-                AptosVM::execute_block(
-                    &sig_verified_block,
-                    &self.data_store,
-                    onchain_config.clone(),
-                )
-                .map(BlockOutput::into_transaction_outputs_forced),
-            )
+            Some(self.execute_transaction_block_impl(
+                &sig_verified_block,
+                onchain_config.clone(),
+                true,
+            ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block, onchain_config))
+            Some(self.execute_transaction_block_impl(&sig_verified_block, onchain_config, false))
         } else {
             None
         };
@@ -627,8 +636,12 @@ impl FakeExecutor {
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has been removed")
+                    },
                 };
                 Ok(gas_profiler)
             },

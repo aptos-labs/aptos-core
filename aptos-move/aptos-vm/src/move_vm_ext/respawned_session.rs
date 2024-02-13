@@ -26,7 +26,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId,
     },
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
@@ -192,7 +192,6 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.base_executor_view
@@ -279,8 +278,10 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.base_executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -289,7 +290,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -380,15 +381,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // TODO[agg_v2](fix): Revisit this error whether it should be invariant violation
-                    //                    or a panic/fallback.
-                    Some(Err(PartialVMError::new(
-                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    )
-                    .with_message(
-                        "Non-ResourceGroup write found for key in get_resource_from_group call"
-                            .to_string(),
-                    )))
+                    // There should be no colisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
                 },
             })
             .transpose()?

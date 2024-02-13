@@ -16,7 +16,7 @@ use tracing::{debug, info};
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 /// Establishes a connection pool to Postgres
-pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
+pub fn establish_connection_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::builder()
         .build(manager)
@@ -52,6 +52,7 @@ pub fn upsert_uris(
             json_parser_retry_count.eq(excluded(json_parser_retry_count)),
             animation_optimizer_retry_count.eq(excluded(animation_optimizer_retry_count)),
             do_not_parse.eq(excluded(do_not_parse)),
+            last_transaction_version.eq(excluded(last_transaction_version)),
         ));
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();

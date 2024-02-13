@@ -21,10 +21,12 @@ use aptos_types::{
     delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateView, StateViewId,
+        errors::StateviewError,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
     },
-    write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
@@ -117,12 +119,10 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         address: &AccountAddress,
         struct_tag: &StructTag,
         metadata: &[Metadata],
-        // Question: Is maybe_layout = Some(..) iff the layout has an aggregator v2
         maybe_layout: Option<&MoveTypeLayout>,
     ) -> PartialVMResult<(Option<Bytes>, usize)> {
         let resource_group = get_resource_group_from_metadata(struct_tag, metadata);
         if let Some(resource_group) = resource_group {
-            // TODO[agg_v2](fix) pass the layout to resource groups
             let key = StateKey::access_path(AccessPath::resource_group_access_path(
                 *address,
                 resource_group.clone(),
@@ -249,7 +249,6 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -288,8 +287,10 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -298,7 +299,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -383,7 +384,7 @@ pub(crate) mod tests {
         };
 
         let group_adapter = ResourceGroupAdapter::new(
-            // TODO[agg_v2](fix) add a converter for StateView for tests that implements ResourceGroupView
+            // TODO[agg_v2](test) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,

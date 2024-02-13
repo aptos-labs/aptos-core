@@ -2755,97 +2755,6 @@ impl<'de> serde::Deserialize<'de> for IndexedSignature {
         deserializer.deserialize_struct("aptos.transaction.v1.IndexedSignature", FIELDS, GeneratedVisitor)
     }
 }
-impl serde::Serialize for ModuleBundlePayload {
-    #[allow(deprecated)]
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-        let mut len = 0;
-        if !self.modules.is_empty() {
-            len += 1;
-        }
-        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.ModuleBundlePayload", len)?;
-        if !self.modules.is_empty() {
-            struct_ser.serialize_field("modules", &self.modules)?;
-        }
-        struct_ser.end()
-    }
-}
-impl<'de> serde::Deserialize<'de> for ModuleBundlePayload {
-    #[allow(deprecated)]
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        const FIELDS: &[&str] = &[
-            "modules",
-        ];
-
-        #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-            Modules,
-        }
-        impl<'de> serde::Deserialize<'de> for GeneratedField {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                struct GeneratedVisitor;
-
-                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-                    type Value = GeneratedField;
-
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                        write!(formatter, "expected one of: {:?}", &FIELDS)
-                    }
-
-                    #[allow(unused_variables)]
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
-                    where
-                        E: serde::de::Error,
-                    {
-                        match value {
-                            "modules" => Ok(GeneratedField::Modules),
-                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
-                        }
-                    }
-                }
-                deserializer.deserialize_identifier(GeneratedVisitor)
-            }
-        }
-        struct GeneratedVisitor;
-        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
-            type Value = ModuleBundlePayload;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.transaction.v1.ModuleBundlePayload")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<ModuleBundlePayload, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
-            {
-                let mut modules__ = None;
-                while let Some(k) = map.next_key()? {
-                    match k {
-                        GeneratedField::Modules => {
-                            if modules__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("modules"));
-                            }
-                            modules__ = Some(map.next_value()?);
-                        }
-                    }
-                }
-                Ok(ModuleBundlePayload {
-                    modules: modules__.unwrap_or_default(),
-                })
-            }
-        }
-        deserializer.deserialize_struct("aptos.transaction.v1.ModuleBundlePayload", FIELDS, GeneratedVisitor)
-    }
-}
 impl serde::Serialize for MoveAbility {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -6869,9 +6778,6 @@ impl serde::Serialize for TransactionPayload {
                 transaction_payload::Payload::ScriptPayload(v) => {
                     struct_ser.serialize_field("scriptPayload", v)?;
                 }
-                transaction_payload::Payload::ModuleBundlePayload(v) => {
-                    struct_ser.serialize_field("moduleBundlePayload", v)?;
-                }
                 transaction_payload::Payload::WriteSetPayload(v) => {
                     struct_ser.serialize_field("writeSetPayload", v)?;
                 }
@@ -6895,8 +6801,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "entryFunctionPayload",
             "script_payload",
             "scriptPayload",
-            "module_bundle_payload",
-            "moduleBundlePayload",
             "write_set_payload",
             "writeSetPayload",
             "multisig_payload",
@@ -6908,7 +6812,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             Type,
             EntryFunctionPayload,
             ScriptPayload,
-            ModuleBundlePayload,
             WriteSetPayload,
             MultisigPayload,
         }
@@ -6935,7 +6838,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             "type" => Ok(GeneratedField::Type),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
                             "scriptPayload" | "script_payload" => Ok(GeneratedField::ScriptPayload),
-                            "moduleBundlePayload" | "module_bundle_payload" => Ok(GeneratedField::ModuleBundlePayload),
                             "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
                             "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -6981,13 +6883,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::ScriptPayload)
 ;
                         }
-                        GeneratedField::ModuleBundlePayload => {
-                            if payload__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("moduleBundlePayload"));
-                            }
-                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::ModuleBundlePayload)
-;
-                        }
                         GeneratedField::WriteSetPayload => {
                             if payload__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("writeSetPayload"));
@@ -7023,7 +6918,6 @@ impl serde::Serialize for transaction_payload::Type {
             Self::Unspecified => "TYPE_UNSPECIFIED",
             Self::EntryFunctionPayload => "TYPE_ENTRY_FUNCTION_PAYLOAD",
             Self::ScriptPayload => "TYPE_SCRIPT_PAYLOAD",
-            Self::ModuleBundlePayload => "TYPE_MODULE_BUNDLE_PAYLOAD",
             Self::WriteSetPayload => "TYPE_WRITE_SET_PAYLOAD",
             Self::MultisigPayload => "TYPE_MULTISIG_PAYLOAD",
         };
@@ -7040,7 +6934,6 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
             "TYPE_UNSPECIFIED",
             "TYPE_ENTRY_FUNCTION_PAYLOAD",
             "TYPE_SCRIPT_PAYLOAD",
-            "TYPE_MODULE_BUNDLE_PAYLOAD",
             "TYPE_WRITE_SET_PAYLOAD",
             "TYPE_MULTISIG_PAYLOAD",
         ];
@@ -7088,7 +6981,6 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                     "TYPE_UNSPECIFIED" => Ok(transaction_payload::Type::Unspecified),
                     "TYPE_ENTRY_FUNCTION_PAYLOAD" => Ok(transaction_payload::Type::EntryFunctionPayload),
                     "TYPE_SCRIPT_PAYLOAD" => Ok(transaction_payload::Type::ScriptPayload),
-                    "TYPE_MODULE_BUNDLE_PAYLOAD" => Ok(transaction_payload::Type::ModuleBundlePayload),
                     "TYPE_WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     "TYPE_MULTISIG_PAYLOAD" => Ok(transaction_payload::Type::MultisigPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),

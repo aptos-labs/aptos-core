@@ -134,7 +134,7 @@ impl<
     }
 
     /// Contains the latest group ops for the given group key.
-    pub fn finalize_group(&self, group_key: &K) -> Vec<(T, ValueWithLayout<V>)> {
+    pub fn finalize_group(&self, group_key: &K) -> impl Iterator<Item = (T, ValueWithLayout<V>)> {
         self.group_cache
             .borrow()
             .get(group_key)
@@ -142,7 +142,6 @@ impl<
             .borrow()
             .clone()
             .into_iter()
-            .collect()
     }
 
     pub fn insert_group_op(
@@ -190,6 +189,14 @@ impl<
         self.resource_map.borrow().get(key).cloned()
     }
 
+    pub fn fetch_exchanged_data(&self, key: &K) -> Option<(Arc<V>, Arc<MoveTypeLayout>)> {
+        if let Some(ValueWithLayout::Exchanged(value, Some(layout))) = self.fetch_data(key) {
+            Some((value, layout))
+        } else {
+            None
+        }
+    }
+
     pub fn fetch_group_data(&self, key: &K) -> Option<Vec<(Arc<T>, ValueWithLayout<V>)>> {
         self.group_cache.borrow().get(key).map(|group_map| {
             group_map
@@ -225,10 +232,10 @@ impl<
         self.delayed_field_map.borrow().get(id).cloned()
     }
 
-    pub fn write(&self, key: K, value: V, layout: Option<Arc<MoveTypeLayout>>) {
+    pub fn write(&self, key: K, value: Arc<V>, layout: Option<Arc<MoveTypeLayout>>) {
         self.resource_map
             .borrow_mut()
-            .insert(key, ValueWithLayout::Exchanged(Arc::new(value), layout));
+            .insert(key, ValueWithLayout::Exchanged(value, layout));
     }
 
     pub fn write_module(&self, key: K, value: V) {
@@ -280,7 +287,7 @@ mod test {
         map: &UnsyncMap<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>,
         key: &KeyType<Vec<u8>>,
     ) -> HashMap<usize, ValueWithLayout<TestValue>> {
-        map.finalize_group(key).into_iter().collect()
+        map.finalize_group(key).collect()
     }
 
     // TODO[agg_v2](test) Add tests with non trivial layout
@@ -402,7 +409,7 @@ mod test {
         let ap = KeyType(b"/foo/b".to_vec());
         let map = UnsyncMap::<KeyType<Vec<u8>>, usize, TestValue, ExecutableTestType, ()>::new();
 
-        map.finalize_group(&ap);
+        let _ = map.finalize_group(&ap).collect::<Vec<_>>();
     }
 
     #[test]

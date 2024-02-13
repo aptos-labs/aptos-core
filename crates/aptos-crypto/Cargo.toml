@@ -82,11 +82,15 @@ name = "ark_bls12_381"
 harness = false
 
 [[bench]]
+name = "ark_bn254"
+harness = false
+
+[[bench]]
 name = "bls12381"
 harness = false
 
 [[bench]]
-name = "ark_bn254"
+name = "bulletproofs"
 harness = false
 
 [[bench]]
@@ -110,5 +114,5 @@ name = "secp256k1"
 harness = false
 
 [[bench]]
-name = "bulletproofs"
+name = "zk"
 harness = false

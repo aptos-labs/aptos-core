@@ -843,6 +843,16 @@ pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of txns to be executed in a block.
+pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "max_txns_from_block_to_execute",
+        "Histogram for the number of txns to be executed in a block.",
+        exponential_buckets(/*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Update various counters for committed blocks
 pub fn update_counters_for_committed_blocks(blocks_to_commit: &[Arc<ExecutedBlock>]) {
     for block in blocks_to_commit {

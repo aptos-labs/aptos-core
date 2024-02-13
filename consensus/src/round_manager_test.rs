@@ -2152,8 +2152,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
     };
 
     let local_config = ConsensusConfig {
-        max_receiving_block_txns_quorum_store_override: 10,
-        max_receiving_block_bytes_quorum_store_override: 800,
+        max_receiving_block_txns: 10,
+        max_receiving_block_bytes: 800,
         ..Default::default()
     };
 
