@@ -8,6 +8,7 @@ edition = "2021"
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-runtimes = { workspace = true }
 bcs =  { workspace = true }
 bellman = { workspace = true }
 blst = { workspace = true }
@@ -36,17 +37,17 @@ assert-private-keys-not-cloneable = []
 fuzzing = []
 
 [[bench]]
-name = "pvss"
-harness = false
-
-[[bench]]
 name = "crypto"
 harness = false
 
 [[bench]]
-name = "weighted_vuf"
+name = "lagrange"
 harness = false
 
 [[bench]]
-name = "lagrange"
+name = "pvss"
+harness = false
+
+[[bench]]
+name = "weighted_vuf"
 harness = false

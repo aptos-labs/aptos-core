@@ -9,6 +9,7 @@ use blstrs::{
 };
 use group::Curve;
 use pairing::{MillerLoopResult, MultiMillerLoop};
+use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::Mul;
 
@@ -101,7 +102,7 @@ where
     res.final_exponentiation()
 }
 
-pub fn parallel_multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
+pub fn parallel_multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2, pool: &ThreadPool) -> Gt
 where
     I1: Iterator<Item = &'a G1Projective>,
     I2: Iterator<Item = &'a G2Projective>,
@@ -114,6 +115,7 @@ where
             .map(|(g1, g2)| (g1, g2))
             .collect::<Vec<(&G1Affine, &G2Affine)>>()
             .as_slice(),
+        pool,
     )
 }
 

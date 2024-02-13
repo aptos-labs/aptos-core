@@ -14,6 +14,7 @@ use aptos_dkg::{
     },
     weighted_vuf::{bls, pinkas::PinkasWUF, traits::WeightedVUF},
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
 use core::iter::zip;
 use criterion::{
     criterion_group, criterion_main,
@@ -156,16 +157,19 @@ pub fn wvuf_benches<
                 &subset_type,
             );
 
-            wvuf_derive_eval::<WT, WVUF, ThreadRng, M>(
-                &wc,
-                &vuf_pp,
-                &asks,
-                &apks,
-                group,
-                &mut rng,
-                pick_subset_fn,
-                &subset_type,
-            );
+            for num_threads in [1, 2, 4, 8, 16, 32] {
+                wvuf_derive_eval::<WT, WVUF, ThreadRng, M>(
+                    &wc,
+                    &vuf_pp,
+                    &asks,
+                    &apks,
+                    group,
+                    &mut rng,
+                    pick_subset_fn,
+                    &subset_type,
+                    num_threads,
+                );
+            }
         }
 
         wvuf_eval::<WT, WVUF, M>(&wc, &sk, group);
@@ -430,11 +434,17 @@ fn wvuf_derive_eval<
     rng: &mut R,
     pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
     subset_type: &String,
+    num_threads: usize,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
+    let pool = spawn_rayon_thread_pool("bench-wvuf".to_string(), Some(num_threads));
+
     group.bench_function(
-        format!("derive_eval/{}-subset/{}", subset_type, wc),
+        format!(
+            "derive_eval/{}-thread/{}-subset/{}",
+            num_threads, subset_type, wc
+        ),
         move |b| {
             b.iter_with_setup(
                 || {
@@ -447,7 +457,10 @@ fn wvuf_derive_eval<
                         .iter()
                         .map(|apk| Some(apk.clone()))
                         .collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
-                    assert!(WVUF::derive_eval(wc, pp, BENCH_MSG, apks.as_slice(), &proof).is_ok())
+                    assert!(
+                        WVUF::derive_eval(wc, pp, BENCH_MSG, apks.as_slice(), &proof, &pool)
+                            .is_ok()
+                    )
                 },
             )
         },

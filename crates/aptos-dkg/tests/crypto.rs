@@ -9,6 +9,7 @@ use aptos_dkg::{
         random::{random_g1_point, random_g2_point, random_scalar, random_scalars},
     },
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
 use group::Group;
@@ -180,14 +181,19 @@ fn test_parallel_multi_pairing() {
     let r1 = [random_g1_point(&mut rng), random_g1_point(&mut rng)];
     let r2 = [random_g2_point(&mut rng), random_g2_point(&mut rng)];
 
+    let pool1 = spawn_rayon_thread_pool("testmultpair".to_string(), Some(1));
+    let pool32 = spawn_rayon_thread_pool("testmultpair".to_string(), Some(32));
+
     for (g1, g2) in vec![
-        ([G1Projective::identity(), r1[0]], r2.clone()),
-        (r1.clone(), r2.clone()),
-        (r1.clone(), [G2Projective::identity(), r2[0]]),
+        ([G1Projective::identity(), r1[0]], r2),
+        (r1, r2),
+        (r1, [G2Projective::identity(), r2[0]]),
     ] {
         let res1 = multi_pairing(g1.iter(), g2.iter());
-        let res2 = parallel_multi_pairing(g1.iter(), g2.iter());
+        let res2 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool1);
+        let res3 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool32);
 
         assert_eq!(res1, res2);
+        assert_eq!(res1, res3);
     }
 }

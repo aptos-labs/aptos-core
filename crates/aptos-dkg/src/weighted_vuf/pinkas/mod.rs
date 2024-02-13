@@ -5,7 +5,7 @@ use crate::{
     pvss,
     pvss::{traits::HasEncryptionPublicParams, Player, WeightedConfig},
     utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing,
+        g1_multi_exp, g2_multi_exp, multi_pairing, parallel_multi_pairing,
         random::{random_nonzero_scalar, random_scalar},
     },
     weighted_vuf::traits::WeightedVUF,
@@ -15,10 +15,16 @@ use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::{Curve, Group};
 use rand::thread_rng;
+use rayon::{
+    iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator},
+    ThreadPool,
+};
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Neg};
 
 pub const PINKAS_WVUF_DST: &[u8; 21] = b"APTOS_PINKAS_WVUF_DST";
+
+pub const MIN_MULTIEXP_JOB_LEN: usize = 16;
 
 pub struct PinkasWUF;
 
@@ -182,42 +188,63 @@ impl WeightedVUF for PinkasWUF {
         _msg: &[u8],
         apks: &[Option<Self::AugmentedPubKeyShare>],
         proof: &Self::Proof,
+        thread_pool: &ThreadPool,
     ) -> anyhow::Result<Self::Evaluation> {
         // Collect all the evaluation points associated with each player's augmented pubkey sub shares.
         let mut sub_player_ids = Vec::with_capacity(wc.get_total_weight());
+        // The G2 shares
+        let mut rhs = Vec::with_capacity(proof.len());
+        // The RKs of each player
+        let mut rks = Vec::with_capacity(proof.len());
 
-        for (player, _) in proof {
+        for (player, share) in proof {
             for j in 0..wc.get_player_weight(player) {
                 sub_player_ids.push(wc.get_virtual_player(player, j).id);
             }
+
+            let apk = apks[player.id]
+                .as_ref()
+                .ok_or(anyhow!("Missing APK for player {}", player.get_id()))?;
+
+            rks.push(&apk.0.rks);
+            rhs.push(share);
         }
 
         // Compute the Lagrange coefficients associated with those evaluation points
         let batch_dom = wc.get_batch_evaluation_domain();
         let lagr = lagrange_coefficients(batch_dom, &sub_player_ids[..], &Scalar::ZERO);
 
-        // Interpolate the WVUF Proof
         let mut k = 0;
-        let mut lhs = Vec::with_capacity(proof.len());
-        let mut rhs = Vec::with_capacity(proof.len());
-        for (player, share) in proof {
-            // println!(
-            //     "Flattening {} share(s) for player {player}",
-            //     sub_shares.len()
-            // );
-            let apk = apks[player.id]
-                .as_ref()
-                .ok_or(anyhow!("Missing APK for player {}", player.get_id()))?;
-            let rks = &apk.0.rks;
-            let num_shares = rks.len();
+        let ranges: Vec<_> = proof
+            .iter()
+            .map(|(player, _)| {
+                let w = wc.get_player_weight(player);
+                let range = k..k + w;
+                k += w;
+                range
+            })
+            .collect();
 
-            rhs.push(share);
-            lhs.push(g1_multi_exp(&rks[..], &lagr[k..k + num_shares]));
+        // Compute the RK multiexps in parallel
+        let lhs = thread_pool.install(|| {
+            proof
+                .par_iter()
+                .with_min_len(MIN_MULTIEXP_JOB_LEN)
+                .enumerate()
+                .map(|(idx, _)| {
+                    let rks = rks[idx];
+                    let lagr = &lagr[ranges[idx].clone()];
+                    g1_multi_exp(rks, lagr)
+                })
+                .collect::<Vec<G1Projective>>()
+        });
 
-            k += num_shares;
-        }
-
-        Ok(multi_pairing(lhs.iter().map(|r| r), rhs.into_iter()))
+        // Interpolate the WVUF evaluation in parallel
+        Ok(parallel_multi_pairing(
+            lhs.iter().map(|r| r),
+            rhs.into_iter(),
+            thread_pool,
+        ))
     }
 
     /// Verifies the proof shares (using batch verification)

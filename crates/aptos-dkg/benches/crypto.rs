@@ -16,6 +16,7 @@ use aptos_dkg::{
         },
     },
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Gt};
 use criterion::{
     criterion_group, criterion_main, measurement::Measurement, BenchmarkGroup, BenchmarkId,
@@ -52,7 +53,9 @@ pub fn crypto_group(c: &mut Criterion) {
     const AVG_CASE: usize = 74;
     for n in [1, 2, 4, 8, 16, 32, 64, AVG_CASE, 128] {
         multipairing(n, &mut group);
-        parallel_multipairing(n, &mut group);
+        for num_threads in [1, 2, 4, 8, 16, 32] {
+            parallel_multipairing(n, &mut group, num_threads);
+        }
     }
 
     random_scalars_and_points_benches(&mut group);
@@ -408,24 +411,29 @@ fn multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
     });
 }
 
-fn parallel_multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {
+fn parallel_multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>, num_threads: usize) {
     let mut rng = thread_rng();
 
     g.throughput(Throughput::Elements(n as u64));
 
-    g.bench_function(BenchmarkId::new("parallel_multipairing", n), move |b| {
-        b.iter_with_setup(
-            || {
-                let r1 = random_g1_points(n, &mut rng);
-                let r2 = random_g2_points(n, &mut rng);
+    let pool = spawn_rayon_thread_pool("bencmultpair".to_string(), Some(num_threads));
 
-                (r1, r2)
-            },
-            |(r1, r2)| {
-                parallel_multi_pairing(r1.iter(), r2.iter());
-            },
-        )
-    });
+    g.bench_function(
+        format!("parallel_multipairing/{}/{}-threads", n, num_threads),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let r1 = random_g1_points(n, &mut rng);
+                    let r2 = random_g2_points(n, &mut rng);
+
+                    (r1, r2)
+                },
+                |(r1, r2)| {
+                    parallel_multi_pairing(r1.iter(), r2.iter(), &pool);
+                },
+            )
+        },
+    );
 }
 
 fn g1_multiexp<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>) {

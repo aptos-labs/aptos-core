@@ -1257,6 +1257,7 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-runtimes",
  "bcs 0.1.4",
  "bellman",
  "blst",
