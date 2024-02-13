@@ -11,6 +11,7 @@ use crate::{
         StreamRequest, StreamRequestMessage, StreamingServiceListener, TerminateStreamRequest,
     },
 };
+use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{AptosDataClientConfig, DataStreamingServiceConfig};
 use aptos_data_client::{
     global_summary::{GlobalDataSummary, OptimalChunkSizes},
@@ -19,16 +20,36 @@ use aptos_data_client::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_logger::prelude::*;
 use aptos_time_service::TimeService;
+use arc_swap::ArcSwap;
 use futures::StreamExt;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::wrappers::IntervalStream;
+
+// Note: we limit the queue depth to 1 because it doesn't make sense for the progress checker
+// to execute for every notification (because it will process all the updates at once, anyway).
+// Thus, if there are X pending notifications, the first one will handle all pending updates, and
+// the next X-1 will be no-ops. This prevents us from wasting the CPU, unnecessarily.
+const STREAM_PROGRESS_UPDATE_CHANNEL_SIZE: usize = 1;
 
 // Useful constants for the Data Streaming Service
 const GLOBAL_DATA_REFRESH_LOG_FREQ_SECS: u64 = 3;
 const NO_DATA_TO_FETCH_LOG_FREQ_SECS: u64 = 3;
 const STREAM_REQUEST_ERROR_LOG_FREQ_SECS: u64 = 3;
 const TERMINATE_NO_FEEDBACK: &str = "no_feedback";
+
+/// A simple notification sent to the storage service when a
+/// stream has been updated and is ready to be processed.
+#[derive(Clone, Copy, Debug)]
+pub struct StreamUpdateNotification {
+    pub data_stream_id: DataStreamId,
+}
+
+impl StreamUpdateNotification {
+    pub fn new(data_stream_id: DataStreamId) -> Self {
+        Self { data_stream_id }
+    }
+}
 
 /// The data streaming service that responds to data stream requests.
 pub struct DataStreamingService<T> {
@@ -42,13 +63,21 @@ pub struct DataStreamingService<T> {
     aptos_data_client: T,
 
     // Cached global data summary
-    global_data_summary: GlobalDataSummary,
+    global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
 
     // All requested data streams from clients
     data_streams: HashMap<DataStreamId, DataStream<T>>,
 
     // The listener through which to hear new client stream requests
     stream_requests: StreamingServiceListener,
+
+    // The stream update notifier that notifies the streaming service to check
+    // the progress of the data streams. This provides a way for data streams
+    // to immediately notify the streaming service when new data is ready.
+    stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+
+    // The stream update listener to listen for data stream update notifications
+    stream_update_listener: aptos_channel::Receiver<(), StreamUpdateNotification>,
 
     // Unique ID generators to maintain unique IDs across streams
     stream_id_generator: U64IdGenerator,
@@ -66,13 +95,20 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         stream_requests: StreamingServiceListener,
         time_service: TimeService,
     ) -> Self {
+        // Create the stream update notifier and listener
+        let (stream_update_notifier, stream_update_listener) =
+            aptos_channel::new(QueueStyle::LIFO, STREAM_PROGRESS_UPDATE_CHANNEL_SIZE, None);
+
+        // Create the streaming service
         Self {
             data_client_config,
             streaming_service_config,
             aptos_data_client,
-            global_data_summary: GlobalDataSummary::empty(),
+            global_data_summary: Arc::new(ArcSwap::new(Arc::new(GlobalDataSummary::empty()))),
             data_streams: HashMap::new(),
             stream_requests,
+            stream_update_notifier,
+            stream_update_listener,
             stream_id_generator: U64IdGenerator::new(),
             notification_id_generator: Arc::new(U64IdGenerator::new()),
             time_service,
@@ -81,33 +117,54 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 
     /// Starts the dedicated streaming service
     pub async fn start_service(mut self) {
-        let mut data_refresh_interval = IntervalStream::new(interval(Duration::from_millis(
-            self.streaming_service_config
-                .global_summary_refresh_interval_ms,
-        )))
-        .fuse();
+        // Spawn a dedicated task that refreshes the global data summary
+        spawn_global_data_summary_refresher(
+            self.streaming_service_config,
+            self.aptos_data_client.clone(),
+            self.global_data_summary.clone(),
+        );
+
+        // Create a ticker that periodically checks the progress of all data streams
         let mut progress_check_interval = IntervalStream::new(interval(Duration::from_millis(
             self.streaming_service_config.progress_check_interval_ms,
         )))
         .fuse();
 
+        // Start the service loop
         loop {
             ::futures::select! {
                 stream_request = self.stream_requests.select_next_some() => {
-                    self.handle_stream_request_message(stream_request);
-                }
-                _ = data_refresh_interval.select_next_some() => {
-                    self.refresh_global_data_summary();
+                    self.handle_stream_request_message(stream_request, self.stream_update_notifier.clone());
                 }
                 _ = progress_check_interval.select_next_some() => {
+                    // Check the progress of all data streams at a scheduled interval
+                    self.check_progress_of_all_data_streams().await;
+                }
+                notification = self.stream_update_listener.select_next_some() => {
+                    // Check the progress of all data streams when notified
+                    trace!(LogSchema::new(LogEntry::CheckStreamProgress)
+                            .message(&format!(
+                                "Received update notification from: {:?}.",
+                                notification.data_stream_id
+                            ))
+                        );
                     self.check_progress_of_all_data_streams().await;
                 }
             }
         }
     }
 
+    /// Returns the global data summary
+    fn get_global_data_summary(&self) -> GlobalDataSummary {
+        self.global_data_summary.load().clone().deref().clone()
+    }
+
     /// Handles new stream request messages from clients
-    fn handle_stream_request_message(&mut self, request_message: StreamRequestMessage) {
+    fn handle_stream_request_message(
+        &mut self,
+        request_message: StreamRequestMessage,
+        stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
+    ) {
         if let StreamRequest::TerminateStream(request) = request_message.stream_request {
             // Process the feedback request
             if let Err(error) = self.process_terminate_stream_request(&request) {
@@ -119,7 +176,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         }
 
         // Process the stream request
-        let response = self.process_new_stream_request(&request_message);
+        let response = self.process_new_stream_request(&request_message, stream_update_notifier);
         if let Err(error) = &response {
             sample!(
                 SampleRate::Duration(Duration::from_secs(STREAM_REQUEST_ERROR_LOG_FREQ_SECS)),
@@ -198,6 +255,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
     fn process_new_stream_request(
         &mut self,
         request_message: &StreamRequestMessage,
+        stream_update_notifier: aptos_channel::Sender<(), StreamUpdateNotification>,
     ) -> Result<DataStreamListener, Error> {
         // Increment the stream creation counter
         metrics::increment_counter(
@@ -206,23 +264,28 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         );
 
         // Refresh the cached global data summary
-        self.refresh_global_data_summary();
+        refresh_global_data_summary(
+            self.aptos_data_client.clone(),
+            self.global_data_summary.clone(),
+        );
 
         // Create a new data stream
         let stream_id = self.stream_id_generator.next();
+        let advertised_data = self.get_global_data_summary().advertised_data.clone();
         let (data_stream, stream_listener) = DataStream::new(
             self.data_client_config,
             self.streaming_service_config,
             stream_id,
             &request_message.stream_request,
+            stream_update_notifier,
             self.aptos_data_client.clone(),
             self.notification_id_generator.clone(),
-            &self.global_data_summary.advertised_data,
+            &advertised_data,
             self.time_service.clone(),
         )?;
 
         // Verify the data stream can be fulfilled using the currently advertised data
-        data_stream.ensure_data_is_available(&self.global_data_summary.advertised_data)?;
+        data_stream.ensure_data_is_available(&advertised_data)?;
 
         // Store the data stream internally
         if self.data_streams.insert(stream_id, data_stream).is_some() {
@@ -241,35 +304,6 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
 
         // Return the listener
         Ok(stream_listener)
-    }
-
-    /// Refreshes the global data summary by communicating with the Aptos data client
-    fn refresh_global_data_summary(&mut self) {
-        if let Err(error) = self.fetch_global_data_summary() {
-            metrics::increment_counter(&metrics::GLOBAL_DATA_SUMMARY_ERROR, error.get_label());
-            sample!(
-                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
-                warn!(LogSchema::new(LogEntry::RefreshGlobalData)
-                    .event(LogEvent::Error)
-                    .error(&error))
-            );
-        }
-    }
-
-    fn fetch_global_data_summary(&mut self) -> Result<(), Error> {
-        let global_data_summary = self.aptos_data_client.get_global_data_summary();
-        if global_data_summary.is_empty() {
-            sample!(
-                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
-                info!(LogSchema::new(LogEntry::RefreshGlobalData)
-                    .message("Latest global data summary is empty."))
-            );
-        } else {
-            verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
-            self.global_data_summary = global_data_summary;
-        }
-
-        Ok(())
     }
 
     /// Ensures that all existing data streams are making progress
@@ -309,7 +343,7 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
         &mut self,
         data_stream_id: &DataStreamId,
     ) -> Result<(), Error> {
-        let global_data_summary = self.global_data_summary.clone();
+        let global_data_summary = self.get_global_data_summary();
 
         // If there was a send failure, terminate the stream
         let data_stream = self.get_data_stream(data_stream_id)?;
@@ -372,6 +406,74 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStreamingService<
     }
 }
 
+/// Spawns a task that periodically refreshes the global data summary
+fn spawn_global_data_summary_refresher<T: AptosDataClientInterface + Send + Clone + 'static>(
+    data_streaming_service_config: DataStreamingServiceConfig,
+    aptos_data_client: T,
+    cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
+) {
+    tokio::spawn(async move {
+        loop {
+            // Refresh the cached global data summary
+            refresh_global_data_summary(
+                aptos_data_client.clone(),
+                cached_global_data_summary.clone(),
+            );
+
+            // Sleep for a while before refreshing the cache again
+            let sleep_duration_ms =
+                data_streaming_service_config.global_summary_refresh_interval_ms;
+            tokio::time::sleep(Duration::from_millis(sleep_duration_ms)).await;
+        }
+    });
+}
+
+/// Refreshes the global data summary and updates the cache
+fn refresh_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'static>(
+    aptos_data_client: T,
+    cached_global_data_summary: Arc<ArcSwap<GlobalDataSummary>>,
+) {
+    // Fetch the global data summary and update the cache
+    match fetch_global_data_summary(aptos_data_client) {
+        Ok(global_data_summary) => {
+            // Update the cached global data summary
+            cached_global_data_summary.store(Arc::new(global_data_summary));
+        },
+        Err(error) => {
+            // Otherwise, log an error and increment the error counter
+            sample!(
+                SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
+                warn!(LogSchema::new(LogEntry::RefreshGlobalData)
+                    .event(LogEvent::Error)
+                    .error(&error))
+            );
+            metrics::increment_counter(&metrics::GLOBAL_DATA_SUMMARY_ERROR, error.get_label());
+        },
+    }
+}
+
+/// Fetches and returns the global data summary from the data client
+fn fetch_global_data_summary<T: AptosDataClientInterface + Send + Clone + 'static>(
+    aptos_data_client: T,
+) -> Result<GlobalDataSummary, Error> {
+    // Fetch the global data summary from the data client
+    let global_data_summary = aptos_data_client.get_global_data_summary();
+
+    // Periodically log if the global data summary is empty.
+    // Otherwise, verify that all optimal chunk sizes are valid.
+    if global_data_summary.is_empty() {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(GLOBAL_DATA_REFRESH_LOG_FREQ_SECS)),
+            info!(LogSchema::new(LogEntry::RefreshGlobalData)
+                .message("Latest global data summary is empty."))
+        );
+    } else {
+        verify_optimal_chunk_sizes(&global_data_summary.optimal_chunk_sizes)?;
+    }
+
+    Ok(global_data_summary)
+}
+
 /// Verifies that all optimal chunk sizes are valid (i.e., not zero). Returns an
 /// error if a chunk size is 0.
 fn verify_optimal_chunk_sizes(optimal_chunk_sizes: &OptimalChunkSizes) -> Result<(), Error> {
@@ -397,12 +499,21 @@ mod streaming_service_tests {
         data_stream::{DataStreamId, DataStreamListener},
         error::Error,
         streaming_client::{
-            GetAllStatesRequest, NotificationAndFeedback, NotificationFeedback, StreamRequest,
-            StreamRequestMessage, TerminateStreamRequest,
+            DataStreamingClient, GetAllStatesRequest, NotificationAndFeedback,
+            NotificationFeedback, StreamRequest, StreamRequestMessage, TerminateStreamRequest,
         },
+        streaming_service::StreamUpdateNotification,
         tests,
-        tests::utils::MIN_ADVERTISED_STATES,
+        tests::{
+            streaming_service,
+            utils::{
+                get_data_notification, MIN_ADVERTISED_EPOCH_END, MIN_ADVERTISED_STATES,
+                MIN_ADVERTISED_TRANSACTION_OUTPUT,
+            },
+        },
     };
+    use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+    use aptos_config::config::DataStreamingServiceConfig;
     use futures::{
         channel::{oneshot, oneshot::Receiver},
         FutureExt, StreamExt,
@@ -414,6 +525,74 @@ mod streaming_service_tests {
     use tokio::time::timeout;
 
     const MAX_STREAM_WAIT_SECS: u64 = 60;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_check_stream_progress_update() {
+        // Create a streaming service config with an infrequent progress check interval
+        let streaming_service_config = DataStreamingServiceConfig {
+            progress_check_interval_ms: 1_000_000,
+            ..Default::default()
+        };
+
+        // Create the streaming client and service
+        let (streaming_client, streaming_service) =
+            streaming_service::create_streaming_client_and_server(
+                Some(streaming_service_config),
+                false,
+                false,
+                true,
+                false,
+            );
+
+        // Get the stream update notifier
+        let stream_update_notifier = streaming_service.stream_update_notifier.clone();
+
+        // Spawn the storage service
+        tokio::spawn(streaming_service.start_service());
+
+        // Request a continuous output stream and get a data stream listener
+        let mut stream_listener = streaming_client
+            .continuously_stream_transaction_outputs(
+                MIN_ADVERTISED_TRANSACTION_OUTPUT - 1,
+                MIN_ADVERTISED_EPOCH_END,
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Get the first data notification from the stream
+        let _ = get_data_notification(&mut stream_listener).await.unwrap();
+
+        // Continuously send update notifications to the streaming service
+        // until the next data notification is received.
+        let wait_for_notification = async move {
+            loop {
+                // Send an update notification to the streaming service
+                stream_update_notifier
+                    .push((), StreamUpdateNotification::new(0))
+                    .unwrap();
+
+                // Sleep for a while
+                tokio::time::sleep(Duration::from_millis(100)).await;
+
+                // Check if a data notification was received
+                if get_data_notification(&mut stream_listener).await.is_ok() {
+                    return; // Data notification received!
+                }
+            }
+        };
+        if let Err(error) = timeout(
+            Duration::from_secs(MAX_STREAM_WAIT_SECS),
+            wait_for_notification,
+        )
+        .await
+        {
+            panic!(
+                "Failed to send update notification to streaming service: {:?}",
+                error
+            );
+        }
+    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_drop_data_streams() {
@@ -434,7 +613,10 @@ mod streaming_service_tests {
             for _ in 0..num_data_streams {
                 // Create a new data stream
                 let (new_stream_request, response_receiver) = create_new_stream_request();
-                streaming_service.handle_stream_request_message(new_stream_request);
+                streaming_service.handle_stream_request_message(
+                    new_stream_request,
+                    create_stream_update_notifier(),
+                );
                 let data_stream_listener =
                     response_receiver.now_or_never().unwrap().unwrap().unwrap();
                 let data_stream_id = data_stream_listener.data_stream_id;
@@ -489,7 +671,10 @@ mod streaming_service_tests {
             for _ in 0..num_data_streams {
                 // Create a new data stream
                 let (new_stream_request, response_receiver) = create_new_stream_request();
-                streaming_service.handle_stream_request_message(new_stream_request);
+                streaming_service.handle_stream_request_message(
+                    new_stream_request,
+                    create_stream_update_notifier(),
+                );
                 let data_stream_listener =
                     response_receiver.now_or_never().unwrap().unwrap().unwrap();
                 let data_stream_id = data_stream_listener.data_stream_id;
@@ -523,7 +708,10 @@ mod streaming_service_tests {
                 // Terminate the data stream (with no feedback)
                 let (terminate_stream_request, _) =
                     create_terminate_stream_request(data_stream_id, None);
-                streaming_service.handle_stream_request_message(terminate_stream_request);
+                streaming_service.handle_stream_request_message(
+                    terminate_stream_request,
+                    create_stream_update_notifier(),
+                );
 
                 // Verify the stream has been removed
                 let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
@@ -556,7 +744,10 @@ mod streaming_service_tests {
                 for _ in 0..num_data_streams {
                     // Create a new data stream
                     let (new_stream_request, response_receiver) = create_new_stream_request();
-                    streaming_service.handle_stream_request_message(new_stream_request);
+                    streaming_service.handle_stream_request_message(
+                        new_stream_request,
+                        create_stream_update_notifier(),
+                    );
                     let data_stream_listener =
                         response_receiver.now_or_never().unwrap().unwrap().unwrap();
                     let data_stream_id = data_stream_listener.data_stream_id;
@@ -591,8 +782,10 @@ mod streaming_service_tests {
                                 *data_stream_id,
                                 notification_and_feedback,
                             );
-                            streaming_service
-                                .handle_stream_request_message(terminate_stream_request);
+                            streaming_service.handle_stream_request_message(
+                                terminate_stream_request,
+                                create_stream_update_notifier(),
+                            );
 
                             // Verify the stream has been removed
                             let all_data_stream_ids = streaming_service.get_all_data_stream_ids();
@@ -648,5 +841,11 @@ mod streaming_service_tests {
             response_sender,
         };
         (request_message, response_receiver)
+    }
+
+    /// Creates a returns a new stream update notifier (dropping the listener)
+    fn create_stream_update_notifier() -> aptos_channel::Sender<(), StreamUpdateNotification> {
+        let (stream_update_notifier, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+        stream_update_notifier
     }
 }

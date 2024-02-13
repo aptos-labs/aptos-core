@@ -1,12 +1,46 @@
 
 Diagnostics:
-error: cannot immutably borrow local `inner` since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:58:18
+error: cannot mutably borrow local `outer` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:13:50
    │
-57 │         let c; if (cond) c = &mut inner.f1 else c = &mut inner.f2;
-   │                              ------------- previous mutable field borrow
-58 │         let f1 = &inner.f1;
+12 │         let inner = &mut outer.s1;
+   │                     ------------- previous mutable field borrow
+13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
+   │                                                  ^^^^^^^^^^^^^ mutable borrow attempted here
+
+error: cannot mutably borrow local `outer` since other references exists
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:24:58
+   │
+23 │         let inner = &mut outer.s1;
+   │                     ------------- previous mutable field borrow
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                                                          ^^^^^^^^^^^^^ mutable borrow attempted here
+
+error: cannot immutably borrow local `inner` since other mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:25:18
+   │
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                              ------------------ previous mutable call result
+25 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ immutable borrow attempted here
+
+error: cannot dereference local `inner` which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:27:9
+   │
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                              ------------------ previous mutable call result
+   ·
+27 │         *inner;
+   │         ^^^^^^ dereferenced here
+
+error: cannot dereference local `inner` which is still mutable borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:29:9
+   │
+24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
+   │                              ------------------ previous mutable call result
+   ·
+29 │         *inner;
+   │         ^^^^^^ dereferenced here
 
 error: cannot mutably borrow local `outer` since other references exists
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:35:50
@@ -32,24 +66,6 @@ error: cannot dereference local `inner` which is still mutable borrowed
 37 │         *c;
 38 │         *inner;
    │         ^^^^^^ dereferenced here
-
-error: cannot mutably borrow local `outer` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:13:50
-   │
-12 │         let inner = &mut outer.s1;
-   │                     ------------- previous mutable field borrow
-13 │         let c; if (cond) c = copy inner else c = &mut outer.s1;
-   │                                                  ^^^^^^^^^^^^^ mutable borrow attempted here
-
-error: cannot immutably borrow local `inner` since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:67:18
-   │
-66 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f1;
-   │                                     -------------           ------------- previous mutable field borrow
-   │                                     │
-   │                                     previous mutable field borrow
-67 │         let f1 = &inner.f1;
-   │                  ^^^^^^^^^ immutable borrow attempted here
 
 error: cannot mutably borrow local `outer` since other references exists
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:46:58
@@ -87,36 +103,20 @@ error: cannot dereference local `inner` which is still mutable borrowed
 51 │         *inner;
    │         ^^^^^^ dereferenced here
 
-error: cannot mutably borrow local `outer` since other references exists
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:24:58
-   │
-23 │         let inner = &mut outer.s1;
-   │                     ------------- previous mutable field borrow
-24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                                                          ^^^^^^^^^^^^^ mutable borrow attempted here
-
 error: cannot immutably borrow local `inner` since other mutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:25:18
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:58:18
    │
-24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                              ------------------ previous mutable call result
-25 │         let f1 = &inner.f1;
+57 │         let c; if (cond) c = &mut inner.f1 else c = &mut inner.f2;
+   │                              ------------- previous mutable field borrow
+58 │         let f1 = &inner.f1;
    │                  ^^^^^^^^^ immutable borrow attempted here
 
-error: cannot dereference local `inner` which is still mutable borrowed
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:27:9
+error: cannot immutably borrow local `inner` since other mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:67:18
    │
-24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                              ------------------ previous mutable call result
-   ·
-27 │         *inner;
-   │         ^^^^^^ dereferenced here
-
-error: cannot dereference local `inner` which is still mutable borrowed
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo_invalid.move:29:9
-   │
-24 │         let c; if (cond) c = id_mut(copy inner) else c = &mut outer.s1;
-   │                              ------------------ previous mutable call result
-   ·
-29 │         *inner;
-   │         ^^^^^^ dereferenced here
+66 │         let c; if (cond) c = id_mut(&mut inner.f1) else c = &mut inner.f1;
+   │                                     -------------           ------------- previous mutable field borrow
+   │                                     │
+   │                                     previous mutable field borrow
+67 │         let f1 = &inner.f1;
+   │                  ^^^^^^^^^ immutable borrow attempted here

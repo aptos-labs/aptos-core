@@ -15,8 +15,8 @@ use aptos_aggregator::{
     types::{code_invariant_error, DelayedFieldID},
 };
 use aptos_types::{
-    aggregator::PanicError,
     contract_event::ContractEvent,
+    delayed_fields::PanicError,
     state_store::{
         state_key::{StateKey, StateKeyInner},
         state_value::StateValueMetadata,
@@ -25,7 +25,15 @@ use aptos_types::{
     write_set::{TransactionWrite, WriteOp, WriteOpSize, WriteSetMut},
 };
 use move_binary_format::errors::{Location, PartialVMError, PartialVMResult, VMResult};
-use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
+    value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
+use rand::Rng;
 use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
@@ -34,6 +42,34 @@ use std::{
     hash::Hash,
     sync::Arc,
 };
+
+/// Sporadically checks if the given two input type layouts match.
+pub fn randomly_check_layout_matches(
+    layout_1: Option<&MoveTypeLayout>,
+    layout_2: Option<&MoveTypeLayout>,
+) -> Result<(), PanicError> {
+    if layout_1.is_some() != layout_2.is_some() {
+        return Err(code_invariant_error(format!(
+            "Layouts don't match when they are expected to: {:?} and {:?}",
+            layout_1, layout_2
+        )));
+    }
+    if layout_1.is_some() {
+        // Checking if 2 layouts are equal is a recursive operation and is expensive.
+        // We generally call this `randomly_check_layout_matches` function when we know
+        // that the layouts are supposed to match. As an optimization, we only randomly
+        // check if the layouts are matching.
+        let mut rng = rand::thread_rng();
+        let random_number: u32 = rng.gen_range(0, 100);
+        if random_number == 1 && layout_1 != layout_2 {
+            return Err(code_invariant_error(format!(
+                "Layouts don't match when they are expected to: {:?} and {:?}",
+                layout_1, layout_2
+            )));
+        }
+    }
+    Ok(())
+}
 
 /// A change set produced by the VM.
 ///
@@ -111,8 +147,11 @@ impl VMChangeSet {
         aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
         aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
         delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-        reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-        group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
+        reads_needing_delayed_field_exchange: BTreeMap<
+            StateKey,
+            (StateValueMetadata, u64, Arc<MoveTypeLayout>),
+        >,
+        group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
         events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
         checker: &dyn CheckChangeSet,
     ) -> PartialVMResult<Self> {
@@ -130,39 +169,27 @@ impl VMChangeSet {
                         .into_iter()
                         .map(|(k, w)| Ok((k, AbstractResourceWriteOp::WriteResourceGroup(w)))),
                 )
-                .chain(
-                    reads_needing_delayed_field_exchange
-                        .into_iter()
-                        .map(|(k, (w, layout))| {
-                            Ok((
-                                k,
-                                AbstractResourceWriteOp::InPlaceDelayedFieldChange(
-                                    InPlaceDelayedFieldChangeOp {
-                                        layout,
-                                        materialized_size: WriteOpSize::from(&w)
-                                            .write_len()
-                                            .ok_or_else(|| {
-                                                PartialVMError::new(
-                                                    StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
-                                                )
-                                                .with_message(
-                                                    "Read with exchange cannot be a delete."
-                                                        .to_string(),
-                                                )
-                                            })?,
-                                        metadata: w.into_metadata(),
-                                    },
-                                ),
-                            ))
-                        }),
-                )
+                .chain(reads_needing_delayed_field_exchange.into_iter().map(
+                    |(k, (metadata, size, layout))| {
+                        Ok((
+                            k,
+                            AbstractResourceWriteOp::InPlaceDelayedFieldChange(
+                                InPlaceDelayedFieldChangeOp {
+                                    layout,
+                                    materialized_size: size,
+                                    metadata,
+                                },
+                            ),
+                        ))
+                    },
+                ))
                 .chain(group_reads_needing_delayed_field_exchange.into_iter().map(
-                    |(k, (metadata_op, materialized_size))| {
+                    |(k, (metadata, materialized_size))| {
                         Ok((
                             k,
                             AbstractResourceWriteOp::ResourceGroupInPlaceDelayedFieldChange(
                                 ResourceGroupInPlaceDelayedFieldChangeOp {
-                                    metadata_op,
+                                    metadata,
                                     materialized_size,
                                 },
                             ),
@@ -175,7 +202,7 @@ impl VMChangeSet {
                         let (key, value) = element?;
                         if acc.insert(key, value).is_some() {
                             Err(PartialVMError::new(
-                                StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+                                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
                             )
                             .with_message(
                                 "Found duplicate key across resource change sets.".to_string(),
@@ -196,22 +223,22 @@ impl VMChangeSet {
 
     /// Builds a new change set from the storage representation.
     ///
+    /// **WARNING**: this creates a write set that assumes dynamic change set optimizations to be disabled.
+    /// this needs to be applied directly to storage, you cannot get appropriate reads from this in a
+    /// dynamic change set optimization enabled context.
+    /// We have two dynamic change set optimizations, both there to reduce conflicts between transactions:
+    ///  - exchanging delayed fields and leaving their materialization to happen at the end
+    ///  - unpacking resource groups and treating each resource inside it separately
+    ///
     /// **WARNING**: Has complexity O(#write_ops) because we need to iterate
     /// over blobs and split them into resources or modules. Only used to
     /// support transactions with write-set payload.
     ///
     /// Note: does not separate out individual resource group updates.
-    pub fn try_from_storage_change_set(
+    pub fn try_from_storage_change_set_with_delayed_field_optimization_disabled(
         change_set: StorageChangeSet,
         checker: &dyn CheckChangeSet,
-        // Pass in within which resolver context are we creating this change set.
-        // Used to eagerly reject changes created in an incompatible way.
-        is_delayed_field_optimization_capable: bool,
     ) -> VMResult<Self> {
-        assert!(
-            !is_delayed_field_optimization_capable,
-            "try_from_storage_change_set can only be called in non-is_delayed_field_optimization_capable context, as it doesn't support delayed field changes (type layout) and resource groups");
-
         let (write_set, events) = change_set.into_inner();
 
         // There should be no aggregator writes if we have a change set from
@@ -235,9 +262,6 @@ impl VMChangeSet {
         // We can set layout to None, as we are not in the is_delayed_field_optimization_capable context
         let events = events.into_iter().map(|event| (event, None)).collect();
         let change_set = Self {
-            // TODO[agg_v2](fix): do we use same or different capable flag for resource groups?
-            // We should skip unpacking resource groups, as we are not in the is_delayed_field_optimization_capable
-            // context (i.e. if dynamic_change_set_optimizations_enabled is disabled)
             resource_write_set,
             module_write_set,
             delayed_field_change_set: BTreeMap::new(),
@@ -328,7 +352,7 @@ impl VMChangeSet {
                 self.module_write_set()
                     .iter()
                     .chain(self.aggregator_v1_write_set().iter())
-                    .map(|(k, v)| (k, WriteOpSize::from(v))),
+                    .map(|(k, v)| (k, v.write_op_size())),
             )
     }
 
@@ -350,7 +374,7 @@ impl VMChangeSet {
                 self.module_write_set
                     .iter_mut()
                     .chain(self.aggregator_v1_write_set.iter_mut())
-                    .map(|(k, v)| (k, WriteOpSize::from(v as &WriteOp), v.get_metadata_mut())),
+                    .map(|(k, v)| (k, v.write_op_size(), v.get_metadata_mut())),
             )
     }
 
@@ -374,9 +398,9 @@ impl VMChangeSet {
     // Called by `into_transaction_output_with_materialized_writes` only.
     pub(crate) fn extend_resource_write_set(
         &mut self,
-        patched_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
+        materialized_resource_writes: impl Iterator<Item = (StateKey, WriteOp)>,
     ) -> Result<(), PanicError> {
-        for (key, new_write) in patched_resource_writes {
+        for (key, new_write) in materialized_resource_writes {
             let abstract_write = self.resource_write_set.get_mut(&key).ok_or_else(|| {
                 code_invariant_error(format!(
                     "Cannot patch a resource which does not exist, for: {:?}.",
@@ -391,7 +415,7 @@ impl VMChangeSet {
                 )));
             }
 
-            let new_length = WriteOpSize::from(&new_write).write_len();
+            let new_length = new_write.write_op_size().write_len();
             let old_length = abstract_write.materialized_size().write_len();
             if new_length != old_length {
                 return Err(code_invariant_error(format!(
@@ -405,8 +429,8 @@ impl VMChangeSet {
     }
 
     /// The events are set to the input events.
-    pub(crate) fn set_events(&mut self, patched_events: impl Iterator<Item = ContractEvent>) {
-        self.events = patched_events
+    pub(crate) fn set_events(&mut self, materialized_events: impl Iterator<Item = ContractEvent>) {
+        self.events = materialized_events
             .map(|event| (event, None))
             .collect::<Vec<_>>();
     }
@@ -450,8 +474,18 @@ impl VMChangeSet {
                 // Materialization is needed when committing a transaction, so
                 // we need precise mode to compute the true value of an
                 // aggregator.
-                let write =
-                    resolver.try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)?;
+                let write = resolver
+                    .try_convert_aggregator_v1_delta_into_write_op(&state_key, &delta)
+                    .map_err(|e| {
+                        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can
+                        // be constructed.
+                        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
+                        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
+                        e.finish(Location::Module(ModuleId::new(
+                            AGGREGATOR_V1_ADDRESS,
+                            AGGREGATOR_V1_MODULE_NAME.into(),
+                        )))
+                    })?;
                 Ok((state_key, write))
             };
 
@@ -617,13 +651,10 @@ impl VMChangeSet {
                     // Squash entry and additional entries if type layouts match.
                     let (additional_write_op, additional_type_layout) = additional_entry;
                     let (write_op, type_layout) = entry.get_mut();
-                    if *type_layout != additional_type_layout {
-                        return Err(code_invariant_error(format!(
-                            "Cannot squash two writes with different type layouts.
-                            key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                            key, type_layout, additional_type_layout
-                        )));
-                    }
+                    randomly_check_layout_matches(
+                        type_layout.as_deref(),
+                        additional_type_layout.as_deref(),
+                    )?;
                     let noop = !WriteOp::squash(write_op, additional_write_op).map_err(|e| {
                         code_invariant_error(format!("Error while squashing two write ops: {}.", e))
                     })?;
@@ -674,13 +705,7 @@ impl VMChangeSet {
                                 materialized_size: additional_materialized_size,
                             }),
                         ) => {
-                            if layout != additional_layout {
-                                return Err(code_invariant_error(format!(
-                                    "Cannot squash two writes with different type layouts.
-                                    key: {:?}, type_layout: {:?}, additional_type_layout: {:?}",
-                                    key, layout, additional_layout
-                                )));
-                            }
+                            randomly_check_layout_matches(Some(layout), Some(additional_layout))?;
                             let to_delete = !WriteOp::squash(write_op, additional_write_op.clone())
                                 .map_err(|e| {
                                     code_invariant_error(format!(

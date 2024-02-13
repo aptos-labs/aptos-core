@@ -1,0 +1,127 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{ledger_db::WriteSetDb, AptosDB};
+use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::Result;
+use aptos_temppath::TempPath;
+use aptos_types::{
+    transaction::{TransactionToCommit, Version},
+    write_set::WriteSet,
+};
+use proptest::{collection::vec, prelude::*};
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn test_get_write_set(
+        write_sets in vec(
+            any::<WriteSet>(),
+            1..10
+        ),
+    ) {
+        let tmp_dir = TempPath::new();
+        let db = AptosDB::new_for_test(&tmp_dir);
+        let write_set_db  = db.ledger_db.write_set_db();
+        init_db(&write_sets, write_set_db);
+
+        let num_write_sets = write_sets.len();
+        for (version, write_set) in write_sets.into_iter().enumerate() {
+            prop_assert_eq!(write_set_db.get_write_set(version as Version).unwrap(), write_set);
+        }
+
+        prop_assert!(write_set_db.get_write_set(num_write_sets as Version).is_err());
+    }
+
+    #[test]
+    fn test_get_write_set_iter(
+        write_sets in vec(
+            any::<WriteSet>(),
+            1..10
+        ),
+    ) {
+        let tmp_dir = TempPath::new();
+        let db = AptosDB::new_for_test(&tmp_dir);
+        let write_set_db  = db.ledger_db.write_set_db();
+        init_db(&write_sets, write_set_db);
+
+        let num_write_sets = write_sets.len();
+
+        let actual = write_set_db
+            .get_write_set_iter(0, num_write_sets)
+            .unwrap()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        prop_assert_eq!(actual, write_sets.clone());
+
+        let actual = write_set_db
+            .get_write_set_iter(0, num_write_sets + 1)
+            .unwrap()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        prop_assert_eq!(actual, write_sets.clone());
+
+        let actual = write_set_db
+            .get_write_set_iter(0, 0)
+            .unwrap()
+            .collect::<Result<Vec<_>>>()
+            .unwrap();
+        prop_assert!(actual.is_empty());
+
+        if num_write_sets > 0 {
+            let actual = write_set_db
+                .get_write_set_iter(0, num_write_sets - 1)
+                .unwrap()
+                .collect::<Result<Vec<_>>>()
+                .unwrap();
+            prop_assert_eq!(
+                actual,
+                write_sets
+                .into_iter()
+                .take(num_write_sets - 1)
+                .collect::<Vec<_>>()
+            );
+        }
+
+        prop_assert!(write_set_db.get_write_set_iter(10, usize::max_value()).is_err());
+    }
+
+    #[test]
+    fn test_prune(
+        write_sets in vec(
+            any::<WriteSet>(),
+            2..10
+        ),
+    ) {
+        let tmp_dir = TempPath::new();
+        let db = AptosDB::new_for_test(&tmp_dir);
+        let write_set_db  = db.ledger_db.write_set_db();
+        init_db(&write_sets, write_set_db);
+
+        {
+            prop_assert!(write_set_db.get_write_set(0).is_ok());
+            let batch = SchemaBatch::new();
+            WriteSetDb::prune(0, 1, &batch).unwrap();
+            write_set_db.write_schemas(batch).unwrap();
+            prop_assert!(write_set_db.get_write_set(0).is_err());
+        }
+    }
+}
+
+fn init_db(write_sets: &[WriteSet], write_set_db: &WriteSetDb) {
+    assert!(write_set_db.get_write_set(0).is_err());
+
+    write_set_db
+        .commit_write_sets(
+            &write_sets
+                .iter()
+                .map(|write_set| TransactionToCommit {
+                    write_set: write_set.clone(),
+                    ..TransactionToCommit::dummy()
+                })
+                .collect::<Vec<_>>(),
+            0,
+        )
+        .unwrap();
+}

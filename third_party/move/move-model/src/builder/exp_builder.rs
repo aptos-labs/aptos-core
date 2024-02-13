@@ -1406,17 +1406,31 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let (exp_ty, exp) = self.translate_exp_free(exp);
                 if !ty.is_number() {
                     self.error(&loc, "cast target type must be a number");
-                    self.new_error_exp()
-                } else if !self.subs.is_some_number(&exp_ty) {
+                    return self.new_error_exp();
+                } else if !self.subs.is_some_number(&exp_ty)
+                    && !self.subs.is_free_var_without_constraints(&exp_ty)
+                {
                     self.error(&loc, "operand of cast must be a number");
-                    self.new_error_exp()
-                } else {
-                    ExpData::Call(
-                        self.new_node_id_with_type_loc(&ty, &loc),
-                        Operation::Cast,
-                        vec![exp.into_exp()],
-                    )
+                    return self.new_error_exp();
+                } else if let Type::Var(idx) = exp_ty {
+                    let all_ints = PrimitiveType::all_int_types()
+                        .into_iter()
+                        .collect::<BTreeSet<_>>();
+                    self.subs
+                        .add_constraint(
+                            &self.unification_context,
+                            idx,
+                            loc.clone(),
+                            WideningOrder::LeftToRight,
+                            Constraint::SomeNumber(all_ints),
+                        )
+                        .expect("success on var");
                 }
+                ExpData::Call(
+                    self.new_node_id_with_type_loc(&ty, &loc),
+                    Operation::Cast,
+                    vec![exp.into_exp()],
+                )
             },
             EA::Exp_::Annotate(exp, typ) => {
                 let ty = self.translate_type(typ);
@@ -1599,7 +1613,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // Shortcut for single element case
         if list.value.len() == 1 {
             return self.translate_lvalue(
-                list.value.get(0).unwrap(),
+                list.value.first().unwrap(),
                 expected_type,
                 expected_order,
                 match_locals,
@@ -2479,30 +2493,35 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             None,
         ) = &args[1].value
         {
-            let field_name = self.symbol_pool().make(name.value.as_str());
-            let constraint =
-                Constraint::SomeStruct([(field_name, expected_type.clone())].into_iter().collect());
-            if let Err(e) = self.subs.eval_constraint(
-                &self.unification_context,
-                loc,
-                expected_type,
-                self.type_variance(),
-                WideningOrder::RightToLeft,
-                constraint,
-            ) {
-                self.report_unification_error(loc, e, "update field")
-            }
             let struct_exp = self.translate_exp(args[0], expected_type);
+            let expected_type = &self.subs.specialize(expected_type);
             if let Type::Struct(mid, sid, inst) = self.subs.specialize(expected_type) {
                 // field_map contains the instantiated field type.
                 let field_map = self
                     .parent
                     .parent
                     .lookup_struct_fields(mid.qualified_inst(sid, inst));
-                let field_type = field_map.get(&field_name).cloned().unwrap_or(Type::Error); // this error is reported via type unification
+                let field_name = self.symbol_pool().make(name.value.as_str());
+                let expected_field_type =
+                    field_map.get(&field_name).cloned().unwrap_or(Type::Error); // this error is reported via type unification
+                let constraint = Constraint::SomeStruct(
+                    [(field_name, expected_field_type.clone())]
+                        .into_iter()
+                        .collect(),
+                );
+                if let Err(e) = self.subs.eval_constraint(
+                    &self.unification_context,
+                    loc,
+                    expected_type,
+                    self.type_variance(),
+                    WideningOrder::RightToLeft,
+                    constraint,
+                ) {
+                    self.report_unification_error(loc, e, "update field")
+                }
 
                 // Translate the new value with the field type as the expected type.
-                let value_exp = self.translate_exp(args[2], &field_type);
+                let value_exp = self.translate_exp(args[2], &expected_field_type);
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 self.set_node_instantiation(id, vec![expected_type.clone()]);
                 ExpData::Call(

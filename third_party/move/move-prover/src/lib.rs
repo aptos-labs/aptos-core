@@ -227,7 +227,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
     let output_dir = Path::new(&options.output_path)
         .parent()
         .expect("expect the parent directory of the output path to exist");
-    let output_prefix = options.move_sources.get(0).map_or("bytecode", |s| {
+    let output_prefix = options.move_sources.first().map_or("bytecode", |s| {
         Path::new(s).file_name().unwrap().to_str().unwrap()
     });
 
@@ -260,7 +260,13 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             .into_os_string()
             .into_string()
             .unwrap();
-        pipeline.run_with_dump(env, &mut targets, &dump_file_base, options.prover.dump_cfg)
+        pipeline.run_with_dump(
+            env,
+            &mut targets,
+            &dump_file_base,
+            options.prover.dump_cfg,
+            &|_| {},
+        )
     } else {
         pipeline.run(env, &mut targets);
     }

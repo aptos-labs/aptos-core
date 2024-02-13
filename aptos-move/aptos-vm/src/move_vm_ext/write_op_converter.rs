@@ -33,13 +33,12 @@ macro_rules! convert_impl {
             move_storage_op: MoveStorageOp<Bytes>,
             legacy_creation_as_modification: bool,
         ) -> PartialVMResult<WriteOp> {
-            let move_storage_op = match move_storage_op {
-                MoveStorageOp::New(data) => MoveStorageOp::New((data, None)),
-                MoveStorageOp::Modify(data) => MoveStorageOp::Modify((data, None)),
-                MoveStorageOp::Delete => MoveStorageOp::Delete,
-            };
+            let state_value_metadata = self
+                .remote
+                .as_executor_view()
+                .$get_metadata_callback(state_key)?;
             self.convert(
-                self.remote.$get_metadata_callback(state_key),
+                state_value_metadata,
                 move_storage_op,
                 legacy_creation_as_modification,
             )
@@ -116,7 +115,7 @@ fn check_size_and_existence_match(
     if exists {
         if size.get() == 0 {
             Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
                     format!(
                         "Group tag count/size shouldn't be 0 for an existing group: {:?}",
                         state_key
@@ -128,7 +127,7 @@ fn check_size_and_existence_match(
         }
     } else if size.get() > 0 {
         Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR).with_message(
                 format!(
                     "Group tag count/size should be 0 for a new group: {:?}",
                     state_key
@@ -170,16 +169,22 @@ impl<'r> WriteOpConverter<'r> {
         move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<(WriteOp, Option<Arc<MoveTypeLayout>>)> {
-        let result = self.convert(
-            self.remote.get_resource_state_value_metadata(state_key),
-            move_storage_op.clone(),
+        let state_value_metadata = self
+            .remote
+            .as_executor_view()
+            .get_resource_state_value_metadata(state_key)?;
+        let (move_storage_op, layout) = match move_storage_op {
+            MoveStorageOp::New((data, layout)) => (MoveStorageOp::New(data), layout),
+            MoveStorageOp::Modify((data, layout)) => (MoveStorageOp::Modify(data), layout),
+            MoveStorageOp::Delete => (MoveStorageOp::Delete, None),
+        };
+
+        let write_op = self.convert(
+            state_value_metadata,
+            move_storage_op,
             legacy_creation_as_modification,
-        );
-        match move_storage_op {
-            MoveStorageOp::New((_, type_layout)) => Ok((result?, type_layout)),
-            MoveStorageOp::Modify((_, type_layout)) => Ok((result?, type_layout)),
-            MoveStorageOp::Delete => Ok((result?, None)),
-        }
+        )?;
+        Ok((write_op, layout))
     }
 
     pub(crate) fn convert_resource_group_v1(
@@ -189,17 +194,14 @@ impl<'r> WriteOpConverter<'r> {
     ) -> PartialVMResult<GroupWrite> {
         // Resource group metadata is stored at the group StateKey, and can be obtained via the
         // same interfaces at for a resource at a given StateKey.
-        let state_value_metadata_result = self.remote.get_resource_state_value_metadata(state_key);
+        let state_value_metadata = self
+            .remote
+            .as_executor_view()
+            .get_resource_state_value_metadata(state_key)?;
         // Currently, due to read-before-write and a gas charge on the first read that is based
         // on the group size, this should simply re-read a cached (speculative) group size.
-        let pre_group_size = self.remote.resource_group_size(state_key).map_err(|_| {
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message("Error querying resource group size".to_string())
-        })?;
-
-        if let Ok(v) = &state_value_metadata_result {
-            check_size_and_existence_match(&pre_group_size, v.is_some(), state_key)?;
-        }
+        let pre_group_size = self.remote.resource_group_size(state_key)?;
+        check_size_and_existence_match(&pre_group_size, state_value_metadata.is_some(), state_key)?;
 
         let mut inner_ops = BTreeMap::new();
         let mut post_group_size = pre_group_size;
@@ -213,13 +215,7 @@ impl<'r> WriteOpConverter<'r> {
             // but not in the change-set, is to avoid creating unnecessary R/W conflicts (the resources
             // in the change-set are already read, but the other resources are not).
             if !matches!(current_op, MoveStorageOp::New(_)) {
-                let old_tagged_value_size = self
-                    .remote
-                    .resource_size_in_group(state_key, &tag)
-                    .map_err(|_| {
-                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                            .with_message("Error querying resource group size".to_string())
-                    })?;
+                let old_tagged_value_size = self.remote.resource_size_in_group(state_key, &tag)?;
                 let old_size = group_tagged_resource_size(&tag, old_tagged_value_size)?;
                 decrement_size_for_remove_tag(&mut post_group_size, old_size)?;
             }
@@ -248,16 +244,15 @@ impl<'r> WriteOpConverter<'r> {
         // except it encodes the (speculative) size of the group after applying the updates
         // which is used for charging storage fees. Moreover, the metadata computation occurs
         // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
-        // TODO[agg_v2](fix) fix layout for RG
         let metadata_op = if post_group_size.get() == 0 {
             MoveStorageOp::Delete
         } else if pre_group_size.get() == 0 {
-            MoveStorageOp::New((Bytes::new(), None))
+            MoveStorageOp::New(Bytes::new())
         } else {
-            MoveStorageOp::Modify((Bytes::new(), None))
+            MoveStorageOp::Modify(Bytes::new())
         };
         Ok(GroupWrite::new(
-            self.convert(state_value_metadata_result, metadata_op, false)?,
+            self.convert(state_value_metadata, metadata_op, false)?,
             inner_ops,
             post_group_size.get(),
         ))
@@ -265,19 +260,13 @@ impl<'r> WriteOpConverter<'r> {
 
     fn convert(
         &self,
-        state_value_metadata_result: anyhow::Result<Option<StateValueMetadata>>,
-        move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
+        state_value_metadata: Option<StateValueMetadata>,
+        move_storage_op: MoveStorageOp<Bytes>,
         legacy_creation_as_modification: bool,
     ) -> PartialVMResult<WriteOp> {
         use MoveStorageOp::*;
         use WriteOp::*;
-
-        let maybe_existing_metadata = state_value_metadata_result.map_err(|_| {
-            PartialVMError::new(StatusCode::STORAGE_ERROR)
-                .with_message("Storage read failed when converting change set.".to_string())
-        })?;
-
-        let write_op = match (maybe_existing_metadata, move_storage_op) {
+        let write_op = match (state_value_metadata, move_storage_op) {
             (None, Modify(_) | Delete) => {
                 // Possible under speculative execution, returning speculative error waiting for re-execution.
                 return Err(
@@ -296,7 +285,7 @@ impl<'r> WriteOpConverter<'r> {
                         ),
                 );
             },
-            (None, New((data, _))) => match &self.new_slot_metadata {
+            (None, New(data)) => match &self.new_slot_metadata {
                 None => {
                     if legacy_creation_as_modification {
                         WriteOp::legacy_modification(data)
@@ -309,18 +298,13 @@ impl<'r> WriteOpConverter<'r> {
                     metadata: metadata.clone(),
                 },
             },
-            (Some(existing_metadata), Modify((data, _))) => {
+            (Some(metadata), Modify(data)) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Modification {
-                    data,
-                    metadata: existing_metadata,
-                }
+                Modification { data, metadata }
             },
-            (Some(existing_metadata), Delete) => {
+            (Some(metadata), Delete) => {
                 // Inherit metadata even if the feature flags is turned off, for compatibility.
-                Deletion {
-                    metadata: existing_metadata,
-                }
+                Deletion { metadata }
             },
         };
         Ok(write_op)
@@ -333,11 +317,7 @@ impl<'r> WriteOpConverter<'r> {
     ) -> PartialVMResult<WriteOp> {
         let maybe_existing_metadata = self
             .remote
-            .get_aggregator_v1_state_value_metadata(state_key)
-            .map_err(|e| {
-                PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                    .with_message(format!("convert_aggregator_modification failed {:?}", e))
-            })?;
+            .get_aggregator_v1_state_value_metadata(state_key)?;
         let data = serialize(&value).into();
 
         let op = match maybe_existing_metadata {
@@ -368,7 +348,8 @@ mod tests {
     use aptos_types::{
         account_address::AccountAddress,
         state_store::{
-            state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+            errors::StateviewError, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
         },
     };
     use aptos_vm_types::resource_group_adapter::{group_size_as_sum, GroupSizeKind};
@@ -423,16 +404,19 @@ mod tests {
     impl TStateView for MockStateView {
         type Key = StateKey;
 
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
             Ok(self.data.get(state_key).cloned())
         }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_delete_modify_ops() {
@@ -490,7 +474,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_new_op() {
@@ -531,7 +515,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_new_group() {
@@ -557,7 +541,7 @@ mod tests {
         );
     }
 
-    // TODO[agg_v2](fix) make as_resolver_with_group_size_kind support AsSum
+    // TODO[agg_v2](test) make as_resolver_with_group_size_kind support AsSum
     // #[test]
     #[allow(unused)]
     fn size_computation_delete_group() {

@@ -282,11 +282,7 @@ impl VMRuntime {
     ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
         let (ty, value) = match ty {
             Type::Reference(inner) | Type::MutableReference(inner) => {
-                let ref_value: Reference = value.cast().map_err(|_err| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
-                        "non reference value given for a reference typed return value".to_string(),
-                    )
-                })?;
+                let ref_value: Reference = value.cast()?;
                 let inner_value = ref_value.read_ref()?;
                 (&**inner, inner_value)
             },
@@ -297,6 +293,7 @@ impl VMRuntime {
             .loader
             .type_to_type_layout(ty, module_store)
             .map_err(|_err| {
+                // TODO: Should we use `err` instead of mapping?
                 PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
                     "entry point functions cannot have non-serializable return types".to_string(),
                 )

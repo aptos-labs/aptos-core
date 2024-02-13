@@ -87,7 +87,7 @@ pub enum FeatureFlag {
     SponsoredAutomaticAccountCreation,
     FeePayerAccountOptional,
     AggregatorV2DelayedFields,
-    ConcurrentAssets,
+    ConcurrentTokenV2,
     LimitMaxIdentifierLength,
     OperatorBeneficiaryChange,
     VMBinaryFormatV7,
@@ -96,6 +96,11 @@ pub enum FeatureFlag {
     BN254Structures,
     WebAuthnSignature,
     ReconfigureWithDKG,
+    ZkIdSignature,
+    ZkIdZkLessSignature,
+    RemoveDetailedError,
+    JWKConsensus,
+    ConcurrentFungibleAssets,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -238,7 +243,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AggregatorV2DelayedFields => {
                 AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS
             },
-            FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
+            FeatureFlag::ConcurrentTokenV2 => AptosFeatureFlag::CONCURRENT_TOKEN_V2,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
             FeatureFlag::ResourceGroupsChargeAsSizeSum => {
@@ -250,6 +255,11 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::BN254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
             FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
+            FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURES,
+            FeatureFlag::ZkIdZkLessSignature => AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
+            FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
+            FeatureFlag::JWKConsensus => AptosFeatureFlag::JWK_CONSENSUS,
+            FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
         }
     }
 }
@@ -315,7 +325,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS => {
                 FeatureFlag::AggregatorV2DelayedFields
             },
-            AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
+            AptosFeatureFlag::CONCURRENT_TOKEN_V2 => FeatureFlag::ConcurrentTokenV2,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
             AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
             AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
@@ -327,6 +337,11 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::BN254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
+            AptosFeatureFlag::ZK_ID_SIGNATURES => FeatureFlag::ZkIdSignature,
+            AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE => FeatureFlag::ZkIdZkLessSignature,
+            AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
+            AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JWKConsensus,
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
         }
     }
 }

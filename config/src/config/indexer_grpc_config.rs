@@ -41,8 +41,6 @@ pub struct IndexerGrpcConfig {
 
     /// Number of transactions returned in a single stream response
     pub output_batch_size: u16,
-
-    pub enable_expensive_logging: bool,
 }
 
 impl Debug for IndexerGrpcConfig {
@@ -57,7 +55,6 @@ impl Debug for IndexerGrpcConfig {
             .field("processor_task_count", &self.processor_task_count)
             .field("processor_batch_size", &self.processor_batch_size)
             .field("output_batch_size", &self.output_batch_size)
-            .field("enable_expensive_logging", &self.enable_expensive_logging)
             .finish()
     }
 }
@@ -77,7 +74,6 @@ impl Default for IndexerGrpcConfig {
             processor_task_count: DEFAULT_PROCESSOR_TASK_COUNT,
             processor_batch_size: DEFAULT_PROCESSOR_BATCH_SIZE,
             output_batch_size: DEFAULT_OUTPUT_BATCH_SIZE,
-            enable_expensive_logging: false,
         }
     }
 }
@@ -116,19 +112,6 @@ impl ConfigOptimizer for IndexerGrpcConfig {
         if !indexer_config.enabled {
             return Ok(false);
         }
-
-        // TODO: we really shouldn't be overriding the configs if they are
-        // specified in the local node config file. This optimizer should
-        // migrate to the pattern used by other optimizers, but for now, we'll
-        // just keep the legacy behaviour to avoid breaking anything.
-
-        // Override with environment variables if they are set
-        indexer_config.enable_expensive_logging = env_var_or_default(
-            "INDEXER_GRPC_ENABLE_EXPENSIVE_LOGGING",
-            Some(indexer_config.enable_expensive_logging),
-            None,
-        )
-        .unwrap_or(false);
 
         Ok(true)
     }
@@ -192,25 +175,5 @@ mod tests {
         // Sanitize the config and verify that it now succeeds
         IndexerGrpcConfig::sanitize(&node_config, NodeType::Validator, Some(ChainId::mainnet()))
             .unwrap();
-    }
-}
-
-/// Returns the value of the environment variable `env_var`
-/// if it is set, otherwise returns `default`.
-fn env_var_or_default<T: std::str::FromStr>(
-    env_var: &'static str,
-    default: Option<T>,
-    expected_message: Option<String>,
-) -> Option<T> {
-    let partial = std::env::var(env_var).ok().map(|s| s.parse().ok());
-    match default {
-        None => partial.unwrap_or_else(|| {
-            panic!(
-                "{}",
-                expected_message
-                    .unwrap_or_else(|| { format!("Expected env var {} to be set", env_var) })
-            )
-        }),
-        Some(default_value) => partial.unwrap_or(Some(default_value)),
     }
 }

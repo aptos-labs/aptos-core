@@ -29,7 +29,7 @@ impl NativeFunctions {
 }
 
 fn define_empty_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &QualifiedInstId<FunId>) {
-    let key_type = fun_id.inst.get(0).expect("key type");
+    let key_type = fun_id.inst.first().expect("key type");
 
     // TODO: right now the key to storage is simply hash (table_handle, key), which works when key
     // is a primitive type. However, this doesn't work when key is a struct or a vector, represented
@@ -63,7 +63,7 @@ fn define_contains_fun(
     ctx: &Context,
     fun_id: &QualifiedInstId<FunId>,
 ) {
-    let key_type = fun_id.inst.get(0).expect("key type");
+    let key_type = fun_id.inst.first().expect("key type");
 
     emitln!(ctx.writer, "(table_ref, key_ref) -> res {");
     ctx.writer.indent();
@@ -130,7 +130,7 @@ fn define_contains_fun(
 }
 
 fn define_insert_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &QualifiedInstId<FunId>) {
-    let key_type = fun_id.inst.get(0).expect("key type");
+    let key_type = fun_id.inst.first().expect("key type");
     let value_type = fun_id.inst.get(1).expect("value type");
 
     emitln!(ctx.writer, "(table_ref, key_ref, value) {");
@@ -233,7 +233,7 @@ fn define_insert_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &Qualif
 }
 
 fn define_borrow_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &QualifiedInstId<FunId>) {
-    let key_type = fun_id.inst.get(0).expect("key type");
+    let key_type = fun_id.inst.first().expect("key type");
 
     emitln!(ctx.writer, "(table_ref, key_ref) -> value_ref {");
     ctx.writer.indent();
@@ -308,7 +308,7 @@ fn define_borrow_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &Qualif
 }
 
 fn define_remove_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &QualifiedInstId<FunId>) {
-    let key_type = fun_id.inst.get(0).expect("key type");
+    let key_type = fun_id.inst.first().expect("key type");
     let value_type = fun_id.inst.get(1).expect("value type");
 
     emitln!(ctx.writer, "(table_ref, key_ref) -> value {");

@@ -2176,7 +2176,7 @@ impl<'env> FunctionTranslator<'env> {
                     Uninit => {
                         emitln!(writer, "assume $t{}->l == $Uninitialized();", srcs[0]);
                     },
-                    Destroy => {},
+                    Drop | Release => {},
                     TraceLocal(idx) => {
                         let num_oper = global_state
                             .get_temp_index_oper(mid, fid, srcs[0], baseline_flag)

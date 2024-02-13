@@ -10,8 +10,10 @@ use crate::{
     },
     counters,
     scheduler::{DependencyResult, DependencyStatus, Scheduler, TWaitForDependency},
+    value_exchange::{
+        does_value_need_exchange, filter_value_for_exchange, TemporaryValueToIdentifierMapping,
+    },
 };
-use anyhow::bail;
 use aptos_aggregator::{
     bounded_math::{ok_overflow, BoundedMath, SignedU128},
     delta_change_set::serialize,
@@ -19,7 +21,7 @@ use aptos_aggregator::{
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
         code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        ReadPosition, TryFromMoveValue, TryIntoMoveValue,
+        ReadPosition,
     },
 };
 use aptos_logger::error;
@@ -34,9 +36,10 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    aggregator::PanicError,
+    delayed_fields::{ExtractUniqueIndex, PanicError},
     executable::{Executable, ModulePath},
     state_store::{
+        errors::StateviewError,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId, TStateView,
@@ -50,14 +53,11 @@ use aptos_vm_types::resolver::{
 };
 use bytes::Bytes;
 use claims::assert_ok;
-use move_core_types::{
-    value::{IdentifierMappingKind, MoveTypeLayout},
-    vm_status::{StatusCode, VMStatus},
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::{
     value_transformation::{
         deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
-        TransformationError, TransformationResult, ValueToIdentifierMapping,
     },
     values::Value,
 };
@@ -137,7 +137,7 @@ trait ResourceState<T: Transaction> {
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult;
 }
 
@@ -150,12 +150,12 @@ trait ResourceGroupState<T: Transaction> {
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult>;
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult>;
 }
 
 pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
-    versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+    pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
@@ -452,7 +452,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         }
     }
 
-    fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
+    pub(crate) fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.versioned_map
             .delayed_fields()
             .set_base_value(id, base_value)
@@ -477,7 +477,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
         &self,
         group_key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<GroupReadResult> {
+    ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
         if let Some(group_size) = self.captured_reads.borrow().group_size(group_key) {
@@ -508,11 +508,14 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError) => {
-                    bail!("Resource tag bcs serialization error");
+                Err(TagSerializationError(e)) => {
+                    return Err(e);
                 },
             }
         }
@@ -532,7 +535,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult {
         use MVDataError::*;
         use MVDataOutput::*;
@@ -660,8 +663,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult> {
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult> {
         use MVGroupError::*;
 
         if let Some(DataRead::Versioned(_, v, layout)) =
@@ -691,7 +694,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                                     patched_value,
                                     maybe_layout.cloned().map(Arc::new),
                                 );
-                            // Refetch in case a concurrent change went through.
+                            // Re-fetch in case a concurrent change went through.
                             continue;
                         },
                         ValueWithLayout::Exchanged(value, layout) => {
@@ -734,10 +737,15 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                 },
                 Err(Dependency(dep_idx)) => {
                     if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        bail!("Interrupted as block execution was halted");
+                        // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
+                        // like in ReadResult for resources.
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
                     }
                 },
-                Err(TagSerializationError) => {
+                Err(TagSerializationError(_)) => {
                     unreachable!("Reading a resource does not require tag serialization");
                 },
             }
@@ -750,7 +758,6 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
     pub(crate) counter: &'a RefCell<u32>,
-    pub(crate) dynamic_change_set_optimizations_enabled: bool,
     pub(crate) incorrect_use: RefCell<bool>,
 }
 
@@ -759,23 +766,21 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
         unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         start_counter: u32,
         counter: &'a RefCell<u32>,
-        dynamic_change_set_optimizations_enabled: bool,
     ) -> Self {
         Self {
             unsync_map,
             read_set: RefCell::new(UnsyncReadSet::default()),
             start_counter,
             counter,
-            dynamic_change_set_optimizations_enabled,
             incorrect_use: RefCell::new(false),
         }
     }
 
-    fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
+    pub(crate) fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
         self.unsync_map.write_delayed_field(id, base_value)
     }
 
-    fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
+    pub(crate) fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
         self.unsync_map.fetch_delayed_field(&id)
     }
 }
@@ -791,7 +796,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
         key: &T::Key,
         target_kind: ReadKind,
         layout: UnknownOrLayout,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
     ) -> ReadResult {
         match self.unsync_map.fetch_data(key) {
             Some(mut value) => {
@@ -811,6 +816,9 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
                                 value = exchanged_value;
                             },
                             Err(_) => {
+                                // TODO[agg_v2](cleanup): `patch_base_value` already marks as incorrect use
+                                //               and logs an error! We need to make this uniform across
+                                //               resources and groups.
                                 *self.incorrect_use.borrow_mut() = true;
                                 error!("Unsync map couldn't patch base value");
                                 return ReadResult::HaltSpeculativeExecution(
@@ -858,8 +866,8 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
         group_key: &T::Key,
         resource_tag: &T::Tag,
         maybe_layout: Option<&MoveTypeLayout>,
-        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> anyhow::Result<T::Value>,
-    ) -> anyhow::Result<GroupReadResult> {
+        patch_base_value: &dyn Fn(&T::Value, Option<&MoveTypeLayout>) -> PartialVMResult<T::Value>,
+    ) -> PartialVMResult<GroupReadResult> {
         match self
             .unsync_map
             .fetch_group_tagged_data(group_key, resource_tag)
@@ -876,7 +884,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
                         maybe_layout.clone(),
                     );
 
-                    // sequential execution doesn't need to worry about concurrent change going through.
+                    // Sequential execution doesn't need to worry about concurrent change going through.
                     value = ValueWithLayout::Exchanged(Arc::new(patched_value), maybe_layout);
                 }
 
@@ -939,7 +947,7 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
     base_view: &'a S,
-    latest_view: ViewState<'a, T, X>,
+    pub(crate) latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
@@ -998,8 +1006,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn get_raw_base_value(&self, state_key: &T::Key) -> anyhow::Result<Option<StateValue>> {
-        let ret = self.base_view.get_state_value(state_key);
+    fn get_raw_base_value(&self, state_key: &T::Key) -> PartialVMResult<Option<StateValue>> {
+        let ret = self.base_view.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Unexpected storage error for {:?}: {:?}",
+                state_key, e
+            ))
+        });
 
         if ret.is_err() {
             // Even speculatively, reading from base view should not return an error.
@@ -1013,14 +1026,14 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             self.mark_incorrect_use();
         }
 
-        ret
+        ret.map_err(Into::into)
     }
 
     fn patch_base_value(
         &self,
         value: &T::Value,
         layout: Option<&MoveTypeLayout>,
-    ) -> anyhow::Result<T::Value> {
+    ) -> PartialVMResult<T::Value> {
         let maybe_patched = match (value.as_state_value(), layout) {
             (Some(state_value), Some(layout)) => {
                 let res = self.replace_values_with_identifiers(state_value, layout);
@@ -1035,7 +1048,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             err
                         );
                         self.mark_incorrect_use();
-                        return Err(err);
+                        return Err(PartialVMError::new(
+                            StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                        )
+                        .with_message(format!("{}", err)));
                     },
                 }
             },
@@ -1098,88 +1114,35 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         Ok((patched_bytes, mapping.into_inner()))
     }
 
-    // Given a bytes, where values were already exchanged with idnetifiers,
-    // return a list of identifiers present in it.
-    fn extract_identifiers_from_value(
-        &self,
-        bytes: &Bytes,
-        layout: &MoveTypeLayout,
-    ) -> anyhow::Result<HashSet<T::Identifier>> {
-        let mapping = TemporaryExtractIdentifiersMapping::<T>::new();
-        // TODO[agg_v2](cleanup) rename deserialize_and_replace_values_with_ids to not be specific to mapping trait implementation
-        // TODO[agg_v2](cleanup) provide traversal method, that doesn't create unnecessary patched value.
-        let _patched_value =
-            deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping).ok_or_else(
-                || anyhow::anyhow!("Failed to deserialize resource during id replacement"),
-            )?;
-        Ok(mapping.into_inner())
-    }
-
-    fn does_value_need_exchange(
-        &self,
-        value: &T::Value,
-        layout: &Arc<MoveTypeLayout>,
-        delayed_write_set_keys: &HashSet<T::Identifier>,
-        key: &T::Key,
-    ) -> Option<Result<(T::Key, (T::Value, Arc<MoveTypeLayout>)), PanicError>> {
-        if let Some(bytes) = value.bytes() {
-            let identifiers_in_read_result = self.extract_identifiers_from_value(bytes, layout);
-
-            match identifiers_in_read_result {
-                Ok(identifiers_in_read) => {
-                    if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                        return Some(Ok((key.clone(), (value.clone(), layout.clone()))));
-                    }
-                },
-                Err(e) => {
-                    return Some(Err(code_invariant_error(format!("Cannot extract identifiers from value that identifiers were exchanged into before {:?}", e))))
-                }
-            }
-        }
-        None
-    }
-
-    fn get_reads_needing_exchange_parallel(
-        &self,
-        read_set: &CapturedReads<T>,
-        delayed_write_set_keys: &HashSet<T::Identifier>,
-        skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>, PanicError> {
-        read_set
-            .get_read_values_with_delayed_fields()
-            .filter(|(key, _)| !skip.contains(key))
-            .flat_map(|(key, data_read)| {
-                if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                    return self.does_value_need_exchange(
-                        value,
-                        layout,
-                        delayed_write_set_keys,
-                        key,
-                    );
-                }
-                None
-            })
-            .collect()
-    }
-
     fn get_reads_needing_exchange_sequential(
         &self,
         read_set: &HashSet<T::Key>,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        delayed_write_set_keys: &HashSet<T::Identifier>,
+        delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (T::Value, Arc<MoveTypeLayout>)>, PanicError> {
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
         read_set
             .iter()
-            .filter(|key| !skip.contains(key))
-            .flat_map(|key| match unsync_map.fetch_data(key) {
-                Some(ValueWithLayout::Exchanged(value, Some(layout))) => self
-                    .does_value_need_exchange(value.as_ref(), &layout, delayed_write_set_keys, key),
-                Some(ValueWithLayout::Exchanged(_, None)) => None,
-                Some(ValueWithLayout::RawFromStorage(_)) => Some(Err(code_invariant_error(
-                    "Cannot exchange value that was not exchanged before",
-                ))),
-                None => None,
+            .filter_map(|key| {
+                if skip.contains(key) {
+                    return None;
+                }
+
+                match unsync_map.fetch_data(key) {
+                    Some(ValueWithLayout::Exchanged(value, Some(layout))) => {
+                        filter_value_for_exchange::<T>(
+                            value.as_ref(),
+                            &layout,
+                            delayed_write_set_ids,
+                            key,
+                        )
+                    },
+                    Some(ValueWithLayout::Exchanged(_, None)) => None,
+                    Some(ValueWithLayout::RawFromStorage(_)) => Some(Err(code_invariant_error(
+                        "Cannot exchange value that was not exchanged before",
+                    ))),
+                    None => None,
+                }
             })
             .collect()
     }
@@ -1187,9 +1150,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     fn get_group_reads_needing_exchange_parallel(
         &self,
         parallel_state: &ParallelState<'a, T, X>,
-        delayed_write_set_keys: &HashSet<T::Identifier>,
+        delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (T::Value, u64)>, PanicError> {
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64)>, PanicError> {
         let reads_with_delayed_fields = parallel_state
             .captured_reads
             .borrow()
@@ -1201,18 +1164,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             .into_iter()
             .flat_map(|(key, group_read)| {
                 let GroupRead { inner_reads, .. } = group_read;
+
+                // TODO[agg_v2](clean-up): Once ids can be extracted without possible failure,
+                // the following is just an any call on iterator (same for resource reads).
                 let mut resources_needing_delayed_field_exchange = false;
                 for data_read in inner_reads.values() {
                     if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
-                        if let Some(bytes) = value.bytes() {
-                            let identifiers_in_read = self
-                                .extract_identifiers_from_value(bytes, layout.as_ref())
-                                .unwrap();
-                            if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                                // TODO[agg_v2](optimize): Is it possible to avoid clones here?
-                                resources_needing_delayed_field_exchange = true;
-                                break;
-                            }
+                        // TODO[agg_v2](optimize): Is it possible to avoid clones here?
+                        match does_value_need_exchange::<T>(
+                            value,
+                            layout.as_ref(),
+                            delayed_write_set_ids,
+                        ) {
+                            Ok(needs_exchange) => {
+                                if needs_exchange {
+                                    resources_needing_delayed_field_exchange = true;
+                                    break;
+                                }
+                            },
+                            Err(e) => {
+                                return Some(Err(e));
+                            },
                         }
                     }
                 }
@@ -1221,20 +1193,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                 }
 
                 if let Ok(Some(metadata)) = self.get_resource_state_value_metadata(&key) {
-                    let metadata = Some(StateValue::new_with_metadata(Bytes::new(), metadata));
-                    if let Ok(GroupReadResult::Size(group_size)) =
-                        parallel_state.read_group_size(&key, self.txn_idx)
-                    {
-                        let metadata_op: T::Value = TransactionWrite::from_state_value(metadata);
-                        if let Some(metadata_op) = metadata_op.convert_read_to_modification() {
-                            return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
-                        }
-                    } else {
-                        return Some(Err(code_invariant_error(format!(
-                            "Cannot compute metadata op size for the group read {:?}",
-                            key
-                        ))));
-                    }
+                    return Some(
+                        if let Ok(GroupReadResult::Size(group_size)) =
+                            parallel_state.read_group_size(&key, self.txn_idx)
+                        {
+                            Ok((key.clone(), (metadata, group_size.get())))
+                        } else {
+                            Err(code_invariant_error(format!(
+                                "Cannot compute metadata op size for the group read {:?}",
+                                key
+                            )))
+                        },
+                    );
                 }
                 Some(Err(code_invariant_error(format!(
                     "Cannot compute metadata op for the group read {:?}",
@@ -1248,9 +1218,9 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         &self,
         group_read_set: &HashMap<T::Key, HashSet<T::Tag>>,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
-        delayed_write_set_keys: &HashSet<T::Identifier>,
+        delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (T::Value, u64)>, PanicError> {
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64)>, PanicError> {
         group_read_set
             .iter()
             .filter(|(key, _tags)| !skip.contains(key))
@@ -1263,18 +1233,21 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             if let ValueWithLayout::Exchanged(value, Some(layout)) =
                                 value_with_layout
                             {
-                                if let Some(bytes) = value.bytes() {
-                                    let identifiers_in_read = self
-                                        .extract_identifiers_from_value(bytes, layout.as_ref())
-                                        .unwrap();
-                                    if !delayed_write_set_keys.is_disjoint(&identifiers_in_read) {
-                                        resources_needing_delayed_field_exchange = true;
-                                        break;
-                                    }
-                                } else {
-                                    return Some(Err(code_invariant_error(
-                                        "Delete shouldn't be in get_group_reads_needing_exchange_sequential",
-                                    )));
+                                // TODO[agg_v2](optimize): Is it possible to avoid clones here?
+                                match does_value_need_exchange::<T>(
+                                    &value,
+                                    layout.as_ref(),
+                                    delayed_write_set_ids,
+                                ) {
+                                    Ok(needs_exchange) => {
+                                        if needs_exchange {
+                                            resources_needing_delayed_field_exchange = true;
+                                            break;
+                                        }
+                                    },
+                                    Err(e) => {
+                                        return Some(Err(e));
+                                    },
                                 }
                             }
                         }
@@ -1282,17 +1255,15 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     if !resources_needing_delayed_field_exchange {
                         return None;
                     }
-                    if let Some(metadata) = unsync_map.fetch_data(key) {
+                    if let Ok(Some(metadata)) = self.get_resource_state_value_metadata(key) {
                         if let Ok(GroupReadResult::Size(group_size)) =
                             unsync_map.get_group_size(key)
                         {
-                            if let Some(metadata_op) = metadata
-                                .extract_value_no_layout()
-                                .convert_read_to_modification()
-                            {
-                                return Some(Ok((key.clone(), (metadata_op, group_size.get()))));
-                            }
+                            return Some(Ok((key.clone(), (metadata, group_size.get()))));
                         } else {
+                            // TODO[agg_v2](fix): `get_group_size` can fail on group tag serialization. Do
+                            //       we want to propagate this error? This is somewhat an invariant
+                            //       violation so PanicError is also ok?
                             return Some(Err(code_invariant_error(format!(
                                 "Cannot compute metadata op size for the group read {:?}",
                                 key
@@ -1314,7 +1285,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         state_key: &T::Key,
         layout: UnknownOrLayout,
         kind: ReadKind,
-    ) -> anyhow::Result<ReadResult> {
+    ) -> PartialVMResult<ReadResult> {
         debug_assert!(
             state_key.module_path().is_none(),
             "Reading a module {:?} using ResourceView",
@@ -1365,10 +1336,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
             // will not log the speculative error,
             // so no actual error will be logged once the execution is halted and
             // the speculative logging is flushed.
-            ReadResult::HaltSpeculativeExecution(msg) => Err(anyhow::Error::new(VMStatus::error(
+            ReadResult::HaltSpeculativeExecution(msg) => Err(PartialVMError::new(
                 StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
-                Some(msg),
-            ))),
+            )
+            .with_message(msg)),
             ReadResult::Uninitialized => {
                 unreachable!("base value must already be recorded in the MV data structure")
             },
@@ -1376,12 +1347,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         }
     }
 
-    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> anyhow::Result<()> {
+    fn initialize_mvhashmap_base_group_contents(&self, group_key: &T::Key) -> PartialVMResult<()> {
         let (base_group, metadata_op): (BTreeMap<T::Tag, Bytes>, _) =
             match self.get_raw_base_value(group_key)? {
                 Some(state_value) => (
-                    bcs::from_bytes(state_value.bytes())
-                        .map_err(|_| anyhow::Error::msg("Resource group deserialization error"))?,
+                    bcs::from_bytes(state_value.bytes()).map_err(|e| {
+                        PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                            .with_message(format!(
+                                "Failed to deserialize the resource group at {:? }: {:?}",
+                                group_key, e
+                            ))
+                    })?,
                     TransactionWrite::from_state_value(Some(state_value)),
                 ),
                 None => (BTreeMap::new(), TransactionWrite::from_state_value(None)),
@@ -1417,7 +1393,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         self.get_resource_state_value_impl(
             state_key,
             UnknownOrLayout::Known(maybe_layout),
@@ -1429,7 +1405,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Metadata)
             .map(|res| {
                 if let ReadResult::Metadata(v) = res {
@@ -1440,7 +1416,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
             })
     }
 
-    fn resource_exists(&self, state_key: &Self::Key) -> anyhow::Result<bool> {
+    fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         self.get_resource_state_value_impl(state_key, UnknownOrLayout::Unknown, ReadKind::Exists)
             .map(|res| {
                 if let ReadResult::Exists(v) = res {
@@ -1459,7 +1435,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     type Layout = MoveTypeLayout;
     type ResourceTag = T::Tag;
 
-    fn resource_group_size(&self, group_key: &Self::GroupKey) -> anyhow::Result<ResourceGroupSize> {
+    fn resource_group_size(
+        &self,
+        group_key: &Self::GroupKey,
+    ) -> PartialVMResult<ResourceGroupSize> {
         let mut group_read = match &self.latest_view {
             ViewState::Sync(state) => state.read_group_size(group_key, self.txn_idx)?,
             ViewState::Unsync(state) => state.unsync_map.get_group_size(group_key)?,
@@ -1482,7 +1461,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         let maybe_layout = maybe_layout.filter(|_| self.is_delayed_field_optimization_capable());
 
         let mut group_read = self
@@ -1518,7 +1497,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         _group_key: &Self::GroupKey,
         _resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<usize> {
+    ) -> PartialVMResult<usize> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
@@ -1526,7 +1505,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         &self,
         _group_key: &Self::GroupKey,
         _resource_tag: &Self::ResourceTag,
-    ) -> anyhow::Result<bool> {
+    ) -> PartialVMResult<bool> {
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
@@ -1539,7 +1518,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     fn is_resource_group_split_in_change_set_capable(&self) -> bool {
         match &self.latest_view {
             ViewState::Sync(_) => true,
-            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+            ViewState::Unsync(_) => true,
         }
     }
 }
@@ -1549,7 +1528,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
 {
     type Key = T::Key;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         debug_assert!(
             state_key.module_path().is_some(),
             "Reading a resource {:?} using ModuleView",
@@ -1594,7 +1573,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
         self.base_view.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
         self.base_view.get_usage()
     }
 }
@@ -1607,7 +1586,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         // TODO[agg_v1](cleanup):
         // Integrate aggregators V1. That is, we can lift the u128 value
         // from the state item by passing the right layout here. This can
@@ -1623,12 +1602,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
     type Identifier = T::Identifier;
     type ResourceGroupTag = T::Tag;
     type ResourceKey = T::Key;
-    type ResourceValue = T::Value;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         match &self.latest_view {
             ViewState::Sync(_) => true,
-            ViewState::Unsync(state) => state.dynamic_change_set_optimizations_enabled,
+            ViewState::Unsync(_) => true,
         }
     }
 
@@ -1690,31 +1668,37 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        match &self.latest_view {
-            ViewState::Sync(state) => (state.counter.fetch_add(1, Ordering::SeqCst) as u64).into(),
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        let index = match &self.latest_view {
+            ViewState::Sync(state) => state.counter.fetch_add(1, Ordering::SeqCst),
             ViewState::Unsync(state) => {
                 let mut counter = state.counter.borrow_mut();
-                let id = (*counter as u64).into();
+                let id = *counter;
                 *counter += 1;
                 id
             },
-        }
+        };
+
+        (index, width).into()
     }
 
     fn validate_and_convert_delayed_field_id(
         &self,
         id: u64,
     ) -> Result<Self::Identifier, PanicError> {
+        let result: Self::Identifier = id.into();
+
+        let unique_index = result.extract_unique_index();
+
         let start_counter = match &self.latest_view {
             ViewState::Sync(state) => state.start_counter,
             ViewState::Unsync(state) => state.start_counter,
         };
 
-        if id < start_counter as u64 {
+        if unique_index < start_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've started from {}",
-                id, start_counter
+                "Invalid delayed field id: {}, index: {}, we've started from {}",
+                id, unique_index, start_counter
             )));
         }
 
@@ -1723,44 +1707,35 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             ViewState::Unsync(state) => *state.counter.borrow(),
         };
 
-        if id > current as u64 {
+        if unique_index > current {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, we've only reached to {}",
-                id, current
+                "Invalid delayed field id: {}, index: {}, we've only reached to {}",
+                id, unique_index, current
             )));
         }
 
-        Ok(id.into())
+        Ok(result)
     }
 
-    // TODO - update comment.
-    // For each resource that satisfies the following conditions,
-    //     1. Resource is in read set
-    //     2. Resource is not in write set
-    // replace the delayed field identifiers in the resource with corresponding values.
-    // If any of the delayed field identifiers in the resource are part of delayed_field_write_set,
-    // then include the resource in the write set.
     fn get_reads_needing_exchange(
         &self,
-        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         match &self.latest_view {
-            ViewState::Sync(state) => {
-                let captured_reads = state.captured_reads.borrow();
-                self.get_reads_needing_exchange_parallel(
-                    &captured_reads,
-                    delayed_write_set_keys,
-                    skip,
-                )
-            },
+            ViewState::Sync(state) => state
+                .captured_reads
+                .borrow()
+                .get_read_values_with_delayed_fields(delayed_write_set_ids, skip),
             ViewState::Unsync(state) => {
                 let read_set = state.read_set.borrow();
                 self.get_reads_needing_exchange_sequential(
                     &read_set.resource_reads,
                     state.unsync_map,
-                    delayed_write_set_keys,
+                    delayed_write_set_ids,
                     skip,
                 )
             },
@@ -1769,149 +1744,23 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
 
     fn get_group_reads_needing_exchange(
         &self,
-        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         match &self.latest_view {
             ViewState::Sync(state) => {
-                self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_keys, skip)
+                self.get_group_reads_needing_exchange_parallel(state, delayed_write_set_ids, skip)
             },
             ViewState::Unsync(state) => {
                 let read_set = state.read_set.borrow();
                 self.get_group_reads_needing_exchange_sequential(
                     &read_set.group_reads,
                     state.unsync_map,
-                    delayed_write_set_keys,
+                    delayed_write_set_ids,
                     skip,
                 )
             },
         }
-    }
-}
-
-struct TemporaryValueToIdentifierMapping<
-    'a,
-    T: Transaction,
-    S: TStateView<Key = T::Key>,
-    X: Executable,
-> {
-    latest_view: &'a LatestView<'a, T, S, X>,
-    txn_idx: TxnIndex,
-    // These are the delayed field keys that were touched when utilizing this mapping
-    // to replace ids with values or values with ids
-    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
-}
-
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
-    TemporaryValueToIdentifierMapping<'a, T, S, X>
-{
-    pub fn new(latest_view: &'a LatestView<'a, T, S, X>, txn_idx: TxnIndex) -> Self {
-        Self {
-            latest_view,
-            txn_idx,
-            delayed_field_keys: RefCell::new(HashSet::new()),
-        }
-    }
-
-    fn generate_delayed_field_id(&self) -> T::Identifier {
-        self.latest_view.generate_delayed_field_id()
-    }
-
-    pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_keys.into_inner()
-    }
-}
-
-// For aggregators V2, values are replaced with identifiers at deserialization time,
-// and are replaced back when the value is serialized. The "lifted" values are cached
-// by the `LatestView` in the aggregators multi-version data structure.
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
-    for TemporaryValueToIdentifierMapping<'a, T, S, X>
-{
-    fn value_to_identifier(
-        &self,
-        kind: &IdentifierMappingKind,
-        layout: &MoveTypeLayout,
-        value: Value,
-    ) -> TransformationResult<Value> {
-        let id = self.generate_delayed_field_id();
-        let base_value = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
-        match &self.latest_view.latest_view {
-            ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
-            ViewState::Unsync(state) => {
-                state.set_delayed_field_value(id, base_value);
-            },
-        };
-        self.delayed_field_keys.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
-    }
-
-    fn identifier_to_value(
-        &self,
-        layout: &MoveTypeLayout,
-        identifier_value: Value,
-    ) -> TransformationResult<Value> {
-        let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_keys.borrow_mut().insert(id);
-        match &self.latest_view.latest_view {
-            ViewState::Sync(state) => Ok(state
-                .versioned_map
-                .delayed_fields()
-                .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
-                .expect("Committed value for ID must always exist")
-                .try_into_move_value(layout)?),
-            ViewState::Unsync(state) => Ok(state
-                .read_delayed_field(id)
-                .expect("Delayed field value for ID must always exist in sequential execution")
-                .try_into_move_value(layout)?),
-        }
-    }
-}
-
-struct TemporaryExtractIdentifiersMapping<T: Transaction> {
-    // These are the delayed field keys that were touched when utilizing this mapping
-    // to replace ids with values or values with ids
-    delayed_field_keys: RefCell<HashSet<T::Identifier>>,
-}
-
-impl<T: Transaction> TemporaryExtractIdentifiersMapping<T> {
-    pub fn new() -> Self {
-        Self {
-            delayed_field_keys: RefCell::new(HashSet::new()),
-        }
-    }
-
-    pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_keys.into_inner()
-    }
-}
-
-impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMapping<T> {
-    fn value_to_identifier(
-        &self,
-        _kind: &IdentifierMappingKind,
-        layout: &MoveTypeLayout,
-        value: Value,
-    ) -> TransformationResult<Value> {
-        let id = T::Identifier::try_from_move_value(layout, value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_keys.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
-    }
-
-    fn identifier_to_value(
-        &self,
-        layout: &MoveTypeLayout,
-        identifier_value: Value,
-    ) -> TransformationResult<Value> {
-        let id = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_keys.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
     }
 }
 
@@ -1939,10 +1788,11 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        aggregator::DelayedFieldID,
+        delayed_fields::{bytes_and_width_to_derived_string_struct, to_utf8_bytes, DelayedFieldID},
         executable::Executable,
         state_store::{
-            state_storage_usage::StateStorageUsage, state_value::StateValue, TStateView,
+            errors::StateviewError, state_storage_usage::StateStorageUsage,
+            state_value::StateValue, TStateView,
         },
         transaction::BlockExecutableTransaction,
         write_set::TransactionWrite,
@@ -2025,7 +1875,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
         let txn_idx = 1;
@@ -2164,7 +2014,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
         let txn_idx = 1;
@@ -2303,7 +2153,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let math = BoundedMath::new(max_value);
         let txn_idx = 1;
@@ -2442,7 +2292,7 @@ mod test {
         let mut view = FakeVersionedDelayedFieldView::default();
         let captured_reads = RefCell::new(CapturedReads::<TestTransactionType>::new());
         let wait_for = FakeWaitForDependency();
-        let id = DelayedFieldID::new(600);
+        let id = DelayedFieldID::new_for_test_for_u64(600);
         let max_value = 600;
         let txn_idx = 1;
         let storage_value = 200;
@@ -2514,6 +2364,16 @@ mod test {
         )]))
     }
 
+    fn create_derived_string_layout() -> MoveTypeLayout {
+        MoveTypeLayout::Tagged(
+            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
+            Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+                create_string_layout(),
+                create_vector_layout(MoveTypeLayout::U8),
+            ]))),
+        )
+    }
+
     fn create_string_layout() -> MoveTypeLayout {
         MoveTypeLayout::Struct(MoveStructLayout::Runtime(vec![MoveTypeLayout::Vector(
             Box::new(MoveTypeLayout::U8),
@@ -2528,18 +2388,16 @@ mod test {
         Value::struct_(Struct::pack(vec![value]))
     }
 
+    fn create_derived_value(value: impl ToString, width: usize) -> Value {
+        bytes_and_width_to_derived_string_struct(to_utf8_bytes(value), width).unwrap()
+    }
+
     fn create_struct_value(inner: Value) -> Value {
         Value::struct_(Struct::pack(vec![inner]))
     }
 
     fn create_vector_value(inner: Vec<Value>) -> Value {
         Value::vector_for_testing_only(inner)
-    }
-
-    fn create_string_value(value: &str) -> Value {
-        Value::struct_(Struct::pack(vec![Value::vector_u8(
-            bcs::to_bytes(value).unwrap().to_vec(),
-        )]))
     }
 
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
@@ -2561,11 +2419,14 @@ mod test {
     impl TStateView for MockStateView {
         type Key = KeyType<u32>;
 
-        fn get_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+        fn get_state_value(
+            &self,
+            state_key: &Self::Key,
+        ) -> Result<Option<StateValue>, StateviewError> {
             Ok(self.data.get(state_key).cloned())
         }
 
-        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
             unimplemented!();
         }
     }
@@ -2587,9 +2448,10 @@ mod test {
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
+        let start_counter = 5;
         let latest_view = LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
             &base_view,
-            ViewState::Unsync(SequentialState::new(&unsync_map, 5, &counter, true)),
+            ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
             1,
         );
 
@@ -2638,7 +2500,7 @@ mod test {
             "One identifier should have been replaced in this case"
         );
         assert!(
-            identifiers.contains(&DelayedFieldID::new(5)),
+            identifiers.contains(&DelayedFieldID::new_with_width(5, 8)),
             "The value 25 should have been replaced in the identifier 5"
         );
         let (final_state_value, identifiers) = latest_view
@@ -2675,9 +2537,18 @@ mod test {
         );
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                Value::struct_(Struct::pack(vec![Value::u64(6), Value::u64(50)])),
-                Value::struct_(Struct::pack(vec![Value::u64(7), Value::u64(65)])),
-                Value::struct_(Struct::pack(vec![Value::u64(8), Value::u64(20)])),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(DelayedFieldID::new_with_width(6, 8).as_u64()),
+                    Value::u64(50),
+                ])),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(DelayedFieldID::new_with_width(7, 8).as_u64()),
+                    Value::u64(65),
+                ])),
+                Value::struct_(Struct::pack(vec![
+                    Value::u64(DelayedFieldID::new_with_width(8, 8).as_u64()),
+                    Value::u64(20),
+                ])),
             ])]));
         assert_eq!(
             patched_state_value,
@@ -2719,9 +2590,15 @@ mod test {
         );
         let patched_value =
             Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
-                create_snapshot_value(Value::u128(9)),
-                create_snapshot_value(Value::u128(10)),
-                create_snapshot_value(Value::u128(11)),
+                create_snapshot_value(Value::u128(
+                    DelayedFieldID::new_with_width(9, 16).as_u64() as u128
+                )),
+                create_snapshot_value(Value::u128(
+                    DelayedFieldID::new_with_width(10, 16).as_u64() as u128
+                )),
+                create_snapshot_value(Value::u128(
+                    DelayedFieldID::new_with_width(11, 16).as_u64() as u128
+                )),
             ])]));
         assert_eq!(
             patched_state_value,
@@ -2739,16 +2616,14 @@ mod test {
 
         /*
             layout = Struct {
-                snap: vec![AggregatorSnapshot<string>]
+                snap: vec![DerivedStringSnapshot]
             }
         */
-        let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
-            create_string_layout(),
-        )));
+        let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));
         let value = create_struct_value(create_vector_value(vec![
-            create_snapshot_value(create_string_value("hello")),
-            create_snapshot_value(create_string_value("ab")),
-            create_snapshot_value(create_string_value("c")),
+            create_derived_value("hello", 60),
+            create_derived_value("ab", 55),
+            create_derived_value("c", 50),
         ]));
         let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         let (patched_state_value, identifiers) = latest_view
@@ -2762,17 +2637,23 @@ mod test {
             counter == RefCell::new(15),
             "The counter should have been updated to 15"
         );
-        // TODO: This assertion is failing. The replaced identifier is not BCS encoded.
-        // let patched_value = Value::struct_(Struct::pack(vec![
-        //     Value::vector_for_testing_only(vec![
-        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("12").unwrap().to_vec())]))])),
-        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("13").unwrap().to_vec())]))])),
-        //         Value::struct_(Struct::pack(vec![Value::struct_(Struct::pack(vec![Value::vector_u8(bcs::to_bytes("14").unwrap().to_vec())]))])),
-        // ])]));
-        // assert_eq!(
-        //     patched_state_value,
-        //     StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
-        // );
+
+        let patched_value =
+            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+                DelayedFieldID::new_with_width(12, 60)
+                    .into_derived_string_struct()
+                    .unwrap(),
+                DelayedFieldID::new_with_width(13, 55)
+                    .into_derived_string_struct()
+                    .unwrap(),
+                DelayedFieldID::new_with_width(14, 50)
+                    .into_derived_string_struct()
+                    .unwrap(),
+            ])]));
+        assert_eq!(
+            patched_state_value,
+            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+        );
         let (final_state_value, identifiers2) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
@@ -2805,15 +2686,9 @@ mod test {
 
     fn create_sequential_latest_view<'a>(
         h: &'a Holder,
-        dynamic_change_set_optimizations_enabled: bool,
     ) -> LatestView<'a, TestTransactionType, MockStateView, MockExecutable> {
         let sequential_state: SequentialState<'a, TestTransactionType, MockExecutable> =
-            SequentialState::new(
-                &h.unsync_map,
-                *h.counter.borrow(),
-                &h.counter,
-                dynamic_change_set_optimizations_enabled,
-            );
+            SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
         LatestView::<'a, TestTransactionType, MockStateView, MockExecutable>::new(
             &h.base_view,
@@ -2850,7 +2725,7 @@ mod test {
         }
 
         fn new_view(&self) -> ViewsComparison<'_> {
-            let latest_view_seq = create_sequential_latest_view(&self.holder, true);
+            let latest_view_seq = create_sequential_latest_view(&self.holder);
             let latest_view_par =
                 LatestView::<TestTransactionType, MockStateView, MockExecutable>::new(
                     &self.base_view,
@@ -2898,7 +2773,7 @@ mod test {
             &self,
             state_key: &KeyType<u32>,
             maybe_layout: Option<&MoveTypeLayout>,
-        ) -> anyhow::Result<Option<StateValue>> {
+        ) -> PartialVMResult<Option<StateValue>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value(state_key, maybe_layout);
@@ -2909,7 +2784,7 @@ mod test {
             self.assert_res_eq(seq, par)
         }
 
-        fn resource_exists(&self, state_key: &KeyType<u32>) -> anyhow::Result<bool> {
+        fn resource_exists(&self, state_key: &KeyType<u32>) -> PartialVMResult<bool> {
             let seq = self.latest_view_seq.resource_exists(state_key);
             let par = self.latest_view_par.resource_exists(state_key);
 
@@ -2919,7 +2794,7 @@ mod test {
         fn get_resource_state_value_metadata(
             &self,
             state_key: &KeyType<u32>,
-        ) -> anyhow::Result<Option<StateValueMetadata>> {
+        ) -> PartialVMResult<Option<StateValueMetadata>> {
             let seq = self
                 .latest_view_seq
                 .get_resource_state_value_metadata(state_key);
@@ -2932,25 +2807,28 @@ mod test {
 
         fn get_reads_needing_exchange(
             &self,
-            delayed_write_set_keys: &HashSet<DelayedFieldID>,
+            delayed_write_set_ids: &HashSet<DelayedFieldID>,
             skip: &HashSet<KeyType<u32>>,
-        ) -> Result<BTreeMap<KeyType<u32>, (ValueType, Arc<MoveTypeLayout>)>, PanicError> {
+        ) -> Result<
+            BTreeMap<KeyType<u32>, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+            PanicError,
+        > {
             let seq = self
                 .latest_view_seq
-                .get_reads_needing_exchange(delayed_write_set_keys, skip);
+                .get_reads_needing_exchange(delayed_write_set_ids, skip);
             let par = self
                 .latest_view_par
-                .get_reads_needing_exchange(delayed_write_set_keys, skip);
+                .get_reads_needing_exchange(delayed_write_set_ids, skip);
 
             self.assert_res_eq(
                 seq.as_ref().map(|m| {
                     m.iter()
-                        .map(|(k, (v, l))| (*k, (v.as_state_value(), l.clone())))
+                        .map(|(k, (metadata, size, layout))| (*k, (metadata, size, layout.clone())))
                         .collect::<BTreeMap<_, _>>()
                 }),
                 par.as_ref().map(|m| {
                     m.iter()
-                        .map(|(k, (v, l))| (*k, (v.as_state_value(), l.clone())))
+                        .map(|(k, (metadata, size, layout))| (*k, (metadata, size, layout.clone())))
                         .collect::<BTreeMap<_, _>>()
                 }),
             )
@@ -3061,10 +2939,13 @@ mod test {
         let state_value = create_state_value(&value, &layout);
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
 
-        let holder = ComparisonHolder::new(data, 1000);
+        let start_counter = 1000;
+        let id = DelayedFieldID::new_with_width(start_counter, 8);
+
+        let holder = ComparisonHolder::new(data, start_counter);
         let views = holder.new_view();
 
-        let patched_value = create_struct_value(create_aggregator_value_u64(1000, 30));
+        let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
         let patched_state_value = create_state_value(&patched_value, &layout);
 
         match check_metadata {
@@ -3084,10 +2965,7 @@ mod test {
             Some(patched_state_value.clone())
         );
         assert!(views
-            .get_reads_needing_exchange(
-                &HashSet::from([DelayedFieldID::new(1000)]),
-                &HashSet::new()
-            )
+            .get_reads_needing_exchange(&HashSet::from([id]), &HashSet::new())
             .unwrap()
             .contains_key(&KeyType(1, false)));
         assert_fetch_eq(
@@ -3116,7 +2994,9 @@ mod test {
         let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
         data.insert(KeyType::<u32>(4, false), state_value_4);
 
-        let holder = ComparisonHolder::new(data, 1000);
+        let start_counter = 1000;
+        let id = DelayedFieldID::new_with_width(start_counter, 8);
+        let holder = ComparisonHolder::new(data, start_counter);
         let views = holder.new_view();
 
         assert_eq!(
@@ -3138,7 +3018,7 @@ mod test {
             Some(state_value_3.clone())
         );
 
-        //TODO: This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
+        // TODO[agg_v2](fix): This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
         // Is Err(StorageVersion) expected here?
         println!(
             "data: {:?}",
@@ -3148,7 +3028,7 @@ mod test {
                 .fetch_data(&KeyType::<u32>(3, false), 1)
         );
 
-        let patched_value = create_struct_value(create_aggregator_value_u64(1000, 30));
+        let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
         let state_value_4 =
             StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into());
         assert_eq!(
@@ -3160,27 +3040,29 @@ mod test {
 
         // When we throw exception, it is not required read summaries to match, as they will not be used
         // assert_err_eq!(
-        //     views.get_delayed_field_value(&DelayedFieldID::new(1005)),
-        //     PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(DelayedFieldID::new(1005))),
+        //     views.get_delayed_field_value(&DelayedFieldID::new_for_test_for_u64(1005)),
+        //     PanicOr::Or(DelayedFieldsSpeculativeError::NotFound(DelayedFieldID::new_for_test_for_u64(1005))),
         // );
 
         assert_ok_eq!(
-            views.get_delayed_field_value(&DelayedFieldID::new(1000)),
+            views.get_delayed_field_value(&id),
             DelayedFieldValue::Aggregator(25),
         );
 
         let captured_reads = views.latest_view_par.take_parallel_reads();
         assert!(captured_reads.validate_data_reads(holder.versioned_map.data(), 1));
-        let read_set_with_delayed_fields = captured_reads.get_read_values_with_delayed_fields();
+        // TODO(aggr_v2): what's up with this test case?
+        let _read_set_with_delayed_fields =
+            captured_reads.get_read_values_with_delayed_fields(&HashSet::new(), &HashSet::new());
 
-        // TODO: This prints
+        // TODO[agg_v2](fix): This prints
         // read: (KeyType(4, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         // read: (KeyType(2, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
-        for read in read_set_with_delayed_fields {
-            println!("read: {:?}", read);
-        }
+        // for read in read_set_with_delayed_fields {
+        //     println!("read: {:?}", read);
+        // }
 
-        // TODO: This assertion fails.
+        // TODO[agg_v2](fix): This assertion fails.
         // let data_read = DataRead::Versioned(Ok((1,0)), Arc::new(TransactionWrite::from_state_value(Some(state_value_4))), Some(Arc::new(layout)));
         // assert!(read_set_with_delayed_fields.any(|x| x == (&KeyType::<u32>(4, false), &data_read)));
     }

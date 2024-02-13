@@ -145,8 +145,8 @@ async fn schedule_compute_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -165,11 +165,12 @@ async fn schedule_compute_should_discover_validator_txns() {
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        false,
     );
 
     // Ensure the dummy executor has received the txns.
     let _ = execution_policy
-        .schedule_compute(&block, HashValue::zero())
+        .schedule_compute(&block, HashValue::zero(), None)
         .await
         .await;
 
@@ -197,8 +198,8 @@ async fn commit_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -230,6 +231,7 @@ async fn commit_should_discover_validator_txns() {
         Arc::new(NoOpShuffler {}),
         BlockExecutorConfigFromOnchain::new_no_block_limit(),
         Arc::new(NoOpDeduper {}),
+        false,
     );
 
     let (tx, rx) = oneshot::channel::<()>();

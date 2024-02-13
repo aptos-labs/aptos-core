@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_types::{
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     state_store::{
         state_key::StateKey,
         state_value::{StateValue, StateValueMetadata},
@@ -19,17 +19,11 @@ use aptos_types::{
     },
     write_set::WriteOp,
 };
-use move_binary_format::errors::{Location, PartialVMError, VMError, VMResult};
-use move_core_types::{
-    account_address::AccountAddress,
-    ident_str,
-    identifier::IdentStr,
-    language_storage::{ModuleId, StructTag, CORE_CODE_ADDRESS},
-    value::MoveTypeLayout,
-    vm_status::StatusCode,
-};
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
 use std::{
     collections::{BTreeMap, HashSet},
+    fmt::Debug,
     sync::Arc,
 };
 
@@ -38,7 +32,7 @@ use std::{
 
 /// Allows to query AggregatorV1 values from the state storage.
 pub trait TAggregatorV1View {
-    type Identifier;
+    type Identifier: Debug;
 
     /// Aggregator V1 is implemented as a state item, and therefore the API has
     /// the same pattern as for modules or resources:
@@ -49,12 +43,15 @@ pub trait TAggregatorV1View {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>>;
+    ) -> PartialVMResult<Option<StateValue>>;
 
-    fn get_aggregator_v1_value(&self, id: &Self::Identifier) -> anyhow::Result<Option<u128>> {
+    fn get_aggregator_v1_value(&self, id: &Self::Identifier) -> PartialVMResult<Option<u128>> {
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         match maybe_state_value {
-            Some(state_value) => Ok(Some(bcs::from_bytes(state_value.bytes())?)),
+            Some(state_value) => Ok(Some(bcs::from_bytes(state_value.bytes()).map_err(|e| {
+                PartialVMError::new(StatusCode::UNEXPECTED_DESERIALIZATION_ERROR)
+                    .with_message(format!("Failed to deserialize aggregator value: {:?}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -64,7 +61,7 @@ pub trait TAggregatorV1View {
     fn get_aggregator_v1_state_value_metadata(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         // When getting state value metadata for aggregator V1, we need to do a
         // precise read.
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
@@ -78,32 +75,11 @@ pub trait TAggregatorV1View {
         &self,
         id: &Self::Identifier,
         delta_op: &DeltaOp,
-    ) -> VMResult<WriteOp> {
-        // We need to set abort location for Aggregator V1 to ensure correct VMStatus can
-        // be constructed.
-        const AGGREGATOR_V1_ADDRESS: AccountAddress = CORE_CODE_ADDRESS;
-        const AGGREGATOR_V1_MODULE_NAME: &IdentStr = ident_str!("aggregator");
-        let vm_error = |e: PartialVMError| -> VMError {
-            e.finish(Location::Module(ModuleId::new(
-                AGGREGATOR_V1_ADDRESS,
-                AGGREGATOR_V1_MODULE_NAME.into(),
-            )))
-        };
-
-        let base = self
-            .get_aggregator_v1_value(id)
-            .map_err(|e| {
-                vm_error(
-                    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                        .with_message(e.to_string()),
-                )
-            })?
-            .ok_or_else(|| {
-                vm_error(
-                    PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
-                        .with_message("Cannot convert delta for deleted aggregator".to_string()),
-                )
-            })?;
+    ) -> PartialVMResult<WriteOp> {
+        let base = self.get_aggregator_v1_value(id)?.ok_or_else(|| {
+            PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
+                .with_message("Cannot convert delta for deleted aggregator".to_string())
+        })?;
 
         delta_op
             .apply_to(base)
@@ -116,10 +92,11 @@ pub trait TAggregatorV1View {
                     reason: DeltaApplicationFailureReason::Underflow,
                     ..
                 }) => subtraction_v1_error(e),
+                // Because aggregator V1 never underflows or overflows, all other
+                // application errors are bugs.
                 _ => code_invariant_error(format!("Unexpected delta application error: {:?}", e))
                     .into(),
             })
-            .map_err(vm_error)
             .map(|result| WriteOp::legacy_modification(serialize(&result).into()))
     }
 }
@@ -137,8 +114,13 @@ where
     fn get_aggregator_v1_state_value(
         &self,
         state_key: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
-        self.get_state_value(state_key)
+    ) -> PartialVMResult<Option<StateValue>> {
+        self.get_state_value(state_key).map_err(|e| {
+            PartialVMError::new(StatusCode::STORAGE_ERROR).with_message(format!(
+                "Aggregator value not found for {:?}: {:?}",
+                state_key, e
+            ))
+        })
     }
 }
 
@@ -148,7 +130,6 @@ pub trait TDelayedFieldView {
     type Identifier;
     type ResourceKey;
     type ResourceGroupTag;
-    type ResourceValue;
 
     fn is_delayed_field_optimization_capable(&self) -> bool;
 
@@ -182,7 +163,7 @@ pub trait TDelayedFieldView {
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
-    fn generate_delayed_field_id(&self) -> Self::Identifier;
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier;
 
     /// Validate that given value (from aggregator structure) is a valid delayed field identifier,
     /// and convert it to Self::Identifier if so.
@@ -195,34 +176,34 @@ pub trait TDelayedFieldView {
     /// 1. The resource is read during the transaction execution.
     /// 2. The resource is not present in write set of the VM Change Set.
     /// 3. The resource has a delayed field in it that is part of delayed field change set.
-    /// We get these resources and include them in the write set of the transaction output.
+    /// We get the keys of these resources and metadata to include them in the write set
+    /// of the transaction output after value exchange.
     fn get_reads_needing_exchange(
         &self,
-        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>;
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    >;
 
     /// Returns the list of resource groups that satisfy all the following conditions:
     /// 1. At least one of the resource in the group is read during the transaction execution.
     /// 2. The resource group is not present in the write set of the VM Change Set.
     /// 3. At least one of the resources in the group has a delayed field in it that is part.
     /// of delayed field change set.
-    /// We get these resource groups and include them in the write set of the transaction output.
-    /// For each such resource group, this function outputs (resource key, (metadata op, resource group size))
+    /// We get the keys of these resource groups and metadata to include them in the write set
+    /// of the transaction output after value exchange. For each such resource group, this function
+    /// outputs:(resource key, (metadata, resource group size))
     fn get_group_reads_needing_exchange(
         &self,
-        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError>;
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError>;
 }
 
 pub trait DelayedFieldResolver:
-    TDelayedFieldView<
-    Identifier = DelayedFieldID,
-    ResourceKey = StateKey,
-    ResourceGroupTag = StructTag,
-    ResourceValue = WriteOp,
->
+    TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = StateKey, ResourceGroupTag = StructTag>
 {
 }
 
@@ -231,7 +212,6 @@ impl<T> DelayedFieldResolver for T where
         Identifier = DelayedFieldID,
         ResourceKey = StateKey,
         ResourceGroupTag = StructTag,
-        ResourceValue = WriteOp,
     >
 {
 }
@@ -243,7 +223,6 @@ where
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         // For resolvers that are not capable, it cannot be enabled
@@ -269,7 +248,7 @@ where
 
     /// Returns a unique per-block identifier that can be used when creating a
     /// new aggregator V2.
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
+    fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
         unimplemented!("generate_delayed_field_id not implemented")
     }
 
@@ -282,18 +261,20 @@ where
 
     fn get_reads_needing_exchange(
         &self,
-        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unimplemented!("get_reads_needing_exchange not implemented")
     }
 
     fn get_group_reads_needing_exchange(
         &self,
-        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         unimplemented!("get_group_reads_needing_exchange not implemented")
     }
 }

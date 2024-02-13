@@ -1072,6 +1072,7 @@ impl MoveModuleBytecode {
         }
     }
 
+    #[allow(clippy::unnecessary_fallible_conversions)]
     pub fn try_parse_abi(mut self) -> anyhow::Result<Self> {
         if self.abi.is_none() {
             // Ignore error, because it is possible a transaction module payload contains

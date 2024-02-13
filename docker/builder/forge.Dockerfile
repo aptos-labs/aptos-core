@@ -5,14 +5,14 @@ FROM debian-base as forge
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \   
     apt-get update && apt-get install --no-install-recommends -y \
-        libssl1.1 \
-        ca-certificates \
-        openssh-client \
-        wget \
-        busybox \
-        git \
-        unzip \
-        awscli 
+    libssl1.1 \
+    ca-certificates \
+    openssh-client \
+    wget \
+    busybox \
+    git \
+    unzip \
+    awscli 
 
 WORKDIR /aptos
 
@@ -25,7 +25,7 @@ RUN cd /usr/local/bin && wget "https://get.helm.sh/helm-v3.8.0-linux-amd64.tar.g
 ENV PATH "$PATH:/root/bin"
 
 WORKDIR /aptos
-COPY --link --from=tools-builder /aptos/dist/forge /usr/local/bin/forge
+COPY --link --from=node-builder /aptos/dist/forge /usr/local/bin/forge
 ### Get Aptos Framework Release for forge framework upgrade testing
 COPY --link --from=tools-builder /aptos/aptos-move/framework/ /aptos/aptos-move/framework/
 COPY --link --from=tools-builder /aptos/aptos-move/aptos-release-builder/ /aptos/aptos-move/aptos-release-builder/

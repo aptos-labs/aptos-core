@@ -43,7 +43,7 @@ impl DBTool {
             DBTool::Backup(cmd) => cmd.run().await,
             DBTool::BackupMaintenance(cmd) => cmd.run().await,
             DBTool::Bootstrap(cmd) => cmd.run(),
-            DBTool::Debug(cmd) => cmd.run(),
+            DBTool::Debug(cmd) => Ok(cmd.run()?),
             DBTool::ReplayVerify(cmd) => {
                 let ret = cmd.run().await;
                 info!("Replay verify result: {:?}", ret);

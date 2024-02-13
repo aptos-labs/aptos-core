@@ -155,6 +155,30 @@ pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub(crate) static STATE_KV_DB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        // metric name
+        "aptos_state_kv_db_properties",
+        // metric description
+        "StateKvDb rocksdb integer properties",
+        // metric labels (dimensions)
+        &["shard_id", "cf_name", "property_name",]
+    )
+    .unwrap()
+});
+
+pub(crate) static STATE_MERKLE_DB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        // metric name
+        "aptos_state_merkle_db_properties",
+        // metric description
+        "StateMerkleDb rocksdb integer properties",
+        // metric labels (dimensions)
+        &["shard_id", "cf_name", "property_name",]
+    )
+    .unwrap()
+});
+
 // Async committer gauges:
 pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(

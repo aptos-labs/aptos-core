@@ -20,15 +20,20 @@ pub fn initialize(
     mode: ExecutorMode,
     aggregator_execution_enabled: bool,
     txns: usize,
+    allow_block_executor_fallback: bool,
 ) -> AggV2TestHarness {
-    let (harness, account) = initialize_harness(mode, aggregator_execution_enabled, path);
-
+    let (mut harness, account) =
+        initialize_harness(mode, aggregator_execution_enabled, path.clone());
+    if !allow_block_executor_fallback {
+        harness.executor.disable_block_executor_fallback();
+    }
     let mut result = AggV2TestHarness {
         harness,
         comparison_harnesses: vec![],
         account,
         txn_accounts: vec![],
         txn_index: 0,
+        path,
     };
 
     result.initialize_issuer_accounts(txns);
@@ -39,16 +44,21 @@ pub fn initialize_enabled_disabled_comparison(
     path: PathBuf,
     mode: ExecutorMode,
     txns: usize,
+    allow_block_executor_fallback: bool,
 ) -> AggV2TestHarness {
-    let (harness_base, account_base) = initialize_harness(mode, false, path.clone());
-    let (harness_comp, _account_comp) = initialize_harness(mode, true, path);
-
+    let (mut harness_base, account_base) = initialize_harness(mode, false, path.clone());
+    let (mut harness_comp, _account_comp) = initialize_harness(mode, true, path.clone());
+    if !allow_block_executor_fallback {
+        harness_base.executor.disable_block_executor_fallback();
+        harness_comp.executor.disable_block_executor_fallback();
+    }
     let mut agg_harness = AggV2TestHarness {
         harness: harness_base,
-        comparison_harnesses: vec![harness_comp],
+        comparison_harnesses: vec![(harness_comp, "aggregator_execution_enabled".to_string())],
         account: account_base,
         txn_accounts: vec![],
         txn_index: 0,
+        path,
     };
 
     agg_harness.initialize_issuer_accounts(txns);
@@ -87,10 +97,11 @@ fn initialize_harness(
 
 pub struct AggV2TestHarness {
     pub harness: MoveHarness,
-    pub comparison_harnesses: Vec<MoveHarness>,
+    pub comparison_harnesses: Vec<(MoveHarness, String)>,
     pub account: Account,
     pub txn_accounts: Vec<Account>,
     pub txn_index: usize,
+    pub path: PathBuf,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -163,6 +174,12 @@ impl AggregatorLocation {
     }
 }
 
+pub enum StructType {
+    Aggregator,
+    Snapshot,
+    DerivedString,
+}
+
 impl AggV2TestHarness {
     pub fn run_block_in_parts_and_check(
         &mut self,
@@ -173,14 +190,9 @@ impl AggV2TestHarness {
             .harness
             .run_block_in_parts_and_check(block_split, txn_block.clone());
 
-        for (idx, h) in self.comparison_harnesses.iter_mut().enumerate() {
+        for (h, name) in self.comparison_harnesses.iter_mut() {
             let new_result = h.run_block_in_parts_and_check(block_split, txn_block.clone());
-            assert_outputs_equal(
-                &result,
-                "baseline",
-                &new_result,
-                &format!("comparison {}", idx),
-            );
+            assert_outputs_equal(&result, "baseline", &new_result, name);
         }
     }
 
@@ -198,7 +210,7 @@ impl AggV2TestHarness {
 
         let result = self.harness.store_and_fund_account(&acc, balance, seq_num);
 
-        for h in self.comparison_harnesses.iter_mut() {
+        for (h, _name) in self.comparison_harnesses.iter_mut() {
             h.store_and_fund_account(&acc, balance, seq_num);
         }
 
@@ -210,21 +222,24 @@ impl AggV2TestHarness {
         account: Option<&Account>,
         use_type: UseType,
         element_type: ElementType,
-        aggregator: bool,
+        struct_type: StructType,
     ) -> SignedTransaction {
         self.harness.create_entry_function(
             account.unwrap_or(&self.account),
-            str::parse(
-                if aggregator {
-                    "0x1::aggregator_v2_test::init_aggregator"
-                } else {
-                    "0x1::aggregator_v2_test::init_snapshot"
-                },
-            )
+            str::parse(match struct_type {
+                StructType::Aggregator => "0x1::aggregator_v2_test::init_aggregator",
+                StructType::Snapshot => "0x1::aggregator_v2_test::init_snapshot",
+                StructType::DerivedString => "0x1::aggregator_v2_test::init_derived_string",
+            })
             .unwrap(),
             vec![element_type.get_type_tag()],
             vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
         )
+    }
+
+    pub fn republish(&mut self) -> SignedTransaction {
+        self.harness
+            .create_publish_package_cache_building(&self.account, &self.path, |_| {})
     }
 
     fn create_entry_agg_func_with_args(
@@ -265,6 +280,16 @@ impl AggV2TestHarness {
             snap_loc,
             &[expected],
         )
+    }
+
+    pub fn check_derived(
+        &mut self,
+        snap_loc: &AggregatorLocation,
+        expected: u128,
+    ) -> SignedTransaction {
+        self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::check_derived", snap_loc, &[
+            expected,
+        ])
     }
 
     #[allow(clippy::new_ret_no_self)]
@@ -452,42 +477,11 @@ impl AggV2TestHarness {
     }
 
     // idempotent verify functions:
-
-    pub fn verify_copy_snapshot(&mut self) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::aggregator_v2_test::verify_copy_snapshot").unwrap(),
-            vec![],
-            vec![],
-        )
-    }
-
-    pub fn verify_copy_string_snapshot(&mut self) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::aggregator_v2_test::verify_copy_string_snapshot").unwrap(),
-            vec![],
-            vec![],
-        )
-    }
-
     pub fn verify_string_concat(&mut self) -> SignedTransaction {
         self.txn_index += 1;
         self.harness.create_entry_function(
             &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
             str::parse("0x1::aggregator_v2_test::verify_string_concat").unwrap(),
-            vec![],
-            vec![],
-        )
-    }
-
-    pub fn verify_string_snapshot_concat(&mut self) -> SignedTransaction {
-        self.txn_index += 1;
-        self.harness.create_entry_function(
-            &self.txn_accounts[self.txn_index % self.txn_accounts.len()],
-            str::parse("0x1::aggregator_v2_test::verify_string_snapshot_concat").unwrap(),
             vec![],
             vec![],
         )

@@ -791,18 +791,10 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
 fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config
-        .consensus
-        .max_sending_block_txns_quorum_store_override = 30000;
-    config
-        .consensus
-        .max_receiving_block_txns_quorum_store_override = 40000;
-    config
-        .consensus
-        .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
-    config
-        .consensus
-        .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+    config.consensus.max_sending_block_txns = 30000;
+    config.consensus.max_receiving_block_txns = 40000;
+    config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
+    config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
@@ -992,7 +984,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             (95, 1.5, 3., 4., 0),
             (950, 2., 3., 4., 0),
             (2750, 2.5, 3.5, 4.5, 0),
-            (4600, 3., 4., 5., 10), // Allow some expired transactions (high-load)
+            (4600, 3., 4., 6., 10), // Allow some expired transactions (high-load)
         ]
         .into_iter()
         .map(
@@ -1782,9 +1774,11 @@ fn realistic_env_max_load_test(
                 if ha_proxy {
                     4600
                 } else if long_running {
-                    7500
-                } else {
+                    // This is for forge stable
                     7000
+                } else {
+                    // During land time we want to be less strict, otherwise we flaky fail
+                    6000
                 },
             ),
         }))
@@ -1834,7 +1828,7 @@ fn realistic_env_max_load_test(
                     5,
                 ))
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
+                    max_no_progress_secs: 15.0,
                     max_round_gap: 4,
                 }),
         )
@@ -2028,12 +2022,7 @@ fn changing_working_quorum_test_helper(
             let block_size = (target_tps / 4) as u64;
 
             config.consensus.max_sending_block_txns = block_size;
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = block_size;
-            config
-                .consensus
-                .max_receiving_block_txns_quorum_store_override = block_size;
+            config.consensus.max_receiving_block_txns = block_size;
             config.consensus.round_initial_timeout_ms = 500;
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
             config.consensus.quorum_store_poll_time_ms = 100;

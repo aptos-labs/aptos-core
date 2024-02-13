@@ -23,6 +23,7 @@ pub mod traits;
 pub mod validatable;
 pub mod x25519;
 
+pub mod poseidon_bn254;
 #[cfg(test)]
 mod unit_tests;
 

@@ -6,9 +6,9 @@ use crate::{
     pruner::{db_sub_pruner::DBSubPruner, pruner_utils::get_or_initialize_subpruner_progress},
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
 };
-use anyhow::Result;
 use aptos_logger::info;
 use aptos_schemadb::SchemaBatch;
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::sync::Arc;
 

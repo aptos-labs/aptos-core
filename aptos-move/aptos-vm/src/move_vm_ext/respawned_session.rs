@@ -18,18 +18,19 @@ use aptos_aggregator::{
 };
 use aptos_gas_algebra::Fee;
 use aptos_types::{
-    aggregator::PanicError,
+    delayed_fields::PanicError,
     state_store::{
+        errors::StateviewError,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueMetadata},
         StateViewId,
     },
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
-    change_set::VMChangeSet,
+    change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
         TResourceGroupView, TResourceView,
@@ -37,12 +38,12 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
-use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -73,7 +74,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn spawn(
         vm: &'l AptosVM,
         session_id: SessionId,
-        base: &'r dyn AptosMoveResolver,
+        base: &'r impl AptosMoveResolver,
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
     ) -> Result<Self, VMStatus> {
@@ -146,34 +147,6 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     }
 }
 
-// Sporadically checks if the given two input type layouts match
-pub fn randomly_check_layout_matches(
-    layout_1: Option<&MoveTypeLayout>,
-    layout_2: Option<&MoveTypeLayout>,
-) -> Result<(), PanicError> {
-    if layout_1.is_some() != layout_2.is_some() {
-        return Err(code_invariant_error(format!(
-            "Layouts don't match when they are expected to: {:?} and {:?}",
-            layout_1, layout_2
-        )));
-    }
-    if layout_1.is_some() {
-        // Checking if 2 layouts are equal is a recursive operation and is expensive.
-        // We generally call this `randomly_check_layout_matches` function when we know
-        // that the layouts are supposed to match. As an optimization, we only randomly
-        // check if the layouts are matching.
-        let mut rng = rand::thread_rng();
-        let random_number: u32 = rng.gen_range(0, 100);
-        if random_number == 1 && layout_1 != layout_2 {
-            return Err(code_invariant_error(format!(
-                "Layouts don't match when they are expected to: {:?} and {:?}",
-                layout_1, layout_2
-            )));
-        }
-    }
-    Ok(())
-}
-
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
 pub struct ExecutorViewWithChangeSet<'r> {
     base_executor_view: &'r dyn ExecutorView,
@@ -201,7 +174,7 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
     fn get_aggregator_v1_state_value(
         &self,
         id: &Self::Identifier,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.aggregator_v1_delta_set().get(id) {
             Some(delta_op) => Ok(self
                 .base_executor_view
@@ -219,7 +192,6 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.base_executor_view
@@ -290,8 +262,8 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         }
     }
 
-    fn generate_delayed_field_id(&self) -> Self::Identifier {
-        self.base_executor_view.generate_delayed_field_id()
+    fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier {
+        self.base_executor_view.generate_delayed_field_id(width)
     }
 
     fn validate_and_convert_delayed_field_id(
@@ -306,8 +278,10 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.base_executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -316,7 +290,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -330,7 +304,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         &self,
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<StateValue>> {
+    ) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
                 AbstractResourceWriteOp::Write(write_op)
@@ -357,7 +331,7 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
     fn get_resource_state_value_metadata(
         &self,
         state_key: &Self::Key,
-    ) -> anyhow::Result<Option<StateValueMetadata>> {
+    ) -> PartialVMResult<Option<StateValueMetadata>> {
         match self.change_set.resource_write_set().get(state_key) {
             Some(
                 AbstractResourceWriteOp::Write(write_op)
@@ -387,7 +361,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     fn resource_group_size(
         &self,
         _group_key: &Self::GroupKey,
-    ) -> anyhow::Result<ResourceGroupSize> {
+    ) -> PartialVMResult<ResourceGroupSize> {
         // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
         Ok(ResourceGroupSize::zero_concrete())
     }
@@ -397,7 +371,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         group_key: &Self::GroupKey,
         resource_tag: &Self::ResourceTag,
         maybe_layout: Option<&Self::Layout>,
-    ) -> anyhow::Result<Option<Bytes>> {
+    ) -> PartialVMResult<Option<Bytes>> {
         use AbstractResourceWriteOp::*;
         if let Some((write_op, layout)) = self
             .change_set
@@ -407,16 +381,19 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    Some(Err(anyhow::anyhow!(
-                        "Non-ResourceGroup write found for key in get_resource_from_group call"
-                    )))
+                    // There should be no colisions, we cannot have group key refer to a resource.
+                    Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
                 },
             })
             .transpose()?
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            randomly_check_layout_matches(maybe_layout, layout.as_deref())
-                .map_err(|e| anyhow::anyhow!("get_resource_from_group layout check: {:?}", e))?;
+            randomly_check_layout_matches(maybe_layout, layout.as_deref()).map_err(|e| {
+                // TODO[agg_v2](cleanup): Push into `randomly_check_layout_matches` once Satya's
+                //                        change lands. Consider the error code as well.
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(format!("get_resource_from_group layout check: {:?}", e))
+            })?;
 
             Ok(write_op.extract_raw_bytes())
         } else {
@@ -438,7 +415,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
 impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     type Key = StateKey;
 
-    fn get_module_state_value(&self, state_key: &Self::Key) -> anyhow::Result<Option<StateValue>> {
+    fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
         match self.change_set.module_write_set().get(state_key) {
             Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base_executor_view.get_module_state_value(state_key),
@@ -451,8 +428,10 @@ impl<'r> StateStorageView for ExecutorViewWithChangeSet<'r> {
         self.base_executor_view.id()
     }
 
-    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-        anyhow::bail!("Unexpected access to get_usage()")
+    fn get_usage(&self) -> Result<StateStorageUsage, StateviewError> {
+        Err(StateviewError::Other(
+            "Unexpected access to get_usage()".to_string(),
+        ))
     }
 }
 
@@ -582,7 +561,7 @@ mod test {
         let aggregator_v1_delta_set =
             BTreeMap::from([(key("aggregator_delta_set"), delta_add(1, 1000))]);
 
-        // TODO[agg_v2]: Layout hardcoded to None. Test with layout = Some(..)
+        // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let resource_group_write_set = BTreeMap::from([
             (
                 key("resource_group_both"),
@@ -674,5 +653,5 @@ mod test {
         );
     }
 
-    // TODO[agg_v2](tests) add delayed field tests
+    // TODO[agg_v2](test) add delayed field tests
 }

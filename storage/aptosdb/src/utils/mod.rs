@@ -8,8 +8,8 @@ use crate::{
     common::NUM_STATE_SHARDS,
     schema::db_metadata::{DbMetadataKey, DbMetadataSchema},
 };
-use anyhow::Result;
 use aptos_schemadb::{SchemaBatch, DB};
+use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use arr_macro::arr;
 

@@ -21,7 +21,7 @@ use aptos_executor_types::ExecutorResult;
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_executor::config::BlockExecutorConfigFromOnchain, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::LedgerInfoWithSignatures, randomness::Randomness,
 };
 use async_trait::async_trait;
 use fail::fail_point;
@@ -65,6 +65,7 @@ impl StateComputer for OrderingStateComputer {
         _block: &Block,
         // The parent block id.
         _parent_block_id: HashValue,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         // Return dummy block and bypass the execution phase.
         // This will break the e2e smoke test (for now because
@@ -138,6 +139,7 @@ impl StateComputer for OrderingStateComputer {
         _: Arc<dyn TransactionShuffler>,
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
+        _: bool,
     ) {
     }
 
@@ -175,6 +177,7 @@ impl StateComputer for DagStateSyncComputer {
         _block: &Block,
         // The parent block root hash.
         _parent_block_id: HashValue,
+        _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         unimplemented!("method not supported")
     }
@@ -205,6 +208,7 @@ impl StateComputer for DagStateSyncComputer {
         _transaction_shuffler: Arc<dyn TransactionShuffler>,
         _block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         _transaction_deduper: Arc<dyn TransactionDeduper>,
+        _randomness_enabled: bool,
     ) {
         unimplemented!("method not supported");
     }

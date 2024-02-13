@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::tests::mock_view::MockStateView;
+use aptos_types::delayed_fields::DelayedFieldID;
 use claims::assert_none;
 use move_core_types::value::{
     IdentifierMappingKind, LayoutTag, MoveStructLayout::Runtime, MoveTypeLayout,
@@ -99,8 +100,10 @@ fn test_exchange_u64() {
         &layout,
     )
     .unwrap();
-    exchange.assert_mapping_equal_at(0, Value::u64(200));
-    assert!(patched_value.equals(&Value::u64(0)).unwrap());
+    exchange.assert_mapping_equal_at(0, 8, Value::u64(200));
+    assert!(patched_value
+        .equals(&Value::u64(DelayedFieldID::new_with_width(0, 8).as_u64()))
+        .unwrap());
     assert!(unpatched_value.equals(&input_value).unwrap());
 }
 
@@ -121,8 +124,12 @@ fn test_exchange_u128() {
         &layout,
     )
     .unwrap();
-    exchange.assert_mapping_equal_at(0, Value::u128(300));
-    assert!(patched_value.equals(&Value::u128(0)).unwrap());
+    exchange.assert_mapping_equal_at(0, 16, Value::u128(300));
+    assert!(patched_value
+        .equals(&Value::u128(
+            DelayedFieldID::new_with_width(0, 16).as_u64() as u128
+        ))
+        .unwrap());
     assert!(unpatched_value.equals(&input_value).unwrap());
 }
 
@@ -155,12 +162,12 @@ fn test_exchange_works_inside_struct() {
         &layout,
     )
     .unwrap();
-    exchange.assert_mapping_equal_at(0, Value::u64(500));
-    exchange.assert_mapping_equal_at(1, Value::u128(600));
+    exchange.assert_mapping_equal_at(0, 8, Value::u64(500));
+    exchange.assert_mapping_equal_at(1, 16, Value::u128(600));
     let expected_patched_value = Value::struct_(Struct::pack(vec![
         Value::u64(400),
-        Value::u64(0),
-        Value::u128(1),
+        Value::u64(DelayedFieldID::new_with_width(0, 8).as_u64()),
+        Value::u128(DelayedFieldID::new_with_width(1, 16).as_u64() as u128),
     ]));
     assert!(patched_value.equals(&expected_patched_value).unwrap());
     assert!(unpatched_value.equals(&input_value).unwrap());

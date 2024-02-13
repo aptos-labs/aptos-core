@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosDB;
-use anyhow::{anyhow, Result};
+use anyhow::anyhow;
 use aptos_config::config::{NodeConfig, StorageDirPaths};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter,
+    cached_state_view::ShardedStateCache, state_delta::StateDelta, DbReader, DbWriter, Result,
     StateSnapshotReceiver,
 };
 use aptos_types::{
@@ -49,7 +49,6 @@ impl FastSyncStorageWrapper {
             config.storage.enable_indexer,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
-            config.indexer_table_info.enabled,
         )
         .map_err(|err| anyhow!("fast sync DB failed to open {}", err))?;
 
@@ -60,7 +59,12 @@ impl FastSyncStorageWrapper {
             .state_sync_driver
             .bootstrapping_mode
             .is_fast_sync()
-            && (db_main.ledger_store.get_latest_version().map_or(0, |v| v) == 0)
+            && (db_main
+                .ledger_db
+                .metadata_db()
+                .get_latest_version()
+                .map_or(0, |v| v)
+                == 0)
         {
             db_dir.push(SECONDARY_DB_DIR);
             let secondary_db = AptosDB::open(
@@ -71,7 +75,6 @@ impl FastSyncStorageWrapper {
                 config.storage.enable_indexer,
                 config.storage.buffered_state_target_items,
                 config.storage.max_num_nodes_per_lru_cache_shard,
-                config.indexer_table_info.enabled,
             )
             .map_err(|err| anyhow!("Secondary DB failed to open {}", err))?;
 

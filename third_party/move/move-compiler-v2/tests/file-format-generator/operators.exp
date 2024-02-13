@@ -267,7 +267,7 @@ fun operators::bools($t0: bool, $t1: bool): bool {
  33: label L11
      # live vars: $t0, $t1, $t3
  34: if ($t3) goto 35 else goto 38
-     # live vars:
+     # live vars: $t0, $t1
  35: label L15
      # live vars:
  36: $t2 := true
@@ -285,7 +285,7 @@ fun operators::bools($t0: bool, $t1: bool): bool {
  42: $t2 := !($t1)
      # live vars: $t2
  43: goto 46
-     # live vars:
+     # live vars: $t1
  44: label L19
      # live vars:
  45: $t2 := false
@@ -368,7 +368,7 @@ fun operators::order($t0: u64, $t1: u64): bool {
  19: $t2 := !($t7)
      # live vars: $t2
  20: goto 23
-     # live vars:
+     # live vars: $t0, $t1
  21: label L7
      # live vars:
  22: $t2 := false
@@ -490,14 +490,14 @@ B18:
 	47: MoveLoc[5](loc3: bool)
 	48: Ret
 }
-equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
+equality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 3 */ {
 B0:
 	0: MoveLoc[0](Arg0: Ty0)
 	1: MoveLoc[1](Arg1: Ty0)
 	2: Eq
 	3: Ret
 }
-inequality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
+inequality<Ty0: drop>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 4 */ {
 B0:
 	0: MoveLoc[0](Arg0: Ty0)
 	1: MoveLoc[1](Arg1: Ty0)
