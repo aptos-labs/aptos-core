@@ -3,12 +3,21 @@
 use criterion::Criterion;
 use criterion::criterion_main;
 use criterion::criterion_group;
-use aptos_executor_types::{should_forward_to_subscription_service, should_forward_to_subscription_service_v2};
+use aptos_executor_types::{should_forward_to_subscription_service, should_forward_to_subscription_service_old};
 use aptos_types::contract_event::ContractEvent;
 
-fn bench_group(c: &mut Criterion) {
-    let mut group = c.benchmark_group("group1");
-    group.bench_function("func1", move |b| {
+fn default_targets(c: &mut Criterion) {
+    let mut group = c.benchmark_group("should_forward_to_subscription_service");
+    group.bench_function("v0", move |b| {
+        b.iter_with_setup(
+            || ContractEvent::new_v2_with_type_tag_str("0x1::jwks::QuorumCertifiedUpdate", vec![0xff; 256]),
+            |event| {
+                should_forward_to_subscription_service_old(&event)
+            },
+        )
+    });
+
+    group.bench_function("v1", move |b| {
         b.iter_with_setup(
             || ContractEvent::new_v2_with_type_tag_str("0x1::jwks::QuorumCertifiedUpdate", vec![0xff; 256]),
             |event| {
@@ -16,21 +25,12 @@ fn bench_group(c: &mut Criterion) {
             },
         )
     });
-
-    group.bench_function("func2", move |b| {
-        b.iter_with_setup(
-            || ContractEvent::new_v2_with_type_tag_str("0x1::jwks::QuorumCertifiedUpdate", vec![0xff; 256]),
-            |event| {
-                should_forward_to_subscription_service_v2(&event)
-            },
-        )
-    });
 }
 
 criterion_group!(
-    name = group1;
+    name = default_group;
     config = Criterion::default();
-    targets = bench_group
+    targets = default_targets
 );
 
-criterion_main!(group1);
+criterion_main!(default_group);

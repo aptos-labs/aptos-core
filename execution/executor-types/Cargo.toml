@@ -37,5 +37,5 @@ default = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
 
 [[bench]]
-name = "bench1"
+name = "default"
 harness = false

@@ -530,6 +530,12 @@ impl ProofRead for ProofReader {
 
 /// Used in both state sync and consensus to filter the txn events that should be subscribable by node components.
 pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
+    let type_tag = event.type_tag();
+    type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref() || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref() || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
+}
+
+#[cfg(test)]
+pub fn should_forward_to_subscription_service_old(event: &ContractEvent) -> bool {
     matches!(
         event.type_tag().to_string().as_str(),
         "0x1::reconfiguration::NewEpochEvent"
@@ -537,9 +543,4 @@ pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
             | "\
             0x1::jwks::ObservedJWKsUpdated"
     )
-}
-
-pub fn should_forward_to_subscription_service_v2(event: &ContractEvent) -> bool {
-    let type_tag = event.type_tag();
-    type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref() || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref() || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
 }
