@@ -119,7 +119,7 @@ Store new block events as a move resource, internally using a circular buffer.
 
 </dd>
 <dt>
-<code>current_idx: u32</code>
+<code>next_idx: u32</code>
 </dt>
 <dd>
 
@@ -305,7 +305,7 @@ This can only be called during Genesis.
 
     <b>move_to</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(aptos_framework, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
         max_capacity: 2000,
-        current_idx: 0,
+        next_idx: 0,
         <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>: <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>(),
     });
 
@@ -515,12 +515,12 @@ Emit the event and update height and global timestamp
 <pre><code><b>fun</b> <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, event_handle: &<b>mut</b> EventHandle&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;, new_block_event: <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>) <b>acquires</b> <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
     <b>if</b> (<b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework)) {
         <b>let</b> commit_history_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
-        <b>let</b> idx = commit_history_ref.current_idx;
+        <b>let</b> idx = commit_history_ref.next_idx;
         <b>if</b> (<a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_contains">table_with_length::contains</a>(&commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx)) {
             <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx);
         };
         <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx, <b>copy</b> new_block_event);
-        commit_history_ref.current_idx = (idx + 1) % commit_history_ref.max_capacity;
+        commit_history_ref.next_idx = (idx + 1) % commit_history_ref.max_capacity;
     };
     <a href="timestamp.md#0x1_timestamp_update_global_time">timestamp::update_global_time</a>(vm, new_block_event.proposer, new_block_event.time_microseconds);
     <b>assert</b>!(
@@ -593,12 +593,13 @@ new block event for WriteSetPayload.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_emit_writeset_block_event">emit_writeset_block_event</a>(vm_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fake_block_hash: <b>address</b>) <b>acquires</b> <a href="block.md#0x1_block_BlockResource">BlockResource</a>, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm_signer);
     <b>let</b> block_metadata_ref = <b>borrow_global_mut</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
     block_metadata_ref.height = <a href="event.md#0x1_event_counter">event::counter</a>(&block_metadata_ref.new_block_events);
 
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a>&gt;(
+    <a href="block.md#0x1_block_emit_new_block_event">emit_new_block_event</a>(
+        vm_signer,
         &<b>mut</b> block_metadata_ref.new_block_events,
         <a href="block.md#0x1_block_NewBlockEvent">NewBlockEvent</a> {
             <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: fake_block_hash,
