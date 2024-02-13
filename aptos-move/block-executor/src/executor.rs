@@ -257,14 +257,11 @@ where
                 )
             },
             ExecutionStatus::Abort(err) => {
-                // Abort indicates an unrecoverable VM failure, and should not occur
-                // even due to speculation. Thus, we do not need to finish execution and
-                // can directly return an error.
-                return Err(code_invariant_error(format!(
-                    "FatalVMError from parallel execution {:?} at txn {}",
-                    err, idx_to_execute
-                ))
-                .into());
+                // Abort indicates an unrecoverable VM failure, but currently it seemingly
+                // can occur due to speculative execution (in particular for BlockMetadata txn).
+                // Therefore, we do not short circuit here. TODO: investigate if we can
+                // eliminate the scenarios when Abort status can happen speculatively.
+                (ExecutionStatus::Abort(err), Vec::new())
             },
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 return Err(code_invariant_error(format!(
@@ -489,7 +486,8 @@ where
                 scheduler.add_to_commit_queue(txn_idx);
             }
 
-            // An invariant check on the recorded outputs.
+            last_input_output.check_fatal_vm_error(txn_idx)?;
+            // Handle a potential vm error, then check invariants on the recorded outputs.
             last_input_output.check_execution_status_during_commit(txn_idx)?;
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
@@ -687,10 +685,7 @@ where
             materialized_events,
         )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
-            let execution_status = txn_output.output_status();
-
-            match execution_status {
+            match last_input_output.txn_output(txn_idx).unwrap().as_ref() {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
@@ -1352,10 +1347,17 @@ where
             // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
             // StateCheckpoint will be added afterwards.
             let error_code = match sequential_error {
-                BlockExecutionError::FatalBlockExecutorError(_) => StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
-                BlockExecutionError::FatalVMError(_) => StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                BlockExecutionError::FatalBlockExecutorError(_) => {
+                    StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+                },
+                BlockExecutionError::FatalVMError(_) => {
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                },
             };
-            let ret = signature_verified_block.iter().map(|_| E::Output::discard_output(error_code)).collect();
+            let ret = signature_verified_block
+                .iter()
+                .map(|_| E::Output::discard_output(error_code))
+                .collect();
             return Ok(BlockOutput::new(ret));
         }
 
