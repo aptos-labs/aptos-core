@@ -127,6 +127,6 @@ script {{
         .await
         .last_completed
         .expect("dkg result for epoch 6 should be present");
-    assert_eq!(5, dkg_session.target_epoch());
+    assert_eq!(6, dkg_session.target_epoch());
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
 }
