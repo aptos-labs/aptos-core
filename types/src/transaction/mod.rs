@@ -31,7 +31,6 @@ use aptos_crypto::{
     CryptoMaterialError, HashValue,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use move_core_types::transaction_argument::convert_txn_args;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rayon::prelude::*;
@@ -198,50 +197,6 @@ impl RawTransaction {
         }
     }
 
-    /// Create a new `RawTransaction` with a module to publish.
-    pub fn new_module(
-        sender: AccountAddress,
-        sequence_number: u64,
-        module: Module,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::ModuleBundle(ModuleBundle::from(module)),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    /// Create a new `RawTransaction` with a list of modules to publish.
-    ///
-    /// Multiple modules per transaction can be published.
-    pub fn new_module_bundle(
-        sender: AccountAddress,
-        sequence_number: u64,
-        modules: ModuleBundle,
-        max_gas_amount: u64,
-        gas_unit_price: u64,
-        expiration_timestamp_secs: u64,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::ModuleBundle(modules),
-            max_gas_amount,
-            gas_unit_price,
-            expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
     /// into a `SignatureCheckedTransaction`.
     ///
@@ -389,54 +344,6 @@ impl RawTransaction {
         self.payload
     }
 
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        let (code, args) = match &self.payload {
-            TransactionPayload::Script(script) => (
-                get_transaction_name(script.code()),
-                convert_txn_args(script.args()),
-            ),
-            TransactionPayload::EntryFunction(script_fn) => (
-                format!("{}::{}", script_fn.module(), script_fn.function()),
-                script_fn.args().to_vec(),
-            ),
-            TransactionPayload::Multisig(multisig) => (
-                format!(
-                    "Executing next transaction for multisig account {}",
-                    multisig.multisig_address,
-                ),
-                vec![],
-            ),
-            TransactionPayload::ModuleBundle(_) => ("module publishing".to_string(), vec![]),
-        };
-        let mut f_args: String = "".to_string();
-        for arg in args {
-            f_args = format!("{}\n\t\t\t{:02X?},", f_args, arg);
-        }
-        format!(
-            "RawTransaction {{ \n\
-             \tsender: {}, \n\
-             \tsequence_number: {}, \n\
-             \tpayload: {{, \n\
-             \t\ttransaction: {}, \n\
-             \t\targs: [ {} \n\
-             \t\t]\n\
-             \t}}, \n\
-             \tmax_gas_amount: {}, \n\
-             \tgas_unit_price: {}, \n\
-             \texpiration_timestamp_secs: {:#?}, \n\
-             \tchain_id: {},
-             }}",
-            self.sender,
-            self.sequence_number,
-            code,
-            f_args,
-            self.max_gas_amount,
-            self.gas_unit_price,
-            self.expiration_timestamp_secs,
-            self.chain_id,
-        )
-    }
-
     /// Return the sender of this transaction.
     pub fn sender(&self) -> AccountAddress {
         self.sender
@@ -487,13 +394,21 @@ impl RawTransactionWithData {
     }
 }
 
+/// Marks payload as deprecated. We need to use it to ensure serialization or
+/// deserialization is not broken.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct DeprecatedPayload {
+    // Used because 'analyze_serde_formats' complains with "Please avoid 0-sized containers".
+    dummy_value: u64,
+}
+
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayload {
     /// A transaction that executes code.
     Script(Script),
     /// Deprecated.
-    ModuleBundle(ModuleBundle),
+    ModuleBundle(DeprecatedPayload),
     /// A transaction that executes an existing entry function published on-chain.
     EntryFunction(EntryFunction),
     /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
@@ -825,17 +740,6 @@ impl SignedTransaction {
         all_signer_addresses.push(self.sender());
         let mut s = BTreeSet::new();
         all_signer_addresses.iter().any(|a| !s.insert(*a))
-    }
-
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        format!(
-            "SignedTransaction {{ \n \
-             raw_txn: {}, \n \
-             authenticator: {:#?}, \n \
-             }}",
-            self.raw_txn.format_for_client(get_transaction_name),
-            self.authenticator
-        )
     }
 
     pub fn is_multi_agent(&self) -> bool {
@@ -1916,26 +1820,6 @@ impl Transaction {
         match self {
             Transaction::ValidatorTransaction(t) => Some(t),
             _ => None,
-        }
-    }
-
-    pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
-        match self {
-            Transaction::UserTransaction(user_txn) => {
-                user_txn.format_for_client(get_transaction_name)
-            },
-            // TODO: display proper information for client
-            Transaction::GenesisTransaction(_write_set) => String::from("genesis"),
-            // TODO: display proper information for client
-            Transaction::BlockMetadata(_block_metadata) => String::from("block_metadata"),
-            // TODO: display proper information for client
-            Transaction::StateCheckpoint(_) => String::from("state_checkpoint"),
-            // TODO: display proper information for client
-            Transaction::ValidatorTransaction(_) => String::from("validator_transaction"),
-            // TODO: display proper information for client
-            Transaction::BlockMetadataExt(_block_metadata_ext) => {
-                String::from("block_metadata_ext")
-            },
         }
     }
 

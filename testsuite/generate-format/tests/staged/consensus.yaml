@@ -424,6 +424,9 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
+DeprecatedPayload:
+  STRUCT:
+    - dummy_value: U64
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -523,14 +526,6 @@ LedgerInfoWithV0:
         TYPENAME: LedgerInfo
     - signatures:
         TYPENAME: AggregateSignature
-Module:
-  STRUCT:
-    - code: BYTES
-ModuleBundle:
-  STRUCT:
-    - codes:
-        SEQ:
-          TYPENAME: Module
 ModuleId:
   STRUCT:
     - address:
@@ -933,7 +928,7 @@ TransactionPayload:
     1:
       ModuleBundle:
         NEWTYPE:
-          TYPENAME: ModuleBundle
+          TYPENAME: DeprecatedPayload
     2:
       EntryFunction:
         NEWTYPE:

@@ -4099,6 +4099,7 @@ dependencies = [
  "datatest-stable",
  "hex",
  "move-binary-format",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
  "move-core-types",

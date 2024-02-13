@@ -8,8 +8,8 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Script, TransactionArgument,
-        TransactionPayload, TransactionStatus,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -233,53 +233,13 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     // publish all packages
     for group in packages {
-        let sender = *group[0].address();
-        let serialized_modules: Vec<Vec<u8>> = group
-            .iter()
-            .map(|m| {
-                let mut b = vec![];
-                m.serialize(&mut b).map(|_| b)
-            })
-            .collect::<Result<Vec<Vec<u8>>, _>>()
-            .map_err(|_| Corpus::Keep)?;
-
-        // deprecated but easiest way to publish modules
-        let mb = ModuleBundle::new(serialized_modules);
-        let acc = vm.new_account_at(sender);
-        let tx = acc
-            .transaction()
-            .gas_unit_price(100)
-            .sequence_number(0)
-            .payload(TransactionPayload::ModuleBundle(mb))
-            .sign();
+        // TODO: Publish modules through native context instead.
         tdbg!("publishing");
-        let res = vm
-            .execute_block(vec![tx])
-            .map_err(|e| {
-                check_for_invariant_violation(e);
-                Corpus::Keep
-            })?
-            .pop()
-            .expect("expected 1 output");
-        tdbg!(&res);
-        // if error exit gracefully
-        let status = match tdbg!(res.status()) {
-            TransactionStatus::Keep(status) => status,
-            _ => return Err(Corpus::Keep),
-        };
-        vm.apply_write_set(res.write_set());
-        match tdbg!(status) {
-            ExecutionStatus::Success => (),
-            ExecutionStatus::MiscellaneousError(e) => {
-                if let Some(e) = e {
-                    if e.status_type() == StatusType::InvariantViolation {
-                        panic!("invariant violation {:?}", e);
-                    }
-                }
-                return Err(Corpus::Keep);
-            },
-            _ => return Err(Corpus::Keep),
-        };
+        for module in group.iter() {
+            let mut b = vec![];
+            module.serialize(&mut b).map_err(|_| Corpus::Keep)?;
+            vm.add_module(&module.self_id(), b);
+        }
         tdbg!("published");
     }
 
