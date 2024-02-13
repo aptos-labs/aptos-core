@@ -266,12 +266,8 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         self.base_executor_view.generate_delayed_field_id(width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        self.base_executor_view
-            .validate_and_convert_delayed_field_id(id)
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        self.base_executor_view.validate_delayed_field_id(id)
     }
 
     fn get_reads_needing_exchange(

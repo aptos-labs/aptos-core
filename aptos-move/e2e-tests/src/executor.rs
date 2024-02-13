@@ -159,8 +159,6 @@ impl FakeExecutor {
             allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
-        // As a set effect, also allow module bundle txns. TODO: Remove
-        aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
     }
 
@@ -638,8 +636,12 @@ impl FakeExecutor {
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has been removed")
+                    },
                 };
                 Ok(gas_profiler)
             },
