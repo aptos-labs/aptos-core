@@ -9,7 +9,6 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
-    delayed_fields::{ExtractUniqueIndex, TryFromMoveValue, TryIntoMoveValue},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
@@ -63,6 +62,9 @@ pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use move_core_types::transaction_argument::TransactionArgument;
 use move_core_types::vm_status::AbortLocation;
+use move_vm_types::delayed_values::delayed_field_id::{
+    ExtractUniqueIndex, ExtractWidth, TryFromMoveValue, TryIntoMoveValue,
+};
 pub use multisig::{ExecutionError, Multisig, MultisigTransactionPayload};
 use once_cell::sync::OnceCell;
 pub use script::{
@@ -1882,6 +1884,7 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         + From<u64>
         + From<(u32, u32)>
         + ExtractUniqueIndex
+        + ExtractWidth
         + TryIntoMoveValue
         + TryFromMoveValue<Hint = ()>;
     type Value: Send + Sync + Debug + Clone + TransactionWrite;

@@ -4,10 +4,7 @@
 use crate::view::{LatestView, ViewState};
 use aptos_aggregator::{
     resolver::TDelayedFieldView,
-    types::{
-        code_invariant_error, DelayedFieldValue, PanicError, ReadPosition, TryFromMoveValue,
-        TryIntoMoveValue,
-    },
+    types::{code_invariant_error, DelayedFieldValue, PanicError, ReadPosition},
 };
 use aptos_mvhashmap::{types::TxnIndex, versioned_delayed_fields::TVersionedDelayedFieldView};
 use aptos_types::{
@@ -17,12 +14,12 @@ use aptos_types::{
     write_set::TransactionWrite,
 };
 use bytes::Bytes;
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::value::{IdentifierMappingKind, MoveTypeLayout};
 use move_vm_types::{
-    value_transformation::{
-        deserialize_and_replace_values_with_ids, TransformationError, TransformationResult,
-        ValueToIdentifierMapping,
-    },
+    delayed_values::delayed_field_id::{ExtractWidth, TryFromMoveValue},
+    value_serde::{deserialize_and_allow_delayed_values, ValueToIdentifierMapping},
+    value_traversal::find_identifiers_in_value,
     values::Value,
 };
 use std::{cell::RefCell, collections::HashSet, sync::Arc};
@@ -66,108 +63,66 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable>
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> ValueToIdentifierMapping
     for TemporaryValueToIdentifierMapping<'a, T, S, X>
 {
+    type Identifier = T::Identifier;
+
     fn value_to_identifier(
         &self,
         kind: &IdentifierMappingKind,
         layout: &MoveTypeLayout,
         value: Value,
-    ) -> TransformationResult<Value> {
+    ) -> PartialVMResult<Self::Identifier> {
         let (base_value, width) = DelayedFieldValue::try_from_move_value(layout, value, kind)?;
         let id = self.generate_delayed_field_id(width);
         match &self.latest_view.latest_view {
             ViewState::Sync(state) => state.set_delayed_field_value(id, base_value),
-            ViewState::Unsync(state) => {
-                state.set_delayed_field_value(id, base_value);
-            },
+            ViewState::Unsync(state) => state.set_delayed_field_value(id, base_value),
         };
         self.delayed_field_ids.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
+        Ok(id)
     }
 
     fn identifier_to_value(
         &self,
         layout: &MoveTypeLayout,
-        identifier_value: Value,
-    ) -> TransformationResult<Value> {
-        let (id, width) = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_ids.borrow_mut().insert(id);
-        Ok(match &self.latest_view.latest_view {
+        identifier: Self::Identifier,
+    ) -> PartialVMResult<Value> {
+        self.delayed_field_ids.borrow_mut().insert(identifier);
+        let delayed_field = match &self.latest_view.latest_view {
             ViewState::Sync(state) => state
                 .versioned_map
                 .delayed_fields()
-                .read_latest_committed_value(&id, self.txn_idx, ReadPosition::AfterCurrentTxn)
+                .read_latest_committed_value(
+                    &identifier,
+                    self.txn_idx,
+                    ReadPosition::AfterCurrentTxn,
+                )
                 .expect("Committed value for ID must always exist"),
             ViewState::Unsync(state) => state
-                .read_delayed_field(id)
+                .read_delayed_field(identifier)
                 .expect("Delayed field value for ID must always exist in sequential execution"),
-        }
-        .try_into_move_value(layout, width)?)
+        };
+        delayed_field.try_into_move_value(layout, identifier.extract_width())
     }
 }
 
-struct TemporaryExtractIdentifiersMapping<T: Transaction> {
-    // These are the delayed field keys that were touched when utilizing this mapping
-    // to replace ids with values or values with ids
-    delayed_field_ids: RefCell<HashSet<T::Identifier>>,
-}
-
-impl<T: Transaction> TemporaryExtractIdentifiersMapping<T> {
-    pub fn new() -> Self {
-        Self {
-            delayed_field_ids: RefCell::new(HashSet::new()),
-        }
-    }
-
-    pub fn into_inner(self) -> HashSet<T::Identifier> {
-        self.delayed_field_ids.into_inner()
-    }
-}
-
-impl<T: Transaction> ValueToIdentifierMapping for TemporaryExtractIdentifiersMapping<T> {
-    fn value_to_identifier(
-        &self,
-        _kind: &IdentifierMappingKind,
-        layout: &MoveTypeLayout,
-        value: Value,
-    ) -> TransformationResult<Value> {
-        let (id, _) = T::Identifier::try_from_move_value(layout, value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_ids.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
-    }
-
-    fn identifier_to_value(
-        &self,
-        layout: &MoveTypeLayout,
-        identifier_value: Value,
-    ) -> TransformationResult<Value> {
-        let (id, _) = T::Identifier::try_from_move_value(layout, identifier_value, &())
-            .map_err(|e| TransformationError(format!("{:?}", e)))?;
-        self.delayed_field_ids.borrow_mut().insert(id);
-        id.try_into_move_value(layout)
-            .map_err(|e| TransformationError(format!("{:?}", e)))
-    }
-}
-
-// Given a Bytes, where values were already exchanged with identifiers,
+// Given bytes, where values were already exchanged with identifiers,
 // return a list of identifiers present in it.
-// TODO[agg_v2](cleanup): store list of identifiers with the exchanged value (like layout),
-// and remove this method.
 fn extract_identifiers_from_value<T: Transaction>(
     bytes: &Bytes,
     layout: &MoveTypeLayout,
-) -> Result<HashSet<T::Identifier>, PanicError> {
-    let mapping = TemporaryExtractIdentifiersMapping::<T>::new();
-    // TODO[agg_v2](cleanup) rename deserialize_and_replace_values_with_ids to not be specific
-    // to mapping trait implementation.
-    let _patched_value = deserialize_and_replace_values_with_ids(bytes.as_ref(), layout, &mapping)
-        .ok_or_else(|| {
-            code_invariant_error("Failed to deserialize a value to extract identifiers")
-        })?;
-    Ok(mapping.into_inner())
+) -> anyhow::Result<HashSet<T::Identifier>> {
+    // TODO[agg_v2](optimize): this performs 2 traversals of a value:
+    //   1) deserialize,
+    //   2) find identifiers to populate the set.
+    //   See if can cache identifiers in advance, or combine it with
+    //   deserialization.
+    let value = deserialize_and_allow_delayed_values(bytes, layout)
+        .ok_or_else(|| anyhow::anyhow!("Failed to deserialize resource during id replacement"))?;
+
+    let mut identifiers = HashSet::new();
+    find_identifiers_in_value(&value, &mut identifiers)?;
+    // TODO[agg_v2](cleanup): ugly way of converting delayed ids to generic type params.
+    Ok(identifiers.into_iter().map(T::Identifier::from).collect())
 }
 
 // Deletion returns a PanicError.
@@ -179,6 +134,7 @@ pub(crate) fn does_value_need_exchange<T: Transaction>(
     if let Some(bytes) = value.bytes() {
         extract_identifiers_from_value::<T>(bytes, layout)
             .map(|identifiers_in_read| !delayed_write_set_ids.is_disjoint(&identifiers_in_read))
+            .map_err(|e| code_invariant_error(format!("Identifier extraction failed with {:?}", e)))
     } else {
         // Deletion returns an error.
         Err(code_invariant_error(

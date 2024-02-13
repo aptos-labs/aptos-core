@@ -40,7 +40,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     resolver::ModuleResolver,
-    value::{LayoutTag, MoveStructLayout, MoveTypeLayout},
+    value::{MoveStructLayout, MoveTypeLayout},
 };
 use move_resource_viewer::MoveValueAnnotator;
 use serde_json::Value;
@@ -792,13 +792,12 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             MoveTypeLayout::Struct(struct_layout) => {
                 self.try_into_vm_value_struct(struct_layout, val)?
             },
-            MoveTypeLayout::Signer => {
+
+            // Some values, e.g., signer or ones with custom serialization
+            // (native), are not stored to storage and so we do not expect
+            // to see them here.
+            MoveTypeLayout::Signer | MoveTypeLayout::Native(..) => {
                 bail!("unexpected move type {:?} for value {:?}", layout, val)
-            },
-            MoveTypeLayout::Tagged(tag, inner_layout) => match tag {
-                LayoutTag::IdentifierMapping(_) => {
-                    self.try_into_vm_value_from_layout(inner_layout, val)?
-                },
             },
         })
     }
