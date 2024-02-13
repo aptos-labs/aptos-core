@@ -11,6 +11,8 @@ mod aptos_cli;
 #[cfg(test)]
 mod client;
 #[cfg(test)]
+mod execution;
+#[cfg(test)]
 mod consensus;
 #[cfg(test)]
 mod full_nodes;

@@ -649,9 +649,14 @@ where
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
 
-        fail_point!("commit-all-halt-err", |_| Err(code_invariant_error("ResourceGroupSerializationError")));
+        fail_point!("commit-all-halt-err", |_| Err(code_invariant_error(
+            "ResourceGroupSerializationError"
+        )));
 
-        let serialized_groups = serialize_groups::<T>(materialized_finalized_groups).map_err(|e| code_invariant_error(format!("Panic error in serializing groups {e:?}")))?;
+        let serialized_groups =
+            serialize_groups::<T>(materialized_finalized_groups).map_err(|e| {
+                code_invariant_error(format!("Panic error in serializing groups {e:?}"))
+            })?;
 
         let resource_write_set = last_input_output.take_resource_write_set(txn_idx);
         let resource_writes_to_materialize = resource_writes_to_materialize!(
@@ -1026,17 +1031,27 @@ where
                     }
                     alert!("Fatal VM error by transaction {}", idx as TxnIndex);
                     // Record the status indicating the unrecoverable VM failure.
-                    return Err(SequentialBlockExecutionError::ErrorToReturn(BlockExecutionError::FatalVMError(err)));
+                    return Err(SequentialBlockExecutionError::ErrorToReturn(
+                        BlockExecutionError::FatalVMError(err),
+                    ));
                 },
                 ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    alert!("Discarding transaction because we got DelayedFieldsCodeInvariantError in the sequential fallback: {msg}");
-                    ret.push(E::Output::discard_output(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR));
-                    continue;
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
+                    alert!("Sequential execution DelayedFieldsCodeInvariantError error by transaction {}: {}", idx as TxnIndex, msg);
+                    return Err(SequentialBlockExecutionError::ErrorToReturn(
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
+                    ));
                 },
                 ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
-                    alert!("Discarding transaction because we got SpeculativeExecutionAbortError in the sequential fallback {msg}");
-                    ret.push(E::Output::discard_output(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR));
-                    continue;
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
+                    alert!("Sequential execution SpeculativeExecutionAbortError error by transaction {}: {}", idx as TxnIndex, msg);
+                    return Err(SequentialBlockExecutionError::ErrorToReturn(
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
+                    ));
                 },
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     // Calculating the accumulated gas costs of the committed txns.
@@ -1156,7 +1171,9 @@ where
                             // The corresponding error / alert must already be triggered, the goal in sequential
                             // fallback is to just skip any transactions that would cause such serialization errors.
                             alert!("Discarding transaction because serialization failed in bcs fallback");
-                            ret.push(E::Output::discard_output(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR));
+                            ret.push(E::Output::discard_output(
+                                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                            ));
                             continue;
                         }
                     };
@@ -1186,8 +1203,9 @@ where
                         let materialized_finalized_groups =
                             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
                         let serialized_groups =
-                            serialize_groups::<T>(materialized_finalized_groups)
-                                .map_err(|_| SequentialBlockExecutionError::ResourceGroupSerializationError)?;
+                            serialize_groups::<T>(materialized_finalized_groups).map_err(|_| {
+                                SequentialBlockExecutionError::ResourceGroupSerializationError
+                            })?;
 
                         let resource_writes_to_materialize = resource_writes_to_materialize!(
                             resource_write_set,
@@ -1206,24 +1224,25 @@ where
                             &latest_view,
                         )?;
 
-                        output
-                            .incorporate_materialized_txn_output(
-                                // No aggregator v1 delta writes are needed for sequential execution.
-                                // They are already handled because we passed materialize_deltas=true
-                                // to execute_transaction.
-                                vec![],
-                                materialized_resource_write_set
-                                    .into_iter()
-                                    .chain(serialized_groups.into_iter())
-                                    .collect(),
-                                materialized_events,
-                            )?;
+                        output.incorporate_materialized_txn_output(
+                            // No aggregator v1 delta writes are needed for sequential execution.
+                            // They are already handled because we passed materialize_deltas=true
+                            // to execute_transaction.
+                            vec![],
+                            materialized_resource_write_set
+                                .into_iter()
+                                .chain(serialized_groups.into_iter())
+                                .collect(),
+                            materialized_events,
+                        )?;
                     }
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
 
                     if latest_view.is_incorrect_use() {
-                        return Err(code_invariant_error("Incorrect use in sequential execution").into());
+                        return Err(
+                            code_invariant_error("Incorrect use in sequential execution").into(),
+                        );
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
@@ -1308,7 +1327,7 @@ where
                     executor_arguments,
                     signature_verified_block,
                     base_view,
-                    false,
+                    true,
                 );
 
                 // If sequential gave us result, return it
@@ -1317,21 +1336,27 @@ where
                         return Ok(output);
                     },
                     Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
-                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error("resource group serialization during bcs fallback should not happen"))
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(
+                            "resource group serialization during bcs fallback should not happen",
+                        ))
                     },
-                    Err(SequentialBlockExecutionError::ErrorToReturn(err)) => {
-                        err
-                    }
+                    Err(SequentialBlockExecutionError::ErrorToReturn(err)) => err,
                 }
             },
-            Err(SequentialBlockExecutionError::ErrorToReturn(err)) => {
-                err
-            }
+            Err(SequentialBlockExecutionError::ErrorToReturn(err)) => err,
         };
 
         // if not skip failed blocks enabled
-        if let BlockExecutionError::FatalBlockExecutorError(err) = sequential_error {
-            panic!("Fatal block executor error during sequential execution: {:?}", err);
+        if self.config.local.discard_failed_blocks {
+            // We cannot execute block, disard everything (including block metadata and validator transactions)
+            // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
+            // StateCheckpoint will be added afterwards.
+            let error_code = match sequential_error {
+                BlockExecutionError::FatalBlockExecutorError(_) => StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                BlockExecutionError::FatalVMError(_) => StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+            };
+            let ret = signature_verified_block.iter().map(|_| E::Output::discard_output(error_code)).collect();
+            return Ok(BlockOutput::new(ret));
         }
 
         Err(sequential_error)

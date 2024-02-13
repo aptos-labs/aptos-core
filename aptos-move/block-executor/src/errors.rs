@@ -9,20 +9,20 @@ use aptos_types::delayed_fields::PanicError;
 // aborting the parallel execution pipeline and falling back to the sequential execution.
 // TODO: provide proper multi-versioning for code (like data) for the cache.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ModulePathReadWriteError;
+pub(crate) struct ModulePathReadWriteError;
 
 // This is not PanicError because we need to match the error variant to provide a specialized
 // fallback logic if a resource group serialization error occurs.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ResourceGroupSerializationError;
+pub(crate) struct ResourceGroupSerializationError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 /// Logging is bottlenecked in constructors.
-pub enum SequentialBlockExecutionError<E> {
+pub(crate) enum SequentialBlockExecutionError<E> {
     // This is not PanicError because we need to match the error variant to provide a specialized
     // fallback logic if a resource group serialization error occurs.
     ResourceGroupSerializationError,
-    ErrorToReturn(BlockExecutionError<E>)
+    ErrorToReturn(BlockExecutionError<E>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,6 +43,8 @@ impl<E> From<PanicError> for BlockExecutionError<E> {
 
 impl<E> From<PanicError> for SequentialBlockExecutionError<E> {
     fn from(err: PanicError) -> Self {
-        SequentialBlockExecutionError::ErrorToReturn(BlockExecutionError::FatalBlockExecutorError(err))
+        SequentialBlockExecutionError::ErrorToReturn(BlockExecutionError::FatalBlockExecutorError(
+            err,
+        ))
     }
 }
