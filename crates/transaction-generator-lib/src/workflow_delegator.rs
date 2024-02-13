@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator, call_custom_modules::CustomModulesDelegationGeneratorCreator, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress, econia_order_generator::EconiaLimitOrderTransactionGenerator
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -331,28 +331,27 @@ impl WorkflowTxnGeneratorCreator {
                     )
                     .await;
 
-                let econia_place_orders_worker = if EconiaFlowType::Basic == flow_type {
-                    CustomModulesDelegationGeneratorCreator::create_worker(
-                        init_txn_factory.clone(),
-                        root_account,
-                        txn_executor,
-                        &mut packages,
-                        &mut EntryPointTransactionGenerator {
-                            entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
-                        },
-                    )
-                    .await
-                } else {
-                    CustomModulesDelegationGeneratorCreator::create_worker(
-                        init_txn_factory.clone(),
-                        root_account,
-                        txn_executor,
-                        &mut packages,
-                        &mut EntryPointTransactionGenerator {
-                            entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
-                        },
-                    )
-                    .await
+                let econia_place_orders_worker = match flow_type {
+                    EconiaFlowType::Basic => CustomModulesDelegationGeneratorCreator::create_worker(
+                            init_txn_factory.clone(),
+                            root_account,
+                            txn_executor,
+                            &mut packages,
+                            &mut EntryPointTransactionGenerator {
+                                entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
+                            },
+                        )
+                        .await,
+                    EconiaFlowType::Advanced => CustomModulesDelegationGeneratorCreator::create_worker(
+                            init_txn_factory.clone(),
+                            root_account,
+                            txn_executor,
+                            &mut packages,
+                            &mut EconiaLimitOrderTransactionGenerator::new(deposit_coins_pool.clone(),
+                                place_orders_pool.clone(),
+                            )
+                        )
+                        .await
                 };
 
                 let packages = Arc::new(packages);

@@ -48,7 +48,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
     /// If you need to send any additional initialization transactions
     /// (like creating and funding additional accounts), you can do so by using provided txn_executor
     async fn create_generator_fn(
-        &self,
+        &mut self,
         root_account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         txn_executor: &dyn ReliableTransactionSubmitter,
