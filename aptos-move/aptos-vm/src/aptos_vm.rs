@@ -48,8 +48,8 @@ use aptos_types::{
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
-        MultisigTransactionPayload, SignatureCheckedTransaction, SignedTransaction, Transaction,
-        TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        MultisigTransactionPayload, Script, SignatureCheckedTransaction, SignedTransaction,
+        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
         ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
@@ -69,8 +69,8 @@ use move_binary_format::{
     access::ModuleAccess,
     compatibility::Compatibility,
     deserializer::DeserializerConfig,
-    errors::{verification_error, Location, PartialVMError, PartialVMResult, VMError, VMResult},
-    CompiledModule, IndexKind,
+    errors::{Location, PartialVMError, PartialVMResult, VMError, VMResult},
+    CompiledModule,
 };
 use move_core_types::{
     account_address::AccountAddress,
