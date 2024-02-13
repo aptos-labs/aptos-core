@@ -13,10 +13,10 @@ use aptos_vm_genesis::default_features_resource_for_genesis;
 use crate::utils::get_current_consensus_config;
 
 /// Enable on-chain randomness in the following steps.
-/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e`.
-/// - Enable validator transactions in consensus config in epoch `e + 1`.
+/// - Enable validator transactions in consensus config in epoch `e`.
+/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e + 1`.
 #[tokio::test]
-async fn enable_feature_0() {
+async fn enable_feature_1() {
     let epoch_duration_secs = 20;
     let estimated_dkg_latency_secs = 40;
 
@@ -54,7 +54,36 @@ async fn enable_feature_0() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Enabling feature RECONFIGURE_WITH_DKG.");
+    info!("Now in epoch 3. Enabling validator transactions.");
+    let mut config = get_current_consensus_config(&client).await;
+    config.enable_validator_txns();
+    let config_bytes = bcs::to_bytes(&config).unwrap();
+    let enable_vtxn_script = format!(r#"
+script {{
+    use aptos_framework::aptos_governance;
+    use aptos_framework::consensus_config;
+    fun main(core_resources: &signer) {{
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        let config_bytes = vector{:?};
+        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
+        aptos_governance::reconfigure(&framework_signer);
+    }}
+}}
+"#, config_bytes);
+
+    debug!("enable_vtxn_script={}", enable_vtxn_script);
+    let txn_summary = cli
+        .run_script(root_idx, enable_vtxn_script.as_str())
+        .await
+        .expect("Txn execution error.");
+    debug!("enabling_vtxn_summary={:?}", txn_summary);
+
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
+        .await
+        .expect("Waited too long for epoch 4.");
+
+    info!("Now in epoch 4. Enabling feature RECONFIGURE_WITH_DKG.");
     let enable_dkg_script = r#"
 script {
     use aptos_framework::aptos_governance;
@@ -71,34 +100,6 @@ script {
         .await
         .expect("Txn execution error.");
     debug!("enabling_dkg_summary={:?}", txn_summary);
-
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Waited too long for epoch 4.");
-
-    info!("Now in epoch 4. Enabling validator transactions.");
-    let mut config = get_current_consensus_config(&client).await;
-    config.enable_validator_txns();
-    let config_bytes = bcs::to_bytes(&config).unwrap();
-    let enable_vtxn_script = format!(r#"
-script {{
-    use aptos_framework::aptos_governance;
-    use aptos_framework::consensus_config;
-    fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let config_bytes = vector{:?};
-        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-        aptos_governance::reconfigure(&framework_signer);
-    }}
-}}
-"#, config_bytes);
-    debug!("enable_vtxn_script={}", enable_vtxn_script);
-    let txn_summary = cli
-        .run_script(root_idx, enable_vtxn_script.as_str())
-        .await
-        .expect("Txn execution error.");
-    debug!("enabling_vtxn_summary={:?}", txn_summary);
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(
