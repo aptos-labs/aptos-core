@@ -105,6 +105,7 @@ pub fn validate_zkid_authenticators(
 ) -> Result<(), VMStatus> {
     if authenticators.is_empty() {
         return Ok(());
+    }
 
     let config = &get_configs_onchain(resolver)?;
 
