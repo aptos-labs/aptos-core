@@ -50,6 +50,7 @@ pub fn crypto_group(c: &mut Criterion) {
         accumulator_poly_slow(thresh, &mut group);
     }
 
+    // Derived from `print_best_worst_avg_case_subsets` in `tests/secret_sharing_config.rs`.
     const AVG_CASE: usize = 74;
     for n in [1, 2, 4, 8, 16, 32, 64, AVG_CASE, 128] {
         multipairing(n, &mut group);

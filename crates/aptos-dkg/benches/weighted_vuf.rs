@@ -442,8 +442,8 @@ fn wvuf_derive_eval<
 
     group.bench_function(
         format!(
-            "derive_eval/{}-thread/{}-subset/{}",
-            num_threads, subset_type, wc
+            "derive_eval/{}-subset/{}-thread/{}",
+            subset_type, num_threads, wc
         ),
         move |b| {
             b.iter_with_setup(

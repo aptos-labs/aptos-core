@@ -24,7 +24,7 @@ use std::ops::{Mul, Neg};
 
 pub const PINKAS_WVUF_DST: &[u8; 21] = b"APTOS_PINKAS_WVUF_DST";
 
-pub const MIN_MULTIEXP_JOB_LEN: usize = 16;
+pub const MIN_MULTIEXP_JOB_LEN: usize = 4;
 
 pub struct PinkasWUF;
 
