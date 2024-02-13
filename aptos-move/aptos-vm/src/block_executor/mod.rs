@@ -33,7 +33,11 @@ use aptos_types::{
 };
 use aptos_vm_logging::{flush_speculative_logs, init_speculative_logs};
 use aptos_vm_types::{abstract_write_op::AbstractResourceWriteOp, output::VMOutput};
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::{StatusCode, VMStatus}};
+use move_core_types::{
+    language_storage::StructTag,
+    value::MoveTypeLayout,
+    vm_status::{StatusCode, VMStatus},
+};
 use once_cell::sync::OnceCell;
 use rayon::ThreadPool;
 use std::{
@@ -89,7 +93,9 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
     }
 
     fn discard_output(discard_code: StatusCode) -> Self {
-        Self::new(VMOutput::empty_with_status(TransactionStatus::Discard(discard_code)))
+        Self::new(VMOutput::empty_with_status(TransactionStatus::Discard(
+            discard_code,
+        )))
     }
 
     // TODO: get rid of the cloning data-structures in the following APIs.
@@ -435,9 +441,13 @@ impl BlockAptosVM {
 
                 Ok(BlockOutput::new(output_vec))
             },
-            Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(err_msg))) => {
-                Err(VMStatus::Error { status_code: StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR, sub_status: None, message: Some(err_msg) })
-            },
+            Err(BlockExecutionError::FatalBlockExecutorError(PanicError::CodeInvariantError(
+                err_msg,
+            ))) => Err(VMStatus::Error {
+                status_code: StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                sub_status: None,
+                message: Some(err_msg),
+            }),
             Err(BlockExecutionError::FatalVMError(err)) => Err(err),
         }
     }

@@ -236,15 +236,17 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 ExecutionStatus::Abort(_) => {
                     Err(code_invariant_error("Abort status cannot be committed"))
                 },
-                ExecutionStatus::SpeculativeExecutionAbortError(_) => {
-                    Err(code_invariant_error("Speculative error status cannot be committed"))
-                },
+                ExecutionStatus::SpeculativeExecutionAbortError(_) => Err(code_invariant_error(
+                    "Speculative error status cannot be committed",
+                )),
                 ExecutionStatus::DelayedFieldsCodeInvariantError(_) => Err(code_invariant_error(
                     "Delayed field invariant error cannot be committed",
                 )),
             }
         } else {
-            Err(code_invariant_error("Recorded output not found during commit"))
+            Err(code_invariant_error(
+                "Recorded output not found during commit",
+            ))
         }
     }
 

@@ -8,7 +8,9 @@ use crate::{
 use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
-    delayed_fields::PanicError, executable::{Executable, ExecutableDescriptor, ModulePath}, write_set::TransactionWrite
+    delayed_fields::PanicError,
+    executable::{Executable, ExecutableDescriptor, ModulePath},
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
 use move_binary_format::errors::PartialVMResult;

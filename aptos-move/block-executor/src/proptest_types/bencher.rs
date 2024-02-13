@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::BlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -14,7 +13,6 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::types::code_invariant_error;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     executable::ExecutableTestType,
@@ -140,7 +138,6 @@ where
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
-        self.baseline_output
-            .assert_output(&output.map_err(|err| BlockExecutionError::FatalBlockExecutorError(code_invariant_error(""))));
+        self.baseline_output.assert_parallel_output(&output);
     }
 }

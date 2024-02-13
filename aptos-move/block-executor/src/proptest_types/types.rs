@@ -1100,7 +1100,7 @@ where
         }
     }
 
-    fn discard_output(discard_code: move_core_types::vm_status::StatusCode) -> Self {
+    fn discard_output(_discard_code: move_core_types::vm_status::StatusCode) -> Self {
         Self {
             writes: vec![],
             group_writes: vec![],

@@ -99,6 +99,7 @@ static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
+static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
@@ -265,6 +266,20 @@ impl AptosVM {
     /// Get the paranoid type check flag if already set, otherwise return default true
     pub fn get_paranoid_checks() -> bool {
         match PARANOID_TYPE_CHECKS.get() {
+            Some(enable) => *enable,
+            None => true,
+        }
+    }
+
+    /// Sets runtime config when invoked the first time.
+    pub fn set_discard_failed_blocks(enable: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        DISCARD_FAILED_BLOCKS.set(enable).ok();
+    }
+
+    /// Get the paranoid type check flag if already set, otherwise return default true
+    pub fn get_discard_failed_blocks() -> bool {
+        match DISCARD_FAILED_BLOCKS.get() {
             Some(enable) => *enable,
             None => true,
         }
@@ -2084,6 +2099,7 @@ impl VMExecutor for AptosVM {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: Self::get_concurrency_level(),
                     allow_fallback: true,
+                    discard_failed_blocks: Self::get_discard_failed_blocks(),
                 },
                 onchain: onchain_config,
             },
