@@ -9,6 +9,7 @@ use crate::{
         TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
+    executor_utilities::*,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     limit_processor::BlockGasLimitProcessor,
     scheduler::{DependencyStatus, ExecutionTaskType, Scheduler, SchedulerTask, Wave},
@@ -26,18 +27,17 @@ use aptos_aggregator::{
 use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error};
 use aptos_mvhashmap::{
-    types::{Incarnation, MVDataOutput, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
+    types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
     versioned_delayed_fields::CommitError,
     MVHashMap,
 };
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
-    contract_event::TransactionEvent,
     delayed_fields::PanicError,
     executable::Executable,
     on_chain_config::BlockGasLimitType,
-    state_store::TStateView,
+    state_store::{state_value::StateValue, TStateView},
     transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
     write_set::{TransactionWrite, WriteOp},
 };
@@ -49,7 +49,6 @@ use core::panic;
 use fail::fail_point;
 use move_core_types::value::MoveTypeLayout;
 use num_cpus;
-use rand::{thread_rng, Rng};
 use rayon::ThreadPool;
 use std::{
     cell::RefCell,
@@ -127,7 +126,10 @@ where
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
-        let mut apply_updates = |output: &E::Output| -> Result<(), PanicError> {
+        let mut apply_updates = |output: &E::Output| -> Result<
+            Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
+            PanicError,
+        > {
             for (group_key, group_metadata_op, group_ops) in
                 output.resource_group_write_set().into_iter()
             {
@@ -141,7 +143,8 @@ where
                     idx_to_execute,
                     incarnation,
                     // Group metadata op needs no layout (individual resources in groups do).
-                    (group_metadata_op, None),
+                    Arc::new(group_metadata_op),
+                    None,
                 );
                 if versioned_cache.group_data().write(
                     group_key,
@@ -154,19 +157,21 @@ where
                 }
             }
 
+            let resource_write_set = output.resource_write_set();
+
             // Then, process resource & aggregator_v1 & module writes.
-            for (k, v) in output.resource_write_set().into_iter().chain(
+            for (k, v, maybe_layout) in resource_write_set.clone().into_iter().chain(
                 output
                     .aggregator_v1_write_set()
                     .into_iter()
-                    .map(|(state_key, write_op)| (state_key, (write_op, None))),
+                    .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
                 if prev_modified_keys.remove(&k).is_none() {
                     updates_outside = true;
                 }
                 versioned_cache
                     .data()
-                    .write(k, idx_to_execute, incarnation, v);
+                    .write(k, idx_to_execute, incarnation, v, maybe_layout);
             }
 
             for (k, v) in output.module_write_set().into_iter() {
@@ -224,29 +229,32 @@ where
                     };
                 }
             }
-            Ok(())
+            Ok(resource_write_set)
         };
 
-        let result = match execute_result {
+        let (result, resource_write_set) = match execute_result {
             // These statuses are the results of speculative execution, so even for
             // SkipRest (skip the rest of transactions) and Abort (abort execution with
             // user defined error), no immediate action is taken. Instead the statuses
             // are recorded and (final statuses) are analyzed when the block is executed.
             ExecutionStatus::Success(output) => {
                 // Apply the writes/deltas to the versioned_data_cache.
-                apply_updates(&output)?;
-                ExecutionStatus::Success(output)
+                let resource_write_set = apply_updates(&output)?;
+                (ExecutionStatus::Success(output), resource_write_set)
             },
             ExecutionStatus::SkipRest(output) => {
                 // Apply the writes/deltas and record status indicating skip.
-                apply_updates(&output)?;
-                ExecutionStatus::SkipRest(output)
+                let resource_write_set = apply_updates(&output)?;
+                (ExecutionStatus::SkipRest(output), resource_write_set)
             },
             ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
                 read_set.capture_delayed_field_read_error(&PanicOr::Or(
                     MVDelayedFieldsError::DeltaApplicationFailure,
                 ));
-                ExecutionStatus::SpeculativeExecutionAbortError(msg)
+                (
+                    ExecutionStatus::SpeculativeExecutionAbortError(msg),
+                    Vec::new(),
+                )
             },
             ExecutionStatus::Abort(err) => {
                 // Abort indicates an unrecoverable VM failure, and should not occur
@@ -284,7 +292,7 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(idx_to_execute, read_set, result) {
+        if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
             return Err(PanicOr::Or(
                 IntentionalFallbackToSequential::module_path_read_write(
                     "Module read & write".into(),
@@ -518,65 +526,27 @@ where
                 }
             }
 
-            let process_finalized_group =
-                |finalized_group: anyhow::Result<Vec<(T::Tag, ValueWithLayout<T::Value>)>>,
-                 metadata_is_deletion: bool|
-                 -> Result<_, _> {
-                    match finalized_group {
-                        Ok(finalized_group) => {
-                            // finalize_group already applies the deletions.
-                            if finalized_group.is_empty() != metadata_is_deletion {
-                                return Err(code_invariant_error(format!(
-                                "Group is empty = {} but op is deletion = {} in parallel execution",
-                                finalized_group.is_empty(),
-                                metadata_is_deletion
-                            )));
-                            }
-                            Ok(finalized_group)
-                        },
-                        Err(e) => Err(code_invariant_error(format!(
-                            "Error committing resource group {:?}",
-                            e
-                        ))),
-                    }
-                };
-
-            let group_metadata_ops = last_input_output.group_metadata_ops(txn_idx);
-            let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
-            for (group_key, metadata_op) in group_metadata_ops.into_iter() {
-                // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
-                let finalized_result = versioned_cache
-                    .group_data()
-                    .finalize_group(&group_key, txn_idx);
-                match process_finalized_group(finalized_result, metadata_op.is_deletion()) {
-                    Ok(finalized_group) => {
-                        finalized_groups.push((group_key, metadata_op, finalized_group));
-                    },
-                    Err(err) => {
-                        return Err(err.into());
-                    },
-                }
-            }
-
-            if let Some(group_reads_needing_delayed_field_exchange) =
-                last_input_output.group_reads_needing_delayed_field_exchange(txn_idx)
-            {
-                for (group_key, metadata_op) in
-                    group_reads_needing_delayed_field_exchange.into_iter()
-                {
-                    let finalized_result = versioned_cache
-                        .group_data()
-                        .get_last_committed_group(&group_key);
-                    match process_finalized_group(finalized_result, metadata_op.is_deletion()) {
-                        Ok(finalized_group) => {
-                            finalized_groups.push((group_key, metadata_op, finalized_group));
-                        },
-                        Err(err) => {
-                            return Err(err.into());
-                        },
-                    }
-                }
-            }
+            let finalized_groups = groups_to_finalize!(last_input_output, txn_idx)
+                .map(|((group_key, metadata_op), is_read_needing_exchange)| {
+                    // finalize_group copies Arc of values and the Tags (TODO: optimize as needed).
+                    // TODO[agg_v2]: have a test that fails if we don't do the if.
+                    let finalized_result = if is_read_needing_exchange {
+                        versioned_cache
+                            .group_data()
+                            .get_last_committed_group(&group_key)
+                    } else {
+                        versioned_cache
+                            .group_data()
+                            .finalize_group(&group_key, txn_idx)
+                    };
+                    map_finalized_group::<T>(
+                        group_key,
+                        finalized_result,
+                        metadata_op,
+                        is_read_needing_exchange,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
 
@@ -608,116 +578,6 @@ where
             }
         }
         Ok(())
-    }
-
-    // For each delayed field in resource write set, replace the identifiers with values.
-    fn map_id_to_values_in_write_set(
-        resource_write_set: Option<Vec<(T::Key, (T::Value, Option<Arc<MoveTypeLayout>>))>>,
-        latest_view: &LatestView<T, S, X>,
-    ) -> BTreeMap<T::Key, T::Value> {
-        let mut patched_resource_write_set = BTreeMap::new();
-        if let Some(resource_write_set) = resource_write_set {
-            for (key, (write_op, layout)) in resource_write_set.into_iter() {
-                // layout is Some(_) if it contains a delayed field
-                if let Some(layout) = layout {
-                    if !write_op.is_deletion() {
-                        match write_op.bytes() {
-                            // TODO[agg_v2](fix): propagate error
-                            None => unreachable!(),
-                            Some(write_op_bytes) => {
-                                let patched_bytes = match latest_view
-                                    .replace_identifiers_with_values(write_op_bytes, &layout)
-                                {
-                                    Ok((bytes, _)) => bytes,
-                                    Err(_) => {
-                                        unreachable!(
-                                            "Failed to replace identifiers with values, {layout:?}"
-                                        )
-                                    },
-                                };
-                                let mut patched_write_op = write_op;
-                                patched_write_op.set_bytes(patched_bytes);
-                                patched_resource_write_set.insert(key, patched_write_op);
-                            },
-                        }
-                    }
-                }
-            }
-        }
-        patched_resource_write_set
-    }
-
-    fn map_id_to_values_in_group_writes(
-        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, ValueWithLayout<T::Value>)>)>,
-        latest_view: &LatestView<T, S, X>,
-    ) -> Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)> {
-        let mut patched_finalized_groups = Vec::with_capacity(finalized_groups.len());
-        for (group_key, group_metadata_op, resource_vec) in finalized_groups.into_iter() {
-            let mut patched_resource_vec = Vec::with_capacity(resource_vec.len());
-            for (tag, value_with_layout) in resource_vec.into_iter() {
-                let value = match value_with_layout {
-                    ValueWithLayout::RawFromStorage(value) => value,
-                    ValueWithLayout::Exchanged(value, None) => value,
-                    ValueWithLayout::Exchanged(value, Some(layout)) => Arc::new(
-                        Self::replace_ids_with_values(&value, layout.as_ref(), latest_view),
-                    ),
-                };
-                patched_resource_vec.push((tag, value));
-            }
-            patched_finalized_groups.push((group_key, group_metadata_op, patched_resource_vec));
-        }
-        patched_finalized_groups
-    }
-
-    // Parse the input `value` and replace delayed field identifiers with
-    // corresponding values
-    fn replace_ids_with_values(
-        value: &T::Value,
-        layout: &MoveTypeLayout,
-        latest_view: &LatestView<T, S, X>,
-    ) -> T::Value {
-        if let Some(mut value) = value.convert_read_to_modification() {
-            if let Some(value_bytes) = value.bytes() {
-                let (patched_bytes, _) = latest_view
-                    .replace_identifiers_with_values(value_bytes, layout)
-                    .unwrap();
-                value.set_bytes(patched_bytes);
-                value
-            } else {
-                unreachable!("Value to be exchanged doesn't have bytes: {:?}", value)
-            }
-        } else {
-            unreachable!(
-                "Value to be exchanged cannot be transformed to modification: {:?}",
-                value
-            );
-        }
-    }
-
-    // For each delayed field in the event, replace delayed field identifier with value.
-    fn map_id_to_values_events(
-        events: Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>>,
-        latest_view: &LatestView<T, S, X>,
-    ) -> Vec<T::Event> {
-        let mut patched_events = vec![];
-        for (event, layout) in events {
-            if let Some(layout) = layout {
-                let event_data = event.get_event_data();
-                match latest_view
-                    .replace_identifiers_with_values(&Bytes::from(event_data.to_vec()), &layout)
-                {
-                    Ok((bytes, _)) => {
-                        let mut patched_event = event;
-                        patched_event.set_event_data(bytes.to_vec());
-                        patched_events.push(patched_event);
-                    },
-                    Err(_) => unreachable!("Failed to replace identifiers with values in event"),
-                }
-            } else {
-                patched_events.push(event);
-            }
-        }
-        patched_events
     }
 
     fn materialize_aggregator_v1_delta_writes(
@@ -772,55 +632,6 @@ where
         aggregator_v1_delta_writes
     }
 
-    fn serialize_groups(
-        finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
-        txn_idx: TxnIndex,
-    ) -> Result<Vec<(T::Key, T::Value)>, PanicOr<IntentionalFallbackToSequential>> {
-        fail_point!(
-            "fail-point-resource-group-serialization",
-            !finalized_groups.is_empty(),
-            |_| Err(PanicOr::Or(
-                IntentionalFallbackToSequential::ResourceGroupSerializationError
-            ))
-        );
-
-        finalized_groups
-            .into_iter()
-            .map(|(group_key, mut metadata_op, finalized_group)| {
-                let btree: BTreeMap<T::Tag, Bytes> = finalized_group
-                    .into_iter()
-                    // TODO[agg_v2](fix): Should anything be done using the layout here?
-                    .map(|(resource_tag, arc_v)| {
-                        let bytes = arc_v
-                            .extract_raw_bytes()
-                            .expect("Deletions should already be applied");
-                        (resource_tag, bytes)
-                    })
-                    .collect();
-
-                let res = bcs::to_bytes(&btree)
-                    .map_err(|e| {
-                        PanicOr::Or(
-                            IntentionalFallbackToSequential::resource_group_serialization_error(
-                                format!("Unexpected resource group error {:?}", e),
-                                txn_idx,
-                            ),
-                        )
-                    })
-                    .map(|group_bytes| {
-                        metadata_op.set_bytes(group_bytes.into());
-                        (group_key, metadata_op)
-                    });
-
-                if res.is_err() {
-                    alert!("Failed to serialize resource group");
-                }
-
-                res
-            })
-            .collect()
-    }
-
     fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
@@ -839,38 +650,23 @@ where
             shared_counter,
         );
         let latest_view = LatestView::new(base_view, ViewState::Sync(parallel_state), txn_idx);
-        let resource_write_set = last_input_output.resource_write_set(txn_idx);
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
+        let materialized_finalized_groups =
+            map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
+        let serialized_groups = serialize_groups::<T>(materialized_finalized_groups, txn_idx)?;
 
-        let mut patched_resource_write_set =
-            Self::map_id_to_values_in_write_set(resource_write_set, &latest_view);
-
-        if let Some(reads_needing_delayed_field_exchange) =
-            last_input_output.reads_needing_delayed_field_exchange(txn_idx)
-        {
-            for (key, layout) in reads_needing_delayed_field_exchange.into_iter() {
-                if let Ok(MVDataOutput::Versioned(
-                    _,
-                    ValueWithLayout::Exchanged(value, existing_layout),
-                )) = versioned_cache.data().fetch_data(&key, txn_idx)
-                {
-                    randomly_check_layout_matches(
-                        existing_layout.as_deref(),
-                        Some(layout.as_ref()),
-                    )?;
-                    patched_resource_write_set.insert(
-                        key,
-                        Self::replace_ids_with_values(&value, layout.as_ref(), &latest_view),
-                    );
-                }
-            }
-        }
-
-        let patched_finalized_groups =
-            Self::map_id_to_values_in_group_writes(finalized_groups, &latest_view);
+        let resource_write_set = last_input_output.take_resource_write_set(txn_idx);
+        let resource_writes_to_materialize = resource_writes_to_materialize!(
+            resource_write_set,
+            last_input_output,
+            versioned_cache.data(),
+            txn_idx
+        )?;
+        let materialized_resource_write_set =
+            map_id_to_values_in_write_set(resource_writes_to_materialize, &latest_view)?;
 
         let events = last_input_output.events(txn_idx);
-        let patched_events = Self::map_id_to_values_events(events, &latest_view);
+        let materialized_events = map_id_to_values_events(events, &latest_view)?;
         let aggregator_v1_delta_writes = Self::materialize_aggregator_v1_delta_writes(
             txn_idx,
             last_input_output,
@@ -878,16 +674,14 @@ where
             base_view,
         );
 
-        let serialized_groups = Self::serialize_groups(patched_finalized_groups, txn_idx)?;
-
         last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
-            patched_resource_write_set
+            materialized_resource_write_set
                 .into_iter()
                 .chain(serialized_groups)
                 .collect(),
-            patched_events,
+            materialized_events,
         )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
             let txn_output = last_input_output.txn_output(txn_idx).unwrap();
@@ -1126,8 +920,9 @@ where
     fn apply_output_sequential(
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         output: &E::Output,
+        resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
-        for (key, (write_op, layout)) in output.resource_write_set().into_iter() {
+        for (key, write_op, layout) in resource_write_set.into_iter() {
             unsync_map.write(key, write_op, layout);
         }
 
@@ -1139,11 +934,11 @@ where
                         code_invariant_error(format!("Unexpected resource group error {:?}", e))
                     })?;
             }
-            unsync_map.write(group_key, metadata_op, None);
+            unsync_map.write(group_key, Arc::new(metadata_op), None);
         }
 
         for (key, write_op) in output.aggregator_v1_write_set().into_iter() {
-            unsync_map.write(key, write_op, None);
+            unsync_map.write(key, Arc::new(write_op), None);
         }
 
         for (key, write_op) in output.module_write_set().into_iter() {
@@ -1358,83 +1153,49 @@ where
 
                     // Apply the writes.
                     // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
-                    Self::apply_output_sequential(&unsync_map, &output)?;
+                    let resource_write_set = output.resource_write_set();
+                    Self::apply_output_sequential(
+                        &unsync_map,
+                        &output,
+                        resource_write_set.clone(),
+                    )?;
 
                     // If dynamic change set materialization part (indented for clarity/variable scope):
                     {
-                        let group_metadata_ops = output.resource_group_metadata_ops();
-                        let mut finalized_groups = Vec::with_capacity(group_metadata_ops.len());
-                        for (group_key, group_metadata_op) in group_metadata_ops.into_iter() {
-                            let finalized_group: Vec<_> =
-                                unsync_map.finalize_group(&group_key).collect();
-                            if finalized_group.is_empty() != group_metadata_op.is_deletion() {
-                                // TODO[agg_v2](fix): code invariant error if dynamic change set optimizations disabled.
-                                // TODO[agg_v2](fix): make sure this cannot be triggered by an user transaction
-                                return Err(code_invariant_error(format!(
-                                    "Group is empty = {} but op is deletion = {} in sequential execution",
-                                    finalized_group.is_empty(),
-                                    group_metadata_op.is_deletion()
-                                )).into());
-                            }
-                            finalized_groups.push((group_key, group_metadata_op, finalized_group));
-                        }
+                        let finalized_groups = groups_to_finalize!(output,)
+                            .map(|((group_key, metadata_op), is_read_needing_exchange)| {
+                                let finalized_group =
+                                    Ok(unsync_map.finalize_group(&group_key).collect());
+                                map_finalized_group::<T>(
+                                    group_key,
+                                    finalized_group,
+                                    metadata_op,
+                                    is_read_needing_exchange,
+                                )
+                            })
+                            .collect::<Result<Vec<_>, _>>()?;
+                        let materialized_finalized_groups =
+                            map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
+                        let serialized_groups =
+                            serialize_groups::<T>(materialized_finalized_groups, idx as TxnIndex)
+                                .map_err(BlockExecutionError::FallbackToSequential)?;
 
-                        for (group_key, group_metadata_op) in
-                            output.group_reads_needing_delayed_field_exchange()
-                        {
-                            let finalized_group: Vec<_> =
-                                unsync_map.finalize_group(&group_key).collect();
-                            if finalized_group.is_empty() != group_metadata_op.is_deletion() {
-                                return Err(code_invariant_error(format!(
-                                    "Group is empty = {} but op is deletion = {} in sequential execution",
-                                    finalized_group.is_empty(),
-                                    group_metadata_op.is_deletion()
-                                )).into());
-                            }
-                            finalized_groups.push((group_key, group_metadata_op, finalized_group));
-                        }
-
+                        let resource_writes_to_materialize = resource_writes_to_materialize!(
+                            resource_write_set,
+                            output,
+                            unsync_map,
+                        )?;
                         // Replace delayed field id with values in resource write set and read set.
-                        let resource_change_set = Some(output.resource_write_set());
-                        let mut patched_resource_write_set =
-                            Self::map_id_to_values_in_write_set(resource_change_set, &latest_view);
-
-                        for (key, layout) in
-                            output.reads_needing_delayed_field_exchange().into_iter()
-                        {
-                            if let Some(ValueWithLayout::Exchanged(value, _)) =
-                                unsync_map.fetch_data(&key)
-                            {
-                                if patched_resource_write_set
-                                    .insert(
-                                        key,
-                                        Self::replace_ids_with_values(
-                                            &value,
-                                            layout.as_ref(),
-                                            &latest_view,
-                                        ),
-                                    )
-                                    .is_some()
-                                {
-                                    return Err(BlockExecutionError::FallbackToSequential(code_invariant_error(
-                                        "reads_needing_delayed_field_exchange already in the write set for key",
-                                    ).into()));
-                                }
-                            }
-                        }
-
-                        let patched_finalized_groups =
-                            Self::map_id_to_values_in_group_writes(finalized_groups, &latest_view);
+                        let materialized_resource_write_set = map_id_to_values_in_write_set(
+                            resource_writes_to_materialize,
+                            &latest_view,
+                        )?;
 
                         // Replace delayed field id with values in events
-                        let patched_events = Self::map_id_to_values_events(
+                        let materialized_events = map_id_to_values_events(
                             Box::new(output.get_events().into_iter()),
                             &latest_view,
-                        );
-
-                        let serialized_groups =
-                            Self::serialize_groups(patched_finalized_groups, idx as TxnIndex)
-                                .map_err(BlockExecutionError::FallbackToSequential)?;
+                        )?;
 
                         output
                             .incorporate_materialized_txn_output(
@@ -1442,11 +1203,11 @@ where
                                 // They are already handled because we passed materialize_deltas=true
                                 // to execute_transaction.
                                 vec![],
-                                patched_resource_write_set
+                                materialized_resource_write_set
                                     .into_iter()
                                     .chain(serialized_groups.into_iter())
                                     .collect(),
-                                patched_events,
+                                materialized_events,
                             )
                             .map_err(PanicOr::from)
                             .map_err(BlockExecutionError::FallbackToSequential)?;
@@ -1526,70 +1287,65 @@ where
             )
         };
 
-        let mut resource_group_bcs_fallback = matches!(
-            ret,
-            Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-                IntentionalFallbackToSequential::ResourceGroupSerializationError
-            )))
-        );
+        if self.config.local.allow_fallback {
+            let mut resource_group_bcs_fallback = matches!(
+                ret,
+                Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                    IntentionalFallbackToSequential::ResourceGroupSerializationError
+                )))
+            );
 
-        if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
-            // Sequential execution fallback, only worth doing if we did a different pass before,
-            // i.e. parallel. This fallback does not handle resource group serialization issues.
+            if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
+                // Sequential execution fallback, only worth doing if we did a different pass before,
+                // i.e. parallel. This fallback does not handle resource group serialization issues.
 
-            if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
-                // Any error logs are already written at appropriate levels.
-                debug!("Sequential_fallback occurred");
+                if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
+                    // Any error logs are already written at appropriate levels.
+                    debug!("Sequential_fallback occurred");
 
-                // All logs from the parallel execution should be cleared and not reported.
-                // Clear by re-initializing the speculative logs.
+                    // All logs from the parallel execution should be cleared and not reported.
+                    // Clear by re-initializing the speculative logs.
+                    init_speculative_logs(signature_verified_block.len());
+
+                    ret = self.execute_transactions_sequential(
+                        executor_arguments,
+                        signature_verified_block,
+                        base_view,
+                        false,
+                    );
+                    resource_group_bcs_fallback = matches!(
+                        ret,
+                        Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
+                            IntentionalFallbackToSequential::ResourceGroupSerializationError
+                        )))
+                    );
+                }
+            }
+
+            if resource_group_bcs_fallback {
+                alert!("Resource group serialization fallback");
                 init_speculative_logs(signature_verified_block.len());
-
                 ret = self.execute_transactions_sequential(
                     executor_arguments,
                     signature_verified_block,
                     base_view,
-                    false,
-                );
-                resource_group_bcs_fallback = matches!(
-                    ret,
-                    Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-                        IntentionalFallbackToSequential::ResourceGroupSerializationError
-                    )))
+                    true,
                 );
             }
-        }
 
-        if resource_group_bcs_fallback {
-            alert!("Resource group serialization fallback");
-            init_speculative_logs(signature_verified_block.len());
-            ret = self.execute_transactions_sequential(
-                executor_arguments,
-                signature_verified_block,
-                base_view,
-                true,
-            );
-        }
-
-        // If after trying available fallbacks, we still are askign to do a fallback,
-        // something unrecoverable went wrong.
-        if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
+            // If after trying available fallbacks, we still are askign to do a fallback,
+            // something unrecoverable went wrong.
+            if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
+                // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
+                // this error often when something that should never happen goes wrong
+                panic!("Sequential execution failed with {:?}", e);
+            }
+        } else if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
             // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
             // this error often when something that should never happen goes wrong
-            panic!("Sequential execution failed with {:?}", e);
+            panic!("Fallback disabled, execution failed due to {:?}", e);
         }
 
         ret
     }
-}
-
-fn gen_id_start_value(sequential: bool) -> u32 {
-    // IDs are ephemeral. Pick a random prefix, and different each time,
-    // in case exchange is mistakenly not performed - to more easily catch it.
-    // And in a bad case where it happens in prod, to and make sure incorrect
-    // block doesn't get committed, but chain halts.
-    // (take a different range from parallel execution, to even more easily differentiate)
-
-    let offset = if sequential { 0 } else { 1000 };
-    thread_rng().gen_range(1 + offset, 1000 + offset) * 1_000_000
 }

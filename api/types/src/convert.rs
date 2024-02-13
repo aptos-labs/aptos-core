@@ -18,6 +18,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     access_path::{AccessPath, Path},
@@ -25,7 +26,7 @@ use aptos_types::{
     contract_event::{ContractEvent, EventWithVersion},
     state_store::{
         state_key::{StateKey, StateKeyInner},
-        table::TableHandle,
+        table::{TableHandle, TableInfo},
     },
     transaction::{
         EntryFunction, ExecutionStatus, ModuleBundle, Multisig, RawTransaction, Script,
@@ -62,13 +63,19 @@ const OBJECT_STRUCT: &IdentStr = ident_str!("Object");
 pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
     db: Arc<dyn DbReader>,
+    table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
 impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
-    pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
+    pub fn new(
+        inner: &'a R,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
             db,
+            table_info_reader,
         }
     }
 
@@ -422,12 +429,9 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         key: &[u8],
         value: &[u8],
     ) -> Result<Option<DecodedTableData>> {
-        if !self.db.indexer_enabled() && !self.db.indexer_async_v2_enabled() {
-            return Ok(None);
-        }
-        let table_info = match self.db.get_table_info(handle) {
-            Ok(ti) => ti,
-            Err(_) => {
+        let table_info = match self.get_table_info(handle)? {
+            Some(ti) => ti,
+            None => {
                 aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
@@ -435,6 +439,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
+
         let key = self.try_into_move_value(&table_info.key_type, key)?;
         let value = self.try_into_move_value(&table_info.value_type, value)?;
 
@@ -451,12 +456,9 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         handle: TableHandle,
         key: &[u8],
     ) -> Result<Option<DeletedTableData>> {
-        if !self.db.indexer_enabled() && !self.db.indexer_async_v2_enabled() {
-            return Ok(None);
-        }
-        let table_info = match self.db.get_table_info(handle) {
-            Ok(ti) => ti,
-            Err(_) => {
+        let table_info = match self.get_table_info(handle)? {
+            Some(ti) => ti,
+            None => {
                 aptos_logger::warn!(
                     "Table info not found for handle {:?}, can't decode table item. OK for simulation",
                     handle
@@ -464,6 +466,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                 return Ok(None); // if table item not found return None anyway to avoid crash
             },
         };
+
         let key = self.try_into_move_value(&table_info.key_type, key)?;
 
         Ok(Some(DeletedTableData {
@@ -923,6 +926,18 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             args,
         })
     }
+
+    fn get_table_info(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+        if let Some(table_info_reader) = self.table_info_reader.as_ref() {
+            // Attempt to get table_info from the table_info_reader if it exists
+            Ok(table_info_reader.get_table_info(handle)?)
+        } else if self.db.indexer_enabled() {
+            // Attempt to get table_info from the db if indexer is enabled
+            Ok(Some(self.db.get_table_info(handle)?))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
@@ -933,12 +948,20 @@ impl<'a, R: ModuleResolver + ?Sized> ExplainVMStatus for MoveConverter<'a, R> {
     }
 }
 pub trait AsConverter<R> {
-    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
+    fn as_converter(
+        &self,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> MoveConverter<R>;
 }
 
 impl<R: ModuleResolver> AsConverter<R> for R {
-    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
-        MoveConverter::new(self, db)
+    fn as_converter(
+        &self,
+        db: Arc<dyn DbReader>,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    ) -> MoveConverter<R> {
+        MoveConverter::new(self, db, table_info_reader)
     }
 }
 

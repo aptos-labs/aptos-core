@@ -20,7 +20,7 @@ use aptos_aggregator::{
 use aptos_types::{
     access_path::AccessPath,
     delayed_fields::{PanicError, SnapshotToStringFormula},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
@@ -622,7 +622,7 @@ fn test_resource_groups_squashing() {
             ExpandedVMChangeSetBuilder::new()
                 .with_group_reads_needing_delayed_field_exchange(vec![(
                     as_state_key!("1"),
-                    (modification_metadata.clone(), 400)
+                    (modification_metadata.metadata().clone(), 400)
                 )])
                 .build(),
             &MockChangeSetChecker
@@ -650,7 +650,8 @@ fn test_write_and_read_discrepancy_caught() {
         .with_reads_needing_delayed_field_exchange(vec![(
             as_state_key!("1"),
             (
-                WriteOp::legacy_modification(as_bytes!(1).into()),
+                StateValueMetadata::none(),
+                10,
                 Arc::new(MoveTypeLayout::U64)
             )
         )])
@@ -669,7 +670,7 @@ fn test_write_and_read_discrepancy_caught() {
         )])
         .with_group_reads_needing_delayed_field_exchange(vec![(
             as_state_key!("1"),
-            (metadata_op, group_size)
+            (metadata_op.metadata().clone(), group_size)
         )])
         .try_build());
 }

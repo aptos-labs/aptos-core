@@ -11,5 +11,5 @@ CurrencyInfo = "0xA550C18"
 VMReserved = "0x0"
 
 [dependencies]
-MoveStdlib = { local = "../../../../../move-stdlib" }
-MoveNursery = { local = "../../../../../move-stdlib/nursery" }
+MoveStdlib = { local = "../../../../move-stdlib" }
+MoveNursery = { local = "../../../../move-stdlib/nursery" }

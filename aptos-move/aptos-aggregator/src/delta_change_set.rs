@@ -220,7 +220,10 @@ mod test {
     };
     use aptos_types::{
         delayed_fields::PanicError,
-        state_store::{state_key::StateKey, state_value::StateValue},
+        state_store::{
+            state_key::StateKey,
+            state_value::{StateValue, StateValueMetadata},
+        },
         write_set::WriteOp,
     };
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
@@ -509,7 +512,6 @@ mod test {
         type Identifier = ();
         type ResourceGroupTag = ();
         type ResourceKey = ();
-        type ResourceValue = ();
 
         fn is_delayed_field_optimization_capable(&self) -> bool {
             unimplemented!("Irrelevant for the test")
@@ -545,7 +547,7 @@ mod test {
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
         ) -> Result<
-            BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>,
+            BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
             PanicError,
         > {
             unimplemented!("Irrelevant for the test")
@@ -555,7 +557,7 @@ mod test {
             &self,
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
-        ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
             unimplemented!("Irrelevant for the test")
         }
     }

@@ -1802,12 +1802,12 @@ mod tests {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
                 non_malleability_signature: ephem_proof_sig,
-                training_wheels_signature: EphemeralSignature::ed25519(
-                    Ed25519Signature::dummy_signature(),
-                ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
-                override_aud_val: None,
                 exp_horizon_secs: config.max_exp_horizon_secs,
+                override_aud_val: None,
+                training_wheels_signature: Some(EphemeralSignature::ed25519(
+                    Ed25519Signature::dummy_signature(),
+                )),
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,

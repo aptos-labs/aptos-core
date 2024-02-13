@@ -74,7 +74,6 @@ fn bootstrap_with_genesis(db_dir: impl AsRef<Path>, enable_storage_sharding: boo
             false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-            false, /* indexer async v2 */
         )
         .expect("DB should open."),
     );

@@ -41,7 +41,7 @@ impl AbstractResourceWriteOp {
     pub fn materialized_size(&self) -> WriteOpSize {
         use AbstractResourceWriteOp::*;
         match self {
-            Write(write) => write.into(),
+            Write(write) => write.write_op_size(),
             WriteWithDelayedFields(WriteWithDelayedFieldsOp {
                 write_op,
                 materialized_size,
@@ -85,12 +85,12 @@ impl AbstractResourceWriteOp {
             | WriteResourceGroup(GroupWrite {
                 metadata_op: write_op,
                 ..
-            })
-            | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
-                metadata_op: write_op,
-                ..
             }) => write_op.get_metadata_mut(),
-            InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp { metadata, .. }) => metadata,
+            InPlaceDelayedFieldChange(InPlaceDelayedFieldChangeOp { metadata, .. })
+            | ResourceGroupInPlaceDelayedFieldChange(ResourceGroupInPlaceDelayedFieldChangeOp {
+                metadata,
+                ..
+            }) => metadata,
         }
     }
 
@@ -98,15 +98,16 @@ impl AbstractResourceWriteOp {
         write_op: WriteOp,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
     ) -> Self {
-        if let Some(layout) = maybe_layout {
-            let materialized_size = WriteOpSize::from(&write_op).write_len();
-            Self::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
-                write_op,
-                layout,
-                materialized_size,
-            })
-        } else {
-            Self::Write(write_op)
+        match maybe_layout {
+            Some(layout) => {
+                let materialized_size = write_op.write_op_size().write_len();
+                Self::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
+                    write_op,
+                    layout,
+                    materialized_size,
+                })
+            },
+            None => Self::Write(write_op),
         }
     }
 }
@@ -180,6 +181,8 @@ impl GroupWrite {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
+/// Note that write_op can be a Deletion, as long as the Move type layout contains
+/// a delayed field. This simplifies squashing session outputs, in particular.
 pub struct WriteWithDelayedFieldsOp {
     pub write_op: WriteOp,
     pub layout: Arc<MoveTypeLayout>,
@@ -204,6 +207,6 @@ pub struct InPlaceDelayedFieldChangeOp {
 /// If future implementation needs those - they can be added.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct ResourceGroupInPlaceDelayedFieldChangeOp {
-    pub metadata_op: WriteOp,
     pub materialized_size: u64,
+    pub metadata: StateValueMetadata,
 }
