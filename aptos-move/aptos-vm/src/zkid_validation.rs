@@ -107,6 +107,9 @@ pub fn validate_zkid_authenticators(
         return Ok(());
     }
 
+    println!("hihi");
+    println!("1");
+
     let config = &get_configs_onchain(resolver)?;
 
     if authenticators.len() > config.max_zkid_signatures_per_txn as usize {
@@ -120,12 +123,14 @@ pub fn validate_zkid_authenticators(
             .verify_expiry(&onchain_timestamp_obj)
             .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
     }
+    println!("2");
 
     let patched_jwks = get_jwks_onchain(resolver)?;
     let pvk = &get_groth16_vk_onchain(resolver)?
         .try_into()
         .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
+    println!("3");
     let training_wheels_pk = match &config.training_wheels_pubkey {
         None => None,
         Some(bytes) => Some(EphemeralPublicKey::ed25519(
