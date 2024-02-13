@@ -49,9 +49,9 @@ async fn enable_feature_0() {
     let client = aptos_rest_client::Client::new(client_endpoint.clone());
 
     swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(epoch_duration_secs * 2))
+        .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))
         .await
-        .expect("Waited too long for epoch 2.");
+        .expect("Waited too long for epoch 3.");
     debug!("Enabling the feature.");
     let enable_dkg_script = r#"
 script {
@@ -71,11 +71,11 @@ script {
     debug!("enabling_dkg_summary={:?}", txn_summary);
 
     swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))
+        .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
         .await
-        .expect("Waited too long for epoch 3.");
+        .expect("Waited too long for epoch 4.");
 
-    info!("Now in epoch 3. There should be no DKG result since vtxn has not been enabled. Enabling vtxn in ConsensusConfig.");
+    info!("Now in epoch 4. There should be no DKG result since vtxn has not been enabled. Enabling vtxn in ConsensusConfig.");
     let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
     let config_bytes = bcs::to_bytes(&config).unwrap();
@@ -100,13 +100,13 @@ script {{
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(
-            4,
+            5,
             Duration::from_secs(epoch_duration_secs * 2),
         )
         .await
-        .expect("Waited too long for epoch 4.");
+        .expect("Waited too long for epoch 5.");
 
-    info!("Now in epoch 4. Both DKG and vtxn are enabled. There should be no randomness since DKG did not happen at the end of last epoch.");
+    info!("Now in epoch 5. Both DKG and vtxn are enabled. There should be no randomness since DKG did not happen at the end of last epoch.");
     let maybe_last_complete = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed;
@@ -114,19 +114,19 @@ script {{
         maybe_last_complete.is_none() || maybe_last_complete.as_ref().unwrap().target_epoch() != 4
     );
 
-    info!("Waiting for epoch 5.");
+    info!("Waiting for epoch 6.");
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(
-            5,
+            6,
             Duration::from_secs(epoch_duration_secs + estimated_dkg_latency_secs),
         )
         .await
-        .expect("Waited too long for epoch 5.");
+        .expect("Waited too long for epoch 6.");
 
     let dkg_session = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed
-        .expect("dkg result for epoch 5 should be present");
+        .expect("dkg result for epoch 6 should be present");
     assert_eq!(5, dkg_session.target_epoch());
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
 }
