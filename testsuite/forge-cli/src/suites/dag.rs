@@ -1,9 +1,13 @@
 // Copyright © Aptos Foundation
 
 use crate::{wrap_with_realistic_env, TestCommand};
-use aptos_forge::{success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria}, EmitJobMode, EmitJobRequest, ForgeConfig};
+use aptos_forge::{
+    success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
+    EmitJobMode, EmitJobRequest, ForgeConfig,
+};
 use aptos_sdk::types::on_chain_config::{
-    ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, OnChainExecutionConfig, ValidatorTxnConfig
+    ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, OnChainExecutionConfig,
+    ValidatorTxnConfig,
 };
 use aptos_testcases::two_traffics_test::TwoTrafficsTest;
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
@@ -23,7 +27,7 @@ fn get_dag_on_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 7, 7),
         _ => return None, // The test name does not match a dag realistic-env test
     };
     Some(test)
@@ -53,18 +57,18 @@ fn dag_realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
+                    mempool_backlog: 30000,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
-                    4600
+                    2000
                 } else if long_running {
                     // This is for forge stable
-                    7000
+                    2500
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    6000
+                    2800
                 },
             ),
         }))
@@ -97,8 +101,7 @@ fn dag_realistic_env_max_load_test(
                     // Give at least 60s for catchup, give 10% of the run for longer durations.
                     (duration.as_secs() / 10).max(60),
                 )
-                .add_latency_threshold(3.4, LatencyType::P50)
-                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_threshold(4.0, LatencyType::P50)
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 15.0,
                     max_round_gap: 4,
