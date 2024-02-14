@@ -576,6 +576,7 @@ pub fn convert_multi_key_signature(sig: &MultiKeySignature) -> transaction::Mult
     }
 }
 
+#[allow(deprecated)]
 fn convert_signature(signature: &Signature) -> transaction::AnySignature {
     match signature {
         Signature::Ed25519(s) => transaction::AnySignature {
@@ -602,7 +603,7 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
         Signature::ZkId(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Zkid as i32,
             signature: s.0.clone(),
-            signature_variant: Some(any_signature::SignatureVariant::ZkId(ZkId {
+            signature_variant: Some(any_signature::SignatureVariant::Zkid(ZkId {
                 signature: s.0.clone(),
             })),
         },
