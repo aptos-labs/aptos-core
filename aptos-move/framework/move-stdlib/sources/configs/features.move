@@ -393,7 +393,7 @@ module std::features {
     }
 
     /// Whether deploying to objects is enabled.
-    const OBJECT_CODE_DEPLOYMENT: u64 = 51;
+    const OBJECT_CODE_DEPLOYMENT: u64 = 52;
     public fun is_object_code_deployment_enabled(): bool acquires Features {
         is_enabled(OBJECT_CODE_DEPLOYMENT)
     }

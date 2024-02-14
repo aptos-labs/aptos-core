@@ -58,7 +58,8 @@ pub enum FeatureFlag {
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
-    OBJECT_CODE_DEPLOYMENT = 51,
+    REFUNDABLE_BYTES = 51,
+    OBJECT_CODE_DEPLOYMENT = 52,
 }
 
 /// Representation of features on chain as a bitset.
@@ -83,6 +84,8 @@ impl Default for Features {
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
         features.enable(BN254_STRUCTURES);
+        features.enable(REFUNDABLE_BYTES);
+
         features
     }
 }
@@ -180,5 +183,9 @@ impl Features {
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
+    }
+
+    pub fn is_refundable_bytes_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
 }

@@ -1949,6 +1949,7 @@ dependencies = [
  "move-core-types",
  "move-vm-types",
  "paste",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -7186,6 +7187,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-types",
  "bcs 0.1.4",
  "claims",
  "hex",

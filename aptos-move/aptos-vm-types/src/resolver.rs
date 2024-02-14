@@ -54,6 +54,11 @@ pub trait TResourceView {
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
     }
 
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
+        self.get_resource_state_value(state_key, None)
+            .map(|maybe_state_value| maybe_state_value.map(|state_value| state_value.size() as u64))
+    }
+
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         // For existence, layouts are not important.
         self.get_resource_state_value(state_key, None)
@@ -158,6 +163,11 @@ pub trait TModuleView {
     ) -> PartialVMResult<Option<StateValueMetadata>> {
         let maybe_state_value = self.get_module_state_value(state_key)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
+    }
+
+    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
+        let maybe_state_value = self.get_module_state_value(state_key)?;
+        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
     }
 
     fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {

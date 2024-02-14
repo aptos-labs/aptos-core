@@ -457,6 +457,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::ZK_ID_SIGNATURES,
         FeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
         FeatureFlag::JWK_CONSENSUS,
+        FeatureFlag::REFUNDABLE_BYTES,
         FeatureFlag::OBJECT_CODE_DEPLOYMENT,
     ]
 }

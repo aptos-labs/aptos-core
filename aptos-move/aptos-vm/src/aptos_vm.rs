@@ -174,14 +174,14 @@ impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
+        let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
             gas_params,
             storage_gas_params,
             native_gas_params,
             misc_gas_params,
             gas_feature_version,
-        ) = get_gas_parameters(resolver);
-        let features = Features::fetch_config(resolver).unwrap_or_default();
+        ) = get_gas_parameters(&features, resolver);
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -521,7 +521,8 @@ impl AptosVM {
                 })?;
 
             let mut change_set = session.finish(change_set_configs)?;
-            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data) {
+            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)
+            {
                 info!(
                     *log_context,
                     "Failed during charge_change_set: {:?}. Most likely exceded gas limited.", err,
@@ -539,7 +540,11 @@ impl AptosVM {
             let storage_refund = fee_statement.storage_fee_refund();
 
             let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-            let expected = u64::from(gas_params.vm.txn.storage_fee_per_state_slot_create);
+            let expected = u64::from(
+                gas_meter
+                    .disk_space_pricing()
+                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+            );
             // With the current gas schedule actual is expected to be 50_000 or higher, the cost
             // for the account slot.
             if actual < expected {
@@ -767,6 +772,7 @@ impl AptosVM {
         change_set: &mut VMChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
+        resolver: &impl AptosMoveResolver,
     ) -> Result<GasQuantity<Octa>, VMStatus> {
         for (key, op_size) in change_set.write_set_size_iter() {
             gas_meter.charge_io_gas_for_write(key, &op_size)?;
@@ -776,6 +782,7 @@ impl AptosVM {
             change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
+            resolver.as_executor_view(),
         )?;
         if !self.features.is_storage_deletion_refund_enabled() {
             storage_refund = 0.into();
@@ -793,7 +800,8 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let mut change_set = session.finish(change_set_configs)?;
-        let storage_refund = self.charge_change_set(&mut change_set, gas_meter, txn_data)?;
+        let storage_refund =
+            self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
 
         // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
