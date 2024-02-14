@@ -2,6 +2,7 @@
 
 use crate::{
     changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand,
+    SYSTEM_12_CORES_10GB_THRESHOLD,
 };
 use aptos_forge::{
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
@@ -13,6 +14,7 @@ use aptos_sdk::types::on_chain_config::{
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
+    dag_onchain_enable_test::DagOnChainEnableTest, two_traffics_test::TwoTrafficsTest,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
@@ -33,6 +35,7 @@ fn get_dag_on_realistic_env_test(
     let test = match test_name {
         "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 7, 7),
         "dag_changing_working_quorum_test" => dag_changing_working_quorum_test(),
+        "dag_reconfig_enable_test" => dag_reconfig_enable_test(),
         _ => return None, // The test name does not match a dag realistic-env test
     };
     Some(test)
@@ -154,4 +157,20 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
     }))
 }
 
+fn dag_reconfig_enable_test() -> ForgeConfig {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
+        .add_network_test(DagOnChainEnableTest {})
+        .with_success_criteria(
+            SuccessCriteria::new(1000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
+}
 
