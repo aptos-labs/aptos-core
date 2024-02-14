@@ -50,6 +50,5 @@ impl MoveStructType for NewEpochEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewEpochEvent");
 }
 
-pub static NEW_EPOCH_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| {
-    TypeTag::Struct(Box::new(NewEpochEvent::struct_tag()))
-});
+pub static NEW_EPOCH_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(NewEpochEvent::struct_tag())));

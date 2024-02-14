@@ -20,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
-    str::FromStr,
 };
 
 pub mod jwk;
@@ -222,6 +221,5 @@ impl MoveStructType for ObservedJWKsUpdated {
     const STRUCT_NAME: &'static IdentStr = ident_str!("ObservedJWKsUpdated");
 }
 
-pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| {
-    TypeTag::Struct(Box::new(ObservedJWKsUpdated::struct_tag()))
-});
+pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(ObservedJWKsUpdated::struct_tag())));

@@ -14,7 +14,7 @@ use move_core_types::{
 use once_cell::sync::Lazy;
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fmt::Debug, str::FromStr};
+use std::{collections::BTreeSet, fmt::Debug};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {
@@ -33,9 +33,8 @@ impl MoveStructType for DKGStartEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
 }
 
-pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| {
-    TypeTag::Struct(Box::new(DKGStartEvent::struct_tag()))
-});
+pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(DKGStartEvent::struct_tag())));
 
 /// DKG transcript and its metadata.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
