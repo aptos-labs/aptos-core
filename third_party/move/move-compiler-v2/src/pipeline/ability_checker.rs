@@ -81,6 +81,8 @@ fn check_drop_for_temp_with_msg(
 
 /// If temporary variable `t` does not have ability `drop`, generates an error,
 /// unless the state before `code_offset` won't return.
+/// Drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
 fn cond_check_drop_for_temp_with_msg(
     func_target: &FunctionTarget,
     code_offset: CodeOffset,
@@ -89,7 +91,7 @@ fn cond_check_drop_for_temp_with_msg(
     err_msg: &str,
 ) {
     let abort_state = get_abort_state_at(func_target, code_offset);
-    if abort_state.before.may_return() {
+    if abort_state.after.may_return() {
         check_drop_for_temp_with_msg(func_target, t, loc, err_msg)
     }
 }
@@ -101,7 +103,7 @@ fn cond_check_drop_for_temp_with_msg(
 fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         let abort_state = get_abort_state_at(target, code_offset);
-        if abort_state.before.may_return() {
+        if abort_state.after.may_return() {
             check_drop(target, ty, loc, "write_ref: cannot drop")
         }
     } else {
