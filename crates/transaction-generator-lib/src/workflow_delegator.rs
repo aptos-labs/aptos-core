@@ -416,6 +416,7 @@ impl WorkflowTxnGeneratorCreator {
                 let pool_per_stage = if create_accounts {
                     vec![
                         created_pool,
+                        Arc::new(ObjectPool::new()),
                         register_market_accounts_pool,
                         deposit_coins_pool,
                         place_orders_pool,
@@ -423,6 +424,7 @@ impl WorkflowTxnGeneratorCreator {
                 } else {
                     vec![
                         // TODO: As there is no pool for register_market_worker, didn't add a pool here. Is that an issue?
+                        Arc::new(ObjectPool::new()),
                         register_market_accounts_pool,
                         deposit_coins_pool,
                         place_orders_pool,
