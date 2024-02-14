@@ -28,7 +28,7 @@ use std::{collections::BTreeMap, fmt::Display};
 /// - the top element is { Return, Abort }: may return, abort, or not terminate
 /// - { Return }: may return or not terminate, but definitely does not abort
 /// - { Abort }: may abort or not terminate, but definitely does not return
-/// - the bot element is {}: don't terminate
+/// - the bottom element is {}: don't terminate
 ///
 /// That is, if at a program point the abstract state is `s`, then for all paths from that point,
 /// the program can only exit in the exit states contained in `s`, if the program does terminate.

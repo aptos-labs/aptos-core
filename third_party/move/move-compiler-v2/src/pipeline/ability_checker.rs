@@ -68,7 +68,7 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
 /// Checks drop ability for the given type;
 /// generates an error, unless the state after `code_offset` won't return.
 /// Drop ability must only be enforced if there is an execution path from this code offset
-/// that returns. It's legit in Move to do not drop after an abort or infinite loop.
+/// that returns. It's legit in Move to not drop in code definitely not leading to a return.
 pub fn cond_check_drop(
     func_target: &FunctionTarget,
     code_offset: CodeOffset,
@@ -85,7 +85,7 @@ pub fn cond_check_drop(
 /// If temporary variable `t` does not have ability `drop`, generates an error,
 /// unless the state after `code_offset` won't return.
 /// Drop ability must only be enforced if there is an execution path from this code offset
-/// that returns. It's legit in Move to do not drop after an abort or infinite loop.
+/// that returns. It's legit in Move to not drop in code definitely not leading to a return.
 fn cond_check_drop_for_temp_with_msg(
     func_target: &FunctionTarget,
     code_offset: CodeOffset,
@@ -100,7 +100,7 @@ fn cond_check_drop_for_temp_with_msg(
 /// `t` is the local containing the reference being written to
 /// `code_offset` is the code offset of the WriteRef instruction.
 /// Drop ability must only be enforced if there is an execution path from this code offset
-/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
+/// that returns. It's legit in Move to not drop in code definitely not leading to a return.
 fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
         cond_check_drop(target, code_offset, ty, loc, "write_ref: cannot drop")
@@ -227,8 +227,8 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
             match kind {
                 AssignKind::Copy | AssignKind::Store => {
                     check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
-                    // dst is not dropped in advance in this case, since it's read by src
                     if *dst == *src {
+                        // dst is not dropped in advance in this case, since it's read by src
                         cond_check_drop_for_temp_with_msg(
                             target,
                             code_offset,
@@ -288,7 +288,7 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
     }
 }
 
-fn get_abort_state<'a>(target: &'a FunctionTarget<'a>) -> &'a ExitStateAnnotation {
+fn get_exit_state<'a>(target: &'a FunctionTarget<'a>) -> &'a ExitStateAnnotation {
     target
         .get_annotations()
         .get::<ExitStateAnnotation>()
@@ -299,7 +299,7 @@ fn get_exit_state_at<'a>(
     target: &'a FunctionTarget<'a>,
     code_offset: CodeOffset,
 ) -> &'a ExitStateAtCodeOffset {
-    get_abort_state(target)
+    get_exit_state(target)
         .get_annotation_at(code_offset)
         .expect("abort state")
 }
