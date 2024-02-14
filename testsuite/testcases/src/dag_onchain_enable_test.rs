@@ -68,7 +68,7 @@ impl NetworkLoadTest for DagOnChainEnableTest {
             )
             .unwrap();
 
-            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V2(_)));
+            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V3 { .. }));
 
             // Change to V2
             let new_consensus_config = OnChainConsensusConfig::V3 {
