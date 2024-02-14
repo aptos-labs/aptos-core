@@ -67,3 +67,13 @@ proposals:
       - FeatureFlag:
           enabled:
             - webauthn_signature
+  - name: step_6_object_code_deployment
+    metadata:
+      title: "AIP-54: Object Code Deployment"
+      description: "AIP-54: Introduces a method to deploy code to objects, allowing more modular and resource efficient development."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/259"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - object_code_deployment
