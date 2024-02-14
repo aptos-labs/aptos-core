@@ -589,9 +589,11 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
         Signature::Secp256k1Ecdsa(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Secp256k1Ecdsa as i32,
             signature: s.0.clone(),
-            signature_variant: Some(any_signature::SignatureVariant::Secp256k1Ecdsa(Secp256k1Ecdsa {
-                signature: s.0.clone(),
-            })),
+            signature_variant: Some(any_signature::SignatureVariant::Secp256k1Ecdsa(
+                Secp256k1Ecdsa {
+                    signature: s.0.clone(),
+                },
+            )),
         },
         Signature::WebAuthn(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Webauthn as i32,
