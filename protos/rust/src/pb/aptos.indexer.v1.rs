@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // @generated
 /// This is for storage only.
 #[allow(clippy::derive_partial_eq_without_eq)]

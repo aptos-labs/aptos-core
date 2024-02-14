@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // @generated
 /// Generated client implementations.
 pub mod fullnode_data_client {

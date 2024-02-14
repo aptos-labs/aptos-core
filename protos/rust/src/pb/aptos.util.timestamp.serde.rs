@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // @generated
 impl serde::Serialize for Timestamp {
     #[allow(deprecated)]
@@ -88,7 +90,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                             if seconds__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("seconds"));
                             }
-                            seconds__ = 
+                            seconds__ =
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }
@@ -96,7 +98,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                             if nanos__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("nanos"));
                             }
-                            nanos__ = 
+                            nanos__ =
                                 Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
                             ;
                         }

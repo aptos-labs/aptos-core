@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // @generated
 /// Generated client implementations.
 pub mod network_message_service_client {

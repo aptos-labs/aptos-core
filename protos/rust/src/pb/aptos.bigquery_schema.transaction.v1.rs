@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // @generated
 /// Transaction is a simplified representation for the transaction
 /// happened on the chain. Mainly built for streaming into BigQuery.
