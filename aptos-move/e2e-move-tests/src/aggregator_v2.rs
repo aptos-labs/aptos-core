@@ -237,6 +237,26 @@ impl AggV2TestHarness {
         )
     }
 
+    pub fn delete(
+        &mut self,
+        account: Option<&Account>,
+        use_type: UseType,
+        element_type: ElementType,
+        struct_type: StructType,
+    ) -> SignedTransaction {
+        self.harness.create_entry_function(
+            account.unwrap_or(&self.account),
+            str::parse(match struct_type {
+                StructType::Aggregator => "0x1::aggregator_v2_test::delete_aggregator",
+                StructType::Snapshot => "0x1::aggregator_v2_test::delete_snapshot",
+                StructType::DerivedString => "0x1::aggregator_v2_test::delete_derived_string",
+            })
+            .unwrap(),
+            vec![element_type.get_type_tag()],
+            vec![bcs::to_bytes(&(use_type as u32)).unwrap()],
+        )
+    }
+
     pub fn republish(&mut self) -> SignedTransaction {
         self.harness
             .create_publish_package_cache_building(&self.account, &self.path, |_| {})
@@ -330,6 +350,10 @@ impl AggV2TestHarness {
 
     pub fn add_sub(&mut self, agg_loc: &AggregatorLocation, a: u128, b: u128) -> SignedTransaction {
         self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_sub", agg_loc, &[a, b])
+    }
+
+    pub fn add_delete(&mut self, agg_loc: &AggregatorLocation, value: u128) -> SignedTransaction {
+        self.create_entry_agg_func_with_args("0x1::aggregator_v2_test::add_delete", agg_loc, &[value])
     }
 
     pub fn materialize(&mut self, agg_loc: &AggregatorLocation) -> SignedTransaction {
