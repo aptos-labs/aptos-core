@@ -180,7 +180,8 @@ impl MetadataBackend for AptosDBBackend {
                     self.get_from_db_result(target_epoch, target_round, &events, hit_end)
                 },
                 Err(e) => {
-                    error!(
+                    // fails if requested events were pruned / or we never backfil them.
+                    warn!(
                         error = ?e, "[leader reputation] Fail to refresh window",
                     );
                     (vec![], HashValue::zero())

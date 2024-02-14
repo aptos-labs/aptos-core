@@ -484,10 +484,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     end_epoch: different_epoch,
                 };
                 let msg = ConsensusMsg::EpochRetrievalRequest(Box::new(request));
-                self.network_sender.send_to(peer_id, msg).context(format!(
-                    "[EpochManager] Failed to send epoch retrieval to {}",
-                    peer_id
-                ))
+                if let Err(err) = self.network_sender.send_to(peer_id, msg) {
+                    warn!(
+                        "[EpochManager] Failed to send epoch retrieval to {}, {:?}",
+                        peer_id, err
+                    );
+                    counters::EPOCH_MANAGER_ISSUES_DETAILS
+                        .with_label_values(&["failed_to_send_epoch_retrieval"])
+                        .inc();
+                }
+
+                Ok(())
             },
             Ordering::Equal => {
                 bail!("[EpochManager] Same epoch should not come to process_different_epoch");
@@ -1287,7 +1294,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         msg_epoch,
                         self.epoch()
                     );
-                    counters::EPOCH_PROOF_WRONG_EPOCH.inc();
+                    counters::EPOCH_MANAGER_ISSUES_DETAILS
+                        .with_label_values(&["epoch_proof_wrong_epoch"])
+                        .inc();
                 }
             },
             ConsensusMsg::EpochRetrievalRequest(request) => {
@@ -1430,7 +1439,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 if let Some(tx) = &self.buffer_manager_msg_tx {
                     tx.push(peer_id, request)
                 } else {
-                    Err(anyhow::anyhow!("Buffer manager not started"))
+                    counters::EPOCH_MANAGER_ISSUES_DETAILS
+                        .with_label_values(&["buffer_manager_not_started"])
+                        .inc();
+                    warn!("Buffer manager not started");
+                    Ok(())
                 }
             },
             IncomingRpcRequest::RandGenRequest(_) => Ok(()),
