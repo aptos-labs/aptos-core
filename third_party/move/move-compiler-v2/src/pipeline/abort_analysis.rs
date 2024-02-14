@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Computes at a given program point, how the program may exit later.
-//! Does the program returns, aborts, or doesn't terminate?
+//! Computes at a given program point, how the function may exit later.
+//! Does the function return, abort, or doesn't terminate?
 //! Check documentation of `ExitState` for more on the abstract domain used in the analysis.
 //! The analysis is intraprocedural, and considers any user function may abort.
 //!
@@ -26,11 +26,11 @@ use std::{collections::BTreeMap, fmt::Display};
 ///
 /// - the join operation is set union
 /// - the top element is { Return, Abort }: may return, abort, or not terminate
-/// - { Return }: may return or not terminate
-/// - { Abort }: may abort or not terminate
+/// - { Return }: may return or not terminate, but definitely does not abort
+/// - { Abort }: may abort or not terminate, but definitely does not return
 /// - the bot element is {}: don't terminate
 ///
-/// That is, if at a program point the abstract state is `s`, then from that point,
+/// That is, if at a program point the abstract state is `s`, then for all paths from that point,
 /// the program can only exit in the exit states contained in `s`, if the program does terminate.
 #[derive(AbstractDomain, Clone)]
 pub struct ExitState(SetDomain<ExitStatus>);
