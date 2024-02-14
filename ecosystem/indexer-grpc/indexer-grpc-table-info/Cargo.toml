@@ -30,6 +30,7 @@ serde_json = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
 tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 

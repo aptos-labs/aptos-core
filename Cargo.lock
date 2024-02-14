@@ -2343,6 +2343,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-stream",
+ "tokio-util 0.7.10",
  "tonic 0.10.2",
  "tonic-reflection",
 ]
