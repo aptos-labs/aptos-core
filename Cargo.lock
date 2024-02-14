@@ -254,7 +254,7 @@ dependencies = [
  "aptos-move-debugger",
  "aptos-network-checker",
  "aptos-node",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -2060,7 +2060,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-runtimes",
  "async-trait",
  "backoff",
@@ -2088,7 +2088,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "async-trait",
  "backoff",
  "backtrace",
@@ -2133,7 +2133,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-runtimes",
  "async-trait",
  "base64 0.13.1",
@@ -2162,7 +2162,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-runtimes",
  "async-trait",
  "base64 0.13.1",
@@ -2204,7 +2204,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf)",
  "aptos-proptest-helpers",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-runtimes",
  "aptos-sdk",
  "aptos-secure-storage",
@@ -2250,7 +2250,7 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-inspection-service",
  "aptos-logger",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-runtimes",
  "aptos-transaction-emitter-lib",
  "aptos-transaction-generator-lib",
@@ -2318,7 +2318,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-rocksdb-options",
  "aptos-runtimes",
  "aptos-schemadb",
@@ -2347,7 +2347,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "async-trait",
  "backoff",
  "backtrace",
@@ -3276,6 +3276,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.1.2"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c#af0dcea7144225a709e4f595e58f8026b99e901c"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3287,8 +3288,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.2"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c#af0dcea7144225a709e4f595e58f8026b99e901c"
+version = "1.1.3"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3617,7 +3617,7 @@ dependencies = [
  "aptos-config",
  "aptos-logger",
  "aptos-metrics-core",
- "aptos-protos 1.1.2",
+ "aptos-protos 1.1.3",
  "aptos-retrier",
  "bcs 0.1.4",
  "crossbeam-channel",
@@ -12922,7 +12922,7 @@ source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=684
 dependencies = [
  "anyhow",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=68424a2b721cbd4a6b8c1e7c951f5d4f665473d3)",
- "aptos-protos 1.1.2 (git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c)",
+ "aptos-protos 1.1.2",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",

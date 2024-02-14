@@ -1,5 +1,3 @@
-// Copyright © Aptos Foundation
-
 // @generated
 pub mod aptos {
     pub mod bigquery_schema {
