@@ -32,6 +32,8 @@ pub fn has_ability(target: &FunctionTarget, ty: &Type, ability: Ability) -> bool
 }
 
 /// Checks if the given type has the given ability, and add diagnostics if not.
+/// Note that drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
 fn check_ability(target: &FunctionTarget, ty: &Type, ability: Ability, loc: &Loc, err_msg: &str) {
     if !has_ability(target, ty, ability) {
         target.global_env().error(loc, err_msg)
@@ -63,20 +65,15 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     }
 }
 
-/// Checks if the given type has constraint drop, and add diagnostics if not.
-fn check_drop(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-    check_ability(func_target, ty, Ability::Drop, loc, err_msg)
-}
-
-/// Checks if the given temporary variable has constraint drop, and add diagnostics if not.
-fn check_drop_for_temp_with_msg(
-    func_target: &FunctionTarget,
-    t: TempIndex,
-    loc: &Loc,
-    err_msg: &str,
-) {
-    let ty = func_target.get_local_type(t);
-    check_drop(func_target, ty, loc, err_msg)
+/// Checks drop ability for the given type;
+/// generates an error, unless the state before `code_offset` won't return.
+/// Drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
+pub fn cond_check_drop(func_target: &FunctionTarget, code_offset: CodeOffset, ty: &Type, loc: &Loc, err_msg: &str) {
+    let abort_state = get_abort_state_at(func_target, code_offset);
+    if abort_state.after.may_return() {
+        check_ability(func_target, ty, Ability::Drop, loc, err_msg)
+    }
 }
 
 /// If temporary variable `t` does not have ability `drop`, generates an error,
@@ -90,10 +87,8 @@ fn cond_check_drop_for_temp_with_msg(
     loc: &Loc,
     err_msg: &str,
 ) {
-    let abort_state = get_abort_state_at(func_target, code_offset);
-    if abort_state.after.may_return() {
-        check_drop_for_temp_with_msg(func_target, t, loc, err_msg)
-    }
+    let ty = func_target.get_local_type(t);
+    cond_check_drop(func_target, code_offset, ty, loc, err_msg)
 }
 
 /// `t` is the local containing the reference being written to
@@ -102,10 +97,7 @@ fn cond_check_drop_for_temp_with_msg(
 /// that returns. It's legit in Move to do not drop before an abort or infinite loop.
 fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
-        let abort_state = get_abort_state_at(target, code_offset);
-        if abort_state.after.may_return() {
-            check_drop(target, ty, loc, "write_ref: cannot drop")
-        }
+        cond_check_drop(target, code_offset, ty, loc, "write_ref: cannot drop")
     } else {
         panic!("ICE ability checker: write_ref has non-reference destination")
     }
