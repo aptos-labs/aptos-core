@@ -13,6 +13,8 @@ Reconfiguration, and may be updated by root.
 -  [Function `set`](#0x1_consensus_config_set)
 -  [Function `set_for_next_epoch`](#0x1_consensus_config_set_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_consensus_config_on_new_epoch)
+-  [Function `validator_txn_enabled`](#0x1_consensus_config_validator_txn_enabled)
+-  [Function `validator_txn_enabled_internal`](#0x1_consensus_config_validator_txn_enabled_internal)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -179,6 +181,53 @@ See <code>aptos_framework::aptos_governance::reconfigure()</code> for more detai
         *<b>borrow_global_mut</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework) = <a href="config_buffer.md#0x1_config_buffer_extract">config_buffer::extract</a>();
     }
 }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_consensus_config_validator_txn_enabled"></a>
+
+## Function `validator_txn_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled">validator_txn_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled">validator_txn_enabled</a>(): bool <b>acquires</b> <a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a> {
+    <b>let</b> config_bytes = <b>borrow_global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework).config;
+    <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled_internal">validator_txn_enabled_internal</a>(config_bytes)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_consensus_config_validator_txn_enabled_internal"></a>
+
+## Function `validator_txn_enabled_internal`
+
+
+
+<pre><code><b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled_internal">validator_txn_enabled_internal</a>(config_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled_internal">validator_txn_enabled_internal</a>(config_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
 </code></pre>
 
 
