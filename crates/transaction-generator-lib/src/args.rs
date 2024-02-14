@@ -58,7 +58,9 @@ pub enum TransactionTypeArg {
     SmartTablePicture30KWith200Change,
     SmartTablePicture1MWith1KChange,
     SmartTablePicture1BWith1KChange,
-    Econia,
+    EconiaBasic1Market,
+    EconiaAdvanced1Market,
+    EconiaAdvanced10Market,
 }
 
 impl TransactionTypeArg {
@@ -378,12 +380,31 @@ impl TransactionTypeArg {
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::Econia => TransactionType::Workflow {
+            TransactionTypeArg::EconiaBasic1Market => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 100000,
+                    flow_type: crate::EconiaFlowType::Basic,
+                    num_markets: 1,
+                },
+                progress_type: WorkflowProgress::MoveByPhases,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EconiaAdvanced1Market => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
                     num_users: 100000,
                     flow_type: crate::EconiaFlowType::Advanced,
-                    num_limit_orders_per_market: 100,
                     num_markets: 1,
+                },
+                progress_type: WorkflowProgress::MoveByPhases,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EconiaAdvanced20Market => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 100000,
+                    flow_type: crate::EconiaFlowType::Advanced,
+                    num_markets: 20,
                 },
                 progress_type: WorkflowProgress::MoveByPhases,
                 num_modules: module_working_set_size,

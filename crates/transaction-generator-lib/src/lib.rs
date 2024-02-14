@@ -101,10 +101,7 @@ pub enum WorkflowKind {
     Econia {
         num_users: usize,
         flow_type: EconiaFlowType,
-        // Places `num_limit_orders_per_market` bid limit orders and
-        // `num_limit_orders_per_market` ask limit orders
-        num_limit_orders_per_market: usize,
-        num_markets: usize
+        num_markets: u64
     },
 }
 

@@ -83,12 +83,11 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
-        num_to_create: usize,
+        _num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut all_requests = Vec::with_capacity(num_to_create);
+        let mut all_requests = Vec::with_capacity(self.packages.len());
 
-        for _ in 0..num_to_create {
-            let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+        for (package, publisher) in self.packages.iter() {
             let mut requests = (self.txn_generator)(
                 account,
                 package,
@@ -97,10 +96,21 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
                 &mut self.rng,
             );
             all_requests.append(&mut requests);
-            // if let Some(request) = request {
-            //     all_requests.push(request);
-            // }
         }
+        // for _ in 0..num_to_create {
+        //     let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+        //     let mut requests = (self.txn_generator)(
+        //         account,
+        //         package,
+        //         publisher,
+        //         &self.txn_factory,
+        //         &mut self.rng,
+        //     );
+        //     all_requests.append(&mut requests);
+        //     // if let Some(request) = request {
+        //     //     all_requests.push(request);
+        //     // }
+        // }
         all_requests
     }
 }
