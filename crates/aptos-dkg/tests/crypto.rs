@@ -8,6 +8,7 @@ use aptos_dkg::{
         multi_pairing, parallel_multi_pairing,
         random::{random_g1_point, random_g2_point, random_scalar, random_scalars},
     },
+    weighted_vuf::pinkas::MIN_MULTIPAIR_NUM_JOBS,
 };
 use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Scalar};
@@ -190,8 +191,8 @@ fn test_parallel_multi_pairing() {
         (r1, [G2Projective::identity(), r2[0]]),
     ] {
         let res1 = multi_pairing(g1.iter(), g2.iter());
-        let res2 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool1);
-        let res3 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool32);
+        let res2 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool1, MIN_MULTIPAIR_NUM_JOBS);
+        let res3 = parallel_multi_pairing(g1.iter(), g2.iter(), &pool32, MIN_MULTIPAIR_NUM_JOBS);
 
         assert_eq!(res1, res2);
         assert_eq!(res1, res3);

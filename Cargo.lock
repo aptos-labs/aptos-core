@@ -1271,6 +1271,7 @@ dependencies = [
  "num-bigint 0.3.3",
  "num-integer",
  "num-traits",
+ "num_cpus",
  "once_cell",
  "pairing",
  "rand 0.7.3",

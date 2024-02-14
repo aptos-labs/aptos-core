@@ -5,19 +5,17 @@ use blstrs::{Fp12, G1Affine, G2Affine, Gt};
 use group::prime::PrimeCurveAffine;
 use rayon::{prelude::*, ThreadPool};
 
-// TODO: Getting this choice to be right might be tricky. Anything between 2 and 5 seems to give 2.5 ms for size-50 batch.
-const MIN_PARALLEL_MULTI_PAIRING_SIZE: usize = 4;
-
 /// Computes $$\sum_{i=1}^n \textbf{ML}(a_i, b_i)$$ given a series of terms
 /// $$(a_1, b_1), (a_2, b_2), ..., (a_n, b_n).$$
 pub fn parallel_multi_miller_loop_and_final_exp(
     terms: &[(&G1Affine, &G2Affine)],
     pool: &ThreadPool,
+    min_length: usize,
 ) -> Gt {
     let res = pool.install(|| {
         terms
             .par_iter()
-            .with_min_len(MIN_PARALLEL_MULTI_PAIRING_SIZE)
+            .with_min_len(min_length)
             .map(|(p, q)| {
                 if (p.is_identity() | q.is_identity()).into() {
                     // Define pairing with zero as one, matching what `pairing` does.

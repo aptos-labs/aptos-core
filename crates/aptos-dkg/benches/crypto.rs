@@ -15,6 +15,7 @@ use aptos_dkg::{
             random_g2_point, random_g2_points, random_scalar, random_scalars,
         },
     },
+    weighted_vuf::pinkas::MIN_MULTIPAIR_NUM_JOBS,
 };
 use aptos_runtimes::spawn_rayon_thread_pool;
 use blstrs::{G1Projective, G2Projective, Gt};
@@ -430,7 +431,7 @@ fn parallel_multipairing<M: Measurement>(n: usize, g: &mut BenchmarkGroup<M>, nu
                     (r1, r2)
                 },
                 |(r1, r2)| {
-                    parallel_multi_pairing(r1.iter(), r2.iter(), &pool);
+                    parallel_multi_pairing(r1.iter(), r2.iter(), &pool, MIN_MULTIPAIR_NUM_JOBS);
                 },
             )
         },

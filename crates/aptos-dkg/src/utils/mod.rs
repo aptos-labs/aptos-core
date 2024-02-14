@@ -102,7 +102,12 @@ where
     res.final_exponentiation()
 }
 
-pub fn parallel_multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2, pool: &ThreadPool) -> Gt
+pub fn parallel_multi_pairing<'a, I1, I2>(
+    lhs: I1,
+    rhs: I2,
+    pool: &ThreadPool,
+    min_length: usize,
+) -> Gt
 where
     I1: Iterator<Item = &'a G1Projective>,
     I2: Iterator<Item = &'a G2Projective>,
@@ -116,6 +121,7 @@ where
             .collect::<Vec<(&G1Affine, &G2Affine)>>()
             .as_slice(),
         pool,
+        min_length,
     )
 }
 
