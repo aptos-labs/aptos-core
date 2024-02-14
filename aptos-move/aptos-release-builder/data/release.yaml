@@ -57,3 +57,13 @@ proposals:
                 include_user_txn_size_in_block_output: true
                 add_block_limit_outcome_onchain: false
             transaction_deduper_type: txn_hash_and_authenticator_v1
+  - name: step_5_passkey_authenticator
+    metadata:
+      title: "AIP-66: Passkey Accounts"
+      description: "AIP-66: The first WebAuthn Authenticator for Aptos, enabling users to utilize passkeys and other WebAuthn credentials for transaction authentication."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/322"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - webauthn_signature
