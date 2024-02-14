@@ -98,9 +98,16 @@ impl Identity {
     }
 
     pub fn save_private_key(path: &PathBuf, key: &x25519::PrivateKey) -> anyhow::Result<()> {
-        fs::create_dir_all(path.parent().unwrap())?;
-        File::create(path)?.write_all(&key.to_bytes())?;
-        Ok(())
+        // Create the parent path if it doesn't already exist
+        let parent_path = path.parent().unwrap();
+        if !parent_path.exists() {
+            fs::create_dir_all(parent_path)?;
+        }
+
+        // Save the private key to the specified path
+        File::create(path)?
+            .write_all(&key.to_bytes())
+            .map_err(|error| error.into())
     }
 }
 
