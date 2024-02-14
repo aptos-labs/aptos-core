@@ -36,7 +36,7 @@ use aptos_mvhashmap::{
     MVHashMap,
 };
 use aptos_types::{
-    delayed_fields::{ExtractUniqueIndex, PanicError},
+    delayed_fields::PanicError,
     executable::{Executable, ModulePath},
     state_store::{
         errors::StateviewError,
@@ -56,10 +56,11 @@ use claims::assert_ok;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::{
-    value_transformation::{
-        deserialize_and_replace_values_with_ids, serialize_and_replace_ids_with_values,
+    delayed_values::delayed_field_id::ExtractUniqueIndex,
+    value_serde::{
+        deserialize_and_allow_delayed_values, deserialize_and_replace_values_with_ids,
+        serialize_and_allow_delayed_values, serialize_and_replace_ids_with_values,
     },
-    values::Value,
 };
 use std::{
     cell::RefCell,
@@ -1079,8 +1080,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                patched_value
-                    .simple_serialize(layout)
+                serialize_and_allow_delayed_values(&patched_value, layout)
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
@@ -1101,7 +1101,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     ) -> anyhow::Result<(Bytes, HashSet<T::Identifier>)> {
         // This call will replace all occurrences of aggregator / snapshot
         // identifiers with values with the same type layout.
-        let value = Value::simple_deserialize(bytes, layout).ok_or_else(|| {
+        let value = deserialize_and_allow_delayed_values(bytes, layout).ok_or_else(|| {
             anyhow::anyhow!(
                 "Failed to deserialize resource during id replacement: {:?}",
                 bytes
@@ -1682,39 +1682,27 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
         (index, width).into()
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        let result: Self::Identifier = id.into();
-
-        let unique_index = result.extract_unique_index();
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        let unique_index = id.extract_unique_index();
 
         let start_counter = match &self.latest_view {
             ViewState::Sync(state) => state.start_counter,
             ViewState::Unsync(state) => state.start_counter,
         };
-
-        if unique_index < start_counter {
-            return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, index: {}, we've started from {}",
-                id, unique_index, start_counter
-            )));
-        }
-
-        let current = match &self.latest_view {
+        let current_counter = match &self.latest_view {
             ViewState::Sync(state) => state.counter.load(Ordering::SeqCst),
             ViewState::Unsync(state) => *state.counter.borrow(),
         };
 
-        if unique_index > current {
+        // We read the counter to create an identifier from it, and only after
+        // increment. So its value must be < the current value.
+        if unique_index < start_counter || unique_index >= current_counter {
             return Err(code_invariant_error(format!(
-                "Invalid delayed field id: {}, index: {}, we've only reached to {}",
-                id, unique_index, current
+                "Invalid delayed field id: {:?} with index: {} (started from {} and reached {})",
+                id, unique_index, start_counter, current_counter
             )));
         }
-
-        Ok(result)
+        Ok(())
     }
 
     fn get_reads_needing_exchange(
@@ -1788,7 +1776,6 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        delayed_fields::{bytes_and_width_to_derived_string_struct, to_utf8_bytes, DelayedFieldID},
         executable::Executable,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
@@ -1800,10 +1787,14 @@ mod test {
     use aptos_vm_types::resolver::TResourceView;
     use bytes::Bytes;
     use claims::{assert_err_eq, assert_none, assert_ok_eq, assert_some_eq};
-    use move_core_types::value::{
-        IdentifierMappingKind, LayoutTag, MoveStructLayout, MoveTypeLayout,
+    use move_core_types::value::{IdentifierMappingKind, MoveStructLayout, MoveTypeLayout};
+    use move_vm_types::{
+        delayed_values::{
+            delayed_field_id::DelayedFieldID,
+            derived_string_snapshot::{bytes_and_width_to_derived_string_struct, to_utf8_bytes},
+        },
+        values::{Struct, Value},
     };
-    use move_vm_types::values::{Struct, Value};
     use std::{cell::RefCell, collections::HashMap, sync::atomic::AtomicU32};
     use test_case::test_case;
 
@@ -2345,33 +2336,45 @@ mod test {
 
     fn create_aggregator_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
         MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-            MoveTypeLayout::Tagged(
-                LayoutTag::IdentifierMapping(IdentifierMappingKind::Aggregator),
-                Box::new(inner.clone()),
-            ),
-            inner.clone(),
+            MoveTypeLayout::Native(IdentifierMappingKind::Aggregator, Box::new(inner.clone())),
+            inner,
         ]))
+    }
+
+    fn create_aggregator_storage_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![inner.clone(), inner.clone()]))
     }
 
     fn create_aggregator_layout_u64() -> MoveTypeLayout {
         create_aggregator_layout(MoveTypeLayout::U64)
     }
 
+    fn create_snapshot_storage_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![inner]))
+    }
+
     fn create_snapshot_layout(inner: MoveTypeLayout) -> MoveTypeLayout {
-        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Tagged(
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::Snapshot),
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![MoveTypeLayout::Native(
+            IdentifierMappingKind::Snapshot,
             Box::new(inner),
         )]))
     }
 
     fn create_derived_string_layout() -> MoveTypeLayout {
-        MoveTypeLayout::Tagged(
-            LayoutTag::IdentifierMapping(IdentifierMappingKind::DerivedString),
+        MoveTypeLayout::Native(
+            IdentifierMappingKind::DerivedString,
             Box::new(MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 create_string_layout(),
                 create_vector_layout(MoveTypeLayout::U8),
             ]))),
         )
+    }
+
+    fn create_derived_string_storage_layout() -> MoveTypeLayout {
+        MoveTypeLayout::Struct(MoveStructLayout::new(vec![
+            create_string_layout(),
+            create_vector_layout(MoveTypeLayout::U8),
+        ]))
     }
 
     fn create_string_layout() -> MoveTypeLayout {
@@ -2442,9 +2445,6 @@ mod test {
 
     #[test]
     fn test_id_value_exchange() {
-        // Test that replace_values_with_identifiers and replace_identifiers_with_values functions are working correctly
-
-        // Create latest_view
         let unsync_map = UnsyncMap::new();
         let counter = RefCell::new(5);
         let base_view = MockStateView::new(HashMap::new());
@@ -2489,14 +2489,19 @@ mod test {
                 agg: Aggregator<u64>
             }
         */
-        let layout = create_struct_layout(create_aggregator_layout_u64());
+        let storage_layout =
+            create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
-        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let state_value =
+            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+
+        let layout = create_struct_layout(create_aggregator_layout_u64());
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
             .unwrap();
-        assert!(
-            identifiers.len() == 1,
+        assert_eq!(
+            identifiers.len(),
+            1,
             "One identifier should have been replaced in this case"
         );
         assert!(
@@ -2507,8 +2512,9 @@ mod test {
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
         assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
-        assert!(
-            identifiers.len() == 1,
+        assert_eq!(
+            identifiers.len(),
+            1,
             "One identifier should have been replaced in this case"
         );
 
@@ -2517,22 +2523,29 @@ mod test {
                 aggregators: vec![Aggregator<u64>]
             }
         */
-        let layout = create_struct_layout(create_vector_layout(create_aggregator_layout_u64()));
+        let storage_layout = create_struct_layout(create_vector_layout(
+            create_aggregator_storage_layout(MoveTypeLayout::U64),
+        ));
         let value = create_struct_value(create_vector_value(vec![
             create_aggregator_value_u64(20, 50),
             create_aggregator_value_u64(35, 65),
             create_aggregator_value_u64(0, 20),
         ]));
-        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let state_value =
+            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+
+        let layout = create_struct_layout(create_vector_layout(create_aggregator_layout_u64()));
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
             .unwrap();
-        assert!(
-            identifiers.len() == 3,
+        assert_eq!(
+            identifiers.len(),
+            3,
             "Three identifiers should have been replaced in this case"
         );
-        assert!(
-            counter == RefCell::new(9),
+        assert_eq!(
+            counter,
+            RefCell::new(9),
             "The counter should have been updated to 9"
         );
         let patched_value =
@@ -2552,14 +2565,20 @@ mod test {
             ])]));
         assert_eq!(
             patched_state_value,
-            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+            StateValue::new_legacy(
+                patched_value
+                    .simple_serialize(&storage_layout)
+                    .unwrap()
+                    .into()
+            )
         );
         let (final_state_value, identifiers) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
         assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
-        assert!(
-            identifiers.len() == 3,
+        assert_eq!(
+            identifiers.len(),
+            3,
             "Three identifiers should have been replaced in this case"
         );
 
@@ -2568,24 +2587,31 @@ mod test {
                 aggregators: vec![AggregatorSnapshot<u128>]
             }
         */
-        let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
-            MoveTypeLayout::U128,
-        )));
+        let storage_layout = create_struct_layout(create_vector_layout(
+            create_snapshot_storage_layout(MoveTypeLayout::U128),
+        ));
         let value = create_struct_value(create_vector_value(vec![
             create_snapshot_value(Value::u128(20)),
             create_snapshot_value(Value::u128(35)),
             create_snapshot_value(Value::u128(0)),
         ]));
-        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let state_value =
+            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+
+        let layout = create_struct_layout(create_vector_layout(create_snapshot_layout(
+            MoveTypeLayout::U128,
+        )));
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
             .unwrap();
-        assert!(
-            identifiers.len() == 3,
+        assert_eq!(
+            identifiers.len(),
+            3,
             "Three identifiers should have been replaced in this case"
         );
-        assert!(
-            counter == RefCell::new(12),
+        assert_eq!(
+            counter,
+            RefCell::new(12),
             "The counter should have been updated to 12"
         );
         let patched_value =
@@ -2602,14 +2628,20 @@ mod test {
             ])]));
         assert_eq!(
             patched_state_value,
-            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+            StateValue::new_legacy(
+                patched_value
+                    .simple_serialize(&storage_layout)
+                    .unwrap()
+                    .into()
+            )
         );
         let (final_state_value, identifiers2) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
         assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
-        assert!(
-            identifiers2.len() == 3,
+        assert_eq!(
+            identifiers2.len(),
+            3,
             "Three identifiers should have been replaced in this case"
         );
         assert_eq!(identifiers, identifiers2);
@@ -2619,22 +2651,28 @@ mod test {
                 snap: vec![DerivedStringSnapshot]
             }
         */
-        let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));
+        let storage_layout =
+            create_struct_layout(create_vector_layout(create_derived_string_storage_layout()));
         let value = create_struct_value(create_vector_value(vec![
             create_derived_value("hello", 60),
             create_derived_value("ab", 55),
             create_derived_value("c", 50),
         ]));
-        let state_value = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let state_value =
+            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
+
+        let layout = create_struct_layout(create_vector_layout(create_derived_string_layout()));
         let (patched_state_value, identifiers) = latest_view
             .replace_values_with_identifiers(state_value.clone(), &layout)
             .unwrap();
-        assert!(
-            identifiers.len() == 3,
+        assert_eq!(
+            identifiers.len(),
+            3,
             "Three identifiers should have been replaced in this case"
         );
-        assert!(
-            counter == RefCell::new(15),
+        assert_eq!(
+            counter,
+            RefCell::new(15),
             "The counter should have been updated to 15"
         );
 
@@ -2652,14 +2690,20 @@ mod test {
             ])]));
         assert_eq!(
             patched_state_value,
-            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into())
+            StateValue::new_legacy(
+                patched_value
+                    .simple_serialize(&storage_layout)
+                    .unwrap()
+                    .into()
+            )
         );
         let (final_state_value, identifiers2) = latest_view
             .replace_identifiers_with_values(patched_state_value.bytes(), &layout)
             .unwrap();
         assert_eq!(state_value, StateValue::from(final_state_value.to_vec()));
-        assert!(
-            identifiers2.len() == 3,
+        assert_eq!(
+            identifiers2.len(),
+            3,
             "Three identifiers should have been replaced in this case"
         );
         assert_eq!(identifiers, identifiers2);
@@ -2934,9 +2978,10 @@ mod test {
     #[test_case(Some(false))]
     #[test_case(None)]
     fn test_aggregator_read_operations(check_metadata: Option<bool>) {
-        let layout = create_struct_layout(create_aggregator_layout_u64());
+        let storage_layout =
+            create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
-        let state_value = create_state_value(&value, &layout);
+        let state_value = create_state_value(&value, &storage_layout);
         let data = HashMap::from([(KeyType::<u32>(1, false), state_value.clone())]);
 
         let start_counter = 1000;
@@ -2946,7 +2991,7 @@ mod test {
         let views = holder.new_view();
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
-        let patched_state_value = create_state_value(&patched_value, &layout);
+        let patched_state_value = create_state_value(&patched_value, &storage_layout);
 
         match check_metadata {
             Some(true) => {
@@ -2960,6 +3005,7 @@ mod test {
             None => {},
         };
 
+        let layout = create_struct_layout(create_aggregator_layout_u64());
         assert_ok_eq!(
             views.get_resource_state_value(&KeyType::<u32>(1, false), Some(&layout)),
             Some(patched_state_value.clone())
@@ -2989,9 +3035,11 @@ mod test {
         ));
         let mut data = HashMap::new();
         data.insert(KeyType::<u32>(3, false), state_value_3.clone());
-        let layout = create_struct_layout(create_aggregator_layout_u64());
+        let storage_layout =
+            create_struct_layout(create_aggregator_storage_layout(MoveTypeLayout::U64));
         let value = create_struct_value(create_aggregator_value_u64(25, 30));
-        let state_value_4 = StateValue::new_legacy(value.simple_serialize(&layout).unwrap().into());
+        let state_value_4 =
+            StateValue::new_legacy(value.simple_serialize(&storage_layout).unwrap().into());
         data.insert(KeyType::<u32>(4, false), state_value_4);
 
         let start_counter = 1000;
@@ -3005,6 +3053,7 @@ mod test {
                 .unwrap(),
             None
         );
+        let layout = create_struct_layout(create_aggregator_layout_u64());
         assert_eq!(
             views
                 .get_resource_state_value(&KeyType::<u32>(2, false), Some(&layout))
@@ -3029,8 +3078,12 @@ mod test {
         );
 
         let patched_value = create_struct_value(create_aggregator_value_u64(id.as_u64(), 30));
-        let state_value_4 =
-            StateValue::new_legacy(patched_value.simple_serialize(&layout).unwrap().into());
+        let state_value_4 = StateValue::new_legacy(
+            patched_value
+                .simple_serialize(&storage_layout)
+                .unwrap()
+                .into(),
+        );
         assert_eq!(
             views
                 .get_resource_state_value(&KeyType::<u32>(4, false), Some(&layout))

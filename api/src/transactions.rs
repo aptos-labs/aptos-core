@@ -941,8 +941,15 @@ impl TransactionsApi {
                         }
                     },
 
-                    // Deprecated. Will be removed in the future.
-                    TransactionPayload::ModuleBundle(_) => {},
+                    // Deprecated. To avoid panics when malicios users submit this
+                    // payload, return an error.
+                    TransactionPayload::ModuleBundle(_) => {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Module bundle payload has been removed",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ))
+                    },
                 }
                 // TODO: Verify script args?
 

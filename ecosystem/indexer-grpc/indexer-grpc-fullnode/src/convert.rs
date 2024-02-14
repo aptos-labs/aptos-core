@@ -171,20 +171,9 @@ pub fn convert_transaction_payload(
             )),
         },
 
-        // Deprecated. Will be removed in the future.
-        TransactionPayload::ModuleBundlePayload(mbp) => transaction::TransactionPayload {
-            r#type: transaction::transaction_payload::Type::ModuleBundlePayload as i32,
-            payload: Some(
-                transaction::transaction_payload::Payload::ModuleBundlePayload(
-                    transaction::ModuleBundlePayload {
-                        modules: mbp
-                            .modules
-                            .iter()
-                            .map(convert_move_module_bytecode)
-                            .collect(),
-                    },
-                ),
-            ),
+        // Deprecated.
+        TransactionPayload::ModuleBundlePayload(_) => {
+            unreachable!("Module bundle payload has been removed")
         },
     }
 }

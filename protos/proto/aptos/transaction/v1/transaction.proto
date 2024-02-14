@@ -231,9 +231,9 @@ message TransactionPayload {
     TYPE_UNSPECIFIED = 0;
     TYPE_ENTRY_FUNCTION_PAYLOAD = 1;
     TYPE_SCRIPT_PAYLOAD = 2;
-    TYPE_MODULE_BUNDLE_PAYLOAD = 3;
     TYPE_WRITE_SET_PAYLOAD = 4;
     TYPE_MULTISIG_PAYLOAD = 5;
+    reserved 3;
   }
 
   Type type = 1;
@@ -241,10 +241,10 @@ message TransactionPayload {
   oneof payload {
     EntryFunctionPayload entry_function_payload = 2;
     ScriptPayload script_payload = 3;
-    ModuleBundlePayload module_bundle_payload = 4;
     WriteSetPayload write_set_payload = 5;
     MultisigPayload multisig_payload = 6;
   }
+  reserved 4;
 }
 
 message EntryFunctionPayload {
@@ -281,10 +281,6 @@ message MultisigTransactionPayload {
   oneof payload {
     EntryFunctionPayload entry_function_payload = 2;
   }
-}
-
-message ModuleBundlePayload {
-  repeated MoveModuleBytecode modules = 1;
 }
 
 message MoveModuleBytecode {

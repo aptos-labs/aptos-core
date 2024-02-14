@@ -364,8 +364,21 @@ pub(crate) fn write_u64_as_uleb128(binary: &mut BinaryData, mut val: u64) -> Res
     Ok(())
 }
 
+pub fn size_u32_as_uleb128(mut value: usize) -> usize {
+    let mut len = 1;
+    while value >= 0x80 {
+        // 7 (lowest) bits of data get written in a single byte.
+        len += 1;
+        value >>= 7;
+    }
+    len
+}
+
+pub fn bcs_size_of_byte_array(length: usize) -> usize {
+    size_u32_as_uleb128(length) + length
+}
+
 /// Write a `u16` in Little Endian format.
-#[allow(dead_code)]
 pub(crate) fn write_u16(binary: &mut BinaryData, value: u16) -> Result<()> {
     binary.extend(&value.to_le_bytes())
 }
