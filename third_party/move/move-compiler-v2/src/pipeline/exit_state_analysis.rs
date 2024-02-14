@@ -93,9 +93,9 @@ impl ExitStateAnnotation {
     }
 }
 
-pub struct AbortAnalysis {}
+pub struct ExitStateAnalysis {}
 
-impl AbortAnalysis {
+impl ExitStateAnalysis {
     /// Returns the state per instruction of the given function
     fn analyze(&self, target: &FunctionTarget) -> BTreeMap<CodeOffset, ExitStateAtCodeOffset> {
         let code = target.get_bytecode();
@@ -107,7 +107,7 @@ impl AbortAnalysis {
     }
 }
 
-impl TransferFunctions for AbortAnalysis {
+impl TransferFunctions for ExitStateAnalysis {
     type State = ExitState;
 
     const BACKWARD: bool = true;
@@ -130,11 +130,11 @@ impl TransferFunctions for AbortAnalysis {
     }
 }
 
-impl DataflowAnalysis for AbortAnalysis {}
+impl DataflowAnalysis for ExitStateAnalysis {}
 
-pub struct AbortAnalysisProcessor {}
+pub struct ExitStateAnalysisProcessor {}
 
-impl FunctionTargetProcessor for AbortAnalysisProcessor {
+impl FunctionTargetProcessor for ExitStateAnalysisProcessor {
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
@@ -146,7 +146,7 @@ impl FunctionTargetProcessor for AbortAnalysisProcessor {
             return data;
         }
         let target = FunctionTarget::new(fun_env, &data);
-        let analysis = AbortAnalysis {};
+        let analysis = ExitStateAnalysis {};
         let annotations = ExitStateAnnotation(analysis.analyze(&target));
         data.annotations.set(annotations, true);
         data
@@ -157,7 +157,7 @@ impl FunctionTargetProcessor for AbortAnalysisProcessor {
     }
 }
 
-impl AbortAnalysisProcessor {
+impl ExitStateAnalysisProcessor {
     pub fn register_formatters(target: &FunctionTarget) {
         target.register_annotation_formatter(Box::new(format_abort_state_annotation))
     }

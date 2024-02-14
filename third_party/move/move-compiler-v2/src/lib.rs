@@ -13,7 +13,7 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    ability_checker::AbilityChecker, abort_analysis::AbortAnalysisProcessor,
+    ability_checker::AbilityChecker, exit_state_analysis::ExitStateAnalysisProcessor,
     avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
     dead_store_elimination::DeadStoreElimination, explicit_drop::ExplicitDrop,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
@@ -215,7 +215,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
         // only used for ability checking
-        pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
+        pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }

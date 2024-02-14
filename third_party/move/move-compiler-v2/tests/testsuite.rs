@@ -8,7 +8,7 @@ use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, flow_insensitive_checkers, function_checker,
     inliner, logging, pipeline,
     pipeline::{
-        ability_checker::AbilityChecker, abort_analysis::AbortAnalysisProcessor,
+        ability_checker::AbilityChecker, exit_state_analysis::ExitStateAnalysisProcessor,
         avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination, explicit_drop::ExplicitDrop,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
@@ -229,7 +229,7 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/abort-analysis/") {
-            pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             Self {
                 type_check_only: false,
                 dump_ast: false,
@@ -244,7 +244,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
-            pipeline.add_processor(Box::new(AbortAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,

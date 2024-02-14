@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{
-    abort_analysis::AbortAnalysisProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    exit_state_analysis::ExitStateAnalysisProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
@@ -12,7 +12,7 @@ use crate::pipeline::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_checker;
-pub mod abort_analysis;
+pub mod exit_state_analysis;
 pub mod avail_copies_analysis;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
@@ -28,7 +28,7 @@ pub mod visibility_checker;
 /// to visualize the result of an analysis as annotations on the bytecode, for
 /// debugging.
 pub fn register_formatters(target: &FunctionTarget) {
-    AbortAnalysisProcessor::register_formatters(target);
+    ExitStateAnalysisProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
     ReferenceSafetyProcessor::register_formatters(target);
     AvailCopiesAnalysisProcessor::register_formatters(target);

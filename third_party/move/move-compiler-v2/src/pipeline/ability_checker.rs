@@ -6,7 +6,7 @@
 //! - Copies, moves, and drops have been made explicit in assignment instructions
 //! - Abort analysis has been performed so that ExitStateAnnotation are available
 
-use crate::pipeline::abort_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
+use crate::pipeline::exit_state_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
 use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
@@ -70,7 +70,7 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
 /// Drop ability must only be enforced if there is an execution path from this code offset
 /// that returns. It's legit in Move to do not drop before an abort or infinite loop.
 pub fn cond_check_drop(func_target: &FunctionTarget, code_offset: CodeOffset, ty: &Type, loc: &Loc, err_msg: &str) {
-    let abort_state = get_abort_state_at(func_target, code_offset);
+    let abort_state = get_exit_state_at(func_target, code_offset);
     if abort_state.after.may_return() {
         check_ability(func_target, ty, Ability::Drop, loc, err_msg)
     }
@@ -289,7 +289,7 @@ fn get_abort_state<'a>(target: &'a FunctionTarget<'a>) -> &'a ExitStateAnnotatio
         .expect("abort state annotation")
 }
 
-fn get_abort_state_at<'a>(
+fn get_exit_state_at<'a>(
     target: &'a FunctionTarget<'a>,
     code_offset: CodeOffset,
 ) -> &'a ExitStateAtCodeOffset {
