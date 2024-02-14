@@ -139,7 +139,8 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::BatchRetrieval(req) => Some(req.req.epoch()),
             IncomingRpcRequest::DAGRequest(req) => Some(req.req.epoch()),
             IncomingRpcRequest::RandGenRequest(req) => Some(req.req.epoch()),
-            IncomingRpcRequest::BlockRetrieval(_) | IncomingRpcRequest::CommitRequest(_) => None,
+            IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
+            IncomingRpcRequest::BlockRetrieval(_) => None,
         }
     }
 }
