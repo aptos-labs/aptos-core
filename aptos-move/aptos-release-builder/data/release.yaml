@@ -52,7 +52,7 @@ proposals:
                 io_gas_effective_multiplier: 1
                 conflict_penalty_window: 6
                 use_granular_resource_group_conflicts: false
-                use_module_publishing_block_conflict: false
+                use_module_publishing_block_conflict: true
                 block_output_limit: 3145728
                 include_user_txn_size_in_block_output: true
                 add_block_limit_outcome_onchain: false
@@ -118,3 +118,34 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
+  - name: step_9_enable_aggregator_v2_api
+    metadata:
+      title: "AIP-47: Enable Aggregator v2 API"
+      description: "AIP-47: This AIP revamps and expands upon the current concept of Aggregators. Enabling their usage for control flow, and storing their values elsewhere. This step only enables new APIs."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aggregator_v2_api
+  - name: step_10_enable_concurrent_digital_assets
+    metadata:
+      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
+      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - concurrent_token_v2
+  - name: step_11_enable_aggregator_v2_parallelism
+    metadata:
+      title: "AIP-43: Enable Aggregator v2 parallelism"
+      description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aggregator_v2_delayed_fields          
+            - resource_groups_charge_as_sum
