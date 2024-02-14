@@ -210,8 +210,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 return Err(code_invariant_error(format!(
                     "FatalVMError from parallel execution {:?} at txn {}",
                     err, txn_idx
-                ))
-                .into());
+                )));
             }
         }
         Ok(())

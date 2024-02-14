@@ -130,7 +130,6 @@ pub(crate) fn serialize_groups<T: Transaction>(
         .map(|(group_key, mut metadata_op, finalized_group)| {
             let btree: BTreeMap<T::Tag, Bytes> = finalized_group
                 .into_iter()
-                // TODO[agg_v2](fix): Should anything be done using the layout here?
                 .map(|(resource_tag, arc_v)| {
                     let bytes = arc_v
                         .extract_raw_bytes()

@@ -277,11 +277,11 @@ impl AptosVM {
         DISCARD_FAILED_BLOCKS.set(enable).ok();
     }
 
-    /// Get the paranoid type check flag if already set, otherwise return default true
+    /// Get the discard failed blocks flag if already set, otherwise return default (false)
     pub fn get_discard_failed_blocks() -> bool {
         match DISCARD_FAILED_BLOCKS.get() {
             Some(enable) => *enable,
-            None => true,
+            None => false,
         }
     }
 

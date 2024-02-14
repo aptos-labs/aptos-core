@@ -375,7 +375,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
             Err(BlockExecutionError::FatalBlockExecutorError(_)) => {
-                // Parallel execution currently returns an arbitrary error to fallback.
                 // TODO: adjust the logic to be able to test better.
             },
         }

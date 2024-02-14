@@ -50,9 +50,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
         fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
-            ExecutionStatus::DelayedFieldsCodeInvariantError(
-                "fail points error".into(),
-            )
+            ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
         });
 
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);

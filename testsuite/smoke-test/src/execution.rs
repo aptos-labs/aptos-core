@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    smoke_test_environment::SwarmBuilder,
-    utils::get_current_version,
-};
+use crate::{smoke_test_environment::SwarmBuilder, utils::get_current_version};
 use aptos_forge::{NodeExt, SwarmExt};
 use std::{sync::Arc, time::Duration};
 
@@ -25,12 +22,15 @@ async fn fallback_test() {
         .await
         .expect("Epoch 2 taking too long to come!");
 
-    let client = swarm.validators().nth(0).unwrap().rest_client();
+    let client = swarm.validators().next().unwrap().rest_client();
 
-    client.set_failpoint(
-        "aptos_vm::vm_wrapper::execute_transaction".to_string(),
-        "100%return".to_string(),
-    ).await.unwrap();
+    client
+        .set_failpoint(
+            "aptos_vm::vm_wrapper::execute_transaction".to_string(),
+            "100%return".to_string(),
+        )
+        .await
+        .unwrap();
 
     for _i in 0..1 {
         let version_milestone_0 = get_current_version(&client).await;

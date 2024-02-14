@@ -566,6 +566,13 @@ where
                         txn_idx + 1,
                         scheduler.num_txns(),
                     );
+
+                    // failpoint triggering error at the last committed transaction,
+                    // to test that next transaction is handled correctly
+                    fail_point!("commit-all-halt-err", |_| Err(code_invariant_error(
+                        "fail points: Last committed transaction halted"
+                    )
+                    .into()));
                 }
                 return Ok(());
             }
@@ -646,10 +653,6 @@ where
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-
-        fail_point!("commit-all-halt-err", |_| Err(code_invariant_error(
-            "ResourceGroupSerializationError"
-        )));
 
         let serialized_groups =
             serialize_groups::<T>(materialized_finalized_groups).map_err(|e| {
@@ -1314,6 +1317,8 @@ where
                     panic!("Parallel execution failed and fallback is not allowed");
                 }
 
+                // TODO[agg_v2](cleanup): check if sequential execution logs anything in the speculative logs,
+                // and whether clearing them below is needed at all.
                 // All logs from the first pass of sequential execution should be cleared and not reported.
                 // Clear by re-initializing the speculative logs.
                 init_speculative_logs(signature_verified_block.len());
@@ -1341,9 +1346,8 @@ where
             Err(SequentialBlockExecutionError::ErrorToReturn(err)) => err,
         };
 
-        // if not skip failed blocks enabled
         if self.config.local.discard_failed_blocks {
-            // We cannot execute block, disard everything (including block metadata and validator transactions)
+            // We cannot execute block, discard everything (including block metadata and validator transactions)
             // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
             // StateCheckpoint will be added afterwards.
             let error_code = match sequential_error {
