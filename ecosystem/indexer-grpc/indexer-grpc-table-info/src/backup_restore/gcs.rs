@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    fs_ops::create_tar_gz, generate_blob_name, BackupRestoreMetadata, JSON_FILE_TYPE,
-    METADATA_FILE_NAME, TAR_FILE_TYPE,
+    fs_ops::{create_tar_gz, unpack_tar_gz},
+    generate_blob_name, BackupRestoreMetadata, JSON_FILE_TYPE, METADATA_FILE_NAME, TAR_FILE_TYPE,
 };
-use crate::backup_restore::fs_ops::{unpack_tar_gz, write_snapshot_to_file};
 use anyhow::Context;
 use aptos_db_indexer::db_v2::IndexerAsyncV2;
 use aptos_logger::{error, info};
@@ -33,7 +32,12 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{fs, fs::File, task};
+use tokio::{
+    fs::{self, File},
+    io::AsyncWriteExt,
+    task,
+};
+use tokio_stream::StreamExt;
 
 pub struct GcsBackupRestoreOperator {
     bucket_name: String,
@@ -186,11 +190,11 @@ impl GcsBackupRestoreOperator {
         // Spawn blocking a thread to create a gzipped tar file by compressing a folder into a single file
         // synchronously without blocking the async thread
         let snapshot_path_closure = snapshot_path.clone();
-        let (tar_file, _tar_file_name) = task::spawn_blocking(move || {
+        let tar_file = task::spawn_blocking(move || {
             create_tar_gz(snapshot_path_closure.clone(), &epoch.to_string())
-                .expect("Failed to create tar.gz file in blocking task")
         })
-        .await?;
+        .await?
+        .expect("Failed to create tar.gz file in blocking task");
 
         // Open the file in async mode to stream it
         let file = File::open(&tar_file)
@@ -248,7 +252,7 @@ impl GcsBackupRestoreOperator {
 
         match self
             .gcs_client
-            .download_object(
+            .download_streamed_object(
                 &GetObjectRequest {
                     bucket: self.bucket_name.clone(),
                     object: epoch_based_filename.clone(),
@@ -258,18 +262,24 @@ impl GcsBackupRestoreOperator {
             )
             .await
         {
-            Ok(snapshot) => {
+            Ok(mut stream) => {
+                // Create a temporary file and write the stream to it directly
                 let temp_file_name = "snapshot.tar.gz";
                 let temp_file_path = base_path.join(temp_file_name);
                 let temp_file_path_clone = temp_file_path.clone();
+                let mut temp_file = File::create(&temp_file_path_clone).await?;
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(data) => temp_file.write_all(&data).await?,
+                        Err(e) => return Err(anyhow::Error::new(e)),
+                    }
+                }
+                temp_file.sync_all().await?;
+
                 // Spawn blocking a thread to synchronously unpack gzipped tar file without blocking the async thread
-                task::spawn_blocking(move || {
-                    write_snapshot_to_file(&snapshot, &temp_file_path_clone)
-                        .expect("Failed to write snapshot to file system");
-                    unpack_tar_gz(&temp_file_path_clone, &db_path)
-                        .expect("Failed to unpack gzipped tar file");
-                })
-                .await?;
+                task::spawn_blocking(move || unpack_tar_gz(&temp_file_path_clone, &db_path))
+                    .await?
+                    .expect("Failed to unpack gzipped tar file");
 
                 fs::remove_file(&temp_file_path)
                     .await
