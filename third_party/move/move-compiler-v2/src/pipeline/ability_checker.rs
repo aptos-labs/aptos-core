@@ -66,10 +66,16 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
 }
 
 /// Checks drop ability for the given type;
-/// generates an error, unless the state before `code_offset` won't return.
+/// generates an error, unless the state after `code_offset` won't return.
 /// Drop ability must only be enforced if there is an execution path from this code offset
-/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
-pub fn cond_check_drop(func_target: &FunctionTarget, code_offset: CodeOffset, ty: &Type, loc: &Loc, err_msg: &str) {
+/// that returns. It's legit in Move to do not drop after an abort or infinite loop.
+pub fn cond_check_drop(
+    func_target: &FunctionTarget,
+    code_offset: CodeOffset,
+    ty: &Type,
+    loc: &Loc,
+    err_msg: &str,
+) {
     let abort_state = get_exit_state_at(func_target, code_offset);
     if abort_state.after.may_return() {
         check_ability(func_target, ty, Ability::Drop, loc, err_msg)
@@ -77,9 +83,9 @@ pub fn cond_check_drop(func_target: &FunctionTarget, code_offset: CodeOffset, ty
 }
 
 /// If temporary variable `t` does not have ability `drop`, generates an error,
-/// unless the state before `code_offset` won't return.
+/// unless the state after `code_offset` won't return.
 /// Drop ability must only be enforced if there is an execution path from this code offset
-/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
+/// that returns. It's legit in Move to do not drop after an abort or infinite loop.
 fn cond_check_drop_for_temp_with_msg(
     func_target: &FunctionTarget,
     code_offset: CodeOffset,
