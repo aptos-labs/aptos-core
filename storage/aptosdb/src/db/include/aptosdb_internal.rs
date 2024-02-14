@@ -116,10 +116,10 @@ impl AptosDB {
         );
 
         if indexer.next_version() < ledger_next_version {
-            let state_view = DbStateView {
-                db: self.state_store.clone(),
-                version: Some(ledger_next_version - 1),
-            };
+            use aptos_storage_interface::state_view::DbStateViewAtVersion;
+            let db : Arc<dyn DbReader> = self.state_store.clone();
+
+            let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
             let resolver = state_view.as_move_resolver();
             let annotator = MoveValueAnnotator::new(&resolver);
 

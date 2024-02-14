@@ -16,6 +16,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
+use fail::fail_point;
 use move_core_types::vm_status::{StatusCode, VMStatus};
 
 pub(crate) struct AptosExecutorTask<'a, S> {
@@ -48,6 +49,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         txn: &SignatureVerifiedTransaction,
         txn_idx: TxnIndex,
     ) -> ExecutionStatus<AptosTransactionOutput, VMStatus> {
+        fail_point!("aptos_vm::vm_wrapper::execute_transaction", |_| {
+            ExecutionStatus::DelayedFieldsCodeInvariantError("fail points error".into())
+        });
+
         let log_context = AdapterLogSchema::new(self.base_view.id(), txn_idx as usize);
         let resolver = self
             .vm

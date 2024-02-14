@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::{BlockExecutionError, IntentionalFallbackToSequential},
+    errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -21,7 +21,6 @@ use aptos_aggregator::{
     bounded_math::SignedU128,
     delta_change_set::{delta_add, delta_sub, DeltaOp},
     delta_math::DeltaHistory,
-    types::PanicOr,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
@@ -116,25 +115,24 @@ fn resource_group_bcs_fallback() {
     assert!(!fail::list().is_empty());
 
     let par_output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
-    assert_matches!(
-        par_output,
-        Err(PanicOr::Or(
-            IntentionalFallbackToSequential::FallbackFromParallel
-        ))
-    );
+    assert_matches!(par_output, Err(()));
 
     let seq_output =
         block_executor.execute_transactions_sequential((), &transactions, &data_view, false);
     assert_matches!(
         seq_output,
-        Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-            IntentionalFallbackToSequential::ResourceGroupSerializationError
-        )))
+        Err(SequentialBlockExecutionError::ResourceGroupSerializationError)
     );
 
     // Now execute with fallback handling for resource group serialization error:
-    let fallback_output =
-        block_executor.execute_transactions_sequential((), &transactions, &data_view, true);
+    let fallback_output = block_executor
+        .execute_transactions_sequential((), &transactions, &data_view, true)
+        .map_err(|e| match e {
+            SequentialBlockExecutionError::ResourceGroupSerializationError => {
+                panic!("Unexpected error")
+            },
+            SequentialBlockExecutionError::ErrorToReturn(err) => err,
+        });
     let fallback_output_block = block_executor.execute_block((), &transactions, &data_view);
     for output in [fallback_output, fallback_output_block] {
         match output {
@@ -197,12 +195,7 @@ fn block_output_err_precedence() {
     // Pause the thread that processes the aborting txn1, so txn2 can halt the scheduler first.
     // Confirm that the fatal VM error is still detected and sequential fallback triggered.
     let output = block_executor.execute_transactions_parallel((), &transactions, &data_view);
-    assert_matches!(
-        output,
-        Err(PanicOr::Or(
-            IntentionalFallbackToSequential::FallbackFromParallel
-        ))
-    );
+    assert_matches!(output, Err(()));
     scenario.teardown();
 }
 
@@ -268,7 +261,7 @@ where
     .execute_transactions_parallel((), &transactions, &data_view);
 
     let baseline = BaselineOutput::generate(&transactions, None);
-    baseline.assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+    baseline.assert_parallel_output(&output);
 }
 
 fn random_value(delete_value: bool) -> ValueType {

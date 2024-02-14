@@ -47,7 +47,7 @@ use bytes::Bytes;
 use claims::assert_none;
 use core::panic;
 use fail::fail_point;
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use num_cpus;
 use rayon::ThreadPool;
 use std::{
@@ -106,7 +106,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-    ) -> Result<bool, PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<bool, PanicOr<ModulePathReadWriteError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -257,14 +257,11 @@ where
                 )
             },
             ExecutionStatus::Abort(err) => {
-                // Abort indicates an unrecoverable VM failure, and should not occur
-                // even due to speculation. Thus, we do not need to finish execution and
-                // can directly return an error.
-                return Err(code_invariant_error(format!(
-                    "FatalVMError from parallel execution {:?} at txn {}",
-                    err, idx_to_execute
-                ))
-                .into());
+                // Abort indicates an unrecoverable VM failure, but currently it seemingly
+                // can occur due to speculative execution (in particular for BlockMetadata txn).
+                // Therefore, we do not short circuit here. TODO: investigate if we can
+                // eliminate the scenarios when Abort status can happen speculatively.
+                (ExecutionStatus::Abort(err), Vec::new())
             },
             ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
                 return Err(code_invariant_error(format!(
@@ -293,12 +290,10 @@ where
         }
 
         if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
-            return Err(PanicOr::Or(
-                IntentionalFallbackToSequential::module_path_read_write(
-                    "Module read & write".into(),
-                    idx_to_execute,
-                ),
-            ));
+            // Module R/W is an expected fallback behavior, no alert is required.
+            debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
+
+            return Err(PanicOr::Or(ModulePathReadWriteError));
         }
         Ok(updates_outside)
     }
@@ -443,7 +438,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<(), PanicOr<ModulePathReadWriteError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
@@ -491,7 +486,8 @@ where
                 scheduler.add_to_commit_queue(txn_idx);
             }
 
-            // An invariant check on the recorded outputs.
+            last_input_output.check_fatal_vm_error(txn_idx)?;
+            // Handle a potential vm error, then check invariants on the recorded outputs.
             last_input_output.check_execution_status_during_commit(txn_idx)?;
 
             if let Some(fee_statement) = last_input_output.fee_statement(txn_idx) {
@@ -570,9 +566,13 @@ where
                         txn_idx + 1,
                         scheduler.num_txns(),
                     );
-                    fail_point!("commit-all-halt-err", |_| Err(PanicOr::Or(
-                        IntentionalFallbackToSequential::ResourceGroupSerializationError
-                    )));
+
+                    // failpoint triggering error at the last committed transaction,
+                    // to test that next transaction is handled correctly
+                    fail_point!("commit-all-halt-err", |_| Err(code_invariant_error(
+                        "fail points: Last committed transaction halted"
+                    )
+                    .into()));
                 }
                 return Ok(());
             }
@@ -642,7 +642,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::<T, X>::new(
             versioned_cache,
             scheduler,
@@ -653,7 +653,11 @@ where
         let finalized_groups = last_input_output.take_finalized_group(txn_idx);
         let materialized_finalized_groups =
             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
-        let serialized_groups = serialize_groups::<T>(materialized_finalized_groups, txn_idx)?;
+
+        let serialized_groups =
+            serialize_groups::<T>(materialized_finalized_groups).map_err(|e| {
+                code_invariant_error(format!("Panic error in serializing groups {e:?}"))
+            })?;
 
         let resource_write_set = last_input_output.take_resource_write_set(txn_idx);
         let resource_writes_to_materialize = resource_writes_to_materialize!(
@@ -684,10 +688,7 @@ where
             materialized_events,
         )?;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            let txn_output = last_input_output.txn_output(txn_idx).unwrap();
-            let execution_status = txn_output.output_status();
-
-            match execution_status {
+            match last_input_output.txn_output(txn_idx).unwrap().as_ref() {
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     txn_commit_listener.on_transaction_committed(txn_idx, output);
                 },
@@ -728,7 +729,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<(), PanicOr<ModulePathReadWriteError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -737,7 +738,7 @@ where
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
         let mut scheduler_task = SchedulerTask::NoTask;
 
-        let drain_commit_queue = || -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+        let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
                 self.materialize_txn_commit(
                     txn_idx,
@@ -833,7 +834,7 @@ where
         executor_initial_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
-    ) -> Result<BlockOutput<E::Output>, PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<BlockOutput<E::Output>, ()> {
         let _timer = PARALLEL_EXECUTION_SECONDS.start_timer();
         // Using parallel execution with 1 thread currently will not work as it
         // will only have a coordinator role but no workers for rolling commit.
@@ -877,7 +878,7 @@ where
         self.executor_thread_pool.scope(|s| {
             for _ in 0..self.config.local.concurrency_level {
                 s.spawn(|_| {
-                    if let Err(e) = self.worker_loop(
+                    if let Err(err) = self.worker_loop(
                         &executor_initial_arguments,
                         signature_verified_block,
                         &last_input_output,
@@ -890,11 +891,11 @@ where
                         &final_results,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // IntentionalFallbackToSequential variant is logged at construction,
+                        // ModulePathReadWriteError variant is logged at construction,
                         // and below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = &e {
+                        if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
-                        };
+                        }
                         shared_maybe_error.store(true, Ordering::SeqCst);
 
                         // Make sure to halt the scheduler if it hasn't already been halted.
@@ -912,27 +913,21 @@ where
 
         (!shared_maybe_error.load(Ordering::SeqCst))
             .then(|| BlockOutput::new(final_results.into_inner()))
-            .ok_or(PanicOr::Or(
-                IntentionalFallbackToSequential::FallbackFromParallel,
-            ))
+            .ok_or(())
     }
 
     fn apply_output_sequential(
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
         for (key, write_op, layout) in resource_write_set.into_iter() {
             unsync_map.write(key, write_op, layout);
         }
 
         for (group_key, metadata_op, group_ops) in output.resource_group_write_set().into_iter() {
             for (value_tag, (group_op, maybe_layout)) in group_ops.into_iter() {
-                unsync_map
-                    .insert_group_op(&group_key, value_tag, group_op, maybe_layout)
-                    .map_err(|e| {
-                        code_invariant_error(format!("Unexpected resource group error {:?}", e))
-                    })?;
+                unsync_map.insert_group_op(&group_key, value_tag, group_op, maybe_layout)?;
             }
             unsync_map.write(group_key, Arc::new(metadata_op), None);
         }
@@ -995,14 +990,13 @@ where
         Ok(())
     }
 
-    // TODO[agg_v2][fix] Propagate code_invariant_error, to use second fallback.
     pub(crate) fn execute_transactions_sequential(
         &self,
         executor_arguments: E::Argument,
         signature_verified_block: &[T],
         base_view: &S,
         resource_group_bcs_fallback: bool,
-    ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
+    ) -> Result<BlockOutput<E::Output>, SequentialBlockExecutionError<E::Error>> {
         let num_txns = signature_verified_block.len();
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(executor_arguments);
@@ -1029,6 +1023,34 @@ where
             let res = executor.execute_transaction(&latest_view, txn, idx as TxnIndex);
             let must_skip = matches!(res, ExecutionStatus::SkipRest(_));
             match res {
+                ExecutionStatus::Abort(err) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
+                    alert!("Fatal VM error by transaction {}", idx as TxnIndex);
+                    // Record the status indicating the unrecoverable VM failure.
+                    return Err(SequentialBlockExecutionError::ErrorToReturn(
+                        BlockExecutionError::FatalVMError(err),
+                    ));
+                },
+                ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
+                    alert!("Sequential execution DelayedFieldsCodeInvariantError error by transaction {}: {}", idx as TxnIndex, msg);
+                    return Err(SequentialBlockExecutionError::ErrorToReturn(
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
+                    ));
+                },
+                ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
+                    if let Some(commit_hook) = &self.transaction_commit_hook {
+                        commit_hook.on_execution_aborted(idx as TxnIndex);
+                    }
+                    alert!("Sequential execution SpeculativeExecutionAbortError error by transaction {}: {}", idx as TxnIndex, msg);
+                    return Err(SequentialBlockExecutionError::ErrorToReturn(
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
+                    ));
+                },
                 ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                     // Calculating the accumulated gas costs of the committed txns.
                     let fee_statement = output.fee_statement();
@@ -1146,13 +1168,15 @@ where
                         if serialization_error {
                             // The corresponding error / alert must already be triggered, the goal in sequential
                             // fallback is to just skip any transactions that would cause such serialization errors.
-                            ret.push(E::Output::skip_output());
+                            alert!("Discarding transaction because serialization failed in bcs fallback");
+                            ret.push(E::Output::discard_output(
+                                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR,
+                            ));
                             continue;
                         }
                     };
 
                     // Apply the writes.
-                    // TODO[agg_v2](fix): return code invariant error if dynamic change set optimizations disabled.
                     let resource_write_set = output.resource_write_set();
                     Self::apply_output_sequential(
                         &unsync_map,
@@ -1177,8 +1201,9 @@ where
                         let materialized_finalized_groups =
                             map_id_to_values_in_group_writes(finalized_groups, &latest_view)?;
                         let serialized_groups =
-                            serialize_groups::<T>(materialized_finalized_groups, idx as TxnIndex)
-                                .map_err(BlockExecutionError::FallbackToSequential)?;
+                            serialize_groups::<T>(materialized_finalized_groups).map_err(|_| {
+                                SequentialBlockExecutionError::ResourceGroupSerializationError
+                            })?;
 
                         let resource_writes_to_materialize = resource_writes_to_materialize!(
                             resource_write_set,
@@ -1197,51 +1222,31 @@ where
                             &latest_view,
                         )?;
 
-                        output
-                            .incorporate_materialized_txn_output(
-                                // No aggregator v1 delta writes are needed for sequential execution.
-                                // They are already handled because we passed materialize_deltas=true
-                                // to execute_transaction.
-                                vec![],
-                                materialized_resource_write_set
-                                    .into_iter()
-                                    .chain(serialized_groups.into_iter())
-                                    .collect(),
-                                materialized_events,
-                            )
-                            .map_err(PanicOr::from)
-                            .map_err(BlockExecutionError::FallbackToSequential)?;
+                        output.incorporate_materialized_txn_output(
+                            // No aggregator v1 delta writes are needed for sequential execution.
+                            // They are already handled because we passed materialize_deltas=true
+                            // to execute_transaction.
+                            vec![],
+                            materialized_resource_write_set
+                                .into_iter()
+                                .chain(serialized_groups.into_iter())
+                                .collect(),
+                            materialized_events,
+                        )?;
                     }
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
 
                     if latest_view.is_incorrect_use() {
-                        panic!("Incorrect use in sequential execution")
+                        return Err(
+                            code_invariant_error("Incorrect use in sequential execution").into(),
+                        );
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_transaction_committed(idx as TxnIndex, &output);
                     }
                     ret.push(output);
-                },
-                ExecutionStatus::Abort(err) => {
-                    if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_execution_aborted(idx as TxnIndex);
-                    }
-                    alert!("Fatal VM error by transaction {}", idx as TxnIndex);
-                    // Record the status indicating the unrecoverable VM failure.
-                    return Err(BlockExecutionError::FatalVMError(err));
-                },
-                ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    return Err(BlockExecutionError::FallbackToSequential(
-                        code_invariant_error(msg).into(),
-                    ));
-                },
-                ExecutionStatus::SpeculativeExecutionAbortError(msg) => {
-                    panic!(
-                        "Sequential execution must not have SpeculativeExecutionAbortError: {:?}",
-                        msg
-                    );
                 },
             };
             // When the txn is a SkipRest txn, halt sequential execution.
@@ -1271,81 +1276,95 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
-        let mut ret = if self.config.local.concurrency_level > 1 {
-            self.execute_transactions_parallel(
+        if self.config.local.concurrency_level > 1 {
+            let parallel_result = self.execute_transactions_parallel(
                 executor_arguments,
                 signature_verified_block,
                 base_view,
-            )
-            .map_err(BlockExecutionError::FallbackToSequential)
-        } else {
-            self.execute_transactions_sequential(
-                executor_arguments,
-                signature_verified_block,
-                base_view,
-                false,
-            )
-        };
-
-        if self.config.local.allow_fallback {
-            let mut resource_group_bcs_fallback = matches!(
-                ret,
-                Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-                    IntentionalFallbackToSequential::ResourceGroupSerializationError
-                )))
             );
 
-            if self.config.local.concurrency_level > 1 && !resource_group_bcs_fallback {
-                // Sequential execution fallback, only worth doing if we did a different pass before,
-                // i.e. parallel. This fallback does not handle resource group serialization issues.
-
-                if let Err(BlockExecutionError::FallbackToSequential(_)) = &ret {
-                    // Any error logs are already written at appropriate levels.
-                    debug!("Sequential_fallback occurred");
-
-                    // All logs from the parallel execution should be cleared and not reported.
-                    // Clear by re-initializing the speculative logs.
-                    init_speculative_logs(signature_verified_block.len());
-
-                    ret = self.execute_transactions_sequential(
-                        executor_arguments,
-                        signature_verified_block,
-                        base_view,
-                        false,
-                    );
-                    resource_group_bcs_fallback = matches!(
-                        ret,
-                        Err(BlockExecutionError::FallbackToSequential(PanicOr::Or(
-                            IntentionalFallbackToSequential::ResourceGroupSerializationError
-                        )))
-                    );
-                }
+            // If parallel gave us result, return it
+            if let Ok(output) = parallel_result {
+                return Ok(output);
             }
 
-            if resource_group_bcs_fallback {
-                alert!("Resource group serialization fallback");
+            if !self.config.local.allow_fallback {
+                panic!("Parallel execution failed and fallback is not allowed");
+            }
+
+            // All logs from the parallel execution should be cleared and not reported.
+            // Clear by re-initializing the speculative logs.
+            init_speculative_logs(signature_verified_block.len());
+
+            debug!("parallel execution requiring fallback");
+        }
+
+        // If we didn't run parallel or it didn't finish successfully - run sequential
+        let sequential_result = self.execute_transactions_sequential(
+            executor_arguments,
+            signature_verified_block,
+            base_view,
+            false,
+        );
+
+        // If sequential gave us result, return it
+        let sequential_error = match sequential_result {
+            Ok(output) => {
+                return Ok(output);
+            },
+            Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
+                if !self.config.local.allow_fallback {
+                    panic!("Parallel execution failed and fallback is not allowed");
+                }
+
+                // TODO[agg_v2](cleanup): check if sequential execution logs anything in the speculative logs,
+                // and whether clearing them below is needed at all.
+                // All logs from the first pass of sequential execution should be cleared and not reported.
+                // Clear by re-initializing the speculative logs.
                 init_speculative_logs(signature_verified_block.len());
-                ret = self.execute_transactions_sequential(
+
+                let sequential_result = self.execute_transactions_sequential(
                     executor_arguments,
                     signature_verified_block,
                     base_view,
                     true,
                 );
-            }
 
-            // If after trying available fallbacks, we still are askign to do a fallback,
-            // something unrecoverable went wrong.
-            if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
-                // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
-                // this error often when something that should never happen goes wrong
-                panic!("Sequential execution failed with {:?}", e);
-            }
-        } else if let Err(BlockExecutionError::FallbackToSequential(e)) = &ret {
-            // TODO[agg_v2][fix] make sure this can never happen - we have sequential raising
-            // this error often when something that should never happen goes wrong
-            panic!("Fallback disabled, execution failed due to {:?}", e);
+                // If sequential gave us result, return it
+                match sequential_result {
+                    Ok(output) => {
+                        return Ok(output);
+                    },
+                    Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {
+                        BlockExecutionError::FatalBlockExecutorError(code_invariant_error(
+                            "resource group serialization during bcs fallback should not happen",
+                        ))
+                    },
+                    Err(SequentialBlockExecutionError::ErrorToReturn(err)) => err,
+                }
+            },
+            Err(SequentialBlockExecutionError::ErrorToReturn(err)) => err,
+        };
+
+        if self.config.local.discard_failed_blocks {
+            // We cannot execute block, discard everything (including block metadata and validator transactions)
+            // (TODO: maybe we should add fallback here to first try BlockMetadataTransaction alone)
+            // StateCheckpoint will be added afterwards.
+            let error_code = match sequential_error {
+                BlockExecutionError::FatalBlockExecutorError(_) => {
+                    StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+                },
+                BlockExecutionError::FatalVMError(_) => {
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+                },
+            };
+            let ret = signature_verified_block
+                .iter()
+                .map(|_| E::Output::discard_output(error_code))
+                .collect();
+            return Ok(BlockOutput::new(ret));
         }
 
-        ret
+        Err(sequential_error)
     }
 }

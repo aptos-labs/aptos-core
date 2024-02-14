@@ -168,12 +168,6 @@ impl OpenIdSig {
             pk.iss
         );
 
-        ensure!(
-            self.uid_key.eq("sub") || self.uid_key.eq("email"),
-            "uid_key must be either 'sub' or 'email', was \"{}\"",
-            self.uid_key
-        );
-
         // When an aud_val override is set, the IDC-committed `aud` is included next to the
         // OpenID signature.
         let idc_aud_val = match self.idc_aud_val.as_ref() {
@@ -229,10 +223,7 @@ impl OpenIdSig {
         )?);
 
         let nonce_fr = poseidon_bn254::hash_scalars(frs)?;
-        let mut nonce_bytes = vec![0u8; config.nonce_commitment_num_bytes as usize];
-        nonce_fr.serialize_uncompressed(&mut nonce_bytes[..])?;
-
-        Ok(base64url_encode(&nonce_bytes[..]))
+        Ok(nonce_fr.to_string())
     }
 }
 
@@ -589,10 +580,6 @@ pub fn get_zkid_authenticators(
     Ok(authenticators)
 }
 
-pub fn base64url_encode(data: &[u8]) -> String {
-    base64::encode_config(data, URL_SAFE_NO_PAD)
-}
-
 pub fn base64url_encode_str(data: &str) -> String {
     base64::encode_config(data.as_bytes(), URL_SAFE_NO_PAD)
 }
@@ -751,7 +738,7 @@ mod test {
         nonce: Option<String>,
     ) -> String {
         let nonce_str = match &nonce {
-            None => "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
+            None => "15142559071815587978635947836206288328330533396937069427032377153167520963771",
             Some(s) => s.as_str(),
         };
 
