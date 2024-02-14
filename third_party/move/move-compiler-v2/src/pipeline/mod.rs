@@ -4,6 +4,7 @@
 
 use crate::pipeline::{
     avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    exit_state_analysis::ExitStateAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
@@ -15,6 +16,7 @@ pub mod ability_checker;
 pub mod avail_copies_analysis;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
+pub mod exit_state_analysis;
 pub mod explicit_drop;
 pub mod livevar_analysis_processor;
 pub mod reference_safety_processor;
@@ -27,6 +29,7 @@ pub mod visibility_checker;
 /// to visualize the result of an analysis as annotations on the bytecode, for
 /// debugging.
 pub fn register_formatters(target: &FunctionTarget) {
+    ExitStateAnalysisProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
     ReferenceSafetyProcessor::register_formatters(target);
     AvailCopiesAnalysisProcessor::register_formatters(target);

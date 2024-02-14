@@ -15,7 +15,8 @@ pub mod pipeline;
 use crate::pipeline::{
     ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-    explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
+    exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
+    livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor,
@@ -213,6 +214,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
+        // only used for ability checking
+        pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }

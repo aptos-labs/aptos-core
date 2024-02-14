@@ -10,7 +10,8 @@ use move_compiler_v2::{
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-        explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
+        exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
+        livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
@@ -227,12 +228,23 @@ impl TestConfig {
                 dump_annotated_targets: true,
                 dump_for_only_some_stages: None,
             }
+        } else if path.contains("/abort-analysis/") {
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
         } else if path.contains("/ability-checker/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,

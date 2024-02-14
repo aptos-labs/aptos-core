@@ -315,6 +315,104 @@ fun ability::no_key($t0: address) {
  10: return ()
 }
 
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun ability::invalid_copy() {
+     var $t0: ability::Impotent
+     var $t1: ability::Impotent
+     var $t2: bool
+     var $t3: ability::Impotent
+     var $t4: ability::Impotent
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t1 := pack ability::Impotent($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t0 := move($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t3 := copy($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: $t4 := move($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {}
+  7: return ()
+}
+
+
+[variant baseline]
+fun ability::invalid_move_to($t0: &signer) {
+     var $t1: ability::Impotent
+     var $t2: bool
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  0: $t2 := false
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  1: $t1 := pack ability::Impotent($t2)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  2: move_to<ability::Impotent>($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
+  3: return ()
+}
+
+
+[variant baseline]
+fun ability::no_key($t0: address) {
+     var $t1: address
+     var $t2: ability::Impotent
+     var $t3: ability::S<ability::Impotent>
+     var $t4: &mut ability::Impotent
+     var $t5: &ability::Impotent
+     var $t6: bool
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  0: $t1 := copy($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  1: $t2 := move_from<ability::Impotent>($t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  2: drop($t2)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  3: $t3 := move_from<ability::S<ability::Impotent>>($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  4: drop($t3)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  5: $t4 := borrow_global<ability::Impotent>($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  6: drop($t4)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  7: $t5 := borrow_global<ability::Impotent>($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: drop($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: $t6 := exists<ability::Impotent>($t0)
+     # abort state before: {returns}
+     # abort state after : {}
+ 10: return ()
+}
+
 
 Diagnostics:
 error: cannot drop
@@ -398,13 +496,29 @@ fun ability::invalid_copy() {
      var $t2: bool
      var $t3: ability::Impotent
      var $t4: ability::Impotent
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t1 := pack ability::Impotent($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t0 := move($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t3 := copy($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: $t4 := move($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {}
   7: return ()
 }
 
@@ -413,9 +527,17 @@ fun ability::invalid_copy() {
 fun ability::invalid_move_to($t0: &signer) {
      var $t1: ability::Impotent
      var $t2: bool
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t2 := false
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t1 := pack ability::Impotent($t2)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   2: move_to<ability::Impotent>($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
   3: return ()
 }
 
@@ -428,15 +550,37 @@ fun ability::no_key($t0: address) {
      var $t4: &mut ability::Impotent
      var $t5: &ability::Impotent
      var $t6: bool
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t1 := copy($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t2 := move_from<ability::Impotent>($t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   2: drop($t2)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   3: $t3 := move_from<ability::S<ability::Impotent>>($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   4: drop($t3)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   5: $t4 := borrow_global<ability::Impotent>($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   6: drop($t4)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   7: $t5 := borrow_global<ability::Impotent>($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   8: drop($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: $t6 := exists<ability::Impotent>($t0)
+     # abort state before: {returns}
+     # abort state after : {}
  10: return ()
 }
