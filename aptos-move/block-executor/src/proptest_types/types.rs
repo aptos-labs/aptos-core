@@ -1100,6 +1100,20 @@ where
         }
     }
 
+    fn discard_output(_discard_code: move_core_types::vm_status::StatusCode) -> Self {
+        Self {
+            writes: vec![],
+            group_writes: vec![],
+            deltas: vec![],
+            events: vec![],
+            read_results: vec![],
+            read_group_sizes: vec![],
+            materialized_delta_writes: OnceCell::new(),
+            total_gas: 0,
+            skipped: true,
+        }
+    }
+
     fn materialize_agg_v1(
         &self,
         _view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
