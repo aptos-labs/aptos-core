@@ -30,7 +30,7 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{
-        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type, TypeContext
+        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type, TypeContext,
     },
 };
 use parking_lot::RwLock;
@@ -44,12 +44,10 @@ use std::{
 mod function;
 mod modules;
 mod script;
-mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
 pub(crate) use script::{Script, ScriptCache};
-use type_loader::intern_type;
 
 type ScriptHash = [u8; 32];
 
@@ -336,6 +334,7 @@ impl Loader {
     // necessary type as stored in the map. The expected type must be a concrete type (no TyParam).
     // Returns true if a successful match is made.
     fn match_return_type<'a>(
+        &'a self,
         returned: &Type,
         expected: &'a Type,
         map: &mut BTreeMap<u16, &'a Type>,
@@ -351,12 +350,17 @@ impl Loader {
             },
             // Recursive types we need to recurse the matching types
             (Type::Reference(ret_inner), Type::Reference(expected_inner))
-            | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner)) => {
-                Self::match_return_type(ret_inner, expected_inner, map)
-            },
-            (Type::Vector(ret_inner), Type::Vector(expected_inner)) => {
-                Self::match_return_type(ret_inner, expected_inner, map)
-            },
+            | (Type::MutableReference(ret_inner), Type::MutableReference(expected_inner)) => self
+                .match_return_type(
+                    self.type_context.get_type_by_index(*ret_inner),
+                    self.type_context.get_type_by_index(*expected_inner),
+                    map,
+                ),
+            (Type::Vector(ret_inner), Type::Vector(expected_inner)) => self.match_return_type(
+                self.type_context.get_type_by_index(*ret_inner),
+                self.type_context.get_type_by_index(*expected_inner),
+                map,
+            ),
             // Abilities should not contribute to the equality check as they just serve for caching computations.
             // For structs the both need to be the same struct.
             (
@@ -367,23 +371,20 @@ impl Loader {
             ) => *ret_idx == *expected_idx,
             // For struct instantiations we need to additionally match all type arguments
             (
+                Type::StructInstantiation { idx: ret_idx, .. },
                 Type::StructInstantiation {
-                    idx: ret_idx,
-                    ty_args: ret_fields,
-                    ..
-                },
-                Type::StructInstantiation {
-                    idx: expected_idx,
-                    ty_args: expected_fields,
-                    ..
+                    idx: expected_idx, ..
                 },
             ) => {
+                let (ret_idx, ret_fields) = self.type_context.get_instantiation_by_index(*ret_idx);
+                let (expected_idx, expected_fields) =
+                    self.type_context.get_instantiation_by_index(*expected_idx);
                 *ret_idx == *expected_idx
                     && ret_fields.len() == expected_fields.len()
                     && ret_fields
                         .iter()
                         .zip(expected_fields.iter())
-                        .all(|types| Self::match_return_type(types.0, types.1, map))
+                        .all(|types| self.match_return_type(types.0, types.1, map))
             },
             // For primitive types we need to assure the types match
             (Type::U8, Type::U8)
@@ -441,7 +442,7 @@ impl Loader {
         let return_type = &return_vec[0];
 
         let mut map = BTreeMap::new();
-        if !Self::match_return_type(return_type, expected_return_type, &mut map) {
+        if !self.match_return_type(return_type, expected_return_type, &mut map) {
             // For functions that are marked constructor this should not happen.
             return Err(
                 PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
@@ -704,11 +705,10 @@ impl Loader {
             TypeTag::U256 => Type::U256,
             TypeTag::Address => Type::Address,
             TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(tt) => Type::Vector(triomphe::Arc::new(self.load_type(
-                tt,
-                data_store,
-                module_store,
-            )?)),
+            TypeTag::Vector(tt) => Type::Vector(
+                self.type_context
+                    .get_idx_by_type(self.load_type(tt, data_store, module_store)?),
+            ),
             TypeTag::Struct(struct_tag) => {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store, module_store)?;
@@ -728,9 +728,12 @@ impl Loader {
                     }
                     self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
                         .map_err(|e| e.finish(Location::Undefined))?;
+
+                    let inst_idx = self
+                        .type_context
+                        .get_idx_by_instantiation(struct_type.idx, type_params);
                     Type::StructInstantiation {
-                        idx: struct_type.idx,
-                        ty_args: triomphe::Arc::new(type_params),
+                        idx: inst_idx,
                         ability: AbilityInfo::generic_struct(
                             struct_type.abilities,
                             struct_type.phantom_ty_args_mask.clone(),
@@ -1061,12 +1064,12 @@ impl Loader {
                     return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
                 }
             },
-            Type::StructInstantiation {
-                ty_args: struct_inst,
-                ..
-            } => {
+            Type::StructInstantiation { idx, .. } => {
                 let mut sum_nodes = 1u64;
-                for ty in ty_args.iter().chain(struct_inst.iter()) {
+                for ty in ty_args
+                    .iter()
+                    .chain(self.type_context.get_instantiation_by_index(*idx).1.iter())
+                {
                     sum_nodes = sum_nodes.saturating_add(self.count_type_nodes(ty));
                     if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
                         return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
@@ -1085,7 +1088,7 @@ impl Loader {
             | Type::U128
             | Type::U256 => (),
         };
-        ty.subst(ty_args)
+        self.type_context.subst(ty, ty_args)
     }
 
     // Verify the kind (constraints) of an instantiation.
@@ -1103,7 +1106,7 @@ impl Loader {
             ));
         }
         for (ty, expected_k) in ty_args.iter().zip(constraints) {
-            if !expected_k.is_subset(ty.abilities()?) {
+            if !expected_k.is_subset(self.type_context.abilities(ty)?) {
                 return Err(PartialVMError::new(StatusCode::CONSTRAINT_NOT_SATISFIED));
             }
         }
@@ -1221,8 +1224,9 @@ impl<'a> Resolver<'a> {
 
         if let Some(gas_meter) = gas_meter {
             for ty in &func_inst.instantiation {
-                gas_meter
-                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+                gas_meter.charge_create_ty(NumTypeNodes::new(
+                    self.loader.type_context.num_nodes_in_subst(ty, ty_args)? as u64,
+                ))?;
             }
         }
 
@@ -1289,15 +1293,16 @@ impl<'a> Resolver<'a> {
         }
 
         let struct_ = &struct_inst.definition_struct_type;
+        let idx = self.loader().type_context.get_idx_by_instantiation(
+            struct_.idx,
+            struct_inst
+                .instantiation
+                .iter()
+                .map(|ty| self.subst(ty, ty_args))
+                .collect::<PartialVMResult<_>>()?,
+        );
         Ok(Type::StructInstantiation {
-            idx: struct_.idx,
-            ty_args: triomphe::Arc::new(
-                struct_inst
-                    .instantiation
-                    .iter()
-                    .map(|ty| self.subst(ty, ty_args))
-                    .collect::<PartialVMResult<_>>()?,
-            ),
+            idx,
             ability: AbilityInfo::generic_struct(
                 struct_.abilities,
                 struct_.phantom_ty_args_mask.clone(),
@@ -1329,12 +1334,14 @@ impl<'a> Resolver<'a> {
         let instantiation_types = field_instantiation
             .instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
+            .map(|inst_ty| self.loader().type_context.subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         // TODO: Is this type substitution unbounded?
-        field_instantiation.definition_struct_type.fields[field_instantiation.offset]
-            .subst(&instantiation_types)
+        self.loader.type_context.subst(
+            &field_instantiation.definition_struct_type.fields[field_instantiation.offset],
+            &instantiation_types,
+        )
     }
 
     pub(crate) fn get_struct_fields(
@@ -1361,13 +1368,13 @@ impl<'a> Resolver<'a> {
         let instantiation_types = struct_inst
             .instantiation
             .iter()
-            .map(|inst_ty| inst_ty.subst(ty_args))
+            .map(|inst_ty| self.loader().type_context.subst(inst_ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         struct_type
             .fields
             .iter()
-            .map(|ty| ty.subst(&instantiation_types))
+            .map(|ty| self.loader().type_context.subst(ty, &instantiation_types))
             .collect::<PartialVMResult<Vec<_>>>()
     }
 
@@ -1452,15 +1459,16 @@ impl<'a> Resolver<'a> {
 
                 let struct_ = &field_inst.definition_struct_type;
 
+                let inst_idx = self.loader().type_context.get_idx_by_instantiation(
+                    struct_.idx,
+                    field_inst
+                        .instantiation
+                        .iter()
+                        .map(|ty| self.loader().type_context.subst(ty, args))
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                );
                 Ok(Type::StructInstantiation {
-                    idx: struct_.idx,
-                    ty_args: triomphe::Arc::new(
-                        field_inst
-                            .instantiation
-                            .iter()
-                            .map(|ty| ty.subst(args))
-                            .collect::<PartialVMResult<Vec<_>>>()?,
-                    ),
+                    idx: inst_idx,
                     ability: AbilityInfo::generic_struct(
                         struct_.abilities,
                         struct_.phantom_ty_args_mask.clone(),
@@ -1499,6 +1507,10 @@ impl<'a> Resolver<'a> {
     // get the loader
     pub(crate) fn module_store(&self) -> &ModuleStorageAdapter {
         self.module_store
+    }
+
+    pub(crate) fn abilities(&self, ty: &Type) -> PartialVMResult<AbilitySet> {
+        self.loader.type_context.abilities(ty)
     }
 }
 
@@ -1637,15 +1649,22 @@ impl Loader {
             Type::U256 => TypeTag::U256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
-            Type::Vector(ty) => TypeTag::Vector(Box::new(self.type_to_type_tag(ty)?)),
+            Type::Vector(ty) => TypeTag::Vector(Box::new(
+                self.type_to_type_tag(self.type_context.get_type_by_index(*ty))?,
+            )),
             Type::Struct { idx, .. } => TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
                 *idx,
                 &[],
                 gas_context,
             )?)),
-            Type::StructInstantiation { idx, ty_args, .. } => TypeTag::Struct(Box::new(
-                self.struct_name_to_type_tag(*idx, ty_args, gas_context)?,
-            )),
+            Type::StructInstantiation { idx, .. } => {
+                let (ty, ty_args) = self.type_context.get_instantiation_by_index(*idx);
+                TypeTag::Struct(Box::new(self.struct_name_to_type_tag(
+                    *ty,
+                    ty_args,
+                    gas_context,
+                )?))
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1662,15 +1681,15 @@ impl Loader {
             match ty {
                 Type::Vector(ty) => {
                     result += 1;
-                    todo.push(ty);
+                    todo.push(self.type_context.get_type_by_index(*ty));
                 },
                 Type::Reference(ty) | Type::MutableReference(ty) => {
                     result += 1;
-                    todo.push(ty);
+                    todo.push(self.type_context.get_type_by_index(*ty));
                 },
-                Type::StructInstantiation { ty_args, .. } => {
+                Type::StructInstantiation { idx, .. } => {
                     result += 1;
-                    todo.extend(ty_args.iter())
+                    todo.extend(self.type_context.get_instantiation_by_index(*idx).1.iter())
                 },
                 _ => {
                     result += 1;
@@ -1834,8 +1853,12 @@ impl Loader {
             },
             Type::Vector(ty) => {
                 *count += 1;
-                let (layout, has_identifier_mappings) =
-                    self.type_to_type_layout_impl(ty, module_store, count, depth + 1)?;
+                let (layout, has_identifier_mappings) = self.type_to_type_layout_impl(
+                    self.type_context.get_type_by_index(*ty),
+                    module_store,
+                    count,
+                    depth + 1,
+                )?;
                 (
                     MoveTypeLayout::Vector(Box::new(layout)),
                     has_identifier_mappings,
@@ -1848,11 +1871,17 @@ impl Loader {
                     self.struct_name_to_type_layout(module_store, *idx, &[], count, depth)?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
-            Type::StructInstantiation { idx, ty_args, .. } => {
+            Type::StructInstantiation { idx, .. } => {
                 *count += 1;
+                let (ty, ty_args) = self.type_context.get_instantiation_by_index(*idx);
                 // Note depth is incread inside struct_name_to_type_layout instead.
-                let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(module_store, *idx, ty_args, count, depth)?;
+                let (layout, has_identifier_mappings) = self.struct_name_to_type_layout(
+                    module_store,
+                    *ty,
+                    ty_args.as_ref(),
+                    count,
+                    depth,
+                )?;
                 (MoveTypeLayout::Struct(layout), has_identifier_mappings)
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -1952,21 +1981,27 @@ impl Loader {
             Type::U256 => MoveTypeLayout::U256,
             Type::Address => MoveTypeLayout::Address,
             Type::Signer => MoveTypeLayout::Signer,
-            Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
-                self.type_to_fully_annotated_layout_impl(ty, module_store, count, depth + 1)?,
-            )),
+            Type::Vector(ty) => {
+                MoveTypeLayout::Vector(Box::new(self.type_to_fully_annotated_layout_impl(
+                    self.type_context.get_type_by_index(*ty),
+                    module_store,
+                    count,
+                    depth + 1,
+                )?))
+            },
             Type::Struct { idx, .. } => MoveTypeLayout::Struct(
                 self.struct_name_to_fully_annotated_layout(*idx, module_store, &[], count, depth)?,
             ),
-            Type::StructInstantiation {
-                idx: name, ty_args, ..
-            } => MoveTypeLayout::Struct(self.struct_name_to_fully_annotated_layout(
-                *name,
-                module_store,
-                ty_args,
-                count,
-                depth,
-            )?),
+            Type::StructInstantiation { idx, .. } => {
+                let (name, ty_args) = self.type_context.get_instantiation_by_index(*idx);
+                MoveTypeLayout::Struct(self.struct_name_to_fully_annotated_layout(
+                    *name,
+                    module_store,
+                    ty_args.as_ref(),
+                    count,
+                    depth,
+                )?)
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -2024,12 +2059,18 @@ impl Loader {
             | Type::U32
             | Type::U256 => DepthFormula::constant(1),
             Type::Vector(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, module_store)?;
+                let mut inner = self.calculate_depth_of_type(
+                    self.type_context.get_type_by_index(*ty),
+                    module_store,
+                )?;
                 inner.scale(1);
                 inner
             },
             Type::Reference(ty) | Type::MutableReference(ty) => {
-                let mut inner = self.calculate_depth_of_type(ty, module_store)?;
+                let mut inner = self.calculate_depth_of_type(
+                    self.type_context.get_type_by_index(*ty),
+                    module_store,
+                )?;
                 inner.scale(1);
                 inner
             },
@@ -2040,7 +2081,8 @@ impl Loader {
                 struct_formula.scale(1);
                 struct_formula
             },
-            Type::StructInstantiation { idx, ty_args, .. } => {
+            Type::StructInstantiation { idx, .. } => {
+                let (ty, ty_args) = self.type_context.get_instantiation_by_index(*idx);
                 let ty_arg_map = ty_args
                     .iter()
                     .enumerate()
@@ -2049,7 +2091,7 @@ impl Loader {
                         Ok((var, self.calculate_depth_of_type(ty, module_store)?))
                     })
                     .collect::<PartialVMResult<BTreeMap<_, _>>>()?;
-                let struct_formula = self.calculate_depth_of_struct(*idx, module_store)?;
+                let struct_formula = self.calculate_depth_of_struct(*ty, module_store)?;
                 let mut subst_struct_formula = struct_formula.subst(ty_arg_map)?;
                 subst_struct_formula.scale(1);
                 subst_struct_formula

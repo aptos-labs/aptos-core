@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    intern_type, BinaryCache, Function, FunctionHandle, FunctionInstantiation,
-    ModuleStorageAdapter, Scope, ScriptHash,
+    BinaryCache, Function, FunctionHandle, FunctionInstantiation, ModuleStorageAdapter, Scope,
+    ScriptHash,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -86,7 +86,8 @@ impl Script {
             let mut instantiation = vec![];
             for ty in &script.signature_at(func_inst.type_parameters).0 {
                 instantiation.push(
-                    intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)
+                    type_context
+                        .load_signature_token(BinaryIndexedView::Script(&script), ty, &struct_names)
                         .map_err(|e| e.finish(Location::Script))?,
                 );
             }
@@ -104,7 +105,13 @@ impl Script {
         let parameter_tys = parameters
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| {
+                type_context.load_signature_token(
+                    BinaryIndexedView::Script(&script),
+                    tok,
+                    &struct_names,
+                )
+            })
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let locals = Signature(
@@ -118,14 +125,26 @@ impl Script {
         let local_tys = locals
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| {
+                type_context.load_signature_token(
+                    BinaryIndexedView::Script(&script),
+                    tok,
+                    &struct_names,
+                )
+            })
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let return_ = Signature(vec![]);
         let return_tys = return_
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| {
+                type_context.load_signature_token(
+                    BinaryIndexedView::Script(&script),
+                    tok,
+                    &struct_names,
+                )
+            })
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let type_parameters = script.type_parameters.clone();
@@ -175,7 +194,12 @@ impl Script {
                         };
                         single_signature_token_map.insert(
                             *si,
-                            intern_type(BinaryIndexedView::Script(&script), ty, &struct_names)
+                            type_context
+                                .load_signature_token(
+                                    BinaryIndexedView::Script(&script),
+                                    ty,
+                                    &struct_names,
+                                )
                                 .map_err(|e| e.finish(Location::Script))?,
                         );
                     }

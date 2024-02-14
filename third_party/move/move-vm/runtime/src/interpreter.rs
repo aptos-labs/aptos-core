@@ -324,8 +324,9 @@ impl Interpreter {
         locals: Locals,
     ) -> PartialVMResult<Frame> {
         for ty in function.local_types() {
-            gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(&ty_args)? as u64))?;
+            gas_meter.charge_create_ty(NumTypeNodes::new(
+                loader.type_context.num_nodes_in_subst(ty, &ty_args)? as u64,
+            ))?;
         }
 
         let local_tys = if self.paranoid_type_checks {
@@ -1072,10 +1073,18 @@ fn check_depth_of_type_impl(
         | Type::Signer => check_depth!(0),
         // Even though this is recursive this is OK since the depth of this recursion is
         // bounded by the depth of the type arguments, which we have already checked.
-        Type::Reference(ty) | Type::MutableReference(ty) => {
-            check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?
-        },
-        Type::Vector(ty) => check_depth_of_type_impl(resolver, ty, max_depth, check_depth!(1))?,
+        Type::Reference(ty) | Type::MutableReference(ty) => check_depth_of_type_impl(
+            resolver,
+            resolver.loader().type_context.get_type_by_index(*ty),
+            max_depth,
+            check_depth!(1),
+        )?,
+        Type::Vector(ty) => check_depth_of_type_impl(
+            resolver,
+            resolver.loader().type_context.get_type_by_index(*ty),
+            max_depth,
+            check_depth!(1),
+        )?,
         Type::Struct { idx, .. } => {
             let formula = resolver
                 .loader()
@@ -1083,7 +1092,11 @@ fn check_depth_of_type_impl(
             check_depth!(formula.solve(&[]))
         },
         // NB: substitution must be performed before calling this function
-        Type::StructInstantiation { idx, ty_args, .. } => {
+        Type::StructInstantiation { idx, .. } => {
+            let (struct_idx, ty_args) = resolver
+                .loader()
+                .type_context
+                .get_instantiation_by_index(*idx);
             // Calculate depth of all type arguments, and make sure they themselves are not too deep.
             let ty_arg_depths = ty_args
                 .iter()
@@ -1094,7 +1107,7 @@ fn check_depth_of_type_impl(
                 .collect::<PartialVMResult<Vec<_>>>()?;
             let formula = resolver
                 .loader()
-                .calculate_depth_of_struct(*idx, resolver.module_store())?;
+                .calculate_depth_of_struct(*struct_idx, resolver.module_store())?;
             check_depth!(formula.solve(&ty_arg_depths))
         },
         Type::TyParam(_) => {
@@ -1182,9 +1195,12 @@ impl FrameTypeCache {
         let ((field_type, field_type_count), (struct_ty, struct_type_count)) =
             Self::get_or(&mut self.field_instantiation, idx, |idx| {
                 let struct_type = resolver.field_instantiation_to_struct(idx, ty_args)?;
-                let struct_type_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let struct_type_count = NumTypeNodes::new(
+                    resolver.loader().type_context.num_nodes(&struct_type) as u64,
+                );
                 let field_type = resolver.get_field_type_generic(idx, ty_args)?;
-                let field_type_count = NumTypeNodes::new(field_type.num_nodes() as u64);
+                let field_type_count =
+                    NumTypeNodes::new(resolver.loader().type_context.num_nodes(&field_type) as u64);
                 Ok((
                     (field_type, field_type_count),
                     (struct_type, struct_type_count),
@@ -1205,7 +1221,7 @@ impl FrameTypeCache {
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.struct_def_instantiation, idx, |idx| {
             let ty = resolver.get_struct_type_generic(idx, ty_args)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            let ty_count = NumTypeNodes::new(resolver.loader().type_context.num_nodes(&ty) as u64);
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
@@ -1226,7 +1242,8 @@ impl FrameTypeCache {
                     .instantiate_generic_struct_fields(idx, ty_args)?
                     .into_iter()
                     .map(|ty| {
-                        let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        let num_nodes =
+                            NumTypeNodes::new(resolver.loader().type_context.num_nodes(&ty) as u64);
                         (ty, num_nodes)
                     })
                     .collect::<Vec<_>>())
@@ -1243,7 +1260,7 @@ impl FrameTypeCache {
     ) -> PartialVMResult<(&Type, NumTypeNodes)> {
         let (ty, ty_count) = Self::get_or(&mut self.single_sig_token, idx, |idx| {
             let ty = resolver.instantiate_single_type(idx, ty_args)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            let ty_count = NumTypeNodes::new(resolver.loader().type_context.num_nodes(&ty) as u64);
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
@@ -1280,7 +1297,7 @@ impl Frame {
         local_tys: &[Type],
         locals: &Locals,
         _ty_args: &[Type],
-        _resolver: &Resolver,
+        resolver: &Resolver,
         interpreter: &mut Interpreter,
         instruction: &Bytecode,
     ) -> PartialVMResult<()> {
@@ -1294,7 +1311,7 @@ impl Frame {
             Bytecode::Ret => {
                 for (idx, ty) in local_tys.iter().enumerate() {
                     if !locals.is_invalid(idx)? {
-                        check_ability(ty.abilities()?.has_drop())?;
+                        check_ability(resolver.abilities(ty)?.has_drop())?;
                     }
                 }
             },
@@ -1307,7 +1324,7 @@ impl Frame {
                 let val_ty = interpreter.operand_stack.pop_ty()?;
                 ty.check_eq(&val_ty)?;
                 if !locals.is_invalid(*idx as usize)? {
-                    check_ability(ty.abilities()?.has_drop())?;
+                    check_ability(resolver.abilities(&ty)?.has_drop())?;
                 }
             },
             // We will check the rest of the instructions after execution phase.
@@ -1407,7 +1424,7 @@ impl Frame {
             },
             Bytecode::Pop => {
                 let ty = interpreter.operand_stack.pop_ty()?;
-                check_ability(ty.abilities()?.has_drop())?;
+                check_ability(resolver.abilities(&ty)?.has_drop())?;
             },
             Bytecode::LdU8(_) => interpreter.operand_stack.push_ty(Type::U8)?,
             Bytecode::LdU16(_) => interpreter.operand_stack.push_ty(Type::U16)?,
@@ -1420,13 +1437,16 @@ impl Frame {
             },
             Bytecode::LdConst(i) => {
                 let constant = resolver.constant_at(*i);
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::from_const_signature(&constant.type_)?)?;
+                interpreter.operand_stack.push_ty(
+                    resolver
+                        .loader()
+                        .type_context
+                        .from_const_signature(&constant.type_)?,
+                )?;
             },
             Bytecode::CopyLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
-                check_ability(ty.abilities()?.has_copy())?;
+                check_ability(resolver.abilities(&ty)?.has_copy())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveLoc(idx) => {
@@ -1436,59 +1456,81 @@ impl Frame {
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                interpreter.operand_stack.push_ty(Type::MutableReference(
+                    resolver.loader().type_context.get_idx_by_type(ty),
+                ))?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                interpreter.operand_stack.push_ty(Type::Reference(
+                    resolver.loader().type_context.get_idx_by_type(ty),
+                ))?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_ref_eq(&expected_ty)?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(resolver.get_field_type(*fh_idx)?)))?;
+                resolver
+                    .loader()
+                    .type_context
+                    .check_ref_eq(&top_ty, &expected_ty)?;
+                interpreter.operand_stack.push_ty(Type::Reference(
+                    resolver
+                        .loader()
+                        .type_context
+                        .get_idx_by_type(resolver.get_field_type(*fh_idx)?),
+                ))?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_eq(&Type::MutableReference(Box::new(expected_ty)))?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(
-                        resolver.get_field_type(*fh_idx)?,
-                    )))?;
+                top_ty.check_eq(&Type::MutableReference(
+                    resolver.loader().type_context.get_idx_by_type(expected_ty),
+                ))?;
+                interpreter.operand_stack.push_ty(Type::MutableReference(
+                    resolver
+                        .loader()
+                        .type_context
+                        .get_idx_by_type(resolver.get_field_type(*fh_idx)?),
+                ))?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
                     frame_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_ref_eq(expected_struct_ty)?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(expected_field_ty.clone())))?;
+                resolver
+                    .loader()
+                    .type_context
+                    .check_ref_eq(&top_ty, expected_struct_ty)?;
+                interpreter.operand_stack.push_ty(Type::Reference(
+                    resolver
+                        .loader()
+                        .type_context
+                        .get_idx_by_type(expected_field_ty.clone()),
+                ))?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
                     frame_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_eq(&Type::MutableReference(Box::new(
-                    expected_struct_ty.clone(),
-                )))?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(expected_field_ty.clone())))?;
+                let ref_ty = Type::MutableReference(
+                    resolver
+                        .loader()
+                        .type_context
+                        .get_idx_by_type(expected_struct_ty.clone()),
+                );
+                top_ty.check_eq(&ref_ty)?;
+                interpreter.operand_stack.push_ty(Type::MutableReference(
+                    resolver
+                        .loader()
+                        .type_context
+                        .get_idx_by_type(expected_field_ty.clone()),
+                ))?;
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct_fields(*idx)?;
                 let output_ty = resolver.get_struct_type(*idx)?;
-                let ability = output_ty.abilities()?;
+                let ability = resolver.abilities(&output_ty)?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
@@ -1514,7 +1556,7 @@ impl Frame {
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    check_ability(field_expected_abilities.is_subset(ty.abilities()?))?;
+                    check_ability(field_expected_abilities.is_subset(resolver.abilities(&ty)?))?;
                     ty.check_eq(expected_ty)?;
                 }
 
@@ -1527,7 +1569,7 @@ impl Frame {
                     .0
                     .clone();
                 let args_ty = frame_cache.get_struct_fields(*idx, resolver, ty_args)?;
-                let ability = output_ty.abilities()?;
+                let ability = resolver.abilities(&output_ty)?;
 
                 // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
@@ -1553,7 +1595,7 @@ impl Frame {
                 {
                     // Fields ability should be a subset of the struct ability because abilities can be weakened but not the other direction.
                     // For example, it is ok to have a struct that doesn't have a copy capability where its field is a struct that has copy capability but not vice versa.
-                    check_ability(field_expected_abilities.is_subset(ty.abilities()?))?;
+                    check_ability(field_expected_abilities.is_subset(resolver.abilities(&ty)?))?;
                     ty.check_eq(expected_ty)?;
                 }
 
@@ -1581,8 +1623,9 @@ impl Frame {
                 let ref_ty = interpreter.operand_stack.pop_ty()?;
                 match ref_ty {
                     Type::Reference(inner) | Type::MutableReference(inner) => {
-                        check_ability(inner.abilities()?.has_copy())?;
-                        interpreter.operand_stack.push_ty(inner.as_ref().clone())?;
+                        let inner_ty = resolver.loader().type_context.get_type_by_index(inner);
+                        check_ability(resolver.abilities(inner_ty)?.has_copy())?;
+                        interpreter.operand_stack.push_ty(inner_ty.clone())?;
                     },
                     _ => {
                         return Err(PartialVMError::new(
@@ -1597,8 +1640,9 @@ impl Frame {
                 let val_ty = interpreter.operand_stack.pop_ty()?;
                 match ref_ty {
                     Type::MutableReference(inner) => {
-                        if *inner == val_ty {
-                            check_ability(inner.abilities()?.has_drop())?;
+                        let inner_ty = resolver.loader().type_context.get_type_by_index(inner);
+                        if *inner_ty == val_ty {
+                            check_ability(resolver.abilities(inner_ty)?.has_drop())?;
                         } else {
                             return Err(PartialVMError::new(
                                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -1680,7 +1724,7 @@ impl Frame {
                             ),
                     );
                 }
-                check_ability(lhs.abilities()?.has_drop())?;
+                check_ability(resolver.abilities(&lhs)?.has_drop())?;
                 interpreter.operand_stack.push_ty(Type::Bool)?;
             },
             Bytecode::MutBorrowGlobal(idx) => {
@@ -1689,10 +1733,10 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.get_struct_type(*idx)?;
-                check_ability(ty.abilities()?.has_key())?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
+                interpreter.operand_stack.push_ty(Type::MutableReference(
+                    resolver.loader().type_context.get_idx_by_type(ty),
+                ))?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
                 interpreter
@@ -1700,10 +1744,10 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.get_struct_type(*idx)?;
-                check_ability(ty.abilities()?.has_key())?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
+                interpreter.operand_stack.push_ty(Type::Reference(
+                    resolver.loader().type_context.get_idx_by_type(ty),
+                ))?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
                 interpreter
@@ -1714,10 +1758,10 @@ impl Frame {
                     .get_struct_type(*idx, resolver, ty_args)?
                     .0
                     .clone();
-                check_ability(ty.abilities()?.has_key())?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
+                interpreter.operand_stack.push_ty(Type::MutableReference(
+                    resolver.loader().type_context.get_idx_by_type(ty),
+                ))?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
                 interpreter
@@ -1728,10 +1772,10 @@ impl Frame {
                     .get_struct_type(*idx, resolver, ty_args)?
                     .0
                     .clone();
-                check_ability(ty.abilities()?.has_key())?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
+                interpreter.operand_stack.push_ty(Type::Reference(
+                    resolver.loader().type_context.get_idx_by_type(ty),
+                ))?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
                 interpreter
@@ -1745,18 +1789,22 @@ impl Frame {
                 interpreter
                     .operand_stack
                     .pop_ty()?
-                    .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
+                    .check_eq(&Type::Reference(
+                        resolver.loader().type_context.get_idx_by_type(Type::Signer),
+                    ))?;
                 ty.check_eq(&resolver.get_struct_type(*idx)?)?;
-                check_ability(ty.abilities()?.has_key())?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
-                    .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
+                    .check_eq(&Type::Reference(
+                        resolver.loader().type_context.get_idx_by_type(Type::Signer),
+                    ))?;
                 ty.check_eq(frame_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
-                check_ability(ty.abilities()?.has_key())?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
             },
             Bytecode::MoveFrom(idx) => {
                 interpreter
@@ -1764,7 +1812,7 @@ impl Frame {
                     .pop_ty()?
                     .check_eq(&Type::Address)?;
                 let ty = resolver.get_struct_type(*idx)?;
-                check_ability(ty.abilities()?.has_key())?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
@@ -1776,7 +1824,7 @@ impl Frame {
                     .get_struct_type(*idx, resolver, ty_args)?
                     .0
                     .clone();
-                check_ability(ty.abilities()?.has_key())?;
+                check_ability(resolver.abilities(&ty)?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {
@@ -1803,54 +1851,59 @@ impl Frame {
                 for elem_ty in elem_tys.iter() {
                     elem_ty.check_eq(ty)?;
                 }
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Vector(triomphe::Arc::new(ty.clone())))?;
+                interpreter.operand_stack.push_ty(Type::Vector(
+                    resolver.loader().type_context.get_idx_by_type(ty.clone()),
+                ))?;
             },
             Bytecode::VecLen(si) => {
                 let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_vec_ref(ty, false)?;
+                resolver.loader().type_context.check_vec_ref(
+                    &interpreter.operand_stack.pop_ty()?,
+                    ty,
+                    false,
+                )?;
                 interpreter.operand_stack.push_ty(Type::U64)?;
             },
             Bytecode::VecImmBorrow(si) => {
                 let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
-                let inner_ty = interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_vec_ref(ty, false)?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::Reference(Box::new(inner_ty)))?;
+                let inner_ty = resolver.loader().type_context.check_vec_ref(
+                    &interpreter.operand_stack.pop_ty()?,
+                    ty,
+                    false,
+                )?;
+                interpreter.operand_stack.push_ty(Type::Reference(
+                    resolver.loader().type_context.get_idx_by_type(inner_ty),
+                ))?;
             },
             Bytecode::VecMutBorrow(si) => {
                 let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
-                let inner_ty = interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_vec_ref(ty, true)?;
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(inner_ty)))?;
+                let inner_ty = resolver.loader().type_context.check_vec_ref(
+                    &interpreter.operand_stack.pop_ty()?,
+                    ty,
+                    true,
+                )?;
+                interpreter.operand_stack.push_ty(Type::MutableReference(
+                    resolver.loader().type_context.get_idx_by_type(inner_ty),
+                ))?;
             },
             Bytecode::VecPushBack(si) => {
                 let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(ty)?;
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_vec_ref(ty, true)?;
+                resolver.loader().type_context.check_vec_ref(
+                    &interpreter.operand_stack.pop_ty()?,
+                    ty,
+                    true,
+                )?;
             },
             Bytecode::VecPopBack(si) => {
                 let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                let inner_ty = interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_vec_ref(ty, true)?;
+                let inner_ty = resolver.loader().type_context.check_vec_ref(
+                    &interpreter.operand_stack.pop_ty()?,
+                    ty,
+                    true,
+                )?;
                 interpreter.operand_stack.push_ty(inner_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
@@ -1858,9 +1911,10 @@ impl Frame {
                 let vec_ty = interpreter.operand_stack.pop_ty()?;
                 match vec_ty {
                     Type::Vector(v) => {
-                        v.check_eq(ty)?;
+                        let vec_ty = resolver.loader().type_context.get_type_by_index(v);
+                        vec_ty.check_eq(ty)?;
                         for _ in 0..*num {
-                            interpreter.operand_stack.push_ty(v.as_ref().clone())?;
+                            interpreter.operand_stack.push_ty(vec_ty.clone())?;
                         }
                     },
                     _ => {
@@ -1875,10 +1929,11 @@ impl Frame {
                 let (ty, _) = frame_cache.get_signature_index_type(*si, resolver, ty_args)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
                 interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_vec_ref(ty, true)?;
+                resolver.loader().type_context.check_vec_ref(
+                    &interpreter.operand_stack.pop_ty()?,
+                    ty,
+                    true,
+                )?;
             },
         }
         Ok(())

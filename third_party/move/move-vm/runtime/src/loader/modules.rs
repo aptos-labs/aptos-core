@@ -5,7 +5,6 @@
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
-        type_loader::intern_type,
         BinaryCache,
     },
     native_functions::NativeFunctions,
@@ -295,15 +294,23 @@ impl Module {
                         .0
                         .iter()
                         .map(|sig| {
-                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs)
+                            type_context.load_signature_token(
+                                BinaryIndexedView::Module(&module),
+                                sig,
+                                &struct_idxs,
+                            )
                         })
                         .collect::<PartialVMResult<Vec<_>>>()?,
                 )
             }
 
             for (idx, struct_def) in module.struct_defs().iter().enumerate() {
-                let definition_struct_type =
-                    Arc::new(Self::make_struct_type(&module, struct_def, &struct_idxs)?);
+                let definition_struct_type = Arc::new(Self::make_struct_type(
+                    &module,
+                    struct_def,
+                    &struct_idxs,
+                    type_context,
+                )?);
                 structs.push(StructDef {
                     field_count: definition_struct_type.fields.len() as u16,
                     definition_struct_type,
@@ -358,7 +365,7 @@ impl Module {
                                     };
                                     single_signature_token_map.insert(
                                         *si,
-                                        intern_type(
+                                        type_context.load_signature_token(
                                             BinaryIndexedView::Module(&module),
                                             ty,
                                             &struct_idxs,
@@ -450,6 +457,7 @@ impl Module {
         module: &CompiledModule,
         struct_def: &StructDefinition,
         struct_name_table: &[StructNameIndex],
+        type_context: &TypeContext,
     ) -> PartialVMResult<StructType> {
         let struct_handle = module.struct_handle_at(struct_def.struct_handle);
         let field_names = match &struct_def.field_information {
@@ -469,7 +477,7 @@ impl Module {
 
         let mut field_tys = vec![];
         for field in fields {
-            let ty = intern_type(
+            let ty = type_context.load_signature_token(
                 BinaryIndexedView::Module(module),
                 &field.signature.0,
                 struct_name_table,

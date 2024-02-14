@@ -4,28 +4,19 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
+use crate::loaded_data::IndexMap;
 use derivative::Derivative;
 use move_binary_format::{
+    binary_views::BinaryIndexedView,
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
-    binary_views::BinaryIndexedView,
 };
-use move_core_types::{
-    gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
-use std::{
-    cell::RefCell,
-    cmp::max,
-    collections::{btree_map, BTreeMap},
-    fmt::Debug,
-};
-use triomphe::Arc as TriompheArc;
-use crate::loaded_data::IndexMap;
+use std::{cmp::max, collections::BTreeMap, fmt::Debug, cell::RefCell, collections::btree_map};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -190,8 +181,14 @@ pub enum Type {
     Address,
     Signer,
     Vector(TypeIndex),
-    Struct(StructNameIndex),
-    StructInstantiation(StructInstantiationIndex),
+    Struct {
+        idx: StructNameIndex,
+        ability: AbilityInfo,
+    },
+    StructInstantiation {
+        idx: StructInstantiationIndex,
+        ability: AbilityInfo,
+    },
     Reference(TypeIndex),
     MutableReference(TypeIndex),
     TyParam(u16),
@@ -200,11 +197,16 @@ pub enum Type {
     U256,
 }
 
+pub struct TypeContext {
+    identifier_cache: IndexMap<StructIdentifier>,
+    instantiation_map: IndexMap<(StructNameIndex, Vec<Type>)>,
+    type_id_map: IndexMap<Type>,
+}
+
 pub struct TypePreorderTraversalIter<'a> {
     context: &'a TypeContext,
     stack: SmallVec<[&'a Type; 32]>,
 }
-
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
@@ -234,7 +236,9 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                         self.stack.push(self.context.type_id_map.get_by_index(ty.0));
                     },
 
-                    StructInstantiation(inst) =>self.stack.extend(self.context.instantiation_map.get_by_index(inst.0).1.iter().rev())
+                    StructInstantiation { idx, .. } => self
+                        .stack
+                        .extend(self.context.instantiation_map.get_by_index(idx.0).1.iter()),
                 }
                 Some(ty)
             },
@@ -243,173 +247,146 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     }
 }
 
-impl Type {
-    pub fn check_eq(&self, other: &Self) -> PartialVMResult<()> {
-       Self::check_eq_impl(self, other)
+// Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
+#[derive(Derivative)]
+#[derivative(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
+pub struct AbilityInfo {
+    #[derivative(
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
+    base_ability_set: AbilitySet,
+
+    #[derivative(
+        PartialEq = "ignore",
+        Hash = "ignore",
+        Ord = "ignore",
+        PartialOrd = "ignore"
+    )]
+    phantom_ty_args_mask: SmallBitVec,
+}
+
+impl AbilityInfo {
+    pub fn struct_(ability: AbilitySet) -> Self {
+        Self {
+            base_ability_set: ability,
+            phantom_ty_args_mask: SmallBitVec::new(),
+        }
     }
 
-    fn check_eq_impl<T: Eq + Debug>(lhs: &T, rhs: &T) -> PartialVMResult<()> {
-        if lhs != rhs {
+    pub fn generic_struct(base_ability_set: AbilitySet, phantom_ty_args_mask: SmallBitVec) -> Self {
+        Self {
+            base_ability_set,
+            phantom_ty_args_mask,
+        }
+    }
+}
+
+impl Type {
+    pub fn check_eq(&self, other: &Self) -> PartialVMResult<()> {
+        if self != other {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message(format!(
                         "Type mismatch: expected {:?}, got {:?}",
-                        lhs, rhs
+                        self, other
                     ))
                     .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
             );
         }
         Ok(())
     }
-
-    pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
-        match self {
-            Type::Bool
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128
-            | Type::U256
-            | Type::Address => Ok(AbilitySet::PRIMITIVES),
-
-            // Technically unreachable but, no point in erroring if we don't have to
-            Type::Reference(_) | Type::MutableReference(_) => Ok(AbilitySet::REFERENCES),
-            Type::Signer => Ok(AbilitySet::SIGNER),
-
-            Type::TyParam(_) => Err(PartialVMError::new(StatusCode::UNREACHABLE).with_message(
-                "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
-            )),
-
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    ty.abilities()?
-                ])
-            },
-            Type::Struct { ability, .. } => Ok(ability.base_ability_set),
-            Type::StructInstantiation {
-                ty_args,
-                ability:
-                    AbilityInfo {
-                        base_ability_set,
-                        phantom_ty_args_mask,
-                    },
-                ..
-            } => {
-                let type_argument_abilities = ty_args
-                    .iter()
-                    .map(|arg| arg.abilities())
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                AbilitySet::polymorphic_abilities(
-                    *base_ability_set,
-                    phantom_ty_args_mask.iter(),
-                    type_argument_abilities,
-                )
-            },
-        }
-    }
-}
-
-#[cfg(test)]
-mod unit_tests {
-    use super::*;
-
-    fn struct_inst_for_test(ty_args: Vec<Type>) -> Type {
-        Type::StructInstantiation {
-            idx: StructNameIndex(0),
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-            ty_args: TriompheArc::new(ty_args),
-        }
-    }
-
-    fn struct_for_test() -> Type {
-        Type::Struct {
-            idx: StructNameIndex(0),
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-        }
-    }
-
-    #[test]
-    fn test_num_nodes_in_type() {
-        use Type::*;
-
-        let cases = [
-            (U8, 1),
-            (Vector(TriompheArc::new(U8)), 2),
-            (Vector(TriompheArc::new(Vector(TriompheArc::new(U8)))), 3),
-            (Reference(Box::new(Bool)), 2),
-            (TyParam(0), 1),
-            (struct_for_test(), 1),
-            (struct_inst_for_test(vec![U8, U8]), 3),
-            (
-                struct_inst_for_test(vec![U8, struct_inst_for_test(vec![Bool, Bool, Bool]), U8]),
-                7,
-            ),
-        ];
-
-        for (ty, expected) in cases {
-            assert_eq!(ty.num_nodes(), expected);
-        }
-    }
-
-    #[test]
-    fn test_num_nodes_in_subst() {
-        use Type::*;
-
-        let cases: Vec<(Type, Vec<Type>, usize)> = vec![
-            (TyParam(0), vec![Bool], 1),
-            (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
-            (Bool, vec![], 1),
-            (
-                struct_inst_for_test(vec![TyParam(0), TyParam(0)]),
-                vec![Vector(TriompheArc::new(Bool))],
-                5,
-            ),
-            (
-                struct_inst_for_test(vec![TyParam(0), TyParam(1)]),
-                vec![
-                    Vector(TriompheArc::new(Bool)),
-                    Vector(TriompheArc::new(Vector(TriompheArc::new(Bool)))),
-                ],
-                6,
-            ),
-        ];
-
-        for (ty, ty_args, expected) in cases {
-            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
-        }
-    }
-}
-
-pub struct TypeContext {
-    identifier_cache: IndexMap<StructIdentifier>,
-    instantiation_map: IndexMap<(StructNameIndex, Vec<Type>)>,
-    type_id_map: IndexMap<Type>,
 }
 
 impl TypeContext {
     pub fn new() -> Self {
-        Self {
-            identifier_cache: IndexMap::new(),
-            instantiation_map: IndexMap::new(),
-            type_id_map: IndexMap::new(),
-        }
+        TypeContext { identifier_cache: IndexMap::new(), instantiation_map: IndexMap::new(), type_id_map: IndexMap::new() }
     }
-
     pub fn get_idx_by_identifier(&self, struct_identifier: StructIdentifier) -> StructNameIndex {
         StructNameIndex(self.identifier_cache.get_or_insert(struct_identifier))
     }
 
-    pub fn get_identifier_by_idx(&self, idx: StructNameIndex) -> &StructIdentifier {
-        self.identifier_cache.get_by_index(idx.0)
+    pub fn get_identifier_by_idx(&self, struct_name_index: StructNameIndex) -> &StructIdentifier {
+        self.identifier_cache.get_by_index(struct_name_index.0)
     }
 
-    pub fn load_signature_token(&self,
+    pub fn get_type_by_index(&self, ty_idx: TypeIndex) -> &Type {
+        self.type_id_map.get_by_index(ty_idx.0)
+    }
+
+    pub fn get_idx_by_type(&self, ty: Type) -> TypeIndex {
+        TypeIndex(self.type_id_map.get_or_insert(ty))
+    }
+
+    pub fn get_instantiation_by_index(&self, inst_idx: StructInstantiationIndex) -> &(StructNameIndex, Vec<Type>) {
+        self.instantiation_map.get_by_index(inst_idx.0)
+    }
+
+    pub fn get_idx_by_instantiation(&self, idx: StructNameIndex, ty_args: Vec<Type>) -> StructInstantiationIndex {
+        StructInstantiationIndex(self.instantiation_map.get_or_insert((idx, ty_args)))
+    }
+
+    pub fn load_signature_token(
+        &self,
         module: BinaryIndexedView,
         tok: &SignatureToken,
-        struct_name_table: &[StructNameIndex]
-    ) -> Type {
-        unimplemented!()
+        struct_name_table: &[StructNameIndex],
+    ) -> PartialVMResult<Type> {
+        let res = match tok {
+            SignatureToken::Bool => Type::Bool,
+            SignatureToken::U8 => Type::U8,
+            SignatureToken::U16 => Type::U16,
+            SignatureToken::U32 => Type::U32,
+            SignatureToken::U64 => Type::U64,
+            SignatureToken::U128 => Type::U128,
+            SignatureToken::U256 => Type::U256,
+            SignatureToken::Address => Type::Address,
+            SignatureToken::Signer => Type::Signer,
+            SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
+            SignatureToken::Vector(inner_tok) => {
+                let inner_type = self.load_signature_token(module, inner_tok, struct_name_table)?;
+                Type::Vector(TypeIndex(self.type_id_map.get_or_insert(inner_type)))
+            },
+            SignatureToken::Reference(inner_tok) => {
+                let inner_type = self.load_signature_token(module, inner_tok, struct_name_table)?;
+                Type::Reference(TypeIndex(self.type_id_map.get_or_insert(inner_type)))
+            },
+            SignatureToken::MutableReference(inner_tok) => {
+                let inner_type = self.load_signature_token(module, inner_tok, struct_name_table)?;
+                Type::MutableReference(TypeIndex(self.type_id_map.get_or_insert(inner_type)))
+            },
+            SignatureToken::Struct(sh_idx) => {
+                let struct_handle = module.struct_handle_at(*sh_idx);
+                Type::Struct {
+                    idx: struct_name_table[sh_idx.0 as usize],
+                    ability: AbilityInfo::struct_(struct_handle.abilities),
+                }
+            },
+            SignatureToken::StructInstantiation(sh_idx, tys) => {
+                let type_args: Vec<_> = tys
+                    .iter()
+                    .map(|tok| self.load_signature_token(module, tok, struct_name_table))
+                    .collect::<PartialVMResult<_>>()?;
+                let struct_handle = module.struct_handle_at(*sh_idx);
+                let inst_idx = self
+                    .instantiation_map
+                    .get_or_insert((struct_name_table[sh_idx.0 as usize], type_args));
+                Type::StructInstantiation {
+                    idx: StructInstantiationIndex(inst_idx),
+                    ability: AbilityInfo::generic_struct(
+                        struct_handle.abilities,
+                        struct_handle
+                            .type_parameters
+                            .iter()
+                            .map(|ty| ty.is_phantom)
+                            .collect(),
+                    ),
+                }
+            },
+        };
+        Ok(res)
     }
 
     pub fn subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
@@ -431,28 +408,53 @@ impl TypeContext {
             Type::U256 => Type::U256,
             Type::Address => Type::Address,
             Type::Signer => Type::Signer,
-            Type::Struct(idx) => Type::Struct(*idx),
+            Type::Struct { idx, ability } => Type::Struct {
+                idx: *idx,
+                ability: ability.clone(),
+            },
             Type::Vector(ty) => Type::Vector(self.subst_ty_idx(*ty, ty_args, depth + 1)?),
-            Type::Reference(ty) => Type::Vector(self.subst_ty_idx(*ty, ty_args, depth + 1)?),
-            Type::MutableReference(ty) => Type::MutableReference(self.subst_ty_idx(*ty, ty_args, depth + 1)?),
-            Type::StructInstantiation(inst_idx) => Type::StructInstantiation(self.subst_struct_inst(*inst_idx, ty_args, depth + 1)?),
+            Type::Reference(ty) => Type::Reference(self.subst_ty_idx(*ty, ty_args, depth + 1)?),
+            Type::MutableReference(ty) => {
+                Type::MutableReference(self.subst_ty_idx(*ty, ty_args, depth + 1)?)
+            },
+            Type::StructInstantiation { idx, ability } => Type::StructInstantiation {
+                idx: self.subst_struct_inst(*idx, ty_args, depth + 1)?,
+                ability: ability.clone(),
+            },
         })
     }
 
-    fn subst_ty_idx(&self, idx: TypeIndex, ty_args: &[Type], depth: usize) -> PartialVMResult<TypeIndex> {
+    fn subst_ty_idx(
+        &self,
+        idx: TypeIndex,
+        ty_args: &[Type],
+        depth: usize,
+    ) -> PartialVMResult<TypeIndex> {
         let ty = self.subst_impl(self.type_id_map.get_by_index(idx.0), ty_args, depth)?;
         Ok(TypeIndex(self.type_id_map.get_or_insert(ty)))
     }
 
-    fn subst_struct_inst(&self, idx: StructInstantiationIndex, ty_args: &[Type], depth: usize) -> PartialVMResult<StructInstantiationIndex> {
+    fn subst_struct_inst(
+        &self,
+        idx: StructInstantiationIndex,
+        ty_args: &[Type],
+        depth: usize,
+    ) -> PartialVMResult<StructInstantiationIndex> {
         let (struct_name, ty_inst) = self.instantiation_map.get_by_index(idx.0);
-        let substituted_tys = ty_inst.iter().map(|ty| {
-            self.subst_impl(ty, ty_args, depth)
-        }).collect::<PartialVMResult<Vec<_>>>()?;
-        Ok(StructInstantiationIndex(self.instantiation_map.get_or_insert((*struct_name, substituted_tys))))
+        let substituted_tys = ty_inst
+            .iter()
+            .map(|ty| self.subst_impl(ty, ty_args, depth))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        Ok(StructInstantiationIndex(
+            self.instantiation_map
+                .get_or_insert((*struct_name, substituted_tys)),
+        ))
     }
 
-    pub fn from_const_signature(&self, constant_signature: &SignatureToken) -> PartialVMResult<Type> {
+    pub fn from_const_signature(
+        &self,
+        constant_signature: &SignatureToken,
+    ) -> PartialVMResult<Type> {
         use SignatureToken as S;
         use Type as L;
 
@@ -465,7 +467,10 @@ impl TypeContext {
             S::U128 => L::U128,
             S::U256 => L::U256,
             S::Address => L::Address,
-            S::Vector(inner) => L::Vector(TypeIndex(self.type_id_map.get_or_insert(self.from_const_signature(inner)))),
+            S::Vector(inner) => L::Vector(TypeIndex(
+                self.type_id_map
+                    .get_or_insert(self.from_const_signature(inner)?),
+            )),
             // Not yet supported
             S::Struct(_) | S::StructInstantiation(_, _) => {
                 return Err(
@@ -483,7 +488,12 @@ impl TypeContext {
         })
     }
 
-    pub fn check_vec_ref(&self, lhs: &Type, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
+    pub fn check_vec_ref(
+        &self,
+        lhs: &Type,
+        inner_ty: &Type,
+        is_mut: bool,
+    ) -> PartialVMResult<Type> {
         match lhs {
             Type::MutableReference(inner) => match self.type_id_map.get_by_index(inner.0) {
                 Type::Vector(inner) => {
@@ -511,7 +521,7 @@ impl TypeContext {
             },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message("VecMutBorrow expects a vector reference".to_string())
+                    .with_message(format!("VecMutBorrow expects a vector reference {:?} {:?}", lhs, inner_ty))
                     .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
             ),
         }
@@ -519,9 +529,10 @@ impl TypeContext {
 
     pub fn check_ref_eq(&self, lhs: &Type, expected_inner: &Type) -> PartialVMResult<()> {
         match lhs {
-            Type::MutableReference(inner) | Type::Reference(inner) => {
-                self.type_id_map.get_by_index(inner.0).check_eq(expected_inner)
-            },
+            Type::MutableReference(inner) | Type::Reference(inner) => self
+                .type_id_map
+                .get_by_index(inner.0)
+                .check_eq(expected_inner),
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("VecMutBorrow expects a vector reference".to_string()),
@@ -529,10 +540,59 @@ impl TypeContext {
         }
     }
 
-    pub fn preorder_traversal(&self, ty: &Type) -> TypePreorderTraversalIter<'_> {
+    pub fn preorder_traversal<'a>(&'a self, ty: &'a Type) -> TypePreorderTraversalIter<'a> {
         TypePreorderTraversalIter {
             context: self,
             stack: smallvec![ty],
+        }
+    }
+
+    pub fn abilities(&self, ty: &Type) -> PartialVMResult<AbilitySet> {
+        match ty {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::Address => Ok(AbilitySet::PRIMITIVES),
+
+            // Technically unreachable but, no point in erroring if we don't have to
+            Type::Reference(_) | Type::MutableReference(_) => Ok(AbilitySet::REFERENCES),
+            Type::Signer => Ok(AbilitySet::SIGNER),
+
+            Type::TyParam(_) => Err(PartialVMError::new(StatusCode::UNREACHABLE).with_message(
+                "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
+            )),
+
+            Type::Vector(ty) => {
+                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                    self.abilities(self.type_id_map.get_by_index(ty.0))?
+                ])
+            },
+            Type::Struct { ability, .. } => Ok(ability.base_ability_set),
+            Type::StructInstantiation {
+                idx,
+                ability:
+                    AbilityInfo {
+                        base_ability_set,
+                        phantom_ty_args_mask,
+                    },
+            } => {
+                let type_argument_abilities = self
+                    .instantiation_map
+                    .get_by_index(idx.0)
+                    .1
+                    .iter()
+                    .map(|arg| self.abilities(arg))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+                AbilitySet::polymorphic_abilities(
+                    *base_ability_set,
+                    phantom_ty_args_mask.iter(),
+                    type_argument_abilities,
+                )
+            },
         }
     }
 
@@ -600,4 +660,9 @@ impl TypeContext {
             Ok(n)
         })
     }
+}
+
+#[test]
+fn size_of() {
+    println!("{:?}", std::mem::size_of::<Type>());
 }

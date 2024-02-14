@@ -18,7 +18,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    loaded_data::runtime_types::{Type, TypeContext},
+    natives::function::NativeResult,
+    values::Value,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -181,5 +183,9 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn type_context(&self) -> &TypeContext {
+        &self.resolver.loader().type_context
     }
 }

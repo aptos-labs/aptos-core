@@ -259,9 +259,10 @@ impl VMRuntime {
             .enumerate()
             .map(|(idx, (arg_ty, arg_bytes))| match &arg_ty {
                 Type::MutableReference(inner_t) | Type::Reference(inner_t) => {
+                    let inner_ty = self.loader().type_context.get_type_by_index(*inner_t);
                     dummy_locals.store_loc(
                         idx,
-                        self.deserialize_value(module_store, inner_t, arg_bytes)?,
+                        self.deserialize_value(module_store, inner_ty, arg_bytes)?,
                         self.loader
                             .vm_config()
                             .enable_invariant_violation_check_in_swap_loc,
@@ -284,7 +285,10 @@ impl VMRuntime {
             Type::Reference(inner) | Type::MutableReference(inner) => {
                 let ref_value: Reference = value.cast()?;
                 let inner_value = ref_value.read_ref()?;
-                (&**inner, inner_value)
+                (
+                    self.loader().type_context.get_type_by_index(*inner),
+                    inner_value,
+                )
             },
             _ => (ty, value),
         };
@@ -345,14 +349,17 @@ impl VMRuntime {
     ) -> VMResult<SerializedReturnValues> {
         let arg_types = param_types
             .into_iter()
-            .map(|ty| ty.subst(&ty_args))
+            .map(|ty| self.loader.type_context.subst(&ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
         let mut_ref_args = arg_types
             .iter()
             .enumerate()
             .filter_map(|(idx, ty)| match ty {
-                Type::MutableReference(inner) => Some((idx, inner.clone())),
+                Type::MutableReference(inner) => Some((
+                    idx,
+                    self.loader().type_context.get_type_by_index(*inner).clone(),
+                )),
                 _ => None,
             })
             .collect::<Vec<_>>();
@@ -361,7 +368,7 @@ impl VMRuntime {
             .map_err(|e| e.finish(Location::Undefined))?;
         let return_types = return_types
             .into_iter()
-            .map(|ty| ty.subst(&ty_args))
+            .map(|ty| self.loader.type_context.subst(&ty, &ty_args))
             .collect::<PartialVMResult<Vec<_>>>()
             .map_err(|err| err.finish(Location::Undefined))?;
 

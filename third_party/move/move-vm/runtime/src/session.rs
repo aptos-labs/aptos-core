@@ -419,7 +419,12 @@ impl<'r, 'l> Session<'r, 'l> {
 
     /// Gets the abilities for this type, at it's particular instantiation
     pub fn get_type_abilities(&self, ty: &Type) -> VMResult<AbilitySet> {
-        ty.abilities().map_err(|e| e.finish(Location::Undefined))
+        self.move_vm
+            .runtime
+            .loader()
+            .type_context
+            .abilities(ty)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     /// Gets the underlying native extensions.

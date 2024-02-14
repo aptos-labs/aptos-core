@@ -190,9 +190,9 @@ mod testing {
         }
     }
 
-    fn get_vector_inner_type(ty: &Type) -> PartialVMResult<&Type> {
+    fn get_vector_inner_type<'a>(native_context: &'a NativeContext, ty: &'a Type) -> PartialVMResult<&'a Type> {
         match ty {
-            Type::Vector(ty) => Ok(ty),
+            Type::Vector(ty) => Ok(native_context.type_context().get_type_by_index(*ty)),
             _ => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message("Could not get the inner Type of a vector's Type".to_string())),
         }
@@ -264,7 +264,7 @@ mod testing {
         match &ty_layout {
             MoveTypeLayout::Vector(_) => {
                 // get the inner type T of a vector<T>
-                let inner_ty = get_vector_inner_type(&ty)?;
+                let inner_ty = get_vector_inner_type(context, &ty)?;
                 let inner_tyl = context.type_to_type_layout(inner_ty)?;
 
                 match inner_tyl {
