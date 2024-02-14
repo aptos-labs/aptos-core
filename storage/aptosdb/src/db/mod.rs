@@ -38,8 +38,8 @@ use aptos_schemadb::{ReadOptions, SchemaBatch};
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     cached_state_view::ShardedStateCache, db_anyhow as anyhow, db_ensure as ensure,
-    db_other_bail as bail, state_delta::StateDelta, state_view::DbStateView, AptosDbError,
-    DbReader, DbWriter, ExecutedTrees, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
+    db_other_bail as bail, state_delta::StateDelta, AptosDbError, DbReader, DbWriter,
+    ExecutedTrees, Order, Result, StateSnapshotReceiver, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     account_address::AccountAddress,
