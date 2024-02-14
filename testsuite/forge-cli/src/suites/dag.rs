@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::{wrap_with_realistic_env, TestCommand};
+use crate::{
+    changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand,
+};
 use aptos_forge::{
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig,
@@ -9,7 +11,9 @@ use aptos_sdk::types::on_chain_config::{
     ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, OnChainExecutionConfig,
     ValidatorTxnConfig,
 };
-use aptos_testcases::two_traffics_test::TwoTrafficsTest;
+use aptos_testcases::{
+    consensus_reliability_tests::ChangingWorkingQuorumTest,
+};
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 pub fn get_dag_test(
@@ -28,6 +32,7 @@ fn get_dag_on_realistic_env_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 7, 7),
+        "dag_changing_working_quorum_test" => dag_changing_working_quorum_test(),
         _ => return None, // The test name does not match a dag realistic-env test
     };
     Some(test)
@@ -108,3 +113,45 @@ fn dag_realistic_env_max_load_test(
                 }),
         )
 }
+
+fn dag_changing_working_quorum_test() -> ForgeConfig {
+    let epoch_duration = 120;
+    let num_large_validators = 0;
+    let base_config = changing_working_quorum_test_helper(
+        16,
+        epoch_duration,
+        100,
+        70,
+        true,
+        true,
+        ChangingWorkingQuorumTest {
+            min_tps: 15,
+            always_healthy_nodes: 0,
+            max_down_nodes: 16,
+            num_large_validators,
+            add_execution_delay: false,
+            // Use longer check duration, as we are bringing enough nodes
+            // to require state-sync to catch up to have consensus.
+            check_period_s: 53,
+        },
+    );
+
+    base_config.with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+        helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
+        helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
+            num_large_validators.into();
+
+        let onchain_consensus_config = OnChainConsensusConfig::V3 {
+            alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+            vtxn: ValidatorTxnConfig::default_for_genesis(),
+        };
+
+        helm_values["chain"]["on_chain_consensus_config"] =
+            serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
+        helm_values["chain"]["on_chain_execution_config"] =
+            serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                .expect("must serialize");
+    }))
+}
+
+

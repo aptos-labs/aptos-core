@@ -62,7 +62,6 @@ use clap::{Parser, Subcommand};
 use futures::stream::{FuturesUnordered, StreamExt};
 use once_cell::sync::Lazy;
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
-use suites::dag::get_dag_test;
 use std::{
     env,
     num::NonZeroUsize,
@@ -75,6 +74,7 @@ use std::{
     thread,
     time::Duration,
 };
+use suites::dag::get_dag_test;
 use tokio::{runtime::Runtime, select};
 use url::Url;
 
@@ -523,7 +523,7 @@ fn get_test_suite(
     } else if let Some(test_suite) = get_state_sync_test(test_name) {
         return Ok(test_suite);
     } else if let Some(test_suite) = get_dag_test(test_name, duration, test_cmd) {
-        return Ok(test_suite)
+        return Ok(test_suite);
     }
 
     // Otherwise, check the test name against the ungrouped test suites
@@ -2009,7 +2009,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
         )
 }
 
-fn changing_working_quorum_test_helper(
+pub fn changing_working_quorum_test_helper(
     num_validators: usize,
     epoch_duration: usize,
     target_tps: usize,
