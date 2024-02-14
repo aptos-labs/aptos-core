@@ -77,3 +77,44 @@ proposals:
       - FeatureFlag:
           enabled:
             - object_code_deployment
+  - name: step_7_enable_validator_txn
+    metadata:
+      title: "AIP-64: Validator Transaction Type"
+      description: "AIP-64: This AIP introduces a new transaction type for validators to perform on-chain operations."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/327"
+    execution_mode: MultiStep
+    update_sequence:
+      - Consensus:
+          V3:
+            alg:
+              main:
+                decoupled_execution: true
+                back_pressure_limit: 10
+                exclude_round: 40
+                proposer_election_type:
+                  leader_reputation:
+                    proposer_and_voter_v2:
+                      active_weight: 1000
+                      inactive_weight: 10
+                      failed_weight: 1
+                      failure_threshold_percent: 10
+                      proposer_window_num_validators_multiplier: 10
+                      voter_window_num_validators_multiplier: 1
+                      weight_by_voting_power: true
+                      use_history_from_previous_epoch_max_count: 5
+                max_failed_authors_to_store: 10
+              quorum_store_enabled: true
+            vtxn:
+              V1:
+                per_block_limit_txn_count: 2
+                per_block_limit_total_bytes: 2097152
+  - name: step_8_enable_jwk_consensus
+    metadata:
+      title: "AIP-67: Native Consensus for JSON Web Key (JWK)"
+      description: "AIP-67: This AIP proposes a solution for validators to agree on OpenID Connect providers' JSON Web Keys."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/331"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - jwk_consensus
