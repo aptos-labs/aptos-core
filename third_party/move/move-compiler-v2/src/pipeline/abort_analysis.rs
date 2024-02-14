@@ -74,7 +74,7 @@ impl Display for ExitStatus {
 #[derive(Clone)]
 pub struct ExitStateAtCodeOffset {
     pub before: ExitState,
-    after: ExitState,
+    pub after: ExitState,
 }
 
 impl ExitStateAtCodeOffset {
