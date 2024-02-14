@@ -168,12 +168,6 @@ impl OpenIdSig {
             pk.iss
         );
 
-        ensure!(
-            self.uid_key.eq("sub") || self.uid_key.eq("email"),
-            "uid_key must be either 'sub' or 'email', was \"{}\"",
-            self.uid_key
-        );
-
         // When an aud_val override is set, the IDC-committed `aud` is included next to the
         // OpenID signature.
         let idc_aud_val = match self.idc_aud_val.as_ref() {
