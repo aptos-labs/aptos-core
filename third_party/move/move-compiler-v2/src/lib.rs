@@ -13,9 +13,9 @@ mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    ability_checker::AbilityChecker, exit_state_analysis::ExitStateAnalysisProcessor,
-    avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
-    dead_store_elimination::DeadStoreElimination, explicit_drop::ExplicitDrop,
+    ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+    exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,

@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{
-    exit_state_analysis::ExitStateAnalysisProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    exit_state_analysis::ExitStateAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
@@ -12,10 +13,10 @@ use crate::pipeline::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_checker;
-pub mod exit_state_analysis;
 pub mod avail_copies_analysis;
 pub mod copy_propagation;
 pub mod dead_store_elimination;
+pub mod exit_state_analysis;
 pub mod explicit_drop;
 pub mod livevar_analysis_processor;
 pub mod reference_safety_processor;
