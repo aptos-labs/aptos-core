@@ -140,7 +140,7 @@ proposals:
             - concurrent_token_v2
   - name: step_11_enable_aggregator_v2_parallelism
     metadata:
-      title: "AIP-43: Enable Aggregator v2 parallelism"
+      title: "AIP-47: Enable Aggregator v2 parallelism"
       description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
     execution_mode: MultiStep
@@ -149,3 +149,13 @@ proposals:
           enabled:
             - aggregator_v2_delayed_fields          
             - resource_groups_charge_as_sum
+  - name: step_12_enable_zkid
+    metadata:
+      title: "AIP-61: OpenID blockchain (OIDB) accounts"
+      description: "Enable validation of zkID transactions, allowing users to transact using their Web2 accounts"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - zk_id_signatures
