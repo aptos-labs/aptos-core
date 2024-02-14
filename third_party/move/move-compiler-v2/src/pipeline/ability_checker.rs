@@ -3,7 +3,8 @@
 
 //! Checks for ability violations.
 //! prerequisite:
-//! - Copies and moves have been made explicit in assignment instructions
+//! - Copies, moves, and drops have been made explicit in assignment instructions
+//! - Abort analysis has been performed so that ExitStateAnnotation are available
 
 use crate::pipeline::abort_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
 use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
@@ -226,7 +227,7 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
             match kind {
                 AssignKind::Copy | AssignKind::Store => {
                     check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
-                    // dst is not dropped in advande in this case, since it's read by src
+                    // dst is not dropped in advance in this case, since it's read by src
                     if *dst == *src {
                         cond_check_drop_for_temp_with_msg(
                             target,
