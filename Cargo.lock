@@ -7182,6 +7182,7 @@ dependencies = [
  "aptos-vm-genesis",
  "bcs 0.1.4",
  "claims",
+ "fail 0.5.1",
  "hex",
  "itertools 0.10.5",
  "move-binary-format",

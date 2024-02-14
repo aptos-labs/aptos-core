@@ -671,7 +671,11 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        fail_point!("move_adapter::execute_script_or_entry_function", |_| {
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+
+        // For testing failed transactions cleanup: simulates failures in
+        // scripts or entry functions.
+        fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
                 status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 sub_status: Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
@@ -679,55 +683,46 @@ impl AptosVM {
             })
         });
 
-        // Run the execution logic
-        {
-            gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        match payload {
+            TransactionPayload::Script(script) => {
+                self.validate_and_execute_script(
+                    &mut session,
+                    gas_meter,
+                    txn_data.senders(),
+                    script,
+                )?;
+            },
+            TransactionPayload::EntryFunction(entry_fn) => {
+                self.validate_and_execute_entry_function(
+                    &mut session,
+                    gas_meter,
+                    txn_data.senders(),
+                    entry_fn,
+                )?;
+            },
 
-            match payload {
-                TransactionPayload::Script(script) => {
-                    self.validate_and_execute_script(
-                        &mut session,
-                        gas_meter,
-                        txn_data.senders(),
-                        script,
-                    )?;
-                },
-                TransactionPayload::EntryFunction(entry_fn) => {
-                    self.validate_and_execute_entry_function(
-                        &mut session,
-                        gas_meter,
-                        txn_data.senders(),
-                        entry_fn,
-                    )?;
-                },
+            // Not reachable as this function should only be invoked for entry or script
+            // transaction payload.
+            _ => unreachable!("Only scripts or entry functions are executed"),
+        };
 
-                // Not reachable as this function should only be invoked for entry or script
-                // transaction payload.
-                _ => unreachable!("Only scripts or entry functions are executed"),
-            };
+        self.resolve_pending_code_publish(&mut session, gas_meter, new_published_modules_loaded)?;
 
-            self.resolve_pending_code_publish(
-                &mut session,
-                gas_meter,
-                new_published_modules_loaded,
-            )?;
+        let respawned_session = self.charge_change_set_and_respawn_session(
+            session,
+            resolver,
+            gas_meter,
+            change_set_configs,
+            txn_data,
+        )?;
 
-            let respawned_session = self.charge_change_set_and_respawn_session(
-                session,
-                resolver,
-                gas_meter,
-                change_set_configs,
-                txn_data,
-            )?;
-
-            self.success_transaction_cleanup(
-                respawned_session,
-                gas_meter,
-                txn_data,
-                log_context,
-                change_set_configs,
-            )
-        }
+        self.success_transaction_cleanup(
+            respawned_session,
+            gas_meter,
+            txn_data,
+            log_context,
+            change_set_configs,
+        )
     }
 
     fn charge_change_set(

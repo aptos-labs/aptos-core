@@ -45,4 +45,5 @@ mod token_objects;
 mod transaction_fee;
 mod type_too_large;
 mod vector_numeric_address;
+mod vm;
 mod vote;
