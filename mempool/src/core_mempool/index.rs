@@ -15,62 +15,12 @@ use aptos_types::account_address::AccountAddress;
 use rand::seq::SliceRandom;
 use std::{
     cmp::Ordering,
-    collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
-    iter::Rev,
+    collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
     ops::Bound,
     time::Duration,
 };
 
 pub type AccountTransactions = BTreeMap<u64, MempoolTransaction>;
-
-/// PriorityIndex represents the main Priority Queue in Mempool.
-/// It's used to form the transaction block for Consensus.
-/// Transactions are ordered by gas price. Second level ordering is done by expiration time.
-///
-/// We don't store the full content of transactions in the index.
-/// Instead we use `OrderedQueueKey` - logical reference to the transaction in the main store.
-pub struct PriorityIndex {
-    data: BTreeSet<OrderedQueueKey>,
-}
-
-pub type PriorityQueueIter<'a> = Rev<Iter<'a, OrderedQueueKey>>;
-
-impl PriorityIndex {
-    pub(crate) fn new() -> Self {
-        Self {
-            data: BTreeSet::new(),
-        }
-    }
-
-    pub(crate) fn insert(&mut self, txn: &MempoolTransaction) {
-        self.data.insert(self.make_key(txn));
-    }
-
-    pub(crate) fn remove(&mut self, txn: &MempoolTransaction) {
-        self.data.remove(&self.make_key(txn));
-    }
-
-    pub(crate) fn contains(&self, txn: &MempoolTransaction) -> bool {
-        self.data.contains(&self.make_key(txn))
-    }
-
-    fn make_key(&self, txn: &MempoolTransaction) -> OrderedQueueKey {
-        OrderedQueueKey {
-            gas_ranking_score: txn.ranking_score,
-            expiration_time: txn.expiration_time,
-            address: txn.get_sender(),
-            sequence_number: txn.sequence_info,
-        }
-    }
-
-    pub(crate) fn iter(&self) -> PriorityQueueIter {
-        self.data.iter().rev()
-    }
-
-    pub(crate) fn size(&self) -> usize {
-        self.data.len()
-    }
-}
 
 #[derive(Eq, PartialEq, Clone, Debug, Hash)]
 pub struct OrderedQueueKey {
@@ -78,6 +28,17 @@ pub struct OrderedQueueKey {
     pub expiration_time: Duration,
     pub address: AccountAddress,
     pub sequence_number: SequenceInfo,
+}
+
+impl OrderedQueueKey {
+    fn make_key(txn: &MempoolTransaction) -> OrderedQueueKey {
+        OrderedQueueKey {
+            gas_ranking_score: txn.ranking_score,
+            expiration_time: txn.expiration_time,
+            address: txn.get_sender(),
+            sequence_number: txn.sequence_info,
+        }
+    }
 }
 
 impl PartialOrd for OrderedQueueKey {
@@ -499,5 +460,71 @@ impl From<&OrderedQueueKey> for TxnPointer {
             sender: key.address,
             sequence_number: key.sequence_number.transaction_sequence_number,
         }
+    }
+}
+
+// TODO: A lazy GC. Also, keep in mind non-validators will never advance the index.
+pub struct FifoIndex {
+    ready: VecDeque<OrderedQueueKey>,
+    previously_selected: Vec<OrderedQueueKey>,
+    // TODO: wasteful, but maybe necessary
+    all: HashSet<OrderedQueueKey>,
+    previously_selected_idx: usize,
+}
+
+impl FifoIndex {
+    pub(crate) fn new() -> Self {
+        Self {
+            ready: VecDeque::new(),
+            previously_selected: vec![],
+            all: HashSet::new(),
+            previously_selected_idx: 0,
+        }
+    }
+
+    /// Reset the previously_selected pointer
+    pub fn reset(&mut self) {
+        self.previously_selected_idx = 0;
+    }
+
+    // TODO: make a proper iterator?
+    pub fn next(&mut self) -> Option<OrderedQueueKey> {
+        while self.previously_selected_idx < self.previously_selected.len() {
+            let txn = &self.previously_selected[self.previously_selected_idx];
+            self.previously_selected_idx += 1;
+            if self.all.contains(txn) {
+                return Some(txn.clone());
+            } else {
+                self.previously_selected
+                    .remove(self.previously_selected_idx - 1);
+            }
+        }
+        while !self.ready.is_empty() {
+            let next = self.ready.pop_front();
+            if let Some(next) = next {
+                if self.all.contains(&next) {
+                    return Some(next);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn insert(&mut self, txn: &MempoolTransaction) {
+        let key = OrderedQueueKey::make_key(txn);
+        self.ready.push_back(key.clone());
+        self.all.insert(key);
+    }
+
+    pub fn contains(&self, txn: &MempoolTransaction) -> bool {
+        self.all.contains(&OrderedQueueKey::make_key(txn))
+    }
+
+    pub(crate) fn size(&self) -> usize {
+        self.all.len()
+    }
+
+    pub fn remove(&mut self, txn: &MempoolTransaction) {
+        self.all.remove(&OrderedQueueKey::make_key(txn));
     }
 }

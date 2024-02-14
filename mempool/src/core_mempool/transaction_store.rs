@@ -5,8 +5,8 @@
 use crate::{
     core_mempool::{
         index::{
-            AccountTransactions, MultiBucketTimelineIndex, ParkingLotIndex, PriorityIndex,
-            PriorityQueueIter, TTLIndex,
+            AccountTransactions, FifoIndex, MultiBucketTimelineIndex, OrderedQueueKey,
+            ParkingLotIndex, TTLIndex,
         },
         mempool::Mempool,
         transaction::{InsertionInfo, MempoolTransaction, TimelineState},
@@ -48,7 +48,7 @@ pub struct TransactionStore {
     sequence_numbers: HashMap<AccountAddress, u64>,
 
     // indexes
-    priority_index: PriorityIndex,
+    fifo_index: FifoIndex,
     // TTLIndex based on client-specified expiration time
     expiration_time_index: TTLIndex,
     // TTLIndex based on system expiration time
@@ -93,7 +93,7 @@ impl TransactionStore {
             expiration_time_index: TTLIndex::new(Box::new(|t: &MempoolTransaction| {
                 Duration::from_secs(t.txn.expiration_timestamp_secs())
             })),
-            priority_index: PriorityIndex::new(),
+            fifo_index: FifoIndex::new(),
             timeline_index: MultiBucketTimelineIndex::new(config.broadcast_buckets.clone())
                 .unwrap(),
             parking_lot_index: ParkingLotIndex::new(),
@@ -291,10 +291,7 @@ impl TransactionStore {
             counters::EXPIRATION_TIME_INDEX_LABEL,
             self.expiration_time_index.size(),
         );
-        counters::core_mempool_index_size(
-            counters::PRIORITY_INDEX_LABEL,
-            self.priority_index.size(),
-        );
+        counters::core_mempool_index_size(counters::PRIORITY_INDEX_LABEL, self.fifo_index.size());
         counters::core_mempool_index_size(
             counters::PARKING_LOT_INDEX_LABEL,
             self.parking_lot_index.size(),
@@ -431,8 +428,8 @@ impl TransactionStore {
             let mut min_seq = sequence_num;
 
             while let Some(txn) = txns.get_mut(&min_seq) {
-                let process_ready = !self.priority_index.contains(txn);
-                self.priority_index.insert(txn);
+                let process_ready = !self.fifo_index.contains(txn);
+                self.fifo_index.insert(txn);
 
                 let process_broadcast_ready = txn.timeline_state == TimelineState::NotReady;
                 if process_broadcast_ready {
@@ -552,7 +549,7 @@ impl TransactionStore {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
         self.system_ttl_index.remove(txn);
         self.expiration_time_index.remove(txn);
-        self.priority_index.remove(txn);
+        self.fifo_index.remove(txn);
         self.timeline_index.remove(txn);
         self.parking_lot_index.remove(txn);
         self.hash_index.remove(&txn.get_committed_hash());
@@ -719,14 +716,14 @@ impl TransactionStore {
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
                     t.was_parked = true;
-                    self.priority_index.remove(t);
+                    self.fifo_index.remove(t);
                     self.timeline_index.remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {
                         t.timeline_state = TimelineState::NotReady;
                     }
                 }
                 if let Some(txn) = txns.remove(&key.sequence_number) {
-                    let is_active = self.priority_index.contains(&txn);
+                    let is_active = self.fifo_index.contains(&txn);
                     let status = if is_active {
                         counters::GC_ACTIVE_TXN_LABEL
                     } else {
@@ -757,10 +754,6 @@ impl TransactionStore {
         self.track_indices();
     }
 
-    pub(crate) fn iter_queue(&self) -> PriorityQueueIter {
-        self.priority_index.iter()
-    }
-
     pub(crate) fn gen_snapshot(&self) -> TxnsLog {
         let mut txns_log = TxnsLog::new();
         for (account, txns) in self.transactions.iter() {
@@ -789,5 +782,13 @@ impl TransactionStore {
     #[cfg(test)]
     pub(crate) fn get_transactions(&self) -> &HashMap<AccountAddress, AccountTransactions> {
         &self.transactions
+    }
+
+    pub(crate) fn next(&mut self) -> Option<OrderedQueueKey> {
+        self.fifo_index.next()
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.fifo_index.reset()
     }
 }

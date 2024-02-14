@@ -242,7 +242,7 @@ impl Mempool {
     fn was_seen(
         txn_pointer: &TransactionSummary,
         seen: &HashMap<TransactionSummary, u64>,
-        upgraded: &HashSet<&TransactionSummary>,
+        upgraded: &HashSet<TransactionSummary>,
         exclude_transactions: &BTreeMap<TransactionSummary, TransactionInProgress>,
     ) -> bool {
         seen.contains_key(txn_pointer)
@@ -258,7 +258,7 @@ impl Mempool {
     ///  mempool should filter out such transactions.
     #[allow(clippy::explicit_counter_loop)]
     pub(crate) fn get_batch(
-        &self,
+        &mut self,
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
@@ -271,9 +271,9 @@ impl Mempool {
         let mut upgraded = HashSet::new();
         // Do not exclude transactions that had a gas upgrade
         if include_gas_upgraded {
-            for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns() {
-                if let Some(txn_info) = exclude_transactions.get(txn_pointer) {
-                    if *new_gas > txn_info.gas_unit_price() {
+            for (txn_pointer, new_gas) in self.transactions.get_gas_upgraded_txns().clone() {
+                if let Some(txn_info) = exclude_transactions.get(&txn_pointer) {
+                    if new_gas > txn_info.gas_unit_price() {
                         upgraded.insert(txn_pointer);
                     }
                 }
@@ -292,7 +292,8 @@ impl Mempool {
         let mut total_bytes = 0;
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
-        'main: for txn in self.transactions.iter_queue() {
+        self.transactions.reset();
+        'main: while let Some(ref txn) = self.transactions.next() {
             txn_walked += 1;
             if Self::was_seen(
                 &TxnPointer::from(txn),
