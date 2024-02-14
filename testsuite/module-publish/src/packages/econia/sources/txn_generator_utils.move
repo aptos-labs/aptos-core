@@ -38,28 +38,28 @@ module econia::txn_generator_utils {
             assets::mint(publisher, fee));
     }
 
-    public entry fun register_market_accounts(user: &signer) {
-        user::register_market_account<BC, QC>(user, MARKET_ID_COIN, NO_CUSTODIAN);
+    public entry fun register_market_accounts(user: &signer, market_id: u64) {
+        user::register_market_account<BC, QC>(user, market_id, NO_CUSTODIAN);
     }
 
-    public entry fun deposit_coins(user: &signer, publisher: &signer) {
-        user::deposit_coins<QC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<QC>(publisher, 1000000));
-        user::deposit_coins<BC>(signer::address_of(user), MARKET_ID_COIN, NO_CUSTODIAN, assets::mint<BC>(publisher, 1000000));
+    public entry fun deposit_coins(user: &signer, publisher: &signer, market_id: u64) {
+        user::deposit_coins<QC>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<QC>(publisher, 1000000));
+        user::deposit_coins<BC>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<BC>(publisher, 1000000));
     }
 
-    public entry fun place_bid_limit_order(user: &signer, size: u64, price: u64) {
-        market::place_limit_order_user<BC, QC>(user, MARKET_ID_COIN, @econia, BID, size, price, 2, CANCEL_MAKER);
+    public entry fun place_bid_limit_order(user: &signer, size: u64, price: u64, market_id: u64) {
+        market::place_limit_order_user<BC, QC>(user, market_id, @econia, BID, size, price, 2, CANCEL_MAKER);
     }
 
-    public entry fun place_ask_limit_order(user: &signer, size: u64, price: u64) {
-        market::place_limit_order_user<BC, QC>(user, MARKET_ID_COIN, @econia, ASK, size, price, 2, CANCEL_MAKER);
+    public entry fun place_ask_limit_order(user: &signer, size: u64, price: u64, market_id: u64) {
+        market::place_limit_order_user<BC, QC>(user, market_id, @econia, ASK, size, price, 2, CANCEL_MAKER);
     }
 
-    public entry fun place_bid_market_order(user: &signer, size: u64) {
-        market::place_market_order_user<BC,QC>(user, MARKET_ID_COIN, @econia, BID, size, CANCEL_MAKER);
+    public entry fun place_bid_market_order(user: &signer, size: u64, market_id: u64) {
+        market::place_market_order_user<BC,QC>(user, market_id, @econia, BID, size, CANCEL_MAKER);
     }
 
-    public entry fun place_ask_market_order(user: &signer, size: u64) {
-        market::place_market_order_user<BC,QC>(user, MARKET_ID_COIN, @econia, ASK, size, CANCEL_MAKER);
+    public entry fun place_ask_market_order(user: &signer, size: u64, market_id: u64) {
+        market::place_market_order_user<BC,QC>(user, market_id, @econia, ASK, size, CANCEL_MAKER);
     }
 }
