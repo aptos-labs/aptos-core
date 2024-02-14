@@ -3,15 +3,15 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    errors::{BlockExecutionError, IntentionalFallbackToSequential},
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
 };
-use aptos_aggregator::types::{code_invariant_error, PanicOr};
+use aptos_aggregator::types::code_invariant_error;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
     delayed_fields::PanicError, fee_statement::FeeStatement,
+    state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
@@ -27,27 +27,24 @@ use std::{
 
 type TxnInput<T> = CapturedReads<T>;
 
-// When a transaction is committed, the output delta writes must be populated by
-// the WriteOps corresponding to the deltas in the corresponding outputs.
-#[derive(Debug)]
-pub(crate) struct TxnOutput<O: TransactionOutput, E: Debug> {
-    output_status: ExecutionStatus<O, BlockExecutionError<E>>,
+macro_rules! forward_on_success_or_skip_rest {
+    ($self:ident, $txn_idx:ident, $f:ident) => {{
+        $self.outputs[$txn_idx as usize]
+            .load()
+            .as_ref()
+            .map_or(vec![], |txn_output| match txn_output.as_ref() {
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.$f(),
+                ExecutionStatus::Abort(_)
+                | ExecutionStatus::SpeculativeExecutionAbortError(_)
+                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
+            })
+    }};
 }
 
 pub(crate) enum KeyKind {
     Resource,
     Module,
     Group,
-}
-
-impl<O: TransactionOutput, E: Debug> TxnOutput<O, E> {
-    pub fn from_output_status(output_status: ExecutionStatus<O, BlockExecutionError<E>>) -> Self {
-        Self { output_status }
-    }
-
-    pub fn output_status(&self) -> &ExecutionStatus<O, BlockExecutionError<E>> {
-        &self.output_status
-    }
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
@@ -60,7 +57,14 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
         >,
     >,
 
-    outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<O, E>>>>, // txn_idx -> output.
+    // TODO: Consider breaking down the outputs when storing (avoid traversals, cache below).
+    outputs: Vec<CachePadded<ArcSwapOption<ExecutionStatus<O, E>>>>, // txn_idx -> output.
+    // Cache to avoid expensive clones of data.
+    // TODO(clean-up): be consistent with naming resource writes: here it means specifically
+    // individual writes, but in some contexts it refers to all writes (e.g. including group writes)
+    arced_resource_writes: Vec<
+        CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
+    >,
 
     // Record all writes and reads to access paths corresponding to modules (code) in any
     // (speculative) executions. Used to avoid a potential race with module publishing and
@@ -79,6 +83,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
                 .collect(),
             outputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
+                .collect(),
+            arced_resource_writes: (0..num_txns)
+                .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
             finalized_groups: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
@@ -120,7 +127,8 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
         input: CapturedReads<T>,
-        output: ExecutionStatus<O, BlockExecutionError<E>>,
+        output: ExecutionStatus<O, E>,
+        arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> bool {
         let written_modules = match &output {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -137,8 +145,9 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             return false;
         }
 
+        *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
-        self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput::from_output_status(output))));
+        self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
 
         true
     }
@@ -159,10 +168,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     /// Returns the total gas, execution gas, io gas and storage gas of the transaction.
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
-        match &self.outputs[txn_idx as usize]
+        match self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
-            .output_status
+            .as_ref()
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.fee_statement())
@@ -172,10 +181,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     }
 
     pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
-        match &self.outputs[txn_idx as usize]
+        match self.outputs[txn_idx as usize]
             .load_full()
             .expect("[BlockSTM]: Execution output must be recorded after execution")
-            .output_status
+            .as_ref()
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
                 Some(output.output_approx_size())
@@ -187,38 +196,51 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     /// Does a transaction at txn_idx have SkipRest or Abort status.
     pub(crate) fn block_skips_rest_at_idx(&self, txn_idx: TxnIndex) -> bool {
         matches!(
-            &self.outputs[txn_idx as usize]
+            self.outputs[txn_idx as usize]
                 .load_full()
                 .expect("[BlockSTM]: Execution output must be recorded after execution")
-                .output_status,
+                .as_ref(),
             ExecutionStatus::SkipRest(_)
         )
+    }
+
+    pub(crate) fn check_fatal_vm_error(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
+        if let Some(status) = self.outputs[txn_idx as usize].load_full() {
+            if let ExecutionStatus::Abort(err) = status.as_ref() {
+                return Err(code_invariant_error(format!(
+                    "FatalVMError from parallel execution {:?} at txn {}",
+                    err, txn_idx
+                )));
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn check_execution_status_during_commit(
         &self,
         txn_idx: TxnIndex,
-    ) -> Result<(), PanicOr<IntentionalFallbackToSequential>> {
+    ) -> Result<(), PanicError> {
         if let Some(status) = self.outputs[txn_idx as usize].load_full() {
-            match &status.output_status {
+            match status.as_ref() {
                 ExecutionStatus::Success(_) | ExecutionStatus::SkipRest(_) => Ok(()),
                 // Transaction cannot be committed with below statuses, as:
                 // - Speculative error must have failed validation.
                 // - Execution w. delayed field code error propagates the error directly,
                 // does not finish execution. Similar for FatalVMError / abort.
                 ExecutionStatus::Abort(_) => {
-                    Err(code_invariant_error("Abort status cannot be committed").into())
+                    Err(code_invariant_error("Abort status cannot be committed"))
                 },
-                ExecutionStatus::SpeculativeExecutionAbortError(_) => {
-                    Err(code_invariant_error("Speculative error status cannot be committed").into())
-                },
+                ExecutionStatus::SpeculativeExecutionAbortError(_) => Err(code_invariant_error(
+                    "Speculative error status cannot be committed",
+                )),
                 ExecutionStatus::DelayedFieldsCodeInvariantError(_) => Err(code_invariant_error(
                     "Delayed field invariant error cannot be committed",
-                )
-                .into()),
+                )),
             }
         } else {
-            Err(code_invariant_error("Recorded output not found during commit").into())
+            Err(code_invariant_error(
+                "Recorded output not found during commit",
+            ))
         }
     }
 
@@ -231,15 +253,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         // check_execution_status_during_commit must be used for checks re:status.
         // Hence, since the status is not SkipRest, it must be Success.
         if let ExecutionStatus::Success(output) = self.take_output(txn_idx) {
-            self.outputs[txn_idx as usize].store(Some(Arc::new(TxnOutput {
-                output_status: ExecutionStatus::SkipRest(output),
-            })));
+            self.outputs[txn_idx as usize].store(Some(Arc::new(ExecutionStatus::SkipRest(output))));
         } else {
-            unreachable!("Unexpected status");
+            unreachable!("Unexpected status, must be Success");
         }
     }
 
-    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<TxnOutput<O, E>>> {
+    pub(crate) fn txn_output(&self, txn_idx: TxnIndex) -> Option<Arc<ExecutionStatus<O, E>>> {
         self.outputs[txn_idx as usize].load_full()
     }
 
@@ -251,13 +271,18 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     ) -> Option<impl Iterator<Item = (T::Key, KeyKind)>> {
         self.outputs[txn_idx as usize]
             .load_full()
-            .and_then(|txn_output| match &txn_output.output_status {
+            .and_then(|txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => Some(
                     t.resource_write_set()
                         .into_iter()
-                        .map(|(k, _)| k)
+                        .map(|(k, _, _)| k)
                         .chain(t.aggregator_v1_write_set().into_keys())
-                        .chain(t.aggregator_v1_delta_set().into_keys())
+                        .chain(
+                            t.aggregator_v1_delta_set()
+                                .into_iter()
+                                .map(|(k, _)| k)
+                                .collect::<Vec<_>>(),
+                        )
                         .map(|k| (k, KeyKind::Resource))
                         .chain(
                             t.module_write_set()
@@ -276,22 +301,6 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             })
     }
 
-    pub(crate) fn resource_write_set(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Option<Vec<(T::Key, (T::Value, Option<Arc<MoveTypeLayout>>))>> {
-        self.outputs[txn_idx as usize]
-            .load_full()
-            .and_then(|txn_output| match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    Some(t.resource_write_set())
-                },
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
-            })
-    }
-
     pub(crate) fn delayed_field_keys(
         &self,
         txn_idx: TxnIndex,
@@ -299,7 +308,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         self.outputs[txn_idx as usize]
             .load()
             .as_ref()
-            .and_then(|txn_output| match &txn_output.output_status {
+            .and_then(|txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     Some(t.delayed_field_change_set().into_keys())
                 },
@@ -312,63 +321,26 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<Vec<(T::Key, Arc<MoveTypeLayout>)>> {
-        self.outputs[txn_idx as usize]
-            .load()
-            .as_ref()
-            .and_then(|txn_output| match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    Some(t.reads_needing_delayed_field_exchange())
-                },
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
-            })
+    ) -> Vec<(T::Key, StateValueMetadata, Arc<MoveTypeLayout>)> {
+        forward_on_success_or_skip_rest!(self, txn_idx, reads_needing_delayed_field_exchange)
     }
 
     pub(crate) fn group_reads_needing_delayed_field_exchange(
         &self,
         txn_idx: TxnIndex,
-    ) -> Option<Vec<(T::Key, T::Value)>> {
-        self.outputs[txn_idx as usize]
-            .load()
-            .as_ref()
-            .and_then(|txn_output| match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    Some(t.group_reads_needing_delayed_field_exchange())
-                },
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => None,
-            })
+    ) -> Vec<(T::Key, StateValueMetadata)> {
+        forward_on_success_or_skip_rest!(self, txn_idx, group_reads_needing_delayed_field_exchange)
     }
 
     pub(crate) fn aggregator_v1_delta_keys(&self, txn_idx: TxnIndex) -> Vec<T::Key> {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
-            vec![],
-            |txn_output| match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    t.aggregator_v1_delta_set().into_keys().collect()
-                },
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
-            },
-        )
+        forward_on_success_or_skip_rest!(self, txn_idx, aggregator_v1_delta_set)
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect()
     }
 
-    pub(crate) fn group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {
-        self.outputs[txn_idx as usize].load().as_ref().map_or(
-            vec![],
-            |txn_output| match &txn_output.output_status {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    t.resource_group_metadata_ops()
-                },
-                ExecutionStatus::Abort(_)
-                | ExecutionStatus::SpeculativeExecutionAbortError(_)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => vec![],
-            },
-        )
+    pub(crate) fn resource_group_metadata_ops(&self, txn_idx: TxnIndex) -> Vec<(T::Key, T::Value)> {
+        forward_on_success_or_skip_rest!(self, txn_idx, resource_group_metadata_ops)
     }
 
     pub(crate) fn events(
@@ -377,7 +349,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     ) -> Box<dyn Iterator<Item = (T::Event, Option<MoveTypeLayout>)>> {
         self.outputs[txn_idx as usize].load().as_ref().map_or(
             Box::new(empty::<(T::Event, Option<MoveTypeLayout>)>()),
-            |txn_output| match &txn_output.output_status {
+            |txn_output| match txn_output.as_ref() {
                 ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                     let events = t.get_events();
                     Box::new(events.into_iter())
@@ -406,6 +378,13 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         std::mem::take(&mut self.finalized_groups[txn_idx as usize].acquire())
     }
 
+    pub(crate) fn take_resource_write_set(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)> {
+        std::mem::take(&mut self.arced_resource_writes[txn_idx as usize].acquire())
+    }
+
     // Called when a transaction is committed to record WriteOps for materialized aggregator values
     // corresponding to the (deltas) in the recorded final output of the transaction, as well as
     // finalized group updates.
@@ -416,10 +395,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         patched_resource_write_set: Vec<(T::Key, T::Value)>,
         patched_events: Vec<T::Event>,
     ) -> Result<(), PanicError> {
-        match &self.outputs[txn_idx as usize]
+        match self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
-            .output_status
+            .as_ref()
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
                 t.incorporate_materialized_txn_output(
@@ -447,10 +426,10 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         &self,
         txn_idx: TxnIndex,
     ) -> HashSet<InputOutputKey<T::Key, T::Tag, T::Identifier>> {
-        match &self.outputs[txn_idx as usize]
+        match self.outputs[txn_idx as usize]
             .load_full()
             .expect("Output must exist")
-            .output_status
+            .as_ref()
         {
             ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t.get_write_summary(),
             ExecutionStatus::Abort(_)
@@ -461,16 +440,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
 
     // Must be executed after parallel execution is done, grabs outputs. Will panic if
     // other outstanding references to the recorded outputs exist.
-    pub(crate) fn take_output(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> ExecutionStatus<O, BlockExecutionError<E>> {
+    pub(crate) fn take_output(&self, txn_idx: TxnIndex) -> ExecutionStatus<O, E> {
         let owning_ptr = self.outputs[txn_idx as usize]
             .swap(None)
             .expect("[BlockSTM]: Output must be recorded after execution");
 
         Arc::try_unwrap(owning_ptr)
-            .map(|output| output.output_status)
             .expect("[BlockSTM]: Output should be uniquely owned after execution")
     }
 }

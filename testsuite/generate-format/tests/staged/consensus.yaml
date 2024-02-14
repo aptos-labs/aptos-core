@@ -424,6 +424,9 @@ DKGTranscriptMetadata:
     - epoch: U64
     - author:
         TYPENAME: AccountAddress
+DeprecatedPayload:
+  STRUCT:
+    - dummy_value: U64
 Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
@@ -523,14 +526,6 @@ LedgerInfoWithV0:
         TYPENAME: LedgerInfo
     - signatures:
         TYPENAME: AggregateSignature
-Module:
-  STRUCT:
-    - code: BYTES
-ModuleBundle:
-  STRUCT:
-    - codes:
-        SEQ:
-          TYPENAME: Module
 ModuleId:
   STRUCT:
     - address:
@@ -745,12 +740,13 @@ SignedGroth16Zkp:
         TYPENAME: Groth16Zkp
     - non_malleability_signature:
         TYPENAME: EphemeralSignature
-    - training_wheels_signature:
-        TYPENAME: EphemeralSignature
+    - exp_horizon_secs: U64
     - extra_field: STR
     - override_aud_val:
         OPTION: STR
-    - exp_horizon_secs: U64
+    - training_wheels_signature:
+        OPTION:
+          TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -932,7 +928,7 @@ TransactionPayload:
     1:
       ModuleBundle:
         NEWTYPE:
-          TYPENAME: ModuleBundle
+          TYPENAME: DeprecatedPayload
     2:
       EntryFunction:
         NEWTYPE:

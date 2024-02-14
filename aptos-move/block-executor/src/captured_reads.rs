@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::InputOutputKey;
+use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -32,7 +32,7 @@ use std::{
             Entry,
             Entry::{Occupied, Vacant},
         },
-        HashMap, HashSet,
+        BTreeMap, HashMap, HashSet,
     },
     sync::Arc,
 };
@@ -327,10 +327,23 @@ impl<T: Transaction> CapturedReads<T> {
     // Return an iterator over the captured reads.
     pub(crate) fn get_read_values_with_delayed_fields(
         &self,
-    ) -> impl Iterator<Item = (&T::Key, &DataRead<T::Value>)> {
+        delayed_write_set_ids: &HashSet<T::Identifier>,
+        skip: &HashSet<T::Key>,
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
         self.data_reads
             .iter()
-            .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
+            .filter_map(|(key, data_read)| {
+                if skip.contains(key) {
+                    return None;
+                }
+
+                if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                    filter_value_for_exchange::<T>(value, layout, delayed_write_set_ids, key)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     // Return an iterator over the captured group reads that contain a delayed field

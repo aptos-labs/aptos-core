@@ -91,8 +91,8 @@ async fn test_zkid_oidc_signature_transaction_submission() {
 
     let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxMzIwMTc1NTc0Njg5NjI2Mjk1MjE1NjI0NDQ5OTc3ODc4Njk5NzE5Njc3NzE0MzIzOTg5Njk3NzczODY0NTIzOTkwMzIyNzI4MjE2IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcyNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "W4-yUKHhM7HYYhELuP9vfRH1D2IgcSSxz397SMz4u04WfLW3mBrmsaZ0QBgUwy33I7ZA6UoffnuUN8M8koXjfFMv0AfTgkQNJCg0X7cPCIn0WplONF6i4ACWUZjX_fSg36y5cRLDBv4pMOOMEI_eGyMt2tOoNZ2Fik1k-AXsyVNV-mqBtzblhdiGpy0bBgvcrMvJiBfe-AJazv-W3Ik5M0OeZB12YbQDHQSMTjhPEnADn6gmgsERBKbaGO8ieKW0v2Ukb3yqIy7PtdM44wJ0E_u2_tyqffmm6VoH6zaiFHgvEqfT7IM1w8_8k7nk2M9rT__o2A0cGWsYzhw3Mxs1Xw".to_string();
 
     let openid_signature = OpenIdSig {
         jwt_sig,
@@ -106,7 +106,7 @@ async fn test_zkid_oidc_signature_transaction_submission() {
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
         jwt_header,
-        exp_timestamp_secs: 1707812836,
+        exp_timestamp_secs: 1727812836,
         ephemeral_pubkey: ephemeral_public_key,
         ephemeral_signature,
     };
@@ -175,7 +175,7 @@ async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification(
 
     let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxMzIwMTc1NTc0Njg5NjI2Mjk1MjE1NjI0NDQ5OTc3ODc4Njk5NzE5Njc3NzE0MzIzOTg5Njk3NzczODY0NTIzOTkwMzIyNzI4MjE2IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcyNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
     let jwt_sig = "bad_signature".to_string();
 
     let openid_signature = OpenIdSig {
@@ -190,7 +190,7 @@ async fn test_zkid_oidc_signature_transaction_submission_fails_jwt_verification(
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
         jwt_header,
-        exp_timestamp_secs: 1707812836,
+        exp_timestamp_secs: 1727812836,
         ephemeral_pubkey: ephemeral_public_key,
         ephemeral_signature,
     };
@@ -260,8 +260,8 @@ async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
 
     let epk_blinder = vec![0u8; 31];
     let jwt_header = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_string();
-    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxYlFsNF9YYzUtSXBDcFViS19BZVhwZ2Q2R1o0MGxVVjN1YjN5b19FTHhrIiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
-    let jwt_sig = "oBdOiIUc-ioG2-sHV1hWDLjgk4NrVf3z6V-HmgbOrVAz3PV1CwdfyTXsmVaCqLzOHzcbFB6ZRDxShs3aR7PsqdlhI0Dh8WrfU8kBkyk1FAmx2nST4SoSJROXsnusaOpNFpgSl96Rq3SXgr-yPBE9dEwTfD00vq2gH_fH1JAIeJJhc6WicMcsEZ7iONT1RZOid_9FlDrg1GxlGtNmpn4nEAmIxqnT0JrCESiRvzmuuXUibwx9xvHgIxhyVuAA9amlzaD1DL6jEc5B_0YnGKN7DO_l2Hkj9MbQZvU0beR-Lfcz8jxCjojODTYmWgbtu5E7YWIyC6dsjiBnTxc-svCsmQ".to_string();
+    let jwt_payload = "eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiIxMzIwMTc1NTc0Njg5NjI2Mjk1MjE1NjI0NDQ5OTc3ODc4Njk5NzE5Njc3NzE0MzIzOTg5Njk3NzczODY0NTIzOTkwMzIyNzI4MjE2IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcyNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9".to_string();
+    let jwt_sig = "W4-yUKHhM7HYYhELuP9vfRH1D2IgcSSxz397SMz4u04WfLW3mBrmsaZ0QBgUwy33I7ZA6UoffnuUN8M8koXjfFMv0AfTgkQNJCg0X7cPCIn0WplONF6i4ACWUZjX_fSg36y5cRLDBv4pMOOMEI_eGyMt2tOoNZ2Fik1k-AXsyVNV-mqBtzblhdiGpy0bBgvcrMvJiBfe-AJazv-W3Ik5M0OeZB12YbQDHQSMTjhPEnADn6gmgsERBKbaGO8ieKW0v2Ukb3yqIy7PtdM44wJ0E_u2_tyqffmm6VoH6zaiFHgvEqfT7IM1w8_8k7nk2M9rT__o2A0cGWsYzhw3Mxs1Xw".to_string();
 
     let openid_signature = OpenIdSig {
         jwt_sig,
@@ -275,7 +275,7 @@ async fn test_zkid_oidc_signature_transaction_submission_epk_expired() {
     let zk_sig = ZkIdSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_signature),
         jwt_header,
-        exp_timestamp_secs: 1704909236,
+        exp_timestamp_secs: 1, // Expired timestamp
         ephemeral_pubkey: ephemeral_public_key,
         ephemeral_signature,
     };
@@ -383,11 +383,12 @@ async fn test_zkid_groth16_verifies() {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephem_proof_sig,
-            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
-            //training_wheels_signature: EphemeralSignature::ed25519(bad_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
-            override_aud_val: None,
             exp_horizon_secs: config.max_exp_horizon_secs,
+            override_aud_val: None,
+            training_wheels_signature: Some(EphemeralSignature::ed25519(
+                tw_sk.sign(&proof).unwrap(),
+            )),
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,
@@ -496,10 +497,12 @@ async fn test_zkid_groth16_signature_transaction_submission_proof_signature_chec
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: proof.clone(),
             non_malleability_signature: ephemeral_signature.clone(), // Wrong signature
-            training_wheels_signature: EphemeralSignature::ed25519(tw_sk.sign(&proof).unwrap()),
             extra_field: "\"family_name\":\"Straka\",".to_string(),
-            override_aud_val: None,
             exp_horizon_secs: config.max_exp_horizon_secs,
+            override_aud_val: None,
+            training_wheels_signature: Some(EphemeralSignature::ed25519(
+                tw_sk.sign(&proof).unwrap(),
+            )),
         }),
         jwt_header,
         exp_timestamp_secs: 1900255944,

@@ -168,12 +168,6 @@ impl OpenIdSig {
             pk.iss
         );
 
-        ensure!(
-            self.uid_key.eq("sub") || self.uid_key.eq("email"),
-            "uid_key must be either 'sub' or 'email', was \"{}\"",
-            self.uid_key
-        );
-
         // When an aud_val override is set, the IDC-committed `aud` is included next to the
         // OpenID signature.
         let idc_aud_val = match self.idc_aud_val.as_ref() {
@@ -229,10 +223,7 @@ impl OpenIdSig {
         )?);
 
         let nonce_fr = poseidon_bn254::hash_scalars(frs)?;
-        let mut nonce_bytes = vec![0u8; config.nonce_commitment_num_bytes as usize];
-        nonce_fr.serialize_uncompressed(&mut nonce_bytes[..])?;
-
-        Ok(base64url_encode(&nonce_bytes[..]))
+        Ok(nonce_fr.to_string())
     }
 }
 
@@ -313,16 +304,16 @@ pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
     /// A signature on the proof (via the ephemeral SK) to prevent malleability attacks.
     pub non_malleability_signature: EphemeralSignature,
-    /// A signature on the proof (via the training wheels SK) to mitigate against flaws in our circuit
-    pub training_wheels_signature: EphemeralSignature,
+    /// The expiration horizon that the circuit should enforce on the expiration date committed in the nonce.
+    /// This must be <= `Configuration::max_expiration_horizon_secs`.
+    pub exp_horizon_secs: u64,
     /// An extra field (e.g., `"<name>":"<val>") that will be matched publicly in the JWT
     pub extra_field: String,
     /// Will be set to the override `aud` value that the circuit should match, instead of the `aud` in the IDC.
     /// This will allow users to recover their zkID accounts derived by an application that is no longer online.
     pub override_aud_val: Option<String>,
-    /// The expiration horizon that the circuit should enforce on the expiration date committed in the nonce.
-    /// This must be <= `Configuration::max_expiration_horizon_secs`.
-    pub exp_horizon_secs: u64,
+    /// A signature on the proof (via the training wheels SK) to mitigate against flaws in our circuit
+    pub training_wheels_signature: Option<EphemeralSignature>,
 }
 
 impl SignedGroth16Zkp {
@@ -331,7 +322,11 @@ impl SignedGroth16Zkp {
     }
 
     pub fn verify_training_wheels_sig(&self, pub_key: &EphemeralPublicKey) -> Result<()> {
-        self.training_wheels_signature.verify(&self.proof, pub_key)
+        if let Some(training_wheels_signature) = &self.training_wheels_signature {
+            training_wheels_signature.verify(&self.proof, pub_key)
+        } else {
+            bail!("No training_wheels_signature found")
+        }
     }
 
     pub fn verify_proof(
@@ -585,10 +580,6 @@ pub fn get_zkid_authenticators(
     Ok(authenticators)
 }
 
-pub fn base64url_encode(data: &[u8]) -> String {
-    base64::encode_config(data, URL_SAFE_NO_PAD)
-}
-
 pub fn base64url_encode_str(data: &str) -> String {
     base64::encode_config(data.as_bytes(), URL_SAFE_NO_PAD)
 }
@@ -695,12 +686,12 @@ mod test {
             sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
                 proof: proof.clone(),
                 non_malleability_signature: ephem_proof_sig,
-                training_wheels_signature: EphemeralSignature::ed25519(
-                    Ed25519Signature::dummy_signature(),
-                ),
                 extra_field: "\"family_name\":\"Straka\",".to_string(),
-                override_aud_val: None,
                 exp_horizon_secs: config.max_exp_horizon_secs,
+                override_aud_val: None,
+                training_wheels_signature: Some(EphemeralSignature::ed25519(
+                    Ed25519Signature::dummy_signature(),
+                )),
             }),
             jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
             exp_timestamp_secs: 1900255944,
@@ -747,7 +738,7 @@ mod test {
         nonce: Option<String>,
     ) -> String {
         let nonce_str = match &nonce {
-            None => "uxxgjhTml_fhiFwyWCyExJTD3J2YK3MoVDOYdnxieiE",
+            None => "15142559071815587978635947836206288328330533396937069427032377153167520963771",
             Some(s) => s.as_str(),
         };
 

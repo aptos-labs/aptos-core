@@ -527,7 +527,6 @@ export interface TransactionPayload {
   type?: TransactionPayload_Type | undefined;
   entryFunctionPayload?: EntryFunctionPayload | undefined;
   scriptPayload?: ScriptPayload | undefined;
-  moduleBundlePayload?: ModuleBundlePayload | undefined;
   writeSetPayload?: WriteSetPayload | undefined;
   multisigPayload?: MultisigPayload | undefined;
 }
@@ -536,7 +535,6 @@ export enum TransactionPayload_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ENTRY_FUNCTION_PAYLOAD = 1,
   TYPE_SCRIPT_PAYLOAD = 2,
-  TYPE_MODULE_BUNDLE_PAYLOAD = 3,
   TYPE_WRITE_SET_PAYLOAD = 4,
   TYPE_MULTISIG_PAYLOAD = 5,
   UNRECOGNIZED = -1,
@@ -553,9 +551,6 @@ export function transactionPayload_TypeFromJSON(object: any): TransactionPayload
     case 2:
     case "TYPE_SCRIPT_PAYLOAD":
       return TransactionPayload_Type.TYPE_SCRIPT_PAYLOAD;
-    case 3:
-    case "TYPE_MODULE_BUNDLE_PAYLOAD":
-      return TransactionPayload_Type.TYPE_MODULE_BUNDLE_PAYLOAD;
     case 4:
     case "TYPE_WRITE_SET_PAYLOAD":
       return TransactionPayload_Type.TYPE_WRITE_SET_PAYLOAD;
@@ -577,8 +572,6 @@ export function transactionPayload_TypeToJSON(object: TransactionPayload_Type): 
       return "TYPE_ENTRY_FUNCTION_PAYLOAD";
     case TransactionPayload_Type.TYPE_SCRIPT_PAYLOAD:
       return "TYPE_SCRIPT_PAYLOAD";
-    case TransactionPayload_Type.TYPE_MODULE_BUNDLE_PAYLOAD:
-      return "TYPE_MODULE_BUNDLE_PAYLOAD";
     case TransactionPayload_Type.TYPE_WRITE_SET_PAYLOAD:
       return "TYPE_WRITE_SET_PAYLOAD";
     case TransactionPayload_Type.TYPE_MULTISIG_PAYLOAD:
@@ -648,10 +641,6 @@ export function multisigTransactionPayload_TypeToJSON(object: MultisigTransactio
     default:
       return "UNRECOGNIZED";
   }
-}
-
-export interface ModuleBundlePayload {
-  modules?: MoveModuleBytecode[] | undefined;
 }
 
 export interface MoveModuleBytecode {
@@ -4391,7 +4380,6 @@ function createBaseTransactionPayload(): TransactionPayload {
     type: 0,
     entryFunctionPayload: undefined,
     scriptPayload: undefined,
-    moduleBundlePayload: undefined,
     writeSetPayload: undefined,
     multisigPayload: undefined,
   };
@@ -4407,9 +4395,6 @@ export const TransactionPayload = {
     }
     if (message.scriptPayload !== undefined) {
       ScriptPayload.encode(message.scriptPayload, writer.uint32(26).fork()).ldelim();
-    }
-    if (message.moduleBundlePayload !== undefined) {
-      ModuleBundlePayload.encode(message.moduleBundlePayload, writer.uint32(34).fork()).ldelim();
     }
     if (message.writeSetPayload !== undefined) {
       WriteSetPayload.encode(message.writeSetPayload, writer.uint32(42).fork()).ldelim();
@@ -4447,13 +4432,6 @@ export const TransactionPayload = {
           }
 
           message.scriptPayload = ScriptPayload.decode(reader, reader.uint32());
-          continue;
-        case 4:
-          if (tag !== 34) {
-            break;
-          }
-
-          message.moduleBundlePayload = ModuleBundlePayload.decode(reader, reader.uint32());
           continue;
         case 5:
           if (tag !== 42) {
@@ -4519,9 +4497,6 @@ export const TransactionPayload = {
         ? EntryFunctionPayload.fromJSON(object.entryFunctionPayload)
         : undefined,
       scriptPayload: isSet(object.scriptPayload) ? ScriptPayload.fromJSON(object.scriptPayload) : undefined,
-      moduleBundlePayload: isSet(object.moduleBundlePayload)
-        ? ModuleBundlePayload.fromJSON(object.moduleBundlePayload)
-        : undefined,
       writeSetPayload: isSet(object.writeSetPayload) ? WriteSetPayload.fromJSON(object.writeSetPayload) : undefined,
       multisigPayload: isSet(object.multisigPayload) ? MultisigPayload.fromJSON(object.multisigPayload) : undefined,
     };
@@ -4537,9 +4512,6 @@ export const TransactionPayload = {
     }
     if (message.scriptPayload !== undefined) {
       obj.scriptPayload = ScriptPayload.toJSON(message.scriptPayload);
-    }
-    if (message.moduleBundlePayload !== undefined) {
-      obj.moduleBundlePayload = ModuleBundlePayload.toJSON(message.moduleBundlePayload);
     }
     if (message.writeSetPayload !== undefined) {
       obj.writeSetPayload = WriteSetPayload.toJSON(message.writeSetPayload);
@@ -4561,9 +4533,6 @@ export const TransactionPayload = {
       : undefined;
     message.scriptPayload = (object.scriptPayload !== undefined && object.scriptPayload !== null)
       ? ScriptPayload.fromPartial(object.scriptPayload)
-      : undefined;
-    message.moduleBundlePayload = (object.moduleBundlePayload !== undefined && object.moduleBundlePayload !== null)
-      ? ModuleBundlePayload.fromPartial(object.moduleBundlePayload)
       : undefined;
     message.writeSetPayload = (object.writeSetPayload !== undefined && object.writeSetPayload !== null)
       ? WriteSetPayload.fromPartial(object.writeSetPayload)
@@ -5180,103 +5149,6 @@ export const MultisigTransactionPayload = {
     message.entryFunctionPayload = (object.entryFunctionPayload !== undefined && object.entryFunctionPayload !== null)
       ? EntryFunctionPayload.fromPartial(object.entryFunctionPayload)
       : undefined;
-    return message;
-  },
-};
-
-function createBaseModuleBundlePayload(): ModuleBundlePayload {
-  return { modules: [] };
-}
-
-export const ModuleBundlePayload = {
-  encode(message: ModuleBundlePayload, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.modules !== undefined && message.modules.length !== 0) {
-      for (const v of message.modules) {
-        MoveModuleBytecode.encode(v!, writer.uint32(10).fork()).ldelim();
-      }
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): ModuleBundlePayload {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseModuleBundlePayload();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modules!.push(MoveModuleBytecode.decode(reader, reader.uint32()));
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  // encodeTransform encodes a source of message objects.
-  // Transform<ModuleBundlePayload, Uint8Array>
-  async *encodeTransform(
-    source:
-      | AsyncIterable<ModuleBundlePayload | ModuleBundlePayload[]>
-      | Iterable<ModuleBundlePayload | ModuleBundlePayload[]>,
-  ): AsyncIterable<Uint8Array> {
-    for await (const pkt of source) {
-      if (globalThis.Array.isArray(pkt)) {
-        for (const p of (pkt as any)) {
-          yield* [ModuleBundlePayload.encode(p).finish()];
-        }
-      } else {
-        yield* [ModuleBundlePayload.encode(pkt as any).finish()];
-      }
-    }
-  },
-
-  // decodeTransform decodes a source of encoded messages.
-  // Transform<Uint8Array, ModuleBundlePayload>
-  async *decodeTransform(
-    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
-  ): AsyncIterable<ModuleBundlePayload> {
-    for await (const pkt of source) {
-      if (globalThis.Array.isArray(pkt)) {
-        for (const p of (pkt as any)) {
-          yield* [ModuleBundlePayload.decode(p)];
-        }
-      } else {
-        yield* [ModuleBundlePayload.decode(pkt as any)];
-      }
-    }
-  },
-
-  fromJSON(object: any): ModuleBundlePayload {
-    return {
-      modules: globalThis.Array.isArray(object?.modules)
-        ? object.modules.map((e: any) => MoveModuleBytecode.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ModuleBundlePayload): unknown {
-    const obj: any = {};
-    if (message.modules?.length) {
-      obj.modules = message.modules.map((e) => MoveModuleBytecode.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ModuleBundlePayload>): ModuleBundlePayload {
-    return ModuleBundlePayload.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ModuleBundlePayload>): ModuleBundlePayload {
-    const message = createBaseModuleBundlePayload();
-    message.modules = object.modules?.map((e) => MoveModuleBytecode.fromPartial(e)) || [];
     return message;
   },
 };

@@ -13,6 +13,8 @@ mod client;
 #[cfg(test)]
 mod consensus;
 #[cfg(test)]
+mod execution;
+#[cfg(test)]
 mod full_nodes;
 #[cfg(test)]
 mod fullnode;

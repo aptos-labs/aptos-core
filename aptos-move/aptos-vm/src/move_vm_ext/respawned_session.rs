@@ -26,7 +26,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId,
     },
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
@@ -192,7 +192,6 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.base_executor_view
@@ -267,20 +266,18 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         self.base_executor_view.generate_delayed_field_id(width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        self.base_executor_view
-            .validate_and_convert_delayed_field_id(id)
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        self.base_executor_view.validate_delayed_field_id(id)
     }
 
     fn get_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.base_executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -289,7 +286,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
