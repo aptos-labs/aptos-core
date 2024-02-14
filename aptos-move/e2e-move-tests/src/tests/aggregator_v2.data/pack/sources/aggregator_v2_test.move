@@ -21,6 +21,10 @@ module 0x1::aggregator_v2_test {
     const EINDEX_DOESNT_EXIST: u64 = 22;
     const EOPTION_DOESNT_EXIST: u64 = 23;
 
+    const ERESOURCE_ALREADY_EXISTS: u64 = 24;
+    const ETABLE_ALREADY_EXISTS: u64 = 25;
+    const ERESOURCE_GROUP_ALREADY_EXISTS: u64 = 26;
+
     struct AggregatorInResource<Agg: store + drop> has key, store, drop {
         data: vector<Option<Agg>>,
     }
@@ -52,11 +56,15 @@ module 0x1::aggregator_v2_test {
     }
 
     fun init<Agg: store + drop>(account: &signer, use_type: u32) {
+        let addr = std::signer::address_of(account);
         if (use_type == USE_RESOURCE_TYPE) {
+            assert!(!exists<AggregatorInResource<Agg>>(addr), ERESOURCE_ALREADY_EXISTS);
             move_to(account, AggregatorInResource<Agg> { data: vector::empty() });
         } else if (use_type == USE_TABLE_TYPE) {
+            assert!(!exists<AggregatorInTable<Agg>>(addr), ETABLE_ALREADY_EXISTS);
             move_to(account, AggregatorInTable<Agg> { data: table::new() });
         } else if (use_type == USE_RESOURCE_GROUP_TYPE) {
+            assert!(!exists<AggregatorInTable<Agg>>(addr), ERESOURCE_GROUP_ALREADY_EXISTS);
             move_to(account, AggregatorInResourceGroup<Agg> { data: vector::empty() });
         } else {
             assert!(false, EINVALID_ARG);
@@ -77,10 +85,12 @@ module 0x1::aggregator_v2_test {
 
     fun delete<Agg: store + drop>(account_addr: address, use_type: u32) acquires AggregatorInResource, AggregatorInResourceGroup {
         if (use_type == USE_RESOURCE_TYPE) {
+            assert!(exists<AggregatorInResource<Agg>>(account_addr), ERESOURCE_DOESNT_EXIST);
             move_from<AggregatorInResource<Agg>>(account_addr);
         // } else if (use_type == USE_TABLE_TYPE) {
         //     move_from<AggregatorInTable<Agg>>(account_addr);
         } else if (use_type == USE_RESOURCE_GROUP_TYPE) {
+            assert!(exists<AggregatorInResourceGroup<Agg>>(account_addr), ERESOURCE_GROUP_DOESNT_EXIST);
             move_from<AggregatorInResourceGroup<Agg>>(account_addr);
         } else {
             assert!(false, EINVALID_ARG);
@@ -124,8 +134,9 @@ module 0x1::aggregator_v2_test {
         if (vector::length(vector_data) == i) {
             vector::push_back(vector_data, option::some(e));
         } else {
+            assert!(vector::length(vector_data) > i, EINDEX_DOESNT_EXIST);
             let option_data = vector::borrow_mut(vector_data, i);
-            option::fill(option_data, e);
+            option::swap_or_fill(option_data, e);
         };
     }
 

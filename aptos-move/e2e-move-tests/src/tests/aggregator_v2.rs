@@ -237,7 +237,7 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     .boxed()
 }
 
-fn arb_dropable_use_type() -> BoxedStrategy<UseType> {
+fn arb_droppable_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         // Just(UseType::UseTableType),
@@ -469,9 +469,9 @@ proptest! {
     }
 
     #[test]
-    fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_dropable_use_type()) {
+    fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_droppable_use_type()) {
         println!("Testing test_aggregator_recreate {:?}", test_env);
-        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
 
         let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
 
