@@ -652,9 +652,7 @@ fn pinkas_wvuf_derive_eval_rks_multiexps<
 
                     (
                         proof.clone(),
-                        rks.into_iter()
-                            .map(|e| e.clone())
-                            .collect::<Vec<Vec<G1Projective>>>(),
+                        rks.into_iter().cloned().collect::<Vec<Vec<G1Projective>>>(),
                         lagr,
                         ranges,
                     )
