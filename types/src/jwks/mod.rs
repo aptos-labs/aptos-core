@@ -223,5 +223,5 @@ impl MoveStructType for ObservedJWKsUpdated {
 }
 
 pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| {
-    TypeTag::from_str(ObservedJWKsUpdated::struct_tag().to_string().as_str()).unwrap()
+    TypeTag::Struct(Box::new(ObservedJWKsUpdated::struct_tag()))
 });

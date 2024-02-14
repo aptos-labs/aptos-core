@@ -33,8 +33,9 @@ impl MoveStructType for DKGStartEvent {
     const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
 }
 
-pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
-    Lazy::new(|| TypeTag::from_str(DKGStartEvent::struct_tag().to_string().as_str()).unwrap());
+pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> = Lazy::new(|| {
+    TypeTag::Struct(Box::new(DKGStartEvent::struct_tag()))
+});
 
 /// DKG transcript and its metadata.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
