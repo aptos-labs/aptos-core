@@ -1395,6 +1395,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_rpc_request"))
         });
+
+        match request.epoch() {
+            Some(epoch) if epoch != self.epoch() => {
+                monitor!(
+                    "process_different_epoch_rpc_request",
+                    self.process_different_epoch(epoch, peer_id)
+                )?;
+                return Ok(());
+            },
+            // TODO: differentiate between None and same epoch.
+            _ => {},
+        }
+
         match request {
             IncomingRpcRequest::BlockRetrieval(request) => {
                 if let Some(tx) = &self.block_retrieval_tx {
@@ -1411,19 +1424,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             },
             IncomingRpcRequest::DAGRequest(request) => {
-                let dag_msg_epoch = request.req.epoch;
-
-                if dag_msg_epoch == self.epoch() {
-                    if let Some(tx) = &self.dag_rpc_tx {
-                        tx.push(peer_id, request)
-                    } else {
-                        Err(anyhow::anyhow!("DAG not bootstrapped"))
-                    }
+                if let Some(tx) = &self.dag_rpc_tx {
+                    tx.push(peer_id, request)
                 } else {
-                    monitor!(
-                        "process_different_epoch_dag_rpc",
-                        self.process_different_epoch(dag_msg_epoch, peer_id)
-                    )
+                    Err(anyhow::anyhow!("DAG not bootstrapped"))
                 }
             },
             IncomingRpcRequest::CommitRequest(request) => {
