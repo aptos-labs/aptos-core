@@ -192,8 +192,7 @@ impl TableData {
 
 impl LayoutInfo {
     fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
-        let (layout, has_identifier_mappings) =
-            context.type_to_type_layout_with_identifier_mappings(value_ty)?;
+        let (layout, has_identifier_mappings) = context.type_to_type_layout(value_ty)?;
         Ok(Self {
             layout: Arc::new(layout),
             has_identifier_mappings,
