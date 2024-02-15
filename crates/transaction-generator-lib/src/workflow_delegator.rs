@@ -18,7 +18,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum StageTracking {
     // stage is externally modified
     ExternallySet(Arc<AtomicUsize>),
@@ -113,6 +113,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
+        println!("\nGenerate transactions: stage: {:?}", self.stage);
         let stage = match self.stage.load_current_stage() {
             Some(stage) => stage,
             None => {
@@ -188,8 +189,11 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
-            generator.generate_transactions(account, num_to_create)
+            let txns = generator.generate_transactions(account, num_to_create);
+            println!("\nStage {}, Generated {} transactions", stage, txns.len());
+            txns
         } else {
+            println!("\nStage {}, Generated 0 transactions", stage);
             Vec::new()
         };
 
