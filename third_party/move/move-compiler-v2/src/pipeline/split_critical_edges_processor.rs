@@ -44,20 +44,23 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
 }
 
 struct SplitCriticalEdgesTransformation {
+    /// Function data of the function being transformed
     data: FunctionData,
-    // labels used in the original code and in the generated code
+    /// Labels used in the original code and in the generated code
     labels: BTreeSet<Label>,
-    srcs_count: BTreeMap<Label, usize>,
+    /// Maps label to its number of incoming edges, including explicit goto/branch or fall throughs.
+    /// If a label is not in the map, it doesn't have any incoming edges.
+    incoming_edge_count: BTreeMap<Label, usize>,
 }
 
 impl SplitCriticalEdgesTransformation {
     pub fn new(data: FunctionData) -> Self {
         let labels = Bytecode::labels(&data.code);
-        let srcs_count = count_srcs(&data.code);
+        let incoming_edges_count = count_incoming_edges(&data.code);
         Self {
             data,
             labels,
-            srcs_count,
+            incoming_edge_count: incoming_edges_count,
         }
     }
 
@@ -114,7 +117,7 @@ impl SplitCriticalEdgesTransformation {
         label: Label,
     ) -> Option<(Label, Vec<Bytecode>)> {
         // label is in `srcs_count` by construction
-        if *self.srcs_count.get(&label).expect("srcs count") > 1 {
+        if *self.incoming_edge_count.get(&label).expect("srcs count") > 1 {
 
             Some(self.split_edge(attr_id, label))
         } else {
@@ -162,7 +165,7 @@ impl SplitCriticalEdgesTransformation {
 }
 
 /// If key present in `map`, add 1 to its value; else insert 1
-fn map_inc<Key: Ord>(map: &mut BTreeMap<Key, usize>, key: Key) {
+fn increment_key_count<Key: Ord>(map: &mut BTreeMap<Key, usize>, key: Key) {
     map.entry(key)
         .and_modify(|n: &mut usize| {
             let (n_suc, overflows) = n.overflowing_add(1);
@@ -175,23 +178,23 @@ fn map_inc<Key: Ord>(map: &mut BTreeMap<Key, usize>, key: Key) {
         .or_insert(1usize);
 }
 
-/// Count the number of sources of labels
-/// labels with no sources are not included
-fn count_srcs(code: &[Bytecode]) -> BTreeMap<Label, usize> {
+/// Count the number of explicit and implicit (fall throughs) uses of labels.
+/// Labels with no predecessors are not included.
+fn count_incoming_edges(code: &[Bytecode]) -> BTreeMap<Label, usize> {
     let mut srcs_count = BTreeMap::new();
     for (code_offset, instr) in code.iter().enumerate() {
         match instr {
-            Bytecode::Jump(_, label) => map_inc(&mut srcs_count, *label),
+            Bytecode::Jump(_, label) => increment_key_count(&mut srcs_count, *label),
             Bytecode::Branch(_, l0, l1, _) => {
-                map_inc(&mut srcs_count, *l0);
-                map_inc(&mut srcs_count, *l1);
+                increment_key_count(&mut srcs_count, *l0);
+                increment_key_count(&mut srcs_count, *l1);
             },
             Bytecode::Label(_, label) => {
                 if code_offset != 0 {
                     let prev_instr = code.get(code_offset - 1).expect("instruction");
                     // treat fall-through's to the label
                     if !prev_instr.is_branch() {
-                        map_inc(&mut srcs_count, *label)
+                        increment_key_count(&mut srcs_count, *label)
                     }
                 }
             },
