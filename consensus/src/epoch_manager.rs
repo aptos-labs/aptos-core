@@ -1404,7 +1404,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 )?;
                 return Ok(());
             },
-            // TODO: differentiate between None and same epoch.
+            None => {
+                ensure!(matches!(request, IncomingRpcRequest::BlockRetrieval(_)));
+            },
             _ => {},
         }
 
@@ -1413,7 +1415,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 if let Some(tx) = &self.block_retrieval_tx {
                     tx.push(peer_id, request)
                 } else {
-                    Err(anyhow::anyhow!("Round manager not started"))
+                    error!("Round manager not started");
+                    Ok(())
                 }
             },
             IncomingRpcRequest::BatchRetrieval(request) => {
@@ -1443,7 +1446,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
     fn process_local_timeout(&mut self, round: u64) {
         let Some(sender) = self.round_manager_tx.as_mut() else {
-            warn!("Received local timeout for round {} without Round Manager", round);
+            warn!(
+                "Received local timeout for round {} without Round Manager",
+                round
+            );
             return;
         };
 
