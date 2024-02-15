@@ -131,7 +131,7 @@ fn test_string_utils() {
         {
             assert_eq!(id, string_utils_id.clone())
         } else {
-            unreachable!("Expected be move abort, got {:?}", status)
+            unreachable!("Expected Move abort, got {:?}", status)
         }
     });
 }
