@@ -124,7 +124,7 @@ impl Report {
 
     /// Returns the list of entries in the report.
     #[cfg(test)]
-    pub fn entries(&self) -> &HashMap<PathBuf, Vec<MutantStats>> {
+    pub fn entries(&self) -> &BTreeMap<PathBuf, Vec<MutantStats>> {
         &self.files
     }
 }

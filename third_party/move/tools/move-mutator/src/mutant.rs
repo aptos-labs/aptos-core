@@ -36,7 +36,7 @@ impl Mutant {
 
     /// Returns the module name that this mutant is in.
     pub fn get_module_name(&self) -> Option<ModuleName> {
-        self.module_name.clone()
+        self.module_name
     }
 
     /// Sets the module name that this mutant is in.

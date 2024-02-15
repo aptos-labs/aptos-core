@@ -31,7 +31,7 @@ pub fn mutate(
     let mut mutants = ast
         .modules
         .into_iter()
-        .map(|module| traverse_module_with_check(module, conf, files))
+        .map(|module| traverse_module_with_check(&module, conf, files))
         .collect::<Result<Vec<_>, _>>()?
         .concat();
 
@@ -52,7 +52,7 @@ pub fn mutate(
 /// that are not included in the configuration.
 #[inline]
 fn traverse_module_with_check(
-    module: (expansion::ast::ModuleIdent, ast::ModuleDefinition),
+    module: &(expansion::ast::ModuleIdent, ast::ModuleDefinition),
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
@@ -92,7 +92,7 @@ fn traverse_module_with_check(
     }
 
     // Now we need to check if the module is included in the configuration.
-    let module_name = extract_module_name(&module);
+    let module_name = extract_module_name(module);
     if let cli::ModuleFilter::Selected(mods) = &conf.project.mutate_modules {
         if !mods.contains(&module_name.to_string()) {
             trace!("Skipping module {}", module_name.to_string());
@@ -100,7 +100,7 @@ fn traverse_module_with_check(
         }
     }
 
-    traverse_module(&module, conf, files)
+    traverse_module(module, conf, files)
 }
 
 /// Internal helper function that returns a reference to the functions defined in the module.
@@ -131,14 +131,15 @@ fn extract_module_name(
 
 /// Traverses a single module and returns a list of mutants.
 /// Checks all the functions and constants defined in the module.
+#[allow(clippy::unnecessary_to_owned)]
 fn traverse_module(
     module: &(expansion::ast::ModuleIdent, ast::ModuleDefinition),
     conf: &Configuration,
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
-    let module_name = extract_module_name(&module);
+    let module_name = extract_module_name(module);
     trace!("Traversing module {}", &module_name.to_string());
-    let mut mutants = functions_of(&module)
+    let mut mutants = functions_of(module)
         .to_owned()
         .into_iter()
         .map(|func| traverse_function(func, conf, files))
@@ -146,7 +147,7 @@ fn traverse_module(
         .concat();
 
     mutants.extend(
-        constants_of(&module)
+        constants_of(module)
             .to_owned()
             .into_iter()
             .map(|(_, constant)| parse_expression_and_find_mutants(constant.value))

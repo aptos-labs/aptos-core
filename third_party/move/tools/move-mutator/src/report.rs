@@ -27,6 +27,10 @@ impl Report {
     }
 
     /// Saves the `Report` as a JSON file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be created or written to.
     pub fn save_to_json_file(&self, path: &Path) -> Result<()> {
         let file = std::fs::File::create(path)?;
 
@@ -36,6 +40,10 @@ impl Report {
     }
 
     /// Loads the `Report` from a JSON file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be opened or read from.
     pub fn load_from_json_file(path: &Path) -> Result<Self> {
         info!("Reading report from {}", path.display());
 
@@ -45,6 +53,10 @@ impl Report {
     }
 
     /// Saves the `Report` as a text file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be created or written to.
     pub fn save_to_text_file(&self, path: &Path) -> Result<()> {
         let mut file = std::fs::File::create(path)?;
 
@@ -149,6 +161,7 @@ impl Mutation {
     }
 
     /// Returns the operator name.
+    #[must_use]
     pub fn get_operator_name(&self) -> &str {
         &self.operator_name
     }
@@ -157,6 +170,7 @@ impl Mutation {
 /// The `MutationReport` struct represents an entry in a report.
 /// It contains information about a mutation that was applied to a file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::module_name_repetitions)]
 pub struct MutationReport {
     /// The path to the mutated file.
     mutant_path: PathBuf,

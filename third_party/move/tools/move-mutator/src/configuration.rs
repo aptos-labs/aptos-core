@@ -37,6 +37,14 @@ impl Configuration {
 
     /// Recognizes the file type based on the file extension.
     /// Currently supported file types are JSON and TOML.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file type is not supported.
+    ///
+    /// # Returns
+    ///
+    /// * `FileType` - The recognized file type.
     fn get_file_type(file_path: &Path) -> anyhow::Result<FileType> {
         match file_path.extension().and_then(|s| s.to_str()) {
             Some("json") => Ok(FileType::JSON),
@@ -46,6 +54,14 @@ impl Configuration {
     }
 
     /// Reads configuration from the configuration file recognizing its type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file type is not supported. or configuration has invalid format.
+    ///
+    /// # Returns
+    ///
+    /// * `Configuration` - The configuration read from the file.
     pub fn from_file(file_path: &Path) -> anyhow::Result<Configuration> {
         let file_type = Configuration::get_file_type(file_path)?;
         debug!("Reading configuration from file type: {:?}", file_type);
@@ -56,6 +72,14 @@ impl Configuration {
     }
 
     /// Reads configuration from the TOML configuration file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file has invalid format.
+    ///
+    /// # Returns
+    ///
+    /// * `Configuration` - The configuration read from the file.
     pub fn from_toml_file(toml_file: &Path) -> anyhow::Result<Configuration> {
         debug!("Reading configuration from TOML file: {:?}", toml_file);
         let toml_source = std::fs::read_to_string(toml_file)?;
@@ -63,12 +87,21 @@ impl Configuration {
     }
 
     /// Reads configuration from the JSON configuration source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file has invalid format.
+    ///
+    /// # Returns
+    ///
+    /// * `Configuration` - The configuration read from the file.
     pub fn from_json_file(json_file: &Path) -> anyhow::Result<Configuration> {
         debug!("Reading configuration from JSON file: {:?}", json_file);
         Ok(serde_json::from_str(&std::fs::read_to_string(json_file)?)?)
     }
 
     /// Returns the configuration for the given file path.
+    #[must_use]
     pub fn get_file_configuration(&self, file_path: &Path) -> Option<&FileConfiguration> {
         self.individual
             .iter()
@@ -87,6 +120,7 @@ pub struct MutationConfig {
 
 /// Configuration for the individual file.
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::module_name_repetitions)]
 pub struct FileConfiguration {
     /// The path to the Move source.
     pub file: PathBuf,

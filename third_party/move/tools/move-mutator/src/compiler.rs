@@ -44,6 +44,10 @@ use move_symbol_pool::Symbol;
 ///
 /// * If any error occurs during the generation, the string with the cause is returned.
 ///
+/// # Panics
+///
+/// This function panics if the source path contains invalid characters.
+///
 /// # Returns
 ///
 /// * `Result<(FilesSourceText, move_compiler::typing::ast::Program), anyhow::Error>` - tuple of `FilesSourceText` and Program if successful, or an error if any error occurs.
@@ -84,7 +88,7 @@ pub fn generate_ast(
 /// This function prepares the compiler for the given package - it resolves all names and dependencies reading them
 /// from the manifest file present at the package root.
 ///
-/// This function is mostly copy of the code present in the `move_package` crate (build_all).
+/// This function is mostly copy of the code present in the `move_package` crate (`build_all`).
 ///
 /// # Arguments
 ///
@@ -336,7 +340,6 @@ fn rewrite_manifest_for_mutant(root: &Path, tempdir: &Path) -> Result<(), anyhow
     manifest
         .dependencies
         .values()
-        .into_iter()
         .chain(manifest.dev_dependencies.values())
         .for_each(|dep| {
             let dep_canon = dep.local.canonicalize();
