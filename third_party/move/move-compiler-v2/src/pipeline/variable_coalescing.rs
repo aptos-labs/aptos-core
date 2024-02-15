@@ -38,7 +38,6 @@ use std::collections::{BTreeMap, BTreeSet};
 /// The live interval of a local (inclusive).
 /// Note that two live intervals i1: [b1, x] and i2: [x, e2] are *not* considered to overlap
 /// even though the code offset `x` is in both intervals.
-#[derive(Debug)]
 struct LiveInterval {
     begin: CodeOffset,
     end: CodeOffset,
