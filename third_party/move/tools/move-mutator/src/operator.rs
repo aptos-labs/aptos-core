@@ -31,6 +31,7 @@ impl MutantInfo {
 /// Trait for mutation operators.
 /// Mutation operators are used to apply mutations to the source code. To keep adding new mutation operators simple,
 /// we use a trait that all mutation operators implement.
+#[allow(clippy::module_name_repetitions)]
 pub trait MutationOperator {
     /// Applies the mutation operator to the given source code.
     /// Returns differently mutated source code listings in a vector.

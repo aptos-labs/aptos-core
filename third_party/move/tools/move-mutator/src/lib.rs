@@ -89,7 +89,7 @@ pub fn run_move_mutator(
 
             // If the downsample ratio is set, we need to downsample the mutants.
             if let Some(percentage) = mutator_configuration.project.downsampling_ratio_percentage {
-                let to_remove = (mutated_sources.len() as f64 * percentage as f64 / 100.0) as usize;
+                let to_remove = (mutated_sources.len() * percentage).div_ceil(100);
 
                 // Delete randomly elements from the vector.
                 let mut rng = thread_rng();
