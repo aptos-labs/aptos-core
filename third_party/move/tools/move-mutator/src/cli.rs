@@ -67,7 +67,9 @@ impl FromStr for ModuleFilter {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "all" => Ok(ModuleFilter::All),
-            _ => Ok(ModuleFilter::Selected(vec![s.to_string()])),
+            _ => Ok(ModuleFilter::Selected(
+                s.split(',').map(String::from).collect(),
+            )),
         }
     }
 }
