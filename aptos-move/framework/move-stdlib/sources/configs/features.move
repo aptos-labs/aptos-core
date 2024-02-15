@@ -324,7 +324,7 @@ module std::features {
 
     const VM_BINARY_FORMAT_V7: u64 = 40;
 
-    const RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM: u64 = 41;
+    const RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET: u64 = 41;
 
     /// Whether the operator commission rate change in delegation pool is enabled.
     /// Lifetime: transient

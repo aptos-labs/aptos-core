@@ -70,7 +70,7 @@ fn run_entry_functions<F: Fn(ExecutionStatus)>(
         vec![
             FeatureFlag::AGGREGATOR_V2_API,
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ],
         vec![],
     );

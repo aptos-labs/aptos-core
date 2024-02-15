@@ -506,11 +506,11 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 
-<a id="0x1_features_RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM"></a>
+<a id="0x1_features_RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET"></a>
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM">RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM</a>: u64 = 41;
+<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET">RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET</a>: u64 = 41;
 </code></pre>
 
 
