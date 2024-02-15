@@ -559,6 +559,7 @@ impl MultiBucketFifoIndex {
     }
 
     pub fn reset(&mut self) {
+        self.index_idx = 0;
         for index in &mut self.indexes {
             index.reset();
         }
