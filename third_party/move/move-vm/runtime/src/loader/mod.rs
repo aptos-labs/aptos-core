@@ -1518,7 +1518,7 @@ impl<'a> Resolver<'a> {
     pub(crate) fn type_to_fully_annotated_layout(
         &self,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.loader
             .type_to_fully_annotated_layout(ty, self.module_store)
     }
@@ -1881,15 +1881,11 @@ impl Loader {
             },
             Type::Struct { idx, .. } => {
                 *count += 1;
-                let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(*idx, module_store, &[], count, depth + 1)?;
-                (layout, has_identifier_mappings)
+                self.struct_name_to_type_layout(*idx, module_store, &[], count, depth + 1)?
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
                 *count += 1;
-                let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(*idx, module_store, ty_args, count, depth + 1)?;
-                (layout, has_identifier_mappings)
+                self.struct_name_to_type_layout(*idx, module_store, ty_args, count, depth + 1)?
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
@@ -1907,7 +1903,7 @@ impl Loader {
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let name = &*self.name_cache.idx_to_identifier(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
@@ -1915,7 +1911,7 @@ impl Loader {
                     *count += *annotated_node_count
                 }
                 if let Some(layout) = &struct_info.annotated_struct_layout {
-                    return Ok(layout.clone());
+                    return Ok((layout.clone(), false));
                 }
             }
         }
@@ -1945,7 +1941,7 @@ impl Loader {
             .zip(&struct_type.fields)
             .map(|(n, ty)| {
                 let ty = self.subst(ty, ty_args)?;
-                let l =
+                let (l, _) =
                     self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))
             })
@@ -1964,7 +1960,7 @@ impl Loader {
         info.annotated_struct_layout = Some(struct_layout.clone());
         info.annotated_node_count = Some(field_node_count);
 
-        Ok(struct_layout)
+        Ok((struct_layout, false))
     }
 
     fn type_to_fully_annotated_layout_impl(
@@ -1973,7 +1969,7 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         count: &mut u64,
         depth: u64,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         if *count > MAX_TYPE_TO_LAYOUT_NODES {
             return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
         }
@@ -1981,33 +1977,71 @@ impl Loader {
             return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
         }
         Ok(match ty {
-            Type::Bool => MoveTypeLayout::Bool,
-            Type::U8 => MoveTypeLayout::U8,
-            Type::U16 => MoveTypeLayout::U16,
-            Type::U32 => MoveTypeLayout::U32,
-            Type::U64 => MoveTypeLayout::U64,
-            Type::U128 => MoveTypeLayout::U128,
-            Type::U256 => MoveTypeLayout::U256,
-            Type::Address => MoveTypeLayout::Address,
-            Type::Signer => MoveTypeLayout::Signer,
-            Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
-                self.type_to_fully_annotated_layout_impl(ty, module_store, count, depth + 1)?,
-            )),
-            Type::Struct { idx, .. } => self.struct_name_to_fully_annotated_layout(
-                *idx,
-                module_store,
-                &[],
-                count,
-                depth + 1,
-            )?,
-            Type::StructInstantiation { idx, ty_args, .. } => self
-                .struct_name_to_fully_annotated_layout(
+            Type::Bool => {
+                *count += 1;
+                (MoveTypeLayout::Bool, false)
+            },
+            Type::U8 => {
+                *count += 1;
+                (MoveTypeLayout::U8, false)
+            },
+            Type::U16 => {
+                *count += 1;
+                (MoveTypeLayout::U16, false)
+            },
+            Type::U32 => {
+                *count += 1;
+                (MoveTypeLayout::U32, false)
+            },
+            Type::U64 => {
+                *count += 1;
+                (MoveTypeLayout::U64, false)
+            },
+            Type::U128 => {
+                *count += 1;
+                (MoveTypeLayout::U128, false)
+            },
+            Type::U256 => {
+                *count += 1;
+                (MoveTypeLayout::U256, false)
+            },
+            Type::Address => {
+                *count += 1;
+                (MoveTypeLayout::Address, false)
+            },
+            Type::Signer => {
+                *count += 1;
+                (MoveTypeLayout::Signer, false)
+            },
+            Type::Vector(ty) => {
+                *count += 1;
+                let (elem_layout, has_identifier_mappings) =
+                    self.type_to_fully_annotated_layout_impl(ty, module_store, count, depth + 1)?;
+                (
+                    MoveTypeLayout::Vector(Box::new(elem_layout)),
+                    has_identifier_mappings,
+                )
+            },
+            Type::Struct { idx, .. } => {
+                *count += 1;
+                self.struct_name_to_fully_annotated_layout(
+                    *idx,
+                    module_store,
+                    &[],
+                    count,
+                    depth + 1,
+                )?
+            },
+            Type::StructInstantiation { idx, ty_args, .. } => {
+                *count += 1;
+                self.struct_name_to_fully_annotated_layout(
                     *idx,
                     module_store,
                     ty_args,
                     count,
                     depth + 1,
-                )?,
+                )?
+            },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -2121,7 +2155,7 @@ impl Loader {
         &self,
         ty: &Type,
         module_store: &ModuleStorageAdapter,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let mut count = 0;
         self.type_to_fully_annotated_layout_impl(ty, module_store, &mut count, 1)
     }
@@ -2145,7 +2179,7 @@ impl Loader {
         type_tag: &TypeTag,
         move_storage: &TransactionDataCache,
         module_storage: &ModuleStorageAdapter,
-    ) -> VMResult<MoveTypeLayout> {
+    ) -> VMResult<(MoveTypeLayout, bool)> {
         let ty = self.load_type(type_tag, move_storage, module_storage)?;
         self.type_to_fully_annotated_layout(&ty, module_storage)
             .map_err(|e| e.finish(Location::Undefined))

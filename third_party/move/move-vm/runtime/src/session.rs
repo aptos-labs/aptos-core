@@ -402,7 +402,10 @@ impl<'r, 'l> Session<'r, 'l> {
         )
     }
 
-    pub fn get_fully_annotated_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+    pub fn get_fully_annotated_type_layout(
+        &self,
+        type_tag: &TypeTag,
+    ) -> VMResult<(MoveTypeLayout, bool)> {
         self.move_vm
             .runtime
             .loader()

@@ -178,7 +178,7 @@ mod testing {
         context: &NativeContext,
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
-        let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
+        let (annotated_type_layout, _) = context.type_to_fully_annotated_layout(ty)?;
         match annotated_type_layout {
             MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
             _ => Err(
