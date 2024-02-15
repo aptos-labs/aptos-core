@@ -1714,8 +1714,8 @@ impl Loader {
 
     fn struct_name_to_type_layout(
         &self,
-        module_store: &ModuleStorageAdapter,
         struct_idx: StructNameIndex,
+        module_store: &ModuleStorageAdapter,
         ty_args: &[Type],
         count: &mut u64,
         depth: u64,
@@ -1748,7 +1748,7 @@ impl Loader {
         let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
             field_tys
                 .iter()
-                .map(|ty| self.type_to_type_layout_impl(ty, module_store, count, depth + 1))
+                .map(|ty| self.type_to_type_layout_impl(ty, module_store, count, depth))
                 .collect::<PartialVMResult<Vec<_>>>()?
                 .into_iter()
                 .unzip();
@@ -1881,16 +1881,14 @@ impl Loader {
             },
             Type::Struct { idx, .. } => {
                 *count += 1;
-                // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(module_store, *idx, &[], count, depth)?;
+                    self.struct_name_to_type_layout(*idx, module_store, &[], count, depth + 1)?;
                 (layout, has_identifier_mappings)
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
                 *count += 1;
-                // Note depth is incread inside struct_name_to_type_layout instead.
                 let (layout, has_identifier_mappings) =
-                    self.struct_name_to_type_layout(module_store, *idx, ty_args, count, depth)?;
+                    self.struct_name_to_type_layout(*idx, module_store, ty_args, count, depth + 1)?;
                 (layout, has_identifier_mappings)
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -1932,7 +1930,6 @@ impl Loader {
             );
         }
 
-        let count_before = *count;
         let mut gas_context = PseudoGasContext {
             cost: 0,
             max_cost: self.vm_config.type_max_cost,
@@ -1940,6 +1937,8 @@ impl Loader {
             cost_per_byte: self.vm_config.type_byte_cost,
         };
         let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
+
+        let count_before = *count;
         let field_layouts = struct_type
             .field_names
             .iter()
@@ -1947,7 +1946,7 @@ impl Loader {
             .map(|(n, ty)| {
                 let ty = self.subst(ty, ty_args)?;
                 let l =
-                    self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth + 1)?;
+                    self.type_to_fully_annotated_layout_impl(&ty, module_store, count, depth)?;
                 Ok(MoveFieldLayout::new(n.clone(), l))
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
@@ -1994,18 +1993,21 @@ impl Loader {
             Type::Vector(ty) => MoveTypeLayout::Vector(Box::new(
                 self.type_to_fully_annotated_layout_impl(ty, module_store, count, depth + 1)?,
             )),
-            Type::Struct { idx, .. } => {
-                self.struct_name_to_fully_annotated_layout(*idx, module_store, &[], count, depth)?
-            },
-            Type::StructInstantiation {
-                idx: name, ty_args, ..
-            } => self.struct_name_to_fully_annotated_layout(
-                *name,
+            Type::Struct { idx, .. } => self.struct_name_to_fully_annotated_layout(
+                *idx,
                 module_store,
-                ty_args,
+                &[],
                 count,
-                depth,
+                depth + 1,
             )?,
+            Type::StructInstantiation { idx, ty_args, .. } => self
+                .struct_name_to_fully_annotated_layout(
+                    *idx,
+                    module_store,
+                    ty_args,
+                    count,
+                    depth + 1,
+                )?,
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
