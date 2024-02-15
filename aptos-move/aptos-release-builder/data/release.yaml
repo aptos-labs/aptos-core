@@ -116,6 +116,7 @@ proposals:
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/331"
     execution_mode: MultiStep
     update_sequence:
+      - RawScript: data/proposals/aip_67_initialization.move
       - FeatureFlag:
           enabled:
             - jwk_consensus
@@ -160,3 +161,11 @@ proposals:
       - FeatureFlag:
           enabled:
             - zk_id_signature
+  - name: step_13_start_watching_google_jwks
+    metadata:
+      title: "Start JWK consensus for Google"
+      description: "JWK Consensus (AIP-67) for Google enables Google-based OIDB accounts (AIP-61)."
+      discussion_url: "TBA"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: data/proposals/start_jwk_consensus_for_google.move
