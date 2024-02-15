@@ -328,7 +328,7 @@ pub fn verify_mutant(
 /// # Returns
 ///
 /// * `Result<(), anyhow::Error>` - Ok if the rewrite is successful, or an error if any error occurs.
-fn rewrite_manifest_for_mutant(root: &Path, tempdir: &Path) -> Result<(), anyhow::Error> {
+pub fn rewrite_manifest_for_mutant(root: &Path, tempdir: &Path) -> Result<(), anyhow::Error> {
     let mut manifest_string = fs::read_to_string(root.join(SourcePackageLayout::Manifest.path()))?;
     let manifest = manifest_parser::parse_move_manifest_string(manifest_string.clone())?;
     let manifest = manifest_parser::parse_source_manifest(manifest)?;
