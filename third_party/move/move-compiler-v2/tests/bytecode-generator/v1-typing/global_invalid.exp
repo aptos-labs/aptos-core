@@ -18,7 +18,7 @@ module 0x42::m {
 
 Diagnostics:
 error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: '#0'
-  ┌─ tests/bytecode-generator/global_invalid.move:4:17
+  ┌─ tests/bytecode-generator/v1-typing/global_invalid.move:4:17
   │
 4 │         assert!(exists<T>(addr), 0);
   │                 ^^^^^^^^^^^^^^^
@@ -26,7 +26,7 @@ error: Expected a struct type. Global storage operations are restricted to struc
   │                 Invalid call to exists<#0>.
 
 error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: '#0'
-  ┌─ tests/bytecode-generator/global_invalid.move:5:17
+  ┌─ tests/bytecode-generator/v1-typing/global_invalid.move:5:17
   │
 5 │         let _ = borrow_global<T>(addr);
   │                 ^^^^^^^^^^^^^^^^^^^^^^
@@ -34,7 +34,7 @@ error: Expected a struct type. Global storage operations are restricted to struc
   │                 Invalid call to BorrowGlobal(Immutable)<#0>.
 
 error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: '#0'
-  ┌─ tests/bytecode-generator/global_invalid.move:6:9
+  ┌─ tests/bytecode-generator/v1-typing/global_invalid.move:6:9
   │
 6 │         move_from<T>(addr);
   │         ^^^^^^^^^^^^^^^^^^

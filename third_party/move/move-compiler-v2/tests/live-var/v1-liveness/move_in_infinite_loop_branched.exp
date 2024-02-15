@@ -1,0 +1,107 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun <SELF>_0::main($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t2 := 0
+  1: $t1 := infer($t2)
+  2: if ($t0) goto 3 else goto 11
+  3: label L0
+  4: label L3
+  5: $t4 := move($t1)
+  6: $t3 := infer($t4)
+  7: $t5 := /($t3, $t3)
+  8: goto 4
+  9: label L4
+ 10: goto 18
+ 11: label L1
+ 12: label L5
+ 13: $t7 := move($t1)
+ 14: $t6 := infer($t7)
+ 15: $t8 := %($t6, $t6)
+ 16: goto 12
+ 17: label L6
+ 18: label L2
+ 19: return ()
+}
+
+
+Diagnostics:
+error: cannot move local `x` since it is used later
+  ┌─ tests/live-var/v1-liveness/move_in_infinite_loop_branched.move:5:28
+  │
+5 │             loop { let y = move x; y / y; }
+  │                            ^^^^^^
+  │                            │
+  │                            attempted to move here
+  │                            used here
+
+error: cannot move local `x` since it is used later
+  ┌─ tests/live-var/v1-liveness/move_in_infinite_loop_branched.move:7:28
+  │
+7 │             loop { let y = move x; y % y; }
+  │                            ^^^^^^
+  │                            │
+  │                            attempted to move here
+  │                            used here
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun <SELF>_0::main($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     # live vars: $t0
+  0: $t2 := 0
+     # live vars: $t0, $t2
+  1: $t1 := copy($t2)
+     # live vars: $t0, $t1
+  2: if ($t0) goto 3 else goto 11
+     # live vars: $t1
+  3: label L0
+     # live vars: $t1
+  4: label L3
+     # live vars: $t1
+  5: $t4 := move($t1)
+     # live vars: $t1, $t4
+  6: $t3 := copy($t4)
+     # live vars: $t1, $t3
+  7: $t5 := /($t3, $t3)
+     # live vars: $t1
+  8: goto 4
+     # live vars:
+  9: label L4
+     # live vars:
+ 10: goto 18
+     # live vars: $t1
+ 11: label L1
+     # live vars: $t1
+ 12: label L5
+     # live vars: $t1
+ 13: $t7 := move($t1)
+     # live vars: $t1, $t7
+ 14: $t6 := copy($t7)
+     # live vars: $t1, $t6
+ 15: $t8 := %($t6, $t6)
+     # live vars: $t1
+ 16: goto 12
+     # live vars:
+ 17: label L6
+     # live vars:
+ 18: label L2
+     # live vars:
+ 19: return ()
+}

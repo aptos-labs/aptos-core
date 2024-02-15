@@ -1,0 +1,44 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun M::t0() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 0
+  1: $t0 := infer($t1)
+  2: $t2 := move($t0)
+  3: $t3 := copy($t0)
+  4: return ()
+}
+
+
+Diagnostics:
+error: cannot move local `x` since it is used later
+  ┌─ tests/live-var/v1-liveness/copy_after_move.move:4:9
+  │
+4 │         move x;
+  │         ^^^^^^ attempted to move here
+5 │         copy x;
+  │         ------ used here
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun M::t0() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t1 := 0
+     # live vars: $t1
+  1: $t0 := copy($t1)
+     # live vars: $t0
+  2: $t2 := move($t0)
+     # live vars: $t0
+  3: $t3 := copy($t0)
+     # live vars:
+  4: return ()
+}
