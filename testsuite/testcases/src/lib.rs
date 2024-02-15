@@ -475,6 +475,13 @@ impl CompositeNetworkTest {
         }
     }
 
+    pub fn new_empty<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
+        CompositeNetworkTest {
+            wrappers: vec![],
+            test: Box::new(test),
+        }
+    }
+
     pub fn new_with_two_wrappers<
         T1: NetworkLoadTest + 'static,
         T2: NetworkLoadTest + 'static,

@@ -717,6 +717,10 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
     )
 }
 
+fn wrap_with_nothing<T: NetworkTest + 'static>(test: T) -> CompositeNetworkTest {
+    CompositeNetworkTest::new_empty(test)
+}
+
 fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
@@ -1764,7 +1768,7 @@ fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+        .add_network_test(wrap_with_nothing(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 6000 })
                 .init_gas_price_multiplier(20),
