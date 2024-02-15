@@ -97,6 +97,25 @@ fn cond_check_drop_for_temp_with_msg(
     cond_check_drop(func_target, code_offset, ty, loc, err_msg)
 }
 
+/// Conditionally checks for drop abilit as `cond_check_drop_for_temp_with_msg`
+/// `op_name`: name of the operation which requires drop ability for the given temp `t`
+fn cond_check_drop_for_temp_by(
+    target: &FunctionTarget,
+    code_offset: CodeOffset,
+    t: TempIndex,
+    loc: &Loc,
+    op_name: &str,
+) {
+    let name_of_t = target.get_local_name_for_error_message(t);
+    cond_check_drop_for_temp_with_msg(
+        target,
+        code_offset,
+        t,
+        loc,
+        &format!("`{op_name}` requires drop ability for {name_of_t}"),
+    )
+}
+
 /// `t` is the local containing the reference being written to
 /// `code_offset` is the code offset of the WriteRef instruction.
 /// Drop ability must only be enforced if there is an execution path from this code offset
@@ -272,7 +291,7 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
                 BorrowField(mod_id, struct_id, insts, _) => {
                     check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
                 },
-                Drop => cond_check_drop_for_temp_with_msg(
+                Drop | Release => cond_check_drop_for_temp_with_msg(
                     target,
                     code_offset,
                     srcs[0],
@@ -281,6 +300,14 @@ fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &B
                 ),
                 ReadRef => check_read_ref(target, srcs[0], &loc),
                 WriteRef => check_write_ref(target, code_offset, srcs[0], &loc),
+                Eq => {
+                    cond_check_drop_for_temp_by(target, code_offset, srcs[0], &loc, "==");
+                    cond_check_drop_for_temp_by(target, code_offset, srcs[1], &loc, "==");
+                },
+                Neq => {
+                    cond_check_drop_for_temp_by(target, code_offset, srcs[0], &loc, "!=");
+                    cond_check_drop_for_temp_by(target, code_offset, srcs[1], &loc, "!=");
+                },
                 _ => (),
             }
         },
