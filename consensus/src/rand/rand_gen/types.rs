@@ -9,6 +9,7 @@ use aptos_dkg::{
     pvss::{Player, WeightedConfig},
     weighted_vuf::traits::WeightedVUF,
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
@@ -19,6 +20,8 @@ use aptos_types::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
+
+const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
@@ -96,12 +99,14 @@ impl TShare for Share {
         }
 
         let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+        let pool = spawn_rayon_thread_pool("wvuf".to_string(), Some(NUM_THREADS_FOR_WVUF_DERIVATION));
         let eval = WVUF::derive_eval(
             &rand_config.wconfig,
             &rand_config.vuf_pp,
             rand_metadata.to_bytes().as_slice(),
             &rand_config.get_all_certified_apk(),
             &proof,
+            &pool,
         )
         .expect("All APK should exist");
         let eval_bytes = bcs::to_bytes(&eval).unwrap();

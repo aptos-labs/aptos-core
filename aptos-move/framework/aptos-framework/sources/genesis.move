@@ -390,7 +390,6 @@ module aptos_framework::genesis {
     use aptos_framework::randomness;
     use aptos_framework::config_buffer;
     use aptos_framework::dkg;
-    use aptos_framework::jwks;
     use aptos_framework::reconfiguration_state;
 
     #[verify_only]

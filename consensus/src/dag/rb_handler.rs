@@ -3,7 +3,6 @@
 
 use super::{dag_store::DagStore, health::HealthBackoff};
 use crate::{
-    counters,
     dag::{
         dag_fetcher::TFetchRequester,
         dag_network::RpcHandler,
@@ -127,14 +126,6 @@ impl NodeBroadcastHandler {
             .map(ValidatorTransaction::size_in_bytes)
             .sum::<usize>() as u64;
         ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
-
-        for vtxn in node.validator_txns() {
-            if !self.features.is_reconfigure_with_dkg_enabled() && vtxn.is_dkg() {
-                counters::UNEXPECTED_DKG_VTXN_COUNT.inc();
-                bail!("DKG vtxn unexpected while the feature is disabled.");
-            }
-            // todo: add checks for each future vtxn topic
-        }
 
         let num_txns = num_vtxns + node.payload().len() as u64;
         let txn_bytes = vtxn_total_bytes + node.payload().size() as u64;

@@ -14,6 +14,7 @@ use aptos_aggregator::{
     resolver::TDelayedFieldView,
     types::{DelayedFieldID, DelayedFieldValue},
 };
+#[cfg(feature = "testing")]
 use aptos_framework::natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};

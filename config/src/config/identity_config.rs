@@ -9,10 +9,9 @@ use aptos_crypto::{
     x25519::{self, PRIVATE_KEY_SIZE},
     ValidCryptoMaterial,
 };
-use aptos_types::account_address::{
+use aptos_types::{account_address::{
     from_identity_public_key, AccountAddress, AccountAddress as PeerId,
-    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGTrait, DefaultDKG},
-};
+}, dkg::{real_dkg::maybe_dk_from_bls_sk, DKGTrait, DefaultDKG}};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{self, File},

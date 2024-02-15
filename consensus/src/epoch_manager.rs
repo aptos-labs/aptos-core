@@ -1241,6 +1241,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
         let features = features.unwrap_or_default();
 
+        let rand_config = self.try_get_rand_config_for_new_epoch(
+            &epoch_state,
+            &features,
+            dkg_state,
+            &consensus_config,
+        );
+        info!(
+            "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, ",
+            epoch_state.epoch, rand_config
+        ); // The sk inside has `SlientDebug`.
+        let rand_config = rand_config.ok();
+
         let (network_sender, payload_client, payload_manager) = self
             .initialize_shared_component(
                 &epoch_state,
