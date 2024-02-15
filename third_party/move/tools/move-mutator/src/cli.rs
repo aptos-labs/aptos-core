@@ -29,7 +29,7 @@ pub struct CLIOptions {
     pub downsample_filter: Option<String>,
     /// Remove averagely given percentage of mutants. See the doc for more details.
     #[clap(long)]
-    pub downsampling_ratio_percentage: Option<u64>,
+    pub downsampling_ratio_percentage: Option<usize>,
     /// Optional configuration file. If provided, it will override the default configuration.
     #[clap(long, short, value_parser)]
     pub configuration_file: Option<PathBuf>,

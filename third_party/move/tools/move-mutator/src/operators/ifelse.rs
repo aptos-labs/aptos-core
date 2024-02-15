@@ -8,7 +8,7 @@ use std::fmt::Debug;
 
 pub const OPERATOR_NAME: &str = "if_else_replacement";
 
-/// IfElse mutation operator.
+/// `IfElse` mutation operator.
 /// Replaces expressions under the if/else statements with literals.
 #[derive(Debug, Clone)]
 pub struct IfElse {

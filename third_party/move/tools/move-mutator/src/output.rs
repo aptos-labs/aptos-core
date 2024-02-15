@@ -22,6 +22,9 @@ use std::path::{Path, PathBuf};
 /// This function constructs the following output path for file.move:
 /// "`output_dir/file_index.move`"
 ///
+/// Paths can be absolute or relative - it doesn't matter. The function will handle it by
+/// canonicalizing the path. Returned path is always relative to the package directory root.
+///
 /// # Arguments
 ///
 /// * `output_dir` - The directory where the mutant will be output.
