@@ -14,11 +14,7 @@ use move_model::{
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
     ty::{Type, TypeDisplayContext},
 };
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt,
-    fmt::Formatter,
-};
+use std::{collections::BTreeMap, fmt, fmt::Formatter};
 
 /// A label for a branch destination.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
