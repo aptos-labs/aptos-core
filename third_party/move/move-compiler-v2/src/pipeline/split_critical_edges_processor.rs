@@ -26,16 +26,17 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         &self,
         _targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv,
-        data: FunctionData,
+        mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
         if fun_env.is_native() {
             return data;
         }
-        let mut transformer = SplitCriticalEdgesTransformation::new(data);
+        let mut transformer = SplitCriticalEdgesTransformation::new(std::mem::take(&mut data.code));
         transformer.transform();
-        transformer.data.annotations.clear();
-        transformer.data
+        data.code = transformer.code;
+        data.annotations.clear();
+        data
     }
 
     fn name(&self) -> String {
@@ -45,7 +46,7 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
 
 struct SplitCriticalEdgesTransformation {
     /// Function data of the function being transformed
-    data: FunctionData,
+    code: Vec<Bytecode>,
     /// Labels used in the original code and in the generated code
     labels: BTreeSet<Label>,
     /// Maps label to its number of incoming edges, including explicit goto/branch or fall throughs.
@@ -56,11 +57,11 @@ struct SplitCriticalEdgesTransformation {
 }
 
 impl SplitCriticalEdgesTransformation {
-    pub fn new(data: FunctionData) -> Self {
-        let labels = Bytecode::labels(&data.code);
-        let incoming_edges_count = count_incoming_edges(&data.code);
+    pub fn new(code: Vec<Bytecode>) -> Self {
+        let labels = Bytecode::labels(&code);
+        let incoming_edges_count = count_incoming_edges(&code);
         Self {
-            data,
+            code,
             labels,
             incoming_edge_count: incoming_edges_count,
         }
@@ -68,8 +69,7 @@ impl SplitCriticalEdgesTransformation {
 
     /// Runs the transformation, which breaks critical edges with empty blocks.
     fn transform(&mut self) {
-        let code = std::mem::take(&mut self.data.code);
-        self.data.code = self.transform_bytecode_vec(code)
+        self.code = self.transform_bytecode_vec(self.code)
     }
 
     /// Transforms the given code and returns the transformed code
