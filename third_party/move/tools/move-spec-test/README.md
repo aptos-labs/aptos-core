@@ -123,11 +123,30 @@ You can try to run the tool using other examples from the `move-mutator`
 tests like:
 ```bash
 ./target/release/move spec-test -p third_party/move/tools/move-mutator/tests/move-assets/simple
-./target/release/move spec-test -p third_party/move/tools/move-mutator/tests/move-assets/breakcontinue -i "Break"
 ```
+
+You should see different results for different modules as it depends on the
+quality of the specifications. Some modules like `Sum` has good specifications
+and all mutants are killed, while others like `Operators` may lack some tests.
 
 You can also try the Move Prover testsuite available in the
 `third_party/move/move-prover/tests/sources/` directory.
+
+To check some real-world examples, you can use the following places:
+- `aptos-move/framework/move-stdlib`
+- `aptos-move/framework/aptos-stdlib`
+
+You should see the results of the tests for the whole stdlib packages. There
+can be some modules which have better specifications quality (more mutants
+killed) and some which have worse quality (fewer mutants killed). It is also
+possible that some modules have no mutants killed at all which can be a sign
+that there are no specifications at all, or they are not tight enough.
+
+It's recommended to generate a report in a JSON format and analyze it to see
+which mutants are not killed and what are the differences between the original
+and modified code. This can help to improve the specifications and make them
+more tight and correct or it may indicate that some specifications some
+mutation operators are not applicable well to that kind of code.
 
 ## Command-line options
 
