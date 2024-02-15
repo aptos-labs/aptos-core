@@ -116,7 +116,7 @@ proposals:
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/331"
     execution_mode: MultiStep
     update_sequence:
-      - RawScript: data/proposals/aip_67_initialization.move
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/aip_67_initialization.move
       - FeatureFlag:
           enabled:
             - jwk_consensus
@@ -168,4 +168,4 @@ proposals:
       discussion_url: "TBA"
     execution_mode: MultiStep
     update_sequence:
-      - RawScript: data/proposals/start_jwk_consensus_for_google.move
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
