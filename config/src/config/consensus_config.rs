@@ -12,6 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 2500;
+// stop reducing size at this point, so 1MB transactions can still go through
+const MIN_BLOCK_BYTES_OVERRIDE: u64 = 1024 * 1024 + BATCH_PADDING_BYTES as u64;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -178,14 +180,14 @@ impl Default for ConsensusConfig {
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
                     back_pressure_pipeline_latency_limit_ms: 800,
-                    max_sending_block_txns_override: 10000,
+                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1100,
-                    max_sending_block_txns_override: 10000,
+                    max_sending_block_txns_override: MAX_SENDING_BLOCK_TXNS,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
                     max_txns_from_block_to_execute: None,
@@ -193,43 +195,55 @@ impl Default for ConsensusConfig {
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1400,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 300,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 1700,
                     max_sending_block_txns_override: 1000,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 400,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 600,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: None,
+                    max_txns_from_block_to_execute: Some(400),
                 },
                 PipelineBackpressureValues {
                     back_pressure_pipeline_latency_limit_ms: 2300,
-                    max_sending_block_txns_override: 400,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: None,
+                    max_txns_from_block_to_execute: Some(150),
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2600,
+                    back_pressure_pipeline_latency_limit_ms: 2700,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    backpressure_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: Some(50),
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 3100,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    backpressure_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: Some(20),
+                },
+                PipelineBackpressureValues {
+                    back_pressure_pipeline_latency_limit_ms: 3500,
+                    max_sending_block_txns_override: 1000,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    backpressure_proposal_delay_ms: 500,
                     // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~500 TPS
+                    // meaning that most aggressively we limit to ~10 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency.
-                    // We cannot reduce this further currently, as it needs to be larger than batch size.
-                    max_sending_block_txns_override: 250,
-                    // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: None,
+                    max_txns_from_block_to_execute: Some(5),
                 },
             ],
             window_for_chain_health: 100,
@@ -241,32 +255,31 @@ impl Default for ConsensusConfig {
                     backoff_proposal_delay_ms: 150,
                 },
                 ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 77,
+                    backoff_if_below_participating_voting_power_percentage: 78,
                     max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 75,
+                    backoff_if_below_participating_voting_power_percentage: 76,
                     max_sending_block_txns_override: 1000,
-                    // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    backoff_proposal_delay_ms: 300,
+                },
+                ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 74,
+                    max_sending_block_txns_override: 500,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_override: 500,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
-                    backoff_proposal_delay_ms: 300,
-                },
-                ChainHealthBackoffValues {
-                    backoff_if_below_participating_voting_power_percentage: 69,
                     // in practice, latencies and delay make it such that ~2 blocks/s is max,
                     // meaning that most aggressively we limit to ~500 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
                     max_sending_block_txns_override: 250,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backoff_proposal_delay_ms: 300,
                 },
             ],
