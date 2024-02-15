@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred_2.move:4:9
+  │
+4 │         vector[&0];
+  │         ^^^^^^
+
+error: invalid type instantiation `&mut u64`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred_2.move:9:9
+  │
+9 │         vector[&mut 0];
+  │         ^^^^^^
+
+error: invalid type instantiation `()`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/vector_with_non_base_type_inferred_2.move:14:9
+   │
+14 │         vector[()];
+   │         ^^^^^^
+
+error: invalid type instantiation `(u64, bool)`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/vector_with_non_base_type_inferred_2.move:19:9
+   │
+19 │         vector[(0, false)];
+   │         ^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/vector_with_non_base_type_inferred_2.move:24:9
+   │
+24 │         vector[&0, &mut 0];
+   │         ^^^^^^
+
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+   ┌─ tests/checking/typing/vector_with_non_base_type_inferred_2.move:29:9
+   │
+29 │         vector[&mut 0, &0];
+   │         ^^^^^^

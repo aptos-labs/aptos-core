@@ -1,0 +1,111 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 9
+  2: label L0
+  3: $t3 := 1
+  4: $t0 := infer($t3)
+  5: $t4 := move($t0)
+  6: $t1 := infer($t4)
+  7: $t5 := infer($t1)
+  8: goto 12
+  9: label L1
+ 10: $t6 := 0
+ 11: $t0 := infer($t6)
+ 12: label L2
+ 13: $t8 := 5
+ 14: $t7 := ==($t0, $t8)
+ 15: if ($t7) goto 16 else goto 18
+ 16: label L3
+ 17: goto 21
+ 18: label L4
+ 19: $t9 := 42
+ 20: abort($t9)
+ 21: label L5
+ 22: return ()
+}
+
+
+Diagnostics:
+error: cannot move local `x` since it is used later
+   ┌─ tests/live-var/v1-commands/branch_assigns_then_moves.move:7:13
+   │
+ 7 │         y = move x;
+   │             ^^^^^^ attempted to move here
+   ·
+12 │     assert!(x == 5, 42);
+   │             ------ used here
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: bool
+     var $t8: u64
+     var $t9: u64
+     # live vars:
+  0: $t2 := true
+     # live vars: $t2
+  1: if ($t2) goto 2 else goto 9
+     # live vars:
+  2: label L0
+     # live vars:
+  3: $t3 := 1
+     # live vars: $t3
+  4: $t0 := copy($t3)
+     # live vars: $t0
+  5: $t4 := move($t0)
+     # live vars: $t0, $t4
+  6: $t1 := copy($t4)
+     # live vars: $t0, $t1
+  7: $t5 := copy($t1)
+     # live vars: $t0
+  8: goto 12
+     # live vars:
+  9: label L1
+     # live vars:
+ 10: $t6 := 0
+     # live vars: $t6
+ 11: $t0 := copy($t6)
+     # live vars: $t0
+ 12: label L2
+     # live vars: $t0
+ 13: $t8 := 5
+     # live vars: $t0, $t8
+ 14: $t7 := ==($t0, $t8)
+     # live vars: $t7
+ 15: if ($t7) goto 16 else goto 18
+     # live vars:
+ 16: label L3
+     # live vars:
+ 17: goto 21
+     # live vars:
+ 18: label L4
+     # live vars:
+ 19: $t9 := 42
+     # live vars: $t9
+ 20: abort($t9)
+     # live vars:
+ 21: label L5
+     # live vars:
+ 22: return ()
+}
