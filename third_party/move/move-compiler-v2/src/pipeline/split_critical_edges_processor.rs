@@ -50,6 +50,8 @@ struct SplitCriticalEdgesTransformation {
     labels: BTreeSet<Label>,
     /// Maps label to its number of incoming edges, including explicit goto/branch or fall throughs.
     /// If a label is not in the map, it doesn't have any incoming edges.
+    /// The count for lables generated in the transformation is not tracked,
+    /// but this map will not be invalidated during the transformation.
     incoming_edge_count: BTreeMap<Label, usize>,
 }
 
@@ -81,7 +83,9 @@ impl SplitCriticalEdgesTransformation {
         }
     }
 
-    /// Transforms a branch instruction by splitting the critical out edges
+    /// Transforms a branch instruction by splitting the critical out edges.
+    /// Note that this will not invalidate `incoming_edge_count`, since the incoming edge of a branch
+    /// is replaced by the goto in the generated empty block
     pub fn transform_branch(&mut self, attr_id: AttrId, l0: Label, l1: Label, t: TempIndex) {
         match (
             self.split_critical_edge(attr_id, l0),
