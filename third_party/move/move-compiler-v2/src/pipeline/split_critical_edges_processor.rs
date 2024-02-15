@@ -118,7 +118,6 @@ impl SplitCriticalEdgesTransformation {
     ) -> Option<(Label, Vec<Bytecode>)> {
         // label is in `srcs_count` by construction
         if *self.incoming_edge_count.get(&label).expect("srcs count") > 1 {
-
             Some(self.split_edge(attr_id, label))
         } else {
             None
@@ -168,12 +167,7 @@ impl SplitCriticalEdgesTransformation {
 fn increment_key_count<Key: Ord>(map: &mut BTreeMap<Key, usize>, key: Key) {
     map.entry(key)
         .and_modify(|n: &mut usize| {
-            let (n_suc, overflows) = n.overflowing_add(1);
-            if overflows {
-                panic!("`count_srcs` overflows")
-            } else {
-                *n = n_suc;
-            }
+            *n += 1;
         })
         .or_insert(1usize);
 }
