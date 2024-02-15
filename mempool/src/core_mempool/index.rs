@@ -501,9 +501,9 @@ impl FifoIndex {
         }
         while !self.ready.is_empty() {
             let next = self.ready.pop_front();
-            if let Some(next) = next {
-                if self.all.contains(&next) {
-                    return Some(next);
+            if let Some(ref txn) = next {
+                if self.all.contains(txn) {
+                    return next;
                 }
             }
         }
