@@ -1734,10 +1734,6 @@ impl Loader {
         let count_before = *count;
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
 
-        // Some types can have fields which are lifted at serialization or deserialization
-        // times. Right now these are Aggregator and AggregatorSnapshot.
-        let maybe_mapping = self.get_identifier_mapping_kind(name);
-
         let field_tys = struct_type
             .fields
             .iter()
@@ -1751,6 +1747,9 @@ impl Loader {
                 .into_iter()
                 .unzip();
 
+        // Some types can have fields which are lifted at serialization or deserialization
+        // times. Right now these are Aggregator and AggregatorSnapshot.
+        let maybe_mapping = self.get_identifier_mapping_kind(name);
         let has_identifier_mappings =
             maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
 
@@ -1955,20 +1954,49 @@ impl Loader {
         let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
 
         let count_before = *count;
-        let field_layouts = struct_type
-            .field_names
-            .iter()
-            .zip(&struct_type.fields)
-            .map(|(n, ty)| {
-                let ty = self.subst(ty, ty_args)?;
-                let (l, _) =
-                    self.type_to_type_layout_impl(&ty, module_store, true, count, depth)?;
-                Ok(MoveFieldLayout::new(n.clone(), l))
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        let layout =
-            MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
+        let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveFieldLayout>, Vec<bool>) =
+            struct_type
+                .field_names
+                .iter()
+                .zip(&struct_type.fields)
+                .map(|(n, ty)| {
+                    let ty = self.subst(ty, ty_args)?;
+                    let (l, has_identifier_mappings) =
+                        self.type_to_type_layout_impl(&ty, module_store, true, count, depth)?;
+                    Ok((MoveFieldLayout::new(n.clone(), l), has_identifier_mappings))
+                })
+                .collect::<PartialVMResult<Vec<_>>>()?
+                .into_iter()
+                .unzip();
+
+        // Some types can have fields which are lifted at serialization or deserialization
+        // times. Right now these are Aggregator and AggregatorSnapshot.
+        let maybe_mapping = self.get_identifier_mapping_kind(name);
+        let has_identifier_mappings =
+            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+
         let field_node_count = *count - count_before;
+        let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
+            // For DerivedString, the whole object should be lifted.
+            MoveTypeLayout::Native(
+                IdentifierMappingKind::DerivedString,
+                Box::new(MoveTypeLayout::Struct(MoveStructLayout::with_types(
+                    struct_tag,
+                    field_layouts,
+                ))),
+            )
+        } else {
+            // For aggregators / snapshots, the first field should be lifted.
+            if let Some(kind) = &maybe_mapping {
+                if let Some(l) = field_layouts.first_mut() {
+                    *l = MoveFieldLayout::new(
+                        l.name.clone(),
+                        MoveTypeLayout::Native(kind.clone(), Box::new(l.layout.clone())),
+                    );
+                }
+            }
+            MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts))
+        };
 
         let mut cache = self.type_cache.write();
         let info = cache
@@ -1980,10 +2008,10 @@ impl Loader {
         info.struct_layout_info = Some(StructLayoutInfoCacheItem {
             struct_layout: layout.clone(),
             node_count: field_node_count,
-            has_identifier_mappings: false,
+            has_identifier_mappings,
         });
 
-        Ok((layout, false))
+        Ok((layout, has_identifier_mappings))
     }
 
     pub(crate) fn calculate_depth_of_struct(
