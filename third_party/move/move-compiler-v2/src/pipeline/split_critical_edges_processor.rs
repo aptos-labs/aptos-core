@@ -68,42 +68,51 @@ impl SplitCriticalEdgesTransformation {
 
     /// Runs the transformation, which breaks critical edges with empty blocks.
     fn transform(&mut self) {
-        let bytecodes = std::mem::take(&mut self.data.code);
-        for bytecode in bytecodes {
-            self.transform_bytecode(bytecode)
-        }
+        let code = std::mem::take(&mut self.data.code);
+        self.data.code = self.transform_bytecode_vec(code)
     }
 
-    /// Transforms a bytecode
-    fn transform_bytecode(&mut self, bytecode: Bytecode) {
+    /// Transforms the given code and returns the transformed code
+    fn transform_bytecode_vec(&mut self, code: Vec<Bytecode>) -> Vec<Bytecode> {
+        let mut transformed = Vec::new();
+        for instr in code {
+            self.transform_bytecode(&mut transformed, instr)
+        }
+        transformed
+    }
+
+    /// Transforms a bytecode, and append it to `transformed`
+    fn transform_bytecode(&mut self, transformed: &mut Vec<Bytecode>, bytecode: Bytecode) {
         match bytecode {
-            Bytecode::Branch(attr_id, l0, l1, t) => self.transform_branch(attr_id, l0, l1, t),
+            Bytecode::Branch(attr_id, l0, l1, t) => self.transform_branch(transformed, attr_id, l0, l1, t),
             // Edge of a `Jump` is never critical because the source node only has one out edge.
-            _ => self.emit(bytecode),
+            _ => transformed.push(bytecode)
         }
     }
 
-    /// Transforms a branch instruction by splitting the critical out edges.
+    /// Transforms a branch instruction by splitting the critical out edges, and append to `transformed`.
     /// Note that this will not invalidate `incoming_edge_count`, since the incoming edge of a branch
     /// is replaced by the goto in the generated empty block
-    pub fn transform_branch(&mut self, attr_id: AttrId, l0: Label, l1: Label, t: TempIndex) {
+    pub fn transform_branch(&mut self, transformed: &mut Vec<Bytecode>, attr_id: AttrId, l0: Label, l1: Label, t: TempIndex) {
         match (
             self.split_critical_edge(attr_id, l0),
             self.split_critical_edge(attr_id, l1),
         ) {
-            (None, None) => self.emit(Bytecode::Branch(attr_id, l0, l1, t)),
-            (None, Some((l1_new, code))) => {
-                self.emit(Bytecode::Branch(attr_id, l0, l1_new, t));
-                self.emit_codes(code)
+            (None, None) => {
+                transformed.push(Bytecode::Branch(attr_id, l0, l1, t))
             },
-            (Some((l0_new, code)), None) => {
-                self.emit(Bytecode::Branch(attr_id, l0_new, l1, t));
-                self.emit_codes(code)
+            (None, Some((l1_new, mut code))) => {
+                transformed.push(Bytecode::Branch(attr_id, l0, l1_new, t));
+                transformed.append(&mut code);
             },
-            (Some((l0_new, code0)), Some((l1_new, code1))) => {
-                self.emit(Bytecode::Branch(attr_id, l0_new, l1_new, t));
-                self.emit_codes(code0);
-                self.emit_codes(code1);
+            (Some((l0_new, mut code)), None) => {
+                transformed.push(Bytecode::Branch(attr_id, l0_new, l1, t));
+                transformed.append(&mut code)
+            },
+            (Some((l0_new, mut code0)), Some((l1_new, mut code1))) => {
+                transformed.push(Bytecode::Branch(attr_id, l0_new, l1_new, t));
+                transformed.append(&mut code0);
+                transformed.append(&mut code1);
             },
         }
     }
@@ -154,16 +163,6 @@ impl SplitCriticalEdgesTransformation {
         );
         self.labels.insert(new_label);
         new_label
-    }
-
-    fn emit(&mut self, bytecode: Bytecode) {
-        self.data.code.push(bytecode)
-    }
-
-    fn emit_codes(&mut self, code: Vec<Bytecode>) {
-        for instr in code {
-            self.emit(instr)
-        }
     }
 }
 
