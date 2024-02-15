@@ -402,7 +402,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaAdvanced20Market => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 10000,
+                    num_users: 100000,
                     flow_type: crate::EconiaFlowType::Advanced,
                     num_markets: 20,
                 },
