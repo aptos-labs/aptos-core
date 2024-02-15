@@ -186,8 +186,8 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
 
                 let mut requests = vec![];
                 for market_id in 1..(*num_markets+1) {
-                    let bid_size = rng.gen_range(2, 10);
-                    let ask_size = rng.gen_range(2, 10);
+                    let bid_size = rng.gen_range(4, 14);
+                    let ask_size = rng.gen_range(4, 14);
 
                     let bid_price = rng.gen_range(1, 200);
                     let ask_price = rng.gen_range(201, 400);
@@ -210,8 +210,8 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
 
                 let mut requests = vec![];
                 for market_id in 1..(*num_markets+1) {
-                    let bid_size = rng.gen_range(2, 10);
-                    let ask_size = rng.gen_range(2, 10);
+                    let bid_size = rng.gen_range(4, 14);
+                    let ask_size = rng.gen_range(4, 14);
 
                     let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size, market_id));
                     let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size, market_id));
