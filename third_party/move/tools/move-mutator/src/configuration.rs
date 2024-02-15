@@ -20,7 +20,7 @@ pub struct Configuration {
     /// Configuration for the mutation operators (project-wide).
     pub mutation: Option<MutationConfig>,
     /// Configuration for the individual files. (optional).
-    pub individual: Option<Vec<FileConfiguration>>,
+    pub individual: Vec<FileConfiguration>,
 }
 
 impl Configuration {
@@ -31,7 +31,7 @@ impl Configuration {
             project,
             project_path,
             mutation: None,
-            individual: None,
+            individual: vec![],
         }
     }
 
@@ -70,11 +70,9 @@ impl Configuration {
 
     /// Returns the configuration for the given file path.
     pub fn get_file_configuration(&self, file_path: &Path) -> Option<&FileConfiguration> {
-        self.individual.as_ref().and_then(|individual| {
-            individual
-                .iter()
-                .find(|file_conf| file_conf.file == file_path)
-        })
+        self.individual
+            .iter()
+            .find(|file_conf| file_conf.file == file_path)
     }
 }
 
@@ -283,7 +281,7 @@ mod tests {
             project: CLIOptions::default(),
             project_path: None,
             mutation: None,
-            individual: Some(vec![file_config]),
+            individual: vec![file_config],
         };
 
         let result = config.get_file_configuration(&PathBuf::from("/unknown/path"));
