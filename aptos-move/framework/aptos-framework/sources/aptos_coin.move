@@ -184,7 +184,7 @@ module aptos_framework::aptos_coin {
             coin::destroy_burn_cap(burn_cap);
             coin::destroy_mint_cap(mint_cap);
         };
-        coin::paired_metadata<AptosCoin>();
+        coin::ensure_paired_metadata<AptosCoin>();
     }
 
     #[test_only]
