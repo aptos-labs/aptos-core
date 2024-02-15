@@ -17,7 +17,7 @@ different code versions (mutants).
 
 Please refer to the design document for more details: [Move Mutator Design](doc/design.md).
 
-## Example Usage
+## Setup check
 
 Please build the whole repository first. In the `aptos-core` directory, run:
 ```bash
@@ -53,18 +53,19 @@ information as the variable allows. To see all the logs run:
 ```bash
 RUST_LOG=trace ./target/debug/aptos move mutate -m third_party/move/tools/move-mutator/tests/move-assets/simple/sources/Sum.move
 ```
-There is possibility to enable logging only for the specific modules. Please
+There is a possibility of enabling logging only for specific modules. Please
 refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
 
 There are also good tests in the Move Prover repository that can be used to
-check the tool. To run them, just use:
+check the tool. To run them, run:
 ```
 ./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
 ./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
 ./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/nonlinear_arithm.move
 ./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/shift.move
 ```
-and observe `mutants_output` directory.
+and observe `mutants_output` directory after each single command. Please note
+that each call overwrites the previous output.
 
 To generate mutants for all files within a test project (for the whole Move 
 package) run:
@@ -73,7 +74,7 @@ package) run:
 ```
 
 Running the above command will generate mutants for all files within the
-`simple` test project and should generate following output:
+`simple` test project and should generate the following output:
 ```
 $ ./target/release/aptos move mutate --package-dir third_party/move/tools/move-mutator/tests/move-assets/simple/
 {
@@ -111,7 +112,7 @@ directory. They can be used to check the mutator tool as well.
 ## Command-line options
 
 Command line options are slightly different when using the `move-cli` tool and
-when using the `aptos` tool. Running tool using either of them will produce
+when using the `aptos` tool. Running a tool using either of them will produce
 the same results as they finally call the same entry point in the mutator code.
 
 To check possible options run:
