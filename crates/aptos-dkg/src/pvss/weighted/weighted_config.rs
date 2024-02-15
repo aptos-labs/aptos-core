@@ -15,7 +15,7 @@ use std::fmt::{Display, Formatter};
 /// the total weight $W$ such that any subset of players with weight $\ge w$ can reconstruct a
 /// dealt secret given a PVSS transcript.
 #[allow(non_snake_case)]
-#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct WeightedConfig {
     /// A weighted config is a $w$-out-of-$W$ threshold config, where $w$ is the minimum weight
     /// needed to reconstruct the secret and $W$ is the total weight.
@@ -29,6 +29,16 @@ pub struct WeightedConfig {
     starting_index: Vec<usize>,
     /// The maximum weight of any player.
     max_player_weight: usize,
+}
+
+impl std::fmt::Debug for WeightedConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "WeightedConfig {{ tc: {:?}, num_players: {}, weight: {:?}, max_player_weight: {} }}",
+            self.tc, self.num_players, self.weight, self.max_player_weight
+        )
+    }
 }
 
 impl WeightedConfig {

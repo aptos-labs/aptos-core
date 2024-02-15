@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter};
 /// Encodes the *threshold configuration* for a normal/unweighted PVSS: i.e., the threshold $t$ and
 /// the number of players $n$ such that any $t$ or more players can reconstruct a dealt secret given
 /// a PVSS transcript. this is Alin leaving his laptop open again...
-#[derive(Clone, PartialEq, Deserialize, Serialize, Debug, Eq)]
+#[derive(Clone, PartialEq, Deserialize, Serialize, Eq)]
 pub struct ThresholdConfig {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
     /// secret; i.e., $t$ or more shares are needed
@@ -26,6 +26,12 @@ pub struct ThresholdConfig {
     /// Batch evaluation domain, consisting of all the $N$th roots of unity (in the scalar field),
     /// where N is the smallest power of two such that n <= N.
     batch_dom: BatchEvaluationDomain,
+}
+
+impl std::fmt::Debug for ThresholdConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ThresholdConfig(t={}, n={})", self.t, self.n)
+    }
 }
 
 impl ThresholdConfig {
