@@ -5,7 +5,7 @@
 use crate::{
     core_mempool::{
         index::{
-            AccountTransactions, FifoIndex, MultiBucketTimelineIndex, OrderedQueueKey,
+            AccountTransactions, MultiBucketFifoIndex, MultiBucketTimelineIndex, OrderedQueueKey,
             ParkingLotIndex, TTLIndex,
         },
         mempool::Mempool,
@@ -48,7 +48,7 @@ pub struct TransactionStore {
     sequence_numbers: HashMap<AccountAddress, u64>,
 
     // indexes
-    fifo_index: FifoIndex,
+    fifo_index: MultiBucketFifoIndex,
     // TTLIndex based on client-specified expiration time
     expiration_time_index: TTLIndex,
     // TTLIndex based on system expiration time
@@ -93,7 +93,7 @@ impl TransactionStore {
             expiration_time_index: TTLIndex::new(Box::new(|t: &MempoolTransaction| {
                 Duration::from_secs(t.txn.expiration_timestamp_secs())
             })),
-            fifo_index: FifoIndex::new(),
+            fifo_index: MultiBucketFifoIndex::new(config.broadcast_buckets.clone()).unwrap(),
             timeline_index: MultiBucketTimelineIndex::new(config.broadcast_buckets.clone())
                 .unwrap(),
             parking_lot_index: ParkingLotIndex::new(),

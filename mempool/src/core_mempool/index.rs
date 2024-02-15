@@ -524,7 +524,83 @@ impl FifoIndex {
         self.all.len()
     }
 
+    // TODO: This is lazy GC, so won't work for non-validators and validators that can't keep up
     pub fn remove(&mut self, txn: &MempoolTransaction) {
         self.all.remove(&OrderedQueueKey::make_key(txn));
+    }
+}
+
+pub struct MultiBucketFifoIndex {
+    indexes: Vec<FifoIndex>,
+    bucket_mins: Vec<u64>,
+    index_idx: usize,
+}
+
+impl MultiBucketFifoIndex {
+    pub(crate) fn new(bucket_mins: Vec<u64>) -> anyhow::Result<Self> {
+        anyhow::ensure!(!bucket_mins.is_empty(), "Must not be empty");
+        anyhow::ensure!(bucket_mins[0] == 0, "First bucket must start at 0");
+
+        let mut prev = None;
+        let mut indexes = vec![];
+        for entry in bucket_mins.clone() {
+            if let Some(prev) = prev {
+                anyhow::ensure!(prev < entry, "Values must be sorted and not repeat");
+            }
+            prev = Some(entry);
+            indexes.push(FifoIndex::new());
+        }
+
+        Ok(Self {
+            indexes,
+            bucket_mins,
+            index_idx: 0,
+        })
+    }
+
+    pub fn reset(&mut self) {
+        for index in &mut self.indexes {
+            index.reset();
+        }
+    }
+
+    pub fn next(&mut self) -> Option<OrderedQueueKey> {
+        let mut next = None;
+        for (i, index) in self.indexes.iter_mut().enumerate().skip(self.index_idx) {
+            next = index.next();
+            self.index_idx = i;
+            if next.is_some() {
+                break;
+            }
+        }
+        next
+    }
+
+    fn get_index(&mut self, ranking_score: u64) -> &mut FifoIndex {
+        let index = self
+            .bucket_mins
+            .binary_search(&ranking_score)
+            .unwrap_or_else(|i| i - 1);
+        self.indexes.get_mut(index).unwrap()
+    }
+
+    pub fn insert(&mut self, txn: &MempoolTransaction) {
+        self.get_index(txn.ranking_score).insert(txn);
+    }
+
+    pub fn contains(&self, txn: &MempoolTransaction) -> bool {
+        self.indexes.iter().any(|index| index.contains(txn))
+    }
+
+    pub fn size(&self) -> usize {
+        let mut size = 0;
+        for index in &self.indexes {
+            size += index.size()
+        }
+        size
+    }
+
+    pub fn remove(&mut self, txn: &MempoolTransaction) {
+        self.get_index(txn.ranking_score).remove(txn);
     }
 }
