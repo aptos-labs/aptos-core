@@ -115,6 +115,7 @@ impl SplitCriticalEdgesTransformation {
     ) -> Option<(Label, Vec<Bytecode>)> {
         // label is in `srcs_count` by construction
         if *self.srcs_count.get(&label).expect("srcs count") > 1 {
+
             Some(self.split_edge(attr_id, label))
         } else {
             None
@@ -141,7 +142,8 @@ impl SplitCriticalEdgesTransformation {
             if self.labels.is_empty() {
                 0
             } else {
-                self.labels.iter().next_back().expect("label").as_usize() + 1
+                let max_label = self.labels.iter().next_back().expect("label");
+                max_label.as_usize() + 1
             },
         );
         self.labels.insert(new_label);
