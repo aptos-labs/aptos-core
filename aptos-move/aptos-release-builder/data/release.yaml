@@ -149,7 +149,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - aggregator_v2_delayed_fields          
-            - resource_groups_charge_as_sum
+            - resource_groups_charge_as_size_sum
   - name: step_12_enable_zkid
     metadata:
       title: "AIP-61: OpenID blockchain (OIDB) accounts"
