@@ -122,7 +122,8 @@ mod tests {
                     "move_sources": ["/path/to/move/source"],
                     "out_mutant_dir": "path/to/out_mutant_dir"
                 },
-                "project_path": "/path/to/project"
+                "project_path": "/path/to/project",
+                "individual": []
             }
         "#;
 
