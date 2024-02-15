@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 60
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - name: prepare move lang prover tooling.
         shell: bash

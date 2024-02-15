@@ -6,6 +6,6 @@ jobs:
   find-packages-with-undeclared-feature-dependencies:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       - run: scripts/find-packages-with-undeclared-feature-dependencies.sh
