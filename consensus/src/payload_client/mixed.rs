@@ -11,7 +11,10 @@ use crate::{
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
 use aptos_types::{
-    dkg::{DKGTranscript, DKGTranscriptMetadata}, on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction,
+    account_address::AccountAddress,
+    dkg::{DKGTranscript, DKGTranscriptMetadata},
+    on_chain_config::ValidatorTxnConfig,
+    validator_txn::ValidatorTransaction,
 };
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
@@ -23,7 +26,6 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use aptos_types::account_address::AccountAddress;
 
 pub struct MixedPayloadClient {
     validator_txn_config: ValidatorTxnConfig,
