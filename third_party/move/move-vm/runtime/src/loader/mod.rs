@@ -1548,8 +1548,7 @@ struct StructLayoutInfoCacheItem {
 struct StructInfoCache {
     struct_tag: Option<(StructTag, u64)>,
     struct_layout_info: Option<StructLayoutInfoCacheItem>,
-    annotated_struct_layout: Option<MoveTypeLayout>,
-    annotated_node_count: Option<u64>,
+    annotated_struct_layout_info: Option<StructLayoutInfoCacheItem>,
 }
 
 impl StructInfoCache {
@@ -1557,8 +1556,7 @@ impl StructInfoCache {
         Self {
             struct_tag: None,
             struct_layout_info: None,
-            annotated_struct_layout: None,
-            annotated_node_count: None,
+            annotated_struct_layout_info: None,
         }
     }
 }
@@ -1907,11 +1905,12 @@ impl Loader {
         let name = &*self.name_cache.idx_to_identifier(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
-                if let Some(annotated_node_count) = &struct_info.annotated_node_count {
-                    *count += *annotated_node_count
-                }
-                if let Some(layout) = &struct_info.annotated_struct_layout {
-                    return Ok((layout.clone(), false));
+                if let Some(struct_layout_info) = &struct_info.annotated_struct_layout_info {
+                    *count += struct_layout_info.node_count;
+                    return Ok((
+                        struct_layout_info.struct_layout.clone(),
+                        struct_layout_info.has_identifier_mappings,
+                    ));
                 }
             }
         }
@@ -1946,7 +1945,7 @@ impl Loader {
                 Ok(MoveFieldLayout::new(n.clone(), l))
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let struct_layout =
+        let layout =
             MoveTypeLayout::Struct(MoveStructLayout::with_types(struct_tag, field_layouts));
         let field_node_count = *count - count_before;
 
@@ -1957,10 +1956,13 @@ impl Loader {
             .or_default()
             .entry(ty_args.to_vec())
             .or_insert_with(StructInfoCache::new);
-        info.annotated_struct_layout = Some(struct_layout.clone());
-        info.annotated_node_count = Some(field_node_count);
+        info.struct_layout_info = Some(StructLayoutInfoCacheItem {
+            struct_layout: layout.clone(),
+            node_count: field_node_count,
+            has_identifier_mappings: false,
+        });
 
-        Ok((struct_layout, false))
+        Ok((layout, false))
     }
 
     fn type_to_fully_annotated_layout_impl(
