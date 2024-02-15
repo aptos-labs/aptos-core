@@ -129,6 +129,8 @@ pub fn run_spec_test(
             ));
         }
 
+        move_mutator::compiler::rewrite_manifest_for_mutant(&package_path, &outdir_prove)?;
+
         benchmark.start();
         let result = prove(config, &outdir_prove, &prover_conf, &mut error_writer);
         benchmark.stop();
