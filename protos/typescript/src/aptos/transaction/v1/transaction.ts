@@ -919,7 +919,16 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
 }
 
 export interface AnySignature {
-  type?: AnySignature_Type | undefined;
+  type?:
+    | AnySignature_Type
+    | undefined;
+  /**
+   * Deprecated: use signature_variant instead.
+   * Note: >= 1.10, this field is deprecated.
+   *
+   * @deprecated
+   */
+  signature?: Uint8Array | undefined;
   ed25519?: Ed25519 | undefined;
   secp256k1Ecdsa?: Secp256k1Ecdsa | undefined;
   webauthn?: WebAuthn | undefined;
@@ -7704,7 +7713,14 @@ export const AnyPublicKey = {
 };
 
 function createBaseAnySignature(): AnySignature {
-  return { type: 0, ed25519: undefined, secp256k1Ecdsa: undefined, webauthn: undefined, zkid: undefined };
+  return {
+    type: 0,
+    signature: new Uint8Array(0),
+    ed25519: undefined,
+    secp256k1Ecdsa: undefined,
+    webauthn: undefined,
+    zkid: undefined,
+  };
 }
 
 export const AnySignature = {
@@ -7712,17 +7728,20 @@ export const AnySignature = {
     if (message.type !== undefined && message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(18).bytes(message.signature);
+    }
     if (message.ed25519 !== undefined) {
-      Ed25519.encode(message.ed25519, writer.uint32(18).fork()).ldelim();
+      Ed25519.encode(message.ed25519, writer.uint32(26).fork()).ldelim();
     }
     if (message.secp256k1Ecdsa !== undefined) {
-      Secp256k1Ecdsa.encode(message.secp256k1Ecdsa, writer.uint32(26).fork()).ldelim();
+      Secp256k1Ecdsa.encode(message.secp256k1Ecdsa, writer.uint32(34).fork()).ldelim();
     }
     if (message.webauthn !== undefined) {
-      WebAuthn.encode(message.webauthn, writer.uint32(34).fork()).ldelim();
+      WebAuthn.encode(message.webauthn, writer.uint32(42).fork()).ldelim();
     }
     if (message.zkid !== undefined) {
-      ZkId.encode(message.zkid, writer.uint32(42).fork()).ldelim();
+      ZkId.encode(message.zkid, writer.uint32(50).fork()).ldelim();
     }
     return writer;
   },
@@ -7746,24 +7765,31 @@ export const AnySignature = {
             break;
           }
 
-          message.ed25519 = Ed25519.decode(reader, reader.uint32());
+          message.signature = reader.bytes();
           continue;
         case 3:
           if (tag !== 26) {
             break;
           }
 
-          message.secp256k1Ecdsa = Secp256k1Ecdsa.decode(reader, reader.uint32());
+          message.ed25519 = Ed25519.decode(reader, reader.uint32());
           continue;
         case 4:
           if (tag !== 34) {
             break;
           }
 
-          message.webauthn = WebAuthn.decode(reader, reader.uint32());
+          message.secp256k1Ecdsa = Secp256k1Ecdsa.decode(reader, reader.uint32());
           continue;
         case 5:
           if (tag !== 42) {
+            break;
+          }
+
+          message.webauthn = WebAuthn.decode(reader, reader.uint32());
+          continue;
+        case 6:
+          if (tag !== 50) {
             break;
           }
 
@@ -7813,6 +7839,7 @@ export const AnySignature = {
   fromJSON(object: any): AnySignature {
     return {
       type: isSet(object.type) ? anySignature_TypeFromJSON(object.type) : 0,
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
       ed25519: isSet(object.ed25519) ? Ed25519.fromJSON(object.ed25519) : undefined,
       secp256k1Ecdsa: isSet(object.secp256k1Ecdsa) ? Secp256k1Ecdsa.fromJSON(object.secp256k1Ecdsa) : undefined,
       webauthn: isSet(object.webauthn) ? WebAuthn.fromJSON(object.webauthn) : undefined,
@@ -7824,6 +7851,9 @@ export const AnySignature = {
     const obj: any = {};
     if (message.type !== undefined && message.type !== 0) {
       obj.type = anySignature_TypeToJSON(message.type);
+    }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
     }
     if (message.ed25519 !== undefined) {
       obj.ed25519 = Ed25519.toJSON(message.ed25519);
@@ -7846,6 +7876,7 @@ export const AnySignature = {
   fromPartial(object: DeepPartial<AnySignature>): AnySignature {
     const message = createBaseAnySignature();
     message.type = object.type ?? 0;
+    message.signature = object.signature ?? new Uint8Array(0);
     message.ed25519 = (object.ed25519 !== undefined && object.ed25519 !== null)
       ? Ed25519.fromPartial(object.ed25519)
       : undefined;

@@ -9,6 +9,8 @@ use aptos_crypto::{
 use passkey_types::{crypto::sha256, webauthn::CollectedClientData, Bytes};
 use serde::{Deserialize, Serialize};
 
+pub const MAX_WEBAUTHN_SIGNATURE_BYTES: usize = 1024;
+
 /// Returns the binary concatenation of
 /// 1. [`authenticator_data_bytes`](PartialAuthenticatorAssertionResponse) and
 /// 2. SHA-256 hash of [`client_data_json`](PartialAuthenticatorAssertionResponse),
