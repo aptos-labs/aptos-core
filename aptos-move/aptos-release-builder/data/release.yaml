@@ -66,7 +66,7 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - webauthn_signature
+            - web_authn_signature
   - name: step_6_object_code_deployment
     metadata:
       title: "AIP-54: Object Code Deployment"
@@ -87,23 +87,24 @@ proposals:
       - Consensus:
           V3:
             alg:
-              main:
-                decoupled_execution: true
-                back_pressure_limit: 10
-                exclude_round: 40
-                proposer_election_type:
-                  leader_reputation:
-                    proposer_and_voter_v2:
-                      active_weight: 1000
-                      inactive_weight: 10
-                      failed_weight: 1
-                      failure_threshold_percent: 10
-                      proposer_window_num_validators_multiplier: 10
-                      voter_window_num_validators_multiplier: 1
-                      weight_by_voting_power: true
-                      use_history_from_previous_epoch_max_count: 5
-                max_failed_authors_to_store: 10
-              quorum_store_enabled: true
+              Jolteon:
+                main:
+                  decoupled_execution: true
+                  back_pressure_limit: 10
+                  exclude_round: 40
+                  proposer_election_type:
+                    leader_reputation:
+                      proposer_and_voter_v2:
+                        active_weight: 1000
+                        inactive_weight: 10
+                        failed_weight: 1
+                        failure_threshold_percent: 10
+                        proposer_window_num_validators_multiplier: 10
+                        voter_window_num_validators_multiplier: 1
+                        weight_by_voting_power: true
+                        use_history_from_previous_epoch_max_count: 5
+                  max_failed_authors_to_store: 10
+                quorum_store_enabled: true
             vtxn:
               V1:
                 per_block_limit_txn_count: 2
@@ -158,4 +159,4 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - zk_id_signatures
+            - zk_id_signature
