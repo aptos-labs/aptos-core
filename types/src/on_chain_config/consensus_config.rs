@@ -19,10 +19,7 @@ pub enum ConsensusAlgorithmConfig {
 
 impl ConsensusAlgorithmConfig {
     pub fn default_for_genesis() -> Self {
-        Self::Jolteon {
-            main: ConsensusConfigV1::default(),
-            quorum_store_enabled: true,
-        }
+        Self::DAG(DagConsensusConfigV1::default())
     }
 
     pub fn default_if_missing() -> Self {
