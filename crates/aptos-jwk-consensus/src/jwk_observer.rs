@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use crate::counters::OBSERVATION_SECONDS;
 use anyhow::Result;
 use aptos_channels::aptos_channel;
 use aptos_logger::{debug, info};
@@ -7,7 +8,7 @@ use aptos_types::jwks::{jwk::JWK, Issuer};
 use futures::{FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::{sync::oneshot, task::JoinHandle, time::MissedTickBehavior};
 
 #[derive(Serialize, Deserialize)]
@@ -93,17 +94,24 @@ impl JWKObserver {
         observation_tx: aptos_channel::Sender<(), (Issuer, Vec<JWK>)>,
         close_rx: oneshot::Receiver<()>,
     ) {
+        let issuer_str =
+            String::from_utf8(issuer.clone()).unwrap_or_else(|_e| "UNKNOWN_ISSUER".to_string());
         let mut interval = tokio::time::interval(fetch_interval);
         interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
         let mut close_rx = close_rx.into_stream();
         loop {
             tokio::select! {
                 _ = interval.tick().fuse() => {
+                    let timer = Instant::now();
                     let result = fetch_jwks(my_addr, open_id_config_url.clone()).await;
-                    debug!("observe_result={:?}", result);
+                    let secs = timer.elapsed().as_secs_f64();
+                    debug!(issuer = issuer_str, "observe_result={:?}", result);
                     if let Ok(mut jwks) = result {
+                        OBSERVATION_SECONDS.with_label_values(&[&issuer_str, "ok"]).observe(secs);
                         jwks.sort();
                         let _ = observation_tx.push((), (issuer.clone(), jwks));
+                    } else {
+                        OBSERVATION_SECONDS.with_label_values(&[&issuer_str, "err"]).observe(secs);
                     }
                 },
                 _ = close_rx.select_next_some() => {
