@@ -35,7 +35,6 @@ use aptos_mvhashmap::{
 use aptos_types::{
     block_executor::config::BlockExecutorConfig,
     delayed_fields::PanicError,
-    executable::Executable,
     on_chain_config::BlockGasLimitType,
     state_store::{state_value::StateValue, TStateView},
     transaction::{BlockExecutableTransaction as Transaction, BlockOutput},
@@ -60,22 +59,21 @@ use std::{
     },
 };
 
-pub struct BlockExecutor<T, E, S, L, X> {
+pub struct BlockExecutor<T, E, S, L> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
     executor_thread_pool: Arc<ThreadPool>,
     transaction_commit_hook: Option<L>,
-    phantom: PhantomData<(T, E, S, L, X)>,
+    phantom: PhantomData<(T, E, S, L)>,
 }
 
-impl<T, E, S, L, X> BlockExecutor<T, E, S, L, X>
+impl<T, E, S, L> BlockExecutor<T, E, S, L>
 where
     T: Transaction,
     E: ExecutorTask<Txn = T>,
     S: TStateView<Key = T::Key> + Sync,
     L: TransactionCommitHook<Output = E::Output>,
-    X: Executable + 'static,
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
@@ -102,10 +100,10 @@ where
         incarnation: Incarnation,
         signature_verified_block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         executor: &E,
         base_view: &S,
-        latest_view: ParallelState<T, X>,
+        latest_view: ParallelState<T, E::Executable>,
     ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
@@ -303,7 +301,7 @@ where
     fn validate(
         idx_to_validate: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
     ) -> Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
         let read_set = last_input_output
@@ -333,7 +331,7 @@ where
     fn update_transaction_on_abort(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
 
@@ -368,7 +366,7 @@ where
         valid: bool,
         validation_wave: Wave,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
@@ -389,7 +387,7 @@ where
 
     fn validate_commit_ready(
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
@@ -431,7 +429,7 @@ where
         &self,
         block_gas_limit_type: &BlockGasLimitType,
         scheduler: &Scheduler,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler_task: &mut SchedulerTask,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -587,7 +585,7 @@ where
     fn materialize_aggregator_v1_delta_writes(
         txn_idx: TxnIndex,
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
         // Materialize all the aggregator v1 deltas.
@@ -639,7 +637,7 @@ where
     fn materialize_txn_commit(
         &self,
         txn_idx: TxnIndex,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler: &Scheduler,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
@@ -647,7 +645,7 @@ where
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
-        let parallel_state = ParallelState::<T, X>::new(
+        let parallel_state = ParallelState::<T, E::Executable>::new(
             versioned_cache,
             scheduler,
             start_shared_counter,
@@ -725,7 +723,7 @@ where
         executor_arguments: &E::Argument,
         block: &[T],
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
-        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
         base_view: &S,
@@ -921,7 +919,7 @@ where
     }
 
     fn apply_output_sequential(
-        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
+        unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         output: &E::Output,
         resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
@@ -1019,7 +1017,7 @@ where
             TxnLastInputOutput::new(num_txns as TxnIndex);
 
         for (idx, txn) in signature_verified_block.iter().enumerate() {
-            let latest_view = LatestView::<T, S, X>::new(
+            let latest_view = LatestView::<T, S, E::Executable>::new(
                 base_view,
                 ViewState::Unsync(SequentialState::new(&unsync_map, start_counter, &counter)),
                 idx as TxnIndex,

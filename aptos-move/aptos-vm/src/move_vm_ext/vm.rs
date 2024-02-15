@@ -26,7 +26,7 @@ use move_binary_format::{
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
-    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions, ModuleStorage,
 };
 use std::{ops::Deref, sync::Arc};
 
@@ -191,6 +191,7 @@ impl MoveVmExt {
     pub fn new_session<'r, S: AptosMoveResolver>(
         &self,
         resolver: &'r S,
+        maybe_module_storage: Option<&'r dyn ModuleStorage>,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
@@ -238,11 +239,16 @@ impl MoveVmExt {
         // cache needs to be flushed to work around those bugs.
         self.inner.flush_loader_cache_if_invalidated();
 
-        SessionExt::new(
-            self.inner.new_session_with_extensions(resolver, extensions),
-            resolver,
-            self.features.clone(),
-        )
+        let session = match maybe_module_storage {
+            Some(module_storage) => self.inner.new_session_with_extensions_and_modules(
+                resolver,
+                module_storage,
+                extensions,
+            ),
+
+            None => self.inner.new_session_with_extensions(resolver, extensions),
+        };
+        SessionExt::new(session, resolver, self.features.clone())
     }
 
     pub fn get_chain_id(&self) -> ChainId {

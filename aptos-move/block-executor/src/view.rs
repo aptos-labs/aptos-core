@@ -37,7 +37,7 @@ use aptos_mvhashmap::{
 };
 use aptos_types::{
     delayed_fields::PanicError,
-    executable::{Executable, ModulePath},
+    executable::{Executable as ExecutableBound, ModulePath},
     state_store::{
         errors::StateviewError,
         state_storage_usage::StateStorageUsage,
@@ -155,7 +155,7 @@ trait ResourceGroupState<T: Transaction> {
     ) -> PartialVMResult<GroupReadResult>;
 }
 
-pub(crate) struct ParallelState<'a, T: Transaction, X: Executable> {
+pub(crate) struct ParallelState<'a, T: Transaction, X: ExecutableBound> {
     pub(crate) versioned_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     scheduler: &'a Scheduler,
     start_counter: u32,
@@ -437,7 +437,7 @@ fn wait_for_dependency(
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> ParallelState<'a, T, X> {
     pub(crate) fn new(
         shared_map: &'a MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         shared_scheduler: &'a Scheduler,
@@ -523,7 +523,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> ResourceState<T> for ParallelState<'a, T, X> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.versioned_map.data().set_base_value(key, value);
     }
@@ -651,7 +651,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> ResourceGroupState<T> for ParallelState<'a, T, X> {
     fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
         self.versioned_map
             .group_data()
@@ -754,7 +754,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
     }
 }
 
-pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
+pub(crate) struct SequentialState<'a, T: Transaction, X: ExecutableBound> {
     pub(crate) unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
     pub(crate) read_set: RefCell<UnsyncReadSet<T>>,
     pub(crate) start_counter: u32,
@@ -762,7 +762,7 @@ pub(crate) struct SequentialState<'a, T: Transaction, X: Executable> {
     pub(crate) incorrect_use: RefCell<bool>,
 }
 
-impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> SequentialState<'a, T, X> {
     pub fn new(
         unsync_map: &'a UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         start_counter: u32,
@@ -786,7 +786,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> ResourceState<T> for SequentialState<'a, T, X> {
     fn set_base_value(&self, key: T::Key, value: ValueWithLayout<T::Value>) {
         self.unsync_map.set_base_value(key, value);
     }
@@ -855,7 +855,7 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for SequentialState<'a,
     }
 }
 
-impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> ResourceGroupState<T> for SequentialState<'a, T, X> {
     fn set_raw_group_base_values(&self, group_key: T::Key, base_values: Vec<(T::Tag, T::Value)>) {
         self.unsync_map
             .set_group_base_values(group_key.clone(), base_values);
@@ -920,12 +920,12 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for SequentialStat
     }
 }
 
-pub(crate) enum ViewState<'a, T: Transaction, X: Executable> {
+pub(crate) enum ViewState<'a, T: Transaction, X: ExecutableBound> {
     Sync(ParallelState<'a, T, X>),
     Unsync(SequentialState<'a, T, X>),
 }
 
-impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
+impl<'a, T: Transaction, X: ExecutableBound> ViewState<'a, T, X> {
     fn get_resource_state(&self) -> &dyn ResourceState<T> {
         match self {
             ViewState::Sync(state) => state,
@@ -946,13 +946,13 @@ impl<'a, T: Transaction, X: Executable> ViewState<'a, T, X> {
 /// all necessary traits, LatestView is provided to the VM and used to intercept the reads.
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
-pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> {
+pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> {
     base_view: &'a S,
     pub(crate) latest_view: ViewState<'a, T, X>,
     txn_idx: TxnIndex,
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<'a, T, S, X> {
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> LatestView<'a, T, S, X> {
     pub(crate) fn new(
         base_view: &'a S,
         latest_view: ViewState<'a, T, X>,
@@ -1383,7 +1383,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TResourceView
     for LatestView<'a, T, S, X>
 {
     type Key = T::Key;
@@ -1428,7 +1428,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceVi
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGroupView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TResourceGroupView
     for LatestView<'a, T, S, X>
 {
     type GroupKey = T::Key;
@@ -1523,9 +1523,10 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TModuleView
     for LatestView<'a, T, S, X>
 {
+    type Executable = X;
     type Key = T::Key;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -1564,9 +1565,17 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TModuleView
             },
         }
     }
+
+    fn store_executable(&self, _state_key: &Self::Key, _executable: Self::Executable) {
+        todo!("Implement in later commit");
+    }
+
+    fn fetch_executable(&self, _state_key: &Self::Key) -> Option<Self::Executable> {
+        todo!("Implement in later commit");
+    }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorageView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> StateStorageView
     for LatestView<'a, T, S, X>
 {
     fn id(&self) -> StateViewId {
@@ -1578,7 +1587,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> StateStorag
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregatorV1View
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TAggregatorV1View
     for LatestView<'a, T, S, X>
 {
     type Identifier = T::Key;
@@ -1596,7 +1605,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TAggregator
     }
 }
 
-impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFieldView
+impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TDelayedFieldView
     for LatestView<'a, T, S, X>
 {
     type Identifier = T::Identifier;
@@ -1776,7 +1785,7 @@ mod test {
         MVHashMap,
     };
     use aptos_types::{
-        executable::Executable,
+        executable::Executable as ExecutableBound,
         state_store::{
             errors::StateviewError, state_storage_usage::StateStorageUsage,
             state_value::StateValue, TStateView,
@@ -2437,7 +2446,7 @@ mod test {
     #[derive(Clone)]
     struct MockExecutable {}
 
-    impl Executable for MockExecutable {
+    impl ExecutableBound for MockExecutable {
         fn size_bytes(&self) -> usize {
             unimplemented!();
         }

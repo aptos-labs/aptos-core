@@ -25,6 +25,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+use move_vm_runtime::ModuleStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 
 enum ExpectedFailure {
@@ -47,11 +48,18 @@ impl AptosVM {
     pub(crate) fn process_dkg_result(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_transcript) {
+        match self.process_dkg_result_inner(
+            resolver,
+            maybe_module_storage,
+            log_context,
+            session_id,
+            dkg_transcript,
+        ) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
@@ -67,6 +75,7 @@ impl AptosVM {
     fn process_dkg_result_inner(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         dkg_node: DKGTranscript,
@@ -95,7 +104,7 @@ impl AptosVM {
 
         // All check passed, invoke VM to publish DKG result on chain.
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id);
+        let mut session = self.new_session(resolver, maybe_module_storage, session_id);
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             dkg_node.transcript_bytes.as_move_value(),

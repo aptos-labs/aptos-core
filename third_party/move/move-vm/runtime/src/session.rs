@@ -30,10 +30,13 @@ use move_vm_types::{
 };
 use std::{borrow::Borrow, sync::Arc};
 
-pub struct Session<'r, 'l> {
+pub struct Session<'r, 'l>
+where
+    'l: 'r,
+{
     pub(crate) move_vm: &'l MoveVM,
     pub(crate) data_cache: TransactionDataCache<'r>,
-    pub(crate) module_store: ModuleStorageAdapter,
+    pub(crate) module_store: ModuleStorageAdapter<'r>,
     pub(crate) native_extensions: NativeContextExtensions<'r>,
 }
 

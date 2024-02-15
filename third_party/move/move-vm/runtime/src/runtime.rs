@@ -36,14 +36,14 @@ use std::{borrow::Borrow, collections::BTreeSet, sync::Arc};
 /// An instantiation of the MoveVM.
 pub(crate) struct VMRuntime {
     loader: Loader,
-    pub(crate) module_cache: Arc<ModuleCache>,
+    pub(crate) module_cache: ModuleCache,
 }
 
 impl Clone for VMRuntime {
     fn clone(&self) -> Self {
         Self {
             loader: self.loader.clone(),
-            module_cache: Arc::new(ModuleCache::clone(&self.module_cache)),
+            module_cache: ModuleCache::clone(&self.module_cache),
         }
     }
 }
@@ -55,7 +55,7 @@ impl VMRuntime {
     ) -> PartialVMResult<Self> {
         Ok(VMRuntime {
             loader: Loader::new(NativeFunctions::new(natives)?, vm_config),
-            module_cache: Arc::new(ModuleCache::new()),
+            module_cache: ModuleCache::new(),
         })
     }
 
@@ -556,7 +556,7 @@ impl VMRuntime {
         &self.loader
     }
 
-    pub(crate) fn module_storage(&self) -> Arc<dyn ModuleStorage> {
-        self.module_cache.clone() as Arc<dyn ModuleStorage>
+    pub(crate) fn module_storage(&self) -> &dyn ModuleStorage {
+        &self.module_cache
     }
 }

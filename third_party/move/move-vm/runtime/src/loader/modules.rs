@@ -74,12 +74,12 @@ impl ModuleStorage for ModuleCache {
     }
 }
 
-pub(crate) struct ModuleStorageAdapter {
-    modules: Arc<dyn ModuleStorage>,
+pub(crate) struct ModuleStorageAdapter<'a> {
+    modules: &'a dyn ModuleStorage,
 }
 
-impl ModuleStorageAdapter {
-    pub(crate) fn new(modules: Arc<dyn ModuleStorage>) -> Self {
+impl<'a> ModuleStorageAdapter<'a> {
+    pub(crate) fn new(modules: &'a dyn ModuleStorage) -> Self {
         Self { modules }
     }
 

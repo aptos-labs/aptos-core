@@ -6,6 +6,7 @@ use aptos_aggregator::{
     types::DelayedFieldID,
 };
 use aptos_types::{
+    executable::Executable,
     serde_helper::bcs_utils::size_u32_as_uleb128,
     state_store::{
         errors::StateviewError,
@@ -19,7 +20,11 @@ use aptos_types::{
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
-use std::collections::{BTreeMap, HashMap};
+use move_vm_runtime::Module;
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 /// Allows to query resources from the state.
 pub trait TResourceView {
@@ -145,6 +150,7 @@ pub trait TResourceGroupView {
 /// Allows to query modules from the state.
 pub trait TModuleView {
     type Key;
+    type Executable;
 
     /// Returns
     ///   -  Ok(None)         if the module is not in storage,
@@ -174,6 +180,14 @@ pub trait TModuleView {
         self.get_module_state_value(state_key)
             .map(|maybe_state_value| maybe_state_value.is_some())
     }
+
+    /// Executable is a compiled module, whereby the TModuleView trait allows the caller to
+    /// fetch modules, compile them, and store the executables for future access (possibly by a
+    /// different thread / worker). It is up to the implementation should ensure that the
+    /// association between executables and modules is correct, e.g. in multi-versioning context.
+    fn store_executable(&self, state_key: &Self::Key, executable: Self::Executable);
+
+    fn fetch_executable(&self, state_key: &Self::Key) -> Option<Self::Executable>;
 }
 
 /// Allows to query state information, e.g. its usage.
@@ -200,31 +214,43 @@ pub trait StateStorageView {
 /// TODO: audit and reconsider the default implementation (e.g. should not
 /// resolve AggregatorV2 via the state-view based default implementation, as it
 /// doesn't provide a value exchange functionality).
-pub trait TExecutorView<K, T, L, I, V>:
+pub trait TExecutorView<K, T, L, I, V, X>:
     TResourceView<Key = K, Layout = L>
-    + TModuleView<Key = K>
+    + TModuleView<Key = K, Executable = X>
     + TAggregatorV1View<Identifier = K>
     + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
 {
 }
 
-impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
+impl<A, K, T, L, I, V, X> TExecutorView<K, T, L, I, V, X> for A where
     A: TResourceView<Key = K, Layout = L>
-        + TModuleView<Key = K>
+        + TModuleView<Key = K, Executable = X>
         + TAggregatorV1View<Identifier = K>
         + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
 {
 }
 
+#[derive(Clone)]
+pub struct AptosExecutable {
+    pub executable_module: Arc<Module>,
+}
+
+impl Executable for AptosExecutable {
+    fn size_bytes(&self) -> usize {
+        // Not used until we re-use the executable cache across blocks and need eviction strategy.
+        unreachable!("size for executables should not yet be used");
+    }
+}
+
 pub trait ExecutorView:
-    TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
+    TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp, AptosExecutable>
 {
 }
 
 impl<T> ExecutorView for T where
-    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp>
+    T: TExecutorView<StateKey, StructTag, MoveTypeLayout, DelayedFieldID, WriteOp, AptosExecutable>
 {
 }
 
@@ -264,6 +290,7 @@ impl<S> TModuleView for S
 where
     S: StateView,
 {
+    type Executable = AptosExecutable;
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -273,6 +300,14 @@ where
                 state_key, e
             ))
         })
+    }
+
+    fn store_executable(&self, _state_key: &Self::Key, _executable: Self::Executable) {
+        unreachable!("Storing executable in a non-executor context");
+    }
+
+    fn fetch_executable(&self, _state_key: &Self::Key) -> Option<Self::Executable> {
+        unreachable!("Fetching executable in a non-executor context");
     }
 }
 

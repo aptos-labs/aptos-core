@@ -18,7 +18,7 @@ use aptos_types::{
     account_address::AccountAddress,
     contract_event::TransactionEvent,
     delayed_fields::PanicError,
-    executable::ModulePath,
+    executable::{ExecutableTestType, ModulePath},
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{
@@ -825,6 +825,7 @@ where
 {
     type Argument = ();
     type Error = usize;
+    type Executable = ExecutableTestType;
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
@@ -834,7 +835,7 @@ where
 
     fn execute_transaction(
         &self,
-        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType>
+        view: &(impl TExecutorView<K, u32, MoveTypeLayout, DelayedFieldID, ValueType, ExecutableTestType>
               + TResourceGroupView<GroupKey = K, ResourceTag = u32, Layout = MoveTypeLayout>),
         txn: &Self::Txn,
         txn_idx: TxnIndex,

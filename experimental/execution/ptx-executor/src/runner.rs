@@ -268,6 +268,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                         vm.execute_single_transaction(
                             &transaction,
                             &vm.as_move_resolver(&state_view),
+                            None,
                             &log_context,
                         )
                     };

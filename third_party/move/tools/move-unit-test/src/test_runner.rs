@@ -248,8 +248,9 @@ impl<'a, 'b, W: Write> TestOutput<'a, 'b, W> {
 }
 
 impl SharedTestingConfig {
-    fn execute_via_move_vm(
-        &self,
+    fn execute_via_move_vm<'a, 'b>(
+        &'a self,
+        move_vm: &'b MoveVM,
         test_plan: &ModuleTestPlan,
         function_name: &str,
         test_info: &TestCase,
@@ -258,8 +259,10 @@ impl SharedTestingConfig {
         VMResult<NativeContextExtensions>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
-    ) {
-        let move_vm = MoveVM::new(self.native_function_table.clone()).unwrap();
+    )
+    where
+        'b: 'a,
+    {
         let extensions = extensions::new_extensions();
         let mut session =
             move_vm.new_session_with_extensions(&self.starting_storage_state, extensions);
@@ -306,11 +309,12 @@ impl SharedTestingConfig {
         test_plan: &ModuleTestPlan,
         output: &TestOutput<impl Write>,
     ) -> TestStatistics {
+        let move_vm = MoveVM::new(self.native_function_table.clone()).unwrap();
         let mut stats = TestStatistics::new();
 
         for (function_name, test_info) in &test_plan.tests {
             let (cs_result, ext_result, exec_result, test_run_info) =
-                self.execute_via_move_vm(test_plan, function_name, test_info);
+                self.execute_via_move_vm(&move_vm, test_plan, function_name, test_info);
 
             if self.record_writeset {
                 stats.test_output(

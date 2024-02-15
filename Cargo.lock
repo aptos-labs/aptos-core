@@ -4397,6 +4397,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "move-vm-runtime",
  "rand 0.7.3",
  "serde",
  "test-case",

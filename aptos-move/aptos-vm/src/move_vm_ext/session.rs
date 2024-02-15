@@ -159,7 +159,10 @@ pub struct SessionExt<'r, 'l> {
     features: Arc<Features>,
 }
 
-impl<'r, 'l> SessionExt<'r, 'l> {
+impl<'r, 'l> SessionExt<'r, 'l>
+where
+    'l: 'r,
+{
     pub fn new(
         inner: Session<'r, 'l>,
         remote: &'r dyn AptosMoveResolver,

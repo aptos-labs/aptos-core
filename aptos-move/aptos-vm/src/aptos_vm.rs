@@ -84,7 +84,9 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::StatusType,
 };
-use move_vm_runtime::{logging::expect_no_verification_errors, session::SerializedReturnValues};
+use move_vm_runtime::{
+    logging::expect_no_verification_errors, session::SerializedReturnValues, ModuleStorage,
+};
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
 use once_cell::sync::{Lazy, OnceCell};
@@ -233,9 +235,11 @@ impl AptosVM {
     pub fn new_session<'r, S: AptosMoveResolver>(
         &self,
         resolver: &'r S,
+        maybe_module_storage: Option<&'r dyn ModuleStorage>,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.move_vm.new_session(resolver, session_id)
+        self.move_vm
+            .new_session(resolver, maybe_module_storage, session_id)
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -360,6 +364,7 @@ impl AptosVM {
             gas_meter,
             txn_data,
             resolver,
+            None,
             log_context,
             change_set_configs,
         )
@@ -414,6 +419,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
     ) -> (VMStatus, VMOutput) {
@@ -455,6 +461,7 @@ impl AptosVM {
                     gas_meter,
                     txn_data,
                     resolver,
+                    maybe_module_storage,
                     status,
                     log_context,
                     change_set_configs,
@@ -499,6 +506,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         status: ExecutionStatus,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
@@ -510,7 +518,11 @@ impl AptosVM {
             is_account_init_for_sponsored_transaction(txn_data, &self.features, resolver)?;
 
         if is_account_init_for_sponsored_transaction {
-            let mut session = self.new_session(resolver, SessionId::run_on_abort(txn_data));
+            let mut session = self.new_session(
+                resolver,
+                maybe_module_storage,
+                SessionId::run_on_abort(txn_data),
+            );
             let status = self.inject_abort_info_if_available(status);
 
             create_account_if_does_not_exist(&mut session, gas_meter, txn_data.sender())
@@ -594,7 +606,11 @@ impl AptosVM {
                 .finish(change_set_configs)
                 .map(|set| (set, fee_statement, status))
         } else {
-            let mut session = self.new_session(resolver, SessionId::epilogue_meta(txn_data));
+            let mut session = self.new_session(
+                resolver,
+                maybe_module_storage,
+                SessionId::epilogue_meta(txn_data),
+            );
             let status = self.inject_abort_info_if_available(status);
 
             let fee_statement =
@@ -1365,6 +1381,7 @@ impl AptosVM {
         &self,
         err: VMStatus,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
@@ -1394,6 +1411,7 @@ impl AptosVM {
                 gas_meter,
                 txn_data,
                 resolver,
+                maybe_module_storage,
                 log_context,
                 &storage_gas_params.change_set_configs,
             )
@@ -1403,13 +1421,18 @@ impl AptosVM {
     fn execute_user_transaction_impl(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session = self.new_session(resolver, SessionId::prologue_meta(&txn_data));
+        let mut session = self.new_session(
+            resolver,
+            maybe_module_storage,
+            SessionId::prologue_meta(&txn_data),
+        );
         if let Err(err) =
             self.validate_signed_transaction(&mut session, resolver, txn, &txn_data, log_context)
         {
@@ -1426,7 +1449,11 @@ impl AptosVM {
             // By releasing resource group cache, we start with a fresh slate for resource group
             // cost accounting.
             resolver.release_resource_group_cache();
-            session = self.new_session(resolver, SessionId::txn_meta(&txn_data));
+            session = self.new_session(
+                resolver,
+                maybe_module_storage,
+                SessionId::txn_meta(&txn_data),
+            );
         }
 
         let is_account_init_for_sponsored_transaction =
@@ -1516,6 +1543,7 @@ impl AptosVM {
             self.on_user_transaction_execution_failure(
                 err,
                 resolver,
+                maybe_module_storage,
                 &txn_data,
                 log_context,
                 gas_meter,
@@ -1528,6 +1556,7 @@ impl AptosVM {
     fn execute_user_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
@@ -1535,7 +1564,13 @@ impl AptosVM {
         // TODO: would we end up having a diverging behavior by creating the gas meter at an earlier time?
         let mut gas_meter = unwrap_or_discard!(self.make_standard_gas_meter(balance, log_context));
 
-        self.execute_user_transaction_impl(resolver, txn, log_context, &mut gas_meter)
+        self.execute_user_transaction_impl(
+            resolver,
+            maybe_module_storage,
+            txn,
+            log_context,
+            &mut gas_meter,
+        )
     }
 
     pub fn execute_user_transaction_with_custom_gas_meter<G, F>(
@@ -1560,7 +1595,7 @@ impl AptosVM {
             balance,
         )?;
         let (status, output) =
-            self.execute_user_transaction_impl(resolver, txn, log_context, &mut gas_meter);
+            self.execute_user_transaction_impl(resolver, None, txn, log_context, &mut gas_meter);
 
         Ok((status, output, gas_meter))
     }
@@ -1568,6 +1603,7 @@ impl AptosVM {
     fn execute_write_set(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         write_set_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
@@ -1601,7 +1637,7 @@ impl AptosVM {
                 Ok(change)
             },
             WriteSetPayload::Script { script, execute_as } => {
-                let mut tmp_session = self.new_session(resolver, session_id);
+                let mut tmp_session = self.new_session(resolver, maybe_module_storage, session_id);
                 let senders = match txn_sender {
                     None => vec![*execute_as],
                     Some(sender) => vec![sender, *execute_as],
@@ -1687,6 +1723,7 @@ impl AptosVM {
     pub(crate) fn process_waypoint_change_set(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         write_set_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -1694,6 +1731,7 @@ impl AptosVM {
         let genesis_id = HashValue::zero();
         let change_set = self.execute_write_set(
             resolver,
+            maybe_module_storage,
             &write_set_payload,
             Some(aptos_types::account_config::reserved_vm_address()),
             SessionId::genesis(genesis_id),
@@ -1716,6 +1754,7 @@ impl AptosVM {
     pub(crate) fn process_block_prologue(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -1727,7 +1766,11 @@ impl AptosVM {
         });
 
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata));
+        let mut session = self.new_session(
+            resolver,
+            maybe_module_storage,
+            SessionId::block_meta(&block_metadata),
+        );
 
         let args = serialize_values(
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
@@ -1758,6 +1801,7 @@ impl AptosVM {
     pub(crate) fn process_block_prologue_ext(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         block_metadata_ext: BlockMetadataExt,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
@@ -1769,8 +1813,11 @@ impl AptosVM {
         });
 
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session =
-            self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
+        let mut session = self.new_session(
+            resolver,
+            maybe_module_storage,
+            SessionId::block_meta_ext(&block_metadata_ext),
+        );
 
         let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args());
         session
@@ -1823,7 +1870,7 @@ impl AptosVM {
             Err(e) => return ViewFunctionOutput::new(Err(e), 0),
         };
 
-        let mut session = vm.new_session(&resolver, SessionId::Void);
+        let mut session = vm.new_session(&resolver, None, SessionId::Void);
         match Self::execute_view_function_in_vm(
             &mut session,
             &vm,
@@ -1962,6 +2009,7 @@ impl AptosVM {
         &self,
         txn: &SignatureVerifiedTransaction,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput, Option<String>), VMStatus> {
         assert!(!self.is_simulation, "VM has to be created for execution");
@@ -1975,14 +2023,19 @@ impl AptosVM {
         Ok(match txn.expect_valid() {
             Transaction::BlockMetadata(block_metadata) => {
                 fail_point!("aptos_vm::execution::block_metadata");
-                let (vm_status, output) =
-                    self.process_block_prologue(resolver, block_metadata.clone(), log_context)?;
+                let (vm_status, output) = self.process_block_prologue(
+                    resolver,
+                    maybe_module_storage,
+                    block_metadata.clone(),
+                    log_context,
+                )?;
                 (vm_status, output, Some("block_prologue".to_string()))
             },
             Transaction::BlockMetadataExt(block_metadata_ext) => {
                 fail_point!("aptos_vm::execution::block_metadata_ext");
                 let (vm_status, output) = self.process_block_prologue_ext(
                     resolver,
+                    maybe_module_storage,
                     block_metadata_ext.clone(),
                     log_context,
                 )?;
@@ -1991,6 +2044,7 @@ impl AptosVM {
             Transaction::GenesisTransaction(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
                     resolver,
+                    maybe_module_storage,
                     write_set_payload.clone(),
                     log_context,
                 )?;
@@ -2000,7 +2054,8 @@ impl AptosVM {
                 fail_point!("aptos_vm::execution::user_transaction");
                 let sender = txn.sender().to_hex();
                 let _timer = TXN_TOTAL_SECONDS.start_timer();
-                let (vm_status, output) = self.execute_user_transaction(resolver, txn, log_context);
+                let (vm_status, output) =
+                    self.execute_user_transaction(resolver, maybe_module_storage, txn, log_context);
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
                     match vm_status.status_code() {
@@ -2077,8 +2132,12 @@ impl AptosVM {
                 (VMStatus::Executed, output, Some("state_checkpoint".into()))
             },
             Transaction::ValidatorTransaction(txn) => {
-                let (vm_status, output) =
-                    self.process_validator_transaction(resolver, txn.clone(), log_context)?;
+                let (vm_status, output) = self.process_validator_transaction(
+                    resolver,
+                    maybe_module_storage,
+                    txn.clone(),
+                    log_context,
+                )?;
                 (vm_status, output, Some("validator_transaction".to_string()))
             },
         })
@@ -2217,7 +2276,7 @@ impl VMValidator for AptosVM {
         let txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-        let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
+        let mut session = self.new_session(&resolver, None, SessionId::prologue_meta(&txn_data));
 
         // Increment the counter for transactions verified.
         let (counter_label, result) = match self.validate_signed_transaction(
@@ -2275,7 +2334,7 @@ impl AptosSimulationVM {
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
         let (vm_status, vm_output) =
-            vm.0.execute_user_transaction(&resolver, transaction, &log_context);
+            vm.0.execute_user_transaction(&resolver, None, transaction, &log_context);
         let txn_output = vm_output
             .try_materialize_into_transaction_output(&resolver)
             .expect("Materializing aggregator V1 deltas should never fail");
