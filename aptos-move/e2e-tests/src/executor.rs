@@ -58,7 +58,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
-    verifier, AptosVM, VMExecutor, VMValidator,
+    verifier, AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -482,11 +482,12 @@ impl FakeExecutor {
         }
     }
 
-    fn execute_transaction_block_impl(
+    fn execute_transaction_block_impl_with_resolver(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
         onchain_config: BlockExecutorConfigFromOnchain,
         sequential: bool,
+        resolver: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
@@ -503,7 +504,7 @@ impl FakeExecutor {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
-            &self.data_store,
+            &resolver,
             config,
             None,
         ).map(BlockOutput::into_transaction_outputs_forced)
@@ -541,16 +542,23 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(
-                AptosVM::execute_block(&sig_verified_block, resolver, onchain_config.clone())
-                    .map(BlockOutput::into_transaction_outputs_forced),
-            )
+            Some(self.execute_transaction_block_impl_with_resolver(
+                &sig_verified_block,
+                onchain_config.clone(),
+                true,
+                resolver,
+            ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block, onchain_config))
+            Some(self.execute_transaction_block_impl_with_resolver(
+                &sig_verified_block,
+                onchain_config,
+                false,
+                resolver,
+            ))
         } else {
             None
         };
@@ -1106,6 +1114,7 @@ impl FakeExecutor {
             features,
             timed_features,
             resolver,
+            false,
         )
         .unwrap();
         let mut session = vm.new_clean_session(resolver, SessionId::void());
