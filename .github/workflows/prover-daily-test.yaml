@@ -25,7 +25,7 @@ jobs:
     runs-on: high-perf-docker
     timeout-minutes: ${{ github.event_name == 'pull_request' && 10 || 240}}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/move-prover-setup
