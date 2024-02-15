@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes};
+use aptos_gas_algebra::{
+    AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes,
+};
 use aptos_gas_meter::AptosGasMeter;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, write_set::WriteOpSize,
@@ -156,6 +158,8 @@ where
         ) -> PartialVMResult<()>;
 
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+
+        fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
     }
 
     #[inline]
