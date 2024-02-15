@@ -1442,12 +1442,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn process_local_timeout(&mut self, round: u64) {
+        let Some(sender) = self.round_manager_tx.as_mut() else {
+            warn!("Received local timeout for round {} without Round Manager", round);
+            return;
+        };
+
         let peer_id = self.author;
         let event = VerifiedEvent::LocalTimeout(round);
-        let sender = self
-            .round_manager_tx
-            .as_mut()
-            .expect("RoundManager not started");
         if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
             error!("Failed to send event to round manager {:?}", e);
         }
