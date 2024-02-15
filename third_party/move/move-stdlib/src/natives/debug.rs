@@ -259,13 +259,13 @@ mod testing {
         include_int_types: bool,
     ) -> PartialVMResult<()> {
         // get type layout in VM format
-        let ty_layout = context.type_to_type_layout(&ty)?;
+        let (ty_layout, _) = context.type_to_type_layout(&ty)?;
 
         match &ty_layout {
             MoveTypeLayout::Vector(_) => {
                 // get the inner type T of a vector<T>
                 let inner_ty = get_vector_inner_type(&ty)?;
-                let inner_tyl = context.type_to_type_layout(inner_ty)?;
+                let (inner_tyl, _) = context.type_to_type_layout(inner_ty)?;
 
                 match inner_tyl {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because

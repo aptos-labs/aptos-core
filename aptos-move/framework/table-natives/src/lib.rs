@@ -174,7 +174,8 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
+                // TODO[agg_v2](test): Make sure we have no custom layouts here?
+                let (key_layout, _) = context.type_to_type_layout(key_ty)?;
                 let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
                 let table = Table {
                     handle,

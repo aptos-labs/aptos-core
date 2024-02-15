@@ -394,7 +394,7 @@ impl<'r, 'l> Session<'r, 'l> {
             .load_type(type_tag, &self.data_cache, &self.module_store)
     }
 
-    pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<MoveTypeLayout> {
+    pub fn get_type_layout(&self, type_tag: &TypeTag) -> VMResult<(MoveTypeLayout, bool)> {
         self.move_vm.runtime.loader().get_type_layout(
             type_tag,
             &self.data_cache,

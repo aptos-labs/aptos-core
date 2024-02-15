@@ -41,12 +41,11 @@ fn native_to_bytes(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    // pop type and value
     let ref_to_val = safely_pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
-    // get type layout
-    let layout = match context.type_to_type_layout(&arg_type) {
+    // TODO[agg_v2](cleanup): Fail early if there are any custom layouts.
+    let (layout, _) = match context.type_to_type_layout(&arg_type) {
         Ok(layout) => layout,
         Err(_) => {
             context.charge(BCS_TO_BYTES_FAILURE)?;
@@ -56,7 +55,6 @@ fn native_to_bytes(
         },
     };
 
-    // serialize value
     let val = ref_to_val.read_ref()?;
     let serialized_value = match val.simple_serialize(&layout) {
         Some(serialized_value) => serialized_value,

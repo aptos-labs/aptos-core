@@ -53,7 +53,7 @@ fn native_to_bytes(
     let arg_type = ty_args.pop().unwrap();
 
     // get type layout
-    let layout = match context.type_to_type_layout(&arg_type) {
+    let (layout, _) = match context.type_to_type_layout(&arg_type) {
         Ok(layout) => layout,
         Err(_) => {
             cost += gas_params.failure;

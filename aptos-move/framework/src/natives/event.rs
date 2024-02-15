@@ -146,7 +146,10 @@ fn native_emitted_events_by_handle(
         .value_as::<AccountAddress>()?;
     let key = EventKey::new(creation_num, addr);
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout(&ty)?;
+
+    // TODO[agg_v2](cleanup): Fail conservatively here.
+    let (ty_layout, _) = context.type_to_type_layout(&ty)?;
+
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
         .emitted_v1_events(&key, &ty_tag)
@@ -174,7 +177,10 @@ fn native_emitted_events(
     let ty = ty_args.pop().unwrap();
 
     let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout(&ty)?;
+
+    // TODO[agg_v2](cleanup): We probably should fail here?
+    let (ty_layout, _) = context.type_to_type_layout(&ty)?;
+
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
         .emitted_v2_events(&ty_tag)

@@ -1511,16 +1511,8 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    pub(crate) fn type_to_type_layout(&self, ty: &Type) -> PartialVMResult<(MoveTypeLayout, bool)> {
         self.loader.type_to_type_layout(ty, self.module_store)
-    }
-
-    pub(crate) fn type_to_type_layout_with_identifier_mappings(
-        &self,
-        ty: &Type,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        self.loader
-            .type_to_type_layout_with_identifier_mappings(ty, self.module_store)
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
@@ -2114,24 +2106,13 @@ impl Loader {
         self.type_to_type_tag_impl(ty, &mut gas_context)
     }
 
-    pub(crate) fn type_to_type_layout_with_identifier_mappings(
+    pub(crate) fn type_to_type_layout(
         &self,
         ty: &Type,
         module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
         let mut count = 0;
         self.type_to_type_layout_impl(ty, module_store, &mut count, 1)
-    }
-
-    pub(crate) fn type_to_type_layout(
-        &self,
-        ty: &Type,
-        module_store: &ModuleStorageAdapter,
-    ) -> PartialVMResult<MoveTypeLayout> {
-        let mut count = 0;
-        let (layout, _has_identifier_mappings) =
-            self.type_to_type_layout_impl(ty, module_store, &mut count, 1)?;
-        Ok(layout)
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
@@ -2151,7 +2132,7 @@ impl Loader {
         type_tag: &TypeTag,
         move_storage: &TransactionDataCache,
         module_storage: &ModuleStorageAdapter,
-    ) -> VMResult<MoveTypeLayout> {
+    ) -> VMResult<(MoveTypeLayout, bool)> {
         let ty = self.load_type(type_tag, move_storage, module_storage)?;
         self.type_to_type_layout(&ty, module_storage)
             .map_err(|e| e.finish(Location::Undefined))

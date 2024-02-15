@@ -212,18 +212,16 @@ impl VMRuntime {
         ty: &Type,
         arg: impl Borrow<[u8]>,
     ) -> PartialVMResult<Value> {
-        let (layout, has_identifier_mappings) = match self
-            .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store)
-        {
-            Ok(layout) => layout,
-            Err(_err) => {
-                return Err(PartialVMError::new(
-                    StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
-                )
-                .with_message("[VM] failed to get layout from type".to_string()));
-            },
-        };
+        let (layout, has_identifier_mappings) =
+            match self.loader.type_to_type_layout(ty, module_store) {
+                Ok(layout) => layout,
+                Err(_err) => {
+                    return Err(PartialVMError::new(
+                        StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
+                    )
+                    .with_message("[VM] failed to get layout from type".to_string()));
+                },
+            };
 
         let deserialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::FAILED_TO_DESERIALIZE_ARGUMENT)
@@ -303,13 +301,13 @@ impl VMRuntime {
 
         let (layout, has_identifier_mappings) = self
             .loader
-            .type_to_type_layout_with_identifier_mappings(ty, module_store)
+            .type_to_type_layout(ty, module_store)
             .map_err(|_err| {
-                // TODO: Should we use `err` instead of mapping?
-                PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
-                    "entry point functions cannot have non-serializable return types".to_string(),
-                )
-            })?;
+            // TODO: Should we use `err` instead of mapping?
+            PartialVMError::new(StatusCode::VERIFICATION_ERROR).with_message(
+                "entry point functions cannot have non-serializable return types".to_string(),
+            )
+        })?;
 
         let serialization_error = || -> PartialVMError {
             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
