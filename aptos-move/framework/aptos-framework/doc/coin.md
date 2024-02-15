@@ -993,15 +993,15 @@ The supply is not tracked for both the coin and fungible asset to be paired.
     // Verify the metadata is the same
     <b>assert</b>!(
         <a href="coin.md#0x1_coin_name">name</a>&lt;CoinType&gt;() == <a href="fungible_asset.md#0x1_fungible_asset_name">fungible_asset::name</a>(metadata),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_AND_FUNGIBLE_ASSET_NAME_MISMATCH">ECOIN_AND_FUNGIBLE_ASSET_NAME_MISMATCH</a>))
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_AND_FUNGIBLE_ASSET_NAME_MISMATCH">ECOIN_AND_FUNGIBLE_ASSET_NAME_MISMATCH</a>)
     );
     <b>assert</b>!(
         <a href="coin.md#0x1_coin_symbol">symbol</a>&lt;CoinType&gt;() == <a href="fungible_asset.md#0x1_fungible_asset_symbol">fungible_asset::symbol</a>(metadata),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_AND_FUNGIBLE_ASSET_SYMBOL_MISMATCH">ECOIN_AND_FUNGIBLE_ASSET_SYMBOL_MISMATCH</a>))
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_AND_FUNGIBLE_ASSET_SYMBOL_MISMATCH">ECOIN_AND_FUNGIBLE_ASSET_SYMBOL_MISMATCH</a>)
     );
     <b>assert</b>!(
         <a href="coin.md#0x1_coin_decimals">decimals</a>&lt;CoinType&gt;() == <a href="fungible_asset.md#0x1_fungible_asset_decimals">fungible_asset::decimals</a>(metadata),
-        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_AND_FUNGIBLE_ASSET_DECIMAL_MISMATCH">ECOIN_AND_FUNGIBLE_ASSET_DECIMAL_MISMATCH</a>))
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="coin.md#0x1_coin_ECOIN_AND_FUNGIBLE_ASSET_DECIMAL_MISMATCH">ECOIN_AND_FUNGIBLE_ASSET_DECIMAL_MISMATCH</a>)
     );
 
     // Verify both track <a href="coin.md#0x1_coin_supply">supply</a> or neither tracks
@@ -1090,7 +1090,7 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
     <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&map.coin_to_fungible_asset_map, type)) {
         <b>let</b> metadata_object_cref =
             <b>if</b> (<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;CoinType&gt;() == <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_utf8">string::utf8</a>(b"<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">0x1::aptos_coin::AptosCoin</a>")) {
-                <a href="object.md#0x1_object_create_object_at_address">object::create_object_at_address</a>(@aptos_framework, @aptos_framework, <b>false</b>)
+                <a href="object.md#0x1_object_create_object_at_address">object::create_object_at_address</a>(@aptos_framework, @aptos_fungible_asset, <b>false</b>)
             } <b>else</b> {
                 <a href="object.md#0x1_object_create_sticky_object">object::create_sticky_object</a>(<a href="coin.md#0x1_coin_coin_address">coin_address</a>&lt;CoinType&gt;())
             };

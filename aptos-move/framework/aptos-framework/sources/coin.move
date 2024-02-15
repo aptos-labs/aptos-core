@@ -214,15 +214,15 @@ module aptos_framework::coin {
         // Verify the metadata is the same
         assert!(
             name<CoinType>() == fungible_asset::name(metadata),
-            error::invalid_argument(error::invalid_argument(ECOIN_AND_FUNGIBLE_ASSET_NAME_MISMATCH))
+            error::invalid_argument(ECOIN_AND_FUNGIBLE_ASSET_NAME_MISMATCH)
         );
         assert!(
             symbol<CoinType>() == fungible_asset::symbol(metadata),
-            error::invalid_argument(error::invalid_argument(ECOIN_AND_FUNGIBLE_ASSET_SYMBOL_MISMATCH))
+            error::invalid_argument(ECOIN_AND_FUNGIBLE_ASSET_SYMBOL_MISMATCH)
         );
         assert!(
             decimals<CoinType>() == fungible_asset::decimals(metadata),
-            error::invalid_argument(error::invalid_argument(ECOIN_AND_FUNGIBLE_ASSET_DECIMAL_MISMATCH))
+            error::invalid_argument(ECOIN_AND_FUNGIBLE_ASSET_DECIMAL_MISMATCH)
         );
 
         // Verify both track supply or neither tracks
@@ -271,7 +271,7 @@ module aptos_framework::coin {
         if (!table::contains(&map.coin_to_fungible_asset_map, type)) {
             let metadata_object_cref =
                 if (type_info::type_name<CoinType>() == string::utf8(b"0x1::aptos_coin::AptosCoin")) {
-                    object::create_object_at_address(@aptos_framework, @aptos_framework, false)
+                    object::create_object_at_address(@aptos_framework, @aptos_fungible_asset, false)
                 } else {
                     object::create_sticky_object(coin_address<CoinType>())
                 };
@@ -1596,7 +1596,40 @@ module aptos_framework::coin {
         assert!(!coin_store_exists<FakeMoney>(account_addr), 0);
         assert!(balance<FakeMoney>(account_addr) == 199, 0);
         assert!(primary_fungible_store::balance(account_addr, ensure_paired_metadata<FakeMoney>()) == 199, 0);
-        burn(withdrawn_coin, &burn_cap);
+
+        let _transfer_ref = paired_transfer_ref(&freeze_cap);
+        let burn_ref = paired_burn_ref(&burn_cap);
+        let fa = coin_to_fungible_asset(withdrawn_coin);
+        fungible_asset::burn(&burn_ref, fa);
+
+        move_to(account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @aptos_framework, aaron = @0xcafe)]
+    fun test_balance_with_both_stores(
+        account: &signer,
+        aaron: &signer
+    ) acquires CoinConversionMap, CoinInfo, CoinStore {
+        let account_addr = signer::address_of(account);
+        let aaron_addr = signer::address_of(aaron);
+        account::create_account_for_test(account_addr);
+        account::create_account_for_test(aaron_addr);
+        create_coin_store<FakeMoney>(aaron);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
+        let coin = mint(100, &mint_cap);
+        let fa = fungible_asset::mint(&paired_mint_ref(&mint_cap), 100);
+        primary_fungible_store::deposit(aaron_addr, fa);
+        deposit_to_coin_store(aaron_addr, coin);
+        assert!(coin_balance<FakeMoney>(aaron_addr) == 100, 0);
+        assert!(balance<FakeMoney>(aaron_addr) == 200, 0);
+        maybe_convert_to_fungible_store<FakeMoney>(aaron_addr);
+        assert!(balance<FakeMoney>(aaron_addr) == 200, 0);
+        assert!(coin_balance<FakeMoney>(aaron_addr) == 0, 0);
+
         move_to(account, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,
@@ -1605,7 +1638,7 @@ module aptos_framework::coin {
     }
 
     #[test(account = @aptos_framework)]
-    fun test_manual_pairing(account: &signer) acquires CoinConversionMap, CoinInfo, PairedCoinType {
+    fun test_manual_pairing_success(account: &signer) acquires CoinConversionMap, CoinInfo, PairedCoinType {
         let account_addr = signer::address_of(account);
         account::create_account_for_test(account_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
@@ -1623,6 +1656,59 @@ module aptos_framework::coin {
         pair_existing_fungible_asset<FakeMoney>(account, metadata);
         assert!(paired_metadata<FakeMoney>() == option::some(metadata), 0);
         assert!(paired_coin(metadata) == option::some(type_info::type_of<FakeMoney>()), 0);
+        move_to(account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x10015, location = Self)]
+    fun test_manual_pairing_failure_mismatched_decimal(account: &signer) acquires CoinConversionMap, CoinInfo {
+        let account_addr = signer::address_of(account);
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
+        let cref = object::create_sticky_object(account_addr);
+        fungible_asset::add_fungibility(
+            &cref,
+            option::some(100000),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
+            2,
+            string::utf8(b""),
+            string::utf8(b"")
+        );
+        let metadata = object::object_from_constructor_ref<Metadata>(&cref);
+        pair_existing_fungible_asset<FakeMoney>(account, metadata);
+        move_to(account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @aptos_framework, aaron = @0xcafe)]
+    #[expected_failure(abort_code = 0x50017, location = Self)]
+    fun test_manual_pairing_failure_different_owner(
+        account: &signer,
+        aaron: &signer
+    ) acquires CoinConversionMap, CoinInfo {
+        let account_addr = signer::address_of(account);
+        account::create_account_for_test(account_addr);
+        let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(account, 1, true);
+        let cref = object::create_sticky_object(signer::address_of(aaron));
+        fungible_asset::add_fungibility(
+            &cref,
+            option::some(100000),
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
+            1,
+            string::utf8(b""),
+            string::utf8(b"")
+        );
+        let metadata = object::object_from_constructor_ref<Metadata>(&cref);
+        pair_existing_fungible_asset<FakeMoney>(account, metadata);
         move_to(account, FakeMoneyCapabilities {
             burn_cap,
             freeze_cap,

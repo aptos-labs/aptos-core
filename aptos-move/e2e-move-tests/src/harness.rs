@@ -826,7 +826,8 @@ impl MoveHarness {
                     .unwrap(),
                 bcs::to_bytes(&enabled).unwrap(),
                 bcs::to_bytes(&disabled).unwrap(),
-            ]);
+            ],
+            );
     }
 
     fn override_one_gas_param(&mut self, param: &str, param_value: u64) {

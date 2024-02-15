@@ -665,33 +665,34 @@ impl TestContext {
                 "CoinStore<0x1::aptos_coin::AptosCoin>",
             )
             .await;
-        let coin = coin_balance_option
-            .map(|x| {
-                x["data"]["coin"]["value"]
-                    .as_str()
-                    .unwrap()
-                    .parse::<u64>()
-                    .unwrap()
-            })
-            .unwrap_or(0);
-        let fungible_store_option = self
-            .api_get_account_resource_option(
-                get_apt_primary_store_address(account),
-                "0x1",
-                "fungible_asset",
-                "FungibleStore",
-            )
-            .await;
-        let fa = fungible_store_option
-            .map(|x| {
-                x["data"]["balance"]
-                    .as_str()
-                    .unwrap()
-                    .parse::<u64>()
-                    .unwrap()
-            })
-            .unwrap_or(0);
-        coin + fa
+        let coin = coin_balance_option.map(|x| {
+            x["data"]["coin"]["value"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        });
+        if let Some(v) = coin {
+            v
+        } else {
+            let fungible_store_option = self
+                .api_get_account_resource_option(
+                    get_apt_primary_store_address(account),
+                    "0x1",
+                    "fungible_asset",
+                    "FungibleStore",
+                )
+                .await;
+            fungible_store_option
+                .map(|x| {
+                    x["data"]["balance"]
+                        .as_str()
+                        .unwrap()
+                        .parse::<u64>()
+                        .unwrap()
+                })
+                .unwrap_or(0)
+        }
     }
 
     pub async fn gen_events_by_handle(
