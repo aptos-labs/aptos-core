@@ -2287,6 +2287,7 @@ name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-admin-service",
  "aptos-metrics-core",
  "aptos-runtimes",
  "async-trait",

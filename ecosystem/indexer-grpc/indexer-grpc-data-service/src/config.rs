@@ -60,6 +60,7 @@ pub struct IndexerGrpcDataServiceConfig {
     #[serde(default = "IndexerGrpcDataServiceConfig::default_data_service_response_channel_size")]
     pub data_service_response_channel_size: usize,
     /// A list of auth tokens that are allowed to access the service.
+    #[serde(default)]
     pub whitelisted_auth_tokens: Vec<String>,
     /// If set, don't check for auth tokens.
     #[serde(default)]
