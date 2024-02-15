@@ -1053,6 +1053,14 @@ fun fields::write_val($t0: fields::S): fields::S {
   9: return $t1
 }
 
+
+Diagnostics:
+error: cannot drop
+   ┌─ tests/ability-checker/fields.move:13:9
+   │
+13 │         x.g.h
+   │         ^^^^^
+
 ============ after AbilityChecker: ================
 
 [variant baseline]

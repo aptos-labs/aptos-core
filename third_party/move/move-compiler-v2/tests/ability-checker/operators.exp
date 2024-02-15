@@ -1533,6 +1533,32 @@ fun operators::order($t0: u64, $t1: u64): bool {
  24: return $t2
 }
 
+
+Diagnostics:
+error: `==` requires drop ability for local `x`
+   ┌─ tests/ability-checker/operators.move:15:9
+   │
+15 │         x == y
+   │         ^^^^^^
+
+error: `==` requires drop ability for local `y`
+   ┌─ tests/ability-checker/operators.move:15:9
+   │
+15 │         x == y
+   │         ^^^^^^
+
+error: `!=` requires drop ability for local `x`
+   ┌─ tests/ability-checker/operators.move:19:9
+   │
+19 │         x != y
+   │         ^^^^^^
+
+error: `!=` requires drop ability for local `y`
+   ┌─ tests/ability-checker/operators.move:19:9
+   │
+19 │         x != y
+   │         ^^^^^^
+
 ============ after AbilityChecker: ================
 
 [variant baseline]
