@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
+    counters,
     counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
@@ -368,6 +369,7 @@ impl DAGStorage for StorageAdapter {
     }
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
+        let timer = counters::FETCH_COMMIT_HISTORY_DURATION.start_timer();
         let version = self.aptos_db.get_latest_version()?;
         let resource = self.get_commit_history_resource(version)?;
         let handle = resource.table_handle();
@@ -391,6 +393,8 @@ impl DAGStorage for StorageAdapter {
                 commit_events.push(self.convert(new_block_event)?);
             }
         }
+        let duration = timer.stop_and_record();
+        info!("[DAG] fetch commit history duration: {} sec", duration);
         commit_events.reverse();
         Ok(commit_events)
     }
