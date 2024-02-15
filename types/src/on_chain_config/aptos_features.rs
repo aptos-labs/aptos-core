@@ -59,6 +59,7 @@ pub enum FeatureFlag {
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
+    OBJECT_CODE_DEPLOYMENT = 52,
 }
 
 /// Representation of features on chain as a bitset.

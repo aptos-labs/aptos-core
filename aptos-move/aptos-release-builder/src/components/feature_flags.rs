@@ -102,6 +102,7 @@ pub enum FeatureFlag {
     JWKConsensus,
     ConcurrentFungibleAssets,
     RefundableBytes,
+    ObjectCodeDeployment,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -262,6 +263,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::JWKConsensus => AptosFeatureFlag::JWK_CONSENSUS,
             FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
+            FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
         }
     }
 }
@@ -345,6 +347,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JWKConsensus,
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
             AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
+            AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
         }
     }
 }
