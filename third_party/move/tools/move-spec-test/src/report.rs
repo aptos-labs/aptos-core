@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use tabled::{builder::Builder, settings::Style};
 
@@ -9,14 +9,14 @@ use tabled::{builder::Builder, settings::Style};
 #[derive(Debug, Serialize)]
 pub struct Report {
     /// The list of entries in the report.
-    files: HashMap<PathBuf, Vec<MutantStats>>,
+    files: BTreeMap<PathBuf, Vec<MutantStats>>,
 }
 
 impl Report {
     /// Creates a new report.
     pub fn new() -> Self {
         Self {
-            files: HashMap::new(),
+            files: BTreeMap::new(),
         }
     }
 
@@ -27,8 +27,8 @@ impl Report {
     }
 
     /// Increments the number of mutants killed for the given path.
-    /// If the path is not in the report, it adds it with the number of mutants tested and killed
-    /// set to the default (0) and then increases only killed count!
+    /// If the path is not in the report, it adds it with the number of mutants tested set to 0 and killed
+    /// count set to 1.
     pub fn increment_mutants_killed(&mut self, path: &Path, module_name: &str) {
         self.increment_stat(path, module_name, |stat| stat.killed += 1);
     }
