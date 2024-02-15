@@ -11,7 +11,10 @@ use crate::{
     thread::ThreadService,
     SafetyRules, TSafetyRules,
 };
+use anyhow::anyhow;
 use aptos_config::config::{InitialSafetyRulesConfig, SafetyRulesConfig, SafetyRulesService};
+use aptos_crypto::bls12381::PrivateKey;
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::RwLock;
 use aptos_secure_storage::{KVStorage, Storage};
 use std::{net::SocketAddr, sync::Arc};
@@ -71,6 +74,17 @@ pub fn storage(config: &SafetyRulesConfig) -> PersistentSafetyStorage {
             )
         }
     }
+}
+
+pub fn load_consensus_key_from_secure_storage(
+    config: &SafetyRulesConfig,
+) -> anyhow::Result<PrivateKey> {
+    let storage: Storage = (&config.backend).into();
+    let storage = Box::new(storage);
+    let response = storage.get::<PrivateKey>(CONSENSUS_KEY).map_err(|e| {
+        anyhow!("load_consensus_key_from_secure_storage failed with storage read error: {e}")
+    })?;
+    Ok(response.value)
 }
 
 enum SafetyRulesWrapper {

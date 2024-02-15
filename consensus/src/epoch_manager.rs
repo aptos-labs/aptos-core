@@ -1040,10 +1040,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_client,
             self.time_service.clone(),
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
-            self.config
-                .max_sending_block_txns(self.quorum_store_enabled),
-            self.config
-                .max_sending_block_bytes(self.quorum_store_enabled),
+            self.config.max_sending_block_txns,
+            self.config.max_sending_block_bytes,
             onchain_consensus_config.max_failed_authors_to_store(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
@@ -1221,7 +1219,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
-        let features = payload.get::<Features>().ok().unwrap_or_default();
+        let features = payload.get::<Features>();
         let dkg_state = payload.get::<DKGState>();
 
         if let Err(error) = &onchain_consensus_config {
@@ -1232,21 +1230,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
+        if let Err(error) = &features {
+            error!("Failed to read on-chain features {}", error);
+        }
+
+        self.epoch_state = Some(epoch_state.clone());
+
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
-
-        let rand_config = self.try_get_rand_config_for_new_epoch(
-            &epoch_state,
-            &features,
-            dkg_state,
-            &consensus_config,
-        );
-        info!(
-            "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, ",
-            epoch_state.epoch, rand_config
-        ); // The sk inside has `SlientDebug`.
-        let rand_config = rand_config.ok();
+        let features = features.unwrap_or_default();
 
         let (network_sender, payload_client, payload_manager) = self
             .initialize_shared_component(
@@ -1466,6 +1459,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let round_manager_tx = self.round_manager_tx.clone();
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
+            let max_batch_expiry_gap_usecs =
+                self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
             self.bounded_executor
                 .spawn(async move {
@@ -1477,6 +1472,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             quorum_store_enabled,
                             peer_id == my_peer_id,
                             max_num_batches,
+                            max_batch_expiry_gap_usecs,
                         )
                     ) {
                         Ok(verified_event) => {

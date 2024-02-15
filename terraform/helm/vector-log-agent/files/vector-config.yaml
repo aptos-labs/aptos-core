@@ -1,6 +1,5 @@
 data_dir: /vector-data-dir
-# TODO: change this to expire_metrics_sec after vector 0.25 has been released.
-expire_metrics: { secs: 1800, nanos: 0 } # expire metrics when no sample has been received after 30 minutes
+expire_metrics_secs: 1800 # expire metrics when no sample has been received after 30 minutes
 api:
   enabled: true
   address: "127.0.0.1:8686"

@@ -7,7 +7,7 @@ use crate::storage::{
     space_pricing::DiskSpacePricing,
 };
 use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::ConfigStorage;
+use aptos_types::on_chain_config::{ConfigStorage, Features};
 use move_core_types::gas_algebra::NumBytes;
 use std::fmt::Debug;
 
@@ -24,13 +24,14 @@ pub struct StorageGasParameters {
 
 impl StorageGasParameters {
     pub fn new(
-        feature_version: u64,
+        gas_feature_version: u64,
+        features: &Features,
         gas_params: &AptosGasParameters,
         config_storage: &impl ConfigStorage,
     ) -> Self {
-        let io_pricing = IoPricing::new(feature_version, gas_params, config_storage);
-        let space_pricing = DiskSpacePricing::v1();
-        let change_set_configs = ChangeSetConfigs::new(feature_version, gas_params);
+        let io_pricing = IoPricing::new(gas_feature_version, gas_params, config_storage);
+        let space_pricing = DiskSpacePricing::new(gas_feature_version, features);
+        let change_set_configs = ChangeSetConfigs::new(gas_feature_version, gas_params);
 
         Self {
             io_pricing,
@@ -45,7 +46,7 @@ impl StorageGasParameters {
                 feature_version: LATEST_GAS_FEATURE_VERSION,
                 legacy_free_write_bytes_quota: free_write_bytes_quota,
             }),
-            space_pricing: DiskSpacePricing::v1(),
+            space_pricing: DiskSpacePricing::latest(),
             change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(
                 LATEST_GAS_FEATURE_VERSION,
             ),

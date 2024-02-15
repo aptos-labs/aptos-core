@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK};
+use super::{
+    dag_store::DagStore,
+    observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
+};
 use crate::{
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     counters::update_counters_for_committed_blocks,
     dag::{
-        dag_store::Dag,
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
@@ -23,7 +25,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_config::NewBlockEvent,
@@ -35,7 +37,11 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 pub trait OrderedNotifier: Send + Sync {
     fn send_ordered_nodes(
@@ -85,16 +91,17 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 
 pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<DagStore>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+    block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
 }
 
 impl OrderedNotifierAdapter {
     pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
-        dag: Arc<RwLock<Dag>>,
+        dag: Arc<DagStore>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -105,6 +112,18 @@ impl OrderedNotifierAdapter {
             parent_block_info: Arc::new(RwLock::new(parent_block_info)),
             epoch_state,
             ledger_info_provider,
+            block_ordered_ts: Arc::new(RwLock::new(BTreeMap::new())),
+        }
+    }
+
+    pub(super) fn pipeline_pending_latency(&self) -> Duration {
+        match self.block_ordered_ts.read().first_key_value() {
+            Some((round, timestamp)) => {
+                let latency = timestamp.elapsed();
+                info!(round = round, latency = latency, "pipeline pending latency");
+                latency
+            },
+            None => Duration::ZERO,
         }
     }
 }
@@ -172,6 +191,12 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let ledger_info_provider = self.ledger_info_provider.clone();
         let dag = self.dag.clone();
         *self.parent_block_info.write() = block_info.clone();
+
+        self.block_ordered_ts
+            .write()
+            .insert(block_info.round(), Instant::now());
+        let block_created_ts = self.block_ordered_ts.clone();
+
         let blocks_to_send = OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -181,8 +206,10 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             callback: Box::new(
                 move |committed_blocks: &[Arc<ExecutedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
-                    dag.write()
-                        .commit_callback(commit_decision.commit_info().round());
+                    block_created_ts
+                        .write()
+                        .retain(|&round, _| round > commit_decision.commit_info().round());
+                    dag.commit_callback(commit_decision.commit_info().round());
                     ledger_info_provider
                         .write()
                         .notify_commit_proof(commit_decision);

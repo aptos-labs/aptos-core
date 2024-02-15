@@ -28,7 +28,7 @@ use aptos_types::{
         webauthn::PartialAuthenticatorAssertionResponse,
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
-    zkid::{MAX_ZK_PUBLIC_KEY_BYTES, MAX_ZK_SIGNATURE_BYTES},
+    zkid,
 };
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
@@ -654,8 +654,11 @@ pub enum GenesisPayload {
 pub enum TransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
-    // Deprecated. Will be removed in the future.
-    ModuleBundlePayload(ModuleBundlePayload),
+
+    // Deprecated. We cannot remove the enum variant because it breaks the
+    // ordering, unfortunately.
+    ModuleBundlePayload(DeprecatedModuleBundlePayload),
+
     MultisigPayload(MultisigPayload),
 }
 
@@ -665,26 +668,19 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
             TransactionPayload::MultisigPayload(inner) => inner.verify(),
-            // Deprecated. Will be removed in the future.
-            TransactionPayload::ModuleBundlePayload(inner) => inner.verify(),
+
+            // Deprecated.
+            TransactionPayload::ModuleBundlePayload(_) => {
+                bail!("Module bundle payload has been removed")
+            },
         }
     }
 }
 
+// We cannot remove enum variant, but at least we can remove the logic
+// and keep a deprecate name here to avoid further usage.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct ModuleBundlePayload {
-    pub modules: Vec<MoveModuleBytecode>,
-}
-
-impl VerifyInput for ModuleBundlePayload {
-    fn verify(&self) -> anyhow::Result<()> {
-        for module in self.modules.iter() {
-            module.verify()?;
-        }
-
-        Ok(())
-    }
-}
+pub struct DeprecatedModuleBundlePayload;
 
 /// Payload which runs a single entry function
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
@@ -1205,18 +1201,17 @@ impl VerifyInput for ZkIdSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > MAX_ZK_PUBLIC_KEY_BYTES {
+        if public_key_len > zkid::ZkIdPublicKey::MAX_LEN {
             bail!(
-                "ZKID public key length is greater than the maximum number of {} bytes: found {} bytes",
-                MAX_ZK_PUBLIC_KEY_BYTES, public_key_len
+                "zkID public key length is greater than the maximum number of {} bytes: found {} bytes",
+                zkid::ZkIdPublicKey::MAX_LEN, public_key_len
             )
-        } else if signature_len > MAX_ZK_SIGNATURE_BYTES {
+        } else if signature_len > zkid::ZkIdSignature::MAX_LEN {
             bail!(
-                "ZKID signature length is greater than the maximum number of {} bytes: found {} bytes",
-                MAX_ZK_SIGNATURE_BYTES, signature_len
+                "zkID signature length is greater than the maximum number of {} bytes: found {} bytes",
+                zkid::ZkIdSignature::MAX_LEN, signature_len
             )
         } else {
-            // TODO(zkid): Any other checks we can do here?
             Ok(())
         }
     }

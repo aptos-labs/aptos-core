@@ -10,6 +10,7 @@ use crate::{
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder, FunctionVariant},
     stackless_bytecode::{BorrowNode, Bytecode, Operation, PropKind},
 };
+use abstract_domain_derive::AbstractDomain;
 use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
@@ -28,7 +29,7 @@ pub fn get_memory_usage<'env>(target: &FunctionTarget<'env>) -> &'env UsageState
 }
 
 /// A summary of the memory accessed / modified per function, both directly and transitively.
-#[derive(Default, Clone)]
+#[derive(AbstractDomain, Default, Clone)]
 pub struct MemoryUsage {
     // The memory directly used in the function.
     pub direct: SetDomain<QualifiedInstId<StructId>>,
@@ -38,7 +39,7 @@ pub struct MemoryUsage {
     pub all: SetDomain<QualifiedInstId<StructId>>,
 }
 
-#[derive(Default, Clone)]
+#[derive(AbstractDomain, Default, Clone)]
 pub struct UsageState {
     /// The memory accessed by this function. This is the union of the three individual fields
     /// below.
@@ -117,21 +118,6 @@ impl MemoryUsage {
     }
 }
 
-impl AbstractDomain for MemoryUsage {
-    fn join(&mut self, other: &Self) -> JoinResult {
-        match (
-            self.direct.join(&other.direct),
-            self.transitive.join(&other.transitive),
-            self.all.join(&other.all),
-        ) {
-            (JoinResult::Unchanged, JoinResult::Unchanged, JoinResult::Unchanged) => {
-                JoinResult::Unchanged
-            },
-            _ => JoinResult::Changed,
-        }
-    }
-}
-
 macro_rules! generate_inserter {
     ($field:ident, $method:ident) => {
         paste! {
@@ -180,25 +166,6 @@ impl UsageState {
         self.add_transitive_modified_iter(callee.modified.get_all_inst(inst).into_iter());
         self.add_transitive_assumed_iter(callee.assumed.get_all_inst(inst).into_iter());
         self.add_transitive_asserted_iter(callee.asserted.get_all_inst(inst).into_iter());
-    }
-}
-
-impl AbstractDomain for UsageState {
-    fn join(&mut self, other: &Self) -> JoinResult {
-        match (
-            self.accessed.join(&other.accessed),
-            self.modified.join(&other.modified),
-            self.assumed.join(&other.assumed),
-            self.asserted.join(&other.asserted),
-        ) {
-            (
-                JoinResult::Unchanged,
-                JoinResult::Unchanged,
-                JoinResult::Unchanged,
-                JoinResult::Unchanged,
-            ) => JoinResult::Unchanged,
-            _ => JoinResult::Changed,
-        }
     }
 }
 

@@ -171,20 +171,9 @@ pub fn convert_transaction_payload(
             )),
         },
 
-        // Deprecated. Will be removed in the future.
-        TransactionPayload::ModuleBundlePayload(mbp) => transaction::TransactionPayload {
-            r#type: transaction::transaction_payload::Type::ModuleBundlePayload as i32,
-            payload: Some(
-                transaction::transaction_payload::Payload::ModuleBundlePayload(
-                    transaction::ModuleBundlePayload {
-                        modules: mbp
-                            .modules
-                            .iter()
-                            .map(convert_move_module_bytecode)
-                            .collect(),
-                    },
-                ),
-            ),
+        // Deprecated.
+        TransactionPayload::ModuleBundlePayload(_) => {
+            unreachable!("Module bundle payload has been removed")
         },
     }
 }
@@ -587,29 +576,36 @@ pub fn convert_multi_key_signature(sig: &MultiKeySignature) -> transaction::Mult
     }
 }
 
+#[allow(deprecated)]
 fn convert_signature(signature: &Signature) -> transaction::AnySignature {
     match signature {
         Signature::Ed25519(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Ed25519 as i32,
-            signature: Some(any_signature::Signature::Ed25519(Ed25519 {
+            signature: s.0.clone(),
+            signature_variant: Some(any_signature::SignatureVariant::Ed25519(Ed25519 {
                 signature: s.0.clone(),
             })),
         },
         Signature::Secp256k1Ecdsa(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Secp256k1Ecdsa as i32,
-            signature: Some(any_signature::Signature::Secp256k1Ecdsa(Secp256k1Ecdsa {
-                signature: s.0.clone(),
-            })),
+            signature: s.0.clone(),
+            signature_variant: Some(any_signature::SignatureVariant::Secp256k1Ecdsa(
+                Secp256k1Ecdsa {
+                    signature: s.0.clone(),
+                },
+            )),
         },
         Signature::WebAuthn(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Webauthn as i32,
-            signature: Some(any_signature::Signature::Webauthn(WebAuthn {
+            signature: s.0.clone(),
+            signature_variant: Some(any_signature::SignatureVariant::Webauthn(WebAuthn {
                 signature: s.0.clone(),
             })),
         },
         Signature::ZkId(s) => transaction::AnySignature {
             r#type: transaction::any_signature::Type::Zkid as i32,
-            signature: Some(any_signature::Signature::Zkid(ZkId {
+            signature: s.0.clone(),
+            signature_variant: Some(any_signature::SignatureVariant::Zkid(ZkId {
                 signature: s.0.clone(),
             })),
         },

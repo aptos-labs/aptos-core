@@ -77,6 +77,8 @@ return true.
 -  [Function `aggregator_snapshots_enabled`](#0x1_features_aggregator_snapshots_enabled)
 -  [Function `get_sponsored_automatic_account_creation`](#0x1_features_get_sponsored_automatic_account_creation)
 -  [Function `sponsored_automatic_account_creation_enabled`](#0x1_features_sponsored_automatic_account_creation_enabled)
+-  [Function `get_concurrent_token_v2_feature`](#0x1_features_get_concurrent_token_v2_feature)
+-  [Function `concurrent_token_v2_enabled`](#0x1_features_concurrent_token_v2_enabled)
 -  [Function `get_concurrent_assets_feature`](#0x1_features_get_concurrent_assets_feature)
 -  [Function `concurrent_assets_enabled`](#0x1_features_concurrent_assets_enabled)
 -  [Function `get_operator_beneficiary_change_feature`](#0x1_features_get_operator_beneficiary_change_feature)
@@ -85,6 +87,14 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
+-  [Function `get_zkid_feature`](#0x1_features_get_zkid_feature)
+-  [Function `zkid_feature_enabled`](#0x1_features_zkid_feature_enabled)
+-  [Function `get_zkid_zkless_feature`](#0x1_features_get_zkid_zkless_feature)
+-  [Function `zkid_zkless_feature_enabled`](#0x1_features_zkid_zkless_feature_enabled)
+-  [Function `get_jwk_consensus_feature`](#0x1_features_get_jwk_consensus_feature)
+-  [Function `jwk_consensus_enabled`](#0x1_features_jwk_consensus_enabled)
+-  [Function `get_concurrent_fungible_assets_feature`](#0x1_features_get_concurrent_fungible_assets_feature)
+-  [Function `concurrent_fungible_assets_enabled`](#0x1_features_concurrent_fungible_assets_enabled)
 -  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
 -  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
@@ -315,14 +325,26 @@ Lifetime: transient
 
 
 
-<a id="0x1_features_CONCURRENT_ASSETS"></a>
+<a id="0x1_features_CONCURRENT_FUNGIBLE_ASSETS"></a>
+
+Whether enable Fungible Asset creation
+to create higher throughput concurrent variants.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>: u64 = 49;
+</code></pre>
+
+
+
+<a id="0x1_features_CONCURRENT_TOKEN_V2"></a>
 
 Whether enable TokenV2 collection creation and Fungible Asset creation
 to create higher throughput concurrent variants.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>: u64 = 37;
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_TOKEN_V2">CONCURRENT_TOKEN_V2</a>: u64 = 37;
 </code></pre>
 
 
@@ -382,6 +404,15 @@ The provided signer has not a framework address.
 
 
 
+<a id="0x1_features_EINVALID_FEATURE"></a>
+
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>: u64 = 1;
+</code></pre>
+
+
+
 <a id="0x1_features_FEE_PAYER_ACCOUNT_OPTIONAL"></a>
 
 
@@ -398,6 +429,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>: u64 = 22;
+</code></pre>
+
+
+
+<a id="0x1_features_JWK_CONSENSUS"></a>
+
+The JWK consensus feature.
+
+Lifetime: permanent
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>: u64 = 49;
 </code></pre>
 
 
@@ -622,6 +665,30 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
+</code></pre>
+
+
+
+<a id="0x1_features_ZK_ID_SIGNATURES"></a>
+
+Whether the zkID feature is enabled, possibly with the ZK-less verification mode.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a>: u64 = 46;
+</code></pre>
+
+
+
+<a id="0x1_features_ZK_ID_ZKLESS_SIGNATURE"></a>
+
+Whether the ZK-less mode of the zkID feature is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>: u64 = 47;
 </code></pre>
 
 
@@ -1578,7 +1645,8 @@ Lifetime: transient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64
 </code></pre>
 
 
@@ -1587,7 +1655,9 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 { <a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_aggregator_snapshots_feature">get_aggregator_snapshots_feature</a>(): u64 {
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
+}
 </code></pre>
 
 
@@ -1600,7 +1670,8 @@ Lifetime: transient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool
 </code></pre>
 
 
@@ -1609,8 +1680,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_AGGREGATOR_V2_API">AGGREGATOR_V2_API</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_aggregator_snapshots_enabled">aggregator_snapshots_enabled</a>(): bool {
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -1664,13 +1735,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_concurrent_assets_feature"></a>
+<a id="0x1_features_get_concurrent_token_v2_feature"></a>
 
-## Function `get_concurrent_assets_feature`
+## Function `get_concurrent_token_v2_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_token_v2_feature">get_concurrent_token_v2_feature</a>(): u64
 </code></pre>
 
 
@@ -1679,7 +1750,57 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_token_v2_feature">get_concurrent_token_v2_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_TOKEN_V2">CONCURRENT_TOKEN_V2</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_concurrent_token_v2_enabled"></a>
+
+## Function `concurrent_token_v2_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_token_v2_enabled">concurrent_token_v2_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_token_v2_enabled">concurrent_token_v2_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    // concurrent token v2 cannot be used <b>if</b> aggregator v2 api is not enabled.
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_TOKEN_V2">CONCURRENT_TOKEN_V2</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_concurrent_assets_feature"></a>
+
+## Function `get_concurrent_assets_feature`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_assets_feature">get_concurrent_assets_feature</a>(): u64 {
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
+}
 </code></pre>
 
 
@@ -1692,7 +1813,8 @@ Lifetime: transient
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool
 </code></pre>
 
 
@@ -1701,9 +1823,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    // concurrent assets cannot be used <b>if</b> aggregator v2 api is not enabled.
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_ASSETS">CONCURRENT_ASSETS</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_assets_enabled">concurrent_assets_enabled</a>(): bool {
+    <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="features.md#0x1_features_EINVALID_FEATURE">EINVALID_FEATURE</a>)
 }
 </code></pre>
 
@@ -1842,6 +1963,191 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_bn254_structures_enabled">bn254_structures_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_BN254_STRUCTURES">BN254_STRUCTURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_zkid_feature"></a>
+
+## Function `get_zkid_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_feature">get_zkid_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_feature">get_zkid_feature</a>(): u64 { <a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_zkid_feature_enabled"></a>
+
+## Function `zkid_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_feature_enabled">zkid_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_feature_enabled">zkid_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_zkid_zkless_feature"></a>
+
+## Function `get_zkid_zkless_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_zkless_feature">get_zkid_zkless_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_zkless_feature">get_zkid_zkless_feature</a>(): u64 { <a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_zkid_zkless_feature_enabled"></a>
+
+## Function `zkid_zkless_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_jwk_consensus_feature"></a>
+
+## Function `get_jwk_consensus_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_jwk_consensus_feature">get_jwk_consensus_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_jwk_consensus_feature">get_jwk_consensus_feature</a>(): u64 { <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_jwk_consensus_enabled"></a>
+
+## Function `jwk_consensus_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_jwk_consensus_enabled">jwk_consensus_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_jwk_consensus_enabled">jwk_consensus_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_concurrent_fungible_assets_feature"></a>
+
+## Function `get_concurrent_fungible_assets_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_assets_feature">get_concurrent_fungible_assets_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_concurrent_fungible_assets_feature">get_concurrent_fungible_assets_feature</a>(): u64 { <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_concurrent_fungible_assets_enabled"></a>
+
+## Function `concurrent_fungible_assets_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_assets_enabled">concurrent_fungible_assets_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_assets_enabled">concurrent_fungible_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
 }
 </code></pre>
 

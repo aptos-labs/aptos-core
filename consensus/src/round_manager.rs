@@ -23,6 +23,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
+    util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
@@ -81,6 +82,7 @@ impl UnverifiedEvent {
         quorum_store_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
+        max_batch_expiry_gap_usecs: u64,
     ) -> Result<VerifiedEvent, VerifyError> {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
@@ -106,7 +108,12 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::SignedBatchInfo(sd) => {
                 if !self_message {
-                    sd.verify(peer_id, max_num_batches, validator)?;
+                    sd.verify(
+                        peer_id,
+                        max_num_batches,
+                        max_batch_expiry_gap_usecs,
+                        validator,
+                    )?;
                 }
                 VerifiedEvent::SignedBatchInfo(sd)
             },
@@ -657,11 +664,11 @@ impl RoundManager {
 
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
-                if !self.features.is_reconfigure_with_dkg_enabled() && vtxn.is_dkg() {
-                    counters::UNEXPECTED_DKG_VTXN_COUNT.inc();
-                    bail!("DKG vtxn unexpected while the feature is disabled.");
-                }
-                // todo: add checks for each future vtxn topic
+                ensure!(
+                    is_vtxn_expected(&self.features, vtxn),
+                    "unexpected validator txn: {:?}",
+                    vtxn.topic()
+                );
             }
         }
 
@@ -688,25 +695,18 @@ impl RoundManager {
         let payload_len = proposal.payload().map_or(0, |payload| payload.len());
         let payload_size = proposal.payload().map_or(0, |payload| payload.size());
         ensure!(
-            num_validator_txns + payload_len as u64
-                <= self
-                    .local_config
-                    .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
+            num_validator_txns + payload_len as u64 <= self.local_config.max_receiving_block_txns,
             "Payload len {} exceeds the limit {}",
             payload_len,
-            self.local_config
-                .max_receiving_block_txns(self.onchain_config.quorum_store_enabled()),
+            self.local_config.max_receiving_block_txns,
         );
 
         ensure!(
             validator_txns_total_bytes + payload_size as u64
-                <= self
-                    .local_config
-                    .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
+                <= self.local_config.max_receiving_block_bytes,
             "Payload size {} exceeds the limit {}",
             payload_size,
-            self.local_config
-                .max_receiving_block_bytes(self.onchain_config.quorum_store_enabled()),
+            self.local_config.max_receiving_block_bytes,
         );
 
         ensure!(

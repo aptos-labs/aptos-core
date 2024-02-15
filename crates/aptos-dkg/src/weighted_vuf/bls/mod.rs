@@ -12,6 +12,7 @@ use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::Group;
 use rand::thread_rng;
+use rayon::ThreadPool;
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Neg};
 
@@ -143,6 +144,7 @@ impl WeightedVUF for BlsWUF {
         _msg: &[u8],
         _apks: &[Option<Self::AugmentedPubKeyShare>],
         proof: &Self::Proof,
+        _thread_pool: &ThreadPool,
     ) -> anyhow::Result<Self::Evaluation> {
         Ok(*proof)
     }

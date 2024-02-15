@@ -4,6 +4,7 @@
 //! produces a single field element as output.
 use anyhow::bail;
 use ark_ff::PrimeField;
+use once_cell::sync::Lazy;
 // TODO(zkid): Figure out the right library for Poseidon.
 use poseidon_ark::Poseidon;
 
@@ -26,6 +27,9 @@ pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 /// SNARK circuits would have to implement this more complicated packing).
 pub const MAX_NUM_INPUT_BYTES: usize = MAX_NUM_INPUT_SCALARS * BYTES_PACKED_PER_SCALAR;
 
+/// Apparently, creating this object is rather slow, so we make it a global.
+static HASHER: Lazy<Poseidon> = Lazy::new(Poseidon::new);
+
 /// Given an array of up to `MAX_NUM_INPUT_SCALARS` field elements (in the BN254 scalar field), hashes
 /// them using Poseidon-BN254 into a single field element.
 pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr> {
@@ -36,9 +40,7 @@ pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr>
         );
     }
 
-    let hash = Poseidon::new();
-
-    hash.hash(inputs).map_err(anyhow::Error::msg)
+    HASHER.hash(inputs).map_err(anyhow::Error::msg)
 }
 
 /// Given an string and `max_bytes`, it pads the byte array of the string with zeros up to size `max_bytes`,
@@ -46,7 +48,7 @@ pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr>
 ///
 /// This function calls `pad_and_pack_bytes_to_scalars_no_len` safely as strings will not contain the zero byte except to terminate.
 pub fn pad_and_hash_string(str: &str, max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
-    pad_and_hash_bytes_no_len(str.as_bytes(), max_bytes)
+    pad_and_hash_bytes_with_len(str.as_bytes(), max_bytes)
 }
 
 /// Given $n$ bytes, this function returns $k$ field elements that pack those bytes as tightly as
@@ -96,9 +98,9 @@ pub fn pad_and_pack_bytes_to_scalars_with_len(
     }
 
     let len_scalar = pack_bytes_to_one_scalar(&len.to_le_bytes())?;
-    let scalars = [len_scalar]
+    let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?
         .into_iter()
-        .chain(pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?)
+        .chain([len_scalar])
         .collect::<Vec<ark_bn254::Fr>>();
     Ok(scalars)
 }
@@ -152,6 +154,7 @@ fn hash_bytes(bytes: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
 /// example ASCII strings. Otherwise unexpected collisions can occur.
 ///
 /// Due to risk of collisions due to improper use by the caller, it is not exposed.
+#[allow(unused)]
 fn pad_and_hash_bytes_no_len(bytes: &[u8], max_bytes: usize) -> anyhow::Result<ark_bn254::Fr> {
     let scalars = pad_and_pack_bytes_to_scalars_no_len(bytes, max_bytes)?;
     hash_scalars(scalars)
@@ -195,8 +198,8 @@ pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
     if chunk.len() > BYTES_PACKED_PER_SCALAR {
         bail!(
             "Cannot convert chunk to scalar. Max chunk size is {} bytes. Was given {} bytes.",
+            BYTES_PACKED_PER_SCALAR,
             chunk.len(),
-            MAX_NUM_INPUT_BYTES,
         );
     }
     let fr = ark_bn254::Fr::from_le_bytes_mod_order(chunk);
@@ -242,11 +245,11 @@ mod test {
     #[test]
     fn test_poseidon_bn254_pad_and_hash_bytes() {
         let aud = "google";
-        const MAX_AUD_VAL_BYTES: usize = 248;
-        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, MAX_AUD_VAL_BYTES).unwrap();
+        const LEN: usize = 248;
+        let aud_val_hash = poseidon_bn254::pad_and_hash_string(aud, LEN).unwrap();
         assert_eq!(
             aud_val_hash.to_string(),
-            "17915006864839806432696532586295153111003299925560813222373957953553432368724"
+            "4022319167392179362271493931675371567039199401695470709241660273812313544045"
         );
     }
 

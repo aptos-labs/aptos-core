@@ -22,6 +22,7 @@ pub struct LogSchema {
 pub enum LogEvent {
     CommitViaBlock,
     CommitViaSync,
+    IncrementalProofExpired,
     NetworkReceiveProposal,
     NewEpoch,
     NewRound,

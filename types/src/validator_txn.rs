@@ -1,39 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(any(test, feature = "fuzzing"))]
+use crate::dkg::DKGTranscriptMetadata;
 use crate::{dkg::DKGTranscript, jwks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+#[cfg(any(test, feature = "fuzzing"))]
+use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub enum ValidatorTransaction {
-    DummyTopic1(DummyValidatorTransaction),
     DKGResult(DKGTranscript),
-    DummyTopic2(DummyValidatorTransaction),
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct DummyValidatorTransaction {
-    pub valid: bool,
-    #[serde(with = "serde_bytes")]
-    pub payload: Vec<u8>,
+    ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
 }
 
 impl ValidatorTransaction {
     #[cfg(any(test, feature = "fuzzing"))]
-    pub fn dummy1(payload: Vec<u8>) -> Self {
-        Self::DummyTopic1(DummyValidatorTransaction {
-            valid: true,
-            payload,
-        })
-    }
-
-    #[cfg(any(test, feature = "fuzzing"))]
-    pub fn dummy2(payload: Vec<u8>) -> Self {
-        Self::DummyTopic2(DummyValidatorTransaction {
-            valid: true,
-            payload,
+    pub fn dummy(payload: Vec<u8>) -> Self {
+        Self::DKGResult(DKGTranscript {
+            metadata: DKGTranscriptMetadata {
+                epoch: 999,
+                author: AccountAddress::ZERO,
+            },
+            transcript_bytes: payload,
         })
     }
 
@@ -41,8 +32,13 @@ impl ValidatorTransaction {
         bcs::serialized_size(self).unwrap()
     }
 
-    pub fn is_dkg(&self) -> bool {
-        matches!(self, Self::DKGResult(_))
+    pub fn topic(&self) -> Topic {
+        match self {
+            ValidatorTransaction::DKGResult(_) => Topic::DKG,
+            ValidatorTransaction::ObservedJWKUpdate(update) => {
+                Topic::JWK_CONSENSUS(update.update.issuer.clone())
+            },
+        }
     }
 }
 
@@ -51,7 +47,4 @@ impl ValidatorTransaction {
 pub enum Topic {
     DKG,
     JWK_CONSENSUS(jwks::Issuer),
-    DUMMY1,
-    #[cfg(any(test, feature = "fuzzing"))]
-    DUMMY2,
 }

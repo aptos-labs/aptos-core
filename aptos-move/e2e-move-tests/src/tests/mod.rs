@@ -4,6 +4,7 @@
 mod access_path_test;
 mod aggregator;
 mod aggregator_v2;
+mod aggregator_v2_runtime_checks;
 mod attributes;
 mod chain_id;
 mod code_publishing;

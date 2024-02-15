@@ -733,9 +733,7 @@ impl MoveHarness {
     }
 
     pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {
-        let mut gas_schedule: GasScheduleV2 = self
-            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
-            .unwrap();
+        let mut gas_schedule = self.get_gas_schedule();
         modify(&mut gas_schedule);
         self.set_resource(
             CORE_CODE_ADDRESS,
@@ -745,15 +743,7 @@ impl MoveHarness {
     }
 
     pub fn modify_gas_schedule(&mut self, modify: impl FnOnce(&mut AptosGasParameters)) {
-        let gas_schedule: GasScheduleV2 = self
-            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
-            .unwrap();
-        let feature_version = gas_schedule.feature_version;
-        let mut gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
-            feature_version,
-        )
-        .unwrap();
+        let (feature_version, mut gas_params) = self.get_gas_params();
         modify(&mut gas_params);
         self.set_resource(
             CORE_CODE_ADDRESS,
@@ -763,6 +753,22 @@ impl MoveHarness {
                 entries: gas_params.to_on_chain_gas_schedule(feature_version),
             },
         );
+    }
+
+    pub fn get_gas_params(&self) -> (u64, AptosGasParameters) {
+        let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
+        let feature_version = gas_schedule.feature_version;
+        let params = AptosGasParameters::from_on_chain_gas_schedule(
+            &gas_schedule.to_btree_map(),
+            feature_version,
+        )
+        .unwrap();
+        (feature_version, params)
+    }
+
+    pub fn get_gas_schedule(&self) -> GasScheduleV2 {
+        self.read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
+            .unwrap()
     }
 
     pub fn new_vm(&self) -> AptosVM {
@@ -824,7 +830,7 @@ impl MoveHarness {
                     assert_abort_ref!(
                         output.status(),
                         error,
-                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, gotten {:?}",
+                        "Error code mismatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
                         idx + offset,
                         offset,
                         error,

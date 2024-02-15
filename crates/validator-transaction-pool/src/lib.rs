@@ -22,6 +22,10 @@ impl TransactionFilter {
 }
 
 impl TransactionFilter {
+    pub fn empty() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
+
     pub fn should_exclude(&self, txn: &ValidatorTransaction) -> bool {
         match self {
             TransactionFilter::PendingTxnHashSet(set) => set.contains(&txn.hash()),
@@ -86,6 +90,14 @@ impl VTxnPoolState {
         self.inner
             .lock()
             .pull(deadline, max_items, max_bytes, filter)
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_txn_guard(&self) -> TxnGuard {
+        TxnGuard {
+            pool: self.inner.clone(),
+            seq_num: u64::MAX,
+        }
     }
 }
 

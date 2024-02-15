@@ -40,7 +40,7 @@ pub(crate) fn new_node(
     parents: Vec<NodeCertificate>,
 ) -> Node {
     Node::new(
-        0,
+        1,
         round,
         author,
         timestamp,

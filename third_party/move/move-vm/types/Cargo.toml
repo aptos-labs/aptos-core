@@ -19,12 +19,14 @@ smallvec = "1.6.1"
 triomphe = "0.1.9"
 
 bcs = { workspace = true }
-move-binary-format = { path = "../../move-binary-format" }
 
+move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 
 [dev-dependencies]
+claims = "0.7"
 proptest = "1.0.0"
+rand = "0.8.5"
 
 [features]
 default = []

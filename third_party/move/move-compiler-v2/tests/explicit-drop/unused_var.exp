@@ -8,6 +8,12 @@ warning: Function `0x42::explicate_drop::unused_var` is unused: it has no curren
 4 │ │     }
   │ ╰─────^
 
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/explicit-drop/unused_var.move:6:26
+  │
+6 │     fun unused_arg<T: drop>(x: T) {
+  │                             ^
+
 warning: Function `0x42::explicate_drop::unused_arg` is unused: it has no current callers and is private to its module.
   ┌─ tests/explicit-drop/unused_var.move:6:2
   │

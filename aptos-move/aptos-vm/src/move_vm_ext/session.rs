@@ -30,7 +30,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::values::Value;
+use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -179,15 +179,25 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                                   layout: MoveTypeLayout,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
-            value
-                .simple_serialize(&layout)
-                .map(Into::into)
-                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
-                })
+            let serialization_result = if has_aggregator_lifting {
+                // We allow serialization of native values here because we want to
+                // temporarily store native values (via encoding to ensure deterministic
+                // gas charging) in block storage.
+                serialize_and_allow_delayed_values(&value, &layout)
+                    .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
+            } else {
+                // Otherwise, there should be no native values so ensure
+                // serialization fails here if there are any.
+                value
+                    .simple_serialize(&layout)
+                    .map(|bytes| (bytes.into(), None))
+            };
+            serialization_result.ok_or_else(|| {
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("Error when serializing resource {}.", value))
+            })
         };
+
         let (change_set, mut extensions) = self
             .inner
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
@@ -306,7 +316,6 @@ impl<'r, 'l> SessionExt<'r, 'l> {
     ///
     /// V1 Resource group change set behavior keeps ops for individual resources separate, not
     /// merging them into the a single op corresponding to the whole resource group (V0).
-    /// TODO[agg_v2](fix) Resource groups are currently not handled correctly in terms of propagating MoveTypeLayout
     fn split_and_merge_resource_groups(
         runtime: &MoveVM,
         remote: &dyn AptosMoveResolver,

@@ -3,24 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
-use move_binary_format::binary_views::BinaryIndexedView;
-use move_command_line_common::files::FileHash;
-use move_compiler::compiled_unit::CompiledUnit;
+use log::{debug, trace};
 use move_compiler_v2::{
-    function_checker, inliner, pipeline,
+    annotate_units, disassemble_compiled_units, flow_insensitive_checkers, function_checker,
+    inliner, logging, pipeline,
     pipeline::{
         ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-        explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
+        exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
+        livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
     },
-    run_file_format_gen, Options,
+    run_bytecode_verifier, run_file_format_gen, Options,
 };
-use move_disassembler::disassembler::Disassembler;
-use move_ir_types::location;
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
@@ -60,6 +58,7 @@ fn path_from_crate_root(path: &str) -> String {
 }
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
+    logging::setup_logging_for_testing();
     let mut experiments = extract_test_directives(path, "// experiment:")?;
     if experiments.is_empty() {
         // If there is no experiment, use "" as the 'default' experiment.
@@ -229,12 +228,23 @@ impl TestConfig {
                 dump_annotated_targets: true,
                 dump_for_only_some_stages: None,
             }
+        } else if path.contains("/abort-analysis/") {
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: true,
+                dump_for_only_some_stages: None,
+            }
         } else if path.contains("/ability-checker/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
                 with_copy_inference: true,
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 type_check_only: false,
@@ -284,6 +294,21 @@ impl TestConfig {
                 dump_annotated_targets: true,
                 dump_for_only_some_stages: None,
             }
+        } else if path.contains("/bytecode-verify-failure/") {
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
+                with_copy_inference: true,
+            }));
+            // Note that we do not run ability checker here, as we want to induce
+            // a bytecode verification failure. The test in /bytecode-verify-failure/
+            // has erroneous ability annotations.
+            Self {
+                type_check_only: false,
+                dump_ast: false,
+                pipeline,
+                generate_file_format: true,
+                dump_annotated_targets: false,
+                dump_for_only_some_stages: None,
+            }
         } else {
             panic!(
                 "unexpected test path `{}`, cannot derive configuration",
@@ -310,23 +335,24 @@ impl TestConfig {
         let mut ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
 
         if ok {
+            trace!("After error check, GlobalEnv={}", env.dump_env());
+            // Flow-insensitive checks on AST
+            flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
             function_checker::check_for_function_typed_parameters(&mut env);
             function_checker::check_access_and_use(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
         }
-
         if ok {
-            if options.debug {
-                eprint!("After error check, GlobalEnv={}", env.dump_env());
-            }
-
+            trace!(
+                "After flow-insensitive checks, GlobalEnv={}",
+                env.dump_env()
+            );
             // Run inlining.
             inliner::run_inlining(&mut env);
             ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
-
-            if ok && options.debug {
-                eprint!("After inlining, GlobalEnv={}", env.dump_env());
-            }
+        }
+        if ok {
+            trace!("After inlining, GlobalEnv={}", env.dump_env());
         }
 
         if ok && self.dump_ast {
@@ -338,7 +364,7 @@ impl TestConfig {
         if ok && !self.type_check_only {
             // Run stackless bytecode generator
             let mut targets = move_compiler_v2::run_bytecode_gen(&env);
-            let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+            ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
             if ok {
                 // Run the target pipeline.
                 self.pipeline.run_with_hook(
@@ -356,9 +382,20 @@ impl TestConfig {
                                     "initial bytecode",
                                     targets_before,
                                     &pipeline::register_formatters,
+                                    false,
                                 ),
                             );
                         }
+                        debug!(
+                            "{}",
+                            &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                &env,
+                                "initial bytecode",
+                                targets_before,
+                                &pipeline::register_formatters,
+                                true,
+                            ),
+                        )
                     },
                     // Hook which is run after every step in the pipeline. Prints out
                     // bytecode after the processor, if requested.
@@ -366,40 +403,48 @@ impl TestConfig {
                         let out = &mut test_output.borrow_mut();
                         Self::check_diags(out, &env);
                         // Note that `i` starts at 1.
-                        if self.dump_annotated_targets
-                            && (self.dump_for_only_some_stages.is_none() // dump all stages
-                                || self
-                                    .dump_for_only_some_stages
-                                    .as_ref()
-                                    .is_some_and(|list| list.contains(&(i - 1))))
-                        {
+                        let title = format!("after {}:", processor.name());
+                        let stage_dump_enabled = self.dump_for_only_some_stages.is_none()
+                            || self
+                                .dump_for_only_some_stages
+                                .as_ref()
+                                .is_some_and(|list| list.contains(&(i - 1)));
+                        if self.dump_annotated_targets && stage_dump_enabled {
                             out.push_str(
                                 &move_stackless_bytecode::print_targets_with_annotations_for_test(
                                     &env,
-                                    &format!("after {}:", processor.name()),
+                                    &title,
                                     targets_after,
                                     &pipeline::register_formatters,
+                                    false,
                                 ),
                             );
                         }
+                        if stage_dump_enabled {
+                            debug!(
+                                "{}",
+                                &move_stackless_bytecode::print_targets_with_annotations_for_test(
+                                    &env,
+                                    &title,
+                                    targets_after,
+                                    &pipeline::register_formatters,
+                                    true,
+                                )
+                            )
+                        }
                     },
                 );
-                let ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
+                ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
                 if ok && self.generate_file_format {
                     let units = run_file_format_gen(&env, &targets);
                     let out = &mut test_output.borrow_mut();
                     out.push_str("\n============ disassembled file-format ==================\n");
-                    Self::check_diags(out, &env);
-                    for compiled_unit in units {
-                        let disassembled = match compiled_unit {
-                            CompiledUnit::Module(module) => {
-                                Self::disassemble(BinaryIndexedView::Module(&module.module))?
-                            },
-                            CompiledUnit::Script(script) => {
-                                Self::disassemble(BinaryIndexedView::Script(&script.script))?
-                            },
-                        };
-                        out.push_str(&disassembled);
+                    ok = Self::check_diags(out, &env);
+                    out.push_str(&disassemble_compiled_units(&units)?);
+                    if ok {
+                        let annotated_units = annotate_units(units);
+                        run_bytecode_verifier(&annotated_units, &mut env);
+                        Self::check_diags(out, &env);
                     }
                 }
             }
@@ -422,11 +467,6 @@ impl TestConfig {
         let ok = !env.has_errors();
         env.clear_diag();
         ok
-    }
-
-    fn disassemble(view: BinaryIndexedView) -> anyhow::Result<String> {
-        let diss = Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))?;
-        diss.disassemble()
     }
 }
 

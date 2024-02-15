@@ -44,7 +44,7 @@ pub enum FeatureFlag {
     SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
-    CONCURRENT_ASSETS = 37,
+    CONCURRENT_TOKEN_V2 = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
@@ -53,9 +53,12 @@ pub enum FeatureFlag {
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
-    ZK_ID_SIGNATURE = 46,
-    OPEN_ID_SIGNATURE = 47,
+    ZK_ID_SIGNATURES = 46,
+    ZK_ID_ZKLESS_SIGNATURE = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    JWK_CONSENSUS = 49,
+    CONCURRENT_FUNGIBLE_ASSETS = 50,
+    REFUNDABLE_BYTES = 51,
 }
 
 /// Representation of features on chain as a bitset.
@@ -80,6 +83,8 @@ impl Default for Features {
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
         features.enable(BN254_STRUCTURES);
+        features.enable(REFUNDABLE_BYTES);
+
         features
     }
 }
@@ -170,14 +175,20 @@ impl Features {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
     }
 
-    /// Whether the extra verification of TXN authenticators in the Move prologue is enabled.
-    /// (Necessary for fully-validating zkID transactions.)
+    /// Whether the zkID feature is enabled, specifically the ZK path with ZKP-based signatures.
+    /// The ZK-less path is controlled via a different `FeatureFlag::ZK_ID_ZKLESS_SIGNATURE` flag.
     pub fn is_zkid_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURE)
+        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURES)
     }
 
-    pub fn is_open_id_signature_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::OPEN_ID_SIGNATURE)
+    /// If `FeatureFlag::ZK_ID_SIGNATURES` is enabled, this feature additionally allows for a "ZK-less
+    /// path" where the blockchain can verify OpenID signatures directly. This ZK-less mode exists
+    /// for two reasons. First, it gives as a simpler way to test the feature. Second, it acts as a
+    /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
+    /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
+    /// but without privacy).
+    pub fn is_zkid_zkless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ZK_ID_ZKLESS_SIGNATURE)
     }
 
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
@@ -186,6 +197,10 @@ impl Features {
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
+    }
+
+    pub fn is_refundable_bytes_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
 }
 

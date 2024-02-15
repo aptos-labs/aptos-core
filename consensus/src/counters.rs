@@ -843,6 +843,16 @@ pub static UNEXPECTED_PROPOSAL_EXT_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram for the number of txns to be executed in a block.
+pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "max_txns_from_block_to_execute",
+        "Histogram for the number of txns to be executed in a block.",
+        exponential_buckets(/*start=*/ 1.5, /*factor=*/ 1.5, /*count=*/ 25).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Count of the number of `DKG` validator transactions received while the feature is disabled.
 pub static UNEXPECTED_DKG_VTXN_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

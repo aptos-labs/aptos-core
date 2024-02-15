@@ -57,8 +57,6 @@ module std::vector {
         v
     }
     spec singleton {
-        // TODO: when using opaque here, we get verification errors.
-        // pragma opaque;
         aborts_if false;
         ensures result == vec(e);
     }
@@ -66,7 +64,7 @@ module std::vector {
     /// Reverses the order of the elements in the vector `v` in place.
     public fun reverse<Element>(v: &mut vector<Element>) {
         let len = length(v);
-        if (len == 0) return ();
+        if (len == 0) return;
 
         let front_index = 0;
         let back_index = len -1;

@@ -6,6 +6,7 @@ use aptos_gas_schedule::VMGasParameters;
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
 use aptos_vm_types::{
     change_set::VMChangeSet,
+    resolver::ExecutorView,
     storage::{
         io_pricing::IoPricing,
         space_pricing::{ChargeAndRefund, DiskSpacePricing},
@@ -126,6 +127,7 @@ pub trait AptosGasMeter: MoveGasMeter {
         change_set: &mut VMChangeSet,
         txn_size: NumBytes,
         gas_unit_price: FeePerGasUnit,
+        executor_view: &dyn ExecutorView,
     ) -> VMResult<Fee> {
         // The new storage fee are only active since version 7.
         if self.feature_version() < 7 {
@@ -142,30 +144,34 @@ pub trait AptosGasMeter: MoveGasMeter {
         let pricing = self.disk_space_pricing();
         let params = &self.vm_gas_params().txn;
 
-        // Calculate the storage fees.
+        // Write set
         let mut write_fee = Fee::new(0);
         let mut total_refund = Fee::new(0);
-        for (key, op_size, metadata_opt) in change_set.write_set_iter_mut() {
-            let ChargeAndRefund { charge, refund } =
-                pricing.charge_refund_write_op(params, key, &op_size, metadata_opt);
-            total_refund += refund;
-
+        for res in change_set.write_op_info_iter_mut(executor_view) {
+            let ChargeAndRefund { charge, refund } = pricing.charge_refund_write_op(
+                params,
+                res.map_err(|err| err.finish(Location::Undefined))?,
+            );
             write_fee += charge;
+            total_refund += refund;
         }
 
+        // Events (no event fee in v2)
         let event_fee = change_set
             .events()
             .iter()
             .fold(Fee::new(0), |acc, (event, _)| {
-                acc + pricing.storage_fee_per_event(params, event)
+                acc + pricing.legacy_storage_fee_per_event(params, event)
             });
-        let event_discount = pricing.storage_discount_for_events(params, event_fee);
+        let event_discount = pricing.legacy_storage_discount_for_events(params, event_fee);
         let event_net_fee = event_fee
             .checked_sub(event_discount)
-            .expect("discount should always be less than or equal to total amount");
-        let txn_fee = pricing.storage_fee_for_transaction_storage(params, txn_size);
-        let fee = write_fee + event_net_fee + txn_fee;
+            .expect("event discount should always be less than or equal to total amount");
 
+        // Txn (no txn fee in v2)
+        let txn_fee = pricing.legacy_storage_fee_for_transaction_storage(params, txn_size);
+
+        let fee = write_fee + event_net_fee + txn_fee;
         self.charge_storage_fee(fee, gas_unit_price)
             .map_err(|err| err.finish(Location::Undefined))?;
 
