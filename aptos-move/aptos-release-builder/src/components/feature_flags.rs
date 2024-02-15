@@ -91,7 +91,7 @@ pub enum FeatureFlag {
     LimitMaxIdentifierLength,
     OperatorBeneficiaryChange,
     VMBinaryFormatV7,
-    ResourceGroupsChargeAsSizeSum,
+    ResourceGroupSplitInVmChangeSet,
     CommissionChangeDelegationPool,
     BN254Structures,
     WebAuthnSignature,
@@ -248,8 +248,8 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ConcurrentTokenV2 => AptosFeatureFlag::CONCURRENT_TOKEN_V2,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
-            FeatureFlag::ResourceGroupsChargeAsSizeSum => {
-                AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
+            FeatureFlag::ResourceGroupSplitInVmChangeSet => {
+                AptosFeatureFlag::RESOURCE_GROUP_SPLIT_IN_VM_CHANGE_SET
             },
             FeatureFlag::CommissionChangeDelegationPool => {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
@@ -332,8 +332,8 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::CONCURRENT_TOKEN_V2 => FeatureFlag::ConcurrentTokenV2,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
             AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
-            AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
-                FeatureFlag::ResourceGroupsChargeAsSizeSum
+            AptosFeatureFlag::RESOURCE_GROUP_SPLIT_IN_VM_CHANGE_SET => {
+                FeatureFlag::ResourceGroupSplitInVmChangeSet
             },
             AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
                 FeatureFlag::CommissionChangeDelegationPool
