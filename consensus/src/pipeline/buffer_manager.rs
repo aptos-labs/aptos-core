@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, pipeline::commit_decision::CommitDecision,
+    common::Author, executed_block::ExecutedBlock
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -348,13 +348,6 @@ impl BufferManager {
                 let block = aggregated_item.executed_blocks.last().unwrap().block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
-                if block.author() == Some(self.author) {
-                    let commit_decision = CommitMessage::Decision(CommitDecision::new(
-                        aggregated_item.commit_proof.clone(),
-                    ));
-                    self.commit_proof_rb_handle
-                        .replace(self.do_reliable_broadcast(commit_decision));
-                }
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
                         .send_epoch_change(EpochChangeProof::new(
@@ -515,27 +508,11 @@ impl BufferManager {
                 // we have found the buffer item
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
-                let maybe_proposer = signed_item_mut
-                    .executed_blocks
-                    .last()
-                    .unwrap()
-                    .block()
-                    .author();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-
-                if let Some(proposer) = maybe_proposer {
-                    let sender = self.commit_msg_tx.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = sender.send_commit_vote(commit_vote, proposer).await {
-                            warn!("Failed to send commit vote {:?}", e);
-                        }
-                    });
-                } else {
-                    let commit_vote = CommitMessage::Vote(commit_vote);
-                    signed_item_mut
-                        .rb_handle
-                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
-                }
+                let commit_vote = CommitMessage::Vote(commit_vote);
+                signed_item_mut
+                    .rb_handle
+                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);
