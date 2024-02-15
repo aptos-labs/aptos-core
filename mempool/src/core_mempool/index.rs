@@ -567,7 +567,13 @@ impl MultiBucketFifoIndex {
 
     pub fn next(&mut self) -> Option<OrderedQueueKey> {
         let mut next = None;
-        for (i, index) in self.indexes.iter_mut().enumerate().skip(self.index_idx) {
+        for (i, index) in self
+            .indexes
+            .iter_mut()
+            .rev()
+            .enumerate()
+            .skip(self.index_idx)
+        {
             next = index.next();
             self.index_idx = i;
             if next.is_some() {
