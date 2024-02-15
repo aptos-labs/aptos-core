@@ -33,7 +33,7 @@ jobs:
   rust-move-tests:
     runs-on: high-perf-docker
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run Aptos Move tests with compiler V2
         uses: ./.github/actions/move-tests-compiler-v2
         with:

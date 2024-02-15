@@ -16,7 +16,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # This action will cache ~/.cargo and ./target (or the equivalent on Windows in
       # this case). See more here:

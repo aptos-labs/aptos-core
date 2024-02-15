@@ -45,7 +45,7 @@ jobs:
     outputs:
       only_docs_changed: ${{ steps.determine_file_changes.outputs.only_docs_changed }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run the file change determinator
         id: determine_file_changes
         uses: ./.github/actions/file-change-determinator
@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ${{ inputs.RUNNER_NAME }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.GIT_SHA }}
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
