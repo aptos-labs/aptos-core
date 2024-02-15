@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRegisterMarketTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BypassAccountsPoolWrapperCreator}, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRegisterMarketTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -293,6 +293,7 @@ impl WorkflowTxnGeneratorCreator {
             WorkflowKind::Econia { num_users, flow_type, num_markets } => {
                 let create_accounts = initial_account_pool.is_none();
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
+                let register_market_pool = Arc::new(ObjectPool::new());
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
                 let deposit_coins_pool = Arc::new(ObjectPool::new());
                 let place_orders_pool = Arc::new(ObjectPool::new());
@@ -377,11 +378,15 @@ impl WorkflowTxnGeneratorCreator {
                     )));
                 }
 
-                creators.push(Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                creators.push(Box::new(BypassAccountsPoolWrapperCreator::new(
+                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                         txn_factory.clone(),
                         packages.clone(),
                         econia_register_market_worker,
-                    )));
+                    )),
+                    created_pool.clone(),
+                    Some(register_market_pool.clone()),
+                )));
 
                 creators.push(Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
@@ -389,7 +394,7 @@ impl WorkflowTxnGeneratorCreator {
                         packages.clone(),
                         econia_register_market_user_worker,
                     )),
-                    created_pool.clone(),
+                    register_market_pool.clone(),
                     Some(register_market_accounts_pool.clone()),
                 )));
 
@@ -416,15 +421,14 @@ impl WorkflowTxnGeneratorCreator {
                 let pool_per_stage = if create_accounts {
                     vec![
                         created_pool,
-                        Arc::new(ObjectPool::new()),
+                        register_market_pool,
                         register_market_accounts_pool,
                         deposit_coins_pool,
                         place_orders_pool,
                     ]
                 } else {
                     vec![
-                        // TODO: As there is no pool for register_market_worker, didn't add a pool here. Is that an issue?
-                        Arc::new(ObjectPool::new()),
+                        register_market_pool,
                         register_market_accounts_pool,
                         deposit_coins_pool,
                         place_orders_pool,

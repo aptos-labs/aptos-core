@@ -264,7 +264,7 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketTransactionGenerator
             let mut requests = vec![];
             for i in 0..*num_markets {
                 let builder = txn_factory.payload(register_market(package.get_module_id("txn_generator_utils")));
-                requests.push(account.sign_with_transaction_builder(builder));
+                requests.push(publisher.sign_with_transaction_builder(builder));
             }
             requests
         })
