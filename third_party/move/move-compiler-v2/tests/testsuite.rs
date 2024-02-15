@@ -251,7 +251,7 @@ impl TestConfig {
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: true,
+                dump_annotated_targets: false,
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/copy-propagation/") {
