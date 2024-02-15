@@ -134,8 +134,7 @@ function debug() {
     # find the binary
     binary=$(find ./target -name $fuzz_target -type f -perm /111)
     if [ -z "$binary" ]; then
-        info "Could not find binary for $fuzz_target. Trying to build it..."
-        build $fuzz_target
+        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
     fi
     # run the binary with rust-gdb
     export LSAN_OPTIONS=verbosity=1:log_threads=1
@@ -157,8 +156,7 @@ function flamegraph() {
     # find the binary
     binary=$(find ./target -name $fuzz_target -type f -perm /111)
     if [ -z "$binary" ]; then
-        info "Could not find binary for $fuzz_target. Trying to build it..."
-        build $fuzz_target
+        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
     fi
     # run the binary with cargo-flamegraph
     time=$(date +%s)
