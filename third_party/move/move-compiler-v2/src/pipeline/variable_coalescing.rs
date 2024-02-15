@@ -35,23 +35,28 @@ use move_stackless_bytecode::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-/// The live interval of a local.
+/// The live interval of a local (inclusive).
+/// Note that two live intervals i1: [b1, x] and i2: [x, e2] are *not* considered to overlap
+/// even though the code offset `x` is in both intervals.
 #[derive(Debug)]
-struct LiveInterval(
-    /* first seen */ CodeOffset,
-    /* last seen */ CodeOffset,
-);
+struct LiveInterval {
+    begin: CodeOffset,
+    end: CodeOffset,
+}
 
 impl LiveInterval {
     /// Create a new live interval that only has the given offset.
     fn new(offset: CodeOffset) -> Self {
-        Self(offset, offset)
+        Self {
+            begin: offset,
+            end: offset,
+        }
     }
 
     /// Include the given offset in the live interval, expanding the interval as necessary.
     fn include(&mut self, offset: CodeOffset) {
-        self.0 = std::cmp::min(self.0, offset);
-        self.1 = std::cmp::max(self.1, offset);
+        self.begin = std::cmp::min(self.begin, offset);
+        self.end = std::cmp::max(self.end, offset);
     }
 }
 
@@ -87,7 +92,7 @@ impl VariableCoalescing {
     /// transformation (eg., because it is borrowed or because it is never used): it implies
     /// that it is the trivial live interval.
     fn live_intervals(target: &FunctionTarget) -> Vec<Option<LiveInterval>> {
-        let live_var_annotation = target
+        let LiveVarAnnotation(live_var_infos) = target
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("live var annotation is a prerequisite");
@@ -98,7 +103,7 @@ impl VariableCoalescing {
         let mut live_intervals = std::iter::repeat_with(|| None)
             .take(target.get_local_count())
             .collect::<Vec<_>>();
-        for (offset, live_var_info) in live_var_annotation.0.iter() {
+        for (offset, live_var_info) in live_var_infos.iter() {
             live_var_info
                 .after
                 .keys()
@@ -123,10 +128,10 @@ impl VariableCoalescing {
             if let Some(interval) = interval {
                 live_interval_events.push(LiveIntervalEvent::Begin(
                     local as TempIndex,
-                    interval.0,
-                    (interval.1 - interval.0) as usize,
+                    interval.begin,
+                    (interval.end - interval.begin) as usize,
                 ));
-                live_interval_events.push(LiveIntervalEvent::End(local as TempIndex, interval.1));
+                live_interval_events.push(LiveIntervalEvent::End(local as TempIndex, interval.end));
             }
         }
         live_interval_events.sort_by(|a, b| {
