@@ -92,11 +92,18 @@ pub fn run_spec_test(
 
     let mut proving_benchmarks = vec![Benchmark::new(); report.get_mutants().len()];
     benchmarks.prover.start();
-    for (elem, benchmark) in report
+    for (index, (elem, benchmark)) in report
         .get_mutants()
         .iter()
         .zip(proving_benchmarks.iter_mut())
+        .enumerate()
     {
+        info!(
+            "Proving mutant {} out of {}",
+            index,
+            report.get_mutants().len()
+        );
+
         let mutant_file = elem.mutant_path();
         // Strip prefix to get the path relative to the package directory (or take that path if it's already relative).
         let original_file = elem
