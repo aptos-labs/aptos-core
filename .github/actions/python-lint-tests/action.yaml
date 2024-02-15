@@ -4,16 +4,11 @@ inputs:
   GIT_SHA:
     description: "Optional git sha to checkout"
     required: false
-    type: string
 
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: ${{ inputs.GIT_SHA }}
-        # Get enough commits to compare to
-        fetch-depth: 100
+    # The source code must be checkout out by the workflow that invokes this action.
 
     - name: Get changed files
       id: changed-files
