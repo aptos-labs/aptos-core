@@ -68,13 +68,14 @@ impl Display for Block {
             .unwrap_or_else(|| "(NIL)".to_string());
         write!(
             f,
-            "[id: {}, author: {}, epoch: {}, round: {:02}, parent_id: {}, timestamp: {}]",
+            "[id: {}, author: {}, epoch: {}, round: {:02}, parent_id: {}, timestamp: {}, num_txns: {}]",
             self.id,
             author,
             self.epoch(),
             self.round(),
             self.parent_id(),
             self.timestamp_usecs(),
+            self.num_txns(),
         )
     }
 }
@@ -113,6 +114,31 @@ impl Block {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
                 Payload::DirectMempool(_txns) => 0,
                 Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
+            },
+        }
+    }
+
+    pub fn num_txns(&self) -> usize {
+        match self.block_data.payload() {
+            None => 0,
+            Some(payload) => match payload {
+                Payload::InQuorumStore(pos) => {
+                    pos.proofs.iter().map(|p| p.num_txns() as usize).sum()
+                },
+                Payload::DirectMempool(txns) => txns.len(),
+                Payload::InQuorumStoreWithLimit(pos) => {
+                    let size: usize = pos
+                        .proof_with_data
+                        .proofs
+                        .iter()
+                        .map(|p| p.num_txns() as usize)
+                        .sum();
+                    if let Some(limit) = pos.max_txns_to_execute {
+                        size.min(limit)
+                    } else {
+                        size
+                    }
+                },
             },
         }
     }
