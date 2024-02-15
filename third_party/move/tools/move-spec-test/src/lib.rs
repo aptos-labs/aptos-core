@@ -57,6 +57,16 @@ pub fn run_spec_test(
 
     let prover_conf = cli::generate_prover_options(options)?;
 
+    let mut error_writer = termcolor::StandardStream::stderr(termcolor::ColorChoice::Auto);
+
+    let result = prove(config, &package_path, &prover_conf, &mut error_writer);
+
+    if let Err(e) = result {
+        let msg = format!("Original code verification failed! Prover failed with error: {e}");
+        error!("{msg}");
+        return Err(anyhow!(msg));
+    }
+
     // Setup temporary directory structure.
     let outdir = tempfile::tempdir()?.into_path();
     let outdir_original = outdir.join("base");
@@ -77,16 +87,6 @@ pub fn run_spec_test(
 
     // Proving part.
     move_mutator::compiler::copy_dir_all(&package_path, &outdir_original)?;
-
-    let mut error_writer = termcolor::StandardStream::stderr(termcolor::ColorChoice::Auto);
-
-    let result = prove(config, &package_path, &prover_conf, &mut error_writer);
-
-    if let Err(e) = result {
-        let msg = format!("Original code verification failed! Prover failed with error: {e}");
-        error!("{msg}");
-        return Err(anyhow!(msg));
-    }
 
     let mut spec_report = report::Report::new();
 
