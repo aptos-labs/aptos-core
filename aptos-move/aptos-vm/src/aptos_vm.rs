@@ -171,7 +171,10 @@ pub struct AptosVM {
 }
 
 impl AptosVM {
-    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+    pub fn new(
+        resolver: &impl AptosMoveResolver,
+        override_is_delayed_field_optimization_capable: Option<bool>,
+    ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let features = Features::fetch_config(resolver).unwrap_or_default();
@@ -191,10 +194,18 @@ impl AptosVM {
             .unwrap_or(0);
 
         let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
-        if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
+        if let Some(profile) = Self::get_timed_feature_override() {
             timed_features_builder = timed_features_builder.with_override_profile(profile)
         }
         let timed_features = timed_features_builder.build();
+
+        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
+        // so they can be exchanged with identifiers during VM execution.
+        let override_is_delayed_field_optimization_capable =
+            override_is_delayed_field_optimization_capable
+                .unwrap_or_else(|| resolver.is_delayed_field_optimization_capable());
+        let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
+            && features.is_aggregator_v2_delayed_fields_enabled();
 
         let move_vm = MoveVmExt::new(
             native_gas_params,
@@ -204,6 +215,7 @@ impl AptosVM {
             features.clone(),
             timed_features.clone(),
             resolver,
+            aggregator_v2_type_tagging,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -218,7 +230,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn new_session<'r, S: AptosMoveResolver>(
+    pub fn new_session<'r, S: AptosMoveResolver>(
         &self,
         resolver: &'r S,
         session_id: SessionId,
@@ -1801,7 +1813,10 @@ impl AptosVM {
         gas_budget: u64,
     ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver,
+            /*override_is_delayed_field_optimization_capable=*/ Some(false),
+        );
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let mut gas_meter = match Self::memory_tracked_gas_meter(&vm, &log_context, gas_budget) {
             Ok(gas_meter) => gas_meter,
@@ -2235,7 +2250,10 @@ pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
-        let mut vm = AptosVM::new(resolver);
+        let mut vm = AptosVM::new(
+            resolver,
+            /*override_is_delayed_field_optimization_capable=*/ Some(false),
+        );
         vm.is_simulation = true;
         Self(vm)
     }

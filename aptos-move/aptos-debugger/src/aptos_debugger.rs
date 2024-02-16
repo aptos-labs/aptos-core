@@ -78,7 +78,10 @@ impl AptosDebugger {
 
         // TODO(Gas): revisit this.
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver,
+            /*override_is_delayed_field_optimization_capable=*/ Some(false),
+        );
 
         // Module bundle is deprecated!
         if let TransactionPayload::ModuleBundle(_) = txn.payload() {
@@ -268,6 +271,7 @@ impl AptosDebugger {
             features,
             TimedFeaturesBuilder::enable_all().build(),
             &state_view_storage,
+            /*aggregator_v2_type_tagging*/ false,
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);
