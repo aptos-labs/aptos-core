@@ -128,7 +128,7 @@ pub struct LifetimeState {
     /// A map from temporaries to labels, for those temporaries which have an associated node in the graph.
     /// If a local is originally borrowed, it will point from `temp` to a node with the `MemoryLocation::Local(temp)`.
     /// If a local is a reference derived from a location, it will point to a node with `MemoryLocation::Derived`.
-    local_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
+    temp_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
     /// A map from globals to labels. Represents root states of the active graph.
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
     /// Contains the set of variables whose values may have been moved to somewhere else.
@@ -255,10 +255,10 @@ impl AbstractDomain for LifetimeState {
         // A label renaming map resulting from joining lifetime nodes.
         let mut renaming: BTreeMap<LifetimeLabel, LifetimeLabel> = BTreeMap::new();
 
-        let mut new_local_to_label_map = std::mem::take(&mut self.local_to_label_map);
+        let mut new_temp_to_label_map = std::mem::take(&mut self.temp_to_label_map);
         change = change.combine(self.join_label_map(
-            &mut new_local_to_label_map,
-            &other.local_to_label_map,
+            &mut new_temp_to_label_map,
+            &other.temp_to_label_map,
             &mut renaming,
         ));
         let mut new_global_to_label_map = std::mem::take(&mut self.global_to_label_map);
@@ -267,12 +267,12 @@ impl AbstractDomain for LifetimeState {
             &other.global_to_label_map,
             &mut renaming,
         ));
-        self.local_to_label_map = new_local_to_label_map;
+        self.temp_to_label_map = new_temp_to_label_map;
         self.global_to_label_map = new_global_to_label_map;
 
         if !renaming.is_empty() {
             Self::rename_labels_in_graph(&renaming, &mut self.graph);
-            Self::rename_labels_in_map(&renaming, &mut self.local_to_label_map);
+            Self::rename_labels_in_map(&renaming, &mut self.temp_to_label_map);
             Self::rename_labels_in_map(&renaming, &mut self.global_to_label_map);
             change = JoinResult::Changed;
         }
@@ -396,7 +396,7 @@ impl LifetimeState {
                 }
             }
             for l in self
-                .local_to_label_map
+                .temp_to_label_map
                 .values()
                 .chain(self.global_to_label_map.values())
             {
@@ -429,7 +429,7 @@ impl LifetimeState {
             debug!(
                 "{} {}",
                 header,
-                self.local_to_label_map
+                self.temp_to_label_map
                     .iter()
                     .map(|(k, v)| format!("$t{} = {}", k, v))
                     .join(", ")
@@ -494,8 +494,8 @@ impl LifetimeState {
     }
 
     /// Gets the label associated with a local, if it has children.
-    fn label_for_local_with_children(&self, temp: TempIndex) -> Option<&LifetimeLabel> {
-        self.label_for_local(temp).filter(|l| !self.is_leaf(l))
+    fn label_for_temp_with_children(&self, temp: TempIndex) -> Option<&LifetimeLabel> {
+        self.label_for_temp(temp).filter(|l| !self.is_leaf(l))
     }
 
     /// Gets the label associated with a global, if it has children.
@@ -512,21 +512,21 @@ impl LifetimeState {
     }
 
     /// Gets the label associated with a local.
-    fn label_for_local(&self, temp: TempIndex) -> Option<&LifetimeLabel> {
-        self.local_to_label_map.get(&temp)
+    fn label_for_temp(&self, temp: TempIndex) -> Option<&LifetimeLabel> {
+        self.temp_to_label_map.get(&temp)
     }
 
     /// If label for local exists, return it, otherwise create a new node. The code offset and qualifier are
     /// used to create a lifetime label if needed. 'root' indicates whether is a label for an actual memory
     /// root (like a local, external, or global) instead of a reference.
-    fn make_local(
+    fn make_temp(
         &mut self,
         temp: TempIndex,
         code_offset: CodeOffset,
         qualifier: u8,
         root: bool,
     ) -> LifetimeLabel {
-        self.make_local_from_label_fun(
+        self.make_temp_from_label_fun(
             temp,
             || LifetimeLabel::new_from_code_offset(code_offset, qualifier),
             root,
@@ -535,13 +535,13 @@ impl LifetimeState {
 
     /// More general version as above where the label to be created, if needed, is specified
     /// by a function.
-    fn make_local_from_label_fun(
+    fn make_temp_from_label_fun(
         &mut self,
         temp: TempIndex,
         from_label: impl Fn() -> LifetimeLabel,
         root: bool,
     ) -> LifetimeLabel {
-        if let Some(label) = self.local_to_label_map.get(&temp) {
+        if let Some(label) = self.temp_to_label_map.get(&temp) {
             *label
         } else {
             let label = from_label();
@@ -553,7 +553,7 @@ impl LifetimeState {
                     MemoryLocation::Derived
                 },
             );
-            self.local_to_label_map.insert(temp, label);
+            self.temp_to_label_map.insert(temp, label);
             label
         }
     }
@@ -622,7 +622,7 @@ impl LifetimeState {
     /// Returns a map from labels which are used by temporaries to the set which are using them.
     fn leaves(&self) -> BTreeMap<LifetimeLabel, BTreeSet<TempIndex>> {
         let mut leaves: BTreeMap<LifetimeLabel, BTreeSet<TempIndex>> = BTreeMap::new();
-        for (temp, label) in &self.local_to_label_map {
+        for (temp, label) in &self.temp_to_label_map {
             leaves.entry(*label).or_default().insert(*temp);
         }
         leaves
@@ -630,7 +630,7 @@ impl LifetimeState {
 
     /// Releases graph resources for a reference in temporary.
     fn release_ref(&mut self, temp: TempIndex) {
-        if let Some(label) = self.local_to_label_map.remove(&temp) {
+        if let Some(label) = self.temp_to_label_map.remove(&temp) {
             if self.is_leaf(&label) {
                 // We can drop the underlying node, as there are no borrows out.
                 let in_use = self.leaves().keys().cloned().collect();
@@ -641,7 +641,7 @@ impl LifetimeState {
                     use MemoryLocation::*;
                     match location {
                         Local(temp) => {
-                            self.local_to_label_map.remove(&temp);
+                            self.temp_to_label_map.remove(&temp);
                         },
                         Global(qid) => {
                             self.global_to_label_map.remove(&qid);
@@ -660,7 +660,7 @@ impl LifetimeState {
     #[allow(unused)]
     fn reduced_state(&self, included: impl Fn(&LifetimeLabel) -> bool) -> LifetimeState {
         let mut new = self.clone();
-        for (t, l) in &self.local_to_label_map {
+        for (t, l) in &self.temp_to_label_map {
             if !included(l) {
                 new.release_ref(*t)
             }
@@ -680,26 +680,26 @@ impl LifetimeState {
     ) -> LifetimeLabel {
         self.release_ref(temp);
         // Temp might not be released if it is still borrowed, so remove from the map
-        self.local_to_label_map.remove(&temp);
-        let label = self.make_local(temp, code_offset, qualifier, false);
+        self.temp_to_label_map.remove(&temp);
+        let label = self.make_temp(temp, code_offset, qualifier, false);
         self.check_graph_consistency();
         label
     }
 
     /// Move a reference from source to destination. This moves the LifetimeLabel over to the new temp.
     fn move_ref(&mut self, dest: TempIndex, src: TempIndex) {
-        let Some(label) = self.local_to_label_map.remove(&src) else {
+        let Some(label) = self.temp_to_label_map.remove(&src) else {
             return;
         };
-        self.local_to_label_map.insert(dest, label);
+        self.temp_to_label_map.insert(dest, label);
         self.check_graph_consistency()
     }
 
     /// Copies a reference from source to destination. This create a new lifetime node and clones the edges
     /// leading into the node associated with the source reference.
     fn copy_ref(&mut self, dest: TempIndex, src: TempIndex) {
-        if let Some(label) = self.label_for_local(src) {
-            self.local_to_label_map.insert(dest, *label);
+        if let Some(label) = self.label_for_temp(src) {
+            self.temp_to_label_map.insert(dest, *label);
         }
     }
 
@@ -735,7 +735,7 @@ impl LifetimeState {
 
     /// Returns the temporaries borrowed
     pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
-        self.local_to_label_map.keys().cloned()
+        self.temp_to_label_map.keys().cloned()
     }
 
     /// Checks if the given local is borrowed
@@ -823,7 +823,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 
     /// Gets a string for a local to be displayed in error messages
     fn display(&self, local: TempIndex) -> String {
-        self.target().get_local_name_for_error_message(local)
+        self.target().get_temp_name_for_error_message(local)
     }
 
     /// Display a non-empty set of temps. This prefers the first printable representative, if any
@@ -862,7 +862,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             // Always valid
             return true;
         }
-        if let Some(label) = self.state.label_for_local_with_children(local) {
+        if let Some(label) = self.state.label_for_temp_with_children(local) {
             let loc = self.cur_loc();
             let usage_info = || self.usage_info(label, |t| t != &local);
             match read_mode {
@@ -932,7 +932,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             // Always valid
             return;
         }
-        if let Some(label) = self.state.label_for_local_with_children(local) {
+        if let Some(label) = self.state.label_for_temp_with_children(local) {
             // The destination is currently borrowed and cannot be assigned
             self.error_with_hints(
                 self.cur_loc(),
@@ -1055,7 +1055,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 format!(
                     "{} ",
                     self.target()
-                        .get_local_name_for_error_message(*temps.iter().next().unwrap())
+                        .get_temp_name_for_error_message(*temps.iter().next().unwrap())
                 ),
             ),
             _ => (BTreeSet::new(), "".to_string()),
@@ -1207,7 +1207,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         // Collect the candidates to display. These are temporaries which are alive _after_ this program point
         // and which are in the same path in the graph (i.e. or parent and child of each other).
         let mut cands = vec![];
-        for (temp, leaf) in self.state.local_to_label_map.iter() {
+        for (temp, leaf) in self.state.temp_to_label_map.iter() {
             if self.is_ref(*temp)
                 && self.alive.after.contains_key(temp)
                 && (self.state.is_ancestor(label, leaf) || self.state.is_ancestor(leaf, label))
@@ -1283,7 +1283,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 
     /// Process a borrow local instruction.
     fn borrow_local(&mut self, dest: TempIndex, src: TempIndex) {
-        let label = self.state.make_local(src, self.code_offset, 0, true);
+        let label = self.state.make_temp(src, self.code_offset, 0, true);
         let child = self.state.replace_ref(dest, self.code_offset, 1);
         let loc = self.cur_loc();
         let is_mut = self.ty(dest).is_mutable_reference();
@@ -1314,7 +1314,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         dest: TempIndex,
         src: TempIndex,
     ) {
-        let label = self.state.make_local(src, self.code_offset, 0, false);
+        let label = self.state.make_temp(src, self.code_offset, 0, false);
         let child = self.state.replace_ref(dest, self.code_offset, 1);
         let loc = self.cur_loc();
         let is_mut = self.ty(dest).is_mutable_reference();
@@ -1356,7 +1356,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 for (i, src) in srcs.iter().enumerate() {
                     let src_ty = self.ty(*src);
                     if src_ty.is_reference() {
-                        let label = self.state.make_local(
+                        let label = self.state.make_temp(
                             *src,
                             self.code_offset,
                             (src_qualifier_offset + i) as u8,
@@ -1398,7 +1398,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     self.global_env().display(resource)
                 ),
                 "extracted here",
-                self.borrow_info(&label, |_| true).into_iter(),
+                self.borrow_info(label, |_| true).into_iter(),
             )
         }
         self.state.moved.remove(&dest);
@@ -1410,7 +1410,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             if self.ty(*src).is_reference() {
                 // Need to check whether this reference is derived from a local which is not a
                 // a parameter
-                if let Some(label) = self.state.label_for_local(*src) {
+                if let Some(label) = self.state.label_for_temp(*src) {
                     for root in self.state.roots(label) {
                         for location in self.state.node(&root).locations.iter() {
                             match location {
@@ -1457,7 +1457,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a WriteRef instruction.
     fn write_ref(&mut self, dest: TempIndex, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
-        if let Some(label) = self.state.label_for_local_with_children(dest) {
+        if let Some(label) = self.state.label_for_temp_with_children(dest) {
             self.error_with_hints(
                 self.cur_loc(),
                 format!(
@@ -1492,7 +1492,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         let alive_temps = step.alive.before_set();
         for temp in step
             .state
-            .local_to_label_map
+            .temp_to_label_map
             .keys()
             .cloned()
             .collect::<Vec<_>>()
@@ -1604,9 +1604,9 @@ impl LifetimeInfoAtCodeOffset {
     /// temporaries being released need to be determined from livevar analysis results.
     pub fn released_temps(&self) -> impl Iterator<Item = TempIndex> + '_ {
         self.before
-            .local_to_label_map
+            .temp_to_label_map
             .keys()
-            .filter(|t| !self.after.local_to_label_map.contains_key(t))
+            .filter(|t| !self.after.temp_to_label_map.contains_key(t))
             .cloned()
     }
 
@@ -1652,7 +1652,7 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
                 let label = LifetimeLabel::new_from_counter(label_counter);
                 label_counter += 1;
                 state.new_node(label, MemoryLocation::External);
-                let target = state.make_local_from_label_fun(
+                let target = state.make_temp_from_label_fun(
                     i,
                     || LifetimeLabel::new_from_counter(label_counter),
                     false,
@@ -1792,7 +1792,7 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let LifetimeState {
             graph,
-            local_to_label_map,
+            temp_to_label_map,
             global_to_label_map,
             moved,
         } = &self.1;
@@ -1804,8 +1804,8 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
         )?;
         writeln!(
             f,
-            "local_to_label: {{{}}}",
-            local_to_label_map
+            "temp_to_label: {{{}}}",
+            temp_to_label_map
                 .iter()
                 .map(|(temp, label)| format!(
                     "{}={}",

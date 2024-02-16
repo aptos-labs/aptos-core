@@ -421,7 +421,7 @@ impl<'a> CopyTransformation<'a> {
                     &target.get_bytecode_loc(id),
                     &format!(
                         "cannot copy {} implicitly",
-                        target.get_local_name_for_error_message(temp)
+                        target.get_temp_name_for_error_message(temp)
                     ),
                 );
             }
@@ -447,7 +447,7 @@ impl<'a> CopyTransformation<'a> {
             &target.get_bytecode_loc(id),
             &format!(
                 "cannot copy {} implicitly",
-                target.get_local_name_for_error_message(temp)
+                target.get_temp_name_for_error_message(temp)
             ),
         );
     }
@@ -470,7 +470,7 @@ impl<'a> CopyTransformation<'a> {
                     format!(
                         "implicit copy of mutable reference in {} which \
                     is used later in argument list",
-                        target.get_local_name_for_error_message(temp)
+                        target.get_temp_name_for_error_message(temp)
                     ),
                     "implicitly copied here",
                     empty(),
@@ -502,7 +502,7 @@ impl<'a> CopyTransformation<'a> {
                 &target.get_bytecode_loc(id),
                 format!(
                     "cannot move {} since it is used later",
-                    target.get_local_name_for_error_message(temp)
+                    target.get_temp_name_for_error_message(temp)
                 ),
                 "attempted to move here",
                 self.make_hints_from_usage(info),

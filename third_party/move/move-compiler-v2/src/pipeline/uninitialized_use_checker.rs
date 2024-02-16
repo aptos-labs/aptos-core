@@ -214,7 +214,7 @@ impl UninitializedUseChecker {
                                 Initialized::Maybe => "possibly ",
                                 _ => "",
                             },
-                            target.get_local_name_for_error_message(*src)
+                            target.get_temp_name_for_error_message(*src)
                         ),
                     );
                 }
