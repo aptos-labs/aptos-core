@@ -403,6 +403,10 @@ impl DAGStorage for StorageAdapter {
         // TODO: use callback from notifier to cache the latest ledger info
         Ok(self.aptos_db.get_latest_ledger_info()?)
     }
+
+    fn get_epoch_to_proposers(&self) -> HashMap<u64, Vec<Author>> {
+        self.epoch_to_validators.clone()
+    }
 }
 
 pub(crate) trait TLedgerInfoProvider: Send + Sync {

@@ -388,18 +388,28 @@ impl DagBootstrapper {
         config: &ProposerAndVoterConfig,
     ) -> Arc<LeaderReputationAdapter> {
         let num_validators = self.epoch_state.verifier.len();
-        // TODO: support multiple epochs
+        let epoch_to_validators_vec = self.storage.get_epoch_to_proposers();
+        let epoch_to_validator_map = epoch_to_validators_vec
+            .iter()
+            .map(|(key, value)| {
+                (
+                    *key,
+                    value
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, author)| (*author, idx))
+                        .collect(),
+                )
+            })
+            .collect();
         let metadata_adapter = Arc::new(MetadataBackendAdapter::new(
-            num_validators * 10,
-            HashMap::from([(
-                self.epoch_state.epoch,
-                self.epoch_state
-                    .verifier
-                    .address_to_validator_index()
-                    .clone(),
-            )]),
+            num_validators
+                * std::cmp::max(
+                    config.proposer_window_num_validators_multiplier,
+                    config.voter_window_num_validators_multiplier,
+                ),
+            epoch_to_validator_map,
         ));
-        // TODO: use onchain config
         let heuristic: Box<dyn ReputationHeuristic> = Box::new(ProposerAndVoterHeuristic::new(
             self.self_peer,
             config.active_weight,
@@ -420,10 +430,7 @@ impl DagBootstrapper {
 
         Arc::new(LeaderReputationAdapter::new(
             self.epoch_state.epoch,
-            HashMap::from([(
-                self.epoch_state.epoch,
-                self.epoch_state.verifier.get_ordered_account_addresses(),
-            )]),
+            epoch_to_validators_vec,
             voting_power,
             metadata_adapter,
             heuristic,
@@ -451,7 +458,10 @@ impl DagBootstrapper {
                         let commit_events = self
                             .storage
                             .get_latest_k_committed_events(
-                                config.voter_window_num_validators_multiplier as u64
+                                std::cmp::max(
+                                    config.proposer_window_num_validators_multiplier,
+                                    config.voter_window_num_validators_multiplier,
+                                ) as u64
                                     * self.epoch_state.verifier.len() as u64,
                             )
                             .expect("Failed to read commit events from storage");
