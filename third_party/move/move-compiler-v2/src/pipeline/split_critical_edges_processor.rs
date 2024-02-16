@@ -64,24 +64,33 @@ impl SplitCriticalEdgesProcessor {
     /// Checks the postcondition of the transformation; cf. module documentation.
     #[cfg(debug_assertions)]
     fn check_postcondition(code: &[Bytecode]) {
-        use move_stackless_bytecode::stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph};
+        use move_stackless_bytecode::stackless_control_flow_graph::{
+            BlockId, StacklessControlFlowGraph,
+        };
         let cfg = StacklessControlFlowGraph::new_forward(code);
         let blocks = cfg.blocks();
-        let mut pred_count: BTreeMap<BlockId, usize> = blocks.iter().map(|block_id| (*block_id, 0)).collect();
+        let mut pred_count: BTreeMap<BlockId, usize> =
+            blocks.iter().map(|block_id| (*block_id, 0)).collect();
         for block in &blocks {
             // don't count the edge from the dummy start to a block as an incoming edge
             if *block == cfg.entry_block() {
                 continue;
             }
             for suc_block in cfg.successors(*block) {
-                *pred_count.get_mut(suc_block).expect(&format!("block {}", suc_block)) += 1;
+                *pred_count
+                    .get_mut(suc_block)
+                    .unwrap_or_else(|| panic!("block {}", suc_block)) += 1;
             }
         }
         for block in blocks {
             let successors = cfg.successors(block);
             if successors.len() > 1 {
                 for suc_block in successors {
-                    assert!(*pred_count.get(suc_block).expect("pred count") <= 1, "{} has > 1 predecessors", suc_block)
+                    assert!(
+                        *pred_count.get(suc_block).expect("pred count") <= 1,
+                        "{} has > 1 predecessors",
+                        suc_block
+                    )
                 }
             }
         }
@@ -129,23 +138,30 @@ impl SplitCriticalEdgesTransformation {
     /// Transforms a bytecode, and append it to `transformed`
     fn transform_bytecode(&mut self, transformed: &mut Vec<Bytecode>, bytecode: Bytecode) {
         match bytecode {
-            Bytecode::Branch(attr_id, l0, l1, t) => self.transform_branch(transformed, attr_id, l0, l1, t),
+            Bytecode::Branch(attr_id, l0, l1, t) => {
+                self.transform_branch(transformed, attr_id, l0, l1, t)
+            },
             // Edge of a `Jump` is never critical because the source node only has one out edge.
-            _ => transformed.push(bytecode)
+            _ => transformed.push(bytecode),
         }
     }
 
     /// Transforms a branch instruction by splitting the critical out edges, and append to `transformed`.
     /// Note that this will not invalidate `incoming_edge_count`, since the incoming edge of a branch
     /// is replaced by the goto in the generated empty block
-    pub fn transform_branch(&mut self, transformed: &mut Vec<Bytecode>, attr_id: AttrId, l0: Label, l1: Label, t: TempIndex) {
+    pub fn transform_branch(
+        &mut self,
+        transformed: &mut Vec<Bytecode>,
+        attr_id: AttrId,
+        l0: Label,
+        l1: Label,
+        t: TempIndex,
+    ) {
         match (
             self.split_critical_edge(attr_id, l0),
             self.split_critical_edge(attr_id, l1),
         ) {
-            (None, None) => {
-                transformed.push(Bytecode::Branch(attr_id, l0, l1, t))
-            },
+            (None, None) => transformed.push(Bytecode::Branch(attr_id, l0, l1, t)),
             (None, Some((l1_new, mut code))) => {
                 transformed.push(Bytecode::Branch(attr_id, l0, l1_new, t));
                 transformed.append(&mut code);
@@ -271,7 +287,7 @@ mod tests {
             Label(attr, l0),
             Nop(attr),
             Label(attr, l1),
-            Ret(attr, vec![t])
+            Ret(attr, vec![t]),
         ];
         let transformed = transform(code);
         let l2 = L::new(2);
@@ -282,7 +298,7 @@ mod tests {
             Label(attr, l0),
             Nop(attr),
             Label(attr, l1),
-            Ret(attr, vec![t])
+            Ret(attr, vec![t]),
         ];
         SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
@@ -294,11 +310,7 @@ mod tests {
         let l0 = L::new(0);
         let t = 0;
         // while (t) { break } L0: return t;
-        let code = vec![
-            Branch(attr, l0, l0, t),
-            Label(attr, l0),
-            Ret(attr, vec![t])
-        ];
+        let code = vec![Branch(attr, l0, l0, t), Label(attr, l0), Ret(attr, vec![t])];
         let transformed = transform(code);
         let l1 = L::new(1);
         let l2 = L::new(2);
@@ -309,7 +321,7 @@ mod tests {
             Label(attr, l2),
             Jump(attr, l0),
             Label(attr, l0),
-            Ret(attr, vec![t])
+            Ret(attr, vec![t]),
         ];
         SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
@@ -321,10 +333,7 @@ mod tests {
         let attr = AttrId::new(0);
         let l0 = L::new(0);
         let t0 = 0;
-        let code = vec![
-            Label(attr, l0),
-            Branch(attr, l0, l0, t0)
-        ];
+        let code = vec![Label(attr, l0), Branch(attr, l0, l0, t0)];
         let transformed = transform(code);
         let l1 = L::new(1);
         let l2 = L::new(2);
@@ -334,7 +343,7 @@ mod tests {
             Label(attr, l1),
             Jump(attr, l0),
             Label(attr, l2),
-            Jump(attr, l0)
+            Jump(attr, l0),
         ];
         SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
@@ -351,7 +360,7 @@ mod tests {
             Label(attr, l0),
             Nop(attr),
             Label(attr, l1),
-            Branch(attr, l0, l1, t)
+            Branch(attr, l0, l1, t),
         ];
         let transformed = transform(code);
         let l2 = L::new(2);
@@ -361,7 +370,7 @@ mod tests {
             Label(attr, l1),
             Branch(attr, l0, l2, t),
             Label(attr, l2),
-            Jump(attr, l1)
+            Jump(attr, l1),
         ];
         SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
