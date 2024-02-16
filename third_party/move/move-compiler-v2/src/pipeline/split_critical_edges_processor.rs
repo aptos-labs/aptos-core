@@ -201,3 +201,93 @@ fn count_incoming_edges(code: &[Bytecode]) -> BTreeMap<Label, usize> {
     }
     srcs_count
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AttrId, Bytecode, SplitCriticalEdgesTransformation};
+    use move_stackless_bytecode::stackless_bytecode::Label as L;
+    use Bytecode::*;
+
+    /// Splits critical edges
+    fn transform(code: Vec<Bytecode>) -> Vec<Bytecode> {
+        let mut transformer = SplitCriticalEdgesTransformation::new(code);
+        transformer.transform();
+        transformer.code
+    }
+
+    #[test]
+    fn test_simple() {
+        let attr = AttrId::new(0);
+        let l0 = L::new(0);
+        let l1 = L::new(1);
+        let t = 0;
+        // if (t) { L0: nop } L1:
+        let code = vec![
+            Branch(attr, l0, l1, t),
+            Label(attr, l0),
+            Nop(attr),
+            Label(attr, l1),
+        ];
+        let transformed = transform(code);
+        let l2 = L::new(2);
+        let expected = vec![
+            Branch(attr, l0, l2, t),
+            Label(attr, l2),
+            Jump(attr, l1),
+            Label(attr, l0),
+            Nop(attr),
+            Label(attr, l1),
+        ];
+        assert_eq!(transformed, expected)
+    }
+
+    /// Demonstrates what happens for branch with equal labels
+    #[test]
+    fn test_branch_eq_label() {
+        let attr = AttrId::new(0);
+        let l0 = L::new(0);
+        let t0 = 0;
+        let code = vec![
+            Label(attr, l0),
+            Branch(attr, l0, l0, t0)
+        ];
+        let transformed = transform(code);
+        let l1 = L::new(1);
+        let l2 = L::new(2);
+        let expected = vec![
+            Label(attr, l0),
+            Branch(attr, l1, l2, t0),
+            Label(attr, l1),
+            Jump(attr, l0),
+            Label(attr, l2),
+            Jump(attr, l0)
+        ];
+        assert_eq!(transformed, expected)
+    }
+
+    /// Branch to the block containing the branch
+    #[test]
+    fn test_branch_self() {
+        let attr = AttrId::new(0);
+        let l0 = L::new(0);
+        let l1 = L::new(1);
+        let t = 0;
+        let code = vec![
+            Label(attr, l0),
+            Nop(attr),
+            Label(attr, l1),
+            Branch(attr, l0, l1, t)
+        ];
+        let transformed = transform(code);
+        let l2 = L::new(2);
+        let expected = vec![
+            Label(attr, l0),
+            Nop(attr),
+            Label(attr, l1),
+            Branch(attr, l0, l2, t),
+            Label(attr, l2),
+            Jump(attr, l1)
+        ];
+        assert_eq!(transformed, expected)
+    }
+}
