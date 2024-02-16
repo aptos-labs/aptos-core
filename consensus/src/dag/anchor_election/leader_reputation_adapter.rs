@@ -14,20 +14,18 @@ use crate::{
     },
 };
 use aptos_bitvec::BitVec;
+use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::account_config::NewBlockEvent;
 use move_core_types::account_address::AccountAddress;
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 pub struct MetadataBackendAdapter {
     epoch_to_validators: HashMap<u64, HashMap<Author, usize>>,
     window_size: usize,
-    sliding_window: Mutex<VecDeque<CommitEvent>>,
+    sliding_window: Mutex<BoundedVecDeque<CommitEvent>>,
 }
 
 impl MetadataBackendAdapter {
@@ -38,7 +36,7 @@ impl MetadataBackendAdapter {
         Self {
             epoch_to_validators,
             window_size,
-            sliding_window: Mutex::new(VecDeque::new()),
+            sliding_window: Mutex::new(BoundedVecDeque::new(window_size)),
         }
     }
 
@@ -46,11 +44,7 @@ impl MetadataBackendAdapter {
         if !self.epoch_to_validators.contains_key(&event.epoch()) {
             return;
         }
-        let mut lock = self.sliding_window.lock();
-        if lock.len() == self.window_size {
-            lock.pop_back();
-        }
-        lock.push_front(event);
+        self.sliding_window.lock().push_front(event);
     }
 
     // TODO: we should change NewBlockEvent on LeaderReputation to take a trait

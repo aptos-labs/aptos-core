@@ -78,7 +78,15 @@ impl AptosDebugger {
 
         // TODO(Gas): revisit this.
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver,
+            /*override_is_delayed_field_optimization_capable=*/ Some(false),
+        );
+
+        // Module bundle is deprecated!
+        if let TransactionPayload::ModuleBundle(_) = txn.payload() {
+            anyhow::bail!("Module bundle payload has been removed")
+        }
 
         let (status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -100,8 +108,12 @@ impl AptosDebugger {
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has already been checked")
+                    },
                 };
                 Ok(gas_profiler)
             },
@@ -259,6 +271,7 @@ impl AptosDebugger {
             features,
             TimedFeaturesBuilder::enable_all().build(),
             &state_view_storage,
+            /*aggregator_v2_type_tagging*/ false,
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);

@@ -14,24 +14,56 @@ use proptest::prelude::*;
 
 const STRESSTEST_MODE: bool = false;
 
-const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+pub(crate) const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::SequentialOnly;
+
+fn _setup(
+    executor_mode: ExecutorMode,
+    aggregator_execution_mode: AggregatorMode,
+    txns: usize,
+    allow_block_executor_fallback: bool,
+) -> AggV2TestHarness {
+    let path = common::test_dir_path("aggregator_v2.data/pack");
+    match aggregator_execution_mode {
+        AggregatorMode::EnabledOnly => initialize(
+            path,
+            executor_mode,
+            true,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::DisabledOnly => initialize(
+            path,
+            executor_mode,
+            false,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::BothComparison => initialize_enabled_disabled_comparison(
+            path,
+            executor_mode,
+            txns,
+            allow_block_executor_fallback,
+        ),
+    }
+}
 
 fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
 ) -> AggV2TestHarness {
-    let path = common::test_dir_path("aggregator_v2.data/pack");
-    match aggregator_execution_mode {
-        AggregatorMode::EnabledOnly => initialize(path, executor_mode, true, txns),
-        AggregatorMode::DisabledOnly => initialize(path, executor_mode, false, txns),
-        AggregatorMode::BothComparison => {
-            initialize_enabled_disabled_comparison(path, executor_mode, txns)
-        },
-    }
+    _setup(executor_mode, aggregator_execution_mode, txns, false)
+}
+
+fn setup_allow_fallback(
+    executor_mode: ExecutorMode,
+    aggregator_execution_mode: AggregatorMode,
+    txns: usize,
+) -> AggV2TestHarness {
+    _setup(executor_mode, aggregator_execution_mode, txns, true)
 }
 
 #[cfg(test)]
@@ -116,8 +148,7 @@ mod test_cases {
     }
 }
 
-#[allow(dead_code)]
-fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
+pub fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
     (0..3)
         .prop_flat_map(move |enum_type| {
             // making running a test with a full block likely
@@ -375,6 +406,28 @@ proptest! {
             (SUCCESS, h.new_add(&agg_loc, 600, 400)),
             // Limit exceeded - abort with EAGGREGATOR_OVERFLOW.
             (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 201))
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
+        println!("Testing test_aggregator_overflow {:?}", test_env);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 600, 400)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+            (SUCCESS, h.republish()),
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 200)),
+            (SUCCESS, h.add(&agg_loc, 1)),
         ];
 
         h.run_block_in_parts_and_check(

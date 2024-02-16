@@ -23,6 +23,7 @@ pub struct NFTMetadataCrawlerURIs {
     image_optimizer_retry_count: i32,
     animation_optimizer_retry_count: i32,
     do_not_parse: bool,
+    last_transaction_version: i64,
 }
 
 impl NFTMetadataCrawlerURIs {
@@ -38,6 +39,7 @@ impl NFTMetadataCrawlerURIs {
             image_optimizer_retry_count: 0,
             animation_optimizer_retry_count: 0,
             do_not_parse: false,
+            last_transaction_version: 0,
         }
     }
 
@@ -155,6 +157,14 @@ impl NFTMetadataCrawlerURIs {
     pub fn set_do_not_parse(&mut self, do_not_parse: bool) {
         self.do_not_parse = do_not_parse;
     }
+
+    pub fn get_last_transaction_version(&self) -> i64 {
+        self.last_transaction_version
+    }
+
+    pub fn set_last_transaction_version(&mut self, last_transaction_version: i64) {
+        self.last_transaction_version = last_transaction_version;
+    }
 }
 
 impl From<NFTMetadataCrawlerURIsQuery> for NFTMetadataCrawlerURIs {
@@ -170,6 +180,7 @@ impl From<NFTMetadataCrawlerURIsQuery> for NFTMetadataCrawlerURIs {
             image_optimizer_retry_count: query.image_optimizer_retry_count,
             animation_optimizer_retry_count: query.animation_optimizer_retry_count,
             do_not_parse: query.do_not_parse,
+            last_transaction_version: query.last_transaction_version,
         }
     }
 }

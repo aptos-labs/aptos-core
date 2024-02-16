@@ -54,6 +54,11 @@ pub trait TResourceView {
             .map(|maybe_state_value| maybe_state_value.map(StateValue::into_metadata))
     }
 
+    fn get_resource_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
+        self.get_resource_state_value(state_key, None)
+            .map(|maybe_state_value| maybe_state_value.map(|state_value| state_value.size() as u64))
+    }
+
     fn resource_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         // For existence, layouts are not important.
         self.get_resource_state_value(state_key, None)
@@ -71,7 +76,7 @@ pub trait TResourceGroupView {
 
     /// Some resolvers might not be capable of the optimization, and should return false.
     /// Others might return based on the config or the run parameters.
-    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+    fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
         false
     }
 
@@ -160,6 +165,11 @@ pub trait TModuleView {
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
+    fn get_module_state_value_size(&self, state_key: &Self::Key) -> PartialVMResult<Option<u64>> {
+        let maybe_state_value = self.get_module_state_value(state_key)?;
+        Ok(maybe_state_value.map(|state_value| state_value.size() as u64))
+    }
+
     fn module_exists(&self, state_key: &Self::Key) -> PartialVMResult<bool> {
         self.get_module_state_value(state_key)
             .map(|maybe_state_value| maybe_state_value.is_some())
@@ -194,7 +204,7 @@ pub trait TExecutorView<K, T, L, I, V>:
     TResourceView<Key = K, Layout = L>
     + TModuleView<Key = K>
     + TAggregatorV1View<Identifier = K>
-    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
+    + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
     + StateStorageView
 {
 }
@@ -203,7 +213,7 @@ impl<A, K, T, L, I, V> TExecutorView<K, T, L, I, V> for A where
     A: TResourceView<Key = K, Layout = L>
         + TModuleView<Key = K>
         + TAggregatorV1View<Identifier = K>
-        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T, ResourceValue = V>
+        + TDelayedFieldView<Identifier = I, ResourceKey = K, ResourceGroupTag = T>
         + StateStorageView
 {
 }

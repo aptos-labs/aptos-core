@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{
-    batch_store::{BatchStore, QuotaManager},
+    batch_store::{BatchStore, BatchWriter, QuotaManager},
     quorum_store_db::QuorumStoreDB,
     types::{PersistedValue, StorageMode},
 };

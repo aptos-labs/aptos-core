@@ -3,9 +3,11 @@
 
 /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
 mod db;
+pub mod db_ops;
 pub mod db_v2;
 mod metadata;
 mod schema;
+pub mod table_info_reader;
 
 use crate::{
     db::INDEX_DB_NAME,
@@ -19,7 +21,7 @@ use aptos_logger::warn;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_ensure, db_other_bail, state_view::DbStateView, AptosDbError, DbReader, Result,
+    db_ensure, db_other_bail, state_view::DbStateViewAtVersion, AptosDbError, DbReader, Result,
 };
 use aptos_types::{
     access_path::Path,
@@ -82,10 +84,7 @@ impl Indexer {
         write_sets: &[&WriteSet],
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
-        let state_view = DbStateView {
-            db: db_reader,
-            version: Some(last_version),
-        };
+        let state_view = db_reader.state_view_at_version(Some(last_version))?;
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
         self.index_with_annotator(&annotator, first_version, write_sets)

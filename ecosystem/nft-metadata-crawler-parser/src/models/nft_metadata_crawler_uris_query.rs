@@ -27,6 +27,7 @@ pub struct NFTMetadataCrawlerURIsQuery {
     pub animation_optimizer_retry_count: i32,
     pub inserted_at: chrono::NaiveDateTime,
     pub do_not_parse: bool,
+    pub last_transaction_version: i64,
 }
 
 impl NFTMetadataCrawlerURIsQuery {
@@ -120,6 +121,7 @@ impl Default for NFTMetadataCrawlerURIsQuery {
             animation_optimizer_retry_count: 0,
             inserted_at: chrono::NaiveDateTime::default(),
             do_not_parse: false,
+            last_transaction_version: 0,
         }
     }
 }

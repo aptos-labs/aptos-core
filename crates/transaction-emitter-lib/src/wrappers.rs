@@ -5,7 +5,8 @@ use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
     emitter::{
-        create_accounts, parse_seed, stats::TxnStats, EmitJobMode, EmitJobRequest, TxnEmitter,
+        create_accounts, parse_seed, stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode,
+        TxnEmitter,
     },
     instance::Instance,
     CreateAccountsArgs,
@@ -97,10 +98,10 @@ pub async fn emit_transactions_with_cluster(
                 args.coordination_delay_between_instances.unwrap_or(0),
             ));
 
-    if let Some(max_transactions_per_account) = args.max_transactions_per_account {
-        emit_job_request =
-            emit_job_request.max_transactions_per_account(max_transactions_per_account);
-    }
+    let num_accounts =
+        NumAccountsMode::create(args.num_accounts, args.max_transactions_per_account);
+
+    emit_job_request = emit_job_request.num_accounts_mode(num_accounts);
 
     if let Some(gas_price) = args.gas_price {
         emit_job_request = emit_job_request.gas_price(gas_price);
@@ -143,6 +144,10 @@ pub async fn emit_transactions_with_cluster(
             .latency_polling_interval(Duration::from_secs_f32(latency_polling_interval_s));
     }
 
+    if args.skip_minting_accounts {
+        emit_job_request = emit_job_request.skip_minting_accounts();
+    }
+
     let stats = emitter
         .emit_txn_for_with_stats(
             &mut coin_source_account,
@@ -171,6 +176,7 @@ pub async fn create_accounts_command(
             .init_gas_price_multiplier(1)
             .expected_gas_per_txn(create_accounts_args.max_gas_per_txn)
             .max_gas_per_txn(create_accounts_args.max_gas_per_txn)
+            .init_max_gas_per_txn(create_accounts_args.max_gas_per_txn)
             .coins_per_account_override(0)
             .expected_max_txns(0)
             .prompt_before_spending();
@@ -183,6 +189,7 @@ pub async fn create_accounts_command(
         &txn_factory,
         &emit_job_request,
         DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
+        false,
         seed,
         create_accounts_args.count,
         4,

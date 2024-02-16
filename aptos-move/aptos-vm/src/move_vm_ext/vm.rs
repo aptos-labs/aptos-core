@@ -72,6 +72,7 @@ impl MoveVmExt {
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
+        aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -99,10 +100,6 @@ impl MoveVmExt {
             type_base_cost = 100;
             type_byte_cost = 1;
         }
-
-        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
-        // so they can be exchanged with identifiers during VM execution.
-        let aggregator_v2_type_tagging = features.is_aggregator_v2_delayed_fields_enabled();
 
         let mut builder = SafeNativeBuilder::new(
             gas_feature_version,
@@ -149,6 +146,7 @@ impl MoveVmExt {
         features: Features,
         timed_features: TimedFeatures,
         resolver: &impl AptosMoveResolver,
+        aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self> {
         Self::new_impl::<fn(DynamicExpression)>(
             native_gas_params,
@@ -159,6 +157,7 @@ impl MoveVmExt {
             timed_features,
             None,
             resolver,
+            aggregator_v2_type_tagging,
         )
     }
 
@@ -171,6 +170,7 @@ impl MoveVmExt {
         timed_features: TimedFeatures,
         gas_hook: Option<F>,
         resolver: &impl AptosMoveResolver,
+        aggregator_v2_type_tagging: bool,
     ) -> VMResult<Self>
     where
         F: Fn(DynamicExpression) + Send + Sync + 'static,
@@ -184,6 +184,7 @@ impl MoveVmExt {
             timed_features,
             gas_hook,
             resolver,
+            aggregator_v2_type_tagging,
         )
     }
 
