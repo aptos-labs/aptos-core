@@ -44,7 +44,7 @@ use aptos_types::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
-    state_store::StateView,
+    state_store::{StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
         BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle, Multisig,
@@ -354,6 +354,35 @@ impl AptosVM {
             u64::from(gas_meter.io_gas_used()),
             u64::from(gas_meter.storage_fee_used()),
             storage_fee_refund,
+        )
+    }
+
+    #[cfg(any(test, feature = "testing"))]
+    pub fn test_failed_transaction_cleanup(
+        &self,
+        error_vm_status: VMStatus,
+        txn: &SignedTransaction,
+        state_view: &impl StateView,
+    ) -> (VMStatus, VMOutput) {
+        let txn_data = TransactionMetadata::new(txn);
+        let log_context = AdapterLogSchema::new(state_view.id(), 0);
+
+        let balance = txn_data.max_gas_amount();
+        let mut gas_meter = self
+            .make_standard_gas_meter(balance, &log_context)
+            .expect("Should be able to create a gas meter for tests");
+        let change_set_configs = &get_or_vm_startup_failure(&self.storage_gas_params, &log_context)
+            .expect("Storage gas parameters should exist for tests")
+            .change_set_configs;
+
+        let resolver = state_view.as_move_resolver();
+        self.failed_transaction_cleanup(
+            error_vm_status,
+            &mut gas_meter,
+            &txn_data,
+            &resolver,
+            &log_context,
+            change_set_configs,
         )
     }
 
@@ -671,10 +700,6 @@ impl AptosVM {
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-
-        // For testing failed transactions cleanup: simulates failures in
-        // scripts or entry functions.
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
                 status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -682,6 +707,8 @@ impl AptosVM {
                 message: None,
             })
         });
+
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
 
         match payload {
             TransactionPayload::Script(script) => {
@@ -2197,8 +2224,6 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
 fn vm_thread_safe() {
     fn assert_send<T: Send>() {}
     fn assert_sync<T: Sync>() {}
-
-    use crate::AptosVM;
 
     assert_send::<AptosVM>();
     assert_sync::<AptosVM>();

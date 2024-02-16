@@ -3,38 +3,44 @@
 
 use crate::MoveHarness;
 use aptos_cached_packages::aptos_stdlib::aptos_account_transfer;
-use aptos_types::transaction::ExecutionStatus;
-use claims::assert_ok_eq;
-use fail::FailScenario;
-use move_core_types::vm_status::StatusCode;
+use aptos_types::{
+    state_store::state_key::StateKey, transaction::ExecutionStatus, write_set::WriteOp,
+};
+use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
+use claims::{assert_ok_eq, assert_some};
+use move_core_types::vm_status::{StatusCode, VMStatus};
+use test_case::test_case;
 
-#[test]
-fn failed_transaction_cleanup_charges_gas() {
-    // Fail in user transaction so we can run failed transaction cleanup.
-    let scenario = FailScenario::setup();
-    assert!(fail::has_failpoints());
-    fail::cfg("aptos_vm::execute_script_or_entry_function", "return()").unwrap();
-    assert!(!fail::list().is_empty());
-
-    // Actual transaction is correct, so that we get to the failpoint.
+// Make sure verification and invariant violation errors are kept.
+#[test_case(StatusCode::TYPE_MISMATCH)]
+#[test_case(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)]
+fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
     let mut h = MoveHarness::new();
     let sender = h.new_account_with_balance_and_sequence_number(1_000_000, 10);
     let receiver = h.new_account_with_balance_and_sequence_number(1_000_000, 10);
     let txn = sender
         .transaction()
         .sequence_number(10)
+        .max_gas_amount(10_000)
         .payload(aptos_account_transfer(*receiver.address(), 1))
         .sign();
-    let output = h.run_block_get_output(vec![txn]).pop().unwrap();
 
-    // After failures in user transactions, even if these are invariant violations,
-    // gas should still be charged.
-    assert_ne!(output.gas_used(), 0);
+    let state_view = h.executor.get_state_view();
+    let vm = AptosVM::new(&state_view.as_move_resolver());
+
+    let output = vm
+        .test_failed_transaction_cleanup(VMStatus::error(status_code, None), &txn, state_view)
+        .1;
+    let write_set: Vec<(&StateKey, &WriteOp)> = output
+        .change_set()
+        .concrete_write_set_iter()
+        .map(|(k, v)| (k, assert_some!(v)))
+        .collect();
+    assert!(!write_set.is_empty());
+
     assert!(!output.status().is_discarded());
     assert_ok_eq!(
-        output.status().status(),
-        ExecutionStatus::MiscellaneousError(Some(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR))
+        output.status().as_kept_status(),
+        ExecutionStatus::MiscellaneousError(Some(status_code))
     );
-
-    scenario.teardown();
 }
