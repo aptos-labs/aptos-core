@@ -33,9 +33,9 @@ proposals:
             - refundable_bytes
   - name: step_4_enable_fairness_shuffler
     metadata:
-      title: "Enable Fairness Shuffler"
-      description: "FairnessShuffler that tries to spread out (delay) transactions from dominant modules in a block, so that if block limit is hit, transactions from non-dominant modules have a fair share of the block space."
-      discussion_url: "TBA"
+      title: "AIP-68: Reordering transactions in a block for fairness"
+      description: "AIP-68: This AIP proposes to update the Transaction Shuffler logic to add other aspects of fairness to how transactions are ordered in the block."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/333"
     execution_mode: MultiStep
     update_sequence:
       - Execution:
@@ -77,7 +77,38 @@ proposals:
       - FeatureFlag:
           enabled:
             - object_code_deployment
-  - name: step_7_enable_validator_txn
+  - name: step_7_enable_aggregator_v2_api
+    metadata:
+      title: "AIP-47: Enable Aggregator v2 API"
+      description: "AIP-47: This AIP revamps and expands upon the current concept of Aggregators. Enabling their usage for control flow, and storing their values elsewhere. This step only enables new APIs."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aggregator_v2_api
+  - name: step_8_enable_concurrent_digital_assets
+    metadata:
+      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
+      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - concurrent_token_v2
+  - name: step_9_enable_aggregator_v2_parallelism
+    metadata:
+      title: "AIP-47: Enable Aggregator v2 parallelism"
+      description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - aggregator_v2_delayed_fields
+            - resource_groups_split_in_vm_change_set
+  - name: step_10_enable_validator_txn
     metadata:
       title: "AIP-64: Validator Transaction Type"
       description: "AIP-64: This AIP introduces a new transaction type for validators to perform on-chain operations."
@@ -109,7 +140,7 @@ proposals:
               V1:
                 per_block_limit_txn_count: 2
                 per_block_limit_total_bytes: 2097152
-  - name: step_8_enable_jwk_consensus
+  - name: step_11_enable_jwk_consensus
     metadata:
       title: "AIP-67: Native Consensus for JSON Web Key (JWK)"
       description: "AIP-67: This AIP proposes a solution for validators to agree on OpenID Connect providers' JSON Web Keys."
@@ -120,37 +151,6 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
-  - name: step_9_enable_aggregator_v2_api
-    metadata:
-      title: "AIP-47: Enable Aggregator v2 API"
-      description: "AIP-47: This AIP revamps and expands upon the current concept of Aggregators. Enabling their usage for control flow, and storing their values elsewhere. This step only enables new APIs."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_v2_api
-  - name: step_10_enable_concurrent_digital_assets
-    metadata:
-      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
-      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - concurrent_token_v2
-  - name: step_11_enable_aggregator_v2_parallelism
-    metadata:
-      title: "AIP-47: Enable Aggregator v2 parallelism"
-      description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - aggregator_v2_delayed_fields          
-            - resource_groups_split_in_vm_change_set
   - name: step_12_enable_zkid
     metadata:
       title: "AIP-61: OpenID blockchain (OIDB) accounts"
