@@ -76,6 +76,7 @@ NUM_ACCOUNTS = max(
 )
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
+
 # numbers are based on the machine spec used by github action
 # Calibrate using median value from
 # Axiom: https://app.axiom.co/aptoslabs-hghf/explorer?qid=88fegG0H1si-s3x8pv&relative=1
