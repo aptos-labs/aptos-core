@@ -18,6 +18,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
+use itertools::max;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Deref,
@@ -375,9 +376,14 @@ impl InMemDag {
     }
 
     pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
-        let from_round = target_round
-            .saturating_sub(self.window_size)
-            .max(self.start_round);
+        let from_round = if self.is_empty() {
+            self.lowest_round()
+        } else {
+            target_round
+                .saturating_sub(self.window_size)
+                .max(self.lowest_incomplete_round())
+                .max(self.lowest_round())
+        };
         let mut bitmask: Vec<_> = self
             .nodes_by_round
             .range(from_round..=target_round)
