@@ -29,6 +29,9 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
+        if cfg!(debug_assertions) {
+            Self::check_precondition(&data);
+        }
         if fun_env.is_native() {
             return data;
         }
@@ -36,11 +39,52 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         transformer.transform();
         data.code = transformer.code;
         data.annotations.clear();
+        if cfg!(debug_assertions) {
+            Self::check_postcondition(&data.code);
+        }
         data
     }
 
     fn name(&self) -> String {
         "SplitCriticalEdgesProcessor".to_owned()
+    }
+}
+
+impl SplitCriticalEdgesProcessor {
+    /// Checks the precondition of the transformaiton; cf. module documentation.
+    #[cfg(debug_assertions)]
+    fn check_precondition(data: &FunctionData) {
+        for instr in &data.code {
+            if matches!(instr, Bytecode::Call(_, _, _, _, Some(_))) {
+                panic!("precondition violated: found call instruction with abort action")
+            }
+        }
+    }
+
+    /// Checks the postcondition of the transformation; cf. module documentation.
+    #[cfg(debug_assertions)]
+    fn check_postcondition(code: &[Bytecode]) {
+        use move_stackless_bytecode::stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph};
+        let cfg = StacklessControlFlowGraph::new_forward(code);
+        let blocks = cfg.blocks();
+        let mut pred_count: BTreeMap<BlockId, usize> = blocks.iter().map(|block_id| (*block_id, 0)).collect();
+        for block in &blocks {
+            // don't count the edge from the dummy start to a block as an incoming edge
+            if *block == cfg.entry_block() {
+                continue;
+            }
+            for suc_block in cfg.successors(*block) {
+                *pred_count.get_mut(suc_block).expect(&format!("block {}", suc_block)) += 1;
+            }
+        }
+        for block in blocks {
+            let successors = cfg.successors(block);
+            if successors.len() > 1 {
+                for suc_block in successors {
+                    assert!(*pred_count.get(suc_block).expect("pred count") <= 1, "{} has > 1 predecessors", suc_block)
+                }
+            }
+        }
     }
 }
 
@@ -204,7 +248,7 @@ fn count_incoming_edges(code: &[Bytecode]) -> BTreeMap<Label, usize> {
 
 #[cfg(test)]
 mod tests {
-    use super::{AttrId, Bytecode, SplitCriticalEdgesTransformation};
+    use super::{AttrId, Bytecode, SplitCriticalEdgesProcessor, SplitCriticalEdgesTransformation};
     use move_stackless_bytecode::stackless_bytecode::Label as L;
     use Bytecode::*;
 
@@ -216,17 +260,18 @@ mod tests {
     }
 
     #[test]
-    fn test_simple() {
+    fn test_empty_branch() {
         let attr = AttrId::new(0);
         let l0 = L::new(0);
         let l1 = L::new(1);
         let t = 0;
-        // if (t) { L0: nop } L1:
+        // if (t) { L0: nop } L1: return t;
         let code = vec![
             Branch(attr, l0, l1, t),
             Label(attr, l0),
             Nop(attr),
             Label(attr, l1),
+            Ret(attr, vec![t])
         ];
         let transformed = transform(code);
         let l2 = L::new(2);
@@ -237,7 +282,36 @@ mod tests {
             Label(attr, l0),
             Nop(attr),
             Label(attr, l1),
+            Ret(attr, vec![t])
         ];
+        SplitCriticalEdgesProcessor::check_postcondition(&transformed);
+        assert_eq!(transformed, expected)
+    }
+
+    #[test]
+    fn test_break_in_while() {
+        let attr = AttrId::new(0);
+        let l0 = L::new(0);
+        let t = 0;
+        // while (t) { break } L0: return t;
+        let code = vec![
+            Branch(attr, l0, l0, t),
+            Label(attr, l0),
+            Ret(attr, vec![t])
+        ];
+        let transformed = transform(code);
+        let l1 = L::new(1);
+        let l2 = L::new(2);
+        let expected = vec![
+            Branch(attr, l1, l2, t),
+            Label(attr, l1),
+            Jump(attr, l0),
+            Label(attr, l2),
+            Jump(attr, l0),
+            Label(attr, l0),
+            Ret(attr, vec![t])
+        ];
+        SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
     }
 
@@ -262,6 +336,7 @@ mod tests {
             Label(attr, l2),
             Jump(attr, l0)
         ];
+        SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
     }
 
@@ -288,6 +363,7 @@ mod tests {
             Label(attr, l2),
             Jump(attr, l1)
         ];
+        SplitCriticalEdgesProcessor::check_postcondition(&transformed);
         assert_eq!(transformed, expected)
     }
 }
