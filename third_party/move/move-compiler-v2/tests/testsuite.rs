@@ -111,6 +111,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExplicitDrop {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             pipeline.add_processor(Box::new(AbilityChecker {}));
             Self {
                 stop_before_generating_bytecode: false,
@@ -214,7 +215,7 @@ impl TestConfig {
         } else if path.contains("/abort-analysis/") {
             pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
             Self {
-                type_check_only: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,
@@ -285,7 +286,7 @@ impl TestConfig {
             // a bytecode verification failure. The test in /bytecode-verify-failure/
             // has erroneous ability annotations.
             Self {
-                type_check_only: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: true,
