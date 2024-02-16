@@ -6,7 +6,7 @@ use crate::{
         adapter::OrderedNotifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::DagStateSynchronizer,
-        dag_store::Dag,
+        dag_store::DagStore,
         storage::DAGStorage,
         tests::{
             dag_test::MockStorage,
@@ -19,7 +19,6 @@ use crate::{
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
-use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -74,7 +73,7 @@ impl TDAGNetworkSender for MockDAGNetworkSender {
 }
 
 struct MockDagFetcher {
-    target_dag: Arc<RwLock<Dag>>,
+    target_dag: Arc<DagStore>,
     epoch_state: Arc<EpochState>,
 }
 
@@ -84,17 +83,15 @@ impl TDagFetcher for MockDagFetcher {
         &self,
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
-        new_dag: Arc<RwLock<Dag>>,
+        new_dag: Arc<DagStore>,
     ) -> anyhow::Result<()> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
             .await
             .unwrap();
 
-        let mut new_dag_writer = new_dag.write();
-
         for node in response.certified_nodes().into_iter().rev() {
-            new_dag_writer.add_node(node).unwrap()
+            new_dag.write().add_node_for_test(node).unwrap()
         }
 
         Ok(())
@@ -152,33 +149,31 @@ async fn test_dag_state_sync() {
         .collect::<Vec<_>>();
     let nodes = generate_dag_nodes(&virtual_dag, &validators);
 
-    let mut fast_dag = Dag::new(
+    let fast_dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),
         1,
         0,
-    );
+    ));
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
-            fast_dag.add_node(node.clone()).unwrap();
+            fast_dag.write().add_node_for_test(node.clone()).unwrap();
         }
     }
-    let fast_dag = Arc::new(RwLock::new(fast_dag));
 
-    let mut slow_dag = Dag::new(
+    let slow_dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         Arc::new(MockStorage::new()),
         Arc::new(MockPayloadManager {}),
         1,
         0,
-    );
+    ));
     for round_nodes in nodes.iter().take(SLOW_DAG_ROUNDS as usize) {
         for node in round_nodes.iter().flatten() {
-            slow_dag.add_node(node.clone()).unwrap();
+            slow_dag.write().add_node_for_test(node.clone()).unwrap();
         }
     }
-    let slow_dag = Arc::new(RwLock::new(slow_dag));
 
     let li_node = nodes[LI_ROUNDS as usize - 1]
         .first()
@@ -229,9 +224,9 @@ async fn test_dag_state_sync() {
     let new_dag = sync_result.unwrap();
 
     assert_eq!(
-        new_dag.lowest_round(),
+        new_dag.read().lowest_round(),
         (LI_ROUNDS - TEST_DAG_WINDOW) as Round
     );
-    assert_eq!(new_dag.highest_round(), NUM_ROUNDS as Round);
-    assert_none!(new_dag.highest_ordered_anchor_round(),);
+    assert_eq!(new_dag.read().highest_round(), NUM_ROUNDS as Round);
+    assert_none!(new_dag.read().highest_ordered_anchor_round(),);
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
-use aptos_gas_algebra::{Fee, FeePerGasUnit};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::gas_params::{instr::*, txn::*};
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
 use move_binary_format::{
@@ -457,6 +457,17 @@ where
         _locals: impl Iterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         Ok(())
+    }
+
+    #[inline]
+    fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        if self.feature_version() < 13 {
+            return Ok(());
+        }
+
+        let cost = SUBST_TY_PER_NODE * num_nodes;
+
+        self.algebra.charge_execution(cost)
     }
 }
 

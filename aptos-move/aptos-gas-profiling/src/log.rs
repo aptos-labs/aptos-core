@@ -35,6 +35,9 @@ pub enum ExecutionGasEvent {
         ty: TypeTag,
         cost: InternalGas,
     },
+    CreateTy {
+        cost: InternalGas,
+    },
 }
 
 /// An enum representing the name of a call frame.
@@ -210,7 +213,7 @@ impl ExecutionAndIOCosts {
     }
 
     pub(crate) fn assert_consistency(&self) {
-        use ExecutionGasEvent::{Bytecode, Call, CallNative, LoadResource, Loc};
+        use ExecutionGasEvent::{Bytecode, Call, CallNative, CreateTy, LoadResource, Loc};
 
         let mut total = InternalGas::zero();
 
@@ -219,9 +222,10 @@ impl ExecutionAndIOCosts {
         for op in self.gas_events() {
             match op {
                 Loc(..) | Call(..) => (),
-                Bytecode { cost, .. } | CallNative { cost, .. } | LoadResource { cost, .. } => {
-                    total += *cost
-                },
+                Bytecode { cost, .. }
+                | CallNative { cost, .. }
+                | LoadResource { cost, .. }
+                | CreateTy { cost, .. } => total += *cost,
             }
         }
 

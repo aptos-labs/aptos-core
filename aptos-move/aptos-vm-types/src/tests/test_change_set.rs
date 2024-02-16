@@ -20,7 +20,7 @@ use aptos_aggregator::{
 use aptos_types::{
     access_path::AccessPath,
     delayed_fields::{PanicError, SnapshotToStringFormula},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
     transaction::ChangeSet as StorageChangeSet,
     write_set::{WriteOp, WriteSetMut},
 };
@@ -253,7 +253,8 @@ macro_rules! assert_invariant_violation {
             // TODO[agg_v2](test): Uniformize errors for write op squashing.
             assert!(
                 err.major_status() == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
-                    || err.major_status() == StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR
+                    || err.major_status()
+                        == StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
             );
         };
 
@@ -518,6 +519,7 @@ fn test_resource_groups_squashing() {
         modification_metadata.clone(),
         BTreeMap::from([create_tag_0_op.clone()]),
         100,
+        0,
     );
     let create_tag_0 = ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(as_state_key!("1"), create_group_write_0.clone())])
@@ -526,6 +528,7 @@ fn test_resource_groups_squashing() {
     let modify_group_write_0 = GroupWrite::new(
         modification_metadata.clone(),
         BTreeMap::from([(mock_tag_0(), as_modify_op!(7))]),
+        100,
         100,
     );
     let modify_tag_0 = ExpandedVMChangeSetBuilder::new()
@@ -537,6 +540,7 @@ fn test_resource_groups_squashing() {
         modification_metadata.clone(),
         BTreeMap::from([create_tag_1_op.clone()]),
         200,
+        100,
     );
     let create_tag_1 = ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(as_state_key!("1"), create_group_write_1.clone())])
@@ -546,6 +550,7 @@ fn test_resource_groups_squashing() {
     let modify_group_write_1 = GroupWrite::new(
         modification_metadata.clone(),
         BTreeMap::from([modify_tag_1_op.clone()]),
+        200,
         200,
     );
     let modify_tag_1 = ExpandedVMChangeSetBuilder::new()
@@ -564,7 +569,8 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([(mock_tag_0(), as_create_op!(7))]),
-                100
+                100,
+                0,
             ))
         );
     }
@@ -580,7 +586,8 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone(), create_tag_1_op.clone()]),
-                200
+                200,
+                0,
             ))
         );
 
@@ -594,7 +601,8 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone(), (mock_tag_1(), as_create_op!(17))]),
-                200
+                200,
+                0,
             ))
         );
     }
@@ -610,7 +618,8 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone(), modify_tag_1_op.clone()]),
-                200
+                200,
+                0,
             ))
         );
     }
@@ -621,7 +630,7 @@ fn test_resource_groups_squashing() {
             ExpandedVMChangeSetBuilder::new()
                 .with_group_reads_needing_delayed_field_exchange(vec![(
                     as_state_key!("1"),
-                    (modification_metadata.clone(), 400)
+                    (modification_metadata.metadata().clone(), 400)
                 )])
                 .build(),
             &MockChangeSetChecker
@@ -633,7 +642,8 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone()]),
-                400
+                400,
+                0,
             ))
         );
     }
@@ -649,7 +659,8 @@ fn test_write_and_read_discrepancy_caught() {
         .with_reads_needing_delayed_field_exchange(vec![(
             as_state_key!("1"),
             (
-                WriteOp::legacy_modification(as_bytes!(1).into()),
+                StateValueMetadata::none(),
+                10,
                 Arc::new(MoveTypeLayout::U64)
             )
         )])
@@ -664,11 +675,11 @@ fn test_write_and_read_discrepancy_caught() {
     assert_err!(ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(
             as_state_key!("1"),
-            GroupWrite::new(metadata_op.clone(), BTreeMap::new(), group_size,)
+            GroupWrite::new(metadata_op.clone(), BTreeMap::new(), group_size, group_size)
         )])
         .with_group_reads_needing_delayed_field_exchange(vec![(
             as_state_key!("1"),
-            (metadata_op, group_size)
+            (metadata_op.metadata().clone(), group_size)
         )])
         .try_build());
 }
@@ -715,6 +726,7 @@ mod tests {
             metadata_op,
             inner_ops.into_iter().collect(),
             group_size,
+            group_size, // prev_group_size
         ))
     }
 
@@ -728,7 +740,7 @@ mod tests {
 
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{
-            let group_write = GroupWrite::new($op, BTreeMap::new(), $s);
+            let group_write = GroupWrite::new($op, BTreeMap::new(), $s, $s);
             assert_eq!(group_write.maybe_group_op_size(), $exp);
         }};
     }

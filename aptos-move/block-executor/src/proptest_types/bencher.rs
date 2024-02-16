@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::BlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -139,7 +138,6 @@ where
         >::new(config, executor_thread_pool, None)
         .execute_transactions_parallel((), &self.transactions, &data_view);
 
-        self.baseline_output
-            .assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+        self.baseline_output.assert_parallel_output(&output);
     }
 }

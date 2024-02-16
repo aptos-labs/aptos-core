@@ -4,7 +4,7 @@ export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
-CORPUS_ZIPS=()
+CORPUS_ZIPS=("https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip")
 
 function info() {
     echo "[info] $1"
@@ -16,11 +16,13 @@ function error() {
 }
 
 function cargo_fuzz() {
-    rustup install nightly
+    # Nightly version control
+    NIGHTLY_VERSION="nightly-2024-01-01"
+    rustup install $NIGHTLY_VERSION
     if [ -z "$1" ]; then
         error "error using cargo()"
     fi
-    cargo_fuzz_cmd="cargo +nightly fuzz $1"
+    cargo_fuzz_cmd="cargo "+$NIGHTLY_VERSION" fuzz $1"
     shift
     $cargo_fuzz_cmd $EXTRAFLAGS $@
 }
@@ -36,14 +38,17 @@ function usage() {
         "build-oss-fuzz")
             echo "Usage: $0 build-oss-fuzz <target_dir>"
             ;;
+        "debug")
+            echo "Usage: $0 debug <fuzz_target> <testcase>"
+            ;;
+        "flamegraph")
+            echo "Usage: $0 flamegraph <fuzz_target> <testcase>"
+            ;;
         "list")
             echo "Usage: $0 list"
             ;;
         "run")
             echo "Usage: $0 run <fuzz_target> [testcase]"
-            ;;
-        "debug")
-            echo "Usage: $0 debug <fuzz_target> <testcase>"
             ;;
         "test")
             echo "Usage: $0 test"
@@ -53,9 +58,10 @@ function usage() {
             echo "    add               adds a new fuzz target"
             echo "    build             builds fuzz targets"
             echo "    build-oss-fuzz    builds fuzz targets for oss-fuzz"
+            echo "    debug             debugs a fuzz target with a testcase"
+            echo "    flamegraph        generates a flamegraph for a fuzz target with a testcase"
             echo "    list              lists existing fuzz targets"
             echo "    run               runs a fuzz target"
-            echo "    debug             debugs a fuzz target with a testcase"
             echo "    test              tests all fuzz targets"
             ;;
     esac
@@ -74,7 +80,7 @@ function build() {
     info "Target directory: $target_dir"
     mkdir -p $target_dir
     info "Building $fuzz_target"
-    cargo_fuzz build --verbose -O --target-dir $target_dir $fuzz_target
+    cargo_fuzz build --sanitizer none --verbose -O --target-dir $target_dir $fuzz_target
 }
 
 function build-oss-fuzz() {
@@ -114,6 +120,49 @@ function build-oss-fuzz() {
     done
 }
 
+# use rust-gdb to debug a fuzz target with a testcase
+function debug() {
+    if [ -z "$2" ]; then
+        usage debug
+    fi
+    fuzz_target=$1
+    testcase=$2
+    if [ ! -f "$testcase" ]; then
+        error "$testcase does not exist"
+    fi
+    info "Debugging $fuzz_target with $testcase"
+    # find the binary
+    binary=$(find ./target -name $fuzz_target -type f -perm /111)
+    if [ -z "$binary" ]; then
+        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
+    fi
+    # run the binary with rust-gdb
+    export LSAN_OPTIONS=verbosity=1:log_threads=1
+    export RUST_BACKTRACE=1 
+    rust-gdb --args $binary $testcase -- -runs=1
+}
+
+# use cargo-flamegraph to generate a flamegraph for a fuzz target with a testcase
+function flamegraph() {
+    if [ -z "$2" ]; then
+        usage flamegraph
+    fi
+    fuzz_target=$1
+    testcase=$2
+    if [ ! -f "$testcase" ]; then
+        error "$testcase does not exist"
+    fi
+    info "Generating flamegraph for $fuzz_target with $testcase"
+    # find the binary
+    binary=$(find ./target -name $fuzz_target -type f -perm /111)
+    if [ -z "$binary" ]; then
+        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
+    fi
+    # run the binary with cargo-flamegraph
+    time=$(date +%s)
+    cargo flamegraph -o "${fuzz_target}_${time}.svg" --bin "$binary" "$testcase -- -runs=1"
+}
+
 function run() {
     if [ -z "$1" ]; then
         usage run
@@ -129,31 +178,6 @@ function run() {
     fi
     info "Running $fuzz_target"
     cargo_fuzz run $fuzz_target $testcase
-}
-
-# use rust-gdb to debug a fuzz target with a testcase
-function debug() {
-    if [ -z "$1" ]; then
-        usage debug
-    fi
-    fuzz_target=$1
-    testcase=$2
-    if [ -z "$testcase" ]; then
-        error "No testcase provided"
-    fi
-    if [ ! -f "$testcase" ]; then
-        error "$testcase does not exist"
-    fi
-    info "Debugging $fuzz_target with $testcase"
-    # find the binary
-    binary=$(find ./target -name $fuzz_target -type f -executable)
-    if [ -z "$binary" ]; then
-        error "Could not find binary for $fuzz_target"
-    fi
-    # run the binary with rust-gdb
-    export LSAN_OPTIONS=verbosity=1:log_threads=1
-    export RUST_BACKTRACE=1 
-    rust-gdb --args $binary $testcase -- -runs=1
 }
 
 function test() {
@@ -185,23 +209,7 @@ function add() {
             echo "path = \"$fuzz_target_path\""
             echo "test = false"
             echo "doc = false"
-        } >> $fuzz_path/Cargo.toml
-        info "Fuzzing target '$fuzz_target' added successfully at $fuzz_target_path."
-    else
-        error "Failed to create directory or file for fuzzing target."
-    fi
-
-    mkdir -p fuzz/fuzz_targets/$(dirname $fuzz_target_path) && touch fuzz/fuzz_targets/$fuzz_target_path
-
-    if [ $? -eq 0 ]; then
-        {
-            echo ""
-            echo "[[bin]]"
-            echo "name = \"$fuzz_target\""
-            echo "path = \"$fuzz_target_path\""
-            echo "test = false"
-            echo "doc = false"
-        } >> $fuzz_path/Cargo.toml
+        } >> fuzz/Cargo.toml
         info "Fuzzing target '$fuzz_target' added successfully at $fuzz_target_path."
     else
         error "Failed to create directory or file for fuzzing target."
@@ -234,6 +242,14 @@ case "$1" in
     shift
     build-oss-fuzz "$@"
     ;;
+  "debug")
+    shift
+    debug "$@"
+    ;;
+  "flamegraph")
+    shift
+    flamegraph "$@"
+    ;;
    "list")
     shift
     list
@@ -241,10 +257,6 @@ case "$1" in
   "run")
     shift
     run  "$@"
-    ;;
-  "debug")
-    shift
-    debug "$@"
     ;;
   "test")
     shift

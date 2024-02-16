@@ -48,7 +48,7 @@ pub enum FeatureFlag {
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
-    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
+    RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
@@ -58,6 +58,8 @@ pub enum FeatureFlag {
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
+    REFUNDABLE_BYTES = 51,
+    OBJECT_CODE_DEPLOYMENT = 52,
 }
 
 /// Representation of features on chain as a bitset.
@@ -82,6 +84,8 @@ impl Default for Features {
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
         features.enable(BN254_STRUCTURES);
+        features.enable(REFUNDABLE_BYTES);
+
         features
     }
 }
@@ -151,14 +155,14 @@ impl Features {
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
         // This feature depends on resource groups being split inside VMChange set,
-        // which is gated by RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM feature, so
+        // which is gated by RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET feature, so
         // require that feature to be enabled as well.
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
-            && self.is_resource_group_charge_as_size_sum_enabled()
+            && self.is_resource_groups_split_in_vm_change_set_enabled()
     }
 
-    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+    pub fn is_resource_groups_split_in_vm_change_set_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET)
     }
 
     /// Whether the zkID feature is enabled, specifically the ZK path with ZKP-based signatures.
@@ -179,5 +183,9 @@ impl Features {
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
+    }
+
+    pub fn is_refundable_bytes_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
 }

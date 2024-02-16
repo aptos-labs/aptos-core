@@ -8,7 +8,7 @@ use aptos_gas_algebra::Gas;
 use aptos_gas_schedule::{InitialGasSchedule, TransactionGasParameters};
 use aptos_language_e2e_tests::{
     assert_prologue_disparity, assert_prologue_parity, common_transactions::EMPTY_SCRIPT,
-    compile::compile_module, current_function_name, executor::FakeExecutor, transaction_status_eq,
+    current_function_name, executor::FakeExecutor, transaction_status_eq,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -23,7 +23,6 @@ use move_core_types::{
     gas_algebra::GasQuantity,
     identifier::Identifier,
     language_storage::{StructTag, TypeTag},
-    vm_status::StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER,
 };
 use move_ir_compiler::Compiler;
 
@@ -512,120 +511,6 @@ fn verify_max_sequence_number() {
     );
 }
 
-#[test]
-pub fn test_open_publishing_invalid_address() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    let receiver = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-    executor.add_account_data(&receiver);
-
-    let module = format!(
-        "
-        module 0x{}.M {{
-            public max(a: u64, b: u64): u64 {{
-            label b0:
-                jump_if (copy(a) > copy(b)) b2;
-            label b1:
-                return copy(b);
-            label b2:
-                return copy(a);
-            }}
-
-            public sum(a: u64, b: u64): u64 {{
-                let c: u64;
-            label b0:
-                c = copy(a) + copy(b);
-                return copy(c);
-            }}
-        }}
-        ",
-        receiver.address().to_hex(),
-    );
-
-    let random_module = compile_module(&module).1;
-    let txn = sender
-        .account()
-        .transaction()
-        .module(random_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-
-    // TODO: This is not verified for now.
-    // verify and fail because the addresses don't match
-    // let vm_status = executor.verify_transaction(txn.clone()).status().unwrap();
-
-    // assert!(vm_status.is(StatusType::Verification));
-    // assert!(vm_status.major_status == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
-
-    // execute and fail for the same reason
-    let output = executor.execute_transaction(txn);
-    if let TransactionStatus::Keep(status) = output.status() {
-        // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER)
-        assert!(
-            status
-                == &ExecutionStatus::MiscellaneousError(Some(MODULE_ADDRESS_DOES_NOT_MATCH_SENDER))
-        );
-    } else {
-        panic!("Unexpected execution status: {:?}", output)
-    };
-}
-
-#[test]
-pub fn test_open_publishing() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(10_0000_0000, 10);
-    executor.add_account_data(&sender);
-
-    let program = format!(
-        "
-        module 0x{}.M {{
-            public max(a: u64, b: u64): u64 {{
-            label b0:
-                jump_if (copy(a) > copy(b)) b2;
-            label b1:
-                return copy(b);
-            label b2:
-                return copy(a);
-            }}
-
-            public sum(a: u64, b: u64): u64 {{
-                let c: u64;
-            label b0:
-                c = copy(a) + copy(b);
-                return copy(c);
-            }}
-        }}
-        ",
-        sender.address().to_hex(),
-    );
-
-    let random_module = compile_module(&program).1;
-    let txn = sender
-        .account()
-        .transaction()
-        .module(random_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(100)
-        .sign();
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    assert_eq!(
-        executor.execute_transaction(txn).status(),
-        &TransactionStatus::Keep(ExecutionStatus::Success)
-    );
-}
-
 fn bad_module() -> (CompiledModule, Vec<u8>) {
     let bad_module_code = "
     module 0x1.Test {
@@ -737,42 +622,6 @@ fn test_script_dependency_fails_verification() {
 }
 
 #[test]
-fn test_module_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-    let good_module = {
-        let (_, serialized_module) = good_module_uses_bad(*sender.address(), bad_module);
-        aptos_types::transaction::Module::new(serialized_module)
-    };
-
-    let txn = sender
-        .account()
-        .transaction()
-        .module(good_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
-}
-
-#[test]
 fn test_type_tag_dependency_fails_verification() {
     let mut executor = FakeExecutor::from_head_genesis();
     executor.set_golden_file(current_function_name!());
@@ -860,67 +709,6 @@ fn test_script_transitive_dependency_fails_verification() {
         .account()
         .transaction()
         .script(Script::new(script, vec![], vec![]))
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    // As of now, we verify module/script dependencies. This will result in an
-    // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
-    match executor.execute_transaction(txn).status() {
-        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
-            assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
-        },
-        _ => panic!("Kept transaction with an invariant violation!"),
-    }
-}
-
-#[test]
-fn test_module_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
-
-    // Get a module that fails verification into the store.
-    let (bad_module, bad_module_bytes) = bad_module();
-    executor.add_module(&bad_module.self_id(), bad_module_bytes);
-
-    // Create a module that tries to use that module.
-    let (good_module, good_module_bytes) =
-        good_module_uses_bad(account_config::CORE_CODE_ADDRESS, bad_module);
-    executor.add_module(&good_module.self_id(), good_module_bytes);
-
-    // Create a transaction that tries to use that module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let module_code = format!(
-        "
-    module 0x{}.Test3 {{
-        import 0x1.Test2;
-        public bar() {{
-        label b0:
-            Test2.bar();
-            return;
-        }}
-    }}
-    ",
-        sender.address().to_hex()
-    );
-    let module = {
-        let compiler = Compiler {
-            deps: vec![&good_module],
-        };
-        aptos_types::transaction::Module::new(
-            compiler
-                .into_module_blob(module_code.as_str())
-                .expect("Module compilation failed"),
-        )
-    };
-
-    let txn = sender
-        .account()
-        .transaction()
-        .module(module)
         .sequence_number(10)
         .max_gas_amount(100_000)
         .gas_unit_price(1)

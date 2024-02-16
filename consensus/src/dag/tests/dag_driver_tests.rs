@@ -7,7 +7,7 @@ use crate::{
         dag_driver::DagDriver,
         dag_fetcher::TFetchRequester,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
-        dag_store::Dag,
+        dag_store::DagStore,
         errors::DagDriverError,
         health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
         order_rule::OrderRule,
@@ -25,7 +25,6 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -122,13 +121,13 @@ fn setup(
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
     let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
-    let dag = Arc::new(RwLock::new(Dag::new(
+    let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
-    )));
+    ));
 
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),
@@ -156,7 +155,7 @@ fn setup(
     let ledger_info_provider = Arc::new(MockLedgerInfoProvider {
         latest_ledger_info: mock_ledger_info,
     });
-    let (round_tx, _round_rx) = tokio::sync::mpsc::channel(10);
+    let (round_tx, _round_rx) = tokio::sync::mpsc::unbounded_channel();
     let round_state = RoundState::new(
         round_tx.clone(),
         Box::new(OptimisticResponsive::new(round_tx)),
@@ -191,7 +190,7 @@ async fn test_certified_node_handler() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: None,
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
@@ -216,7 +215,7 @@ async fn test_dag_driver_drop() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: Some(tx),
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     driver.enter_new_round(1).await;
 
