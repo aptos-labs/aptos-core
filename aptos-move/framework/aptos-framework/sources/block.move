@@ -85,6 +85,15 @@ module aptos_framework::block {
         );
     }
 
+    /// Initialize the commit history resource if it's not in genesis.
+    public fun initialize_commit_history(fx: &signer, max_capacity: u32) {
+        move_to<CommitHistory>(fx, CommitHistory {
+            max_capacity,
+            next_idx: 0,
+            table: table_with_length::new(),
+        });
+    }
+
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_epoch_interval_microsecs(
