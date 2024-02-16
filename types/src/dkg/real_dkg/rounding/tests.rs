@@ -54,6 +54,29 @@ fn test_rounding_equal_stakes() {
 }
 
 #[test]
+fn test_rounding_small_stakes() {
+    let num_runs = 100;
+    let mut rng = rand::thread_rng();
+    for _ in 0..num_runs {
+        let validator_num = rng.gen_range(1, 500);
+        let mut validator_stakes = vec![];
+        for _ in 0..validator_num {
+            validator_stakes.push(rng.gen_range(1, 10));
+        }
+        let dkg_rounding =
+            DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
+        assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
+
+        let total_weight_min = total_weight_lower_bound(&validator_stakes);
+        let total_weight_max =
+            total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+        let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
+        assert!(total_weight >= total_weight_min as u64);
+        assert!(total_weight <= total_weight_max as u64);
+    }
+}
+
+#[test]
 fn test_rounding_uniform_distribution() {
     let num_runs = 100;
     let mut rng = rand::thread_rng();

@@ -3,6 +3,7 @@
 use aptos_dkg::pvss::WeightedConfig;
 use fixed::types::U64F64;
 use std::{
+    cmp::max,
     fmt,
     fmt::{Debug, Formatter},
 };
@@ -250,7 +251,7 @@ fn compute_profile_fixed_point(
     let hardcoded_threshold_fixed = U64F64::from_num(0.5);
     let stake_sum: u64 = validator_stakes.iter().sum::<u64>();
     let stake_sum_fixed = U64F64::from_num(stake_sum);
-    let stake_per_weight: u64 = stake_sum / weights_sum;
+    let stake_per_weight: u64 = max(1, stake_sum / weights_sum);
     let stake_per_weight_fixed = U64F64::from_num(stake_per_weight);
     let mut delta_down_fixed = U64F64::from_num(0);
     let mut delta_up_fixed = U64F64::from_num(0);
