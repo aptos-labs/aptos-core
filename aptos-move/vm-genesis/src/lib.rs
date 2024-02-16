@@ -23,6 +23,12 @@ use aptos_types::{
     bn254_circom::Groth16VerificationKey,
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
+    jwks::{
+        jwk::JWK,
+        patch::{PatchJWKMoveStruct, PatchUpsertJWK},
+        rsa::RSA_JWK,
+    },
+    move_any::AsMoveAny,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
@@ -533,17 +539,6 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
 }
 
 fn initialize_zkid(session: &mut SessionExt, chain_id: ChainId) {
-    let config = zkid::Configuration::new_for_devnet_and_testing();
-    exec_function(
-        session,
-        ZKID_MODULE_NAME,
-        "update_configuration",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            config.as_move_value(),
-        ]),
-    );
     if !chain_id.is_mainnet() {
         let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
         exec_function(
@@ -556,7 +551,43 @@ fn initialize_zkid(session: &mut SessionExt, chain_id: ChainId) {
                 vk.as_move_value(),
             ]),
         );
+
+        let jwk = RSA_JWK {
+            kid:"test_jwk".to_owned(),
+            kty:"RSA".to_owned(),
+            alg:"RS256".to_owned(),
+            e:"AQAB".to_owned(),
+            n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
+        }.into();
+        let patch: PatchJWKMoveStruct = PatchUpsertJWK {
+            issuer: "https://accounts.google.com".to_owned(),
+            jwk,
+        }
+        .into();
+        exec_function(
+            session,
+            JWKS_MODULE_NAME,
+            "set_patches",
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(CORE_CODE_ADDRESS),
+                MoveValue::Vector(vec![patch.as_move_value()]),
+            ]),
+        );
     }
+
+    let config = zkid::Configuration::new_for_devnet_and_testing();
+    exec_function(
+        session,
+        ZKID_MODULE_NAME,
+        "update_configuration",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            config.as_move_value(),
+        ]),
+    );
+
     exec_function(
         session,
         JWKS_MODULE_NAME,

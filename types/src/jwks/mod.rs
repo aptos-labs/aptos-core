@@ -21,6 +21,7 @@ use std::{
 };
 
 pub mod jwk;
+pub mod patch;
 pub mod rsa;
 pub mod unsupported;
 
