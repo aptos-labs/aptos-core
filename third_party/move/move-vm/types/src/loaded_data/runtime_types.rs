@@ -117,6 +117,8 @@ impl DepthFormula {
 pub struct StructType {
     pub idx: StructNameIndex,
     pub fields: Vec<Type>,
+    pub ty_idx: TypeIndex,
+    pub field_idxs: Vec<TypeIndex>,
     pub field_names: Vec<Identifier>,
     pub phantom_ty_args_mask: SmallBitVec,
     pub abilities: AbilitySet,
@@ -491,14 +493,13 @@ impl TypeContext {
     pub fn check_vec_ref(
         &self,
         lhs: &Type,
-        inner_ty: &Type,
+        inner_ty: TypeIndex,
         is_mut: bool,
     ) -> PartialVMResult<Type> {
         match lhs {
             Type::MutableReference(inner) => match self.type_id_map.get_by_index(inner.0) {
-                Type::Vector(inner) => {
+                Type::Vector(inner) if *inner == inner_ty => {
                     let inner = self.type_id_map.get_by_index(inner.0);
-                    inner.check_eq(inner_ty)?;
                     Ok(inner.clone())
                 },
                 _ => Err(
@@ -508,9 +509,8 @@ impl TypeContext {
                 ),
             },
             Type::Reference(inner) if !is_mut => match self.type_id_map.get_by_index(inner.0) {
-                Type::Vector(inner) => {
+                Type::Vector(inner) if *inner == inner_ty => {
                     let inner = self.type_id_map.get_by_index(inner.0);
-                    inner.check_eq(inner_ty)?;
                     Ok(inner.clone())
                 },
                 _ => Err(
@@ -527,12 +527,9 @@ impl TypeContext {
         }
     }
 
-    pub fn check_ref_eq(&self, lhs: &Type, expected_inner: &Type) -> PartialVMResult<()> {
+    pub fn check_ref_eq(&self, lhs: &Type, expected_inner: TypeIndex) -> PartialVMResult<()> {
         match lhs {
-            Type::MutableReference(inner) | Type::Reference(inner) => self
-                .type_id_map
-                .get_by_index(inner.0)
-                .check_eq(expected_inner),
+            Type::MutableReference(inner) | Type::Reference(inner) if *inner == expected_inner => Ok(()),
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("VecMutBorrow expects a vector reference".to_string()),

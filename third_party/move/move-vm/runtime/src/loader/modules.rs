@@ -25,7 +25,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
-    StructIdentifier, StructNameIndex, StructType, Type, TypeContext,
+    AbilityInfo, StructIdentifier, StructNameIndex, StructType, Type, TypeContext,
 };
 use parking_lot::RwLock;
 use std::{
@@ -476,6 +476,7 @@ impl Module {
         };
 
         let mut field_tys = vec![];
+        let mut field_idxs = vec![];
         for field in fields {
             let ty = type_context.load_signature_token(
                 BinaryIndexedView::Module(module),
@@ -483,11 +484,17 @@ impl Module {
                 struct_name_table,
             )?;
             debug_assert!(field_tys.len() < usize::max_value());
-            field_tys.push(ty);
+            field_tys.push(ty.clone());
+            field_idxs.push(type_context.get_idx_by_type(ty));
         }
 
         Ok(StructType {
             fields: field_tys,
+            field_idxs,
+            ty_idx: type_context.get_idx_by_type(Type::Struct {
+                idx: struct_name_table[struct_def.struct_handle.0 as usize],
+                ability: AbilityInfo::struct_(abilities),
+            }),
             phantom_ty_args_mask: struct_handle
                 .type_parameters
                 .iter()

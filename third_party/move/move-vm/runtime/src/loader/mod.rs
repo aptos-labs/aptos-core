@@ -30,7 +30,8 @@ use move_core_types::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{
-        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type, TypeContext,
+        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+        TypeContext, TypeIndex,
     },
 };
 use parking_lot::RwLock;
@@ -1310,12 +1311,12 @@ impl<'a> Resolver<'a> {
         })
     }
 
-    pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
+    pub(crate) fn get_field_type(&self, idx: FieldHandleIndex) -> PartialVMResult<TypeIndex> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let handle = &module.field_handles[idx.0 as usize];
 
-                Ok(handle.definition_struct_type.fields[handle.offset].clone())
+                Ok(handle.definition_struct_type.field_idxs[handle.offset])
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         }
@@ -1435,14 +1436,14 @@ impl<'a> Resolver<'a> {
         }
     }
 
-    pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> PartialVMResult<Type> {
+    pub(crate) fn field_handle_to_struct(
+        &self,
+        idx: FieldHandleIndex,
+    ) -> PartialVMResult<TypeIndex> {
         match &self.binary {
             BinaryType::Module(module) => {
                 let struct_ = &module.field_handles[idx.0 as usize].definition_struct_type;
-                Ok(Type::Struct {
-                    idx: struct_.idx,
-                    ability: AbilityInfo::struct_(struct_.abilities),
-                })
+                Ok(struct_.ty_idx)
             },
             BinaryType::Script(_) => unreachable!("Scripts cannot have field instructions"),
         }
