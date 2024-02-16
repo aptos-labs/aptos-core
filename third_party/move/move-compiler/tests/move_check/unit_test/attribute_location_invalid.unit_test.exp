@@ -10,7 +10,7 @@ error[E02015]: invalid attribute
 6 │ #[test]
   │   ^^^^
   │   │
-  │   Known attribute 'test' is not expected with a module
+  │   Attribute 'test' is not expected with a module
   │   Expected to be used with one of the following: function
 
 error[E02015]: invalid attribute
@@ -19,6 +19,6 @@ error[E02015]: invalid attribute
 10 │     #[expected_failure(abort_code = 0)]
    │       ^^^^^^^^^^^^^^^^
    │       │
-   │       Known attribute 'expected_failure' is not expected with a struct
+   │       Attribute 'expected_failure' is not expected with a struct
    │       Expected to be used with one of the following: function
 

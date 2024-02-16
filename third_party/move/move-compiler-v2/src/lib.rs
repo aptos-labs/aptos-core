@@ -15,11 +15,12 @@ pub mod pipeline;
 use crate::pipeline::{
     ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-    explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
+    exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
+    livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor,
-    unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
+    unreachable_code_remover::UnreachableCodeRemover,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -69,7 +70,7 @@ pub fn run_move_compiler(
     // Flow-insensitive checks on AST
     flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
     function_checker::check_for_function_typed_parameters(&mut env);
-    function_checker::check_access_and_use(&mut env);
+    function_checker::check_access_and_use(&mut env, true);
     check_errors(&env, error_writer, "checking errors")?;
 
     trace!(
@@ -82,6 +83,9 @@ pub fn run_move_compiler(
     check_errors(&env, error_writer, "inlining")?;
 
     debug!("After inlining, GlobalEnv=\n{}", env.dump_env());
+
+    function_checker::check_access_and_use(&mut env, false);
+    check_errors(&env, error_writer, "post-inlining access checks")?;
 
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
@@ -205,7 +209,6 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let mut pipeline = FunctionTargetPipeline::default();
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
-        pipeline.add_processor(Box::new(VisibilityChecker()));
     }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
         with_copy_inference: true,
@@ -213,6 +216,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(ExplicitDrop {}));
     if safety_on {
+        // only used for ability checking
+        pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
         // Ability checker is functionally not relevant so can be completely skipped if safety is off
         pipeline.add_processor(Box::new(AbilityChecker {}));
     }

@@ -1208,7 +1208,7 @@ fun operators::order($t0: u64, $t1: u64): bool {
  24: return $t2
 }
 
-============ after AbilityChecker: ================
+============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
 fun operators::arithm($t0: u64, $t1: u64): u64 {
@@ -1217,11 +1217,23 @@ fun operators::arithm($t0: u64, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64
      var $t6: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t6 := -($t0, $t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t5 := /($t1, $t6)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   2: $t4 := *($t5, $t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   3: $t3 := %($t4, $t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   4: $t2 := +($t0, $t3)
+     # abort state before: {returns}
+     # abort state after : {}
   5: return $t2
 }
 
@@ -1233,11 +1245,23 @@ fun operators::bits($t0: u64, $t1: u8): u64 {
      var $t4: u64
      var $t5: u64
      var $t6: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t4 := <<($t0, $t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t3 := &($t4, $t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   2: $t6 := >>($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t5 := ^($t6, $t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: $t2 := |($t3, $t5)
+     # abort state before: {returns}
+     # abort state after : {}
   5: return $t2
 }
 
@@ -1250,54 +1274,152 @@ fun operators::bools($t0: bool, $t1: bool): bool {
      var $t5: bool
      var $t6: bool
      var $t7: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: if ($t0) goto 1 else goto 4
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: label L0
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t5 := copy($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: goto 6
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: label L1
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: $t5 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: if ($t5) goto 8 else goto 11
+     # abort state before: {returns}
+     # abort state after : {returns}
   8: label L3
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: $t4 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: goto 19
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: label L4
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: if ($t0) goto 13 else goto 16
+     # abort state before: {returns}
+     # abort state after : {returns}
  13: label L6
+     # abort state before: {returns}
+     # abort state after : {returns}
  14: $t4 := !($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
  15: goto 18
+     # abort state before: {returns}
+     # abort state after : {returns}
  16: label L7
+     # abort state before: {returns}
+     # abort state after : {returns}
  17: $t4 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
  18: label L8
+     # abort state before: {returns}
+     # abort state after : {returns}
  19: label L5
+     # abort state before: {returns}
+     # abort state after : {returns}
  20: if ($t4) goto 21 else goto 24
+     # abort state before: {returns}
+     # abort state after : {returns}
  21: label L9
+     # abort state before: {returns}
+     # abort state after : {returns}
  22: $t3 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
  23: goto 33
+     # abort state before: {returns}
+     # abort state after : {returns}
  24: label L10
+     # abort state before: {returns}
+     # abort state after : {returns}
  25: $t6 := !($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
  26: if ($t6) goto 27 else goto 30
+     # abort state before: {returns}
+     # abort state after : {returns}
  27: label L12
+     # abort state before: {returns}
+     # abort state after : {returns}
  28: $t3 := copy($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
  29: goto 32
+     # abort state before: {returns}
+     # abort state after : {returns}
  30: label L13
+     # abort state before: {returns}
+     # abort state after : {returns}
  31: $t3 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
  32: label L14
+     # abort state before: {returns}
+     # abort state after : {returns}
  33: label L11
+     # abort state before: {returns}
+     # abort state after : {returns}
  34: if ($t3) goto 35 else goto 38
+     # abort state before: {returns}
+     # abort state after : {returns}
  35: label L15
+     # abort state before: {returns}
+     # abort state after : {returns}
  36: $t2 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
  37: goto 47
+     # abort state before: {returns}
+     # abort state after : {returns}
  38: label L16
+     # abort state before: {returns}
+     # abort state after : {returns}
  39: $t7 := !($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
  40: if ($t7) goto 41 else goto 44
+     # abort state before: {returns}
+     # abort state after : {returns}
  41: label L18
+     # abort state before: {returns}
+     # abort state after : {returns}
  42: $t2 := !($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
  43: goto 46
+     # abort state before: {returns}
+     # abort state after : {returns}
  44: label L19
+     # abort state before: {returns}
+     # abort state after : {returns}
  45: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
  46: label L20
+     # abort state before: {returns}
+     # abort state after : {returns}
  47: label L17
+     # abort state before: {returns}
+     # abort state after : {}
  48: return $t2
 }
 
@@ -1305,7 +1427,11 @@ fun operators::bools($t0: bool, $t1: bool): bool {
 [variant baseline]
 fun operators::equality<#0>($t0: #0, $t1: #0): bool {
      var $t2: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t2 := ==($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
   1: return $t2
 }
 
@@ -1313,7 +1439,11 @@ fun operators::equality<#0>($t0: #0, $t1: #0): bool {
 [variant baseline]
 fun operators::inequality<#0>($t0: #0, $t1: #0): bool {
      var $t2: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t2 := !=($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
   1: return $t2
 }
 
@@ -1326,29 +1456,404 @@ fun operators::order($t0: u64, $t1: u64): bool {
      var $t5: bool
      var $t6: bool
      var $t7: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t5 := <($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: if ($t5) goto 2 else goto 5
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: label L0
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t4 := <=($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: goto 7
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: label L1
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: $t4 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
   8: if ($t4) goto 9 else goto 13
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: label L3
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: $t6 := >($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: $t3 := !($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: goto 15
+     # abort state before: {returns}
+     # abort state after : {returns}
  13: label L4
+     # abort state before: {returns}
+     # abort state after : {returns}
  14: $t3 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
  15: label L5
+     # abort state before: {returns}
+     # abort state after : {returns}
  16: if ($t3) goto 17 else goto 21
+     # abort state before: {returns}
+     # abort state after : {returns}
  17: label L6
+     # abort state before: {returns}
+     # abort state after : {returns}
  18: $t7 := >=($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
  19: $t2 := !($t7)
+     # abort state before: {returns}
+     # abort state after : {returns}
  20: goto 23
+     # abort state before: {returns}
+     # abort state after : {returns}
  21: label L7
+     # abort state before: {returns}
+     # abort state after : {returns}
  22: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
  23: label L8
+     # abort state before: {returns}
+     # abort state after : {}
+ 24: return $t2
+}
+
+============ after AbilityChecker: ================
+
+[variant baseline]
+fun operators::arithm($t0: u64, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  0: $t6 := -($t0, $t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  1: $t5 := /($t1, $t6)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  2: $t4 := *($t5, $t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  3: $t3 := %($t4, $t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  4: $t2 := +($t0, $t3)
+     # abort state before: {returns}
+     # abort state after : {}
+  5: return $t2
+}
+
+
+[variant baseline]
+fun operators::bits($t0: u64, $t1: u8): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  0: $t4 := <<($t0, $t1)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  1: $t3 := &($t4, $t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  2: $t6 := >>($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t5 := ^($t6, $t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t2 := |($t3, $t5)
+     # abort state before: {returns}
+     # abort state after : {}
+  5: return $t2
+}
+
+
+[variant baseline]
+fun operators::bools($t0: bool, $t1: bool): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: if ($t0) goto 1 else goto 4
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: label L0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t5 := copy($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: goto 6
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: label L1
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: $t5 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: if ($t5) goto 8 else goto 11
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: label L3
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: $t4 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 10: goto 19
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 11: label L4
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: if ($t0) goto 13 else goto 16
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 13: label L6
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 14: $t4 := !($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 15: goto 18
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 16: label L7
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 17: $t4 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 18: label L8
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 19: label L5
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 20: if ($t4) goto 21 else goto 24
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 21: label L9
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 22: $t3 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 23: goto 33
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 24: label L10
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 25: $t6 := !($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 26: if ($t6) goto 27 else goto 30
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 27: label L12
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 28: $t3 := copy($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 29: goto 32
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 30: label L13
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 31: $t3 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 32: label L14
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 33: label L11
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 34: if ($t3) goto 35 else goto 38
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 35: label L15
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 36: $t2 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 37: goto 47
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 38: label L16
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 39: $t7 := !($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 40: if ($t7) goto 41 else goto 44
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 41: label L18
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 42: $t2 := !($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 43: goto 46
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 44: label L19
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 45: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 46: label L20
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 47: label L17
+     # abort state before: {returns}
+     # abort state after : {}
+ 48: return $t2
+}
+
+
+[variant baseline]
+fun operators::equality<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t2 := ==($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
+  1: return $t2
+}
+
+
+[variant baseline]
+fun operators::inequality<#0>($t0: #0, $t1: #0): bool {
+     var $t2: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t2 := !=($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
+  1: return $t2
+}
+
+
+[variant baseline]
+fun operators::order($t0: u64, $t1: u64): bool {
+     var $t2: bool
+     var $t3: bool
+     var $t4: bool
+     var $t5: bool
+     var $t6: bool
+     var $t7: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t5 := <($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: if ($t5) goto 2 else goto 5
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: label L0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t4 := <=($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: goto 7
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: label L1
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: $t4 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: if ($t4) goto 9 else goto 13
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: label L3
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 10: $t6 := >($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 11: $t3 := !($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: goto 15
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 13: label L4
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 14: $t3 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 15: label L5
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 16: if ($t3) goto 17 else goto 21
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 17: label L6
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 18: $t7 := >=($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 19: $t2 := !($t7)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 20: goto 23
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 21: label L7
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 22: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 23: label L8
+     # abort state before: {returns}
+     # abort state after : {}
  24: return $t2
 }

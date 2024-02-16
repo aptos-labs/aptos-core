@@ -124,8 +124,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
             1024, // 1KB free per state write
         ],
         [
-            free_event_bytes_quota: NumBytes,
-            { 7.. => "free_event_bytes_quota" },
+            legacy_free_event_bytes_quota: NumBytes,
+            { 7..=13 => "free_event_bytes_quota", 14.. => "legacy_free_event_bytes_quota" },
             1024, // 1KB free event bytes per transaction
         ],
         [
@@ -154,23 +154,35 @@ crate::gas_schedule::macros::define_gas_parameters!(
             8192,
         ],
         [
-            storage_fee_per_state_slot_create: FeePerSlot,
-            { 7.. => "storage_fee_per_state_slot_create" },
+            legacy_storage_fee_per_state_slot_create: FeePerSlot,
+            { 7..=13 => "storage_fee_per_state_slot_create", 14.. => "legacy_storage_fee_per_state_slot_create" },
             50000,
         ],
         [
-            storage_fee_per_excess_state_byte: FeePerByte,
-            { 7.. => "storage_fee_per_excess_state_byte" },
+            storage_fee_per_state_slot: FeePerSlot,
+            { 14.. => "storage_fee_per_state_slot" },
+            // 0.8 million APT for 2 billion state slots
+            40_000,
+        ],
+        [
+            legacy_storage_fee_per_excess_state_byte: FeePerByte,
+            { 7..=13 => "storage_fee_per_excess_state_byte", 14.. => "legacy_storage_fee_per_excess_state_byte" },
             50,
         ],
         [
-            storage_fee_per_event_byte: FeePerByte,
-            { 7.. => "storage_fee_per_event_byte" },
+            storage_fee_per_state_byte: FeePerByte,
+            { 14.. => "storage_fee_per_state_byte" },
+            // 0.8 million APT for 2 TB state bytes
+            40,
+        ],
+        [
+            legacy_storage_fee_per_event_byte: FeePerByte,
+            { 7..=13 => "storage_fee_per_event_byte", 14.. => "legacy_storage_fee_per_event_byte" },
             20,
         ],
         [
-            storage_fee_per_transaction_byte: FeePerByte,
-            { 7.. => "storage_fee_per_transaction_byte" },
+            legacy_storage_fee_per_transaction_byte: FeePerByte,
+            { 7..=13 => "storage_fee_per_transaction_byte", 14.. => "legacy_storage_fee_per_transaction_byte" },
             20,
         ],
         [
@@ -187,7 +199,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
             2_0000_0000, // 2 APT
-        ]
+        ],
     ]
 );
 

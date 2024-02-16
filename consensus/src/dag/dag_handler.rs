@@ -91,7 +91,7 @@ impl NetworkHandler {
             move |rpc_request: IncomingDAGRequest| {
                 let epoch_state = epoch_state.clone();
                 async move {
-                    let epoch = rpc_request.req.epoch;
+                    let epoch = rpc_request.req.epoch();
                     let result = rpc_request
                         .req
                         .try_into()

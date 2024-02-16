@@ -86,7 +86,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             maybe_resource_group_view,
             executor_view,
             gas_feature_version,
-            features.is_resource_group_charge_as_size_sum_enabled(),
+            features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
 
         Self::new(
@@ -325,7 +325,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
             None,
             self,
             gas_feature_version,
-            features.is_resource_group_charge_as_size_sum_enabled(),
+            features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
         let max_identifier_size = get_max_identifier_size(&features);
         StorageAdapter::new(
@@ -373,19 +373,19 @@ pub(crate) mod tests {
     ) -> StorageAdapter<S> {
         assert!(group_size_kind != GroupSizeKind::AsSum, "not yet supported");
 
-        let (gas_feature_version, resource_group_charge_as_size_sum_enabled) = match group_size_kind
-        {
-            GroupSizeKind::AsSum => (12, true),
-            GroupSizeKind::AsBlob => (10, false),
-            GroupSizeKind::None => (1, false),
-        };
+        let (gas_feature_version, resource_groups_split_in_vm_change_set_enabled) =
+            match group_size_kind {
+                GroupSizeKind::AsSum => (12, true),
+                GroupSizeKind::AsBlob => (10, false),
+                GroupSizeKind::None => (1, false),
+            };
 
         let group_adapter = ResourceGroupAdapter::new(
             // TODO[agg_v2](test) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,
-            resource_group_charge_as_size_sum_enabled,
+            resource_groups_split_in_vm_change_set_enabled,
         );
         StorageAdapter::new(state_view, 0, 0, group_adapter)
     }

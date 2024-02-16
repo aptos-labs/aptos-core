@@ -22,7 +22,7 @@ function cargo_fuzz() {
     if [ -z "$1" ]; then
         error "error using cargo()"
     fi
-    cargo_fuzz_cmd="cargo "+$NIGHTLY_VERSION-x86_64-unknown-linux-gnu" fuzz $1"
+    cargo_fuzz_cmd="cargo "+$NIGHTLY_VERSION" fuzz $1"
     shift
     $cargo_fuzz_cmd $EXTRAFLAGS $@
 }
@@ -122,22 +122,19 @@ function build-oss-fuzz() {
 
 # use rust-gdb to debug a fuzz target with a testcase
 function debug() {
-    if [ -z "$1" ]; then
+    if [ -z "$2" ]; then
         usage debug
     fi
     fuzz_target=$1
     testcase=$2
-    if [ -z "$testcase" ]; then
-        error "No testcase provided"
-    fi
     if [ ! -f "$testcase" ]; then
         error "$testcase does not exist"
     fi
     info "Debugging $fuzz_target with $testcase"
     # find the binary
-    binary=$(find ./target -name $fuzz_target -type f -executable)
+    binary=$(find ./target -name $fuzz_target -type f -perm /111)
     if [ -z "$binary" ]; then
-        error "Could not find binary for $fuzz_target"
+        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
     fi
     # run the binary with rust-gdb
     export LSAN_OPTIONS=verbosity=1:log_threads=1
@@ -147,22 +144,19 @@ function debug() {
 
 # use cargo-flamegraph to generate a flamegraph for a fuzz target with a testcase
 function flamegraph() {
-    if [ -z "$1" ]; then
+    if [ -z "$2" ]; then
         usage flamegraph
     fi
     fuzz_target=$1
     testcase=$2
-    if [ -z "$testcase" ]; then
-        error "No testcase provided"
-    fi
     if [ ! -f "$testcase" ]; then
         error "$testcase does not exist"
     fi
     info "Generating flamegraph for $fuzz_target with $testcase"
     # find the binary
-    binary=$(find ./target -name $fuzz_target -type f -executable)
+    binary=$(find ./target -name $fuzz_target -type f -perm /111)
     if [ -z "$binary" ]; then
-        error "Could not find binary for $fuzz_target"
+        error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
     fi
     # run the binary with cargo-flamegraph
     time=$(date +%s)
@@ -215,23 +209,7 @@ function add() {
             echo "path = \"$fuzz_target_path\""
             echo "test = false"
             echo "doc = false"
-        } >> $fuzz_path/Cargo.toml
-        info "Fuzzing target '$fuzz_target' added successfully at $fuzz_target_path."
-    else
-        error "Failed to create directory or file for fuzzing target."
-    fi
-
-    mkdir -p fuzz/fuzz_targets/$(dirname $fuzz_target_path) && touch fuzz/fuzz_targets/$fuzz_target_path
-
-    if [ $? -eq 0 ]; then
-        {
-            echo ""
-            echo "[[bin]]"
-            echo "name = \"$fuzz_target\""
-            echo "path = \"$fuzz_target_path\""
-            echo "test = false"
-            echo "doc = false"
-        } >> $fuzz_path/Cargo.toml
+        } >> fuzz/Cargo.toml
         info "Fuzzing target '$fuzz_target' added successfully at $fuzz_target_path."
     else
         error "Failed to create directory or file for fuzzing target."

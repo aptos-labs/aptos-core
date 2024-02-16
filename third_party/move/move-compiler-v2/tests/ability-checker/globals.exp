@@ -340,6 +340,105 @@ fun globals::write($t0: address, $t1: u64): u64 {
   8: return $t2
 }
 
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun globals::check($t0: address): bool {
+     var $t1: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t1 := exists<globals::R>($t0)
+     # abort state before: {returns}
+     # abort state after : {}
+  1: return $t1
+}
+
+
+[variant baseline]
+fun globals::publish($t0: &signer) {
+     var $t1: globals::R
+     var $t2: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  0: $t2 := 1
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  1: $t1 := pack globals::R($t2)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  2: move_to<globals::R>($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
+  3: return ()
+}
+
+
+[variant baseline]
+fun globals::read($t0: address): u64 {
+     var $t1: u64
+     var $t2: &globals::R
+     var $t3: &globals::R
+     var $t4: &u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  0: $t3 := borrow_global<globals::R>($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t2 := move($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t4 := borrow_field<globals::R>.f($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t1 := read_ref($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {}
+  6: return $t1
+}
+
+
+[variant baseline]
+fun globals::write($t0: address, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &mut globals::R
+     var $t4: &mut globals::R
+     var $t5: u64
+     var $t6: &mut u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
+  0: $t4 := borrow_global<globals::R>($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t3 := move($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t5 := 2
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t6 := borrow_field<globals::R>.f($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: write_ref($t6, $t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: drop($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: $t2 := 9
+     # abort state before: {returns}
+     # abort state after : {}
+  8: return $t2
+}
+
 
 Diagnostics:
 error: no key ability
@@ -371,7 +470,11 @@ error: no key ability
 [variant baseline]
 fun globals::check($t0: address): bool {
      var $t1: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t1 := exists<globals::R>($t0)
+     # abort state before: {returns}
+     # abort state after : {}
   1: return $t1
 }
 
@@ -380,9 +483,17 @@ fun globals::check($t0: address): bool {
 fun globals::publish($t0: &signer) {
      var $t1: globals::R
      var $t2: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t2 := 1
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t1 := pack globals::R($t2)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   2: move_to<globals::R>($t0, $t1)
+     # abort state before: {returns}
+     # abort state after : {}
   3: return ()
 }
 
@@ -393,12 +504,26 @@ fun globals::read($t0: address): u64 {
      var $t2: &globals::R
      var $t3: &globals::R
      var $t4: &u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   0: $t3 := borrow_global<globals::R>($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t2 := move($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t4 := borrow_field<globals::R>.f($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: $t1 := read_ref($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {}
   6: return $t1
 }
 
@@ -410,13 +535,31 @@ fun globals::write($t0: address, $t1: u64): u64 {
      var $t4: &mut globals::R
      var $t5: u64
      var $t6: &mut u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns}
   0: $t4 := borrow_global<globals::R>($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t3 := move($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t5 := 2
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t6 := borrow_field<globals::R>.f($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: write_ref($t6, $t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: drop($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: $t2 := 9
+     # abort state before: {returns}
+     # abort state after : {}
   8: return $t2
 }

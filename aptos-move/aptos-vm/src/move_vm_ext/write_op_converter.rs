@@ -240,10 +240,7 @@ impl<'r> WriteOpConverter<'r> {
             inner_ops.insert(tag, legacy_op);
         }
 
-        // Create the op that would look like a combined V0 resource group MoveStorageOp,
-        // except it encodes the (speculative) size of the group after applying the updates
-        // which is used for charging storage fees. Moreover, the metadata computation occurs
-        // fully backwards compatibly, and lets obtain final storage op by replacing bytes.
+        // Create an op to encode the proper kind for resource group operation.
         let metadata_op = if post_group_size.get() == 0 {
             MoveStorageOp::Delete
         } else if pre_group_size.get() == 0 {
@@ -255,6 +252,7 @@ impl<'r> WriteOpConverter<'r> {
             self.convert(state_value_metadata, metadata_op, false)?,
             inner_ops,
             post_group_size.get(),
+            pre_group_size.get(),
         ))
     }
 

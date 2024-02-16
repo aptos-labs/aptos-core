@@ -1260,6 +1260,10 @@ impl SignatureToken {
             stack: vec![(self, 1)],
         }
     }
+
+    pub fn num_nodes(&self) -> usize {
+        self.preorder_traversal().count()
+    }
 }
 
 /// A `Constant` is a serialized value along with its type. That type will be deserialized by the

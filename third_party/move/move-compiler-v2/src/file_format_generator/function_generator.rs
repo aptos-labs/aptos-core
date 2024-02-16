@@ -92,7 +92,7 @@ impl<'a> FunctionGenerator<'a> {
         fun_env: FunctionEnv<'b>,
         acquires_list: &BTreeSet<StructId>,
     ) {
-        let loc = fun_env.get_loc();
+        let loc = fun_env.get_id_loc();
         let function = gen.function_index(ctx, &loc, &fun_env);
         let visibility = fun_env.visibility();
         let fun_count = gen.module.function_defs.len();
