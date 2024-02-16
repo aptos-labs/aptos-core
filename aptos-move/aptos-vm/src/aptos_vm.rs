@@ -357,36 +357,7 @@ impl AptosVM {
         )
     }
 
-    #[cfg(any(test, feature = "testing"))]
-    pub fn test_failed_transaction_cleanup(
-        &self,
-        error_vm_status: VMStatus,
-        txn: &SignedTransaction,
-        state_view: &impl StateView,
-    ) -> (VMStatus, VMOutput) {
-        let txn_data = TransactionMetadata::new(txn);
-        let log_context = AdapterLogSchema::new(state_view.id(), 0);
-
-        let balance = txn_data.max_gas_amount();
-        let mut gas_meter = self
-            .make_standard_gas_meter(balance, &log_context)
-            .expect("Should be able to create a gas meter for tests");
-        let change_set_configs = &get_or_vm_startup_failure(&self.storage_gas_params, &log_context)
-            .expect("Storage gas parameters should exist for tests")
-            .change_set_configs;
-
-        let resolver = state_view.as_move_resolver();
-        self.failed_transaction_cleanup(
-            error_vm_status,
-            &mut gas_meter,
-            &txn_data,
-            &resolver,
-            &log_context,
-            change_set_configs,
-        )
-    }
-
-    fn failed_transaction_cleanup(
+    pub(crate) fn failed_transaction_cleanup(
         &self,
         error_vm_status: VMStatus,
         gas_meter: &mut impl AptosGasMeter,
@@ -1254,7 +1225,7 @@ impl AptosVM {
             .finish(Location::Undefined)
     }
 
-    fn make_standard_gas_meter(
+    pub(crate) fn make_standard_gas_meter(
         &self,
         balance: Gas,
         log_context: &AdapterLogSchema,
