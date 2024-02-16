@@ -15,9 +15,7 @@ use aptos_dkg::{
 };
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
-use rounding::{
-    RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD,
-};
+use rounding::{RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -56,11 +54,8 @@ pub fn build_dkg_pvss_config(
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
 
-    let dkg_rounding = DKGRounding::new(
-        &validator_stakes,
-        SECRECY_THRESHOLD,
-        RECONSTRUCT_THRESHOLD,
-    );
+    let dkg_rounding =
+        DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
 
     println!(
         "[Randomness] rounding: epoch {} starts, profile = {:?}",
