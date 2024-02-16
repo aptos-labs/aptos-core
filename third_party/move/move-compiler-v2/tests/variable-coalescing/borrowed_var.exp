@@ -67,12 +67,12 @@ fun m::test() {
 fun m::test() {
      var $t0: u64
      var $t1: u64
-     var $t2: &u64
+     var $t2: &u64 [unused]
      var $t3: &u64
      var $t4: &u64
      var $t5: &u64
      var $t6: bool
-     var $t7: u64
+     var $t7: u64 [unused]
      var $t8: u64
   0: $t1 := 5
   1: $t0 := infer($t1)

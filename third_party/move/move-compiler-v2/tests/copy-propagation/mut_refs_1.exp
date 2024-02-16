@@ -63,9 +63,9 @@ fun m::test($t0: u64): u64 {
 
 [variant baseline]
 fun m::test($t0: u64): u64 {
-     var $t1: u64
+     var $t1: u64 [unused]
      var $t2: u64
-     var $t3: &mut u64
+     var $t3: &mut u64 [unused]
      var $t4: &mut u64
      var $t5: u64
   0: $t2 := copy($t0)

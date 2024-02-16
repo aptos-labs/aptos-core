@@ -75,13 +75,13 @@ fun m::test($t0: bool): u64 {
 
 [variant baseline]
 fun m::test($t0: bool): u64 {
-     var $t1: u64
-     var $t2: u64
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64
-     var $t6: u64
-     var $t7: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
      var $t8: u64
   0: $t3 := 2
   1: $t3 := infer($t3)

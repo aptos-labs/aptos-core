@@ -396,6 +396,23 @@ impl<'env> FunctionTarget<'env> {
             .collect()
     }
 
+    /// Returns all the mentioned locals (in non-spec-only bytecode instructions).
+    pub fn get_mentioned_locals(&self) -> BTreeSet<TempIndex> {
+        let mut res = BTreeSet::new();
+        for bc in self.get_bytecode() {
+            if bc.is_spec_only() {
+                continue;
+            }
+            bc.sources()
+                .iter()
+                .chain(bc.dests().iter())
+                .for_each(|local| {
+                    res.insert(*local);
+                });
+        }
+        res
+    }
+
     /// Pretty print a bytecode instruction with offset, comments, annotations, and VC information.
     pub fn pretty_print_bytecode(
         &self,
@@ -700,9 +717,13 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
             writeln!(f, ";")?;
         } else {
             writeln!(f, " {{")?;
+            let mentioned_locals = self.get_mentioned_locals();
             for i in self.get_parameter_count()..self.get_local_count() {
                 write!(f, "     var ")?;
                 write_decl(f, i)?;
+                if !mentioned_locals.contains(&i) {
+                    write!(f, " [unused]")?;
+                }
                 writeln!(f)?;
             }
             let label_offsets = Bytecode::label_offsets(self.get_bytecode());

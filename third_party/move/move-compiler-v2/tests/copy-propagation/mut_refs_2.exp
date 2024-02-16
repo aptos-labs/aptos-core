@@ -116,7 +116,7 @@ fun m::test($t0: m::S): u64 {
      var $t1: u64
      var $t2: m::S
      var $t3: m::S
-     var $t4: &mut u64
+     var $t4: &mut u64 [unused]
      var $t5: &mut u64
      var $t6: &mut m::S
      var $t7: u64
