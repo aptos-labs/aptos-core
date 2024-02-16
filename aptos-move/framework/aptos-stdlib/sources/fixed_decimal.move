@@ -122,6 +122,16 @@ module aptos_std::fixed_decimal {
         (result as u64)
     }
 
+    #[view]
+    public fun divide_int(int: u64, fixed: u128): u64 {
+        assert!(int <= MAX_U64_DECIMAL_u64, E_INT_TOO_LARGE);
+        assert!(fixed <= MAX_DECIMAL_FIXED_u128, E_FIXED_TOO_LARGE);
+        assert!(fixed != 0, E_DIVIDE_BY_ZERO);
+        let result = (int as u256) * SCALE_FACTOR_u256 / (fixed as u256);
+        assert!(result <= MAX_U64_DECIMAL_u256, E_OVERFLOW);
+        (result as u64)
+    }
+
     /// For when division by zero will not happen, but overflow might. A performance optimization
     /// that enables low-cost checks from calling functions.
     public inline fun from_ratio_optimistic(numerator: u64, denominator: u64): (u256, bool) {
@@ -140,6 +150,12 @@ module aptos_std::fixed_decimal {
             result, // Value before casting back to `u64`.
             result > MAX_U64_DECIMAL_u256, // True if result overflows max power of ten in `u64`.
         )
+    }
+
+    /// For when integer and fixed decimal inputs are valid, and the result is known to not
+    /// overflow. A performance optimization that enables low-cost checks from calling functions.
+    public inline fun divide_int_optimistic(int: u64, fixed: u128): u64 {
+        ((int as u256) * SCALE_FACTOR_u256 / (fixed as u256) as u64)
     }
 
     /// For fixed decimal inputs that are known to be valid, but the result might overflow. A
@@ -333,6 +349,41 @@ module aptos_std::fixed_decimal {
         assert!(result == 2 * MAX_U64_DECIMAL_u256, 0);
         assert!(overflows, 0);
     }
+
+    #[test]
+    fun test_divide_int() {
+        assert!(divide_int(1, UNITY_u128) == 1, 0);
+        assert!(divide_int(1, 1) == MAX_U64_DECIMAL_u64, 0);
+        assert!(divide_int(MAX_U64_DECIMAL_u64, MAX_DECIMAL_FIXED_u128) == 1, 0);
+    }
+
+    #[test, expected_failure(abort_code = E_INT_TOO_LARGE, location = Self)]
+    fun test_divide_int_int_too_large() {
+        divide_int(MAX_U64_DECIMAL_u64 + 1, UNITY_u128);
+    }
+
+    #[test, expected_failure(abort_code = E_FIXED_TOO_LARGE, location = Self)]
+    fun test_divide_int_fixed_too_large() {
+        divide_int(1, MAX_DECIMAL_FIXED_u128 + 1);
+    }
+
+    #[test, expected_failure(abort_code = E_DIVIDE_BY_ZERO, location = Self)]
+    fun test_divide_int_divide_by_zero() {
+        divide_int(1, 0);
+    }
+
+    #[test, expected_failure(abort_code = E_OVERFLOW, location = Self)]
+    fun test_divide_int_overflow() {
+        divide_int(MAX_U64_DECIMAL_u64 / 2 + 1, UNITY_u128 / 2);
+    }
+
+    #[test]
+    fun test_divide_int_optimistic() {
+        assert!(divide_int_optimistic(1, UNITY_u128) == 1, 0);
+        assert!(divide_int_optimistic(1, 1) == MAX_U64_DECIMAL_u64, 0);
+        assert!(divide_int_optimistic(MAX_U64_DECIMAL_u64, MAX_DECIMAL_FIXED_u128) == 1, 0);
+    }
+
 
     #[test]
     fun test_multiply_optimistic() {

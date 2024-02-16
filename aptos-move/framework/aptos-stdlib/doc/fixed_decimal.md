@@ -29,8 +29,10 @@ as a <code>u128</code>) will have a result of 1. For more, see <code><a href="fi
 -  [Function `multiply`](#0x1_fixed_decimal_multiply)
 -  [Function `divide`](#0x1_fixed_decimal_divide)
 -  [Function `scale_int`](#0x1_fixed_decimal_scale_int)
+-  [Function `divide_int`](#0x1_fixed_decimal_divide_int)
 -  [Function `from_ratio_optimistic`](#0x1_fixed_decimal_from_ratio_optimistic)
 -  [Function `scale_int_optimistic`](#0x1_fixed_decimal_scale_int_optimistic)
+-  [Function `divide_int_optimistic`](#0x1_fixed_decimal_divide_int_optimistic)
 -  [Function `multiply_optimistic`](#0x1_fixed_decimal_multiply_optimistic)
 -  [Function `divide_optimistic`](#0x1_fixed_decimal_divide_optimistic)
 
@@ -499,6 +501,36 @@ Inputs do not necessarily need to be within max representable <code>u64</code> v
 
 </details>
 
+<a id="0x1_fixed_decimal_divide_int"></a>
+
+## Function `divide_int`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_divide_int">divide_int</a>(int: u64, fixed: u128): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_divide_int">divide_int</a>(int: u64, fixed: u128): u64 {
+    <b>assert</b>!(int &lt;= <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u64">MAX_U64_DECIMAL_u64</a>, <a href="fixed_decimal.md#0x1_fixed_decimal_E_INT_TOO_LARGE">E_INT_TOO_LARGE</a>);
+    <b>assert</b>!(fixed &lt;= <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_DECIMAL_FIXED_u128">MAX_DECIMAL_FIXED_u128</a>, <a href="fixed_decimal.md#0x1_fixed_decimal_E_FIXED_TOO_LARGE">E_FIXED_TOO_LARGE</a>);
+    <b>assert</b>!(fixed != 0, <a href="fixed_decimal.md#0x1_fixed_decimal_E_DIVIDE_BY_ZERO">E_DIVIDE_BY_ZERO</a>);
+    <b>let</b> result = (int <b>as</b> u256) * <a href="fixed_decimal.md#0x1_fixed_decimal_SCALE_FACTOR_u256">SCALE_FACTOR_u256</a> / (fixed <b>as</b> u256);
+    <b>assert</b>!(result &lt;= <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u256">MAX_U64_DECIMAL_u256</a>, <a href="fixed_decimal.md#0x1_fixed_decimal_E_OVERFLOW">E_OVERFLOW</a>);
+    (result <b>as</b> u64)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_fixed_decimal_from_ratio_optimistic"></a>
 
 ## Function `from_ratio_optimistic`
@@ -552,6 +584,32 @@ performance optimization that enables low-cost checks from calling functions.
         result, // Value before casting back <b>to</b> `u64`.
         result &gt; <a href="fixed_decimal.md#0x1_fixed_decimal_MAX_U64_DECIMAL_u256">MAX_U64_DECIMAL_u256</a>, // True <b>if</b> result overflows max power of ten in `u64`.
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fixed_decimal_divide_int_optimistic"></a>
+
+## Function `divide_int_optimistic`
+
+For when integer and fixed decimal inputs are valid, and the result is known to not
+overflow. A performance optimization that enables low-cost checks from calling functions.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_divide_int_optimistic">divide_int_optimistic</a>(int: u64, fixed: u128): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="fixed_decimal.md#0x1_fixed_decimal_divide_int_optimistic">divide_int_optimistic</a>(int: u64, fixed: u128): u64 {
+    ((int <b>as</b> u256) * <a href="fixed_decimal.md#0x1_fixed_decimal_SCALE_FACTOR_u256">SCALE_FACTOR_u256</a> / (fixed <b>as</b> u256) <b>as</b> u64)
 }
 </code></pre>
 
