@@ -32,7 +32,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
-        let vm = AptosVM::new(&argument.as_move_resolver());
+        let vm = AptosVM::new_with_delayed_fields(&argument.as_move_resolver());
 
         Self {
             vm,

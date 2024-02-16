@@ -172,6 +172,22 @@ pub struct AptosVM {
 
 impl AptosVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+        Self::new_impl(resolver, resolver.is_delayed_field_optimization_capable())
+    }
+
+    pub(crate) fn new_with_delayed_fields(resolver: &impl AptosMoveResolver) -> Self {
+        Self::new_impl(resolver, true)
+    }
+
+    // Used by simulation & view functions.
+    fn new_no_delayed_fields(resolver: &impl AptosMoveResolver) -> Self {
+        Self::new_impl(resolver, false)
+    }
+
+    fn new_impl(
+        resolver: &impl AptosMoveResolver,
+        is_delayed_field_optimization_capable: bool,
+    ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
         let features = Features::fetch_config(resolver).unwrap_or_default();
@@ -196,6 +212,8 @@ impl AptosVM {
         }
         let timed_features = timed_features_builder.build();
 
+        let aggregator_vw_type_tagging = is_delayed_field_optimization_capable
+            && features.is_aggregator_v2_delayed_fields_enabled();
         let move_vm = MoveVmExt::new(
             native_gas_params,
             misc_gas_params,
@@ -204,6 +222,7 @@ impl AptosVM {
             features.clone(),
             timed_features.clone(),
             resolver,
+            aggregator_vw_type_tagging,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -218,7 +237,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn new_session<'r, S: AptosMoveResolver>(
+    pub fn new_session<'r, S: AptosMoveResolver>(
         &self,
         resolver: &'r S,
         session_id: SessionId,
@@ -1801,7 +1820,7 @@ impl AptosVM {
         gas_budget: u64,
     ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new_no_delayed_fields(&resolver);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let mut gas_meter = match Self::memory_tracked_gas_meter(&vm, &log_context, gas_budget) {
             Ok(gas_meter) => gas_meter,
@@ -2235,7 +2254,7 @@ pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
-        let mut vm = AptosVM::new(resolver);
+        let mut vm = AptosVM::new_no_delayed_fields(resolver);
         vm.is_simulation = true;
         Self(vm)
     }

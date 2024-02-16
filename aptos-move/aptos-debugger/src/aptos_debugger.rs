@@ -268,6 +268,7 @@ impl AptosDebugger {
             features,
             TimedFeaturesBuilder::enable_all().build(),
             &state_view_storage,
+            /*aggregator_v2_type_tagging*/ false,
         )
         .unwrap();
         let mut session = move_vm.new_session(&state_view_storage, SessionId::Void);

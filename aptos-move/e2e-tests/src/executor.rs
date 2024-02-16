@@ -809,6 +809,7 @@ impl FakeExecutor {
             self.features.clone(),
             timed_features,
             &resolver,
+            false,
         )
         .unwrap();
 
@@ -886,6 +887,7 @@ impl FakeExecutor {
                     a2.lock().unwrap().push(expression);
                 }),
                 &resolver,
+                /*aggregator_v2_type_tagging=*/ false,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void());
@@ -959,6 +961,7 @@ impl FakeExecutor {
                 self.features.clone(),
                 timed_features,
                 &resolver,
+                false,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void());
@@ -1022,6 +1025,7 @@ impl FakeExecutor {
             features.clone(),
             timed_features,
             &resolver,
+            features.is_aggregator_v2_delayed_fields_enabled(),
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void());
@@ -1077,6 +1081,7 @@ impl FakeExecutor {
             // FIXME: should probably read the timestamp from storage.
             TimedFeaturesBuilder::enable_all().build(),
             &resolver,
+            false,
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void());
