@@ -52,7 +52,6 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
 
 impl SplitCriticalEdgesProcessor {
     /// Checks the precondition of the transformaiton; cf. module documentation.
-    #[cfg(debug_assertions)]
     fn check_precondition(data: &FunctionData) {
         for instr in &data.code {
             if matches!(instr, Bytecode::Call(_, _, _, _, Some(_))) {
@@ -62,7 +61,6 @@ impl SplitCriticalEdgesProcessor {
     }
 
     /// Checks the postcondition of the transformation; cf. module documentation.
-    #[cfg(debug_assertions)]
     fn check_postcondition(code: &[Bytecode]) {
         use move_stackless_bytecode::stackless_control_flow_graph::{
             BlockId, StacklessControlFlowGraph,
