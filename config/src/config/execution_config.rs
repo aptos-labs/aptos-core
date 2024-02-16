@@ -31,6 +31,8 @@ pub struct ExecutionConfig {
     pub num_proof_reading_threads: u16,
     /// Enables paranoid mode for types, which adds extra runtime VM checks
     pub paranoid_type_verification: bool,
+    /// Enabled discarding blocks that fail execution due to BlockSTM/VM issue.
+    pub discard_failed_blocks: bool,
     /// Enables paranoid mode for hot potatoes, which adds extra runtime VM checks
     pub paranoid_hot_potato_verification: bool,
     /// Enables enhanced metrics around processed transactions
@@ -67,6 +69,7 @@ impl Default for ExecutionConfig {
             num_proof_reading_threads: 32,
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
+            discard_failed_blocks: false,
             processed_transactions_detailed_counters: false,
             transaction_filter: Filter::empty(),
             genesis_waypoint: None,

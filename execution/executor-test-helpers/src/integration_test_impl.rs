@@ -14,13 +14,17 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
 };
-use aptos_storage_interface::{state_view::DbStateViewAtVersion, DbReaderWriter, Order};
+use aptos_storage_interface::{
+    state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},
+    DbReaderWriter, Order,
+};
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
+    ledger_info::LedgerInfo,
     state_store::account_with_state_view::{AccountWithStateView, AsAccountWithStateView},
     test_helpers::transaction_test_helpers::{block, TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG},
     transaction::{
@@ -192,38 +196,40 @@ pub fn test_execution_with_storage_impl_inner(
         Ok(TrustedStateChange::Epoch { new_state, .. }) => new_state,
         _ => panic!("unexpected state change"),
     };
-    let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(trusted_state.version(), 11);
+    let latest_li = state_proof.latest_ledger_info();
+    let current_version = latest_li.version();
+    assert_eq!(trusted_state.version(), current_version);
+    assert_eq!(current_version, 11);
 
     let t5 = db
         .reader
         .get_transaction_by_version(5, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&t5, &block1[4]).unwrap();
+    verify_committed_txn_status(latest_li, &t5, &block1[4]).unwrap();
 
     let t6 = db
         .reader
         .get_transaction_by_version(6, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&t6, &block1[5]).unwrap();
+    verify_committed_txn_status(latest_li, &t6, &block1[5]).unwrap();
 
     let t7 = db
         .reader
         .get_transaction_by_version(7, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&t7, &block1[6]).unwrap();
+    verify_committed_txn_status(latest_li, &t7, &block1[6]).unwrap();
 
     let reconfig1 = db
         .reader
         .get_transaction_by_version(11, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&reconfig1, &block1[10]).unwrap();
+    verify_committed_txn_status(latest_li, &reconfig1, &block1[10]).unwrap();
 
     let t8 = db
         .reader
         .get_transaction_by_version(8, current_version, true)
         .unwrap();
-    verify_committed_txn_status(&t8, &block1[7]).unwrap();
+    verify_committed_txn_status(latest_li, &t8, &block1[7]).unwrap();
     // We requested the events to come back from this one, so verify that they did
     assert_eq!(t8.events.unwrap().len(), 5);
 
@@ -231,15 +237,16 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transaction_by_version(9, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&t9, &block1[8]).unwrap();
+    verify_committed_txn_status(latest_li, &t9, &block1[8]).unwrap();
 
     let t10 = db
         .reader
         .get_transaction_by_version(10, current_version, true)
         .unwrap();
-    verify_committed_txn_status(&t10, &block1[9]).unwrap();
+    verify_committed_txn_status(latest_li, &t10, &block1[9]).unwrap();
 
     // test the initial balance.
+    // not a state checkpoint, can't get verified view
     let db_state_view = db.reader.state_view_at_version(Some(7)).unwrap();
     let account1_view = db_state_view.as_account_with_state_view(&account1_address);
     verify_account_balance(get_account_balance(&account1_view), |x| x == 2_000 * B).unwrap();
@@ -253,7 +260,7 @@ pub fn test_execution_with_storage_impl_inner(
     // test the final balance.
     let db_state_view = db
         .reader
-        .state_view_at_version(Some(current_version))
+        .verified_state_view_at_version(Some(current_version), latest_li)
         .unwrap();
     let account1_view = db_state_view.as_account_with_state_view(&account1_address);
     verify_account_balance(get_account_balance(&account1_view), |x| {
@@ -361,7 +368,7 @@ pub fn test_execution_with_storage_impl_inner(
         assert_eq!(account3_received_events.len(), 3);
         let account4_resource = db
             .reader
-            .state_view_at_version(Some(current_version))
+            .verified_state_view_at_version(Some(current_version), latest_li)
             .unwrap()
             .as_account_with_state_view(&account4.address())
             .get_account_resource()
@@ -398,7 +405,9 @@ pub fn test_execution_with_storage_impl_inner(
         Ok(TrustedStateChange::Epoch { new_state, .. }) => new_state,
         _ => panic!("unexpected state change"),
     };
-    let current_version = state_proof.latest_ledger_info().version();
+    let latest_li = state_proof.latest_ledger_info();
+    let current_version = latest_li.version();
+    assert_eq!(trusted_state.version(), current_version);
     assert_eq!(current_version, 13);
 
     let output3 = executor
@@ -416,7 +425,8 @@ pub fn test_execution_with_storage_impl_inner(
         Ok(TrustedStateChange::Version { new_state, .. }) => new_state,
         _ => panic!("unexpected state change"),
     };
-    let current_version = state_proof.latest_ledger_info().version();
+    let latest_li = state_proof.latest_ledger_info();
+    let current_version = latest_li.version();
     assert_eq!(current_version, 29);
 
     // More verification
@@ -424,17 +434,17 @@ pub fn test_execution_with_storage_impl_inner(
         .reader
         .get_transaction_by_version(15, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&t15, &block3[1]).unwrap();
+    verify_committed_txn_status(latest_li, &t15, &block3[1]).unwrap();
 
     let t28 = db
         .reader
         .get_transaction_by_version(28, current_version, false)
         .unwrap();
-    verify_committed_txn_status(&t28, &block3[14]).unwrap();
+    verify_committed_txn_status(latest_li, &t28, &block3[14]).unwrap();
 
     let db_state_view = db
         .reader
-        .state_view_at_version(Some(current_version))
+        .verified_state_view_at_version(Some(current_version), latest_li)
         .unwrap();
 
     let account1_view = db_state_view.as_account_with_state_view(&account1_address);
@@ -591,9 +601,14 @@ pub fn verify_transactions(
 }
 
 pub fn verify_committed_txn_status(
+    latest_li: &LedgerInfo,
     txn_with_proof: &TransactionWithProof,
     expected_txn: &SignatureVerifiedTransaction,
 ) -> Result<()> {
+    txn_with_proof
+        .proof
+        .verify(latest_li, txn_with_proof.version)?;
+
     let txn = &txn_with_proof.transaction;
 
     ensure!(

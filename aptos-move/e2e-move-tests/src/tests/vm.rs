@@ -28,7 +28,10 @@ fn failed_transaction_cleanup_charges_gas(status_code: StatusCode) {
         .sign();
 
     let state_view = h.executor.get_state_view();
-    let vm = AptosVM::new(&state_view.as_move_resolver());
+    let vm = AptosVM::new(
+        &state_view.as_move_resolver(),
+        /*override_is_delayed_field_optimization_capable=*/ Some(false),
+    );
 
     let balance = 10_000;
     let output = vm

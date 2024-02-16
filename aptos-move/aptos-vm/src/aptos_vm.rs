@@ -97,6 +97,7 @@ static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
 static NUM_EXECUTION_SHARD: OnceCell<usize> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
+static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
@@ -167,17 +168,20 @@ pub struct AptosVM {
 }
 
 impl AptosVM {
-    pub fn new(resolver: &impl AptosMoveResolver) -> Self {
+    pub fn new(
+        resolver: &impl AptosMoveResolver,
+        override_is_delayed_field_optimization_capable: Option<bool>,
+    ) -> Self {
         let _timer = TIMER.timer_with(&["AptosVM::new"]);
 
+        let features = Features::fetch_config(resolver).unwrap_or_default();
         let (
             gas_params,
             storage_gas_params,
             native_gas_params,
             misc_gas_params,
             gas_feature_version,
-        ) = get_gas_parameters(resolver);
-        let features = Features::fetch_config(resolver).unwrap_or_default();
+        ) = get_gas_parameters(&features, resolver);
 
         // If no chain ID is in storage, we assume we are in a testing environment and use ChainId::TESTING
         let chain_id = ChainId::fetch_config(resolver).unwrap_or_else(ChainId::test);
@@ -187,10 +191,18 @@ impl AptosVM {
             .unwrap_or(0);
 
         let mut timed_features_builder = TimedFeaturesBuilder::new(chain_id, timestamp);
-        if let Some(profile) = crate::AptosVM::get_timed_feature_override() {
+        if let Some(profile) = Self::get_timed_feature_override() {
             timed_features_builder = timed_features_builder.with_override_profile(profile)
         }
         let timed_features = timed_features_builder.build();
+
+        // If aggregator execution is enabled, we need to tag aggregator_v2 types,
+        // so they can be exchanged with identifiers during VM execution.
+        let override_is_delayed_field_optimization_capable =
+            override_is_delayed_field_optimization_capable
+                .unwrap_or_else(|| resolver.is_delayed_field_optimization_capable());
+        let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
+            && features.is_aggregator_v2_delayed_fields_enabled();
 
         let move_vm = MoveVmExt::new(
             native_gas_params,
@@ -200,6 +212,7 @@ impl AptosVM {
             features,
             timed_features.clone(),
             resolver,
+            aggregator_v2_type_tagging,
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
@@ -213,7 +226,7 @@ impl AptosVM {
         }
     }
 
-    pub(crate) fn new_session<'r, S: AptosMoveResolver>(
+    pub fn new_session<'r, S: AptosMoveResolver>(
         &self,
         resolver: &'r S,
         session_id: SessionId,
@@ -268,6 +281,20 @@ impl AptosVM {
         match PARANOID_TYPE_CHECKS.get() {
             Some(enable) => *enable,
             None => true,
+        }
+    }
+
+    /// Sets runtime config when invoked the first time.
+    pub fn set_discard_failed_blocks(enable: bool) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        DISCARD_FAILED_BLOCKS.set(enable).ok();
+    }
+
+    /// Get the discard failed blocks flag if already set, otherwise return default (false)
+    pub fn get_discard_failed_blocks() -> bool {
+        match DISCARD_FAILED_BLOCKS.get() {
+            Some(enable) => *enable,
+            None => false,
         }
     }
 
@@ -484,7 +511,8 @@ impl AptosVM {
                 })?;
 
             let mut change_set = session.finish(change_set_configs)?;
-            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data) {
+            if let Err(err) = self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)
+            {
                 info!(
                     *log_context,
                     "Failed during charge_change_set: {:?}. Most likely exceeded gas limited.", err,
@@ -502,7 +530,11 @@ impl AptosVM {
             let storage_refund = fee_statement.storage_fee_refund();
 
             let actual = gas_used * gas_unit_price + storage_fee - storage_refund;
-            let expected = u64::from(gas_params.vm.txn.storage_fee_per_state_slot_create);
+            let expected = u64::from(
+                gas_meter
+                    .disk_space_pricing()
+                    .hack_account_creation_fee_lower_bound(&gas_params.vm.txn),
+            );
             // With the current gas schedule actual is expected to be 50_000 or higher, the cost
             // for the account slot.
             if actual < expected {
@@ -728,6 +760,7 @@ impl AptosVM {
         change_set: &mut VMChangeSet,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
+        resolver: &impl AptosMoveResolver,
     ) -> Result<GasQuantity<Octa>, VMStatus> {
         for (key, op_size) in change_set.write_set_size_iter() {
             gas_meter.charge_io_gas_for_write(key, &op_size)?;
@@ -737,6 +770,7 @@ impl AptosVM {
             change_set,
             txn_data.transaction_size,
             txn_data.gas_unit_price,
+            resolver.as_executor_view(),
         )?;
         if !self.features().is_storage_deletion_refund_enabled() {
             storage_refund = 0.into();
@@ -754,7 +788,8 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
     ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
         let mut change_set = session.finish(change_set_configs)?;
-        let storage_refund = self.charge_change_set(&mut change_set, gas_meter, txn_data)?;
+        let storage_refund =
+            self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
 
         // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
@@ -1706,7 +1741,10 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let resolver = state_view.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver,
+            /*override_is_delayed_field_optimization_capable=*/ Some(false),
+        );
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let mut gas_meter = match vm.make_standard_gas_meter(max_gas_amount.into(), &log_context) {
             Ok(gas_meter) => gas_meter,
@@ -1992,6 +2030,7 @@ impl VMExecutor for AptosVM {
                 local: BlockExecutorLocalConfig {
                     concurrency_level: Self::get_concurrency_level(),
                     allow_fallback: true,
+                    discard_failed_blocks: Self::get_discard_failed_blocks(),
                 },
                 onchain: onchain_config,
             },
@@ -2119,7 +2158,10 @@ pub struct AptosSimulationVM(AptosVM);
 
 impl AptosSimulationVM {
     pub fn new(resolver: &impl AptosMoveResolver) -> Self {
-        let mut vm = AptosVM::new(resolver);
+        let mut vm = AptosVM::new(
+            resolver,
+            /*override_is_delayed_field_optimization_capable=*/ Some(false),
+        );
         vm.is_simulation = true;
         Self(vm)
     }

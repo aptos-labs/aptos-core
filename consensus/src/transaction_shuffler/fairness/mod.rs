@@ -105,7 +105,7 @@ impl<'a, const NUM_CONFLICT_ZONES: usize> FairnessShufflerImpl<'a, NUM_CONFLICT_
     /// both passes, that's O(2n). And each transaction comes out of each conflict zones at most
     /// once, that's O(3n). In either case, the transaction is examined by going through all 3
     /// conflict zones and all 3 pending zones. So the time complexity is O(9n) = O(n). Or if we
-    /// consider `NUM_CONFLICT_ZONES = m`, the time complexity is O(mn).
+    /// consider `NUM_CONFLICT_ZONES = m`, the time complexity is O(m*m*n).
     pub fn shuffle(mut self) -> Vec<TxnIdx> {
         // First pass, only select transactions with no conflicts in all conflict zones
         while let Some(txn_idx) = self.selection_tracker.next_unselected() {

@@ -324,7 +324,7 @@ module std::features {
 
     const VM_BINARY_FORMAT_V7: u64 = 40;
 
-    const RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM: u64 = 41;
+    const RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET: u64 = 41;
 
     /// Whether the operator commission rate change in delegation pool is enabled.
     /// Lifetime: transient
@@ -390,6 +390,12 @@ module std::features {
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
         // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
         is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
+    }
+
+    /// Whether deploying to objects is enabled.
+    const OBJECT_CODE_DEPLOYMENT: u64 = 52;
+    public fun is_object_code_deployment_enabled(): bool acquires Features {
+        is_enabled(OBJECT_CODE_DEPLOYMENT)
     }
 
     // ============================================================================================

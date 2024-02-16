@@ -68,6 +68,14 @@ pub trait TAggregatorV1View {
         Ok(maybe_state_value.map(StateValue::into_metadata))
     }
 
+    fn get_aggregator_v1_state_value_size(
+        &self,
+        id: &Self::Identifier,
+    ) -> PartialVMResult<Option<u64>> {
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
+        Ok(maybe_state_value.map(|v| v.size() as u64))
+    }
+
     /// Consumes a single delta of aggregator V1, and tries to materialize it
     /// with a given identifier (state key). If materialization succeeds, a
     /// write op is produced.

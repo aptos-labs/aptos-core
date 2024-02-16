@@ -265,7 +265,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         tdbg!("publishing");
         for module in group.iter() {
             let mut b = vec![];
-            module.serialize(&mut b).map_err(|_| Corpus::Keep)?;
+            module.serialize(&mut b).map_err(|_| Corpus::Reject)?;
+            CompiledModule::deserialize(&b).map_err(|_| Corpus::Reject)?;
             vm.add_module(&module.self_id(), b);
         }
         tdbg!("published");

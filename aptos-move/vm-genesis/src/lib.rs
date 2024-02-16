@@ -119,6 +119,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -230,6 +231,7 @@ pub fn encode_genesis_change_set(
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -450,13 +452,15 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         FeatureFlag::BN254_STRUCTURES,
-        FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+        FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
         // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
         FeatureFlag::ZK_ID_SIGNATURES,
         FeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
         FeatureFlag::JWK_CONSENSUS,
+        FeatureFlag::REFUNDABLE_BYTES,
+        FeatureFlag::OBJECT_CODE_DEPLOYMENT,
     ]
 }
 
@@ -974,6 +978,7 @@ pub fn test_genesis_module_publishing() {
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();

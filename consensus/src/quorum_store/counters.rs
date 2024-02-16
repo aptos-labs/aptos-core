@@ -618,6 +618,17 @@ pub static BATCH_CREATION_COMPUTE_LATENCY: Lazy<DurationHistogram> = Lazy::new(|
     )
 });
 
+/// Histogram of the time it takes to persist batches generated locally to the DB.
+pub static BATCH_CREATION_PERSIST_LATENCY: Lazy<DurationHistogram> = Lazy::new(|| {
+    DurationHistogram::new(
+        register_histogram!(
+            "quorum_store_batch_creation_persist_latency",
+            "Histogram of the time it takes to persist batches generated locally to the DB.",
+        )
+        .unwrap(),
+    )
+});
+
 /// Histogram of the time durations from created batch to created PoS.
 pub static BATCH_TO_POS_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     DurationHistogram::new(

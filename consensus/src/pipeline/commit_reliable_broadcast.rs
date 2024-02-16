@@ -37,6 +37,14 @@ impl CommitMessage {
             CommitMessage::Nack => bail!("Unexpected NACK in incoming commit message"),
         }
     }
+
+    pub fn epoch(&self) -> Option<u64> {
+        match self {
+            CommitMessage::Vote(vote) => Some(vote.epoch()),
+            CommitMessage::Decision(decision) => Some(decision.epoch()),
+            _ => None,
+        }
+    }
 }
 
 impl RBMessage for CommitMessage {}

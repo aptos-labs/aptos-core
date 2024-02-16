@@ -12,7 +12,7 @@ use crate::{
 use aptos_logger::info;
 use aptos_schemadb::{SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_other_bail as bail, state_view::DbStateView, AptosDbError, DbReader, Result,
+    db_other_bail as bail, state_view::DbStateViewAtVersion, AptosDbError, DbReader, Result,
 };
 use aptos_types::{
     access_path::Path,
@@ -82,10 +82,7 @@ impl IndexerAsyncV2 {
         end_early_if_pending_on_empty: bool,
     ) -> Result<()> {
         let last_version = first_version + write_sets.len() as Version;
-        let state_view = DbStateView {
-            db: db_reader,
-            version: Some(last_version),
-        };
+        let state_view = db_reader.state_view_at_version(Some(last_version))?;
         let resolver = state_view.as_move_resolver();
         let annotator = MoveValueAnnotator::new(&resolver);
         self.index_with_annotator(

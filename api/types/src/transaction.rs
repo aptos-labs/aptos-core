@@ -25,7 +25,7 @@ use aptos_types::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
             SingleKeyAuthenticator, TransactionAuthenticator, MAX_NUM_OF_SIGS,
         },
-        webauthn::PartialAuthenticatorAssertionResponse,
+        webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
     zkid,
@@ -1177,12 +1177,18 @@ pub struct WebAuthnSignature {
 impl VerifyInput for WebAuthnSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
+        let signature_len = self.signature.inner().len();
 
         // Currently only takes Secp256r1Ecdsa. If other signature schemes are introduced, modify this to accommodate them
         if public_key_len != PUBLIC_KEY_LENGTH {
             bail!(
                 "The public key provided is an invalid number of bytes, should be {} bytes but found {}. Note WebAuthn signatures only support Secp256r1Ecdsa at this time.",
                 secp256r1_ecdsa::PUBLIC_KEY_LENGTH, public_key_len
+            )
+        } else if signature_len > MAX_WEBAUTHN_SIGNATURE_BYTES {
+            bail!(
+                "The WebAuthn signature length is greater than the maximum number of {} bytes: found {} bytes.",
+                MAX_WEBAUTHN_SIGNATURE_BYTES, signature_len
             )
         } else {
             // TODO: Check if they match / parse correctly?

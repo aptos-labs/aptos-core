@@ -4,7 +4,7 @@
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_store::BatchStore,
+        batch_store::{BatchStore, BatchWriter},
         counters,
         types::{Batch, PersistedValue},
     },
