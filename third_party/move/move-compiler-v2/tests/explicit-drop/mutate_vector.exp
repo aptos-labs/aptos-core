@@ -82,7 +82,7 @@ public fun m::scalar_zero(): m::Scalar {
   3: return $t0
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 public fun m::new_scalar_from_u8($t0: u8): m::Scalar {

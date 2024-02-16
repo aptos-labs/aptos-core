@@ -38,7 +38,7 @@ fun explicate_drop::test0(): u8 {
   5: return $t0
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun explicate_drop::test0(): u8 {

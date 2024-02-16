@@ -119,7 +119,7 @@ fun m::drop_after_loop() {
  28: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun m::drop_after_loop() {

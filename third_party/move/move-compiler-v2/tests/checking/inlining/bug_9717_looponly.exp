@@ -235,7 +235,7 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
  46: return $t1
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {

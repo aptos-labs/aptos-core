@@ -115,7 +115,7 @@ fun ability::no_key($t0: address) {
   6: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun ability::invalid_copy() {

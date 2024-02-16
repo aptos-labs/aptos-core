@@ -33,7 +33,7 @@ fun test::test(): test::U<test::S<test::T>> {
   4: return $t0
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun test::test(): test::U<test::S<test::T>> {

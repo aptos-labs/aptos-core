@@ -108,7 +108,7 @@ fun explicate_drop::unused_var() {
   2: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun explicate_drop::id<#0>($t0: #0): #0 {

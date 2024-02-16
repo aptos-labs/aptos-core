@@ -378,7 +378,7 @@ fun operators::order($t0: u64, $t1: u64): bool {
  24: return $t2
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun operators::arithm($t0: u64, $t1: u64): u64 {

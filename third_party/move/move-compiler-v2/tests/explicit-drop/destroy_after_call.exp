@@ -69,7 +69,7 @@ fun m::g() {
   8: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun m::f($t0: &mut u64): &mut u64 {

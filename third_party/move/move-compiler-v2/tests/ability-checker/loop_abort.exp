@@ -157,7 +157,7 @@ fun Test::test2($t0: bool) {
  13: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun Test::test0() {

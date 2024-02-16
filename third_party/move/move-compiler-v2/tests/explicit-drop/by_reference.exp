@@ -410,7 +410,7 @@ fun <SELF>_0::check() {
 103: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun <SELF>_0::check() {

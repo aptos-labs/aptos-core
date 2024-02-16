@@ -193,7 +193,7 @@ fun m::test_for_each_mut() {
  44: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun m::test_for_each_mut() {

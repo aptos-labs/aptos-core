@@ -79,7 +79,7 @@ public fun M::test_resource($t0: &signer) {
  16: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 public fun M::test_resource($t0: &signer) {

@@ -247,7 +247,7 @@ fun vectors::test_for_each_mut() {
  48: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun vectors::test_for_each_mut() {

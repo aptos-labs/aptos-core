@@ -76,7 +76,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
  15: return $t2
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
