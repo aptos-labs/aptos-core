@@ -29,6 +29,7 @@ bcs = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 derivative = { workspace = true }
+fixed = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 jsonwebtoken = { workspace = true }

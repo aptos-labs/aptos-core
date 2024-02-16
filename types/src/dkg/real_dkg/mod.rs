@@ -16,8 +16,7 @@ use aptos_dkg::{
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use rounding::{
-    RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD, STEP_SIZE, WEIGHT_PER_VALIDATOR_MAX,
-    WEIGHT_PER_VALIDATOR_MIN,
+    RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -57,23 +56,14 @@ pub fn build_dkg_pvss_config(
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
 
-    // // For mainnet-like testing
-    // let validator_stakes: Vec<u64> = MAINNET_STAKES.to_vec();
-    // assert!(validator_stakes.len() == next_validator_set.active_validators.len());
-
-    let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * next_validators.len();
-    let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * next_validators.len();
     let dkg_rounding = DKGRounding::new(
-        validator_stakes.clone(),
-        total_weight_min,
-        total_weight_max,
-        STEP_SIZE,
+        &validator_stakes,
         SECRECY_THRESHOLD,
         RECONSTRUCT_THRESHOLD,
     );
 
     println!(
-        "[Randomness] rounding: epoch {} starts {:?}",
+        "[Randomness] rounding: epoch {} starts, profile = {:?}",
         cur_epoch, dkg_rounding.profile
     );
 

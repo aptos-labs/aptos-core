@@ -1,30 +1,63 @@
 // Copyright © Aptos Foundation
 
 use crate::dkg::real_dkg::rounding::{
-    DKGRounding, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD, STEP_SIZE, WEIGHT_PER_VALIDATOR_MAX,
-    WEIGHT_PER_VALIDATOR_MIN,
+    total_weight_lower_bound, total_weight_upper_bound, DKGRounding, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD
 };
+use aptos_dkg::pvss::WeightedConfig;
 use rand::Rng;
 
 #[test]
 fn compute_mainnet_rounding() {
-    let mainnet_dkg_rounding = DKGRounding::new(
-        MAINNET_STAKES.to_vec(),
-        WEIGHT_PER_VALIDATOR_MIN * MAINNET_STAKES.len(),
-        WEIGHT_PER_VALIDATOR_MAX * MAINNET_STAKES.len(),
-        STEP_SIZE,
+    let validator_stakes = MAINNET_STAKES.to_vec();
+    let dkg_rounding = DKGRounding::new(
+        &validator_stakes,
         SECRECY_THRESHOLD,
         RECONSTRUCT_THRESHOLD,
     );
-    println!("{:?}", mainnet_dkg_rounding.profile);
-    assert!(
-        mainnet_dkg_rounding
-            .profile
-            .validator_weights
-            .iter()
-            .sum::<u64>()
-            <= (WEIGHT_PER_VALIDATOR_MAX * MAINNET_STAKES.len()) as u64
+    // println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
+    // Result:
+    // mainnet rounding profile: total_weight: 437, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.5859020899996102, reconstruct_threshold_in_weights: 237, validator_weights: [10, 1, 9, 9, 1, 1, 9, 9, 1, 7, 8, 5, 2, 1, 9, 7, 1, 2, 1, 9, 2, 1, 1, 9, 1, 8, 10, 1, 1, 9, 1, 1, 1, 7, 9, 1, 1, 9, 1, 9, 1, 3, 1, 8, 1, 1, 7, 10, 3, 2, 1, 9, 1, 9, 1, 3, 8, 1, 10, 1, 1, 1, 9, 3, 8, 8, 3, 10, 1, 1, 7, 9, 2, 5, 2, 9, 9, 1, 4, 1, 1, 1, 1, 1, 2, 10, 1, 1, 9, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 9, 8, 1, 1, 9, 2, 1]
+
+    assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
+
+    let total_weight_min = total_weight_lower_bound(&validator_stakes);
+    let total_weight_max = total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+    let total_weight = dkg_rounding
+        .profile
+        .validator_weights
+        .iter()
+        .sum::<u64>();
+    assert!(total_weight > total_weight_min as u64);
+    assert!(total_weight < total_weight_max as u64);
+}
+
+#[test]
+fn test_rounding_single_validator() {
+    let validator_stakes = vec![1_000_000];
+    let dkg_rounding = DKGRounding::new(
+        &validator_stakes,
+        SECRECY_THRESHOLD,
+        RECONSTRUCT_THRESHOLD,
     );
+    let wconfig = WeightedConfig::new(1, vec![1]).unwrap();
+    assert_eq!(dkg_rounding.wconfig, wconfig);
+}
+
+#[test]
+fn test_rounding_equal_stakes() {
+    let num_runs = 100;
+    let mut rng = rand::thread_rng();
+    for _ in 0..num_runs {
+        let validator_num = rng.gen_range(100, 500);
+        let validator_stakes = vec![1_000_000; validator_num];
+        let dkg_rounding = DKGRounding::new(
+            &validator_stakes,
+            SECRECY_THRESHOLD,
+            RECONSTRUCT_THRESHOLD,
+        );
+        let wconfig = WeightedConfig::new((validator_num as f64 * SECRECY_THRESHOLD).ceil() as usize, vec![1; validator_num]).unwrap();
+        assert_eq!(dkg_rounding.wconfig, wconfig);
+    }
 }
 
 #[test]
@@ -39,20 +72,22 @@ fn test_rounding_uniform_distribution() {
         for _ in 0..validator_num {
             validator_stakes.push(rng.gen_range(1_000_000, 50_000_000));
         }
-        let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * validator_num;
-        let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * validator_num;
         let dkg_rounding = DKGRounding::new(
-            validator_stakes,
-            total_weight_min,
-            total_weight_max,
-            STEP_SIZE,
+            &validator_stakes,
             SECRECY_THRESHOLD,
             RECONSTRUCT_THRESHOLD,
         );
         assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-        assert!(
-            dkg_rounding.profile.validator_weights.iter().sum::<u64>() <= total_weight_max as u64
-        );
+
+        let total_weight_min = total_weight_lower_bound(&validator_stakes);
+        let total_weight_max = total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+        let total_weight = dkg_rounding
+            .profile
+            .validator_weights
+            .iter()
+            .sum::<u64>();
+        assert!(total_weight > total_weight_min as u64);
+        assert!(total_weight < total_weight_max as u64);
     }
 }
 
@@ -80,20 +115,22 @@ fn test_rounding_zipf_distribution() {
     for _ in 0..num_runs {
         let validator_num = rng.gen_range(100, 500);
         let validator_stakes = generate_approximate_zipf(validator_num, 1_000_000, 50_000_000, 5.0);
-        let total_weight_min = WEIGHT_PER_VALIDATOR_MIN * validator_num;
-        let total_weight_max = WEIGHT_PER_VALIDATOR_MAX * validator_num;
         let dkg_rounding = DKGRounding::new(
-            validator_stakes,
-            total_weight_min,
-            total_weight_max,
-            STEP_SIZE,
+            &validator_stakes,
             SECRECY_THRESHOLD,
             RECONSTRUCT_THRESHOLD,
         );
         assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-        assert!(
-            dkg_rounding.profile.validator_weights.iter().sum::<u64>() <= total_weight_max as u64
-        );
+
+        let total_weight_min = total_weight_lower_bound(&validator_stakes);
+        let total_weight_max = total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+        let total_weight = dkg_rounding
+            .profile
+            .validator_weights
+            .iter()
+            .sum::<u64>();
+        assert!(total_weight > total_weight_min as u64);
+        assert!(total_weight < total_weight_max as u64);
     }
 }
 
