@@ -18,7 +18,7 @@ module addr::counter {
     }
 
     #[view]
-    public fun get_counter_value(): u64 acquires Counter {
+    public fun add_and_get_counter_value(): u64 acquires Counter {
         let counter = &mut borrow_global_mut<Counter>(@addr).counter;
         aggregator_v2::add(counter, 10);
         aggregator_v2::read(counter)

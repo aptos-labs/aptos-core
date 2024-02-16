@@ -208,7 +208,7 @@ async fn test_view_aggregator() {
     let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
     context.commit_block(&vec![txn]).await;
 
-    let function = format!("{}::counter::get_counter_value", account.address());
+    let function = format!("{}::counter::add_and_get_counter_value", account.address());
     let resp = context
         .post(
             "/view",
