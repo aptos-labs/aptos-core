@@ -1033,7 +1033,7 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = ["type", "ed25519", "secp256k1_ecdsa", "webauthn", "zkid"]
+    __slots__ = ["type", "signature", "ed25519", "secp256k1_ecdsa", "webauthn", "zkid"]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
@@ -1048,11 +1048,13 @@ class AnySignature(_message.Message):
     TYPE_WEBAUTHN: AnySignature.Type
     TYPE_ZKID: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
     WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
     ZKID_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
+    signature: bytes
     ed25519: Ed25519
     secp256k1_ecdsa: Secp256k1Ecdsa
     webauthn: WebAuthn
@@ -1060,6 +1062,7 @@ class AnySignature(_message.Message):
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
+        signature: _Optional[bytes] = ...,
         ed25519: _Optional[_Union[Ed25519, _Mapping]] = ...,
         secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
         webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,

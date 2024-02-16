@@ -93,6 +93,10 @@ impl RandGenMessage {
     pub fn data(&self) -> &[u8] {
         &self.data
     }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 }
 
 impl core::fmt::Debug for RandGenMessage {

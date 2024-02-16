@@ -83,7 +83,7 @@ Secp256r1EcdsaSignature:
 
 ### Struct and enum changes
 
-`Secp256r1Ecdsa` was also added as an enum variant on `AnyPublicKey`, so the appropriate updates must be made to the  `AnyPublicKey` enum:
+`Secp256r1Ecdsa` was also added as an enum variant on `AnyPublicKey`, so the appropriate updates must be made to the `AnyPublicKey` enum:
 
 ```yaml
 AnyPublicKey:
@@ -129,6 +129,15 @@ Ensure that the changes above are synchronized across all of these files:
 - [x] consensus.yaml
 
 > Note: Because `[api|aptos|consensus].rs`, are already tracking the `AnyPublicKey` and `AnySignature` struct, no further tracers are necessary here
+
+Additionally, ensure that `enums` are tracked correctly across `[api|aptos|consensus].rs`
+```rust
+fn get_registry(){
+    ...
+    tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
+    ...
+}
+```
 
 Lastly ensure that the struct has the appropriate serde macros if needed. In this case, we want to serialize
 `PartialAuthenticatorAssertionResponse`'s `authenticator_data` and `client_data_json`'s `Vec<u8>` to `BYTES` 

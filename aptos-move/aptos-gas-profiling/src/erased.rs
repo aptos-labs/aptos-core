@@ -151,6 +151,7 @@ impl ExecutionGasEvent {
             LoadResource { addr, ty, cost } => {
                 Node::new(format!("load<{}::{}>", Render(addr), ty), *cost)
             },
+            CreateTy { cost } => Node::new("create_ty", *cost),
         }
     }
 }

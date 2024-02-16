@@ -324,7 +324,7 @@ module std::features {
 
     const VM_BINARY_FORMAT_V7: u64 = 40;
 
-    const RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM: u64 = 41;
+    const RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET: u64 = 41;
 
     /// Whether the operator commission rate change in delegation pool is enabled.
     /// Lifetime: transient
@@ -399,6 +399,12 @@ module std::features {
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
         is_enabled(RECONFIGURE_WITH_DKG)
+    }
+
+    /// Whether deploying to objects is enabled.
+    const OBJECT_CODE_DEPLOYMENT: u64 = 52;
+    public fun is_object_code_deployment_enabled(): bool acquires Features {
+        is_enabled(OBJECT_CODE_DEPLOYMENT)
     }
 
     // ============================================================================================

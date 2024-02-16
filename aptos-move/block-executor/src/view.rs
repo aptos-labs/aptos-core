@@ -1515,7 +1515,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
-    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+    fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
         match &self.latest_view {
             ViewState::Sync(_) => true,
             ViewState::Unsync(_) => true,

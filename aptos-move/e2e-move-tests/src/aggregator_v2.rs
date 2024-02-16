@@ -80,14 +80,14 @@ fn initialize_harness(
             vec![
                 FeatureFlag::AGGREGATOR_V2_API,
                 FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-                FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+                FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
             ],
             vec![],
         );
     } else {
         harness.enable_features(vec![FeatureFlag::AGGREGATOR_V2_API], vec![
             FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);

@@ -301,7 +301,7 @@ impl TransactionAuthenticator {
 
     pub fn all_signers(&self) -> Vec<AccountAuthenticator> {
         match self {
-            // This is to ensure that any new TransactionAuthenticor variant must update this function.
+            // This is to ensure that any new TransactionAuthenticator variant must update this function.
             Self::Ed25519 { .. }
             | Self::MultiEd25519 { .. }
             | Self::MultiAgent { .. }

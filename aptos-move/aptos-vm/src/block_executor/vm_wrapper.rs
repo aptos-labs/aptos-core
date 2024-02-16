@@ -128,7 +128,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
             {
                 // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_group_split_in_write_set is enabled.
+                // resource_groups_split_in_change_set is enabled.
                 return false;
             }
         }

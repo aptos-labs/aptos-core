@@ -64,12 +64,12 @@ fn initialize_harness(
     harness.modify_gas_scaling(1000);
     if resource_group_charge_as_sum_enabled {
         harness.enable_features(
-            vec![FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM],
+            vec![FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET],
             vec![],
         );
     } else {
         harness.enable_features(vec![], vec![
-            FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);
