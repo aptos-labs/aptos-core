@@ -1327,7 +1327,6 @@ module aptos_framework::stake {
             let vi: &ValidatorInfo = obj;
             spec {
                 assume len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
-                assume spec_validator_indices_are_valid_config(validator_set.active_validators, len(validator_set.active_validators));
                 assert vi.config.validator_index < len(validator_consensus_infos);
             };
             let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
@@ -1337,7 +1336,6 @@ module aptos_framework::stake {
                 vi.voting_power
             );
             spec {
-                assert spec_validator_indices_are_valid_config(validator_set.active_validators, len(validator_set.active_validators));
                 assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
             };
         });
@@ -1345,8 +1343,6 @@ module aptos_framework::stake {
         vector::for_each_ref(&validator_set.pending_inactive, |obj| {
             let vi: &ValidatorInfo = obj;
             spec {
-                assume len(validator_set.pending_inactive) == 0 ||
-                    spec_validator_indices_are_valid_config(validator_set.pending_inactive, len(validator_set.pending_inactive));
                 assume len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
                 assert vi.config.validator_index < len(validator_consensus_infos);
             };
@@ -1357,8 +1353,6 @@ module aptos_framework::stake {
                 vi.voting_power
             );
             spec {
-                assert len(validator_set.pending_inactive) == 0 ||
-                spec_validator_indices_are_valid_config(validator_set.pending_inactive, len(validator_set.pending_inactive));
                 assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
             };
         });

@@ -3456,7 +3456,6 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
         <b>let</b> vi: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = obj;
         <b>spec</b> {
             <b>assume</b> len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
-            <b>assume</b> <a href="stake.md#0x1_stake_spec_validator_indices_are_valid_config">spec_validator_indices_are_valid_config</a>(validator_set.active_validators, len(validator_set.active_validators));
             <b>assert</b> vi.config.validator_index &lt; len(validator_consensus_infos);
         };
         <b>let</b> vci = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow_mut">vector::borrow_mut</a>(&<b>mut</b> validator_consensus_infos, vi.config.validator_index);
@@ -3466,7 +3465,6 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
             vi.voting_power
         );
         <b>spec</b> {
-            <b>assert</b> <a href="stake.md#0x1_stake_spec_validator_indices_are_valid_config">spec_validator_indices_are_valid_config</a>(validator_set.active_validators, len(validator_set.active_validators));
             <b>assert</b> len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
         };
     });
@@ -3474,8 +3472,6 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.pending_inactive, |obj| {
         <b>let</b> vi: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = obj;
         <b>spec</b> {
-            <b>assume</b> len(validator_set.pending_inactive) == 0 ||
-                <a href="stake.md#0x1_stake_spec_validator_indices_are_valid_config">spec_validator_indices_are_valid_config</a>(validator_set.pending_inactive, len(validator_set.pending_inactive));
             <b>assume</b> len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
             <b>assert</b> vi.config.validator_index &lt; len(validator_consensus_infos);
         };
@@ -3486,8 +3482,6 @@ Return the <code>ValidatorConsensusInfo</code> of each current validator, sorted
             vi.voting_power
         );
         <b>spec</b> {
-            <b>assert</b> len(validator_set.pending_inactive) == 0 ||
-            <a href="stake.md#0x1_stake_spec_validator_indices_are_valid_config">spec_validator_indices_are_valid_config</a>(validator_set.pending_inactive, len(validator_set.pending_inactive));
             <b>assert</b> len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
         };
     });
