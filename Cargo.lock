@@ -2715,6 +2715,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-move-e2e-benchmark"
+version = "0.1.0"
+dependencies = [
+ "aptos-language-e2e-tests",
+ "aptos-transaction-generator-lib",
+ "aptos-types",
+ "rand 0.7.3",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
