@@ -33,8 +33,8 @@ proposals:
             - refundable_bytes
   - name: step_4_enable_fairness_shuffler
     metadata:
-      title: "AIP-68: Enable Fairness Shuffler"
-      description: "AIP-68: FairnessShuffler that tries to spread out (delay) transactions from dominant modules in a block, so that if block limit is hit, transactions from non-dominant modules have a fair share of the block space."
+      title: "AIP-68: Reordering transactions in a block for fairness"
+      description: "AIP-68: This AIP proposes to update the Transaction Shuffler logic to add other aspects of fairness to how transactions are ordered in the block."
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/333"
     execution_mode: MultiStep
     update_sequence:
