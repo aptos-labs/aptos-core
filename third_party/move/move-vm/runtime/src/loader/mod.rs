@@ -21,14 +21,18 @@ use move_binary_format::{
 use move_bytecode_verifier::{self, cyclic_dependencies, dependencies};
 use move_core_types::{
     account_address::AccountAddress,
+    gas_algebra::NumTypeNodes,
     ident_str,
     identifier::IdentStr,
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::loaded_data::runtime_types::{
-    AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+use move_vm_types::{
+    gas::GasMeter,
+    loaded_data::runtime_types::{
+        AbilityInfo, DepthFormula, StructIdentifier, StructNameIndex, StructType, Type,
+    },
 };
 use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use sha3::{Digest, Sha3_256};
@@ -1266,21 +1270,30 @@ impl<'a> Resolver<'a> {
 
     pub(crate) fn instantiate_generic_function(
         &self,
+        gas_meter: Option<&mut impl GasMeter>,
         idx: FunctionInstantiationIndex,
-        type_params: &[Type],
+        ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
         let func_inst = match &self.binary {
             BinaryType::Module(module) => module.function_instantiation_at(idx.0),
             BinaryType::Script(script) => script.function_instantiation_at(idx.0),
         };
+
+        if let Some(gas_meter) = gas_meter {
+            for ty in &func_inst.instantiation {
+                gas_meter
+                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+            }
+        }
+
         let mut instantiation = vec![];
         for ty in &func_inst.instantiation {
-            instantiation.push(self.subst(ty, type_params)?);
+            instantiation.push(self.subst(ty, ty_args)?);
         }
         // Check if the function instantiation over all generics is larger
         // than MAX_TYPE_INSTANTIATION_NODES.
         let mut sum_nodes = 1u64;
-        for ty in type_params.iter().chain(instantiation.iter()) {
+        for ty in ty_args.iter().chain(instantiation.iter()) {
             sum_nodes = sum_nodes.saturating_add(self.loader.count_type_nodes(ty));
             if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
                 return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
@@ -1378,6 +1391,8 @@ impl<'a> Resolver<'a> {
             .iter()
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
+
+        // TODO: Is this type substitution unbounded?
         field_instantiation.definition_struct_type.fields[field_instantiation.offset]
             .subst(&instantiation_types)
     }
@@ -1408,6 +1423,7 @@ impl<'a> Resolver<'a> {
             .iter()
             .map(|inst_ty| inst_ty.subst(ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
+
         struct_type
             .fields
             .iter()
@@ -1428,6 +1444,7 @@ impl<'a> Resolver<'a> {
         ty_args: &[Type],
     ) -> PartialVMResult<Type> {
         let ty = self.single_type_at(idx);
+
         if !ty_args.is_empty() {
             self.subst(ty, ty_args)
         } else {
@@ -1491,11 +1508,14 @@ impl<'a> Resolver<'a> {
     ) -> PartialVMResult<Type> {
         match &self.binary {
             BinaryType::Module(module) => {
-                let struct_ = &module.field_instantiations[idx.0 as usize].definition_struct_type;
+                let field_inst = &module.field_instantiations[idx.0 as usize];
+
+                let struct_ = &field_inst.definition_struct_type;
+
                 Ok(Type::StructInstantiation {
                     idx: struct_.idx,
                     ty_args: triomphe::Arc::new(
-                        module.field_instantiations[idx.0 as usize]
+                        field_inst
                             .instantiation
                             .iter()
                             .map(|ty| ty.subst(args))

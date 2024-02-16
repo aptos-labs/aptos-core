@@ -1407,12 +1407,28 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fail_point!("consensus::process::any", |_| {
             Err(anyhow::anyhow!("Injected error in process_rpc_request"))
         });
+
+        match request.epoch() {
+            Some(epoch) if epoch != self.epoch() => {
+                monitor!(
+                    "process_different_epoch_rpc_request",
+                    self.process_different_epoch(epoch, peer_id)
+                )?;
+                return Ok(());
+            },
+            None => {
+                ensure!(matches!(request, IncomingRpcRequest::BlockRetrieval(_)));
+            },
+            _ => {},
+        }
+
         match request {
             IncomingRpcRequest::BlockRetrieval(request) => {
                 if let Some(tx) = &self.block_retrieval_tx {
                     tx.push(peer_id, request)
                 } else {
-                    Err(anyhow::anyhow!("Round manager not started"))
+                    error!("Round manager not started");
+                    Ok(())
                 }
             },
             IncomingRpcRequest::BatchRetrieval(request) => {
@@ -1423,19 +1439,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 }
             },
             IncomingRpcRequest::DAGRequest(request) => {
-                let dag_msg_epoch = request.req.epoch;
-
-                if dag_msg_epoch == self.epoch() {
-                    if let Some(tx) = &self.dag_rpc_tx {
-                        tx.push(peer_id, request)
-                    } else {
-                        Err(anyhow::anyhow!("DAG not bootstrapped"))
-                    }
+                if let Some(tx) = &self.dag_rpc_tx {
+                    tx.push(peer_id, request)
                 } else {
-                    monitor!(
-                        "process_different_epoch_dag_rpc",
-                        self.process_different_epoch(dag_msg_epoch, peer_id)
-                    )
+                    Err(anyhow::anyhow!("DAG not bootstrapped"))
                 }
             },
             IncomingRpcRequest::CommitRequest(request) => {
@@ -1454,12 +1461,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn process_local_timeout(&mut self, round: u64) {
+        let Some(sender) = self.round_manager_tx.as_mut() else {
+            warn!(
+                "Received local timeout for round {} without Round Manager",
+                round
+            );
+            return;
+        };
+
         let peer_id = self.author;
         let event = VerifiedEvent::LocalTimeout(round);
-        let sender = self
-            .round_manager_tx
-            .as_mut()
-            .expect("RoundManager not started");
         if let Err(e) = sender.push((peer_id, discriminant(&event)), (peer_id, event)) {
             error!("Failed to send event to round manager {:?}", e);
         }
