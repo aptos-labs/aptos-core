@@ -771,9 +771,23 @@ impl FetchResponse {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DAGNetworkMessage {
-    pub epoch: u64,
+    epoch: u64,
     #[serde(with = "serde_bytes")]
-    pub data: Vec<u8>,
+    data: Vec<u8>,
+}
+
+impl DAGNetworkMessage {
+    pub fn new(epoch: u64, data: Vec<u8>) -> Self {
+        Self { epoch, data }
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 }
 
 impl core::fmt::Debug for DAGNetworkMessage {
