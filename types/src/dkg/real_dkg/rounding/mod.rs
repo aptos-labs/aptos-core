@@ -39,9 +39,9 @@ impl DKGRounding {
             reconstruct_threshold_in_stake_ratio,
         );
 
-        let total_weights = profile.validator_weights.iter().sum::<usize>();
+        let total_weights = profile.validator_weights.iter().sum::<u64>();
 
-        if total_weights > total_weight_max {
+        if total_weights > total_weight_max as u64 {
             // dkg todo: add alert here
             println!(
                 "[DKG] error: total_weights {} is larger than threshold {}",
@@ -50,8 +50,12 @@ impl DKGRounding {
         }
 
         let wconfig = WeightedConfig::new(
-            profile.reconstruct_threshold_in_weights,
-            profile.validator_weights.clone(),
+            profile.reconstruct_threshold_in_weights as usize,
+            profile
+                .validator_weights
+                .iter()
+                .map(|w| *w as usize)
+                .collect(),
         )
         .unwrap();
 
@@ -62,13 +66,13 @@ impl DKGRounding {
 #[derive(Clone)]
 pub struct DKGRoundingProfile {
     // calculated weights for each validator after rounding
-    pub validator_weights: Vec<usize>,
+    pub validator_weights: Vec<u64>,
     // The ratio of stake that may reveal the randomness, e.g. 50%
     pub secrecy_threshold_in_stake_ratio: f64,
     // The ratio of stake that always can reconstruct the randomness, e.g. 66.67%
     pub reconstruct_threshold_in_stake_ratio: f64,
     // The number of weights needed to reconstruct the randomness
-    pub reconstruct_threshold_in_weights: usize,
+    pub reconstruct_threshold_in_weights: u64,
 }
 
 impl Debug for DKGRoundingProfile {
@@ -76,7 +80,7 @@ impl Debug for DKGRoundingProfile {
         write!(
             f,
             "total_weight: {}, ",
-            self.validator_weights.iter().sum::<usize>()
+            self.validator_weights.iter().sum::<u64>()
         )?;
         write!(
             f,
@@ -123,7 +127,7 @@ impl DKGRoundingProfile {
 
             let profile = compute_profile(
                 validator_stakes.clone(),
-                total_weight,
+                total_weight as u64,
                 secrecy_threshold_in_stake_ratio,
             );
             if step > MAX_STEPS {
@@ -148,44 +152,37 @@ impl DKGRoundingProfile {
 #[allow(clippy::needless_range_loop)]
 pub fn compute_profile(
     validator_stakes: Vec<u64>,
-    weights_sum: usize,
+    weights_sum: u64,
     secrecy_threshold_in_stake_ratio: f64,
 ) -> DKGRoundingProfile {
-    let hardcoded_best_rounding_threshold = 0.5;
-    let stake_sum = validator_stakes.iter().sum::<u64>();
-    let stake_per_weight = stake_sum / weights_sum as u64;
-    let fractions = validator_stakes
-        .iter()
-        .map(|stake| {
-            (*stake as f64 / stake_per_weight as f64) - ((stake / stake_per_weight) as f64)
-        })
-        .collect::<Vec<f64>>();
-    let mut delta_down = 0.0;
-    let mut delta_up = 0.0;
-    for j in 0..fractions.len() {
-        if fractions[j] + hardcoded_best_rounding_threshold >= 1.0 {
-            delta_up += 1.0 - fractions[j];
+    // dkg todo - productionize - double check if float number operations are deterministic across platform
+    // See paper for details of the rounding algorithm
+    // https://eprint.iacr.org/2024/198
+    let hardcoded_best_rounding_threshold: f64 = 0.5;
+    let stake_sum: u64 = validator_stakes.iter().sum::<u64>();
+    let stake_per_weight: u64 = stake_sum / weights_sum;
+    let mut delta_down: f64 = 0.0;
+    let mut delta_up: f64 = 0.0;
+    let mut validator_weights: Vec<u64> = vec![];
+    for j in 0..validator_stakes.len() {
+        let ideal_weight = validator_stakes[j] as f64 / stake_per_weight as f64;
+        let rounded_weight = (validator_stakes[j] as f64 / stake_per_weight as f64
+            + hardcoded_best_rounding_threshold)
+            .floor();
+        validator_weights.push(rounded_weight as u64);
+        if ideal_weight > rounded_weight {
+            delta_down += ideal_weight - rounded_weight;
         } else {
-            delta_down += fractions[j];
+            delta_up += rounded_weight - ideal_weight;
         }
     }
     let delta_total = delta_down + delta_up;
-
-    let validator_weights = validator_stakes
-        .iter()
-        .map(|stake| {
-            (*stake as f64 / stake_per_weight as f64 + hardcoded_best_rounding_threshold) as usize
-        })
-        .collect::<Vec<usize>>();
-
-    let reconstruct_threshold_in_weights = ((stake_sum as f64) / (stake_per_weight as f64)
-        * secrecy_threshold_in_stake_ratio
+    let reconstruct_threshold_in_weights = ((secrecy_threshold_in_stake_ratio * stake_sum as f64)
+        / (stake_per_weight as f64)
         + delta_up)
-        .ceil() as usize;
-    //dkg todo - productionize - double check if float number operations are deterministic across platform
-
-    let stake_gap = stake_per_weight as f64 * delta_total / stake_sum as f64;
-    let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap;
+        .ceil() as u64;
+    let stake_gap: f64 = stake_per_weight as f64 * delta_total / stake_sum as f64;
+    let reconstruct_threshold_in_stake_ratio: f64 = secrecy_threshold_in_stake_ratio + stake_gap;
 
     DKGRoundingProfile {
         validator_weights,

@@ -22,8 +22,8 @@ fn compute_mainnet_rounding() {
             .profile
             .validator_weights
             .iter()
-            .sum::<usize>()
-            <= WEIGHT_PER_VALIDATOR_MAX * MAINNET_STAKES.len()
+            .sum::<u64>()
+            <= (WEIGHT_PER_VALIDATOR_MAX * MAINNET_STAKES.len()) as u64
     );
 }
 
@@ -50,7 +50,9 @@ fn test_rounding_uniform_distribution() {
             RECONSTRUCT_THRESHOLD,
         );
         assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.validator_weights.iter().sum::<usize>() <= total_weight_max);
+        assert!(
+            dkg_rounding.profile.validator_weights.iter().sum::<u64>() <= total_weight_max as u64
+        );
     }
 }
 
@@ -89,7 +91,9 @@ fn test_rounding_zipf_distribution() {
             RECONSTRUCT_THRESHOLD,
         );
         assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.validator_weights.iter().sum::<usize>() <= total_weight_max);
+        assert!(
+            dkg_rounding.profile.validator_weights.iter().sum::<u64>() <= total_weight_max as u64
+        );
     }
 }
 
