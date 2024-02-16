@@ -70,11 +70,7 @@ impl OnChainExecutionConfig {
     /// Features that are ready for deployment can be enabled here.
     pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
-            transaction_shuffler_type: TransactionShufflerType::Fairness {
-                sender_conflict_window_size: 32,
-                module_conflict_window_size: 2,
-                entry_fun_conflict_window_size: 3,
-            },
+            transaction_shuffler_type: TransactionShufflerType::SenderAwareV2(32),
             block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
                 effective_block_gas_limit: 20000,
                 execution_gas_effective_multiplier: 1,
