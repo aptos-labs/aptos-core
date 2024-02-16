@@ -12,6 +12,7 @@ This module defines a struct storing the metadata of the block and new block eve
 -  [Struct `UpdateEpochIntervalEvent`](#0x1_block_UpdateEpochIntervalEvent)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_block_initialize)
+-  [Function `initialize_commit_history`](#0x1_block_initialize_commit_history)
 -  [Function `update_epoch_interval_microsecs`](#0x1_block_update_epoch_interval_microsecs)
 -  [Function `get_epoch_interval_secs`](#0x1_block_get_epoch_interval_secs)
 -  [Function `block_prologue`](#0x1_block_block_prologue)
@@ -318,6 +319,35 @@ This can only be called during Genesis.
             update_epoch_interval_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="block.md#0x1_block_UpdateEpochIntervalEvent">UpdateEpochIntervalEvent</a>&gt;(aptos_framework),
         }
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_block_initialize_commit_history"></a>
+
+## Function `initialize_commit_history`
+
+Initialize the commit history resource if it's not in genesis.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_initialize_commit_history">initialize_commit_history</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_capacity: u32)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_initialize_commit_history">initialize_commit_history</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_capacity: u32) {
+    <b>move_to</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(fx, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
+        max_capacity,
+        next_idx: 0,
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>: <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_new">table_with_length::new</a>(),
+    });
 }
 </code></pre>
 
