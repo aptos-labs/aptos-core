@@ -839,7 +839,7 @@ impl GlobalEnv {
         while let Some(boxed_loc) = inlined_from {
             let loc = boxed_loc.as_ref();
             let new_label = Label::secondary(loc.file_id, loc.span)
-                .with_message("in a call inlined at this callsite");
+                .with_message("from a call inlined at this callsite");
             labels.push(new_label);
             inlined_from = &loc.inlined_from_loc;
         }
@@ -868,7 +868,7 @@ impl GlobalEnv {
         self.add_diag(diag);
     }
 
-    /// Adds a diagnostic of given severity to this environment, with secondary labels.
+    /// Adds a diagnostic of given severity to this environment, with labels.
     pub fn diag_with_labels(
         &self,
         severity: Severity,
@@ -876,10 +876,10 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
-        self.diag_with_primary_and_labels(severity, loc, msg, "", labels)
+        self.diag_with_primary_and_labels(severity, loc, msg, "", labels);
     }
 
-    /// Adds a diagnostic of given severity to this environment, with primary and secondary labels.
+    /// Adds a diagnostic of given severity to this environment, with primary and primary labels.
     pub fn diag_with_primary_and_labels(
         &self,
         severity: Severity,
@@ -889,16 +889,24 @@ impl GlobalEnv {
         labels: Vec<(Loc, String)>,
     ) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
-        let diag = Diagnostic::new(severity)
-            .with_message(new_msg)
-            .with_labels(vec![
-                Label::primary(loc.file_id, loc.span).with_message(primary)
-            ]);
-        let mut labels = labels
+
+        // primary
+        let diag = Diagnostic::new(severity).with_message(new_msg);
+        // if primary loc is inlined, add qualifiers
+        let mut primary_labels = vec![Label::primary(loc.file_id, loc.span).with_message(primary)];
+        GlobalEnv::add_inlined_from_labels(&mut primary_labels, &loc.inlined_from_loc);
+        let diag = diag.with_labels(primary_labels);
+
+        // add "inlined from" qualifiers to secondary labels as needed
+        let labels = labels
             .into_iter()
-            .map(|(l, m)| Label::secondary(l.file_id, l.span).with_message(m))
-            .collect_vec();
-        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
+            .map(|(loc, msg)| {
+                let mut expanded_labels =
+                    vec![Label::secondary(loc.file_id, loc.span).with_message(msg)];
+                GlobalEnv::add_inlined_from_labels(&mut expanded_labels, &loc.inlined_from_loc);
+                expanded_labels
+            })
+            .concat();
         let diag = diag.with_labels(labels);
         self.add_diag(diag);
     }
@@ -3457,6 +3465,9 @@ pub struct FunctionData {
     /// Location of this function.
     pub(crate) loc: Loc,
 
+    /// Location of the function identifier, suitable for error messages alluding to the function.
+    pub(crate) id_loc: Loc,
+
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
     pub(crate) def_idx: Option<FunctionDefinitionIndex>,
@@ -3588,6 +3599,11 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the location of this function.
     pub fn get_loc(&self) -> Loc {
         self.data.loc.clone()
+    }
+
+    /// Returns the location of the function identifier.
+    pub fn get_id_loc(&self) -> Loc {
+        self.data.id_loc.clone()
     }
 
     /// Returns the attributes of this function.
