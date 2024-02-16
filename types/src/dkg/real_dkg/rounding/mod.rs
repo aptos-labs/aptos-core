@@ -126,14 +126,16 @@ impl DKGRoundingProfile {
             return best_profile;
         }
 
-        // Ensure the weight upper bound is valid
-        while !is_valid_profile(&compute_profile_fixed_point(validator_stakes, weight_high, secrecy_threshold_in_stake_ratio), reconstruct_threshold_in_stake_ratio) {
-            println!(
-                "[Rounding] error in total_weight upper bound formula! total_weight {} is not enough, increasing to {}",
-                total_weight_max,
-                weight_high
-            );
-            weight_high *= 2;
+        let profile_with_total_weight_max = compute_profile_fixed_point(
+            validator_stakes,
+            weight_high,
+            secrecy_threshold_in_stake_ratio,
+        );
+        if !is_valid_profile(&profile_with_total_weight_max, reconstruct_threshold_in_stake_ratio) {
+            // randomness todo: alert error
+            println!("[Randomness] Rounding error! The rounding algorithm is not working, temporarily using unweighted config to ensure progress. Details: total_weight_min: {}, total_weight_max: {}, profile {:?}", total_weight_min, total_weight_max, profile_with_total_weight_max);
+
+            return Self::default(validator_stakes.len(), secrecy_threshold_in_stake_ratio, reconstruct_threshold_in_stake_ratio);
         }
 
         // binary search for the minimum weight that satisfies the conditions
@@ -155,6 +157,15 @@ impl DKGRoundingProfile {
             }
         }
         best_profile
+    }
+
+    pub fn default(num_validators: usize, secrecy_threshold_in_stake_ratio: f64, reconstruct_threshold_in_stake_ratio: f64) -> Self {
+        Self {
+            validator_weights: vec![1; num_validators],
+            secrecy_threshold_in_stake_ratio,
+            reconstruct_threshold_in_stake_ratio,
+            reconstruct_threshold_in_weights: (num_validators as f64 * SECRECY_THRESHOLD) as u64,
+        }
     }
 }
 

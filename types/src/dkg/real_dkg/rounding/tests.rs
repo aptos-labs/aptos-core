@@ -27,8 +27,8 @@ fn compute_mainnet_rounding() {
         .validator_weights
         .iter()
         .sum::<u64>();
-    assert!(total_weight > total_weight_min as u64);
-    assert!(total_weight < total_weight_max as u64);
+    assert!(total_weight >= total_weight_min as u64);
+    assert!(total_weight <= total_weight_max as u64);
 }
 
 #[test]
@@ -86,8 +86,8 @@ fn test_rounding_uniform_distribution() {
             .validator_weights
             .iter()
             .sum::<u64>();
-        assert!(total_weight > total_weight_min as u64);
-        assert!(total_weight < total_weight_max as u64);
+        assert!(total_weight >= total_weight_min as u64);
+        assert!(total_weight <= total_weight_max as u64);
     }
 }
 
@@ -129,8 +129,8 @@ fn test_rounding_zipf_distribution() {
             .validator_weights
             .iter()
             .sum::<u64>();
-        assert!(total_weight > total_weight_min as u64);
-        assert!(total_weight < total_weight_max as u64);
+        assert!(total_weight >= total_weight_min as u64);
+        assert!(total_weight <= total_weight_max as u64);
     }
 }
 
