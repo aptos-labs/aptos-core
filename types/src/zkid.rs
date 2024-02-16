@@ -712,13 +712,7 @@ mod test {
             iss: "https://accounts.google.com".to_owned(),
             idc: addr_seed,
         };
-        let jwk = RSA_JWK {
-            kid:"1".to_owned(),
-            kty:"RSA".to_owned(),
-            alg:"RS256".to_owned(),
-            e:"AQAB".to_owned(),
-            n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
-        };
+        let jwk = RSA_JWK::test_key();
 
         let public_inputs_hash =
             get_public_inputs_hash(&zk_sig, &zk_pk, &jwk, config.max_exp_horizon_secs, &config)

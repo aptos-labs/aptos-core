@@ -14,11 +14,7 @@ use aptos_rest_client::Client;
 use aptos_sdk::types::{AccountKey, LocalAccount};
 use aptos_types::{
     bn254_circom::{G1Bytes, G2Bytes, Groth16VerificationKey},
-    jwks::{
-        jwk::{JWKMoveStruct, JWK},
-        rsa::RSA_JWK,
-        AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
-    },
+    jwks::{jwk::JWKMoveStruct, rsa::RSA_JWK, AllProvidersJWKs, PatchedJWKs, ProviderJWKs},
     transaction::{
         authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
         SignedTransaction,
@@ -545,55 +541,29 @@ async fn test_setup(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) -> Ed255
     let config = maybe_response.unwrap().into_inner();
     println!("zkID configuration: {:?}", config);
 
-    let iss = "https://accounts.google.com";
-    let jwk = RSA_JWK {
-        kid:"test_jwk".to_owned(),
-        kty:"RSA".to_owned(),
-        alg:"RS256".to_owned(),
-        e:"AQAB".to_owned(),
-        n:"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw".to_owned(),
-    };
-
     let training_wheels_sk = Ed25519PrivateKey::generate(&mut thread_rng());
     let training_wheels_pk = Ed25519PublicKey::from(&training_wheels_sk);
 
-    info!("Insert a JWK.");
+    info!("Add training wheels to the zkid config");
     let jwk_patch_script = format!(
         r#"
 script {{
-use aptos_framework::jwks;
 use aptos_framework::zkid;
 use aptos_framework::aptos_governance;
-use std::string::utf8;
 use std::option;
 fun main(core_resources: &signer) {{
     let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-    let google_jwk_0 = jwks::new_rsa_jwk(
-        utf8(b"{}"),
-        utf8(b"RS256"),
-        utf8(b"AQAB"),
-        utf8(b"{}")
-    );
-    let patches = vector[
-        jwks::new_patch_remove_all(),
-        jwks::new_patch_upsert_jwk(b"{}", google_jwk_0),
-    ];
-    jwks::set_patches(&framework_signer, patches);
-
     zkid::update_training_wheels(&framework_signer, option::some(x"{}"));
 }}
 }}
 "#,
-        jwk.kid,
-        jwk.n,
-        iss,
         hex::encode(training_wheels_pk.to_bytes())
     );
 
     let txn_summary = cli.run_script(root_idx, &jwk_patch_script).await.unwrap();
     debug!("txn_summary={:?}", txn_summary);
 
-    info!("Use resource API to check the patch result.");
+    info!("Check that the test jwk is in PatchedJWKs");
     let patched_jwks = get_latest_jwkset(&client).await;
     debug!("patched_jwks={:?}", patched_jwks);
 
@@ -601,7 +571,7 @@ fun main(core_resources: &signer) {{
         entries: vec![ProviderJWKs {
             issuer: b"https://accounts.google.com".to_vec(),
             version: 0,
-            jwks: vec![JWKMoveStruct::from(JWK::RSA(jwk))],
+            jwks: vec![JWKMoveStruct::from(RSA_JWK::test_key())],
         }],
     };
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);
