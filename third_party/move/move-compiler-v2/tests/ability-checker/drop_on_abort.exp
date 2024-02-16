@@ -73,92 +73,92 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      var $t6: u64
      # live vars: $t0
      # graph: {}
-     # temp_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   0: $t4 := borrow_local($t0)
      # live vars: $t0, $t4
      # graph: {@0=local($t0)[borrow(false) -> @1],@1=derived[]}
-     # temp_to_label: {$t0=@0,$t4=@1}
-     # global_to_label: {}
+     # locals: {$t0=@0,$t4=@1}
+     # globals: {}
      # moved: {}
      #
   1: $t3 := vector::length<#0>($t4)
      # live vars: $t0, $t3
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t4}
      #
   2: $t5 := 1
      # live vars: $t0, $t3, $t5
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t4}
      #
   3: $t2 := >($t3, $t5)
      # live vars: $t0, $t2
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
   4: if ($t2) goto 5 else goto 9
      # live vars: $t0
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
   5: label L0
      # live vars:
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
   6: $t6 := 1
      # live vars: $t6
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
   7: abort($t6)
      # live vars: $t0
      # graph: {}
-     # temp_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   8: goto 10
      # live vars: $t0
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
   9: label L1
      # live vars: $t0
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
  10: label L2
      # live vars: $t0
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t3,$t4,$t5}
      #
  11: $t1 := pack m::Option<#0>($t0)
      # live vars: $t1
      # graph: {@0=local($t0)[]}
-     # temp_to_label: {$t0=@0}
-     # global_to_label: {}
+     # locals: {$t0=@0}
+     # globals: {}
      # moved: {$t0,$t3,$t4,$t5}
      #
  12: return $t1

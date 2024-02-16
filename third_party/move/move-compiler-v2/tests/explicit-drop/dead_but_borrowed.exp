@@ -49,43 +49,43 @@ fun explicate_drop::test0(): u8 {
      var $t4: &u8
      # live vars:
      # graph: {}
-     # temp_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   0: $t2 := 42
      # live vars: $t2
      # graph: {}
-     # temp_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   1: $t1 := copy($t2)
      # live vars: $t1
      # graph: {}
-     # temp_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   2: $t4 := borrow_local($t1)
      # live vars: $t4
      # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
-     # temp_to_label: {$t1=@200,$t4=@201}
-     # global_to_label: {}
+     # locals: {$t1=@200,$t4=@201}
+     # globals: {}
      # moved: {}
      #
   3: $t3 := move($t4)
      # live vars: $t3
      # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
-     # temp_to_label: {$t1=@200,$t3=@201}
-     # global_to_label: {}
+     # locals: {$t1=@200,$t3=@201}
+     # globals: {}
      # moved: {$t4}
      #
   4: $t0 := read_ref($t3)
      # live vars: $t0
      # graph: {@200=local($t1)[]}
-     # temp_to_label: {$t1=@200}
-     # global_to_label: {}
+     # locals: {$t1=@200}
+     # globals: {}
      # moved: {$t4}
      #
   5: return $t0

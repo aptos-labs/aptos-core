@@ -823,7 +823,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 
     /// Gets a string for a local to be displayed in error messages
     fn display(&self, local: TempIndex) -> String {
-        self.target().get_temp_name_for_error_message(local)
+        self.target().get_local_name_for_error_message(local)
     }
 
     /// Display a non-empty set of temps. This prefers the first printable representative, if any
@@ -993,9 +993,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         // Continue to process hyper nodes
         while let Some(hyper) = hyper_nodes.pop_first() {
             let hyper_edges = self.state.grouped_children(&hyper);
-            // Check 2-wise permutations of hyper edges for issues. This discovers cases where edges
+            // Check 2-wise combinations of hyper edges for issues. This discovers cases where edges
             // conflict because of mutability.
-            for mut perm in hyper_edges.iter().permutations(2) {
+            for mut perm in hyper_edges.iter().combinations(2) {
                 let (kind1, edges1) = perm.pop().unwrap();
                 let (kind2, edges2) = perm.pop().unwrap();
                 if (kind1.is_mut() || kind2.is_mut()) && kind1.overlaps(kind2) {
@@ -1055,7 +1055,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 format!(
                     "{} ",
                     self.target()
-                        .get_temp_name_for_error_message(*temps.iter().next().unwrap())
+                        .get_local_name_for_error_message(*temps.iter().next().unwrap())
                 ),
             ),
             _ => (BTreeSet::new(), "".to_string()),
@@ -1804,7 +1804,7 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
         )?;
         writeln!(
             f,
-            "temp_to_label: {{{}}}",
+            "locals: {{{}}}",
             temp_to_label_map
                 .iter()
                 .map(|(temp, label)| format!(
@@ -1816,7 +1816,7 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
         )?;
         writeln!(
             f,
-            "global_to_label: {{{}}}",
+            "globals: {{{}}}",
             global_to_label_map
                 .iter()
                 .map(|(str, label)| format!("{}={}", self.0.global_env().display(str), label))
