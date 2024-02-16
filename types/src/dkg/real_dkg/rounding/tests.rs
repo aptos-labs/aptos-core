@@ -101,6 +101,7 @@ fn test_rounding_uniform_distribution() {
     }
 }
 
+#[cfg(test)]
 pub fn generate_approximate_zipf(size: usize, a: u64, b: u64, exponent: f64) -> Vec<u64> {
     use num_traits::Float;
 
@@ -138,6 +139,7 @@ fn test_rounding_zipf_distribution() {
     }
 }
 
+#[cfg(test)]
 pub const MAINNET_STAKES: [u64; 112] = [
     210500217584363000,
     19015034427309200,

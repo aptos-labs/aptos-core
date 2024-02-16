@@ -22,6 +22,7 @@ pub fn total_weight_upper_bound(
     reconstruct_threshold_in_stake_ratio: f64,
     secrecy_threshold_in_stake_ratio: f64,
 ) -> usize {
+    assert!(reconstruct_threshold_in_stake_ratio > secrecy_threshold_in_stake_ratio);
     let factor = (1.0 / (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio))
         as usize
         + 1;
@@ -41,6 +42,8 @@ impl DKGRounding {
         secrecy_threshold_in_stake_ratio: f64,
         reconstruct_threshold_in_stake_ratio: f64,
     ) -> Self {
+        assert!(reconstruct_threshold_in_stake_ratio > secrecy_threshold_in_stake_ratio);
+
         let total_weight_min = total_weight_lower_bound(validator_stakes);
         let total_weight_max = total_weight_upper_bound(
             validator_stakes,
