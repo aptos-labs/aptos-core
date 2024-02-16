@@ -25,7 +25,7 @@ use aptos_aggregator::{
     types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -106,7 +106,7 @@ where
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, X>,
-    ) -> Result<bool, PanicOr<ModulePathReadWriteError>> {
+    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -293,7 +293,9 @@ where
             // Module R/W is an expected fallback behavior, no alert is required.
             debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
 
-            return Err(PanicOr::Or(ModulePathReadWriteError));
+            return Err(PanicOr::Or(
+                ParallelBlockExecutionError::ModulePathReadWriteError,
+            ));
         }
         Ok(updates_outside)
     }
@@ -438,7 +440,7 @@ where
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) -> Result<(), PanicOr<ModulePathReadWriteError>> {
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
@@ -486,7 +488,9 @@ where
                 scheduler.add_to_commit_queue(txn_idx);
             }
 
-            last_input_output.check_fatal_vm_error(txn_idx)?;
+            last_input_output
+                .check_fatal_vm_error(txn_idx)
+                .map_err(PanicOr::Or)?;
             // Handle a potential vm error, then check invariants on the recorded outputs.
             last_input_output.check_execution_status_during_commit(txn_idx)?;
 
@@ -729,7 +733,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicOr<ModulePathReadWriteError>> {
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -891,7 +895,7 @@ where
                         &final_results,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError variant is logged at construction,
+                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
                         // and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
@@ -1027,7 +1031,10 @@ where
                     if let Some(commit_hook) = &self.transaction_commit_hook {
                         commit_hook.on_execution_aborted(idx as TxnIndex);
                     }
-                    alert!("Fatal VM error by transaction {}", idx as TxnIndex);
+                    error!(
+                        "Sequential execution FatalVMError by transaction {}",
+                        idx as TxnIndex
+                    );
                     // Record the status indicating the unrecoverable VM failure.
                     return Err(SequentialBlockExecutionError::ErrorToReturn(
                         BlockExecutionError::FatalVMError(err),
@@ -1296,7 +1303,7 @@ where
             // Clear by re-initializing the speculative logs.
             init_speculative_logs(signature_verified_block.len());
 
-            debug!("parallel execution requiring fallback");
+            info!("parallel execution requiring fallback");
         }
 
         // If we didn't run parallel or it didn't finish successfully - run sequential

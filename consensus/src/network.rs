@@ -133,6 +133,18 @@ pub enum IncomingRpcRequest {
     RandGenRequest(IncomingRandGenRequest),
 }
 
+impl IncomingRpcRequest {
+    pub fn epoch(&self) -> Option<u64> {
+        match self {
+            IncomingRpcRequest::BatchRetrieval(req) => Some(req.req.epoch()),
+            IncomingRpcRequest::DAGRequest(req) => Some(req.req.epoch()),
+            IncomingRpcRequest::RandGenRequest(req) => Some(req.req.epoch()),
+            IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
+            IncomingRpcRequest::BlockRetrieval(_) => None,
+        }
+    }
+}
+
 /// Just a convenience struct to keep all the network proxy receiving queues in one place.
 /// Will be returned by the NetworkTask upon startup.
 pub struct NetworkReceivers {
