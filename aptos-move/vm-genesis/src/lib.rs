@@ -24,11 +24,9 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     jwks::{
-        jwk::JWK,
         patch::{PatchJWKMoveStruct, PatchUpsertJWK},
         rsa::RSA_JWK,
     },
-    move_any::AsMoveAny,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
