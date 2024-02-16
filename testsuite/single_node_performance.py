@@ -86,7 +86,7 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # fmt: off
 TESTS = [
     RunGroupConfig(expected_tps=24000, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=3600, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=11000, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=15000, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     # this was changed from 42000 to make landings not flaky, needs follow up
     RunGroupConfig(expected_tps=37500, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
@@ -95,7 +95,7 @@ TESTS = [
     RunGroupConfig(expected_tps=20700, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=4500, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=16500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=135, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=150, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=2620, key=RunGroupKey(
         "mix_publish_transfer",
         transaction_type_override="publish-package coin-transfer",
@@ -108,7 +108,7 @@ TESTS = [
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=995, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=17, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=22, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=86, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     # RunGroupConfig(expected_tps=3.6, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C),
     # RunGroupConfig(expected_tps=12.8, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),

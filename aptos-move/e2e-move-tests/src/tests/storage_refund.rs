@@ -23,8 +23,10 @@ fn test_refunds() {
         ],
         vec![],
     );
+    // Note: This test uses a lot of execution gas so we need to bump the limit in order for it
+    //       to pass.
     h.modify_gas_schedule(|params| {
-        params.vm.txn.max_execution_gas = 10_000_000_000.into();
+        params.vm.txn.max_execution_gas = 40_000_000_000.into();
         params.vm.txn.storage_fee_per_state_byte = 0.into(); // tested in DiskSpacePricing.
     });
     let mod_addr = AccountAddress::from_hex_literal("0xcafe").unwrap();

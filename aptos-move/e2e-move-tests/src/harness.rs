@@ -380,6 +380,56 @@ impl MoveHarness {
         )
     }
 
+    /// Creates a transaction which publishes the passed already-built Move Package to an object,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn create_object_code_deployment_built_package(
+        &mut self,
+        account: &Account,
+        package: &BuiltPackage,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let code = package.extract_code();
+        let mut metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_publish(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+            ),
+        )
+    }
+
+    /// Creates a transaction which upgrades the passed already-built Move Package,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated for testing purposes.
+    pub fn create_object_code_upgrade_built_package(
+        &mut self,
+        account: &Account,
+        package: &BuiltPackage,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+        publisher_ref: AccountAddress,
+    ) -> SignedTransaction {
+        let code = package.extract_code();
+        let mut metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_upgrade(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+                publisher_ref,
+            ),
+        )
+    }
+
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
     ///
@@ -394,6 +444,36 @@ impl MoveHarness {
         let package = build_package(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
+    }
+
+    pub fn create_object_code_upgrade_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+        publisher_ref: AccountAddress,
+    ) -> SignedTransaction {
+        let package =
+            build_package(path.to_owned(), options).expect("building package must succeed");
+        self.create_object_code_upgrade_built_package(
+            account,
+            &package,
+            patch_metadata,
+            publisher_ref,
+        )
+    }
+
+    pub fn create_object_code_deployment_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package =
+            build_package(path.to_owned(), options).expect("building package must succeed");
+        self.create_object_code_deployment_built_package(account, &package, patch_metadata)
     }
 
     pub fn create_publish_package_cache_building(
@@ -429,6 +509,46 @@ impl MoveHarness {
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
+        self.run(txn)
+    }
+
+    /// Runs the transaction which publishes the Move Package to an object.
+    pub fn object_code_deployment_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+    ) -> TransactionStatus {
+        let txn = self.create_object_code_deployment_package(account, path, options, |_| {});
+        self.run(txn)
+    }
+
+    /// Creates a transaction which publishes the passed already-built Move Package to an object,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn object_code_upgrade_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        publisher_ref: AccountAddress,
+    ) -> TransactionStatus {
+        let txn =
+            self.create_object_code_upgrade_package(account, path, options, |_| {}, publisher_ref);
+        self.run(txn)
+    }
+
+    /// Marks all the packages in the `code_object` as immutable.
+    pub fn object_code_freeze_code_object(
+        &mut self,
+        account: &Account,
+        code_object: AccountAddress,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_freeze_code_object(code_object),
+        );
         self.run(txn)
     }
 

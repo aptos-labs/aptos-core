@@ -18,15 +18,19 @@ base64 = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
 fail = { workspace = true }
+flate2 = { workspace = true }
 futures = { workspace = true }
+google-cloud-storage = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-resource-viewer = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tar = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
 tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 
@@ -46,6 +50,10 @@ aptos-runtimes = { workspace = true }
 aptos-schemadb  = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-types = { workspace = true }
+
+[dev-dependencies]
+rocksdb = { workspace = true }
+tempfile = { workspace = true }
 
 [features]
 failpoints = ["fail/failpoints"]

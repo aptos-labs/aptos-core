@@ -14,7 +14,7 @@ use proptest::prelude::*;
 
 const STRESSTEST_MODE: bool = false;
 
-const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+pub(crate) const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::SequentialOnly;

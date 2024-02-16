@@ -76,7 +76,7 @@ pub trait TResourceGroupView {
 
     /// Some resolvers might not be capable of the optimization, and should return false.
     /// Others might return based on the config or the run parameters.
-    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+    fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
         false
     }
 

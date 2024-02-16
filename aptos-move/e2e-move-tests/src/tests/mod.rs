@@ -4,6 +4,7 @@
 mod access_path_test;
 mod aggregator;
 mod aggregator_v2;
+mod aggregator_v2_events;
 mod aggregator_v2_runtime_checks;
 mod attributes;
 mod chain_id;
@@ -27,6 +28,7 @@ mod missing_gas_parameter;
 mod module_event;
 mod new_integer_types;
 mod nft_dao;
+mod object_code_deployment;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod per_category_gas_limits;

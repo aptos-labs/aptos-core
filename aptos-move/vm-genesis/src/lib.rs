@@ -463,7 +463,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
         FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
         FeatureFlag::BN254_STRUCTURES,
-        FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
+        FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
         FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
         FeatureFlag::WEBAUTHN_SIGNATURE,
         FeatureFlag::RECONFIGURE_WITH_DKG,
@@ -471,6 +471,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
         FeatureFlag::JWK_CONSENSUS,
         FeatureFlag::REFUNDABLE_BYTES,
+        FeatureFlag::OBJECT_CODE_DEPLOYMENT,
     ]
 }
 

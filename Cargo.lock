@@ -99,6 +99,7 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.11",
  "once_cell",
+ "serde",
  "version_check",
  "zerocopy",
 ]
@@ -2332,15 +2333,21 @@ dependencies = [
  "bytes",
  "chrono",
  "fail 0.5.1",
+ "flate2",
  "futures",
+ "google-cloud-storage",
  "hex",
  "hyper",
  "move-resource-viewer",
  "once_cell",
+ "rocksdb",
  "serde",
  "serde_json",
+ "tar",
+ "tempfile",
  "tokio",
  "tokio-stream",
+ "tokio-util 0.7.10",
  "tonic 0.10.2",
  "tonic-reflection",
 ]
@@ -2768,7 +2775,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=68424a2b721cbd4a6b8c1e7c951f5d4f665473d3#68424a2b721cbd4a6b8c1e7c951f5d4f665473d3"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
 dependencies = [
  "chrono",
 ]
@@ -7825,6 +7832,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31a7a908b8f32538a2143e59a6e4e2508988832d5d4d6f7c156b3cbc762643a5"
 
 [[package]]
+name = "filetime"
+version = "0.2.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ee447700ac8aa0b2f2bd7bc4462ad686ba06baa6727ac149a2d6277f0d240fd"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "redox_syscall 0.4.1",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "findshlibs"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9604,6 +9623,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kanal"
+version = "0.1.0-pre8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b05d55519627edaf7fd0f29981f6dc03fb52df3f5b257130eb8d0bf2801ea1d7"
+dependencies = [
+ "futures-core",
+ "lock_api",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11322,6 +11351,8 @@ dependencies = [
  "bytes",
  "fail 0.4.0",
  "hex",
+ "lazy_static",
+ "lru 0.7.8",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-compiler",
@@ -12669,6 +12700,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "postgres-native-tls"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d442770e2b1e244bb5eb03b31c79b65bb2568f413b899eaba850fa945a65954"
+dependencies = [
+ "futures",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tokio-postgres",
+]
+
+[[package]]
 name = "postgres-protocol"
 version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12943,10 +12987,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=68424a2b721cbd4a6b8c1e7c951f5d4f665473d3#68424a2b721cbd4a6b8c1e7c951f5d4f665473d3"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
 dependencies = [
+ "ahash 0.8.7",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=68424a2b721cbd4a6b8c1e7c951f5d4f665473d3)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2)",
  "aptos-protos 1.1.2",
  "async-trait",
  "base64 0.13.1",
@@ -12966,7 +13011,11 @@ dependencies = [
  "google-cloud-googleapis",
  "google-cloud-pubsub",
  "hex",
+ "kanal",
+ "native-tls",
+ "num_cpus",
  "once_cell",
+ "postgres-native-tls",
  "prometheus",
  "prost 0.12.3",
  "prost-types 0.12.3",
@@ -12978,6 +13027,7 @@ dependencies = [
  "sha3 0.9.1",
  "strum 0.24.1",
  "tokio",
+ "tokio-postgres",
  "tonic 0.10.2",
  "tracing",
  "unescape",
@@ -14526,7 +14576,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=68424a2b721cbd4a6b8c1e7c951f5d4f665473d3#68424a2b721cbd4a6b8c1e7c951f5d4f665473d3"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -15271,6 +15321,17 @@ name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
+
+[[package]]
+name = "tar"
+version = "0.4.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b16afcea1f22891c49a00c751c7b63b2233284064f11a200fc624137c51e2ddb"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
 
 [[package]]
 name = "target-lexicon"
@@ -17145,6 +17206,17 @@ dependencies = [
  "curve25519-dalek",
  "rand_core 0.5.1",
  "zeroize",
+]
+
+[[package]]
+name = "xattr"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "914566e6413e7fa959cc394fb30e563ba80f3541fbd40816d4c05a0fc3f2a0f1"
+dependencies = [
+ "libc",
+ "linux-raw-sys 0.4.12",
+ "rustix 0.38.28",
 ]
 
 [[package]]

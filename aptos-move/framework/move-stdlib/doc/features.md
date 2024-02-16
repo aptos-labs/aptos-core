@@ -97,6 +97,7 @@ return true.
 -  [Function `concurrent_fungible_assets_enabled`](#0x1_features_concurrent_fungible_assets_enabled)
 -  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
 -  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
+-  [Function `is_object_code_deployment_enabled`](#0x1_features_is_object_code_deployment_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
@@ -488,6 +489,16 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_OBJECT_CODE_DEPLOYMENT"></a>
+
+Whether deploying to objects is enabled.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>: u64 = 52;
+</code></pre>
+
+
+
 <a id="0x1_features_OPERATOR_BENEFICIARY_CHANGE"></a>
 
 Whether allow changing beneficiaries for operators.
@@ -544,11 +555,11 @@ This is needed because of new attributes for structs and a change in storage rep
 
 
 
-<a id="0x1_features_RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM"></a>
+<a id="0x1_features_RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET"></a>
 
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM">RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM</a>: u64 = 41;
+<pre><code><b>const</b> <a href="features.md#0x1_features_RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET">RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET</a>: u64 = 41;
 </code></pre>
 
 
@@ -2194,6 +2205,30 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_object_code_deployment_enabled"></a>
+
+## Function `is_object_code_deployment_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>)
 }
 </code></pre>
 

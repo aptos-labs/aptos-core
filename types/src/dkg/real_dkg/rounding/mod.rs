@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 
 use aptos_dkg::pvss::WeightedConfig;
+use fixed::types::U64F64;
 use std::{
+    cmp::max,
     fmt,
     fmt::{Debug, Formatter},
 };
-use fixed::types::U64F64;
-
 
 // dkg todo: move to config file
 pub const SECRECY_THRESHOLD: f64 = 0.5;
@@ -17,8 +17,15 @@ pub fn total_weight_lower_bound(validator_stakes: &Vec<u64>) -> usize {
     validator_stakes.len()
 }
 
-pub fn total_weight_upper_bound(validator_stakes: &Vec<u64>, reconstruct_threshold_in_stake_ratio: f64, secrecy_threshold_in_stake_ratio: f64) -> usize {
-    let factor = (1.0 / (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio)) as usize + 1;
+pub fn total_weight_upper_bound(
+    validator_stakes: &Vec<u64>,
+    reconstruct_threshold_in_stake_ratio: f64,
+    secrecy_threshold_in_stake_ratio: f64,
+) -> usize {
+    assert!(reconstruct_threshold_in_stake_ratio > secrecy_threshold_in_stake_ratio);
+    let factor = (1.0 / (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio))
+        as usize
+        + 1;
     // todo: use a better upper bound
     validator_stakes.len() * factor * 2
 }
@@ -35,8 +42,14 @@ impl DKGRounding {
         secrecy_threshold_in_stake_ratio: f64,
         reconstruct_threshold_in_stake_ratio: f64,
     ) -> Self {
+        assert!(reconstruct_threshold_in_stake_ratio > secrecy_threshold_in_stake_ratio);
+
         let total_weight_min = total_weight_lower_bound(validator_stakes);
-        let total_weight_max = total_weight_upper_bound(validator_stakes, reconstruct_threshold_in_stake_ratio, secrecy_threshold_in_stake_ratio);
+        let total_weight_max = total_weight_upper_bound(
+            validator_stakes,
+            reconstruct_threshold_in_stake_ratio,
+            secrecy_threshold_in_stake_ratio,
+        );
 
         let profile = DKGRoundingProfile::new(
             validator_stakes,
@@ -131,11 +144,18 @@ impl DKGRoundingProfile {
             weight_high,
             secrecy_threshold_in_stake_ratio,
         );
-        if !is_valid_profile(&profile_with_total_weight_max, reconstruct_threshold_in_stake_ratio) {
+        if !is_valid_profile(
+            &profile_with_total_weight_max,
+            reconstruct_threshold_in_stake_ratio,
+        ) {
             // randomness todo: alert error
             println!("[Randomness] Rounding error! The rounding algorithm is not working, temporarily using unweighted config to ensure progress. Details: total_weight_min: {}, total_weight_max: {}, profile {:?}", total_weight_min, total_weight_max, profile_with_total_weight_max);
 
-            return Self::default(validator_stakes.len(), secrecy_threshold_in_stake_ratio, reconstruct_threshold_in_stake_ratio);
+            return Self::default(
+                validator_stakes.len(),
+                secrecy_threshold_in_stake_ratio,
+                reconstruct_threshold_in_stake_ratio,
+            );
         }
 
         // binary search for the minimum weight that satisfies the conditions
@@ -146,10 +166,9 @@ impl DKGRoundingProfile {
                 weight_mid,
                 secrecy_threshold_in_stake_ratio,
             );
-    
+
             // Check if the current weight satisfies the conditions
-            if is_valid_profile(&profile, reconstruct_threshold_in_stake_ratio)
-            {
+            if is_valid_profile(&profile, reconstruct_threshold_in_stake_ratio) {
                 best_profile = profile;
                 weight_high = weight_mid - 1;
             } else {
@@ -159,7 +178,11 @@ impl DKGRoundingProfile {
         best_profile
     }
 
-    pub fn default(num_validators: usize, secrecy_threshold_in_stake_ratio: f64, reconstruct_threshold_in_stake_ratio: f64) -> Self {
+    pub fn default(
+        num_validators: usize,
+        secrecy_threshold_in_stake_ratio: f64,
+        reconstruct_threshold_in_stake_ratio: f64,
+    ) -> Self {
         Self {
             validator_weights: vec![1; num_validators],
             secrecy_threshold_in_stake_ratio,
@@ -169,10 +192,13 @@ impl DKGRoundingProfile {
     }
 }
 
-fn is_valid_profile(profile: &DKGRoundingProfile, reconstruct_threshold_in_stake_ratio: f64) -> bool {
+fn is_valid_profile(
+    profile: &DKGRoundingProfile,
+    reconstruct_threshold_in_stake_ratio: f64,
+) -> bool {
     // ensure the reconstruction is below threshold and all validators have at least 1 weight
     profile.reconstruct_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio
-            && profile.validator_weights.iter().all(|&w| w > 0)
+        && profile.validator_weights.iter().all(|&w| w > 0)
 }
 
 #[allow(dead_code)]
@@ -192,9 +218,8 @@ fn compute_profile_floating_point(
     let mut validator_weights: Vec<u64> = vec![];
     for stake in validator_stakes {
         let ideal_weight = stake as f64 / stake_per_weight as f64;
-        let rounded_weight = (stake as f64 / stake_per_weight as f64
-            + hardcoded_best_rounding_threshold)
-            .floor();
+        let rounded_weight =
+            (stake as f64 / stake_per_weight as f64 + hardcoded_best_rounding_threshold).floor();
         validator_weights.push(rounded_weight as u64);
         if ideal_weight > rounded_weight {
             delta_down += ideal_weight - rounded_weight;
@@ -229,16 +254,15 @@ fn compute_profile_fixed_point(
     let hardcoded_threshold_fixed = U64F64::from_num(0.5);
     let stake_sum: u64 = validator_stakes.iter().sum::<u64>();
     let stake_sum_fixed = U64F64::from_num(stake_sum);
-    let stake_per_weight: u64 = stake_sum / weights_sum;
+    let stake_per_weight: u64 = max(1, stake_sum / weights_sum);
     let stake_per_weight_fixed = U64F64::from_num(stake_per_weight);
     let mut delta_down_fixed = U64F64::from_num(0);
     let mut delta_up_fixed = U64F64::from_num(0);
     let mut validator_weights: Vec<u64> = vec![];
     for stake in validator_stakes {
         let ideal_weight_fixed = U64F64::from_num(*stake) / stake_per_weight_fixed;
-        let rounded_weight_fixed = (U64F64::from_num(*stake) / stake_per_weight_fixed
-            + hardcoded_threshold_fixed)
-            .floor();
+        let rounded_weight_fixed =
+            (U64F64::from_num(*stake) / stake_per_weight_fixed + hardcoded_threshold_fixed).floor();
         validator_weights.push(rounded_weight_fixed.to_num::<u64>());
         if ideal_weight_fixed > rounded_weight_fixed {
             delta_down_fixed += ideal_weight_fixed - rounded_weight_fixed;
@@ -249,13 +273,15 @@ fn compute_profile_fixed_point(
     // let stake_per_weight_fixed = U64F64::from_num(stake_sum / validator_weights.iter().sum::<u64>() as u64);
     let delta_total_fixed = delta_down_fixed + delta_up_fixed;
     let secrecy_threshold_in_stake_ratio_fixed = U64F64::from_num(secrecy_threshold_in_stake_ratio);
-    let reconstruct_threshold_in_weights_fixed = (secrecy_threshold_in_stake_ratio_fixed * stake_sum_fixed
-        / stake_per_weight_fixed
-        + delta_up_fixed)
-        .ceil();
-    let reconstruct_threshold_in_weights: u64 = reconstruct_threshold_in_weights_fixed.to_num::<u64>();
+    let reconstruct_threshold_in_weights_fixed =
+        (secrecy_threshold_in_stake_ratio_fixed * stake_sum_fixed / stake_per_weight_fixed
+            + delta_up_fixed)
+            .ceil();
+    let reconstruct_threshold_in_weights: u64 =
+        reconstruct_threshold_in_weights_fixed.to_num::<u64>();
     let stake_gap_fixed = stake_per_weight_fixed * delta_total_fixed / stake_sum_fixed;
-    let reconstruct_threshold_in_stake_ratio: f64 = (secrecy_threshold_in_stake_ratio_fixed + stake_gap_fixed).to_num::<f64>();
+    let reconstruct_threshold_in_stake_ratio: f64 =
+        (secrecy_threshold_in_stake_ratio_fixed + stake_gap_fixed).to_num::<f64>();
 
     DKGRoundingProfile {
         validator_weights,
