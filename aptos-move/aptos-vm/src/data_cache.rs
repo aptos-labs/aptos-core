@@ -13,7 +13,7 @@ use crate::{
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
@@ -43,6 +43,7 @@ use move_core_types::{
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
