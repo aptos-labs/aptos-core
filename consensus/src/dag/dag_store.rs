@@ -375,9 +375,14 @@ impl InMemDag {
     }
 
     pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
-        let from_round = target_round
-            .saturating_sub(self.window_size)
-            .max(self.start_round);
+        let from_round = if self.is_empty() {
+            self.lowest_round()
+        } else {
+            target_round
+                .saturating_sub(self.window_size)
+                .max(self.lowest_incomplete_round())
+                .max(self.lowest_round())
+        };
         let mut bitmask: Vec<_> = self
             .nodes_by_round
             .range(from_round..=target_round)

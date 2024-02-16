@@ -70,7 +70,11 @@ impl Drop for ActiveTrafficGuard {
     }
 }
 
-pub async fn start_traffic(num_accounts: usize, tps: f32, swarm: &mut dyn Swarm) -> ActiveTrafficGuard {
+pub async fn start_traffic(
+    num_accounts: usize,
+    tps: f32,
+    swarm: &mut dyn Swarm,
+) -> ActiveTrafficGuard {
     let validator_clients = swarm.get_all_nodes_clients_with_names();
 
     let finish = Arc::new(AtomicBool::new(false));

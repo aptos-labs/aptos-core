@@ -1,9 +1,14 @@
 // Copyright © Aptos Foundation
 
-use crate::{consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard}, smoke_test_environment::SwarmBuilder};
+use crate::{
+    consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard},
+    smoke_test_environment::SwarmBuilder,
+};
 use aptos_config::config::DagFetcherConfig;
 use aptos_forge::{
-    test_utils::consensus_utils::{no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState},
+    test_utils::consensus_utils::{
+        no_failure_injection, test_consensus_fault_tolerance, FailPointFailureInjection, NodeState,
+    },
     LocalSwarm,
 };
 use aptos_types::on_chain_config::{
@@ -12,7 +17,7 @@ use aptos_types::on_chain_config::{
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::sync::{atomic::AtomicBool, Arc};
 
-pub async fn create_dag_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
+pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
     let swarm = SwarmBuilder::new_local(num_nodes)
         .with_init_config(Arc::new(move |_, config, _| {
             config.api.failpoints_enabled = true;
@@ -53,7 +58,7 @@ pub async fn create_dag_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwa
 async fn test_no_failures() {
     let num_validators = 3;
 
-    let mut swarm = create_dag_swarm(num_validators, 1 * num_validators as u64).await;
+    let mut swarm = create_dag_swarm(num_validators).await;
 
     test_consensus_fault_tolerance(
         &mut swarm,
@@ -87,7 +92,7 @@ async fn run_dag_fail_point_test(
     cycle_duration_s: f32,
     parts_in_cycle: usize,
     traffic_tps: f32,
-    max_block_size: u64,
+    _max_block_size: u64,
     // (cycle, part) -> (Vec(validator_index, name, action), reset_old_enpoints)
     get_fail_points_to_set: Box<
         dyn FnMut(usize, usize) -> (Vec<(usize, String, String)>, bool) + Send,
@@ -97,7 +102,7 @@ async fn run_dag_fail_point_test(
         dyn FnMut(usize, u64, u64, u64, Vec<NodeState>, Vec<NodeState>) -> anyhow::Result<()>,
     >,
 ) {
-    let mut swarm = create_dag_swarm(num_validators, max_block_size).await;
+    let mut swarm = create_dag_swarm(num_validators).await;
     let _active_traffic = if traffic_tps > 0.0 {
         start_traffic(5, traffic_tps, &mut swarm).await
     } else {
