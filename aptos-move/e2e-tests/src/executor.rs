@@ -615,7 +615,9 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let resolver = self.data_store.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
+        );
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -689,8 +691,11 @@ impl FakeExecutor {
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
-    pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(&self.get_state_view().as_move_resolver());
+    pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
+        let vm = AptosVM::new(
+            &self.get_state_view().as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        );
         vm.validate_transaction(txn, &self.data_store)
     }
 
