@@ -165,7 +165,6 @@ proposals:
     metadata:
       title: "Start JWK consensus for Google"
       description: "JWK Consensus (AIP-67) for Google enables Google-based OIDB accounts (AIP-61)."
-      discussion_url: "TBA"
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
