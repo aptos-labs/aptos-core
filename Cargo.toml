@@ -111,6 +111,7 @@ members = [
     "crates/validator-transaction-pool",
     "devtools/aptos-cargo-cli",
     "dkg",
+    "ecosystem/event-filter",
     "ecosystem/indexer-grpc/indexer-grpc-cache-worker",
     "ecosystem/indexer-grpc/indexer-grpc-data-access",
     "ecosystem/indexer-grpc/indexer-grpc-data-service",
@@ -314,6 +315,7 @@ aptos-executable-store = { path = "storage/executable-store" }
 aptos-executor = { path = "execution/executor" }
 aptos-block-partitioner = { path = "execution/block-partitioner" }
 aptos-enum-conversion-derive = { path = "crates/aptos-enum-conversion-derive" }
+aptos-event-filter = { path = "ecosystem/event-filter" }
 aptos-executor-service = { path = "execution/executor-service" }
 aptos-executor-test-helpers = { path = "execution/executor-test-helpers" }
 aptos-executor-types = { path = "execution/executor-types" }
@@ -705,6 +707,7 @@ tonic = { version = "0.10.2", features = [
     "codegen",
 ] }
 tonic-reflection = "0.10.2"
+tokio-tungstenite = "0.21.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
