@@ -33,9 +33,9 @@ proposals:
             - refundable_bytes
   - name: step_4_enable_fairness_shuffler
     metadata:
-      title: "Enable Fairness Shuffler"
-      description: "FairnessShuffler that tries to spread out (delay) transactions from dominant modules in a block, so that if block limit is hit, transactions from non-dominant modules have a fair share of the block space."
-      discussion_url: "TBA"
+      title: "AIP-68: Reordering transactions in a block for fairness"
+      description: "AIP-68: This AIP proposes to update the Transaction Shuffler logic to add other aspects of fairness to how transactions are ordered in the block."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/333"
     execution_mode: MultiStep
     update_sequence:
       - Execution:
@@ -106,7 +106,7 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - aggregator_v2_delayed_fields          
+            - aggregator_v2_delayed_fields
             - resource_groups_split_in_vm_change_set
   - name: step_10_enable_validator_txn
     metadata:
