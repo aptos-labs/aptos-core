@@ -68,8 +68,9 @@ impl SplitCriticalEdgesTransformation {
     }
 
     /// Runs the transformation, which breaks critical edges with empty blocks.
-    fn transform(&mut self) {
-        self.code = self.transform_bytecode_vec(self.code)
+    pub fn transform(&mut self) {
+        let code = std::mem::take(&mut self.code);
+        self.code = self.transform_bytecode_vec(code)
     }
 
     /// Transforms the given code and returns the transformed code
