@@ -26,9 +26,9 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     network_address::DnsName,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerAndVoterConfig,
-        ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, ConsensusConfigV1Ext, ExecutionConfigV1,
+        LeaderReputationType, OnChainConsensusConfig, OnChainExecutionConfig,
+        ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
 };
@@ -198,7 +198,8 @@ async fn test_onchain_config_change() {
             let inner = match genesis_config.consensus_config.clone() {
                 OnChainConsensusConfig::V1(inner) => inner,
                 OnChainConsensusConfig::V2(inner) => inner,
-                OnChainConsensusConfig::V3 {
+                OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main, .. }) => main,
+                OnChainConsensusConfig::V4 {
                     alg: ConsensusAlgorithmConfig::Jolteon { main, .. },
                     ..
                 } => main,

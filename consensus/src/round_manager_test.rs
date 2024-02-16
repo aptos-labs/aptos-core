@@ -2164,7 +2164,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         runtime.handle().clone(),
         1,
         None,
-        Some(OnChainConsensusConfig::V3 {
+        Some(OnChainConsensusConfig::V4 {
             alg: alg_config,
             vtxn: vtxn_config,
         }),

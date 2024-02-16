@@ -71,7 +71,7 @@ impl NetworkLoadTest for DagOnChainEnableTest {
             assert!(matches!(current_consensus_config, OnChainConsensusConfig::V2(_)));
 
             // Change to V2
-            let new_consensus_config = OnChainConsensusConfig::V3 {
+            let new_consensus_config = OnChainConsensusConfig::V4 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_disabled(),
             };

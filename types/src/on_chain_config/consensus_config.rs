@@ -155,7 +155,8 @@ impl ValidatorTxnConfig {
 pub enum OnChainConsensusConfig {
     V1(ConsensusConfigV1),
     V2(ConsensusConfigV1),
-    V3 {
+    V3(ConsensusConfigV1Ext),
+    V4 {
         alg: ConsensusAlgorithmConfig,
         vtxn: ValidatorTxnConfig,
     },
@@ -164,7 +165,7 @@ pub enum OnChainConsensusConfig {
 /// The public interface that exposes all values with safe fallback.
 impl OnChainConsensusConfig {
     pub fn default_for_genesis() -> Self {
-        OnChainConsensusConfig::V3 {
+        OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::default_for_genesis(),
             vtxn: ValidatorTxnConfig::default_for_genesis(),
         }
@@ -173,10 +174,12 @@ impl OnChainConsensusConfig {
     /// The number of recent rounds that don't count into reputations.
     pub fn leader_reputation_exclude_round(&self) -> u64 {
         match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+            OnChainConsensusConfig::V1(config)
+            | OnChainConsensusConfig::V2(config)
+            | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.exclude_round
             },
-            OnChainConsensusConfig::V3 { alg, .. } => alg.leader_reputation_exclude_round(),
+            OnChainConsensusConfig::V4 { alg, .. } => alg.leader_reputation_exclude_round(),
         }
     }
 
@@ -189,28 +192,32 @@ impl OnChainConsensusConfig {
     // to this max size.
     pub fn max_failed_authors_to_store(&self) -> usize {
         match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+            OnChainConsensusConfig::V1(config)
+            | OnChainConsensusConfig::V2(config)
+            | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 config.max_failed_authors_to_store
             },
-            OnChainConsensusConfig::V3 { alg, .. } => alg.max_failed_authors_to_store(),
+            OnChainConsensusConfig::V4 { alg, .. } => alg.max_failed_authors_to_store(),
         }
     }
 
     // Type and configuration used for proposer election.
     pub fn proposer_election_type(&self) -> &ProposerElectionType {
         match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
+            OnChainConsensusConfig::V1(config)
+            | OnChainConsensusConfig::V2(config)
+            | OnChainConsensusConfig::V3(ConsensusConfigV1Ext { main: config, .. }) => {
                 &config.proposer_election_type
             },
-            OnChainConsensusConfig::V3 { alg, .. } => alg.proposer_election_type(),
+            OnChainConsensusConfig::V4 { alg, .. } => alg.proposer_election_type(),
         }
     }
 
     pub fn quorum_store_enabled(&self) -> bool {
         match &self {
             OnChainConsensusConfig::V1(_config) => false,
-            OnChainConsensusConfig::V2(_) => true,
-            OnChainConsensusConfig::V3 { alg, .. } => alg.quorum_store_enabled(),
+            OnChainConsensusConfig::V2(_) | OnChainConsensusConfig::V3(_) => true,
+            OnChainConsensusConfig::V4 { alg, .. } => alg.quorum_store_enabled(),
         }
     }
 
@@ -218,13 +225,14 @@ impl OnChainConsensusConfig {
         match self {
             OnChainConsensusConfig::V1(_) => false,
             OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. } => alg.is_dag_enabled(),
+            OnChainConsensusConfig::V3(_) => false,
+            OnChainConsensusConfig::V4 { alg, .. } => alg.is_dag_enabled(),
         }
     }
 
     pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
         match &self {
-            OnChainConsensusConfig::V3 { alg, .. } => alg.unwrap_dag_config_v1(),
+            OnChainConsensusConfig::V4 { alg, .. } => alg.unwrap_dag_config_v1(),
             _ => unreachable!("not a dag config"),
         }
     }
@@ -234,7 +242,14 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 ValidatorTxnConfig::default_disabled()
             },
-            OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
+            OnChainConsensusConfig::V3(ConsensusConfigV1Ext { extra_features, .. }) => {
+                if extra_features.is_enabled(ConsensusExtraFeature::ValidatorTransaction) {
+                    ValidatorTxnConfig::default_enabled()
+                } else {
+                    ValidatorTxnConfig::default_disabled()
+                }
+            },
+            OnChainConsensusConfig::V4 { vtxn, .. } => vtxn.clone(),
         }
     }
 }
@@ -243,7 +258,7 @@ impl OnChainConsensusConfig {
 /// TODO: rename to "default_if_missing()" to be consistent with others?
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V3 {
+        OnChainConsensusConfig::V4 {
             alg: ConsensusAlgorithmConfig::default_if_missing(),
             vtxn: ValidatorTxnConfig::default_if_missing(),
         }
@@ -303,6 +318,83 @@ impl Default for ConsensusConfigV1 {
             ),
         }
     }
+}
+
+/// An extensible feature flag vector indexed by `ConsensusExtraFeature`.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConsensusExtraFeatures {
+    features: Vec<bool>,
+}
+
+impl ConsensusExtraFeatures {
+    pub fn is_enabled(&self, feature: ConsensusExtraFeature) -> bool {
+        self.features
+            .get(feature as usize)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub fn default_for_genesis() -> Self {
+        Self {
+            features: vec![true],
+        }
+    }
+
+    pub fn default_if_missing() -> Self {
+        Self {
+            features: vec![false],
+        }
+    }
+
+    pub fn update_extra_features(
+        &mut self,
+        features_to_enable: Vec<ConsensusExtraFeature>,
+        features_to_disable: Vec<ConsensusExtraFeature>,
+    ) {
+        for feature in features_to_enable {
+            *self.get_feature_status_mut(feature) = true;
+        }
+
+        for feature in features_to_disable {
+            *self.get_feature_status_mut(feature) = false;
+        }
+    }
+
+    fn get_feature_status_mut(&mut self, feature: ConsensusExtraFeature) -> &mut bool {
+        let idx = feature as usize;
+        if idx >= self.features.len() {
+            self.features.resize(idx + 1, false);
+        }
+        self.features.get_mut(idx).unwrap()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConsensusConfigV1Ext {
+    pub main: ConsensusConfigV1,
+    pub extra_features: ConsensusExtraFeatures,
+}
+
+impl ConsensusConfigV1Ext {
+    pub fn default_for_genesis() -> Self {
+        Self {
+            main: ConsensusConfigV1::default(),
+            extra_features: ConsensusExtraFeatures::default_for_genesis(),
+        }
+    }
+
+    pub fn default_if_missing() -> Self {
+        Self {
+            main: ConsensusConfigV1::default(),
+            extra_features: ConsensusExtraFeatures::default_if_missing(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(non_camel_case_types)]
+pub enum ConsensusExtraFeature {
+    ValidatorTransaction = 0,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
