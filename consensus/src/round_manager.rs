@@ -87,40 +87,40 @@ impl UnverifiedEvent {
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
-                if !self_message {
-                    p.verify(validator, quorum_store_enabled)?;
-                }
+                // if !self_message {
+                //     p.verify(validator, quorum_store_enabled)?;
+                // }
                 VerifiedEvent::ProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
-                if !self_message {
-                    v.verify(validator)?;
-                }
+                // if !self_message {
+                //     v.verify(validator)?;
+                // }
                 VerifiedEvent::VoteMsg(v)
             },
             // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
-                if !self_message {
-                    b.verify(peer_id, max_num_batches)?;
-                }
+                // if !self_message {
+                //     b.verify(peer_id, max_num_batches)?;
+                // }
                 VerifiedEvent::BatchMsg(b)
             },
             UnverifiedEvent::SignedBatchInfo(sd) => {
-                if !self_message {
-                    sd.verify(
-                        peer_id,
-                        max_num_batches,
-                        max_batch_expiry_gap_usecs,
-                        validator,
-                    )?;
-                }
+                // if !self_message {
+                //     sd.verify(
+                //         peer_id,
+                //         max_num_batches,
+                //         max_batch_expiry_gap_usecs,
+                //         validator,
+                //     )?;
+                // }
                 VerifiedEvent::SignedBatchInfo(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
-                if !self_message {
-                    p.verify(max_num_batches, validator)?;
-                }
+                // if !self_message {
+                //     p.verify(max_num_batches, validator)?;
+                // }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
