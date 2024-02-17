@@ -37,7 +37,7 @@ use aptos_framework::{
     BuildOptions, BuiltPackage,
 };
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
-use aptos_lint::aptos_lint;
+use move_lint::move_lint;
 use aptos_rest_client::aptos_api_types::{
     EntryFunctionId, HexEncodedBytes, IdentifierWrapper, MoveModuleId,
 };
@@ -408,11 +408,6 @@ pub struct CompileScriptOutput {
 
 #[derive(Parser)]
 pub struct LintPackage {
-    #[clap(long)]
-    pub(crate) save_metadata: bool,
-
-    #[clap(flatten)]
-    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
     #[clap(flatten)]
     pub(crate) move_options: MovePackageDir,
 }
@@ -425,7 +420,7 @@ impl CliCommand<&'static str> for LintPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let path: PathBuf = self.move_options.get_package_path()?;
-        aptos_lint(path);
+        move_lint(path);
         Ok("")
     }
 }
