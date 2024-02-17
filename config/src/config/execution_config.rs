@@ -62,8 +62,8 @@ impl Default for ExecutionConfig {
             // Parallel execution by default.
             concurrency_level: 8,
             num_proof_reading_threads: 32,
-            paranoid_type_verification: false,
-            paranoid_hot_potato_verification: false,
+            paranoid_type_verification: true,
+            paranoid_hot_potato_verification: true,
             processed_transactions_detailed_counters: false,
             transaction_filter: Filter::empty(),
         }
