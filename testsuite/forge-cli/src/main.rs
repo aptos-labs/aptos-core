@@ -721,8 +721,8 @@ fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
     mempool_config.capacity_per_user = 100_000;
-    mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
-    mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
+    // mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
+    // mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
 }
 
 fn state_sync_config_execute_transactions(state_sync_config: &mut StateSyncConfig) {
@@ -791,8 +791,8 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
 fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = 2000 * 6;
-    config.consensus.max_receiving_block_txns = 2000 * 6 * 2;
+    config.consensus.max_sending_block_txns = 1900 * 6;
+    config.consensus.max_receiving_block_txns = 1900 * 6 * 2;
     config.consensus.max_sending_block_bytes = 3 * 1024 * 1024 * 6;
     config.consensus.max_receiving_block_bytes = 3 * 1024 * 1024 * 6 * 2;
     // TODO: are there reasonable backpressure values to use?
@@ -800,21 +800,21 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
     config.consensus.chain_health_backoff = vec![];
 
     // TODO: can we actually reasonably turn on quorum store backpressure?
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_txn_limit_count = 200000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_per_validator_batch_limit_count = 50;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_min_txn_per_s = 2000;
+    // config
+    //     .consensus
+    //     .quorum_store
+    //     .back_pressure
+    //     .backlog_txn_limit_count = 200000;
+    // config
+    //     .consensus
+    //     .quorum_store
+    //     .back_pressure
+    //     .backlog_per_validator_batch_limit_count = 50;
+    // config
+    //     .consensus
+    //     .quorum_store
+    //     .back_pressure
+    //     .dynamic_min_txn_per_s = 2000;
     config
         .consensus
         .quorum_store
