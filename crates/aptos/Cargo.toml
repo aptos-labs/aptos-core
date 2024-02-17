@@ -33,6 +33,7 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
+aptos-lint = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
