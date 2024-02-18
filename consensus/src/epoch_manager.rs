@@ -1402,8 +1402,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_storage = Arc::new(StorageAdapter::new(
             epoch,
             epoch_to_validators,
-            self.liveness_storage.consensus_db(),
-            self.liveness_storage.aptos_db(),
+            self.storage.consensus_db(),
+            self.storage.aptos_db(),
         ));
 
         let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
