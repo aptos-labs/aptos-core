@@ -145,7 +145,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     commit_state_computer: Arc<dyn StateComputer>,
-    liveness_storage: Arc<dyn PersistentLivenessStorage>,
+    storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
@@ -267,7 +267,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_enabled: false,
             quorum_store_to_mempool_sender,
             commit_state_computer,
-            liveness_storage: storage,
+            storage,
             safety_rules_manager,
             vtxn_pool,
             reconfig_events,
@@ -386,7 +386,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let backend = Arc::new(AptosDBBackend::new(
                     window_size,
                     seek_len,
-                    self.liveness_storage.aptos_db(),
+                    self.storage.aptos_db(),
                 ));
                 let voting_powers: Vec<_> = if weight_by_voting_power {
                     proposers
@@ -462,7 +462,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         // If we are considering beyond the current epoch, we need to fetch validators for those epochs
         if epoch_state.epoch > first_epoch_to_consider {
-            self.liveness_storage
+            self.storage
                 .aptos_db()
                 .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
                 .map_err(Into::into)
@@ -497,7 +497,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "[EpochManager] receive {}", request,
         );
         let proof = self
-            .liveness_storage
+            .storage
             .aptos_db()
             .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch)
             .map_err(DbError::from)
@@ -832,7 +832,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let recovery_manager = RecoveryManager::new(
             epoch_state,
             network_sender,
-            self.liveness_storage.clone(),
+            self.storage.clone(),
             self.commit_state_computer.clone(),
             ledger_data.committed_round(),
             self.config
@@ -868,7 +868,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
-                self.liveness_storage.aptos_db().clone(),
+                self.storage.aptos_db().clone(),
                 network_sender.clone(),
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
@@ -987,10 +987,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, "Update SafetyRules");
 
-        let mut safety_rules = MetricsSafetyRules::new(
-            self.safety_rules_manager.client(),
-            self.liveness_storage.clone(),
-        );
+        let mut safety_rules =
+            MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
         if let Err(error) = safety_rules.perform_initialize() {
             error!(
                 epoch = epoch,
@@ -1029,7 +1027,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
         let block_store = Arc::new(BlockStore::new(
-            Arc::clone(&self.liveness_storage),
+            Arc::clone(&self.storage),
             recovery_data,
             state_computer,
             self.config.max_pruned_blocks_in_mem,
@@ -1080,7 +1078,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proposal_generator,
             safety_rules_container,
             network_sender,
-            self.liveness_storage.clone(),
+            self.storage.clone(),
             onchain_consensus_config,
             buffered_proposal_tx,
             self.config.clone(),
@@ -1339,7 +1337,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         features: &Features,
     ) {
-        match self.liveness_storage.start() {
+        match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
                 self.recovery_mode = false;
                 self.start_round_manager(
@@ -1404,8 +1402,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dag_storage = Arc::new(StorageAdapter::new(
             epoch,
             epoch_to_validators,
-            self.liveness_storage.consensus_db(),
-            self.liveness_storage.aptos_db(),
+            self.storage.consensus_db(),
+            self.storage.aptos_db(),
         ));
 
         let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);

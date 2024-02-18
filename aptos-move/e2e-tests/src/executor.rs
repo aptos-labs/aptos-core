@@ -615,7 +615,9 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let resolver = self.data_store.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
+        );
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -689,8 +691,11 @@ impl FakeExecutor {
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
-    pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(&self.get_state_view().as_move_resolver());
+    pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
+        let vm = AptosVM::new(
+            &self.get_state_view().as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        );
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -809,6 +814,7 @@ impl FakeExecutor {
             self.features.clone(),
             timed_features,
             &resolver,
+            false,
         )
         .unwrap();
 
@@ -886,6 +892,7 @@ impl FakeExecutor {
                     a2.lock().unwrap().push(expression);
                 }),
                 &resolver,
+                /*aggregator_v2_type_tagging=*/ false,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void());
@@ -959,6 +966,7 @@ impl FakeExecutor {
                 self.features.clone(),
                 timed_features,
                 &resolver,
+                false,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void());
@@ -1022,6 +1030,7 @@ impl FakeExecutor {
             features.clone(),
             timed_features,
             &resolver,
+            features.is_aggregator_v2_delayed_fields_enabled(),
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void());
@@ -1077,6 +1086,7 @@ impl FakeExecutor {
             // FIXME: should probably read the timestamp from storage.
             TimedFeaturesBuilder::enable_all().build(),
             &resolver,
+            false,
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void());

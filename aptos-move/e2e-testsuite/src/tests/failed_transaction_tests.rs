@@ -26,7 +26,10 @@ fn failed_transaction_cleanup_test() {
     executor.add_account_data(&sender);
 
     let log_context = AdapterLogSchema::new(executor.get_state_view().id(), 0);
-    let aptos_vm = AptosVM::new(&executor.get_state_view().as_move_resolver());
+    let aptos_vm = AptosVM::new(
+        &executor.get_state_view().as_move_resolver(),
+        /*override_is_delayed_field_optimization_capable=*/ None,
+    );
     let data_cache = executor.get_state_view().as_move_resolver();
 
     let txn_data = TransactionMetadata {

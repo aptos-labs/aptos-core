@@ -461,7 +461,7 @@ where
 
     #[inline]
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
-        if self.feature_version() < 13 {
+        if self.feature_version() < 14 {
             return Ok(());
         }
 
