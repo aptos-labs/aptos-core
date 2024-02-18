@@ -51,7 +51,7 @@ impl ReturnAtEndOfBlockVisitor {
 impl ExpressionAnalysisVisitor for ReturnAtEndOfBlockVisitor {
     fn visit_function_custom(&mut self, func_env: &FunctionEnv, env: &GlobalEnv, _: &LintConfig) {
         let func = func_env.get_def();
-        if let Some(func) = func {
+        if let Some(func) = func.as_ref() {
             func.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
                     if !up {

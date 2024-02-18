@@ -74,7 +74,7 @@ impl ExpressionAnalysisVisitor for ComplexInlineFunctionVisitor {
         env: &GlobalEnv,
         lint_config: &LintConfig,
     ) {
-        if let Some(func) = func_env.get_def() {
+        if let Some(func) = func_env.get_def().as_ref() {
             func.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
                     if !up {

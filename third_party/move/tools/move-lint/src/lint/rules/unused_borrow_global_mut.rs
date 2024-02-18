@@ -2,13 +2,7 @@
 use crate::lint::utils::add_diagnostic_and_emit;
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::model::{FunctionEnv, GlobalEnv};
-use move_stackless_bytecode::borrow_analysis::BorrowAnalysisProcessor;
 use move_stackless_bytecode::function_target::FunctionTarget;
-use move_stackless_bytecode::function_target_pipeline::{
-    FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
-};
-use move_stackless_bytecode::livevar_analysis::LiveVarAnalysisProcessor;
-use move_stackless_bytecode::reaching_def_analysis::ReachingDefProcessor;
 use move_stackless_bytecode::stackless_bytecode::{AttrId, Bytecode, Operation};
 use move_stackless_bytecode::stackless_bytecode_generator::StacklessBytecodeGenerator;
 use std::collections::{BTreeMap, HashSet};

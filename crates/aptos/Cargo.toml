@@ -33,7 +33,6 @@ aptos-indexer-grpc-server-framework = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-ledger = { workspace = true }
-aptos-lint = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-move-debugger = { workspace = true }
 aptos-network-checker = { workspace = true }
@@ -56,9 +55,7 @@ clap = { workspace = true, features = ["env", "unstable-styles"] }
 clap_complete = { workspace = true }
 codespan-reporting = { workspace = true }
 dashmap = { workspace = true }
-diesel = { workspace = true, features = [
-    "postgres_backend",
-] }
+diesel = { workspace = true, features = ["postgres_backend"] }
 diesel-async = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
@@ -66,6 +63,7 @@ hex = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
 move-binary-format = { workspace = true }
+move-lint = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-cli = { workspace = true }
 move-command-line-common = { workspace = true }
@@ -76,15 +74,18 @@ move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
-move-unit-test = { workspace = true, features = [ "debugging" ] }
-move-vm-runtime = { workspace = true, features = [ "testing" ] }
+move-unit-test = { workspace = true, features = ["debugging"] }
+move-vm-runtime = { workspace = true, features = ["testing"] }
 once_cell = { workspace = true }
 poem = { workspace = true }
 processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "2d5cb211a89a8705674e9e1e741c841dd899c558" }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
-self_update = { version = "0.38.0", features = ["archive-zip", "compression-zip-deflate"] }
+self_update = { version = "0.38.0", features = [
+    "archive-zip",
+    "compression-zip-deflate",
+] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }

@@ -2,7 +2,6 @@ use move_model::{
     ast::ExpData,
     model::{FunctionEnv, GlobalEnv, ModuleEnv},
 };
-use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 
 use super::utils::LintConfig;
 
@@ -19,7 +18,7 @@ pub trait ExpressionAnalysisVisitor {
         env: &GlobalEnv,
         lint_config: &LintConfig,
     ) {
-        if let Some(func) = func_env.get_def() {
+        if let Some(func) = func_env.get_def().as_ref() {
             func.visit_pre_post(&mut |is_pre_visit, exp: &ExpData| {
                 if is_pre_visit {
                     self.pre_visit_expression(exp, func_env, env, lint_config);

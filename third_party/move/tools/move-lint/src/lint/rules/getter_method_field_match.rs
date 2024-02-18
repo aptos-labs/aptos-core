@@ -32,7 +32,7 @@ impl GetterMethodFieldMatchLint {
                 .get_name()
                 .display(module_env.symbol_pool())
                 .to_string();
-            if let Some(func) = func_env.get_def() {
+            if let Some(func) = func_env.get_def().as_ref() {
                 self.check_function_definition(func, &func_env, &method_name, module_env);
             }
         }
@@ -136,7 +136,7 @@ impl GetterMethodFieldMatchLint {
         add_diagnostic_and_emit(
             &module_env
                 .env
-                .get_node_loc(func_env.get_def().unwrap().node_id()),
+                .get_node_loc(func_env.get_def().clone().expect("Function definition not found").node_id()),
             &message,
             codespan_reporting::diagnostic::Severity::Warning,
             module_env.env,
@@ -156,7 +156,7 @@ impl GetterMethodFieldMatchLint {
         add_diagnostic_and_emit(
             &module_env
                 .env
-                .get_node_loc(func_env.get_def().unwrap().node_id()),
+                .get_node_loc(func_env.get_def().as_ref().unwrap().node_id()),
             &message,
             codespan_reporting::diagnostic::Severity::Warning,
             module_env.env,

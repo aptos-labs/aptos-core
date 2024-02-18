@@ -249,7 +249,6 @@ dependencies = [
  "aptos-indexer-grpc-utils",
  "aptos-keygen",
  "aptos-ledger",
- "aptos-lint",
  "aptos-logger",
  "aptos-move-debugger",
  "aptos-network-checker",
@@ -289,6 +288,7 @@ dependencies = [
  "move-coverage",
  "move-disassembler",
  "move-ir-types",
+ "move-lint",
  "move-package",
  "move-symbol-pool",
  "move-unit-test",
@@ -2447,33 +2447,6 @@ dependencies = [
  "ledger-transport-hid",
  "once_cell",
  "thiserror",
-]
-
-[[package]]
-name = "aptos-lint"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.3.21",
- "codespan",
- "codespan-reporting",
- "move-abigen",
- "move-command-line-common",
- "move-compiler",
- "move-compiler-v2",
- "move-core-types",
- "move-ir-types",
- "move-model",
- "move-package",
- "move-symbol-pool",
- "named-lock",
- "num 0.4.0",
- "num-bigint 0.4.3",
- "once_cell",
- "petgraph 0.5.1",
- "regex",
- "serde",
- "whoami",
 ]
 
 [[package]]
@@ -10134,6 +10107,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "move-lint"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap 4.3.21",
+ "codespan",
+ "codespan-reporting",
+ "move-abigen",
+ "move-command-line-common",
+ "move-compiler",
+ "move-compiler-v2",
+ "move-core-types",
+ "move-ir-types",
+ "move-model",
+ "move-package",
+ "move-stackless-bytecode",
+ "move-symbol-pool",
+ "named-lock",
+ "num 0.4.0",
+ "num-bigint 0.4.3",
+ "once_cell",
+ "petgraph 0.5.1",
+ "regex",
+ "serde",
+ "toml 0.8.10",
+ "whoami",
+]
+
+[[package]]
 name = "move-model"
 version = "0.1.0"
 dependencies = [
@@ -13525,9 +13527,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.2"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93107647184f6027e3b7dcb2e11034cf95ffa1e3a682c67951963ac69c1c007d"
+checksum = "eb3622f419d1296904700073ea6cc23ad690adbd66f13ea683df73298736f0c1"
 dependencies = [
  "serde",
 ]
@@ -14861,6 +14863,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.8.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a9aad4a3066010876e8dcf5a8a06e70a558751117a145c6ce2b82c2e2054290"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit 0.22.6",
+]
+
+[[package]]
 name = "toml_datetime"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14903,6 +14917,19 @@ dependencies = [
  "indexmap 2.0.1",
  "toml_datetime",
  "winnow 0.5.19",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.22.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c1b5fd4128cc8d3e0cb74d4ed9a9cc7c7284becd4df68f5f940e1ad123606f6"
+dependencies = [
+ "indexmap 2.0.1",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "winnow 0.6.1",
 ]
 
 [[package]]
@@ -16105,6 +16132,15 @@ name = "winnow"
 version = "0.5.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "829846f3e3db426d4cee4510841b71a8e58aa2a76b1132579487ae430ccd9c7b"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "winnow"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d90f4e0f530c4c69f62b80d839e9ef3855edc9cba471a160c4d692deed62b401"
 dependencies = [
  "memchr",
 ]

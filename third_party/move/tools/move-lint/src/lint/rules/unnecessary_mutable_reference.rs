@@ -27,7 +27,7 @@ impl UnnecessaryMutableReferenceLint {
 
     fn check_unnecessary_mutable_references(&self, module: &ModuleEnv, env: &GlobalEnv) {
         for func_env in module.get_functions() {
-            if let Some(body) = func_env.get_def() {
+            if let Some(body) = func_env.get_def().as_ref() {
                 body.visit_pre_post(
                     &mut (|up: bool, exp: &ExpData| {
                         if !up {

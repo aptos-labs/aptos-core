@@ -32,7 +32,7 @@ impl DeepNestingVisitor {
 
 impl ExpressionAnalysisVisitor for DeepNestingVisitor {
     fn visit_function(&mut self, func_env: &FunctionEnv, env: &GlobalEnv, _: &LintConfig) {
-        if let Some(func) = func_env.get_def() {
+        if let Some(func) = func_env.get_def().as_ref() {
             func.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
                     if let ExpData::IfElse(node_id, _, _, _) |  ExpData::Loop(node_id, _) = exp {

@@ -49,7 +49,7 @@ impl UnmodifiedMutableArgumentLint {
     fn is_argument_modified(&self, param: &Parameter, func_env: &FunctionEnv) -> bool {
         let param_name = param.0.display(func_env.symbol_pool()).to_string();
         let mut used = false;
-        if let Some(func_body) = func_env.get_def() {
+        if let Some(func_body) = func_env.get_def().as_ref() {
             func_body.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
                     if !up && !used {

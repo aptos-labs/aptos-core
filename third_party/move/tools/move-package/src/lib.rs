@@ -246,6 +246,20 @@ impl BuildConfig {
         ret
     }
 
+    pub fn move_model_v2_for_package(
+        self,
+        path: &Path,
+        model_config: ModelConfig,
+    ) -> Result<model::GlobalEnv> {
+        // resolution graph diagnostics are only needed for CLI commands so ignore them by passing a
+        // vector as the writer
+        let resolved_graph = self.resolution_graph_for_package(path, &mut Vec::new())?;
+        let mutx = PackageLock::lock();
+        let ret = ModelBuilder::create(resolved_graph, model_config).build_model_v2();
+        mutx.unlock();
+        ret
+    }
+
     pub fn download_deps_for_package<W: Write>(&self, path: &Path, writer: &mut W) -> Result<()> {
         let path = SourcePackageLayout::try_find_root(path)?;
         let toml_manifest =
