@@ -1,3 +1,5 @@
-// Revela decompiler. Copyright (c) Verichains, 2023-2024
+// Copyright (c) Verichains
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 pub mod decompiler;

@@ -1,5 +1,6 @@
-// Revela decompiler. Copyright (c) Verichains, 2023-2024
-// This is designed & optimized for decompiler - not for producing bytecode.
+// Copyright (c) Verichains
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use std::collections::{BTreeMap, BTreeSet};
 
