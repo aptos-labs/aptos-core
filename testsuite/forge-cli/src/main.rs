@@ -1866,8 +1866,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             config.storage.rocksdb_configs.enable_storage_sharding = true;
 
             // Experimental delayed QC aggregation
-            // TODO: should this still be used?
-            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
+            // TODO: remove for regular runs too
+            config.consensus.qc_aggregator_type = QcAggregatorType::NoDelay;
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
