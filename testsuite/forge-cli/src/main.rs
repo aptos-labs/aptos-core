@@ -1854,17 +1854,10 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             optimize_for_maximum_throughput(config);
 
             // Other consensus / Quroum store configs
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
-
-            // Experimental delayed QC aggregation
-            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
