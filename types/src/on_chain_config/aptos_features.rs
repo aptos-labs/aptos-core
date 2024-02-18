@@ -3,9 +3,9 @@
 
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
-
+use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -115,6 +115,17 @@ impl Features {
         self.features[byte_index] &= !bit_mask;
     }
 
+    pub fn into_flag_vec(self) -> Vec<FeatureFlag> {
+        let Self { features } = self;
+        features
+            .into_iter()
+            .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
+            .enumerate()
+            .filter(|(_feature_idx, enabled)| *enabled)
+            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .collect()
+    }
+
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
         let val = flag as u64;
         let byte_index = (val / 8) as usize;
@@ -181,6 +192,10 @@ impl Features {
         self.is_enabled(FeatureFlag::ZK_ID_ZKLESS_SIGNATURE)
     }
 
+    pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
+    }
+
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
@@ -188,4 +203,19 @@ impl Features {
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
+}
+
+#[test]
+fn test_features_into_flag_vec() {
+    let mut features = Features { features: vec![] };
+    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+    features.enable(FeatureFlag::BN254_STRUCTURES);
+    let flag_vec = features.into_flag_vec();
+    assert_eq!(
+        vec![
+            FeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::BN254_STRUCTURES
+        ],
+        flag_vec
+    );
 }
