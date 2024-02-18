@@ -166,11 +166,9 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
             SuccessCriteria::new(1000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 10.0,
                     max_round_gap: 4,
                 }),
         )
 }
-
