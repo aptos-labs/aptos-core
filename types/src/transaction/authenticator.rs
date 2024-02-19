@@ -1005,6 +1005,7 @@ impl AnySignature {
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
             (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key: _ }) => {
+                // TODO(zkid): Batch-verify these two signatures
                 match &signature.sig {
                     ZkpOrOpenIdSig::Groth16Zkp(proof) => {
                         proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?;
@@ -1741,12 +1742,12 @@ mod tests {
         zkid_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
         let tw_sk = Ed25519PrivateKey::generate(&mut thread_rng());
-        // Badly_signed non-malleability signature
+        // Bad non-malleability signature
         match &mut zkid_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+                // bad signature using the TW SK rather than the ESK
                 proof.non_malleability_signature =
                     EphemeralSignature::ed25519(tw_sk.sign(&proof.proof).unwrap());
-                // bad signature using the TW SK rather than the ESK
             },
             ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
         }
