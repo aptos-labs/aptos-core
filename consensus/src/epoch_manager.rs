@@ -574,6 +574,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let network_sender = NetworkSender::new(
             self.author,
+            // TODO: Should this also be an Arc pointer?
             self.network_sender.clone(),
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
@@ -681,7 +682,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         ledger_data: LedgerRecoveryData,
         onchain_consensus_config: OnChainConsensusConfig,
         epoch_state: Arc<EpochState>,
-        network_sender: NetworkSender,
+        network_sender: Arc<NetworkSender>,
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -827,7 +828,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         recovery_data: RecoveryData,
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
-        network_sender: NetworkSender,
+        network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
         features: Features,
@@ -1085,7 +1086,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     initial_data,
                     epoch_state,
                     consensus_config,
-                    network_sender,
+                    Arc::new(network_sender),
                     payload_client,
                     payload_manager,
                     features,
@@ -1098,7 +1099,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     ledger_data,
                     consensus_config,
                     epoch_state,
-                    network_sender,
+                    Arc::new(network_sender),
                 )
                 .await
             },

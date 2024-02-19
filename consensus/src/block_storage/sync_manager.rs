@@ -84,7 +84,7 @@ impl BlockStore {
     ) -> anyhow::Result<()> {
         self.sync_to_highest_commit_cert(
             sync_info.highest_commit_cert().ledger_info(),
-            &retriever.network,
+            retriever.network.clone(),
         )
         .await;
         self.sync_to_highest_ordered_cert(
@@ -122,6 +122,7 @@ impl BlockStore {
             if qc.ends_epoch() {
                 retriever
                     .network
+                    .clone()
                     .broadcast_epoch_change(EpochChangeProof::new(
                         vec![qc.ledger_info().clone()],
                         /* more = */ false,
@@ -346,7 +347,7 @@ impl BlockStore {
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
-        network: &NetworkSender,
+        network: Arc<NetworkSender>,
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
@@ -404,7 +405,7 @@ impl BlockStore {
 
 /// BlockRetriever is used internally to retrieve blocks
 pub struct BlockRetriever {
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
     max_blocks_to_request: u64,
@@ -412,7 +413,7 @@ pub struct BlockRetriever {
 
 impl BlockRetriever {
     pub fn new(
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
         max_blocks_to_request: u64,
