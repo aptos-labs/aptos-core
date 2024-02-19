@@ -5,3 +5,9 @@ error: expected 0 item(s), found 2
    │
 13 │         (_, _) = ();
    │         ^^^^^^
+
+error: expected 0 item(s), found 1
+   ┌─ tests/checking/typing/v1-commands/pop_weird.move:14:9
+   │
+14 │         (_) = ();
+   │         ^^^
