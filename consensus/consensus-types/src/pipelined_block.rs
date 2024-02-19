@@ -20,11 +20,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// ExecutedBlocks are managed in a speculative tree, the committed blocks form a chain. Besides
-/// block data, each executed block also has other derived meta data which could be regenerated from
-/// blocks.
+/// A representation of a block that has been added to the execution pipeline. It might either be in ordered
+/// executed state. In the ordered state, the block is waiting to be executed. In the executed state,
+/// the block has been executed and the output is available.
 #[derive(Clone, Eq, PartialEq)]
-pub struct ExecutedBlock {
+pub struct PipelinedBlock {
     /// Block data that cannot be regenerated.
     block: Block,
     /// Input transactions in the order of execution
@@ -37,8 +37,8 @@ pub struct ExecutedBlock {
     pipeline_insertion_time: OnceCell<Instant>,
 }
 
-impl ExecutedBlock {
-    pub fn replace_result(
+impl PipelinedBlock {
+    pub fn set_execution_result(
         mut self,
         input_transactions: Vec<SignedTransaction>,
         result: StateComputeResult,
@@ -57,19 +57,19 @@ impl ExecutedBlock {
     }
 }
 
-impl Debug for ExecutedBlock {
+impl Debug for PipelinedBlock {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self)
     }
 }
 
-impl Display for ExecutedBlock {
+impl Display for PipelinedBlock {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.block())
     }
 }
 
-impl ExecutedBlock {
+impl PipelinedBlock {
     pub fn new(
         block: Block,
         input_transactions: Vec<SignedTransaction>,
@@ -79,6 +79,16 @@ impl ExecutedBlock {
             block,
             input_transactions,
             state_compute_result,
+            randomness: OnceCell::new(),
+            pipeline_insertion_time: OnceCell::new(),
+        }
+    }
+
+    pub fn new_ordered(block: Block) -> Self {
+        Self {
+            block,
+            input_transactions: vec![],
+            state_compute_result: StateComputeResult::new_dummy(),
             randomness: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
         }
@@ -144,12 +154,12 @@ impl ExecutedBlock {
         )
     }
 
-    pub fn vote_proposal(&self, decoupled_execution: bool) -> VoteProposal {
+    pub fn vote_proposal(&self) -> VoteProposal {
         VoteProposal::new(
             self.compute_result().extension_proof(),
             self.block.clone(),
             self.compute_result().epoch_state().clone(),
-            decoupled_execution,
+            true,
         )
     }
 

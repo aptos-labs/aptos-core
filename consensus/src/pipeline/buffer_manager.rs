@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, pipeline::commit_decision::CommitDecision,
+    common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -67,7 +67,7 @@ pub struct ResetRequest {
 }
 
 pub struct OrderedBlocks {
-    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_blocks: Vec<PipelinedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
@@ -328,14 +328,14 @@ impl BufferManager {
     /// Pop the prefix of buffer items until (including) target_block_id
     /// Send persist request.
     async fn advance_head(&mut self, target_block_id: HashValue) {
-        let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
+        let mut blocks_to_persist: Vec<Arc<PipelinedBlock>> = vec![];
 
         while let Some(item) = self.buffer.pop_front() {
             blocks_to_persist.extend(
                 item.get_blocks()
                     .iter()
                     .map(|eb| Arc::new(eb.clone()))
-                    .collect::<Vec<Arc<ExecutedBlock>>>(),
+                    .collect::<Vec<Arc<PipelinedBlock>>>(),
             );
             if self.signing_root == Some(item.block_id()) {
                 self.signing_root = None;
