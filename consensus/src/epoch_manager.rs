@@ -574,7 +574,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     ) {
         let network_sender = NetworkSender::new(
             self.author,
-            // TODO: Should this also be an Arc pointer?
             self.network_sender.clone(),
             self.self_sender.clone(),
             epoch_state.verifier.clone(),
@@ -732,7 +731,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
                 self.storage.aptos_db().clone(),
-                network_sender.clone(),
+                network_sender,
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
