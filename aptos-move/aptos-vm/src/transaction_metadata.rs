@@ -56,7 +56,8 @@ impl TransactionMetadata {
                 TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::Multisig(_) => vec![],
 
-                // Deprecated. Will be removed in the future.
+                // Deprecated. Return an empty vec because we cannot do anything
+                // else here, only `unreachable!` otherwise.
                 TransactionPayload::ModuleBundle(_) => vec![],
             },
             script_size: match txn.payload() {

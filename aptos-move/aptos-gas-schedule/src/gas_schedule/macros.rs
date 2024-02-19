@@ -66,6 +66,13 @@ macro_rules! define_gas_parameters {
                     $($name: 0.into()),*
                 }
             }
+
+            #[cfg(feature = "testing")]
+            pub fn random() -> Self {
+                Self {
+                    $($name: rand::random::<u64>().into()),*
+                }
+            }
         }
 
         impl $crate::traits::InitialGasSchedule for $params_name {

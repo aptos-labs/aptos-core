@@ -5,14 +5,15 @@
 use crate::move_vm_ext::AptosMoveResolver;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
-    bn254_circom::{get_public_inputs_hash, Groth16VerificationKey},
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     transaction::authenticator::EphemeralPublicKey,
     vm_status::{StatusCode, VMStatus},
-    zkid,
-    zkid::{Configuration, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
+    zkid::{
+        get_public_inputs_hash, Configuration, Groth16VerificationKey, ZkIdPublicKey,
+        ZkIdSignature, ZkpOrOpenIdSig,
+    },
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
@@ -86,11 +87,11 @@ fn get_jwk_for_zkid_authenticator(
         .parse_jwt_header()
         .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
     let jwk_move_struct = jwks
-        .get_jwk(&zkid_pub_key.iss, &jwt_header.kid)
+        .get_jwk(&zkid_pub_key.iss_val, &jwt_header.kid)
         .map_err(|_| {
             invalid_signature!(format!(
                 "JWK for {} with KID {} was not found",
-                zkid_pub_key.iss, jwt_header.kid
+                zkid_pub_key.iss_val, jwt_header.kid
             ))
         })?;
 
@@ -148,10 +149,7 @@ pub fn validate_zkid_authenticators(
                     // If an `aud` override was set for account recovery purposes, check that it is
                     // in the allow-list on-chain.
                     if proof.override_aud_val.is_some() {
-                        zkid::is_allowed_override_aud(
-                            config,
-                            proof.override_aud_val.as_ref().unwrap(),
-                        )?;
+                        config.is_allowed_override_aud(proof.override_aud_val.as_ref().unwrap())?;
                     }
 
                     // The training wheels signature is only checked if a training wheels PK is set on chain
@@ -163,14 +161,10 @@ pub fn validate_zkid_authenticators(
                             })?;
                     }
 
-                    let public_inputs_hash = get_public_inputs_hash(
-                        zkid_sig,
-                        zkid_pub_key,
-                        &rsa_jwk,
-                        proof.exp_horizon_secs,
-                        config,
-                    )
-                    .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
+                    let public_inputs_hash =
+                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, config).map_err(
+                            |_| invalid_signature!("Could not compute public inputs hash"),
+                        )?;
                     proof
                         .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;
@@ -201,7 +195,7 @@ pub fn validate_zkid_authenticators(
                         //
                         // We are now ready to verify the RSA signature
                         openid_sig
-                            .verify_jwt_signature(rsa_jwk, &zkid_sig.jwt_header)
+                            .verify_jwt_signature(&rsa_jwk, &zkid_sig.jwt_header_b64)
                             .map_err(|_| {
                                 invalid_signature!(
                                     "RSA signature verification failed for OpenIdSig"

@@ -1,226 +1,190 @@
 
 Diagnostics:
-error: `public(friend)` inline function `0x42::m::friend_accessible` cannot be called from 0x42::o_nonfriend::foofunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
-   ┌─ tests/checking/inlining/private_call_3.move:12:5
+error: inline function `0x42::m::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::foo` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:12:31
    │
-12 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-13 │ │         bar()
-14 │ │     }
-   │ ╰─────^
-   · │
-81 │       m::friend_accessible();
-   │       ---------------------- called here
+12 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+81 │     m::friend_accessible();
+   │     ---------------------- called here
 
-error: `public(friend)` inline function `0x42::m::friend_accessible` cannot be called from 0x42::o_nonfriend::inaccessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
-   ┌─ tests/checking/inlining/private_call_3.move:12:5
+error: inline function `0x42::m::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::inaccessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:12:31
    │
-12 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-13 │ │         bar()
-14 │ │     }
-   │ ╰─────^
-   · │
-91 │       m::friend_accessible();
-   │       ---------------------- called here
+12 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+91 │     m::friend_accessible();
+   │     ---------------------- called here
 
-error: `public(friend)` inline function `0x42::m::friend_accessible` cannot be called from 0x42::o_nonfriend::friend_accessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
-    ┌─ tests/checking/inlining/private_call_3.move:12:5
+error: inline function `0x42::m::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::friend_accessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
+    ┌─ tests/checking/inlining/private_call_3.move:12:31
     │
- 12 │ ╭     public(friend) inline fun friend_accessible(): u64 {
- 13 │ │         bar()
- 14 │ │     }
-    │ ╰─────^
-    · │
-101 │       m::friend_accessible();
-    │       ---------------------- called here
+ 12 │     public(friend) inline fun friend_accessible(): u64 {
+    │                               ^^^^^^^^^^^^^^^^^ callee
+    ·
+101 │     m::friend_accessible();
+    │     ---------------------- called here
 
-error: `public(friend)` function `0x42::m::bar` cannot be called from 0x42::o_nonfriend::foofunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
-   ┌─ tests/checking/inlining/private_call_3.move:16:5
+error: function `0x42::m::bar` cannot be called from inline function `0x42::o_nonfriend::foo` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:16:24
    │
 16 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 83 │     m::bar();
    │     -------- called here
 
-error: `public(friend)` function `0x42::m::bar` cannot be called from 0x42::o_nonfriend::inaccessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
-   ┌─ tests/checking/inlining/private_call_3.move:16:5
+error: function `0x42::m::bar` cannot be called from inline function `0x42::o_nonfriend::inaccessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_3.move:16:24
    │
 16 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 93 │     m::bar();
    │     -------- called here
 
-error: `public(friend)` function `0x42::m::bar` cannot be called from 0x42::o_nonfriend::friend_accessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
-    ┌─ tests/checking/inlining/private_call_3.move:16:5
+error: function `0x42::m::bar` cannot be called from inline function `0x42::o_nonfriend::friend_accessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m`
+    ┌─ tests/checking/inlining/private_call_3.move:16:24
     │
  16 │     public(friend) fun bar(): u64 { 42 }
-    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │                        ^^^ callee
     ·
 103 │     m::bar();
     │     -------- called here
 
-error: `public(friend)` inline function `0x42::m_nonfriend::friend_accessible` cannot be called from 0x42::o::foofunction `inline ` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:28:5
+error: inline function `0x42::m_nonfriend::friend_accessible` cannot be called from inline function `0x42::o::foo` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:28:31
    │
-28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-29 │ │         bar()
-30 │ │     }
-   │ ╰─────^
-   · │
-45 │       m_nonfriend::friend_accessible();
-   │       -------------------------------- called here
+28 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+45 │     m_nonfriend::friend_accessible();
+   │     -------------------------------- called here
 
-error: `public(friend)` inline function `0x42::m_nonfriend::friend_accessible` cannot be called from 0x42::o::inaccessiblefunction `inline ` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:28:5
+error: inline function `0x42::m_nonfriend::friend_accessible` cannot be called from inline function `0x42::o::inaccessible` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:28:31
    │
-28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-29 │ │         bar()
-30 │ │     }
-   │ ╰─────^
-   · │
-55 │       m_nonfriend::friend_accessible();
-   │       -------------------------------- called here
+28 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+55 │     m_nonfriend::friend_accessible();
+   │     -------------------------------- called here
 
-error: `public(friend)` inline function `0x42::m_nonfriend::friend_accessible` cannot be called from 0x42::o::friend_accessiblefunction `inline ` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:28:5
+error: inline function `0x42::m_nonfriend::friend_accessible` cannot be called from inline function `0x42::o::friend_accessible` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:28:31
    │
-28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-29 │ │         bar()
-30 │ │     }
-   │ ╰─────^
-   · │
-65 │       m_nonfriend::friend_accessible();
-   │       -------------------------------- called here
+28 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+65 │     m_nonfriend::friend_accessible();
+   │     -------------------------------- called here
 
-error: `public(friend)` inline function `0x42::m_nonfriend::friend_accessible` cannot be called from 0x42::o_nonfriend::foofunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:28:5
+error: inline function `0x42::m_nonfriend::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::foo` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:28:31
    │
-28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-29 │ │         bar()
-30 │ │     }
-   │ ╰─────^
-   · │
-82 │       m_nonfriend::friend_accessible();
-   │       -------------------------------- called here
+28 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+82 │     m_nonfriend::friend_accessible();
+   │     -------------------------------- called here
 
-error: `public(friend)` inline function `0x42::m_nonfriend::friend_accessible` cannot be called from 0x42::o_nonfriend::inaccessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:28:5
+error: inline function `0x42::m_nonfriend::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::inaccessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:28:31
    │
-28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
-29 │ │         bar()
-30 │ │     }
-   │ ╰─────^
-   · │
-92 │       m_nonfriend::friend_accessible();
-   │       -------------------------------- called here
+28 │     public(friend) inline fun friend_accessible(): u64 {
+   │                               ^^^^^^^^^^^^^^^^^ callee
+   ·
+92 │     m_nonfriend::friend_accessible();
+   │     -------------------------------- called here
 
-error: `public(friend)` inline function `0x42::m_nonfriend::friend_accessible` cannot be called from 0x42::o_nonfriend::friend_accessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
-    ┌─ tests/checking/inlining/private_call_3.move:28:5
+error: inline function `0x42::m_nonfriend::friend_accessible` cannot be called from inline function `0x42::o_nonfriend::friend_accessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
+    ┌─ tests/checking/inlining/private_call_3.move:28:31
     │
- 28 │ ╭     public(friend) inline fun friend_accessible(): u64 {
- 29 │ │         bar()
- 30 │ │     }
-    │ ╰─────^
-    · │
-102 │       m_nonfriend::friend_accessible();
-    │       -------------------------------- called here
+ 28 │     public(friend) inline fun friend_accessible(): u64 {
+    │                               ^^^^^^^^^^^^^^^^^ callee
+    ·
+102 │     m_nonfriend::friend_accessible();
+    │     -------------------------------- called here
 
-error: `public(friend)` function `0x42::m_nonfriend::bar` cannot be called from 0x42::o::foofunction `inline ` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:32:5
+error: function `0x42::m_nonfriend::bar` cannot be called from inline function `0x42::o::foo` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:32:24
    │
 32 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 47 │     m_nonfriend::bar()
    │     ------------------ called here
 
-error: `public(friend)` function `0x42::m_nonfriend::bar` cannot be called from 0x42::o::inaccessiblefunction `inline ` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:32:5
+error: function `0x42::m_nonfriend::bar` cannot be called from inline function `0x42::o::inaccessible` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:32:24
    │
 32 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 57 │     m_nonfriend::bar()
    │     ------------------ called here
 
-error: `public(friend)` function `0x42::m_nonfriend::bar` cannot be called from 0x42::o::friend_accessiblefunction `inline ` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:32:5
+error: function `0x42::m_nonfriend::bar` cannot be called from inline function `0x42::o::friend_accessible` because module `0x42::o` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:32:24
    │
 32 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 67 │     m_nonfriend::bar()
    │     ------------------ called here
 
-error: `public(friend)` function `0x42::m_nonfriend::bar` cannot be called from 0x42::o_nonfriend::foofunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:32:5
+error: function `0x42::m_nonfriend::bar` cannot be called from inline function `0x42::o_nonfriend::foo` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:32:24
    │
 32 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 84 │     m_nonfriend::bar()
    │     ------------------ called here
 
-error: `public(friend)` function `0x42::m_nonfriend::bar` cannot be called from 0x42::o_nonfriend::inaccessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
-   ┌─ tests/checking/inlining/private_call_3.move:32:5
+error: function `0x42::m_nonfriend::bar` cannot be called from inline function `0x42::o_nonfriend::inaccessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
+   ┌─ tests/checking/inlining/private_call_3.move:32:24
    │
 32 │     public(friend) fun bar(): u64 { 42 }
-   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                        ^^^ callee
    ·
 94 │     m_nonfriend::bar()
    │     ------------------ called here
 
-error: `public(friend)` function `0x42::m_nonfriend::bar` cannot be called from 0x42::o_nonfriend::friend_accessiblefunction `inline ` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
-    ┌─ tests/checking/inlining/private_call_3.move:32:5
+error: function `0x42::m_nonfriend::bar` cannot be called from inline function `0x42::o_nonfriend::friend_accessible` because module `0x42::o_nonfriend` is not a `friend` of `0x42::m_nonfriend`
+    ┌─ tests/checking/inlining/private_call_3.move:32:24
     │
  32 │     public(friend) fun bar(): u64 { 42 }
-    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │                        ^^^ callee
     ·
 104 │     m_nonfriend::bar()
     │     ------------------ called here
 
 error: inline function `0x42::o::inaccessible` cannot be called from function `0x42::n::test` because it is private to module `0x42::o`
-    ┌─ tests/checking/inlining/private_call_3.move:50:5
+    ┌─ tests/checking/inlining/private_call_3.move:50:16
     │
- 50 │ ╭     inline fun inaccessible(): u64 {
- 51 │ │         m::foo();
- 52 │ │         m_nonfriend::foo();
- 53 │ │     bar();
-    · │
- 57 │ │     m_nonfriend::bar()
- 58 │ │     }
-    │ ╰─────^
-    · │
-116 │       assert!(o::inaccessible() == 42, 1);
-    │               ----------------- called here
+ 50 │     inline fun inaccessible(): u64 {
+    │                ^^^^^^^^^^^^ callee
+    ·
+116 │     assert!(o::inaccessible() == 42, 1);
+    │             ----------------- called here
 
 error: inline function `0x42::o_nonfriend::inaccessible` cannot be called from function `0x42::n::test2` because it is private to module `0x42::o_nonfriend`
-    ┌─ tests/checking/inlining/private_call_3.move:87:5
+    ┌─ tests/checking/inlining/private_call_3.move:87:16
     │
- 87 │ ╭     inline fun inaccessible(): u64 {
- 88 │ │         m::foo();
- 89 │ │         m_nonfriend::foo();
- 90 │ │     bar();
-    · │
- 94 │ │     m_nonfriend::bar()
- 95 │ │     }
-    │ ╰─────^
-    · │
-122 │       assert!(o_nonfriend::inaccessible() == 42, 1);
-    │               --------------------------- called here
+ 87 │     inline fun inaccessible(): u64 {
+    │                ^^^^^^^^^^^^ callee
+    ·
+122 │     assert!(o_nonfriend::inaccessible() == 42, 1);
+    │             --------------------------- called here
 
-error: `public(friend)` inline function `0x42::o_nonfriend::friend_accessible` cannot be called from 0x42::n::test2function `` because module `0x42::n` is not a `friend` of `0x42::o_nonfriend`
-    ┌─ tests/checking/inlining/private_call_3.move:97:5
+error: inline function `0x42::o_nonfriend::friend_accessible` cannot be called from function `0x42::n::test2` because module `0x42::n` is not a `friend` of `0x42::o_nonfriend`
+    ┌─ tests/checking/inlining/private_call_3.move:97:31
     │
- 97 │ ╭     public(friend) inline fun friend_accessible(): u64 {
- 98 │ │         m::foo();
- 99 │ │         m_nonfriend::foo();
-100 │ │     bar();
-    · │
-104 │ │     m_nonfriend::bar()
-105 │ │     }
-    │ ╰─────^
-    · │
-123 │       assert!(o_nonfriend::friend_accessible() == 42, 1);
-    │               -------------------------------- called here
+ 97 │     public(friend) inline fun friend_accessible(): u64 {
+    │                               ^^^^^^^^^^^^^^^^^ callee
+    ·
+123 │     assert!(o_nonfriend::friend_accessible() == 42, 1);
+    │             -------------------------------- called here

@@ -4,6 +4,7 @@
 //! produces a single field element as output.
 use anyhow::bail;
 use ark_ff::PrimeField;
+use once_cell::sync::Lazy;
 // TODO(zkid): Figure out the right library for Poseidon.
 use poseidon_ark::Poseidon;
 
@@ -26,6 +27,9 @@ pub const BYTES_PACKED_PER_SCALAR: usize = 31;
 /// SNARK circuits would have to implement this more complicated packing).
 pub const MAX_NUM_INPUT_BYTES: usize = MAX_NUM_INPUT_SCALARS * BYTES_PACKED_PER_SCALAR;
 
+/// Apparently, creating this object is rather slow, so we make it a global.
+static HASHER: Lazy<Poseidon> = Lazy::new(Poseidon::new);
+
 /// Given an array of up to `MAX_NUM_INPUT_SCALARS` field elements (in the BN254 scalar field), hashes
 /// them using Poseidon-BN254 into a single field element.
 pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr> {
@@ -36,9 +40,7 @@ pub fn hash_scalars(inputs: Vec<ark_bn254::Fr>) -> anyhow::Result<ark_bn254::Fr>
         );
     }
 
-    let hash = Poseidon::new();
-
-    hash.hash(inputs).map_err(anyhow::Error::msg)
+    HASHER.hash(inputs).map_err(anyhow::Error::msg)
 }
 
 /// Given an string and `max_bytes`, it pads the byte array of the string with zeros up to size `max_bytes`,

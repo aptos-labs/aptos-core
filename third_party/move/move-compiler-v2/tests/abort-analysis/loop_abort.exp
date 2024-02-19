@@ -1,0 +1,193 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun Test::test0() {
+     var $t0: Test::Impotent
+     var $t1: Test::Impotent
+     var $t2: bool
+  0: $t2 := false
+  1: $t1 := pack Test::Impotent($t2)
+  2: $t0 := infer($t1)
+  3: label L0
+  4: goto 3
+  5: label L1
+  6: return ()
+}
+
+
+[variant baseline]
+fun Test::test1() {
+     var $t0: Test::Impotent
+     var $t1: Test::Impotent
+     var $t2: bool
+     var $t3: bool
+  0: $t2 := false
+  1: $t1 := pack Test::Impotent($t2)
+  2: $t0 := infer($t1)
+  3: label L0
+  4: $t3 := true
+  5: if ($t3) goto 6 else goto 8
+  6: label L2
+  7: goto 10
+  8: label L3
+  9: goto 12
+ 10: label L4
+ 11: goto 3
+ 12: label L1
+ 13: return ()
+}
+
+
+[variant baseline]
+fun Test::test2($t0: bool) {
+     var $t1: Test::Impotent
+     var $t2: Test::Impotent
+     var $t3: bool
+     var $t4: u64
+  0: $t3 := false
+  1: $t2 := pack Test::Impotent($t3)
+  2: $t1 := infer($t2)
+  3: if ($t0) goto 4 else goto 9
+  4: label L0
+  5: label L3
+  6: goto 5
+  7: label L4
+  8: goto 12
+  9: label L1
+ 10: $t4 := 42
+ 11: abort($t4)
+ 12: label L2
+ 13: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun Test::test0() {
+     var $t0: Test::Impotent
+     var $t1: Test::Impotent
+     var $t2: bool
+     # abort state before: {}
+     # abort state after : {}
+  0: $t2 := false
+     # abort state before: {}
+     # abort state after : {}
+  1: $t1 := pack Test::Impotent($t2)
+     # abort state before: {}
+     # abort state after : {}
+  2: $t0 := infer($t1)
+     # abort state before: {}
+     # abort state after : {}
+  3: label L0
+     # abort state before: {}
+     # abort state after : {}
+  4: goto 3
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: label L1
+     # abort state before: {returns}
+     # abort state after : {}
+  6: return ()
+}
+
+
+[variant baseline]
+fun Test::test1() {
+     var $t0: Test::Impotent
+     var $t1: Test::Impotent
+     var $t2: bool
+     var $t3: bool
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t2 := false
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t1 := pack Test::Impotent($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t0 := infer($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: label L0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t3 := true
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: if ($t3) goto 6 else goto 8
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: goto 10
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: label L3
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: goto 12
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 10: label L4
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 11: goto 3
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: label L1
+     # abort state before: {returns}
+     # abort state after : {}
+ 13: return ()
+}
+
+
+[variant baseline]
+fun Test::test2($t0: bool) {
+     var $t1: Test::Impotent
+     var $t2: Test::Impotent
+     var $t3: bool
+     var $t4: u64
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  0: $t3 := false
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  1: $t2 := pack Test::Impotent($t3)
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  2: $t1 := infer($t2)
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  3: if ($t0) goto 4 else goto 9
+     # abort state before: {}
+     # abort state after : {}
+  4: label L0
+     # abort state before: {}
+     # abort state after : {}
+  5: label L3
+     # abort state before: {}
+     # abort state after : {}
+  6: goto 5
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: label L4
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: goto 12
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  9: label L1
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+ 10: $t4 := 42
+     # abort state before: {aborts}
+     # abort state after : {}
+ 11: abort($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: label L2
+     # abort state before: {returns}
+     # abort state after : {}
+ 13: return ()
+}

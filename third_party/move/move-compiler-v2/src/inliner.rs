@@ -421,7 +421,7 @@ impl<'env, 'inliner> ExpRewriterFunctions for OuterInlinerRewriter<'env, 'inline
                 // inline the function call
                 let type_args = self.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
-                let func_loc = func_env.get_loc();
+                let func_loc = func_env.get_id_loc();
                 let body_expr =
                     if let Some(Some(expr)) = self.inliner.funexprs_after_inlining.get(&qfid) {
                         // `qfid` was previously inlined into, use the post-inlining copy of body.

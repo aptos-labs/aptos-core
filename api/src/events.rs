@@ -186,7 +186,10 @@ impl EventsApi {
                     .context
                     .latest_state_view_poem(&latest_ledger_info)?
                     .as_move_resolver()
-                    .as_converter(self.context.db.clone())
+                    .as_converter(
+                        self.context.db.clone(),
+                        self.context.table_info_reader.clone(),
+                    )
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response")
                     .map_err(|err| {

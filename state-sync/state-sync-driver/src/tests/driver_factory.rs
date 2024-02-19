@@ -40,7 +40,6 @@ fn test_new_initialized_configs() {
         false, /* indexer */
         BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-        false, /* indexer async v2 */
     )
     .unwrap();
     let (_, db_rw) = DbReaderWriter::wrap(db);

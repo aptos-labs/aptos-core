@@ -8,8 +8,10 @@ use anyhow::Result;
 use aptos_crypto::Uniform;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use move_core_types::{
-    account_address::AccountAddress, ident_str, identifier::IdentStr, move_resource::MoveStructType,
+    account_address::AccountAddress, ident_str, identifier::IdentStr, language_storage::TypeTag,
+    move_resource::MoveStructType,
 };
+use once_cell::sync::Lazy;
 use rand::CryptoRng;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fmt::Debug};
@@ -30,6 +32,9 @@ impl MoveStructType for DKGStartEvent {
     const MODULE_NAME: &'static IdentStr = ident_str!("dkg");
     const STRUCT_NAME: &'static IdentStr = ident_str!("DKGStartEvent");
 }
+
+pub static DKG_START_EVENT_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(DKGStartEvent::struct_tag())));
 
 /// DKG transcript and its metadata.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
