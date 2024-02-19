@@ -804,7 +804,7 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
         .consensus
         .quorum_store
         .back_pressure
-        .backlog_txn_limit_count = 25_000 * 4;
+        .backlog_txn_limit_count = 25_000 * 6;
     // config
     //     .consensus
     //     .quorum_store
@@ -1847,7 +1847,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 25_000 * 4,
+            mempool_backlog: 25_000 * 6,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
