@@ -9,6 +9,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
+itertools = "0.10.0"
 
 move-core-types = { workspace = true }
 move-ir-types = { workspace = true }

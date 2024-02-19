@@ -147,6 +147,7 @@ impl<'a> fmt::Display for ProcessorResultDisplay<'a> {
 /// A processing pipeline for function targets.
 #[derive(Default)]
 pub struct FunctionTargetPipeline {
+    max_loop: usize,
     processors: Vec<Box<dyn FunctionTargetProcessor>>,
 }
 
@@ -270,6 +271,7 @@ impl FunctionTargetsHolder {
         self.targets.entry(*id).or_default().insert(variant, data);
     }
 
+    /// Processes the function target data for given function.
     /// Return true if this transformed code, or false otherwise
     fn process(
         &mut self,
@@ -301,6 +303,11 @@ impl FunctionTargetsHolder {
 impl FunctionTargetPipeline {
     pub fn is_empty(&self) -> bool {
         self.processors.is_empty()
+    }
+
+    /// Sets the maximum number of loop iterations.
+    pub fn set_max_loop(&mut self, max_loop: usize) {
+        self.max_loop = max_loop
     }
 
     /// Adds a processor to this pipeline. Processor will be called in the order they have been
@@ -392,8 +399,11 @@ impl FunctionTargetPipeline {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
         info!("transforming bytecode");
         hook_before_pipeline(targets);
+        let max_loop = self.max_loop.max(1);
+        let mut loop_cnt = 0;
         let mut changed = true;
-        while changed {
+        while changed && (loop_cnt < max_loop) {
+            loop_cnt += 1;
             // reset changed to assume processors wlll not change anything
             changed = false;
             for (step_count, processor) in self.processors.iter().enumerate() {
@@ -414,7 +424,11 @@ impl FunctionTargetPipeline {
                                     scc.iter().map(|fid| env.get_function(*fid)).collect();
                                 for fid in scc {
                                     let func_env = env.get_function(*fid);
-                                    if targets.process(&func_env, processor.as_ref(), Some(&scc_env)) {
+                                    if targets.process(
+                                        &func_env,
+                                        processor.as_ref(),
+                                        Some(&scc_env),
+                                    ) {
                                         changed = true;
                                     }
                                 }

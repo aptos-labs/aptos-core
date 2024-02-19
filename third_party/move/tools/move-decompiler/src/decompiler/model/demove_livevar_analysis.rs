@@ -1,6 +1,17 @@
 // Copyright (c) Verichains
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+//! This is a modified version of the live var analysis in the stackless bytecode crate. This version introduces the following key differences:
+//! 
+//! - Use of Reaching Definitions Analysis, which is utilized in the `analyze_and_transform`` function. This suggests an enhancement in the analysis to consider reaching definitions, potentially improving the accuracy or effectiveness of the live variable analysis.
+//! 
+//! - Looping Process with Reaching Definitions: looping mechanism that repeatedly applies the analysis and transformation until no further changes are detected in the code based on reaching definitions. This loop ensures that the analysis accounts for all effects of previous transformations, potentially leading to more optimizations.
+//! 
+//! - No Side Effect Operations Optimization: includes a new condition in the transform_code function to check for operations with no side effects (no_side_effect function). If such an operation's result is not live afterward, the operation can be removed, suggesting an optimization not present in the original code.
+//! 
+//! - Elimination of Dead Code and Unused Variables: Both versions include mechanisms for eliminating unused variables and dead code. However, the modified code's approach, particularly with the consideration of reaching definitions, suggests a more refined strategy that could lead to better optimization by removing more dead code.
+//! 
+//! - General Structural and Naming Changes: There are various structural changes, such as the reorganization of code, renaming of functions and structures, and changes in the visibility (e.g., #[allow(dead_code)]) of certain functions. These changes might improve code readability, maintainability, or align with new analysis features.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -9,13 +20,14 @@ use itertools::Itertools;
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, model::FunctionEnv, ty::Type};
 
-use crate::{
+use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
+    reaching_def_analysis::{ReachingDefAnnotation, ReachingDefState},
     stackless_bytecode::{AbortAction, AttrId, Bytecode, Label, Operation},
-    stackless_control_flow_graph::StacklessControlFlowGraph, reaching_def_analysis::{ReachingDefAnnotation, ReachingDefState},
+    stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 
 /// The annotation for live variable analysis. For each code position, we have a set of local
@@ -39,22 +51,23 @@ impl LiveVarAnnotation {
     }
 }
 
-pub struct LiveVarAnalysisProcessor2 {
+pub struct LiveVarAnalysisProcessor {
     /// Whether the processor should attach `LiveVarAnnotation` to the function data.
     annotate: bool,
 }
 
-impl LiveVarAnalysisProcessor2 {
+impl LiveVarAnalysisProcessor {
     pub fn new() -> Box<Self> {
-        Box::new(LiveVarAnalysisProcessor2 { annotate: true })
+        Box::new(LiveVarAnalysisProcessor { annotate: true })
     }
 
+    #[allow(dead_code)]
     pub fn new_no_annotate() -> Box<Self> {
-        Box::new(LiveVarAnalysisProcessor2 { annotate: false })
+        Box::new(LiveVarAnalysisProcessor { annotate: false })
     }
 }
 
-impl FunctionTargetProcessor for LiveVarAnalysisProcessor2 {
+impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
     fn process(
         &self,
         _targets: &mut FunctionTargetsHolder,
@@ -68,9 +81,7 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor2 {
         }
 
         loop {
-            let reaching_def_annotation = data
-                .annotations
-                .get::<ReachingDefAnnotation>();
+            let reaching_def_annotation = data.annotations.get::<ReachingDefAnnotation>();
 
             let next_free_label = data.next_free_label_index();
             let next_free_attr = data.next_free_attr_index();
@@ -80,14 +91,20 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor2 {
 
                 // Call 1st time
                 let code_pre = code.clone();
-                let new_code =
-                    Self::analyze_and_transform(&func_target, next_free_label, next_free_attr, code, reaching_def_annotation);
+                let new_code = Self::analyze_and_transform(
+                    &func_target,
+                    next_free_label,
+                    next_free_attr,
+                    code,
+                    reaching_def_annotation,
+                );
                 if new_code == code_pre {
                     data.code = code_pre;
                     break;
                 }
                 // Eliminate unused locals after dead code elimination.
-                let (code, local_types, remap) = Self::eliminate_unused_vars(&func_target, new_code);
+                let (code, local_types, remap) =
+                    Self::eliminate_unused_vars(&func_target, new_code);
                 data.rename_vars(&|idx| {
                     if let Some(new_idx) = remap.get(&idx) {
                         *new_idx
@@ -99,9 +116,7 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor2 {
                 data.code = code;
             }
 
-            data
-                .annotations
-                .remove::<ReachingDefAnnotation>();
+            data.annotations.remove::<ReachingDefAnnotation>();
         }
 
         if self.annotate {
@@ -121,7 +136,7 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor2 {
     }
 }
 
-impl LiveVarAnalysisProcessor2 {
+impl LiveVarAnalysisProcessor {
     fn analyze_and_transform(
         func_target: &FunctionTarget,
         next_free_label: usize,
@@ -133,7 +148,8 @@ impl LiveVarAnalysisProcessor2 {
 
         let default_reaching_def_states = BTreeMap::new();
 
-        let reaching_def_states = if let Some(ReachingDefAnnotation(map)) = reaching_def_annotation {
+        let reaching_def_states = if let Some(ReachingDefAnnotation(map)) = reaching_def_annotation
+        {
             map
         } else {
             &default_reaching_def_states
@@ -327,10 +343,12 @@ impl<'a> LiveVarAnalysis<'a> {
                 }
 
                 Bytecode::Call(attr_id, dests, oper, srcs, aa)
-                    if code_offset + 1 < code.len()
-                        && dests.len() == 1 =>
+                    if code_offset + 1 < code.len() && dests.len() == 1 =>
                 {
-                    if !dests.is_empty() && Self::no_side_effect(oper.clone()) && annotation_at.after.is_empty() {
+                    if !dests.is_empty()
+                        && Self::no_side_effect(oper.clone())
+                        && annotation_at.after.is_empty()
+                    {
                         // dead code, so lets drop this insn
                     } else {
                         // Catch the common case where we have:
@@ -347,15 +365,16 @@ impl<'a> LiveVarAnalysis<'a> {
                             let annotation_at = &annotations[&(next_code_offset as CodeOffset)];
                             if src == &dests[0] && !annotation_at.after.contains(src) {
                                 transformed_code.push(Bytecode::Call(
-                                            attr_id,
-                                            vec![*dest],
-                                            oper,
-                                            srcs,
-                                            aa,
-                                            ));
+                                    attr_id,
+                                    vec![*dest],
+                                    oper,
+                                    srcs,
+                                    aa,
+                                ));
                                 skip_next = true;
                             } else {
-                                transformed_code.push(Bytecode::Call(attr_id, dests, oper, srcs, aa));
+                                transformed_code
+                                    .push(Bytecode::Call(attr_id, dests, oper, srcs, aa));
                             }
                         } else {
                             transformed_code.push(Bytecode::Call(attr_id, dests, oper, srcs, aa));
@@ -424,7 +443,8 @@ impl<'a> LiveVarAnalysis<'a> {
             .filter(|x| {
                 self.func_target.get_local_type(**x).is_reference()
                     && !annotations[&dest_code_offset].before.contains(x)
-                    && if let Some(reaching_def_state) = reaching_def_states.get(&dest_code_offset) {
+                    && if let Some(reaching_def_state) = reaching_def_states.get(&dest_code_offset)
+                    {
                         !reaching_def_state.is_alias(**x)
                     } else {
                         true
@@ -492,6 +512,7 @@ impl AbstractDomain for LiveVarState {
 // Formatting
 
 /// Format a live variable annotation.
+#[allow(dead_code)]
 pub fn format_livevar_annotation(
     target: &FunctionTarget<'_>,
     code_offset: CodeOffset,

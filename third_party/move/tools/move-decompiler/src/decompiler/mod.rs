@@ -18,12 +18,13 @@ use move_model::{
     ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_stackless_bytecode::{
-    demove_livevar_analysis::LiveVarAnalysisProcessor2,
     demove_peephole_analysis::PeepHoleProcessor,
     function_target::FunctionTarget,
     function_target_pipeline::{FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant},
     reaching_def_analysis::ReachingDefProcessor,
 };
+
+use model::demove_livevar_analysis::LiveVarAnalysisProcessor;
 
 use self::reconstruct::code_unit::SourceCodeUnit;
 pub use self::reconstruct::OptimizerSettings;
@@ -31,6 +32,7 @@ pub use self::reconstruct::OptimizerSettings;
 mod bin_to_compiler_translator;
 mod cfg;
 mod evaluator;
+mod model;
 mod naming;
 mod reconstruct;
 mod stackless_bytecode_display;
@@ -393,9 +395,10 @@ impl<'a> Decompiler<'a> {
 
     pub fn decompile(&mut self) -> Result<String> {
         let mut pipeline = FunctionTargetPipeline::default();
+        pipeline.set_max_loop(1000);
         pipeline.add_processor(PeepHoleProcessor::new());
         pipeline.add_processor(ReachingDefProcessor::new());
-        pipeline.add_processor(LiveVarAnalysisProcessor2::new());
+        pipeline.add_processor(LiveVarAnalysisProcessor::new());
 
         let script_pipeline = FunctionTargetPipeline::default();
 
