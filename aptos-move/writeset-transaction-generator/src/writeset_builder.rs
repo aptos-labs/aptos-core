@@ -125,7 +125,7 @@ where
         // TODO: specify an id by human and pass that in.
         let genesis_id = HashValue::zero();
         let mut session =
-            GenesisSession(move_vm.new_session(&resolver, SessionId::genesis(genesis_id)));
+            GenesisSession(move_vm.new_session(&resolver, None, SessionId::genesis(genesis_id)));
         session.disable_reconfiguration();
         procedure(&mut session);
         session.enable_reconfiguration();

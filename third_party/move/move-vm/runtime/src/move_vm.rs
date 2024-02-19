@@ -82,7 +82,7 @@ impl MoveVM {
     pub fn new_session_with_extensions_and_modules<'r>(
         &self,
         remote: &'r impl MoveResolver<PartialVMError>,
-        module_storage: Arc<dyn ModuleStorage>,
+        module_storage: &'r dyn ModuleStorage,
         native_extensions: NativeContextExtensions<'r>,
     ) -> Session<'r, '_> {
         Session {

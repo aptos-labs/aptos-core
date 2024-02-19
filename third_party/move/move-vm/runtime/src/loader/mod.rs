@@ -48,7 +48,8 @@ mod script;
 mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
-pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
+pub use modules::{Module, ModuleStorage};
+pub(crate) use modules::{ModuleCache, ModuleStorageAdapter};
 pub(crate) use script::{Script, ScriptCache};
 use type_loader::intern_type;
 
@@ -1200,7 +1201,7 @@ enum BinaryType {
 // needs.
 pub(crate) struct Resolver<'a> {
     loader: &'a Loader,
-    module_store: &'a ModuleStorageAdapter,
+    module_store: &'a ModuleStorageAdapter<'a>,
     binary: BinaryType,
 }
 

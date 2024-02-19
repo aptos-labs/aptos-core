@@ -8,8 +8,8 @@ use aptos_aggregator::{
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement,
-    state_store::state_value::StateValueMetadata,
+    delayed_fields::PanicError, executable::Executable as ExecutableBound,
+    fee_statement::FeeStatement, state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
@@ -57,6 +57,9 @@ pub trait ExecutorTask: Sync {
     /// Type of error when the executor failed to process a transaction and needs to abort.
     type Error: Debug + Clone + Send + Sync + Eq + 'static;
 
+    /// Type of executable module / binary that the executor may store for given modules.
+    type Executable: ExecutableBound + 'static;
+
     /// Type to initialize the single thread transaction executor. Copy and Sync are required because
     /// we will create an instance of executor on each individual thread.
     type Argument: Sync + Copy;
@@ -73,6 +76,7 @@ pub trait ExecutorTask: Sync {
             MoveTypeLayout,
             <Self::Txn as Transaction>::Identifier,
             <Self::Txn as Transaction>::Value,
+            Self::Executable,
         > + TResourceGroupView<
             GroupKey = <Self::Txn as Transaction>::Key,
             ResourceTag = <Self::Txn as Transaction>::Tag,

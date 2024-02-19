@@ -32,8 +32,8 @@ use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
     change_set::{randomly_check_layout_matches, VMChangeSet},
     resolver::{
-        ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
-        TResourceGroupView, TResourceView,
+        AptosExecutable, ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView,
+        TModuleView, TResourceGroupView, TResourceView,
     },
     storage::change_set_configs::ChangeSetConfigs,
 };
@@ -59,7 +59,10 @@ fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VM
 /// epilogue. The latter needs to see the state view as if the change set is applied on top of
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
-pub struct RespawnedSession<'r, 'l> {
+pub struct RespawnedSession<'r, 'l>
+where
+    'l: 'r,
+{
     executor_view: ExecutorViewWithChangeSet<'r>,
     #[borrows(executor_view)]
     #[covariant]
@@ -87,7 +90,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         Ok(RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
-            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
+            session_builder: |resolver| Some(vm.new_session(resolver, None, session_id)),
             storage_refund,
         }
         .build())
@@ -409,6 +412,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
 }
 
 impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
+    type Executable = AptosExecutable;
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
@@ -416,6 +420,14 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
             Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base_executor_view.get_module_state_value(state_key),
         }
+    }
+
+    fn store_executable(&self, _state_key: &Self::Key, _executable: Self::Executable) {
+        unreachable!("Storing executable respawned session");
+    }
+
+    fn fetch_executable(&self, _state_key: &Self::Key) -> Option<Self::Executable> {
+        unreachable!("Fetching executable in respawned session");
     }
 }
 

@@ -9,24 +9,56 @@ use aptos_block_executor::task::{ExecutionStatus, ExecutorTask};
 use aptos_logger::{enabled, Level};
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
-    state_store::StateView,
+    access_path::AccessPath,
+    state_store::{state_key::StateKey, StateView},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction, WriteSetPayload,
     },
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
-use aptos_vm_types::resolver::{ExecutorView, ResourceGroupView};
+use aptos_vm_types::resolver::{AptosExecutable, ExecutorView, ResourceGroupView};
 use fail::fail_point;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::{
+    language_storage::ModuleId,
+    vm_status::{StatusCode, VMStatus},
+};
+use move_vm_runtime::{Module, ModuleStorage};
+use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
     vm: AptosVM,
     base_view: &'a S,
 }
 
+struct AptosModuleStorage<'a> {
+    view: &'a dyn ExecutorView,
+}
+
+impl ModuleStorage for AptosModuleStorage<'_> {
+    fn store_module(&self, module_id: &ModuleId, executable: Module) -> Arc<Module> {
+        let state_key = StateKey::access_path(AccessPath::from(module_id));
+
+        let executable_module = Arc::new(executable);
+        let ret = executable_module.clone();
+
+        self.view
+            .store_executable(&state_key, AptosExecutable { executable_module });
+
+        ret
+    }
+
+    fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
+        let state_key = StateKey::access_path(AccessPath::from(module_id));
+        self.view
+            .fetch_executable(&state_key)
+            .map(|AptosExecutable { executable_module }| executable_module)
+    }
+}
+
 impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
     type Argument = &'a S;
     type Error = VMStatus;
+    type Executable = AptosExecutable;
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
@@ -60,9 +92,15 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
+        let _module_storage = AptosModuleStorage {
+            view: executor_with_group_view,
+        };
+        let maybe_module_storage = None;
+        // TODO: enable with:
+        // let maybe_module_storage = Some(module_storage);
         match self
             .vm
-            .execute_single_transaction(txn, &resolver, &log_context)
+            .execute_single_transaction(txn, &resolver, maybe_module_storage, &log_context)
         {
             Ok((vm_status, vm_output, sender)) => {
                 if vm_output.status().is_discarded() {

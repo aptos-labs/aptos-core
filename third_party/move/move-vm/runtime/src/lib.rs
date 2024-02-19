@@ -23,6 +23,8 @@ pub mod session;
 pub mod tracing;
 pub mod config;
 
+pub use loader::{Module, ModuleStorage};
+
 // Only include debugging functionality in debug builds
 #[cfg(any(debug_assertions, feature = "debugging"))]
 mod debug;

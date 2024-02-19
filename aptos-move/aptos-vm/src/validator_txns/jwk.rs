@@ -31,6 +31,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
+use move_vm_runtime::ModuleStorage;
 use move_vm_types::gas::UnmeteredGasMeter;
 use std::collections::HashMap;
 
@@ -55,12 +56,19 @@ impl AptosVM {
     pub(crate) fn process_jwk_update(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         debug!("Processing jwk transaction");
-        match self.process_jwk_update_inner(resolver, log_context, session_id, update) {
+        match self.process_jwk_update_inner(
+            resolver,
+            maybe_module_storage,
+            log_context,
+            session_id,
+            update,
+        ) {
             Ok((vm_status, vm_output)) => {
                 debug!("Processing jwk transaction ok.");
                 Ok((vm_status, vm_output))
@@ -86,6 +94,7 @@ impl AptosVM {
     fn process_jwk_update_inner(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
         update: jwks::QuorumCertifiedUpdate,
@@ -128,7 +137,7 @@ impl AptosVM {
 
         // All verification passed. Apply the `observed`.
         let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, session_id);
+        let mut session = self.new_session(resolver, maybe_module_storage, session_id);
         let args = vec![
             MoveValue::Signer(AccountAddress::ONE),
             vec![observed].as_move_value(),
