@@ -1688,6 +1688,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 };
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 if name.value.as_str() == "_" {
+                    let specialized_expected_type = self.subs.specialize(expected_type);
+                    if let Type::Tuple(tys) = specialized_expected_type {
+                        if tys.len() != 1 {
+                            self.error(loc, &format!("expected {} item(s), found 1", tys.len(),));
+                            return self.new_error_pat(loc);
+                        }
+                    }
                     Pattern::Wildcard(id)
                 } else {
                     let name = self.symbol_pool().make(&name.value);
