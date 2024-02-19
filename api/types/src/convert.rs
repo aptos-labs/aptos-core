@@ -225,9 +225,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
             Multisig(multisig) => {
                 let transaction_payload = if let Some(payload) = multisig.transaction_payload {
                     match payload {
-                        aptos_types::transaction::MultisigTransactionPayload::EntryFunction(
-                            entry_function,
-                        ) => {
+                        aptos_types::transaction::MultisigTransactionPayload::EntryFunction(entry_function) => {
                             let (module, function, ty_args, args) = entry_function.into_inner();
                             let func_args = self
                                 .inner
@@ -256,6 +254,10 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                                         .collect(),
                                 },
                             ))
+                        },
+                        aptos_types::transaction::MultisigTransactionPayload::Script(script) => {
+                            // TODO
+                            None
                         },
                     }
                 } else {
@@ -684,6 +686,10 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
                                 ),
                             )
                         },
+                        MultisigTransactionPayload::ScriptPayload(script) => {
+                            // TODO
+                            None
+                        }
                     }
                 } else {
                     None
