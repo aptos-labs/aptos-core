@@ -257,7 +257,7 @@ impl Default for DataStreamingServiceConfig {
             max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
             max_pending_requests: 50,
             max_request_retry: 5,
-            max_subscription_stream_lag_secs: 5, // 5 seconds
+            max_subscription_stream_lag_secs: 3, // 3 seconds
             progress_check_interval_ms: 50,
         }
     }
