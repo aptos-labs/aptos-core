@@ -7,9 +7,7 @@ use crate::{
     jwks::rsa::RSA_JWK,
     transaction::authenticator::EphemeralPublicKey,
     zkid::{
-        base64url_encode_str,
-        bn254_circom::{G1Bytes, G2Bytes},
-        Claims, Groth16Zkp, IdCommitment, Pepper, ZkIdPublicKey,
+        base64url_encode_str, bn254_circom::{G1Bytes, G2Bytes}, Claims, Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
@@ -18,25 +16,31 @@ use ring::signature::RsaKeyPair;
 use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
 
 /// The JWT header, decoded
-/// TODO(zkid): make sure it matches the SAMPLE_JWK
-pub(crate) const SAMPLE_JWT_HEADER_DECODED: &str =
-    r#"{"alg":"RS256","kid":"test_jwk","typ":"JWT"}"#;
+pub(crate) const SAMPLE_JWT_HEADER_DECODED: Lazy<String> = Lazy::new(||
+    format!(r#"{{"alg":"{}","kid":"{}","typ":"JWT"}}"#, SAMPLE_JWK.alg.as_str(), SAMPLE_JWK.kid.as_str())
+);
 
 /// The JWT header, base64url-encoded
 pub(crate) static SAMPLE_JWT_HEADER_B64: Lazy<String> =
-    Lazy::new(|| base64url_encode_str(SAMPLE_JWT_HEADER_DECODED));
+    Lazy::new(|| base64url_encode_str(SAMPLE_JWT_HEADER_DECODED.as_str()));
 
 /// The JWT payload, decoded
 
-/// TODO(zkid): just reconstruct this
-const SAMPLE_NONCE: &str =
-    "19577986295894221537605638716630107379097287942916046857348832431727358359238";
+const SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
+    let config = Configuration::new_for_testing();
+    OpenIdSig::reconstruct_oauth_nonce(
+        SAMPLE_EPK_BLINDER.as_slice(),
+        SAMPLE_EXP_DATE,
+        &SAMPLE_EPK,
+        &config,
+    ).unwrap()
+});
 
 /// TODO(zkid): Use a multiline format here, for diff-friendliness
 pub(crate) static SAMPLE_JWT_PAYLOAD_DECODED: Lazy<String> = Lazy::new(|| {
     format!(
         r#"{{"iss":"https://accounts.google.com","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
-        SAMPLE_NONCE
+        SAMPLE_NONCE.as_str()
     )
 });
 
@@ -100,10 +104,11 @@ acgc4kgDThAjD7VlXad9UHpNMO8=
 
 pub(crate) const SAMPLE_UID_KEY: &str = "sub";
 
-/// The nonce-committed expiration date (not the JWT `exp`)
-pub(crate) const SAMPLE_EXP_DATE: u64 = 100_000_000_000;
+/// The nonce-committed expiration date (not the JWT `exp`), 12/21/5490
+pub(crate) const SAMPLE_EXP_DATE: u64 = 111_111_111_111;
 
-pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = 1_000_000_000_000;
+/// ~31,710 years
+pub(crate) const SAMPLE_EXP_HORIZON_SECS: u64 = 999_999_999_999;
 
 pub(crate) static SAMPLE_PEPPER: Lazy<Pepper> = Lazy::new(|| Pepper::from_number(76));
 
@@ -138,24 +143,24 @@ pub(crate) static SAMPLE_ZKID_PK: Lazy<ZkIdPublicKey> = Lazy::new(|| {
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Zkp> = Lazy::new(|| {
     Groth16Zkp::new(
         G1Bytes::new_unchecked(
-            "11222117721845012648206453316196906709031175367015728765552350541001024380748",
-            "4851663397005414624070670257885208804157726249354815740151530275552324041091",
+            "12231709561876342858591497461541533679382707548832581865026884128195038623819",
+            "19550065013334671766459652895464943208897555190003385241537366958524038549651",
         )
         .unwrap(),
         G2Bytes::new_unchecked(
             [
-                "19687457460297305316237259264991840333626012135535572148473544628594747117355",
-                "21064728565750127947096453199510282848741959933051171738567026277407547486955",
+                "17760114700472440073566664035341233176332867365948052821768844085204638465257",
+                "2074118366711830630562352153651013053077229376039883853182809642185973784582",
             ],
             [
-                "4695093065385953060612416558206224868118039506645434932517557941664654066200",
-                "3768922435728117920174585514954703175832922885227627119356907271469711069527",
+                "21474168538255367719812229486236305962320711305273777702403534410487962424082",
+                "17404352079167923594003522667505828016450036154572779269542685309363067054790",
             ],
         )
         .unwrap(),
         G1Bytes::new_unchecked(
-            "17849439084046135933715716444346448782094769687292904880382941104505676788243",
-            "12000056674727683221297932913457254516340978536440882675442265710905808483361",
+            "9194799847136645728085689496796085217935413772780751043375835048405276952071",
+            "17704024912475005725846633700069393676807658122056968962396516331631047675983",
         )
         .unwrap(),
     )
