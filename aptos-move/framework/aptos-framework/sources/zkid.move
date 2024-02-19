@@ -80,7 +80,7 @@ module aptos_framework::zkid {
         max_exp_horizon_secs: u64,
         training_wheels_pubkey: Option<vector<u8>>,
         max_commited_epk_bytes: u16,
-        max_iss_field_bytes: u16,
+        max_iss_val_bytes: u16,
         max_extra_field_bytes: u16,
         max_jwt_header_b64_bytes: u32
     ): Configuration {
@@ -90,7 +90,7 @@ module aptos_framework::zkid {
             max_exp_horizon_secs,
             training_wheels_pubkey,
             max_commited_epk_bytes,
-            max_iss_val_bytes: max_iss_field_bytes,
+            max_iss_val_bytes,
             max_extra_field_bytes,
             max_jwt_header_b64_bytes,
         }

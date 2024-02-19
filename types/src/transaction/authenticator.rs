@@ -1007,9 +1007,7 @@ impl AnySignature {
             (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key: _ }) => {
                 match &signature.sig {
                     ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                        let r = proof.verify_non_malleability_sig(&signature.ephemeral_pubkey);
-                        println!("{:?}", r);
-                        r?
+                        proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?;
                     },
                     ZkpOrOpenIdSig::OpenIdSig(_) => {},
                 }
