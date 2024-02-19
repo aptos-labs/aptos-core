@@ -804,7 +804,7 @@ fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
         .consensus
         .quorum_store
         .back_pressure
-        .backlog_txn_limit_count = 25_000 * 6;
+        .backlog_txn_limit_count = 25_000 * 3;
     // config
     //     .consensus
     //     .quorum_store
