@@ -97,7 +97,6 @@ async fn test_zkid_oidc_txn_with_expired_epk() {
     }
 }
 
-// TODO(zkid): Add test for bad training wheels signature (commented out below).
 #[tokio::test]
 async fn test_zkid_groth16_verifies() {
     let (_, _, mut swarm, signed_txn) =
@@ -139,6 +138,29 @@ async fn test_zkid_groth16_with_mauled_proof() {
 
     if result.is_ok() {
         panic!("zkID Groth16 TXN with mauled proof should have failed verification")
+    }
+}
+
+#[tokio::test]
+async fn test_zkid_groth16_with_bad_tw_signature() {
+    let (_tw_sk, mut swarm) = setup_local_net().await;
+    let (zkid_sig, zkid_pk) = get_sample_zkid_groth16_sig_and_pk();
+
+    let mut info = swarm.aptos_public_info();
+
+    /// using the sample ESK rather than the TW SK to get a bad training wheels signature
+    let signed_txn = sign_zkid_transaction(&mut info, zkid_sig, zkid_pk, &get_sample_esk()).await;
+
+    info!("Submit zkID Groth16 transaction");
+    let result = info
+        .client()
+        .submit_without_serializing_response(&signed_txn)
+        .await;
+
+    if result.is_ok() {
+        panic!(
+            "zkID Groth16 TXN with bad training wheels signature should have failed verification"
+        )
     }
 }
 
