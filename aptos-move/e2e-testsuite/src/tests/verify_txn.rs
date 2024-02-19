@@ -45,7 +45,7 @@ fn verify_signature() {
     );
 
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
     );
@@ -76,7 +76,7 @@ fn verify_multi_agent_invalid_sender_signature() {
         None,
     );
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
     );
@@ -106,7 +106,7 @@ fn verify_multi_agent_invalid_secondary_signature() {
         None,
     );
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::INVALID_SIGNATURE
     );
@@ -148,7 +148,7 @@ fn verify_multi_agent_duplicate_secondary_signer() {
         None,
     );
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::SIGNERS_CONTAIN_DUPLICATES
     );
@@ -171,7 +171,7 @@ fn verify_reserved_sender() {
     );
 
     assert_prologue_parity!(
-        executor.verify_transaction(signed_txn.clone()).status(),
+        executor.validate_transaction(signed_txn.clone()).status(),
         executor.execute_transaction(signed_txn).status(),
         StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
     );
@@ -201,7 +201,7 @@ fn verify_simple_payment() {
         ))
         .sequence_number(10)
         .sign();
-    assert_eq!(executor.verify_transaction(txn).status(), None);
+    assert_eq!(executor.validate_transaction(txn).status(), None);
 
     // Create a new transaction that has the bad auth key.
     let txn = receiver
@@ -217,7 +217,7 @@ fn verify_simple_payment() {
         .into_inner();
 
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::INVALID_AUTH_KEY
     );
@@ -230,7 +230,7 @@ fn verify_simple_payment() {
         .sequence_number(1)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::SEQUENCE_NUMBER_TOO_OLD
     );
@@ -243,7 +243,7 @@ fn verify_simple_payment() {
         .sequence_number(11)
         .sign();
     assert_prologue_disparity!(
-        executor.verify_transaction(txn.clone()).status() => None,
+        executor.validate_transaction(txn.clone()).status() => None,
         executor.execute_transaction(txn).status() =>
         TransactionStatus::Discard(StatusCode::SEQUENCE_NUMBER_TOO_NEW)
     );
@@ -258,7 +258,7 @@ fn verify_simple_payment() {
         .gas_unit_price(1)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE
     );
@@ -272,7 +272,7 @@ fn verify_simple_payment() {
         .sequence_number(10)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::SENDING_ACCOUNT_DOES_NOT_EXIST
     );
@@ -294,7 +294,7 @@ fn verify_simple_payment() {
         .max_gas_amount(1_000_000)
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND
     );
@@ -335,7 +335,7 @@ fn verify_simple_payment() {
         .gas_unit_price(txn_gas_params.max_price_per_gas_unit.into())
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS
     );
@@ -349,7 +349,7 @@ fn verify_simple_payment() {
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND
     );
@@ -367,7 +367,7 @@ fn verify_simple_payment() {
         .gas_unit_price((txn_gas_params.max_price_per_gas_unit).into())
         .sign();
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE
     );
@@ -414,7 +414,7 @@ pub fn test_arbitrary_script_execution() {
         .max_gas_amount(100_000)
         .gas_unit_price(1)
         .sign();
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     let status = executor.execute_transaction(txn).status().clone();
     assert!(!status.is_discarded());
     assert_eq!(
@@ -443,7 +443,7 @@ fn verify_expiration_time() {
         None, /* max_gas_amount */
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::TRANSACTION_EXPIRED
     );
@@ -461,7 +461,7 @@ fn verify_expiration_time() {
         None, /* max_gas_amount */
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::TRANSACTION_EXPIRED
     );
@@ -482,7 +482,7 @@ fn verify_chain_id() {
         ChainId::new(ChainId::test().id() + 1),
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::BAD_CHAIN_ID
     );
@@ -505,7 +505,7 @@ fn verify_max_sequence_number() {
         None,     /* max_gas_amount */
     );
     assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
+        executor.validate_transaction(txn.clone()).status(),
         executor.execute_transaction(txn).status(),
         StatusCode::SEQUENCE_NUMBER_TOO_BIG
     );
@@ -612,7 +612,7 @@ fn test_script_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
@@ -664,7 +664,7 @@ fn test_type_tag_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
@@ -715,7 +715,7 @@ fn test_script_transitive_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));
@@ -772,7 +772,7 @@ fn test_type_tag_transitive_dependency_fails_verification() {
         .sign();
     // As of now, we verify module/script dependencies. This will result in an
     // invariant violation as we try to load `Test`
-    assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
+    assert_eq!(executor.validate_transaction(txn.clone()).status(), None);
     match executor.execute_transaction(txn).status() {
         TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(status)) => {
             assert_eq!(status, &Some(StatusCode::UNEXPECTED_VERIFIER_ERROR));

@@ -19,8 +19,6 @@ use aptos_gas_schedule::{
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
-    bn254_circom,
-    bn254_circom::Groth16VerificationKey,
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     move_utils::as_move_value::AsMoveValue,
@@ -31,6 +29,7 @@ use aptos_types::{
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
     zkid,
+    zkid::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -119,6 +118,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -230,6 +230,7 @@ pub fn encode_genesis_change_set(
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -535,7 +536,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
 }
 
 fn initialize_zkid(session: &mut SessionExt, chain_id: ChainId) {
-    let config = zkid::Configuration::new_for_devnet_and_testing();
+    let config = zkid::Configuration::new_for_devnet();
     exec_function(
         session,
         ZKID_MODULE_NAME,
@@ -547,7 +548,7 @@ fn initialize_zkid(session: &mut SessionExt, chain_id: ChainId) {
         ]),
     );
     if !chain_id.is_mainnet() {
-        let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
+        let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
         exec_function(
             session,
             ZKID_MODULE_NAME,
@@ -976,6 +977,7 @@ pub fn test_genesis_module_publishing() {
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();

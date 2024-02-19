@@ -61,7 +61,6 @@ pub use utility_coin::*;
 pub mod account_view;
 pub mod aggregate_signature;
 pub mod block_executor;
-pub mod bn254_circom;
 pub mod bytes;
 pub mod delayed_fields;
 pub mod state_store;
