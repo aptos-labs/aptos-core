@@ -1136,6 +1136,7 @@ mod tests {
         PrivateKey, SigningKey, Uniform,
     };
     use hex::FromHex;
+    use rand::thread_rng;
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
@@ -1699,7 +1700,7 @@ mod tests {
         let (mut zkid_sig, zkid_pk) = get_sample_zkid_groth16_sig_and_pk();
         let sender_addr =
             AuthenticationKey::any_key(AnyPublicKey::zkid(zkid_pk.clone())).account_address();
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
+        let mut raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
             sender_addr,
             0,
             None,
@@ -1712,8 +1713,49 @@ mod tests {
         let single_key_auth =
             SingleKeyAuthenticator::new(AnyPublicKey::zkid(zkid_pk), AnySignature::zkid(zkid_sig));
         let account_auth = AccountAuthenticator::single_key(single_key_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        let signed_txn =
+            SignedTransaction::new_single_sender(raw_txn.clone(), account_auth.clone());
 
         signed_txn.verify_signature().unwrap();
+
+        // Badly-signed TXN
+        raw_txn.expiration_timestamp_secs += 1;
+        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        assert!(signed_txn.verify_signature().is_err());
+    }
+
+    #[test]
+    fn test_zkid_groth16_txn_fails_non_malleability_check() {
+        let esk = get_sample_esk();
+        let (mut zkid_sig, zkid_pk) = get_sample_zkid_groth16_sig_and_pk();
+        let sender_addr =
+            AuthenticationKey::any_key(AnyPublicKey::zkid(zkid_pk.clone())).account_address();
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
+            sender_addr,
+            0,
+            None,
+            None,
+            None,
+            None,
+        );
+        zkid_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+
+        let tw_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+        // Badly_signed non-malleability signature
+        match &mut zkid_sig.sig {
+            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+                proof.non_malleability_signature =
+                    EphemeralSignature::ed25519(tw_sk.sign(&proof.proof).unwrap());
+                // bad signature using the TW SK rather than the ESK
+            },
+            ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
+        }
+
+        let single_key_auth =
+            SingleKeyAuthenticator::new(AnyPublicKey::zkid(zkid_pk), AnySignature::zkid(zkid_sig));
+        let account_auth = AccountAuthenticator::single_key(single_key_auth);
+        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+
+        assert!(signed_txn.verify_signature().is_err());
     }
 }

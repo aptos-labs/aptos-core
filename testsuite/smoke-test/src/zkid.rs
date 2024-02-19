@@ -148,7 +148,7 @@ async fn test_zkid_groth16_with_bad_tw_signature() {
 
     let mut info = swarm.aptos_public_info();
 
-    /// using the sample ESK rather than the TW SK to get a bad training wheels signature
+    // using the sample ESK rather than the TW SK to get a bad training wheels signature
     let signed_txn = sign_zkid_transaction(&mut info, zkid_sig, zkid_pk, &get_sample_esk()).await;
 
     info!("Submit zkID Groth16 transaction");
