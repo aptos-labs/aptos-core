@@ -197,7 +197,7 @@ async fn get_zkid_transaction(
 }
 
 async fn setup_local_net() -> (Ed25519PrivateKey, LocalSwarm) {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(0)
         .await;
