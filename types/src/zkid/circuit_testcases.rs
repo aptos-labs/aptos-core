@@ -7,7 +7,9 @@ use crate::{
     jwks::rsa::RSA_JWK,
     transaction::authenticator::EphemeralPublicKey,
     zkid::{
-        base64url_encode_str, bn254_circom::{G1Bytes, G2Bytes}, Claims, Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey
+        base64url_encode_str,
+        bn254_circom::{G1Bytes, G2Bytes},
+        Claims, Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
@@ -16,9 +18,13 @@ use ring::signature::RsaKeyPair;
 use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
 
 /// The JWT header, decoded
-pub(crate) const SAMPLE_JWT_HEADER_DECODED: Lazy<String> = Lazy::new(||
-    format!(r#"{{"alg":"{}","kid":"{}","typ":"JWT"}}"#, SAMPLE_JWK.alg.as_str(), SAMPLE_JWK.kid.as_str())
-);
+pub(crate) static SAMPLE_JWT_HEADER_DECODED: Lazy<String> = Lazy::new(|| {
+    format!(
+        r#"{{"alg":"{}","kid":"{}","typ":"JWT"}}"#,
+        SAMPLE_JWK.alg.as_str(),
+        SAMPLE_JWK.kid.as_str()
+    )
+});
 
 /// The JWT header, base64url-encoded
 pub(crate) static SAMPLE_JWT_HEADER_B64: Lazy<String> =
@@ -26,14 +32,15 @@ pub(crate) static SAMPLE_JWT_HEADER_B64: Lazy<String> =
 
 /// The JWT payload, decoded
 
-const SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
+static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     let config = Configuration::new_for_testing();
     OpenIdSig::reconstruct_oauth_nonce(
         SAMPLE_EPK_BLINDER.as_slice(),
         SAMPLE_EXP_DATE,
         &SAMPLE_EPK,
         &config,
-    ).unwrap()
+    )
+    .unwrap()
 });
 
 /// TODO(zkid): Use a multiline format here, for diff-friendliness

@@ -20,8 +20,7 @@ fn test_zkid_groth16_proof_verification() {
         ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
     };
 
-    let public_inputs_hash =
-        get_public_inputs_hash(&zk_sig, &zk_pk, &SAMPLE_JWK, &config).unwrap();
+    let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &SAMPLE_JWK, &config).unwrap();
 
     println!(
         "zkID Groth16 test public inputs hash: {}",
