@@ -14,6 +14,7 @@
 -  [Function `update_groth16_verification_key`](#0x1_zkid_update_groth16_verification_key)
 -  [Function `update_configuration`](#0x1_zkid_update_configuration)
 -  [Function `update_training_wheels`](#0x1_zkid_update_training_wheels)
+-  [Function `update_max_exp_horizon`](#0x1_zkid_update_max_exp_horizon)
 -  [Function `remove_all_override_auds`](#0x1_zkid_remove_all_override_auds)
 -  [Function `add_override_aud`](#0x1_zkid_add_override_aud)
 
@@ -153,22 +154,16 @@ The 288-byte Groth16 verification key (VK) for the zkID relation.
  The training wheels PK, if training wheels are on
 </dd>
 <dt>
-<code>nonce_commitment_num_bytes: u16</code>
-</dt>
-<dd>
- The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's <code>nonce</code> field.
-</dd>
-<dt>
 <code>max_commited_epk_bytes: u16</code>
 </dt>
 <dd>
  The max length of an ephemeral public key supported in our circuit (93 bytes)
 </dd>
 <dt>
-<code>max_iss_field_bytes: u16</code>
+<code>max_iss_val_bytes: u16</code>
 </dt>
 <dd>
- The max length of the field name and value of the JWT's <code>iss</code> field supported in our circuit (e.g., <code>"iss":"aptos.com"</code>)
+ The max length of the value of the JWT's <code>iss</code> field supported in our circuit (e.g., <code>"https://accounts.google.com"</code>)
 </dd>
 <dt>
 <code>max_extra_field_bytes: u16</code>
@@ -243,7 +238,7 @@ The training wheels PK needs to be 32 bytes long.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(override_aud_val: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, nonce_commitment_num_bytes: u16, max_commited_epk_bytes: u16, max_iss_field_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_new_configuration">new_configuration</a>(override_aud_val: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_zkid_signatures_per_txn: u16, max_exp_horizon_secs: u64, training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, max_commited_epk_bytes: u16, max_iss_val_bytes: u16, max_extra_field_bytes: u16, max_jwt_header_b64_bytes: u32): <a href="zkid.md#0x1_zkid_Configuration">zkid::Configuration</a>
 </code></pre>
 
 
@@ -257,9 +252,8 @@ The training wheels PK needs to be 32 bytes long.
     max_zkid_signatures_per_txn: u16,
     max_exp_horizon_secs: u64,
     training_wheels_pubkey: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
-    nonce_commitment_num_bytes: u16,
     max_commited_epk_bytes: u16,
-    max_iss_field_bytes: u16,
+    max_iss_val_bytes: u16,
     max_extra_field_bytes: u16,
     max_jwt_header_b64_bytes: u32
 ): <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
@@ -268,9 +262,8 @@ The training wheels PK needs to be 32 bytes long.
         max_zkid_signatures_per_txn,
         max_exp_horizon_secs,
         training_wheels_pubkey,
-        nonce_commitment_num_bytes,
         max_commited_epk_bytes,
-        max_iss_field_bytes,
+        max_iss_val_bytes,
         max_extra_field_bytes,
         max_jwt_header_b64_bytes,
     }
@@ -341,9 +334,8 @@ The training wheels PK needs to be 32 bytes long.
             max_zkid_signatures_per_txn: _,
             max_exp_horizon_secs: _,
             training_wheels_pubkey: _,
-            nonce_commitment_num_bytes: _,
             max_commited_epk_bytes: _,
-            max_iss_field_bytes: _,
+            max_iss_val_bytes: _,
             max_extra_field_bytes: _,
             max_jwt_header_b64_bytes: _,
         } = <b>move_from</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
@@ -380,6 +372,33 @@ The training wheels PK needs to be 32 bytes long.
 
     <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
     config.training_wheels_pubkey = pk;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_zkid_update_max_exp_horizon"></a>
+
+## Function `update_max_exp_horizon`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_max_exp_horizon">update_max_exp_horizon</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_exp_horizon_secs: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="zkid.md#0x1_zkid_update_max_exp_horizon">update_max_exp_horizon</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_exp_horizon_secs: u64) <b>acquires</b> <a href="zkid.md#0x1_zkid_Configuration">Configuration</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+
+    <b>let</b> config = <b>borrow_global_mut</b>&lt;<a href="zkid.md#0x1_zkid_Configuration">Configuration</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx));
+    config.max_exp_horizon_secs = max_exp_horizon_secs;
 }
 </code></pre>
 
