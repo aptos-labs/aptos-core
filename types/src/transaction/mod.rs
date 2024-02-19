@@ -1817,7 +1817,14 @@ impl Transaction {
 
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
-            Transaction::BlockMetadata(v1) => Some(v1),
+            Transaction::BlockMetadata(bm) => Some(bm),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_metadata_ext(&self) -> Option<&BlockMetadataExt> {
+        match self {
+            Transaction::BlockMetadataExt(bme) => Some(bme),
             _ => None,
         }
     }
