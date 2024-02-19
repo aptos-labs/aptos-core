@@ -1777,7 +1777,7 @@ fn realistic_env_max_load_test(
                 if ha_proxy {
                     4600
                 } else if long_running {
-                    // This is for forge stable
+                    // This is for forge stable.
                     7000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
