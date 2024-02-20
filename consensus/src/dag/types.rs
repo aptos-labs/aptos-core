@@ -14,7 +14,8 @@ use anyhow::{bail, ensure};
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     common::{Author, Payload, Round},
-    dag_batch::{DagBatch, DagBatchInfo},
+    dag_batch::{BatchDigest, DagBatch, DagBatchId, DagBatchInfo},
+    proof_of_store::BatchInfo,
 };
 use aptos_crypto::{
     bls12381::Signature,
@@ -876,6 +877,76 @@ impl FetchResponse {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BatchRequest {
+    id: DagBatchId,
+    digest: BatchDigest,
+}
+
+impl BatchRequest {
+    pub fn id(&self) -> &DagBatchId {
+        &self.id
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.id.epoch()
+    }
+
+    pub fn round(&self) -> Round {
+        self.id.round()
+    }
+
+    pub fn batch_digest(&self) -> &BatchDigest {
+        &self.digest
+    }
+
+    fn verify(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+impl From<DagBatchInfo> for BatchRequest {
+    fn from(info: DagBatchInfo) -> Self {
+        Self {
+            id: info.id().clone(),
+            digest: info.digest().clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BatchResponse {
+    batch: DagBatch,
+}
+
+impl BatchResponse {
+    pub fn new(batch: DagBatch) -> Self {
+        Self { batch }
+    }
+
+    pub fn unwrap(self) -> DagBatch {
+        self.batch
+    }
+
+    pub fn verify(
+        self,
+        request: &BatchRequest,
+        _verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<Self> {
+        ensure!(
+            self.batch.digest()
+                == &DagBatch::calculate_digest(self.batch.id(), self.batch.payload()),
+            "payload doesn't hash to digest"
+        );
+
+        ensure!(
+            request.batch_digest() == self.batch.digest(),
+            "request and payload digest mismatch"
+        );
+        Ok(self)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DAGNetworkMessage {
     epoch: u64,
@@ -914,6 +985,8 @@ pub enum DAGMessage {
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
+    PayloadRequest(BatchRequest),
+    PayloadResponse(BatchResponse),
 
     #[cfg(test)]
     TestMessage(TestMessage),
@@ -930,6 +1003,8 @@ impl DAGMessage {
             DAGMessage::CertifiedAckMsg(_) => "CertifiedAckMsg",
             DAGMessage::FetchRequest(_) => "FetchRequest",
             DAGMessage::FetchResponse(_) => "FetchResponse",
+            DAGMessage::PayloadRequest(_) => "PayloadRequest",
+            DAGMessage::PayloadResponse(_) => "PayloadResponse",
             #[cfg(test)]
             DAGMessage::TestMessage(_) => "TestMessage",
             #[cfg(test)]
@@ -950,9 +1025,11 @@ impl DAGMessage {
             DAGMessage::NodeMsg(node) => node.verify(sender, verifier),
             DAGMessage::CertifiedNodeMsg(certified_node) => certified_node.verify(sender, verifier),
             DAGMessage::FetchRequest(fetch_request) => fetch_request.verify(verifier),
+            DAGMessage::PayloadRequest(request) => request.verify(),
             DAGMessage::VoteMsg(_)
             | DAGMessage::CertifiedAckMsg(_)
-            | DAGMessage::FetchResponse(_) => {
+            | DAGMessage::FetchResponse(_)
+            | DAGMessage::PayloadResponse(_) => {
                 bail!("Unexpected to verify {} in rpc handler", self.name())
             },
             #[cfg(test)]
@@ -974,6 +1051,8 @@ impl TConsensusMsg for DAGMessage {
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
             DAGMessage::FetchRequest(req) => req.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,
+            DAGMessage::PayloadRequest(req) => req.id.epoch(),
+            DAGMessage::PayloadResponse(res) => res.batch.epoch(),
             #[cfg(test)]
             DAGMessage::TestMessage(_) => 1,
             #[cfg(test)]

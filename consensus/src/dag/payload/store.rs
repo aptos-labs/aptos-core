@@ -2,7 +2,7 @@ use crate::dag::storage::DAGStorage;
 use anyhow::ensure;
 use aptos_consensus_types::{
     common::{Author, Round},
-    dag_payload::{DecoupledPayload, PayloadDigest, PayloadId},
+    dag_batch::{BatchDigest, DagBatch, DagBatchId},
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
@@ -16,13 +16,13 @@ use thiserror::Error as ThisError;
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]
 pub enum DagPayloadStoreError {
     #[error("payload is missing {0}")]
-    Missing(PayloadId),
+    Missing(DagBatchId),
     #[error("garbage collected, request round {0}, lowest round {1}")]
     GarbageCollected(Round, Round),
 }
 
 pub struct DagPayloadStore {
-    payload_by_digest: DashMap<HashValue, Arc<DecoupledPayload>>,
+    payload_by_digest: DashMap<HashValue, Arc<DagBatch>>,
     storage: Arc<dyn DAGStorage>,
     /// Map between peer id to vector index
     author_to_index: HashMap<Author, usize>,
@@ -39,7 +39,7 @@ impl DagPayloadStore {
         start_round: Round,
         window_size: u64,
     ) -> Self {
-        let mut all_payloads = storage.get_payloads().unwrap_or_default();
+        let mut all_payloads = storage.get_batches().unwrap_or_default();
         all_payloads.sort_unstable_by_key(|(_, payload)| payload.info().round());
 
         let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
@@ -59,13 +59,13 @@ impl DagPayloadStore {
                 to_prune.push(digest);
             }
         }
-        if let Err(e) = storage.delete_payloads(to_prune) {
+        if let Err(e) = storage.delete_batches(to_prune) {
             error!("Error deleting expired payloads: {:?}", e);
         }
         store
     }
 
-    pub fn prune(&self, digests: Vec<PayloadDigest>) {
+    pub fn prune(&self, digests: Vec<BatchDigest>) {
         for digest in &digests {
             self.payload_by_digest.remove(digest);
         }
@@ -74,7 +74,7 @@ impl DagPayloadStore {
         }
     }
 
-    pub fn commit_callback(&self, commit_round: Round, digests: Vec<PayloadDigest>) {
+    pub fn commit_callback(&self, commit_round: Round, digests: Vec<BatchDigest>) {
         let mut start_round = self.start_round.write();
         let new_start_round = commit_round.saturating_sub(3 * self.window_size);
         if new_start_round > *start_round {
@@ -83,12 +83,12 @@ impl DagPayloadStore {
         }
     }
 
-    pub fn is_missing(&self, id: &PayloadId, digest: &PayloadDigest) -> bool {
+    pub fn is_missing(&self, id: &DagBatchId, digest: &BatchDigest) -> bool {
         self.get(id, digest)
             .is_err_and(|e| matches!(e, DagPayloadStoreError::Missing(_)))
     }
 
-    pub fn insert(&self, payload: DecoupledPayload) -> anyhow::Result<()> {
+    pub fn insert(&self, payload: DagBatch) -> anyhow::Result<()> {
         let digest = payload.digest();
 
         ensure!(
@@ -112,7 +112,7 @@ impl DagPayloadStore {
 
         ensure!(!self.payload_by_digest.contains_key(digest));
 
-        self.storage.save_payload(&payload)?;
+        self.storage.save_batch(&payload)?;
 
         self.payload_by_digest.insert(*digest, Arc::new(payload));
 
@@ -121,9 +121,9 @@ impl DagPayloadStore {
 
     pub fn get(
         &self,
-        id: &PayloadId,
-        digest: &PayloadDigest,
-    ) -> Result<Arc<DecoupledPayload>, DagPayloadStoreError> {
+        id: &DagBatchId,
+        digest: &BatchDigest,
+    ) -> Result<Arc<DagBatch>, DagPayloadStoreError> {
         let lowest_round = self.start_round.read();
         if id.round() < *lowest_round {
             return Err(DagPayloadStoreError::GarbageCollected(
