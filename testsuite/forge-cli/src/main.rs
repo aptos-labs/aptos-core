@@ -1842,14 +1842,15 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // the actual throughput to be able to have reasonable queueing but also so throughput
     // will improve as performance improves.
     // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
-    const TARGET_TPS: usize = 18_000;
+    const TARGET_TPS: usize = 15_000;
     // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
     // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
     const MAX_TXNS_PER_BLOCK: usize = 3500;
     // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
-    const VN_LATENCY_S: f64 = 4.0;
+    // This is validator latency, minus mempool queueing time.
+    const VN_LATENCY_S: f64 = 2.5;
     // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
-    const VFN_LATENCY_S: f64 = 10.0;
+    const VFN_LATENCY_S: f64 = 4.0;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
