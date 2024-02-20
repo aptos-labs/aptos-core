@@ -31,6 +31,7 @@ pub enum LogEvent {
     SyncMode,
     SyncOutcome,
     Shutdown,
+    FetchPayload,
 }
 
 impl LogSchema {

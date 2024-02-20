@@ -13,7 +13,7 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_consensus_types::{
     common::{Author, Payload, Round},
-    dag_payload::{DecoupledPayload, PayloadInfo},
+    dag_payload::{DecoupledPayload, PayloadDigest, PayloadId, PayloadInfo},
 };
 use aptos_crypto::{
     bls12381::Signature,
@@ -875,6 +875,76 @@ impl FetchResponse {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PayloadRequest {
+    id: PayloadId,
+    payload_digest: PayloadDigest,
+}
+
+impl PayloadRequest {
+    pub fn id(&self) -> &PayloadId {
+        &self.id
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.id.epoch()
+    }
+
+    pub fn round(&self) -> Round {
+        self.id.round()
+    }
+
+    pub fn payload_digest(&self) -> &PayloadDigest {
+        &self.payload_digest
+    }
+
+    fn verify(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+impl From<PayloadInfo> for PayloadRequest {
+    fn from(info: PayloadInfo) -> Self {
+        Self {
+            id: info.id().clone(),
+            payload_digest: info.digest().clone(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PayloadResponse {
+    payload: DecoupledPayload,
+}
+
+impl PayloadResponse {
+    pub fn new(payload: DecoupledPayload) -> Self {
+        Self { payload }
+    }
+
+    pub fn unwrap(self) -> DecoupledPayload {
+        self.payload
+    }
+
+    pub fn verify(
+        self,
+        request: &PayloadRequest,
+        _verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<Self> {
+        ensure!(
+            self.payload.digest()
+                == &DecoupledPayload::calculate_digest(self.payload.id(), self.payload.payload()),
+            "payload doesn't hash to digest"
+        );
+
+        ensure!(
+            request.payload_digest() == self.payload.digest(),
+            "request and payload digest mismatch"
+        );
+        Ok(self)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DAGNetworkMessage {
     epoch: u64,
@@ -913,6 +983,8 @@ pub enum DAGMessage {
     CertifiedAckMsg(CertifiedAck),
     FetchRequest(RemoteFetchRequest),
     FetchResponse(FetchResponse),
+    PayloadRequest(PayloadRequest),
+    PayloadResponse(PayloadResponse),
 
     #[cfg(test)]
     TestMessage(TestMessage),
@@ -929,6 +1001,8 @@ impl DAGMessage {
             DAGMessage::CertifiedAckMsg(_) => "CertifiedAckMsg",
             DAGMessage::FetchRequest(_) => "FetchRequest",
             DAGMessage::FetchResponse(_) => "FetchResponse",
+            DAGMessage::PayloadRequest(_) => "PayloadRequest",
+            DAGMessage::PayloadResponse(_) => "PayloadResponse",
             #[cfg(test)]
             DAGMessage::TestMessage(_) => "TestMessage",
             #[cfg(test)]
@@ -949,9 +1023,11 @@ impl DAGMessage {
             DAGMessage::NodeMsg(node) => node.verify(sender, verifier),
             DAGMessage::CertifiedNodeMsg(certified_node) => certified_node.verify(sender, verifier),
             DAGMessage::FetchRequest(fetch_request) => fetch_request.verify(verifier),
+            DAGMessage::PayloadRequest(request) => request.verify(),
             DAGMessage::VoteMsg(_)
             | DAGMessage::CertifiedAckMsg(_)
-            | DAGMessage::FetchResponse(_) => {
+            | DAGMessage::FetchResponse(_)
+            | DAGMessage::PayloadResponse(_) => {
                 bail!("Unexpected to verify {} in rpc handler", self.name())
             },
             #[cfg(test)]
@@ -973,6 +1049,8 @@ impl TConsensusMsg for DAGMessage {
             DAGMessage::CertifiedAckMsg(ack) => ack.epoch,
             DAGMessage::FetchRequest(req) => req.epoch,
             DAGMessage::FetchResponse(res) => res.epoch,
+            DAGMessage::PayloadRequest(req) => req.id.epoch(),
+            DAGMessage::PayloadResponse(res) => res.payload.epoch(),
             #[cfg(test)]
             DAGMessage::TestMessage(_) => 1,
             #[cfg(test)]
