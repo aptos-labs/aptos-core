@@ -3,7 +3,6 @@
 
 use crate::bounded_math::SignedU128;
 use aptos_logger::error;
-// TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
 use aptos_types::delayed_fields::PanicError;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{

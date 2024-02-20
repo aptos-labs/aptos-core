@@ -37,6 +37,7 @@ use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
+#[cfg(feature = "testing")]
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 #[cfg(feature = "testing")]
 use std::{
