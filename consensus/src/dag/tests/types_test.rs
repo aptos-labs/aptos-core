@@ -2,13 +2,17 @@
 
 use super::helpers::new_node;
 use crate::dag::{
-    tests::helpers::new_certified_node,
+    tests::helpers::new_certified_node_with_empty_payload,
     types::{
-        CertifiedNode, DAGNetworkMessage, DagSnapshotBitmask, Extensions, Node, NodeCertificate,
-        NodeMetadata, RemoteFetchRequest,
+        CertifiedNode, DAGNetworkMessage, DagPayload, DagSnapshotBitmask, Extensions, Node,
+        NodeCertificate, NodeMetadata, RemoteFetchRequest,
     },
+    NodeMessage,
 };
-use aptos_consensus_types::common::Payload;
+use aptos_consensus_types::{
+    common::Payload,
+    dag_payload::{DecoupledPayload, PayloadInfo},
+};
 use aptos_crypto::HashValue;
 use aptos_types::{
     aggregate_signature::AggregateSignature, validator_verifier::random_validator_verifier,
@@ -36,7 +40,13 @@ fn test_node_verify() {
     );
 
     // Well-formed round 1 node
-    let first_round_node = new_node(1, 10, signers[0].author(), vec![]);
+    let first_round_node = new_node(
+        1,
+        10,
+        signers[0].author(),
+        Payload::empty(false).into(),
+        vec![],
+    );
     assert_ok!(first_round_node.verify(sender, &validator_verifier));
     // Mismatch sender
     first_round_node
@@ -44,7 +54,13 @@ fn test_node_verify() {
         .unwrap_err();
 
     // Round 2 node without parents
-    let node = new_node(2, 20, signers[0].author(), vec![]);
+    let node = new_node(
+        2,
+        20,
+        signers[0].author(),
+        Payload::empty(false).into(),
+        vec![],
+    );
     assert_eq!(
         node.verify(sender, &validator_verifier)
             .unwrap_err()
@@ -57,12 +73,117 @@ fn test_node_verify() {
         first_round_node.metadata().clone(),
         AggregateSignature::empty(),
     );
-    let node = new_node(3, 20, signers[0].author(), vec![parent_cert]);
+    let node = new_node(
+        3,
+        20,
+        signers[0].author(),
+        Payload::empty(false).into(),
+        vec![parent_cert],
+    );
     assert_eq!(
         node.verify(sender, &validator_verifier)
             .unwrap_err()
             .to_string(),
         "invalid parent round"
+    );
+}
+
+#[test]
+fn test_node_message_verify() {
+    let (signers, validator_verifier) = random_validator_verifier(4, None, false);
+    let sender = signers[0].author();
+
+    let inline_payload_node_msg = NodeMessage::new(
+        new_node(
+            1,
+            10,
+            signers[0].author(),
+            Payload::empty(false).into(),
+            vec![],
+        ),
+        None,
+    );
+    assert_ok!(inline_payload_node_msg.verify(sender, &validator_verifier));
+
+    let inline_payload_with_decoupled_payload = NodeMessage::new(
+        new_node(
+            1,
+            10,
+            signers[0].author(),
+            Payload::empty(false).into(),
+            vec![],
+        ),
+        Some(DecoupledPayload::new(
+            1,
+            1,
+            signers[0].author(),
+            Payload::empty(false),
+        )),
+    );
+    assert_eq!(
+        inline_payload_with_decoupled_payload
+            .verify(sender, &validator_verifier)
+            .unwrap_err()
+            .to_string(),
+        "decoupled payload present in Inline DagPayload mode"
+    );
+
+    let decoupled_payload = DecoupledPayload::new(1, 1, signers[0].author(), Payload::empty(false));
+
+    let invalid_decoupled_payload_node_msg = NodeMessage::new(
+        new_node(
+            1,
+            10,
+            signers[0].author(),
+            DagPayload::Decoupled(decoupled_payload.info()),
+            vec![],
+        ),
+        None,
+    );
+    assert_eq!(
+        invalid_decoupled_payload_node_msg
+            .verify(sender, &validator_verifier)
+            .unwrap_err()
+            .to_string(),
+        "decoupled_payload is None in Decoupled DagPayload mode"
+    );
+
+    let valid_decoupled_payload_node_msg = NodeMessage::new(
+        new_node(
+            1,
+            10,
+            signers[0].author(),
+            DagPayload::Decoupled(decoupled_payload.info()),
+            vec![],
+        ),
+        Some(decoupled_payload),
+    );
+    assert_ok!(valid_decoupled_payload_node_msg.verify(sender, &validator_verifier));
+
+    let decoupled_payload = DecoupledPayload::new(1, 1, signers[0].author(), Payload::empty(false));
+    let invalid_decoupled_payload_node_msg = NodeMessage::new(
+        new_node(
+            1,
+            10,
+            signers[0].author(),
+            DagPayload::Decoupled(PayloadInfo::new_for_test(
+                1,
+                1,
+                signers[0].author(),
+                HashValue::zero(),
+                0,
+                0,
+            )),
+            vec![],
+        ),
+        Some(decoupled_payload),
+    );
+    assert_eq!(
+        invalid_decoupled_payload_node_msg
+            .verify(sender, &validator_verifier)
+            .unwrap_err()
+            .to_string(),
+        "dag payload digest and decoupled payload digest mismatch"
     );
 }
 
@@ -85,7 +206,7 @@ fn test_certified_node_verify() {
         "invalid digest"
     );
 
-    let certified_node = new_certified_node(0, signers[0].author(), vec![]);
+    let certified_node = new_certified_node_with_empty_payload(0, signers[0].author(), vec![]);
 
     assert_eq!(
         certified_node

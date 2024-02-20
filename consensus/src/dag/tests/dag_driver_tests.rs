@@ -14,7 +14,7 @@ use crate::{
         round_state::{OptimisticResponsive, RoundState},
         tests::{
             dag_test::MockStorage,
-            helpers::{new_certified_node, MockPayloadManager, TEST_DAG_WINDOW},
+            helpers::{new_certified_node_with_empty_payload, MockPayloadManager, TEST_DAG_WINDOW},
             order_rule_tests::TestNotifier,
         },
         types::{CertifiedAck, DAGMessage, TestAck},
@@ -192,14 +192,16 @@ async fn test_certified_node_handler() {
     });
     let driver = setup(&signers, validator_verifier, network_sender);
 
-    let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
+    let first_round_node = new_certified_node_with_empty_payload(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
     assert_ok!(driver.process(first_round_node.clone()).await);
     // expect an ack if the same message is sent again
     assert_ok_eq!(driver.process(first_round_node).await, CertifiedAck::new(1));
 
-    let parent_node = new_certified_node(1, signers[1].author(), vec![]);
-    let invalid_node = new_certified_node(2, signers[0].author(), vec![parent_node.certificate()]);
+    let parent_node = new_certified_node_with_empty_payload(1, signers[1].author(), vec![]);
+    let invalid_node = new_certified_node_with_empty_payload(2, signers[0].author(), vec![
+        parent_node.certificate(),
+    ]);
     assert_eq!(
         driver.process(invalid_node).await.unwrap_err().to_string(),
         DagDriverError::MissingParents.to_string()

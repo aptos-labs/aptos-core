@@ -8,6 +8,7 @@ pub mod block;
 pub mod block_data;
 pub mod block_retrieval;
 pub mod common;
+pub mod dag_payload;
 pub mod delayed_qc_msg;
 pub mod epoch_retrieval;
 pub mod pipeline;

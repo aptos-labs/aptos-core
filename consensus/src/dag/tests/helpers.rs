@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dag::types::{CertifiedNode, Extensions, Node, NodeCertificate},
+    dag::types::{CertifiedNode, DagPayload, Extensions, Node, NodeCertificate},
     payload_manager::TPayloadManager,
 };
 use aptos_consensus_types::common::{Author, Payload, Round};
@@ -18,6 +18,7 @@ impl TPayloadManager for MockPayloadManager {
 pub(crate) fn new_certified_node(
     round: Round,
     author: Author,
+    payload: DagPayload,
     parents: Vec<NodeCertificate>,
 ) -> CertifiedNode {
     let node = Node::new(
@@ -26,17 +27,26 @@ pub(crate) fn new_certified_node(
         author,
         0,
         vec![],
-        Payload::empty(false).into(),
+        payload,
         parents,
         Extensions::empty(),
     );
     CertifiedNode::new(node, AggregateSignature::empty())
 }
 
+pub(crate) fn new_certified_node_with_empty_payload(
+    round: Round,
+    author: Author,
+    parents: Vec<NodeCertificate>,
+) -> CertifiedNode {
+    new_certified_node(round, author, Payload::empty(false).into(), parents)
+}
+
 pub(crate) fn new_node(
     round: Round,
     timestamp: u64,
     author: Author,
+    payload: DagPayload,
     parents: Vec<NodeCertificate>,
 ) -> Node {
     Node::new(
@@ -45,9 +55,24 @@ pub(crate) fn new_node(
         author,
         timestamp,
         vec![],
-        Payload::empty(false).into(),
+        payload,
         parents,
         Extensions::empty(),
+    )
+}
+
+pub(crate) fn new_node_with_empty_payload(
+    round: Round,
+    timestamp: u64,
+    author: Author,
+    parents: Vec<NodeCertificate>,
+) -> Node {
+    new_node(
+        round,
+        timestamp,
+        author,
+        Payload::empty(false).into(),
+        parents,
     )
 }
 
@@ -76,7 +101,7 @@ pub(crate) fn generate_dag_nodes(
                 if round > 1 {
                     assert_eq!(parents.len(), validators.len() * 2 / 3 + 1);
                 }
-                nodes_at_round.push(Some(new_certified_node(
+                nodes_at_round.push(Some(new_certified_node_with_empty_payload(
                     (round + 1) as u64,
                     *author,
                     parents,
