@@ -41,12 +41,10 @@ module aptos_framework::zkid {
         max_exp_horizon_secs: u64,
         /// The training wheels PK, if training wheels are on
         training_wheels_pubkey: Option<vector<u8>>,
-        /// The size of the "nonce commitment (to the EPK and expiration date)" stored in the JWT's `nonce` field.
-        nonce_commitment_num_bytes: u16,
         /// The max length of an ephemeral public key supported in our circuit (93 bytes)
         max_commited_epk_bytes: u16,
-        /// The max length of the field name and value of the JWT's `iss` field supported in our circuit (e.g., `"iss":"aptos.com"`)
-        max_iss_field_bytes: u16,
+        /// The max length of the value of the JWT's `iss` field supported in our circuit (e.g., `"https://accounts.google.com"`)
+        max_iss_val_bytes: u16,
         /// The max length of the JWT field name and value (e.g., `"max_age":"18"`) supported in our circuit
         max_extra_field_bytes: u16,
         /// The max length of the base64url-encoded JWT header in bytes supported in our circuit
@@ -81,9 +79,8 @@ module aptos_framework::zkid {
         max_zkid_signatures_per_txn: u16,
         max_exp_horizon_secs: u64,
         training_wheels_pubkey: Option<vector<u8>>,
-        nonce_commitment_num_bytes: u16,
         max_commited_epk_bytes: u16,
-        max_iss_field_bytes: u16,
+        max_iss_val_bytes: u16,
         max_extra_field_bytes: u16,
         max_jwt_header_b64_bytes: u32
     ): Configuration {
@@ -92,9 +89,8 @@ module aptos_framework::zkid {
             max_zkid_signatures_per_txn,
             max_exp_horizon_secs,
             training_wheels_pubkey,
-            nonce_commitment_num_bytes,
             max_commited_epk_bytes,
-            max_iss_field_bytes,
+            max_iss_val_bytes,
             max_extra_field_bytes,
             max_jwt_header_b64_bytes,
         }
@@ -129,9 +125,8 @@ module aptos_framework::zkid {
                 max_zkid_signatures_per_txn: _,
                 max_exp_horizon_secs: _,
                 training_wheels_pubkey: _,
-                nonce_commitment_num_bytes: _,
                 max_commited_epk_bytes: _,
-                max_iss_field_bytes: _,
+                max_iss_val_bytes: _,
                 max_extra_field_bytes: _,
                 max_jwt_header_b64_bytes: _,
             } = move_from<Configuration>(signer::address_of(fx));
@@ -150,6 +145,14 @@ module aptos_framework::zkid {
 
         let config = borrow_global_mut<Configuration>(signer::address_of(fx));
         config.training_wheels_pubkey = pk;
+    }
+
+    // Convenience method to set the zkID max expiration horizon, only callable via governance proposal.
+    public fun update_max_exp_horizon(fx: &signer, max_exp_horizon_secs: u64) acquires Configuration {
+        system_addresses::assert_aptos_framework(fx);
+
+        let config = borrow_global_mut<Configuration>(signer::address_of(fx));
+        config.max_exp_horizon_secs = max_exp_horizon_secs;
     }
 
     // Convenience method to append to clear the set of zkID override `aud`'s, only callable via governance proposal.

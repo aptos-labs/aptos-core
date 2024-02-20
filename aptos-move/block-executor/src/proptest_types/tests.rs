@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    errors::BlockExecutionError,
+    errors::SequentialBlockExecutionError,
     executor::BlockExecutor,
     proptest_types::{
         baseline::BaselineOutput,
@@ -15,7 +15,6 @@ use crate::{
     },
     txn_commit_hook::NoOpTransactionCommitHook,
 };
-use aptos_aggregator::types::PanicOr;
 use aptos_types::{
     block_executor::config::BlockExecutorConfig, contract_event::TransactionEvent,
     executable::ExecutableTestType,
@@ -86,12 +85,12 @@ fn run_transactions<K, V, E>(
         .execute_transactions_parallel((), &transactions, &data_view);
 
         if module_access.0 && module_access.1 {
-            assert_matches!(output, Err(PanicOr::Or(_)));
+            assert_matches!(output, Err(()));
             continue;
         }
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+            .assert_parallel_output(&output);
     }
 }
 
@@ -221,7 +220,7 @@ fn deltas_writes_mixed_with_block_gas_limit(num_txns: usize, maybe_block_gas_lim
         .execute_transactions_parallel((), &transactions, &data_view);
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+            .assert_parallel_output(&output);
     }
 }
 
@@ -272,7 +271,7 @@ fn deltas_resolver_with_block_gas_limit(num_txns: usize, maybe_block_gas_limit: 
         .execute_transactions_parallel((), &transactions, &data_view);
 
         BaselineOutput::generate(&transactions, maybe_block_gas_limit)
-            .assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+            .assert_parallel_output(&output);
     }
 }
 
@@ -472,7 +471,7 @@ fn publishing_fixed_params_with_block_gas_limit(
         ) // Ensure enough gas limit to commit the module txns (4 is maximum gas per txn)
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        assert_matches!(output, Err(PanicOr::Or(_)));
+        assert_matches!(output, Err(()));
     }
 }
 
@@ -551,8 +550,7 @@ fn non_empty_group(
         )
         .execute_transactions_parallel((), &transactions, &data_view);
 
-        BaselineOutput::generate(&transactions, None)
-            .assert_output(&output.map_err(BlockExecutionError::FallbackToSequential));
+        BaselineOutput::generate(&transactions, None).assert_parallel_output(&output);
     }
 
     for _ in 0..num_repeat_sequential {
@@ -570,7 +568,12 @@ fn non_empty_group(
         .execute_transactions_sequential((), &transactions, &data_view, false);
         // TODO: test dynamic disabled as well.
 
-        BaselineOutput::generate(&transactions, None).assert_output(&output);
+        BaselineOutput::generate(&transactions, None).assert_output(&output.map_err(|e| match e {
+            SequentialBlockExecutionError::ResourceGroupSerializationError => {
+                panic!("Unexpected error")
+            },
+            SequentialBlockExecutionError::ErrorToReturn(err) => err,
+        }));
     }
 }
 

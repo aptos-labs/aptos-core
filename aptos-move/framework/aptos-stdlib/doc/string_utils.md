@@ -168,6 +168,16 @@ The format string is not valid.
 
 
 
+<a id="0x1_string_utils_EUNABLE_TO_FORMAT_DELAYED_FIELD"></a>
+
+Formatting is not possible because the value contains delayed fields such as aggregators.
+
+
+<pre><code><b>const</b> <a href="string_utils.md#0x1_string_utils_EUNABLE_TO_FORMAT_DELAYED_FIELD">EUNABLE_TO_FORMAT_DELAYED_FIELD</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x1_string_utils_to_string"></a>
 
 ## Function `to_string`

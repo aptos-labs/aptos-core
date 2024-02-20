@@ -119,7 +119,7 @@ impl ExecutionAndIOCosts {
 
                     match event {
                         Loc(_) => (),
-                        Bytecode { cost, .. } => frame_cost += *cost,
+                        Bytecode { cost, .. } | CreateTy { cost } => frame_cost += *cost,
                         Call(inner_frame) => self.visit(inner_frame),
                         CallNative {
                             module_id: module,

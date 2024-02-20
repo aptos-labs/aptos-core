@@ -190,13 +190,59 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
  13: return $t1
 }
 
+============ after AbortAnalysisProcessor: ================
 
-Diagnostics:
-error: cannot drop
-  ┌─ tests/ability-checker/drop_on_abort.move:9:39
-  │
-9 │         if (vector::length(&vec) > 1) abort(1);
-  │                                       ^^^^^^^^
+[variant baseline]
+public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
+     var $t1: m::Option<#0>
+     var $t2: bool
+     var $t3: u64
+     var $t4: &vector<#0>
+     var $t5: u64
+     var $t6: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  0: $t4 := borrow_local($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  1: $t3 := vector::length<#0>($t4)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  2: $t5 := 1
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  3: $t2 := >($t3, $t5)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
+  4: if ($t2) goto 5 else goto 10
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  5: label L0
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  6: drop($t0)
+     # abort state before: {aborts}
+     # abort state after : {aborts}
+  7: $t6 := 1
+     # abort state before: {aborts}
+     # abort state after : {}
+  8: abort($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: goto 11
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 10: label L1
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 11: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: $t1 := pack m::Option<#0>($t0)
+     # abort state before: {returns}
+     # abort state after : {}
+ 13: return $t1
+}
 
 ============ after AbilityChecker: ================
 
@@ -208,18 +254,46 @@ public fun m::from_vec<#0>($t0: vector<#0>): m::Option<#0> {
      var $t4: &vector<#0>
      var $t5: u64
      var $t6: u64
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   0: $t4 := borrow_local($t0)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   1: $t3 := vector::length<#0>($t4)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   2: $t5 := 1
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   3: $t2 := >($t3, $t5)
+     # abort state before: {returns,aborts}
+     # abort state after : {returns,aborts}
   4: if ($t2) goto 5 else goto 10
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   5: label L0
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   6: drop($t0)
+     # abort state before: {aborts}
+     # abort state after : {aborts}
   7: $t6 := 1
+     # abort state before: {aborts}
+     # abort state after : {}
   8: abort($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: goto 11
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: label L1
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: label L2
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: $t1 := pack m::Option<#0>($t0)
+     # abort state before: {returns}
+     # abort state after : {}
  13: return $t1
 }

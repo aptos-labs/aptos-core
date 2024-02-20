@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use aptos_types::delayed_fields::{
-    calculate_width_for_constant_string, calculate_width_for_integer_embeded_string,
+    calculate_width_for_constant_string, calculate_width_for_integer_embedded_string,
     SnapshotToStringFormula,
 };
 use move_binary_format::errors::PartialVMResult;
@@ -264,7 +264,7 @@ impl DelayedFieldData {
     ) -> PartialVMResult<DelayedFieldID> {
         let snapshot = self.delayed_fields.get(&snapshot_id);
         // cast shouldn't fail because we assert on low limit for prefix and suffix before this call.
-        let width = u32::try_from(calculate_width_for_integer_embeded_string(
+        let width = u32::try_from(calculate_width_for_integer_embedded_string(
             prefix.len() + suffix.len(),
             snapshot_id,
         )?)

@@ -791,19 +791,33 @@ fun fields::write_val($t0: fields::S): fields::S {
   9: return $t1
 }
 
-============ after AbilityChecker: ================
+============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
 fun fields::read_ref($t0: &fields::S): u64 {
      var $t1: u64
      var $t2: &fields::T
      var $t3: &u64
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t2 := borrow_field<fields::S>.g($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: drop($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t3 := borrow_field<fields::T>.h($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: $t1 := read_ref($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {}
   6: return $t1
 }
 
@@ -814,14 +828,32 @@ fun fields::read_val($t0: fields::S): u64 {
      var $t2: &fields::T
      var $t3: &fields::S
      var $t4: &u64
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t3 := borrow_local($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t2 := borrow_field<fields::S>.g($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t4 := borrow_field<fields::T>.h($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: $t1 := read_ref($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: release($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {}
   8: return $t1
 }
 
@@ -838,20 +870,50 @@ fun fields::write_local_direct(): fields::S {
      var $t7: &mut u64
      var $t8: &mut fields::T
      var $t9: &mut fields::S
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t3 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t5 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t4 := pack fields::T($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t2 := pack fields::S($t3, $t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: $t1 := move($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: $t6 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: $t9 := borrow_local($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: $t8 := borrow_field<fields::S>.g($t9)
+     # abort state before: {returns}
+     # abort state after : {returns}
   8: drop($t9)
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: $t7 := borrow_field<fields::T>.h($t8)
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: drop($t8)
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: write_ref($t7, $t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: drop($t7)
+     # abort state before: {returns}
+     # abort state after : {returns}
  13: $t0 := move($t1)
+     # abort state before: {returns}
+     # abort state after : {}
  14: return $t0
 }
 
@@ -869,21 +931,53 @@ fun fields::write_local_via_ref(): fields::S {
      var $t8: u64
      var $t9: &mut u64
      var $t10: &mut fields::T
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t3 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t5 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t4 := pack fields::T($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t2 := pack fields::S($t3, $t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: $t1 := move($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: $t7 := borrow_local($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: $t6 := move($t7)
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: $t8 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
   8: $t10 := borrow_field<fields::S>.g($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
   9: drop($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
  10: $t9 := borrow_field<fields::T>.h($t10)
+     # abort state before: {returns}
+     # abort state after : {returns}
  11: drop($t10)
+     # abort state before: {returns}
+     # abort state after : {returns}
  12: write_ref($t9, $t8)
+     # abort state before: {returns}
+     # abort state after : {returns}
  13: drop($t9)
+     # abort state before: {returns}
+     # abort state after : {returns}
  14: $t0 := move($t1)
+     # abort state before: {returns}
+     # abort state after : {}
  15: return $t0
 }
 
@@ -893,13 +987,29 @@ fun fields::write_param($t0: &mut fields::S) {
      var $t1: u64
      var $t2: &mut u64
      var $t3: &mut fields::T
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t1 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t3 := borrow_field<fields::S>.g($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: drop($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: $t2 := borrow_field<fields::T>.h($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: write_ref($t2, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {}
   7: return ()
 }
 
@@ -911,14 +1021,296 @@ fun fields::write_val($t0: fields::S): fields::S {
      var $t3: &mut u64
      var $t4: &mut fields::T
      var $t5: &mut fields::S
+     # abort state before: {returns}
+     # abort state after : {returns}
   0: $t2 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
   1: $t5 := borrow_local($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
   2: $t4 := borrow_field<fields::S>.g($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
   3: drop($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
   4: $t3 := borrow_field<fields::T>.h($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   5: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
   6: write_ref($t3, $t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
   7: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
   8: $t1 := move($t0)
+     # abort state before: {returns}
+     # abort state after : {}
+  9: return $t1
+}
+
+============ after AbilityChecker: ================
+
+[variant baseline]
+fun fields::read_ref($t0: &fields::S): u64 {
+     var $t1: u64
+     var $t2: &fields::T
+     var $t3: &u64
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t2 := borrow_field<fields::S>.g($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: drop($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t3 := borrow_field<fields::T>.h($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t1 := read_ref($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {}
+  6: return $t1
+}
+
+
+[variant baseline]
+fun fields::read_val($t0: fields::S): u64 {
+     var $t1: u64
+     var $t2: &fields::T
+     var $t3: &fields::S
+     var $t4: &u64
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t3 := borrow_local($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t2 := borrow_field<fields::S>.g($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t4 := borrow_field<fields::T>.h($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: $t1 := read_ref($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: release($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {}
+  8: return $t1
+}
+
+
+[variant baseline]
+fun fields::write_local_direct(): fields::S {
+     var $t0: fields::S
+     var $t1: fields::S
+     var $t2: fields::S
+     var $t3: u64
+     var $t4: fields::T
+     var $t5: u64
+     var $t6: u64
+     var $t7: &mut u64
+     var $t8: &mut fields::T
+     var $t9: &mut fields::S
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t3 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t5 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t4 := pack fields::T($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t2 := pack fields::S($t3, $t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t1 := move($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: $t6 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: $t9 := borrow_local($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: $t8 := borrow_field<fields::S>.g($t9)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: drop($t9)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: $t7 := borrow_field<fields::T>.h($t8)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 10: drop($t8)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 11: write_ref($t7, $t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: drop($t7)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 13: $t0 := move($t1)
+     # abort state before: {returns}
+     # abort state after : {}
+ 14: return $t0
+}
+
+
+[variant baseline]
+fun fields::write_local_via_ref(): fields::S {
+     var $t0: fields::S
+     var $t1: fields::S
+     var $t2: fields::S
+     var $t3: u64
+     var $t4: fields::T
+     var $t5: u64
+     var $t6: &mut fields::S
+     var $t7: &mut fields::S
+     var $t8: u64
+     var $t9: &mut u64
+     var $t10: &mut fields::T
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t3 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t5 := 0
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t4 := pack fields::T($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t2 := pack fields::S($t3, $t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t1 := move($t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: $t7 := borrow_local($t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: $t6 := move($t7)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: $t8 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: $t10 := borrow_field<fields::S>.g($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  9: drop($t6)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 10: $t9 := borrow_field<fields::T>.h($t10)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 11: drop($t10)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 12: write_ref($t9, $t8)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 13: drop($t9)
+     # abort state before: {returns}
+     # abort state after : {returns}
+ 14: $t0 := move($t1)
+     # abort state before: {returns}
+     # abort state after : {}
+ 15: return $t0
+}
+
+
+[variant baseline]
+fun fields::write_param($t0: &mut fields::S) {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut fields::T
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t1 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t3 := borrow_field<fields::S>.g($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: drop($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: $t2 := borrow_field<fields::T>.h($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: write_ref($t2, $t1)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: drop($t2)
+     # abort state before: {returns}
+     # abort state after : {}
+  7: return ()
+}
+
+
+[variant baseline]
+fun fields::write_val($t0: fields::S): fields::S {
+     var $t1: fields::S
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: &mut fields::T
+     var $t5: &mut fields::S
+     # abort state before: {returns}
+     # abort state after : {returns}
+  0: $t2 := 42
+     # abort state before: {returns}
+     # abort state after : {returns}
+  1: $t5 := borrow_local($t0)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  2: $t4 := borrow_field<fields::S>.g($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  3: drop($t5)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  4: $t3 := borrow_field<fields::T>.h($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  5: drop($t4)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  6: write_ref($t3, $t2)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  7: drop($t3)
+     # abort state before: {returns}
+     # abort state after : {returns}
+  8: $t1 := move($t0)
+     # abort state before: {returns}
+     # abort state after : {}
   9: return $t1
 }

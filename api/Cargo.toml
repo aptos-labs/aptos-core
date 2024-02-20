@@ -19,6 +19,7 @@ aptos-bcs-utils = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db-indexer = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-global-constants = { workspace = true }

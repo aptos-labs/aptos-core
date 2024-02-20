@@ -8,8 +8,10 @@ edition = "2021"
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-runtimes = { workspace = true }
 bcs =  { workspace = true }
 bellman = { workspace = true }
+blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
 ff = { workspace = true }
@@ -24,27 +26,31 @@ once_cell = { workspace = true }
 pairing = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
 sha3 = { workspace = true }
 static_assertions = { workspace = true }
+
+[dev-dependencies]
+num_cpus = { workspace = true }
 
 [features]
 assert-private-keys-not-cloneable = []
 fuzzing = []
 
 [[bench]]
-name = "pvss"
-harness = false
-
-[[bench]]
 name = "crypto"
 harness = false
 
 [[bench]]
-name = "weighted_vuf"
+name = "lagrange"
 harness = false
 
 [[bench]]
-name = "lagrange"
+name = "pvss"
+harness = false
+
+[[bench]]
+name = "weighted_vuf"
 harness = false

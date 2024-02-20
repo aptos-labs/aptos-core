@@ -79,7 +79,7 @@ move-unit-test = { workspace = true, features = [ "debugging" ] }
 move-vm-runtime = { workspace = true, features = [ "testing" ] }
 once_cell = { workspace = true }
 poem = { workspace = true }
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "68424a2b721cbd4a6b8c1e7c951f5d4f665473d3" }
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "9936ec73cef251fb01fd2c47412e064cad3975c2" }
 rand = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
@@ -87,7 +87,7 @@ self_update = { version = "0.38.0", features = ["archive-zip", "compression-zip-
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "68424a2b721cbd4a6b8c1e7c951f5d4f665473d3" }
+server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "9936ec73cef251fb01fd2c47412e064cad3975c2" }
 tempfile = { workspace = true }
 termcolor = { workspace = true }
 thiserror = { workspace = true }

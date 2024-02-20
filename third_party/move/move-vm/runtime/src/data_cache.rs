@@ -18,6 +18,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    value_serde::deserialize_and_allow_delayed_values,
     values::{GlobalValue, Value},
 };
 use std::collections::btree_map::BTreeMap;
@@ -205,7 +206,7 @@ impl<'r> TransactionDataCache<'r> {
 
             let gv = match data {
                 Some(blob) => {
-                    let val = match Value::simple_deserialize(&blob, &ty_layout) {
+                    let val = match deserialize_and_allow_delayed_values(&blob, &ty_layout) {
                         Some(val) => val,
                         None => {
                             let msg =

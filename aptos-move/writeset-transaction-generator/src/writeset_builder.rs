@@ -113,6 +113,7 @@ where
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &resolver,
+        false,
     )
     .unwrap();
     let change_set = {
