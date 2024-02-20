@@ -27,7 +27,7 @@ pub mod rsa;
 pub mod unsupported;
 
 pub type Issuer = Vec<u8>;
-
+pub type OpenIdConfigUrl = Vec<u8>;
 pub fn issuer_from_str(s: &str) -> Issuer {
     s.as_bytes().to_vec()
 }

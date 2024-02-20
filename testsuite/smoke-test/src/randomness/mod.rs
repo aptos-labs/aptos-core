@@ -17,6 +17,10 @@ use move_core_types::{account_address::AccountAddress, language_storage::CORE_CO
 use rand::{prelude::StdRng, SeedableRng};
 use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
+use aptos::common::types::{CliTypedResult, TransactionSummary};
+use aptos::test::CliTestFramework;
+use aptos_types::jwks::{Issuer, OpenIdConfigUrl};
+use aptos_types::on_chain_config::{FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig};
 
 mod disable_feature_0;
 mod disable_feature_1;
@@ -28,6 +32,7 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod on_chain_config_updates;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]
@@ -256,4 +261,75 @@ async fn verify_randomness(
         "randomness verification failed with final check failure"
     );
     Ok(())
+}
+
+async fn update_on_chain_config_feature_bn254(cli: &CliTestFramework, root_idx: usize) {
+    let script = r#"
+script {
+    use aptos_framework::aptos_governance;
+    fun main(core_resources: &signer) {
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        let feature_id: u64 = std::features::get_bn254_strutures_feature();
+        aptos_governance::toggle_features(&framework_signer, vector[], vector[feature_id]);
+    }
+}
+"#;
+
+    let _txn_summary = cli
+        .run_script(root_idx, script)
+        .await
+        .expect("Txn execution error.");
+}
+
+async fn update_on_chain_consensus_config(config: OnChainConsensusConfig, cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    todo!()
+}
+
+async fn update_on_chain_execution_config(config: OnChainExecutionConfig, cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    todo!()
+}
+
+async fn update_on_chain_gas_schedule(gas_schedule: GasScheduleV2, cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    todo!()
+}
+
+async fn update_on_chain_features(enable_flags: Vec<FeatureFlag>, disable_flags: Vec<FeatureFlag>, cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    let enable_indices = enable_flags.into_iter().map(|flag| flag as usize).collect::<Vec<_>>();
+    let disable_indices = disable_flags.into_iter().map(|flag| flag as usize).collect::<Vec<_>>();
+    let script = format!(r#"
+script {{
+    use aptos_framework::aptos_governance;
+    fun main(core_resources: &signer) {{
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        aptos_governance::toggle_features(&framework_signer, vector{enable_indices:?}, vector{disable_indices:?});
+    }}
+}}
+"#);
+
+    cli
+        .run_script(root_idx, &script)
+        .await
+}
+
+async fn update_on_chain_version(version: u64, cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    todo!()
+}
+
+async fn update_on_chain_validator_set(cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    todo!()
+}
+
+async fn update_on_chain_oidc_providers(ops: Vec<(Issuer, Option<OpenIdConfigUrl>)>, cli: &CliTestFramework, root_idx: usize) -> CliTypedResult<TransactionSummary> {
+    todo!()
+}
+
+async fn update_all_on_chain_configs(rest: &Client, cli: &CliTestFramework, root_idx: usize) {
+    let ver = get_current_version(rest).await;
+    let features = get_on_chain_resource_at_version::<Features>(rest, ver).await;
+    let (enable_flags, disable_flags) = if features.is_enabled(FeatureFlag::BN254_STRUCTURES) {
+        (vec![], vec![FeatureFlag::BN254_STRUCTURES])
+    } else {
+        (vec![FeatureFlag::BN254_STRUCTURES], vec![])
+    };
+    update_on_chain_features(enable_flags, disable_flags, cli, root_idx).await;
 }

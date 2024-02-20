@@ -436,6 +436,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             mut response_sender,
             ..
         } = req;
+        fail_point!("dkg::process_peer_rpc_msg", |_| Err(anyhow!("process_peer_rpc_msg aborted at fail point")));
         ensure!(
             msg.epoch() == self.epoch_state.epoch,
             "[DKG] msg not for current epoch"
