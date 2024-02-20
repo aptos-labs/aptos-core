@@ -16,6 +16,7 @@ use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{AttrId, Bytecode, Label},
+    stackless_control_flow_graph::{BlockId, StacklessControlFlowGraph},
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -62,9 +63,6 @@ impl SplitCriticalEdgesProcessor {
 
     /// Checks the postcondition of the transformation; cf. module documentation.
     fn check_postcondition(code: &[Bytecode]) {
-        use move_stackless_bytecode::stackless_control_flow_graph::{
-            BlockId, StacklessControlFlowGraph,
-        };
         let cfg = StacklessControlFlowGraph::new_forward(code);
         let blocks = cfg.blocks();
         let mut pred_count: BTreeMap<BlockId, usize> =
