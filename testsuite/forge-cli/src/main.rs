@@ -774,7 +774,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            optimize_for_maximum_throughput(config, 20_000, 1.0, 4.0);
+            optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -803,14 +803,13 @@ fn quorum_store_backlog_txn_limit_count(
 fn optimize_for_maximum_throughput(
     config: &mut NodeConfig,
     target_tps: usize,
+    max_txns_per_block: usize,
     vn_latency: f64,
-    blocks_per_s: f64,
 ) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = (target_tps as f64 / blocks_per_s) as u64;
-    config.consensus.max_receiving_block_txns =
-        (target_tps as f64 / blocks_per_s * 4.0 / 3.0) as u64;
+    config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
@@ -818,16 +817,16 @@ fn optimize_for_maximum_throughput(
 
     quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
-    config.consensus.quorum_store.sender_max_batch_txns = 1000;
+    config.consensus.quorum_store.sender_max_batch_txns = 500;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
     config.consensus.quorum_store.sender_max_num_batches = 100;
     config.consensus.quorum_store.sender_max_total_txns = 4000;
     config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
     config.consensus.quorum_store.receiver_max_batch_txns = 1000;
-    config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_num_batches = 100;
-    config.consensus.quorum_store.receiver_max_total_txns = 4000;
-    config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_batch_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_num_batches = 200;
+    config.consensus.quorum_store.receiver_max_total_txns = 8000;
+    config.consensus.quorum_store.receiver_max_total_bytes = 16 * 1024 * 1024;
 }
 
 fn large_db_simple_test() -> ForgeConfig {
@@ -1842,10 +1841,15 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // Config is based on these values. The target TPS should be a slight overestimate of
     // the actual throughput to be able to have reasonable queueing but also so throughput
     // will improve as performance improves.
-    const TARGET_TPS: usize = 20_000;
-    const BLOCKS_PER_S: f64 = 4.0;
+    // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
+    const TARGET_TPS: usize = 18_000;
+    // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
+    // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
+    const MAX_TXNS_PER_BLOCK: usize = 3500;
+    // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     const VN_LATENCY_S: f64 = 4.0;
-    const VFN_LATENCY_S: f64 = 7.0;
+    // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
+    const VFN_LATENCY_S: f64 = 10.0;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
@@ -1857,7 +1861,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
 
-            optimize_for_maximum_throughput(config, TARGET_TPS, VN_LATENCY_S, BLOCKS_PER_S);
+            optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
             // Other consensus / Quroum store configs
             config.consensus.quorum_store_pull_timeout_ms = 200;
