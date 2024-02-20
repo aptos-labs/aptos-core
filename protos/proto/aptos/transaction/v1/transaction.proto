@@ -469,11 +469,16 @@ message AnySignature {
 
   Type type = 1;
 
-  oneof signature {
-    Ed25519 ed25519 = 2;
-    Secp256k1Ecdsa secp256k1_ecdsa = 3;
-    WebAuthn webauthn = 4;
-    ZkId zkid = 5;
+  // Deprecated: use signature_variant instead.
+  // Note: >= 1.10, this field is deprecated.
+  bytes signature = 2 [deprecated = true];
+
+  // Support: >= 1.10.
+  oneof signature_variant {
+    Ed25519 ed25519 = 3;
+    Secp256k1Ecdsa secp256k1_ecdsa = 4;
+    WebAuthn webauthn = 5;
+    ZkId zkid = 6;
   }
 }
 

@@ -566,8 +566,8 @@ MultisigTransactionPayload:
           TYPENAME: EntryFunction
 OpenIdSig:
   STRUCT:
-    - jwt_sig: STR
-    - jwt_payload: STR
+    - jwt_sig_b64: STR
+    - jwt_payload_b64: STR
     - uid_key: STR
     - epk_blinder: BYTES
     - pepper:
@@ -741,7 +741,8 @@ SignedGroth16Zkp:
     - non_malleability_signature:
         TYPENAME: EphemeralSignature
     - exp_horizon_secs: U64
-    - extra_field: STR
+    - extra_field:
+        OPTION: STR
     - override_aud_val:
         OPTION: STR
     - training_wheels_signature:
@@ -1085,14 +1086,14 @@ WriteSetV0:
     TYPENAME: WriteSetMut
 ZkIdPublicKey:
   STRUCT:
-    - iss: STR
+    - iss_val: STR
     - idc:
         TYPENAME: IdCommitment
 ZkIdSignature:
   STRUCT:
     - sig:
         TYPENAME: ZkpOrOpenIdSig
-    - jwt_header: STR
+    - jwt_header_b64: STR
     - exp_timestamp_secs: U64
     - ephemeral_pubkey:
         TYPENAME: EphemeralPublicKey

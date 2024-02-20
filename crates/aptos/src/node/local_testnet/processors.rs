@@ -99,6 +99,8 @@ impl ProcessorManager {
             ending_version: None,
             number_concurrent_processing_tasks: None,
             enable_verbose_logging: None,
+            db_pool_size: None,
+            gap_detection_batch_size: 50,
         };
         let manager = Self {
             config,

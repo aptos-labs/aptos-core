@@ -32,7 +32,10 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
 
     fn init(argument: &'a S) -> Self {
         // AptosVM has to be initialized using configs from storage.
-        let vm = AptosVM::new(&argument.as_move_resolver());
+        let vm = AptosVM::new(
+            &argument.as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ Some(true),
+        );
 
         Self {
             vm,
@@ -61,23 +64,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
         {
-            Ok((vm_status, vm_output, sender)) => {
+            Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
-                    match sender {
-                        Some(s) => speculative_trace!(
-                            &log_context,
-                            format!(
-                                "Transaction discarded, sender: {}, error: {:?}",
-                                s, vm_status
-                            ),
-                        ),
-                        None => {
-                            speculative_trace!(
-                                &log_context,
-                                format!("Transaction malformed, error: {:?}", vm_status),
-                            )
-                        },
-                    };
+                    speculative_trace!(
+                        &log_context,
+                        format!("Transaction discarded, status: {:?}", vm_status),
+                    );
                 }
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(
@@ -128,7 +120,7 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             if let Transaction::GenesisTransaction(WriteSetPayload::Direct(_)) = txn.expect_valid()
             {
                 // WriteSetPayload::Direct cannot be handled in mode where delayed_field_optimization or
-                // resource_group_split_in_write_set is enabled.
+                // resource_groups_split_in_change_set is enabled.
                 return false;
             }
         }

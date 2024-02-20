@@ -11,6 +11,7 @@ pub mod debug;
 pub mod event;
 pub mod hash;
 pub mod object;
+pub mod object_code_deployment;
 pub mod state_storage;
 pub mod string_utils;
 pub mod transaction_context;

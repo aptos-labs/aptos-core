@@ -15,9 +15,9 @@ use crate::{
             account_address_from_public_key, AccountAddressWrapper, ArgWithTypeVec,
             AuthenticationKeyInputOptions, CliError, CliTypedResult, EncodingOptions,
             EntryFunctionArguments, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-            MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
-            PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs, SaveFile,
-            ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
+            MovePackageDir, OptionalPoolAddressArgs, OverrideSizeCheckOption, PoolAddressArgs,
+            PrivateKeyInputOptions, PromptOptions, PublicKeyInputOptions, RestOptions, RngArgs,
+            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary, TypeArgVec,
         },
         utils::write_to_file,
     },
@@ -865,7 +865,7 @@ impl CliTestFramework {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
-            override_size_check: false,
+            override_size_check_option: OverrideSizeCheckOption { value: false },
             included_artifacts_args: IncludedArtifactsArgs {
                 included_artifacts: included_artifacts.unwrap_or(IncludedArtifacts::Sparse),
             },

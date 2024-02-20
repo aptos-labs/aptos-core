@@ -16,7 +16,13 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use smallbitvec::SmallBitVec;
-use std::{cmp::max, collections::BTreeMap, fmt::Debug};
+use smallvec::{smallvec, SmallVec};
+use std::{
+    cell::RefCell,
+    cmp::max,
+    collections::{btree_map, BTreeMap},
+    fmt::Debug,
+};
 use triomphe::Arc as TriompheArc;
 
 pub const TYPE_DEPTH_MAX: usize = 256;
@@ -193,6 +199,48 @@ pub enum Type {
     U16,
     U32,
     U256,
+}
+
+pub struct TypePreorderTraversalIter<'a> {
+    stack: SmallVec<[&'a Type; 32]>,
+}
+
+impl<'a> Iterator for TypePreorderTraversalIter<'a> {
+    type Item = &'a Type;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        use Type::*;
+
+        match self.stack.pop() {
+            Some(ty) => {
+                match ty {
+                    Signer
+                    | Bool
+                    | Address
+                    | U8
+                    | U16
+                    | U32
+                    | U64
+                    | U128
+                    | U256
+                    | Struct { .. }
+                    | TyParam(..) => (),
+
+                    Reference(ty) | MutableReference(ty) => {
+                        self.stack.push(ty);
+                    },
+
+                    Vector(ty) => {
+                        self.stack.push(ty);
+                    },
+
+                    StructInstantiation { ty_args, .. } => self.stack.extend(ty_args.iter().rev()),
+                }
+                Some(ty)
+            },
+            None => None,
+        }
+    }
 }
 
 // Cache for the ability of struct. They will be ignored when comparing equality or Ord as they are just used for caching purpose.
@@ -456,6 +504,148 @@ impl Type {
                     type_argument_abilities,
                 )
             },
+        }
+    }
+
+    pub fn preorder_traversal(&self) -> TypePreorderTraversalIter<'_> {
+        TypePreorderTraversalIter {
+            stack: smallvec![self],
+        }
+    }
+
+    /// Returns the number of nodes the type has.
+    ///
+    /// For example
+    ///   - `u64` has one node
+    ///   - `vector<u64>` has two nodes -- one for the vector and one for the element type u64.
+    ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes.
+    pub fn num_nodes(&self) -> usize {
+        self.preorder_traversal().count()
+    }
+
+    /// Calculates the number of nodes in the substituted type.
+    pub fn num_nodes_in_subst(&self, ty_args: &[Type]) -> PartialVMResult<usize> {
+        use Type::*;
+
+        thread_local! {
+            static CACHE: RefCell<BTreeMap<usize, usize>> = RefCell::new(BTreeMap::new());
+        }
+
+        CACHE.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            cache.clear();
+            let mut num_nodes_in_arg = |idx: usize| -> PartialVMResult<usize> {
+                Ok(match cache.entry(idx) {
+                    btree_map::Entry::Occupied(entry) => *entry.into_mut(),
+                    btree_map::Entry::Vacant(entry) => {
+                        let ty = ty_args.get(idx).ok_or_else(|| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                                .with_message(format!(
+                                "type substitution failed: index out of bounds -- len {} got {}",
+                                ty_args.len(),
+                                idx
+                            ))
+                        })?;
+                        *entry.insert(ty.num_nodes())
+                    },
+                })
+            };
+
+            let mut n = 0;
+            for ty in self.preorder_traversal() {
+                match ty {
+                    TyParam(idx) => {
+                        n += num_nodes_in_arg(*idx as usize)?;
+                    },
+                    Address
+                    | Bool
+                    | Signer
+                    | U8
+                    | U16
+                    | U32
+                    | U64
+                    | U128
+                    | U256
+                    | Vector(..)
+                    | Struct { .. }
+                    | Reference(..)
+                    | MutableReference(..)
+                    | StructInstantiation { .. } => n += 1,
+                }
+            }
+
+            Ok(n)
+        })
+    }
+}
+
+#[cfg(test)]
+mod unit_tests {
+    use super::*;
+
+    fn struct_inst_for_test(ty_args: Vec<Type>) -> Type {
+        Type::StructInstantiation {
+            idx: StructNameIndex(0),
+            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
+            ty_args: TriompheArc::new(ty_args),
+        }
+    }
+
+    fn struct_for_test() -> Type {
+        Type::Struct {
+            idx: StructNameIndex(0),
+            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
+        }
+    }
+
+    #[test]
+    fn test_num_nodes_in_type() {
+        use Type::*;
+
+        let cases = [
+            (U8, 1),
+            (Vector(TriompheArc::new(U8)), 2),
+            (Vector(TriompheArc::new(Vector(TriompheArc::new(U8)))), 3),
+            (Reference(Box::new(Bool)), 2),
+            (TyParam(0), 1),
+            (struct_for_test(), 1),
+            (struct_inst_for_test(vec![U8, U8]), 3),
+            (
+                struct_inst_for_test(vec![U8, struct_inst_for_test(vec![Bool, Bool, Bool]), U8]),
+                7,
+            ),
+        ];
+
+        for (ty, expected) in cases {
+            assert_eq!(ty.num_nodes(), expected);
+        }
+    }
+
+    #[test]
+    fn test_num_nodes_in_subst() {
+        use Type::*;
+
+        let cases: Vec<(Type, Vec<Type>, usize)> = vec![
+            (TyParam(0), vec![Bool], 1),
+            (TyParam(0), vec![Vector(TriompheArc::new(Bool))], 2),
+            (Bool, vec![], 1),
+            (
+                struct_inst_for_test(vec![TyParam(0), TyParam(0)]),
+                vec![Vector(TriompheArc::new(Bool))],
+                5,
+            ),
+            (
+                struct_inst_for_test(vec![TyParam(0), TyParam(1)]),
+                vec![
+                    Vector(TriompheArc::new(Bool)),
+                    Vector(TriompheArc::new(Vector(TriompheArc::new(Bool)))),
+                ],
+                6,
+            ),
+        ];
+
+        for (ty, ty_args, expected) in cases {
+            assert_eq!(ty.num_nodes_in_subst(&ty_args).unwrap(), expected);
         }
     }
 }

@@ -446,7 +446,10 @@ impl serde::Serialize for AnySignature {
         if self.r#type != 0 {
             len += 1;
         }
-        if self.signature.is_some() {
+        if !self.signature.is_empty() {
+            len += 1;
+        }
+        if self.signature_variant.is_some() {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AnySignature", len)?;
@@ -455,18 +458,21 @@ impl serde::Serialize for AnySignature {
                 .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
             struct_ser.serialize_field("type", &v)?;
         }
-        if let Some(v) = self.signature.as_ref() {
+        if !self.signature.is_empty() {
+            struct_ser.serialize_field("signature", pbjson::private::base64::encode(&self.signature).as_str())?;
+        }
+        if let Some(v) = self.signature_variant.as_ref() {
             match v {
-                any_signature::Signature::Ed25519(v) => {
+                any_signature::SignatureVariant::Ed25519(v) => {
                     struct_ser.serialize_field("ed25519", v)?;
                 }
-                any_signature::Signature::Secp256k1Ecdsa(v) => {
+                any_signature::SignatureVariant::Secp256k1Ecdsa(v) => {
                     struct_ser.serialize_field("secp256k1Ecdsa", v)?;
                 }
-                any_signature::Signature::Webauthn(v) => {
+                any_signature::SignatureVariant::Webauthn(v) => {
                     struct_ser.serialize_field("webauthn", v)?;
                 }
-                any_signature::Signature::Zkid(v) => {
+                any_signature::SignatureVariant::Zkid(v) => {
                     struct_ser.serialize_field("zkid", v)?;
                 }
             }
@@ -482,6 +488,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
     {
         const FIELDS: &[&str] = &[
             "type",
+            "signature",
             "ed25519",
             "secp256k1_ecdsa",
             "secp256k1Ecdsa",
@@ -492,6 +499,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Type,
+            Signature,
             Ed25519,
             Secp256k1Ecdsa,
             Webauthn,
@@ -518,6 +526,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                     {
                         match value {
                             "type" => Ok(GeneratedField::Type),
+                            "signature" => Ok(GeneratedField::Signature),
                             "ed25519" => Ok(GeneratedField::Ed25519),
                             "secp256k1Ecdsa" | "secp256k1_ecdsa" => Ok(GeneratedField::Secp256k1Ecdsa),
                             "webauthn" => Ok(GeneratedField::Webauthn),
@@ -543,6 +552,7 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
             {
                 let mut r#type__ = None;
                 let mut signature__ = None;
+                let mut signature_variant__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Type => {
@@ -551,39 +561,48 @@ impl<'de> serde::Deserialize<'de> for AnySignature {
                             }
                             r#type__ = Some(map.next_value::<any_signature::Type>()? as i32);
                         }
-                        GeneratedField::Ed25519 => {
+                        GeneratedField::Signature => {
                             if signature__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("signature"));
+                            }
+                            signature__ =
+                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::Ed25519 => {
+                            if signature_variant__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("ed25519"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::Signature::Ed25519)
+                            signature_variant__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::SignatureVariant::Ed25519)
 ;
                         }
                         GeneratedField::Secp256k1Ecdsa => {
-                            if signature__.is_some() {
+                            if signature_variant__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("secp256k1Ecdsa"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::Signature::Secp256k1Ecdsa)
+                            signature_variant__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::SignatureVariant::Secp256k1Ecdsa)
 ;
                         }
                         GeneratedField::Webauthn => {
-                            if signature__.is_some() {
+                            if signature_variant__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("webauthn"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::Signature::Webauthn)
+                            signature_variant__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::SignatureVariant::Webauthn)
 ;
                         }
                         GeneratedField::Zkid => {
-                            if signature__.is_some() {
+                            if signature_variant__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("zkid"));
                             }
-                            signature__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::Signature::Zkid)
+                            signature_variant__ = map.next_value::<::std::option::Option<_>>()?.map(any_signature::SignatureVariant::Zkid)
 ;
                         }
                     }
                 }
                 Ok(AnySignature {
                     r#type: r#type__.unwrap_or_default(),
-                    signature: signature__,
+                    signature: signature__.unwrap_or_default(),
+                    signature_variant: signature_variant__,
                 })
             }
         }

@@ -574,6 +574,7 @@ mod test {
                         ),
                     ]),
                     0,
+                    0,
                 ),
             ),
             (
@@ -584,6 +585,7 @@ mod test {
                         mock_tag_1(),
                         (WriteOp::legacy_modification(serialize(&5000).into()), None),
                     )]),
+                    0,
                     0,
                 ),
             ),

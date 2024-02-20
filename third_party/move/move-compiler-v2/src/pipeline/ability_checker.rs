@@ -3,10 +3,11 @@
 
 //! Checks for ability violations.
 //! prerequisite:
-//! - liveness analysis and lifetime analysis have been performed
-//! - Copies and moves have been made explicit in assignment instructions
+//! - Copies, moves, and drops have been made explicit in assignment instructions
+//! - Abort analysis has been performed so that ExitStateAnnotation are available
 
-use move_binary_format::file_format::{Ability, AbilitySet};
+use crate::pipeline::exit_state_analysis::{ExitStateAnnotation, ExitStateAtCodeOffset};
+use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
     model::{FunId, FunctionEnv, Loc, ModuleId, QualifiedId, StructId, TypeParameterKind},
@@ -31,6 +32,8 @@ pub fn has_ability(target: &FunctionTarget, ty: &Type, ability: Ability) -> bool
 }
 
 /// Checks if the given type has the given ability, and add diagnostics if not.
+/// Note that drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to do not drop before an abort or infinite loop.
 fn check_ability(target: &FunctionTarget, ty: &Type, ability: Ability, loc: &Loc, err_msg: &str) {
     if !has_ability(target, ty, ability) {
         target.global_env().error(loc, err_msg)
@@ -62,26 +65,45 @@ fn check_read_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
     }
 }
 
-/// Checks if the given type has constraint drop, and add diagnostics if not.
-fn check_drop(func_target: &FunctionTarget, ty: &Type, loc: &Loc, err_msg: &str) {
-    check_ability(func_target, ty, Ability::Drop, loc, err_msg)
+/// Checks drop ability for the given type;
+/// generates an error, unless the state after `code_offset` won't return.
+/// Drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to not drop in code definitely not leading to a return.
+pub fn cond_check_drop(
+    func_target: &FunctionTarget,
+    code_offset: CodeOffset,
+    ty: &Type,
+    loc: &Loc,
+    err_msg: &str,
+) {
+    let abort_state = get_exit_state_at(func_target, code_offset);
+    if abort_state.after.may_return() {
+        check_ability(func_target, ty, Ability::Drop, loc, err_msg)
+    }
 }
 
-/// Checks if the given temporary variable has constraint drop, and add diagnostics if not.
-fn check_drop_for_temp_with_msg(
+/// If temporary variable `t` does not have ability `drop`, generates an error,
+/// unless the state after `code_offset` won't return.
+/// Drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to not drop in code definitely not leading to a return.
+fn cond_check_drop_for_temp_with_msg(
     func_target: &FunctionTarget,
+    code_offset: CodeOffset,
     t: TempIndex,
     loc: &Loc,
     err_msg: &str,
 ) {
     let ty = func_target.get_local_type(t);
-    check_drop(func_target, ty, loc, err_msg)
+    cond_check_drop(func_target, code_offset, ty, loc, err_msg)
 }
 
 /// `t` is the local containing the reference being written to
-fn check_write_ref(target: &FunctionTarget, t: TempIndex, loc: &Loc) {
+/// `code_offset` is the code offset of the WriteRef instruction.
+/// Drop ability must only be enforced if there is an execution path from this code offset
+/// that returns. It's legit in Move to not drop in code definitely not leading to a return.
+fn check_write_ref(target: &FunctionTarget, code_offset: CodeOffset, t: TempIndex, loc: &Loc) {
     if let Type::Reference(_, ty) = target.get_local_type(t) {
-        check_drop(target, ty, loc, "write_ref: cannot drop")
+        cond_check_drop(target, code_offset, ty, loc, "write_ref: cannot drop")
     } else {
         panic!("ICE ability checker: write_ref has non-reference destination")
     }
@@ -176,8 +198,8 @@ impl FunctionTargetProcessor for AbilityChecker {
         }
         let target = FunctionTarget::new(fun_env, &data);
         check_fun_signature(&target);
-        for bytecode in target.get_bytecode() {
-            check_bytecode(&target, bytecode)
+        for (code_offset, bytecode) in target.get_bytecode().iter().enumerate() {
+            check_bytecode(&target, code_offset as CodeOffset, bytecode)
         }
         data
     }
@@ -196,7 +218,7 @@ fn check_fun_signature(target: &FunctionTarget) {
     // return type is checked in function body
 }
 
-fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
+fn check_bytecode(target: &FunctionTarget, code_offset: CodeOffset, bytecode: &Bytecode) {
     let loc = target.get_bytecode_loc(bytecode.get_attr_id());
     match bytecode {
         Bytecode::Assign(_, dst, src, kind) => {
@@ -205,9 +227,15 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
             match kind {
                 AssignKind::Copy | AssignKind::Store => {
                     check_copy_for_temp_with_msg(target, *src, &loc, "cannot copy");
-                    // dst is not dropped in advande in this case, since it's read by src
                     if *dst == *src {
-                        check_drop_for_temp_with_msg(target, *dst, &loc, "invalid implicit drop")
+                        // dst is not dropped in advance in this case, since it's read by src
+                        cond_check_drop_for_temp_with_msg(
+                            target,
+                            code_offset,
+                            *dst,
+                            &loc,
+                            "invalid implicit drop",
+                        )
                     }
                 },
                 AssignKind::Move => (),
@@ -244,12 +272,34 @@ fn check_bytecode(target: &FunctionTarget, bytecode: &Bytecode) {
                 BorrowField(mod_id, struct_id, insts, _) => {
                     check_struct_inst(target, *mod_id, *struct_id, insts, &loc);
                 },
-                Drop => check_drop_for_temp_with_msg(target, srcs[0], &loc, "cannot drop"),
+                Drop => cond_check_drop_for_temp_with_msg(
+                    target,
+                    code_offset,
+                    srcs[0],
+                    &loc,
+                    "cannot drop",
+                ),
                 ReadRef => check_read_ref(target, srcs[0], &loc),
-                WriteRef => check_write_ref(target, srcs[0], &loc),
+                WriteRef => check_write_ref(target, code_offset, srcs[0], &loc),
                 _ => (),
             }
         },
         _ => (),
     }
+}
+
+fn get_exit_state<'a>(target: &'a FunctionTarget<'a>) -> &'a ExitStateAnnotation {
+    target
+        .get_annotations()
+        .get::<ExitStateAnnotation>()
+        .expect("abort state annotation")
+}
+
+fn get_exit_state_at<'a>(
+    target: &'a FunctionTarget<'a>,
+    code_offset: CodeOffset,
+) -> &'a ExitStateAtCodeOffset {
+    get_exit_state(target)
+        .get_annotation_at(code_offset)
+        .expect("abort state")
 }
