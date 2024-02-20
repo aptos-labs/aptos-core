@@ -1,8 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::dkg::real_dkg::rounding::{
-    total_weight_lower_bound, total_weight_upper_bound, DKGRounding, RECONSTRUCT_THRESHOLD,
-    SECRECY_THRESHOLD,
+    is_valid_profile, total_weight_lower_bound, total_weight_upper_bound, DKGRounding,
+    RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfig;
 use rand::Rng;
@@ -16,14 +16,17 @@ fn compute_mainnet_rounding() {
     // Result:
     // mainnet rounding profile: total_weight: 437, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.5859020899996102, reconstruct_threshold_in_weights: 237, validator_weights: [10, 1, 9, 9, 1, 1, 9, 9, 1, 7, 8, 5, 2, 1, 9, 7, 1, 2, 1, 9, 2, 1, 1, 9, 1, 8, 10, 1, 1, 9, 1, 1, 1, 7, 9, 1, 1, 9, 1, 9, 1, 3, 1, 8, 1, 1, 7, 10, 3, 2, 1, 9, 1, 9, 1, 3, 8, 1, 10, 1, 1, 1, 9, 3, 8, 8, 3, 10, 1, 1, 7, 9, 2, 5, 2, 9, 9, 1, 4, 1, 1, 1, 1, 1, 2, 10, 1, 1, 9, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 9, 8, 1, 1, 9, 2, 1]
 
-    assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
-
     let total_weight_min = total_weight_lower_bound(&validator_stakes);
     let total_weight_max =
         total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
     let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
     assert!(total_weight >= total_weight_min as u64);
     assert!(total_weight <= total_weight_max as u64);
+
+    assert!(is_valid_profile(
+        &dkg_rounding.profile,
+        RECONSTRUCT_THRESHOLD
+    ));
 }
 
 #[test]
@@ -65,7 +68,6 @@ fn test_rounding_small_stakes() {
         }
         let dkg_rounding =
             DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
         let total_weight_max =
@@ -73,6 +75,10 @@ fn test_rounding_small_stakes() {
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
         assert!(total_weight >= total_weight_min as u64);
         assert!(total_weight <= total_weight_max as u64);
+        assert!(is_valid_profile(
+            &dkg_rounding.profile,
+            RECONSTRUCT_THRESHOLD
+        ));
     }
 }
 
@@ -90,7 +96,6 @@ fn test_rounding_uniform_distribution() {
         }
         let dkg_rounding =
             DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
         let total_weight_max =
@@ -98,6 +103,10 @@ fn test_rounding_uniform_distribution() {
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
         assert!(total_weight >= total_weight_min as u64);
         assert!(total_weight <= total_weight_max as u64);
+        assert!(is_valid_profile(
+            &dkg_rounding.profile,
+            RECONSTRUCT_THRESHOLD
+        ));
     }
 }
 
@@ -128,7 +137,6 @@ fn test_rounding_zipf_distribution() {
         let validator_stakes = generate_approximate_zipf(validator_num, 1_000_000, 50_000_000, 5.0);
         let dkg_rounding =
             DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
-        assert!(dkg_rounding.profile.reconstruct_threshold_in_stake_ratio <= RECONSTRUCT_THRESHOLD);
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
         let total_weight_max =
@@ -136,6 +144,10 @@ fn test_rounding_zipf_distribution() {
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
         assert!(total_weight >= total_weight_min as u64);
         assert!(total_weight <= total_weight_max as u64);
+        assert!(is_valid_profile(
+            &dkg_rounding.profile,
+            RECONSTRUCT_THRESHOLD
+        ));
     }
 }
 
