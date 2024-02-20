@@ -185,6 +185,7 @@ pub struct RoundManager {
     epoch_state: Arc<EpochState>,
     block_store: Arc<BlockStore>,
     round_state: RoundState,
+    pending_highest_commit_round: Option<Round>,
     proposer_election: UnequivocalProposerElection,
     proposal_generator: ProposalGenerator,
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
@@ -226,6 +227,7 @@ impl RoundManager {
             epoch_state,
             block_store,
             round_state,
+            pending_highest_commit_round: None,
             proposer_election: UnequivocalProposerElection::new(proposer_election),
             proposal_generator,
             safety_rules,
@@ -498,9 +500,23 @@ impl RoundManager {
                     );
                     VerifyError::from(e)
                 })?;
+
+            let highest_commit_round = sync_info.highest_commit_round();
+            let mut sync_commit_certs = false;
+            if self.pending_highest_commit_round.is_none()
+                || highest_commit_round > self.pending_highest_commit_round.unwrap()
+            {
+                self.pending_highest_commit_round = Some(highest_commit_round);
+                sync_commit_certs = true;
+            }
+
             let result = self
                 .block_store
-                .add_certs(sync_info, self.create_block_retriever(author))
+                .add_certs(
+                    sync_info,
+                    self.create_block_retriever(author),
+                    sync_commit_certs,
+                )
                 .await;
             self.process_certificates().await?;
             result

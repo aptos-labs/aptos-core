@@ -81,12 +81,15 @@ impl BlockStore {
         &self,
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
+        sync_commit_certs: bool,
     ) -> anyhow::Result<()> {
-        self.sync_to_highest_commit_cert(
-            sync_info.highest_commit_cert().ledger_info(),
-            &retriever.network,
-        )
-        .await;
+        if sync_commit_certs {
+            self.sync_to_highest_commit_cert(
+                sync_info.highest_commit_cert().ledger_info(),
+                &retriever.network,
+            )
+            .await;
+        }
         self.sync_to_highest_ordered_cert(
             sync_info.highest_ordered_cert().clone(),
             sync_info.highest_commit_cert().clone(),
