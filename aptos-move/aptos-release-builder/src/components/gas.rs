@@ -58,13 +58,15 @@ pub fn generate_gas_upgrade_proposal(
             if is_testnet && next_execution_hash.is_empty() {
                 emitln!(
                     writer,
-                    "gas_schedule::set_gas_schedule(framework_signer, gas_schedule_blob);"
+                    "gas_schedule::set_for_next_epoch(framework_signer, gas_schedule_blob);"
                 );
+                emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
             } else {
                 emitln!(
                     writer,
-                    "gas_schedule::set_gas_schedule(&framework_signer, gas_schedule_blob);"
+                    "gas_schedule::set_for_next_epoch(&framework_signer, gas_schedule_blob);"
                 );
+                emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
             }
         },
     );

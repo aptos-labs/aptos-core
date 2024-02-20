@@ -3,14 +3,11 @@
 use crate::{
     randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
     smoke_test_environment::SwarmBuilder,
-    utils::get_current_consensus_config,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState, on_chain_config::FeatureFlag};
-use aptos_vm_genesis::default_features_resource_for_genesis;
+use aptos_types::{dkg::DKGState, randomness::PerBlockRandomness};
 use std::{sync::Arc, time::Duration};
-use aptos_types::randomness::PerBlockRandomness;
 
 /// Disable on-chain randomness by only disabling feature `RECONFIGURE_WITH_DKG`.
 #[tokio::test]
