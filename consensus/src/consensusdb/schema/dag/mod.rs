@@ -7,7 +7,7 @@
 
 use crate::{
     consensusdb::schema::ensure_slice_len_eq,
-    dag::{CertifiedNode, Node, NodeId, Vote},
+    dag::{CertifiedNode, Node, NodeId, NodeMessage, Vote},
     define_schema,
 };
 use anyhow::Result;
@@ -34,6 +34,31 @@ impl KeyCodec<NodeSchema> for () {
 }
 
 impl ValueCodec<NodeSchema> for Node {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+pub const NODE_MSG_CF_NAME: ColumnFamilyName = "node_msg";
+
+define_schema!(NodeMsgSchema, (), NodeMessage, NODE_MSG_CF_NAME);
+
+impl KeyCodec<NodeMsgSchema> for () {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(vec![])
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        ensure_slice_len_eq(data, size_of::<Self>())?;
+        Ok(())
+    }
+}
+
+impl ValueCodec<NodeMsgSchema> for NodeMessage {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(bcs::to_bytes(&self)?)
     }

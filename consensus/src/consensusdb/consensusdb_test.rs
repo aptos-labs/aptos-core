@@ -4,7 +4,7 @@
 
 use self::schema::dag::NodeSchema;
 use super::*;
-use crate::dag::{CertifiedNode, Extensions, Node, Vote};
+use crate::dag::{CertifiedNode, Extensions, Node, NodeMessage, Vote};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
@@ -105,6 +105,9 @@ fn test_dag() {
         Extensions::empty(),
     );
     test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>((), node.clone(), &db);
+
+    let node_msg = NodeMessage::new(node.clone(), None);
+    test_dag_type::<NodeMsgSchema, <NodeMsgSchema as Schema>::Key>((), node_msg, &db);
 
     let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());
     test_dag_type::<CertifiedNodeSchema, <CertifiedNodeSchema as Schema>::Key>(
