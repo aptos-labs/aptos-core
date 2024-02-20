@@ -8,6 +8,7 @@ use crate::{
 use aptos_consensus_types::{
     block::Block,
     common::{DataStatus, Payload, ProofWithData},
+    dag_payload::{DAGPayloadBundle, PayloadLinkMsg},
     proof_of_store::ProofOfStore,
 };
 use aptos_crypto::HashValue;
@@ -16,10 +17,51 @@ use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::channel::mpsc::Sender;
 use std::sync::Arc;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc::UnboundedSender, oneshot};
 
 pub trait TPayloadManager: Send + Sync {
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
+}
+
+pub struct DAGLink {
+    dag_payload_link_tx: UnboundedSender<PayloadLinkMsg>,
+}
+
+impl DAGLink {
+    #[allow(unused)]
+    pub fn new(tx: UnboundedSender<PayloadLinkMsg>) -> Self {
+        Self {
+            dag_payload_link_tx: tx,
+        }
+    }
+
+    async fn get_transactions(
+        &self,
+        bundle: DAGPayloadBundle,
+    ) -> ExecutorResult<Vec<SignedTransaction>> {
+        debug!("get_transactions {:?}", bundle);
+        let len = bundle.len();
+        // TODO: implement timeouts
+        let (tx, rx) = oneshot::channel();
+        let msg = PayloadLinkMsg::new(bundle, tx);
+        self.dag_payload_link_tx
+            .send(msg)
+            .map_err(|e| ExecutorError::internal_err(e))?;
+        match rx.await {
+            Ok(Ok(txns)) => {
+                assert_eq!(txns.len(), len);
+                Ok(txns)
+            },
+            Ok(Err(err)) => {
+                error!("unable to get payload {}", err);
+                Err(ExecutorError::CouldNotGetData)
+            },
+            Err(e) => {
+                error!("channel closed. DAG is changing mode potentially");
+                Err(ExecutorError::internal_err(e))
+            },
+        }
+    }
 }
 
 /// Responsible to extract the transactions out of the payload and notify QuorumStore about commits.
@@ -27,6 +69,8 @@ pub trait TPayloadManager: Send + Sync {
 pub enum PayloadManager {
     DirectMempool,
     InQuorumStore(Arc<dyn BatchReader>, Sender<CoordinatorCommand>),
+    #[allow(unused)]
+    DAG(Arc<DAGLink>),
 }
 
 impl TPayloadManager for PayloadManager {
@@ -71,7 +115,7 @@ impl PayloadManager {
                 let batches: Vec<_> = payloads
                     .into_iter()
                     .flat_map(|payload| match payload {
-                        Payload::DirectMempool(_) => {
+                        Payload::DirectMempool(_) | Payload::DAG(_) => {
                             unreachable!("InQuorumStore should be used");
                         },
                         Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
@@ -93,6 +137,9 @@ impl PayloadManager {
                         e
                     );
                 }
+            },
+            PayloadManager::DAG(_) => {
+                // Notification happens via state computer commit callback
             },
         }
     }
@@ -124,9 +171,12 @@ impl PayloadManager {
                         batch_reader.clone(),
                     );
                 },
-                Payload::DirectMempool(_) => {
+                Payload::DirectMempool(_) | Payload::DAG(_) => {
                     unreachable!()
                 },
+            },
+            PayloadManager::DAG(_) => {
+                // DAG will call prefetch directly internally
             },
         }
     }
@@ -239,6 +289,9 @@ impl PayloadManager {
                 .await?,
                 proof_with_data.max_txns_to_execute,
             )),
+            (PayloadManager::DAG(link), Payload::DAG(bundle)) => {
+                Ok((link.get_transactions(bundle.clone()).await?, None))
+            },
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,

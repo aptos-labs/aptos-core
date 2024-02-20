@@ -345,11 +345,11 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
-            if !payload.is_direct()
+            if payload.is_in_quorum_store()
                 && max_txns_from_block_to_execute.is_some()
                 && payload.len() > max_txns_from_block_to_execute.unwrap()
             {
-                payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
+                payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute)?;
             }
             (validator_txns, payload, timestamp.as_micros() as u64)
         };
