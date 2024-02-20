@@ -6,9 +6,8 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState};
+use aptos_types::{dkg::DKGState, randomness::PerBlockRandomness};
 use std::{sync::Arc, time::Duration};
-use aptos_types::randomness::PerBlockRandomness;
 
 /// Disable on-chain randomness by only disabling feature `RECONFIGURE_WITH_DKG`.
 #[tokio::test]
