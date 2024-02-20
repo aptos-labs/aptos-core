@@ -12,9 +12,9 @@ use aptos_vm_genesis::default_features_resource_for_genesis;
 use std::{sync::Arc, time::Duration};
 use aptos_types::randomness::PerBlockRandomness;
 
-/// Disable on-chain randomness by only disabling feature `RECONFIGURE_WITH_DKG`.
+/// Disable on-chain randomness by only disabling validator transactions.
 #[tokio::test]
-async fn disable_feature_0() {
+async fn disable_feature_1() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
@@ -40,23 +40,32 @@ async fn disable_feature_0() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Disabling feature RECONFIGURE_WITH_DKG.");
-    let disable_dkg_script = r#"
-script {
+    info!("Now in epoch 3. Disabling validator transactions.");
+    let mut config = get_current_consensus_config(&client).await;
+    assert!(config.is_vtxn_enabled());
+    config.disable_validator_txns();
+    let config_bytes = bcs::to_bytes(&config).unwrap();
+    let disable_vtxn_script = format!(
+        r#"
+script {{
     use aptos_framework::aptos_governance;
-    fun main(core_resources: &signer) {
+    use aptos_framework::consensus_config;
+    fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = std::features::get_reconfigure_with_dkg_feature();
-        aptos_governance::toggle_features(&framework_signer, vector[], vector[dkg_feature_id]);
-    }
-}
-"#;
-
+        let config_bytes = vector{:?};
+        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
+        aptos_governance::reconfigure(&framework_signer);
+    }}
+}}
+"#,
+        config_bytes
+    );
+    debug!("disable_vtxn_script={}", disable_vtxn_script);
     let txn_summary = cli
-        .run_script(root_idx, disable_dkg_script)
+        .run_script(root_idx, disable_vtxn_script.as_str())
         .await
         .expect("Txn execution error.");
-    debug!("disabling_dkg_summary={:?}", txn_summary);
+    debug!("disabling_vtxn_summary={:?}", txn_summary);
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))

@@ -19,6 +19,7 @@ use std::{collections::HashMap, time::Duration};
 use tokio::time::Instant;
 
 mod disable_feature_0;
+mod disable_feature_1;
 mod dkg_basic;
 mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
