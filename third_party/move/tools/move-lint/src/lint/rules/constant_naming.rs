@@ -1,3 +1,6 @@
+//! `ConstantNamingVisitor` enforces a naming convention for constants in Move programs,
+//! requiring them to follow an ALL_CAPS_SNAKE_CASE format. This lint checks each constant's name
+//! within a module against this convention.
 use crate::lint::{utils::add_diagnostic_and_emit, visitor::ExpressionAnalysisVisitor};
 use move_model::model::{GlobalEnv, ModuleEnv, NamedConstantEnv};
 

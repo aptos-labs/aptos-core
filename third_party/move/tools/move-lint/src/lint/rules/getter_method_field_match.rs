@@ -1,3 +1,9 @@
+//! The lint identifies public getter methods in Move programs that do not
+//! adhere to naming and return type conventions. It ensures that the name and return type of a
+//! getter method correspond to the field it accesses. This lint checks each public method with
+//! zero or one parameter to see if it returns a field's value directly. If a method's name or
+//! return type does not match the field it returns, a warning is issued. This promotes better
+//! code practices by ensuring getter methods are clearly associated with the fields they access.
 use crate::lint::{utils::add_diagnostic_and_emit, visitor::ExpressionAnalysisVisitor};
 use move_model::{
     ast::{Exp, ExpData, Operation},

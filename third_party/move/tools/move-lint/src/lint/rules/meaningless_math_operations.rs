@@ -1,3 +1,5 @@
+//! `MeaninglessMathOperationsVisitor` detects and warns about operations in Move programs that have no effect, such as adding zero. 
+//! It aims to improve code clarity by identifying operations that can be simplified or removed.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{Exp, ExpData, Operation, Value};

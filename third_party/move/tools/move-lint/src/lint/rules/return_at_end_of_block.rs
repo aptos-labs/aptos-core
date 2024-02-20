@@ -1,3 +1,5 @@
+//! This lint identifies and warns about redundant return statements at the end of functions in Move programs.
+//! It aims to improve code clarity by suggesting the removal of unnecessary return expressions.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::ExpData;

@@ -1,3 +1,5 @@
+//! This lint detects and warns about out-of-bounds indexing attempts on arrays in Move programs.
+//! It specifically checks for accesses beyond the length of arrays via `vector::borrow` and `vector::borrow_mut` functions.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{Exp, ExpData, Operation, Pattern, Value};

@@ -1,3 +1,9 @@
+//! The lint identifies and warns about explicit self-assignments
+//! in Move programs, such as `x = x;`. These assignments are redundant and do not affect the
+//! program's logic. By detecting these patterns, the lint encourages cleaner and more efficient
+//! code by suggesting the removal of unnecessary self-assignments. This lint enhances code
+//! quality by focusing on eliminating operations that have no effect, thereby improving
+//! readability and maintainability.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{ExpData, Pattern};

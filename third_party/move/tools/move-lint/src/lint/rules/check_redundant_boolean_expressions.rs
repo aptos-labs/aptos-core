@@ -1,3 +1,8 @@
+//! The `RedundantBooleanExpressions` lint checks for boolean expressions
+//! in Move code that are unnecessarily complex and can be simplified.
+//! It focuses on identifying patterns where a boolean value (`true` or `false`)
+//! is used in conjunction with logical operators (`&&` or `||`) in a way that
+//! does not affect the outcome of the expression.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{Exp, ExpData, Operation, Value};

@@ -1,3 +1,5 @@
+//! `InfiniteLoopDetectorVisitor` identifies potential infinite loops in Move programs by checking for loops without 'break' or 'return'.
+//! It warns about any `loop` constructs that may run indefinitely, promoting better control flow and program safety.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{Exp, ExpData};

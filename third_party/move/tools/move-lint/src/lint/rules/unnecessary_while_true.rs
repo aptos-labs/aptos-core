@@ -1,3 +1,5 @@
+//! This lint identifies and warns about `while(true)` loops in Move programs, suggesting the use of `loop` for clarity.
+//! It enhances code readability by recommending a more idiomatic loop construct.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{ExpData, Value};

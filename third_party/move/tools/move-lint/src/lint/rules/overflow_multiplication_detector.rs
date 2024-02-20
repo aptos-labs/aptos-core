@@ -1,5 +1,6 @@
+//! `OverflowMultiplicationDetectorVisitor` identifies and warns about potential overflow in multiplication operations in Move programs.
+//! It leverages declared variable values and type information to predict overflow possibilities.
 use std::collections::BTreeMap;
-
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
 use move_model::ast::{Exp, ExpData, Operation, Pattern, Value};
