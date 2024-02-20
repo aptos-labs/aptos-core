@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd"
+checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
 dependencies = [
  "getrandom 0.2.11",
  "once_cell",
@@ -92,9 +92,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c3a9648d43b9cd48db467b3f87fdd6e146bcc88ab0180006cef2179fe11d01"
+checksum = "42cd52102d3df161c77a887b608d7a4897d7cc112886a9537b738a887a03aaff"
 dependencies = [
  "cfg-if",
  "getrandom 0.2.11",
@@ -2796,6 +2796,7 @@ dependencies = [
  "derivative",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "proptest",
  "proptest-derive 0.4.0",
  "rayon",
@@ -4400,6 +4401,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "rand 0.7.3",
  "serde",
  "test-case",
@@ -8577,7 +8579,7 @@ version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "114a100a9aa9f4c468a7b9e96626cdab267bb652660d8408e8f6d56d4c310edd"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "camino",
  "cargo_metadata 0.18.1",
  "cfg-if",
@@ -8697,7 +8699,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
- "ahash 0.7.7",
+ "ahash 0.7.8",
 ]
 
 [[package]]
@@ -8706,7 +8708,7 @@ version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
 ]
 
 [[package]]
@@ -8715,7 +8717,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "allocator-api2",
 ]
 
@@ -9328,7 +9330,7 @@ version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "321f0f839cd44a4686e9504b0a62b4d69a50b62072144c71c68f5873c167b8d9"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "clap 4.4.14",
  "crossbeam-channel",
  "crossbeam-utils",
@@ -9372,7 +9374,7 @@ version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
- "ahash 0.7.7",
+ "ahash 0.7.8",
  "dashmap",
  "hashbrown 0.12.3",
  "once_cell",
@@ -12980,7 +12982,7 @@ name = "processor"
 version = "1.0.0"
 source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "anyhow",
  "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2)",
  "aptos-protos 1.1.2",
