@@ -265,8 +265,11 @@ module aptos_framework::account {
         borrow_global<Account>(addr).authentication_key
     }
 
-    /// This function is used to rotate a resource account's authentication key to 0, so that no private key can control
-    /// the resource account.
+    /// This function is used to rotate a resource account's authentication key to `new_auth_key`. This is done in
+    /// many contexts:
+    /// 1. During normal key rotation via `rotate_authentication_key` or `rotate_authentication_key_call`
+    /// 2. During resource account initialization so that no private key can control the resource account
+    /// 3. During multisig_v2 account creation
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
@@ -278,9 +281,11 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    /// Entry function-only rotation key function that allows the signer update their authentication_key. Note, this does not update the
-    /// OriginatingAddress because the new_auth_key is not verified. This is imperative because of the introduction of non-standard key
-    /// algorithms such as passkeys, which cannot produce proofs used in `rotate_authentication_key`.
+    /// Private entry function for key rotation that allows the signer to update their authentication key.
+    /// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+    /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+    /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+    /// the format expected in `rotate_authentication_key`.
     entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account {
         rotate_authentication_key_internal(account, new_auth_key);
     }
