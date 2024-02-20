@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dag::types::{CertifiedNode, DagPayload, Extensions, Node, NodeCertificate},
+    dag::{
+        types::{CertifiedNode, DagPayload, Extensions, Node, NodeCertificate},
+        NodeMessage,
+    },
     payload_manager::TPayloadManager,
 };
 use aptos_consensus_types::common::{Author, Payload, Round};
@@ -74,6 +77,16 @@ pub(crate) fn new_node_with_empty_payload(
         Payload::empty(false).into(),
         parents,
     )
+}
+
+pub(crate) fn new_node_message_inline_payload(
+    round: Round,
+    timestamp: u64,
+    author: Author,
+    parents: Vec<NodeCertificate>,
+) -> NodeMessage {
+    let node = new_node_with_empty_payload(round, timestamp, author, parents);
+    NodeMessage::new(node, None)
 }
 
 /// Generate certified nodes for dag given the virtual dag

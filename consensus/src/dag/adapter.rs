@@ -10,12 +10,11 @@ use super::{
 use crate::{
     consensusdb::{
         CertifiedNodeSchema, ConsensusDB, DagVoteSchema, DecoupledPayloadSchema, NodeMsgSchema,
-        NodeSchema,
     },
     counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
-        CertifiedNode, Node, NodeId, Vote,
+        CertifiedNode, NodeId, Vote,
     },
     pipeline::buffer_manager::OrderedBlocks,
 };
@@ -320,18 +319,6 @@ impl StorageAdapter {
 }
 
 impl DAGStorage for StorageAdapter {
-    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()> {
-        Ok(self.consensus_db.put::<NodeSchema>(&(), node)?)
-    }
-
-    fn get_pending_node(&self) -> anyhow::Result<Option<Node>> {
-        Ok(self.consensus_db.get::<NodeSchema>(&())?)
-    }
-
-    fn delete_pending_node(&self) -> anyhow::Result<()> {
-        Ok(self.consensus_db.delete::<NodeSchema>(vec![()])?)
-    }
-
     fn save_pending_node_msg(&self, node_msg: &NodeMessage) -> anyhow::Result<()> {
         Ok(self.consensus_db.put::<NodeMsgSchema>(&(), node_msg)?)
     }

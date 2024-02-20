@@ -452,8 +452,15 @@ impl NodeMessage {
         &self.node
     }
 
-    pub fn payload(&self) -> Option<&DecoupledPayload> {
+    pub fn decoupled_payload(&self) -> Option<&DecoupledPayload> {
         self.decoupled_payload.as_ref()
+    }
+
+    pub fn payload(&self) -> &Payload {
+        match &self.decoupled_payload {
+            Some(payload) => payload.payload(),
+            None => self.node.payload(),
+        }
     }
 
     pub fn unwrap(self) -> (Node, Option<DecoupledPayload>) {
@@ -670,7 +677,7 @@ impl SignatureBuilder {
 
 impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
     type Aggregated = ();
-    type Message = Node;
+    type Message = NodeMessage;
     type Response = Vote;
 
     /// Processes the [Vote]s received for a given [Node]. Once a supermajority voting power
@@ -986,7 +993,7 @@ impl core::fmt::Debug for DAGNetworkMessage {
 
 #[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
 pub enum DAGMessage {
-    NodeMsg(Node),
+    NodeMsg(NodeMessage),
     VoteMsg(Vote),
     CertifiedNodeMsg(CertifiedNodeMessage),
     CertifiedAckMsg(CertifiedAck),

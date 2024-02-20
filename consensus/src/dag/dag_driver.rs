@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff};
+use super::{dag_store::DagStore, health::HealthBackoff, NodeMessage};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -82,7 +82,7 @@ impl DagDriver {
         quorum_store_enabled: bool,
     ) -> Self {
         let pending_node = storage
-            .get_pending_node()
+            .get_pending_node_msg()
             .expect("should be able to read dag storage");
         let highest_strong_links_round =
             dag.read().highest_strong_links_round(&epoch_state.verifier);
@@ -288,30 +288,31 @@ impl DagDriver {
             strong_links,
             Extensions::empty(),
         );
+        let new_node_msg = NodeMessage::new(new_node, None);
         self.storage
-            .save_pending_node(&new_node)
+            .save_pending_node_msg(&new_node_msg)
             .expect("node must be saved");
-        self.broadcast_node(new_node);
+        self.broadcast_node(new_node_msg);
     }
 
-    fn broadcast_node(&self, node: Node) {
+    fn broadcast_node(&self, node_msg: NodeMessage) {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let (tx, rx) = oneshot::channel();
         let signature_builder =
-            SignatureBuilder::new(node.metadata().clone(), self.epoch_state.clone(), tx);
+            SignatureBuilder::new(node_msg.metadata().clone(), self.epoch_state.clone(), tx);
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.clone();
 
-        let round = node.round();
-        let node_clone = node.clone();
-        let timestamp = node.timestamp();
+        let round = node_msg.round();
+        let node_clone = node_msg.node().clone();
+        let timestamp = node_msg.timestamp();
         let node_broadcast = async move {
-            debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
+            debug!(LogSchema::new(LogEvent::BroadcastNode), id = node_msg.id());
 
             defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
-            rb.broadcast(node, signature_builder).await
+            rb.broadcast(node_msg, signature_builder).await
         };
         let certified_broadcast = async move {
             let Ok(certificate) = rx.await else {

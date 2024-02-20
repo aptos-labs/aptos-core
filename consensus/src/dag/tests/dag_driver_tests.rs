@@ -99,7 +99,7 @@ impl TLedgerInfoProvider for MockLedgerInfoProvider {
 struct MockFetchRequester {}
 
 impl TFetchRequester for MockFetchRequester {
-    fn request_for_node(&self, _node: crate::dag::Node) -> anyhow::Result<()> {
+    fn request_for_node(&self, _node: crate::dag::NodeMessage) -> anyhow::Result<()> {
         unimplemented!()
     }
 

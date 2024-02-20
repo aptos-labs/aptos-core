@@ -1,13 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, DAGRpcResult};
+use super::{dag_store::DagStore, types::NodeMessage, DAGRpcResult};
 use crate::dag::{
-    dag_network::{RpcResultWithResponder, TDAGNetworkSender},
-    errors::FetchRequestHandleError,
-    observability::logging::{LogEvent, LogSchema},
-    types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
-    RpcHandler, RpcWithFallback,
+    dag_network::{RpcResultWithResponder, TDAGNetworkSender}, errors::FetchRequestHandleError, observability::logging::{LogEvent, LogSchema}, types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest}, RpcHandler, RpcWithFallback
 };
 use anyhow::{anyhow, ensure};
 use aptos_bitvec::BitVec;
@@ -36,7 +32,7 @@ pub struct FetchWaiter<T> {
 }
 
 impl<T> FetchWaiter<T> {
-    fn new(rx: Receiver<oneshot::Receiver<T>>) -> Self {
+    pub fn new(rx: Receiver<oneshot::Receiver<T>>) -> Self {
         Self {
             rx,
             futures: Box::pin(FuturesUnordered::new()),
@@ -57,18 +53,18 @@ impl<T> Stream for FetchWaiter<T> {
 }
 
 pub trait TFetchRequester: Send + Sync {
-    fn request_for_node(&self, node: Node) -> anyhow::Result<()>;
+    fn request_for_node(&self, node: NodeMessage) -> anyhow::Result<()>;
     fn request_for_certified_node(&self, node: CertifiedNode) -> anyhow::Result<()>;
 }
 
 pub struct FetchRequester {
     request_tx: Sender<LocalFetchRequest>,
-    node_waiter_tx: Sender<oneshot::Receiver<Node>>,
+    node_waiter_tx: Sender<oneshot::Receiver<NodeMessage>>,
     certified_node_waiter_tx: Sender<oneshot::Receiver<CertifiedNode>>,
 }
 
 impl TFetchRequester for FetchRequester {
-    fn request_for_node(&self, node: Node) -> anyhow::Result<()> {
+    fn request_for_node(&self, node: NodeMessage) -> anyhow::Result<()> {
         let (res_tx, res_rx) = oneshot::channel();
         let fetch_req = LocalFetchRequest::Node(node, res_tx);
         self.request_tx
@@ -94,7 +90,7 @@ impl TFetchRequester for FetchRequester {
 
 #[derive(Debug)]
 pub enum LocalFetchRequest {
-    Node(Node, oneshot::Sender<Node>),
+    Node(NodeMessage, oneshot::Sender<NodeMessage>),
     CertifiedNode(CertifiedNode, oneshot::Sender<CertifiedNode>),
 }
 
@@ -144,7 +140,7 @@ impl DagFetcherService {
     ) -> (
         Self,
         FetchRequester,
-        FetchWaiter<Node>,
+        FetchWaiter<NodeMessage>,
         FetchWaiter<CertifiedNode>,
     ) {
         let (request_tx, request_rx) = tokio::sync::mpsc::channel(16);

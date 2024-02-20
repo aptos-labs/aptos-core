@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff};
+use super::{dag_store::DagStore, health::HealthBackoff, NodeMessage};
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
@@ -12,7 +12,7 @@ use crate::{
             tracing::{observe_node, NodeStage},
         },
         storage::DAGStorage,
-        types::{Node, NodeCertificate, Vote},
+        types::{NodeCertificate, Vote},
         NodeId,
     },
     util::is_vtxn_expected,
@@ -103,36 +103,36 @@ impl NodeBroadcastHandler {
         self.storage.delete_votes(to_delete)
     }
 
-    fn validate(&self, node: Node) -> anyhow::Result<Node> {
+    fn validate(&self, node_msg: NodeMessage) -> anyhow::Result<NodeMessage> {
         ensure!(
-            node.epoch() == self.epoch_state.epoch,
+            node_msg.epoch() == self.epoch_state.epoch,
             "different epoch {}, current {}",
-            node.epoch(),
+            node_msg.epoch(),
             self.epoch_state.epoch
         );
 
-        let num_vtxns = node.validator_txns().len() as u64;
+        let num_vtxns = node_msg.validator_txns().len() as u64;
         ensure!(num_vtxns <= self.vtxn_config.per_block_limit_txn_count());
-        for vtxn in node.validator_txns() {
+        for vtxn in node_msg.validator_txns() {
             ensure!(
                 is_vtxn_expected(&self.features, vtxn),
                 "unexpected validator transaction: {:?}",
                 vtxn.topic()
             );
         }
-        let vtxn_total_bytes = node
+        let vtxn_total_bytes = node_msg
             .validator_txns()
             .iter()
             .map(ValidatorTransaction::size_in_bytes)
             .sum::<usize>() as u64;
         ensure!(vtxn_total_bytes <= self.vtxn_config.per_block_limit_total_bytes());
 
-        let num_txns = num_vtxns + node.payload().len() as u64;
-        let txn_bytes = vtxn_total_bytes + node.payload().size() as u64;
+        let num_txns = num_vtxns + node_msg.payload().len() as u64;
+        let txn_bytes = vtxn_total_bytes + node_msg.payload().size() as u64;
         ensure!(num_txns <= self.payload_config.max_receiving_txns_per_round);
         ensure!(txn_bytes <= self.payload_config.max_receiving_size_per_round_bytes);
 
-        let current_round = node.metadata().round();
+        let current_round = node_msg.metadata().round();
 
         let dag_reader = self.dag.read();
         let lowest_round = dag_reader.lowest_round();
@@ -143,7 +143,7 @@ impl NodeBroadcastHandler {
         );
 
         // check which parents are missing in the DAG
-        let missing_parents: Vec<NodeCertificate> = node
+        let missing_parents: Vec<NodeCertificate> = node_msg
             .parents()
             .iter()
             .filter(|parent| !dag_reader.exists(parent.metadata()))
@@ -165,14 +165,14 @@ impl NodeBroadcastHandler {
             // Don't issue fetch requests for parents of the lowest round in the DAG
             // because they are already GC'ed
             if current_round > lowest_round {
-                if let Err(err) = self.fetch_requester.request_for_node(node) {
+                if let Err(err) = self.fetch_requester.request_for_node(node_msg) {
                     error!("request to fetch failed: {}", err);
                 }
                 bail!(NodeBroadcastHandleError::MissingParents);
             }
         }
 
-        Ok(node)
+        Ok(node_msg)
     }
 }
 
@@ -203,16 +203,16 @@ fn read_votes_from_storage(
 
 #[async_trait]
 impl RpcHandler for NodeBroadcastHandler {
-    type Request = Node;
+    type Request = NodeMessage;
     type Response = Vote;
 
-    async fn process(&self, node: Self::Request) -> anyhow::Result<Self::Response> {
+    async fn process(&self, node_msg: Self::Request) -> anyhow::Result<Self::Response> {
         ensure!(
             !self.health_backoff.stop_voting(),
             NodeBroadcastHandleError::VoteRefused
         );
 
-        let key = (node.round(), *node.author());
+        let key = (node_msg.round(), *node_msg.author());
         ensure!(
             self.votes_fine_grained_lock.insert(key),
             "concurrent insertion"
@@ -221,7 +221,8 @@ impl RpcHandler for NodeBroadcastHandler {
             assert_some!(self.votes_fine_grained_lock.remove(&key));
         });
 
-        let node = self.validate(node)?;
+        let node_msg = self.validate(node_msg)?;
+        let (node, _payload) = node_msg.unwrap();
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
             .remote_peer(*node.author())
@@ -236,6 +237,8 @@ impl RpcHandler for NodeBroadcastHandler {
         {
             return Ok(ack.clone());
         }
+
+        // TODO: send payload to PayloadManager
 
         let signature = node.sign_vote(&self.signer)?;
         let vote = Vote::new(node.metadata().clone(), signature);

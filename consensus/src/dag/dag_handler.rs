@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use super::NodeMessage;
 use crate::{
     dag::{
         dag_driver::DagDriver,
@@ -12,7 +13,7 @@ use crate::{
         },
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
-        CertifiedNode, Node,
+        CertifiedNode,
     },
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
@@ -30,7 +31,7 @@ pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
     node_receiver: Arc<NodeBroadcastHandler>,
     dag_driver: Arc<DagDriver>,
-    node_fetch_waiter: FetchWaiter<Node>,
+    node_fetch_waiter: FetchWaiter<NodeMessage>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
     new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     verified_msg_processor: Arc<VerifiedMessageProcessor>,
@@ -42,7 +43,7 @@ impl NetworkHandler {
         node_receiver: NodeBroadcastHandler,
         dag_driver: DagDriver,
         fetch_receiver: FetchRequestHandler,
-        node_fetch_waiter: FetchWaiter<Node>,
+        node_fetch_waiter: FetchWaiter<NodeMessage>,
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
         state_sync_trigger: StateSyncTrigger,
         new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
