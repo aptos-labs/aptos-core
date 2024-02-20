@@ -60,7 +60,7 @@ struct NodeWithoutDigest<'a> {
     author: Author,
     timestamp: u64,
     validator_txns: &'a Vec<ValidatorTransaction>,
-    payload: &'a Payload,
+    payload: &'a DagPayload,
     parents: &'a Vec<NodeCertificate>,
     extensions: &'a Extensions,
 }
@@ -148,12 +148,47 @@ impl Deref for NodeMetadata {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
+pub enum DagPayload {
+    Inline(Payload),
+}
+
+impl DagPayload {
+    pub fn len(&self) -> usize {
+        match self {
+            DagPayload::Inline(payload) => payload.len(),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            DagPayload::Inline(payload) => payload.size(),
+        }
+    }
+}
+
+impl Deref for DagPayload {
+    type Target = Payload;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            DagPayload::Inline(payload) => payload,
+        }
+    }
+}
+
+impl From<Payload> for DagPayload {
+    fn from(payload: Payload) -> Self {
+        Self::Inline(payload)
+    }
+}
+
 /// Node representation in the DAG, parents contain 2f+1 strong links (links to previous round)
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {
     metadata: NodeMetadata,
     validator_txns: Vec<ValidatorTransaction>,
-    payload: Payload,
+    payload: DagPayload,
     parents: Vec<NodeCertificate>,
     extensions: Extensions,
 }
@@ -165,7 +200,7 @@ impl Node {
         author: Author,
         timestamp: u64,
         validator_txns: Vec<ValidatorTransaction>,
-        payload: Payload,
+        payload: DagPayload,
         parents: Vec<NodeCertificate>,
         extensions: Extensions,
     ) -> Self {
@@ -200,7 +235,7 @@ impl Node {
     #[cfg(test)]
     pub fn new_for_test(
         metadata: NodeMetadata,
-        payload: Payload,
+        payload: DagPayload,
         parents: Vec<NodeCertificate>,
         extensions: Extensions,
     ) -> Self {
@@ -220,7 +255,7 @@ impl Node {
         author: Author,
         timestamp: u64,
         validator_txns: &Vec<ValidatorTransaction>,
-        payload: &Payload,
+        payload: &DagPayload,
         parents: &Vec<NodeCertificate>,
         extensions: &Extensions,
     ) -> HashValue {
@@ -290,7 +325,7 @@ impl Node {
         self.metadata.round
     }
 
-    pub fn payload(&self) -> &Payload {
+    pub fn payload(&self) -> &DagPayload {
         &self.payload
     }
 

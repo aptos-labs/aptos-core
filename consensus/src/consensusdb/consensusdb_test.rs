@@ -100,7 +100,7 @@ fn test_dag() {
         Author::random(),
         123,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false).into(),
         vec![],
         Extensions::empty(),
     );
