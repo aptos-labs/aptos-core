@@ -3,9 +3,9 @@
 
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
-
+use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -113,6 +113,17 @@ impl Features {
     pub fn disable(&mut self, flag: FeatureFlag) {
         let (byte_index, bit_mask) = self.resize_for_flag(flag);
         self.features[byte_index] &= !bit_mask;
+    }
+
+    pub fn into_flag_vec(self) -> Vec<FeatureFlag> {
+        let Self { features } = self;
+        features
+            .into_iter()
+            .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
+            .enumerate()
+            .filter(|(_feature_idx, enabled)| *enabled)
+            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .collect()
     }
 
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
