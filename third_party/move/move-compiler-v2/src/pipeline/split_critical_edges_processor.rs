@@ -11,7 +11,7 @@
 //!
 //! Postconditions: no critical edges in the control flow graph.
 
-use log::log_enabled;
+use log::{log_enabled, Level};
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::FunctionData,
