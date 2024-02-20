@@ -26,7 +26,7 @@ pub(crate) fn new_certified_node(
         author,
         0,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false).into(),
         parents,
         Extensions::empty(),
     );
@@ -45,7 +45,7 @@ pub(crate) fn new_node(
         author,
         timestamp,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false).into(),
         parents,
         Extensions::empty(),
     )

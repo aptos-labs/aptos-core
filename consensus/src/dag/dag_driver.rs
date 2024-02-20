@@ -40,7 +40,7 @@ use futures::{
     future::{join, AbortHandle, Abortable},
 };
 use futures_channel::oneshot;
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashSet, ops::Deref, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
@@ -229,7 +229,7 @@ impl DagDriver {
                     .collect::<Vec<_>>();
 
                 let payload_filter =
-                    PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
+                    PayloadFilter::from(&nodes.iter().map(|node| node.payload().deref()).collect());
                 let validator_txn_hashes = nodes
                     .iter()
                     .flat_map(|node| node.validator_txns())
@@ -284,7 +284,7 @@ impl DagDriver {
             self.author,
             timestamp,
             validator_txns,
-            payload,
+            payload.into(),
             strong_links,
             Extensions::empty(),
         );

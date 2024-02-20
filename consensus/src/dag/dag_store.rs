@@ -18,7 +18,6 @@ use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
-use itertools::max;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Deref,

@@ -39,6 +39,7 @@ use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::{
     collections::{BTreeMap, HashMap},
+    ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -144,7 +145,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let mut node_digests = vec![];
         for node in &ordered_nodes {
             validator_txns.extend(node.validator_txns().clone());
-            payload.extend(node.payload().clone());
+            payload.extend(node.payload().deref().clone());
             node_digests.push(node.digest());
         }
         let parent_block_id = self.parent_block_info.read().id();
