@@ -11,6 +11,7 @@ use crate::{
     define_schema,
 };
 use anyhow::Result;
+use aptos_consensus_types::dag_payload::{DecoupledPayload, PayloadDigest};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
     schema::{KeyCodec, ValueCodec},
@@ -112,6 +113,35 @@ impl KeyCodec<CertifiedNodeSchema> for HashValue {
 }
 
 impl ValueCodec<CertifiedNodeSchema> for CertifiedNode {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+pub const DECOUPLED_PAYLOAD_CF_NAME: ColumnFamilyName = "decoupled_payload";
+
+define_schema!(
+    DecoupledPayloadSchema,
+    PayloadDigest,
+    DecoupledPayload,
+    DECOUPLED_PAYLOAD_CF_NAME
+);
+
+impl KeyCodec<DecoupledPayloadSchema> for PayloadDigest {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<DecoupledPayloadSchema> for DecoupledPayload {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(bcs::to_bytes(&self)?)
     }

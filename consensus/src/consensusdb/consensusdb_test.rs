@@ -7,6 +7,7 @@ use crate::dag::{CertifiedNode, Extensions, Node, NodeMessage, Vote};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
+    dag_payload::DecoupledPayload,
 };
 use aptos_crypto::bls12381::Signature;
 use aptos_temppath::TempPath;
@@ -117,4 +118,11 @@ fn test_dag() {
 
     let vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
     test_dag_type::<DagVoteSchema, <DagVoteSchema as Schema>::Key>(node.id(), vote, &db);
+
+    let decoupled_payload = DecoupledPayload::new(1, 1, Author::random(), Payload::empty(false));
+    test_dag_type::<DecoupledPayloadSchema, <DecoupledPayloadSchema as Schema>::Key>(
+        *decoupled_payload.digest(),
+        decoupled_payload,
+        &db,
+    );
 }
