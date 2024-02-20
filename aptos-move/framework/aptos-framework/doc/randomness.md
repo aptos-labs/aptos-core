@@ -155,10 +155,12 @@ Invoked in block prologues to update the block-level randomness seed.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness.md#0x1_randomness_on_new_block">on_new_block</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch: u64, round: u64, seed_for_new_block: Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;) <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_vm">system_addresses::assert_vm</a>(vm);
-    <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global_mut</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
-    <a href="randomness.md#0x1_randomness">randomness</a>.epoch = epoch;
-    <a href="randomness.md#0x1_randomness">randomness</a>.round = round;
-    <a href="randomness.md#0x1_randomness">randomness</a>.seed = seed_for_new_block;
+    <b>if</b> (<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework)) {
+        <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global_mut</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
+        <a href="randomness.md#0x1_randomness">randomness</a>.epoch = epoch;
+        <a href="randomness.md#0x1_randomness">randomness</a>.round = round;
+        <a href="randomness.md#0x1_randomness">randomness</a>.seed = seed_for_new_block;
+    }
 }
 </code></pre>
 
