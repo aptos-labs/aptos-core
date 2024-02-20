@@ -7,7 +7,9 @@ use aptos_language_e2e_tests::{
     executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
 };
 use aptos_types::{
-    account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    on_chain_config::FeatureFlag,
+    transaction::{SignedTransaction, TransactionOutput},
 };
 use move_core_types::{
     ident_str,
@@ -185,7 +187,7 @@ impl AggV2TestHarness {
         &mut self,
         block_split: BlockSplit,
         txn_block: Vec<(u64, SignedTransaction)>,
-    ) {
+    ) -> Vec<TransactionOutput> {
         let result = self
             .harness
             .run_block_in_parts_and_check(block_split, txn_block.clone());
@@ -194,6 +196,8 @@ impl AggV2TestHarness {
             let new_result = h.run_block_in_parts_and_check(block_split, txn_block.clone());
             assert_outputs_equal(&result, "baseline", &new_result, name);
         }
+
+        result
     }
 
     pub fn initialize_issuer_accounts(&mut self, num_accounts: usize) {

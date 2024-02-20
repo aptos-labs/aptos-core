@@ -50,7 +50,7 @@ fn _setup(
     }
 }
 
-fn setup(
+pub(crate) fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
