@@ -774,7 +774,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            optimize_for_maximum_throughput(config);
+            optimize_for_maximum_throughput(config, 20_000, 1.0, 4.0);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
