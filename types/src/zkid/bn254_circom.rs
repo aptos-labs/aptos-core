@@ -3,7 +3,7 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     serialize,
-    zkid::{Configuration, IdCommitment, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
+    zkid::{Configuration, IdCommitment, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
@@ -14,7 +14,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
-// TODO(zkid): Some of this stuff, if not all, belongs to the aptos-crypto crate
+// TODO(oidb): Some of this stuff, if not all, belongs to the aptos-crypto crate
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
@@ -148,8 +148,8 @@ impl TryInto<G2Affine> for &G2Bytes {
 }
 
 pub fn get_public_inputs_hash(
-    sig: &ZkIdSignature,
-    pk: &ZkIdPublicKey,
+    sig: &OidbSignature,
+    pk: &OidbPublicKey,
     jwk: &RSA_JWK,
     config: &Configuration,
 ) -> anyhow::Result<Fr> {
@@ -240,7 +240,7 @@ pub fn get_public_inputs_hash(
         frs.push(use_override_aud);
         poseidon_bn254::hash_scalars(frs)
     } else {
-        bail!("Cannot get_public_inputs_hash for ZkIdSignature")
+        bail!("Cannot get_public_inputs_hash for OidbSignature")
     }
 }
 

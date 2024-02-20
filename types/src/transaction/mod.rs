@@ -18,7 +18,7 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
-    zkid::{ZkIdPublicKey, ZkIdSignature},
+    zkid::{OidbPublicKey, OidbSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -624,15 +624,15 @@ impl SignedTransaction {
         }
     }
 
-    pub fn new_zkid(
+    pub fn new_oidb(
         raw_txn: RawTransaction,
-        public_key: ZkIdPublicKey,
-        signature: ZkIdSignature,
+        public_key: OidbPublicKey,
+        signature: OidbSignature,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::single_sender(
             AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::zkid(public_key),
-                AnySignature::zkid(signature),
+                AnyPublicKey::oidb(public_key),
+                AnySignature::oidb(signature),
             )),
         );
         SignedTransaction {

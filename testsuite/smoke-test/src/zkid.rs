@@ -21,22 +21,22 @@ use aptos_types::{
     },
     zkid::{
         test_utils::{
-            get_sample_esk, get_sample_iss, get_sample_jwk, get_sample_zkid_groth16_sig_and_pk,
-            get_sample_zkid_openid_sig_and_pk,
+            get_sample_esk, get_sample_iss, get_sample_jwk, get_sample_oidb_groth16_sig_and_pk,
+            get_sample_oidb_openid_sig_and_pk,
         },
-        Configuration, Groth16VerificationKey, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
+        Configuration, Groth16VerificationKey, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig,
     },
 };
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::time::Duration;
 
-// TODO(zkid): Test the override aud_val path
+// TODO(oidb): Test the override aud_val path
 
 #[tokio::test]
-async fn test_zkid_oidc_txn_verifies() {
+async fn test_oidb_oidc_txn_verifies() {
     let (_, _, mut swarm, signed_txn) =
-        get_zkid_transaction(get_sample_zkid_openid_sig_and_pk).await;
+        get_oidb_transaction(get_sample_oidb_openid_sig_and_pk).await;
 
     info!("Submit OpenID transaction");
     let result = swarm
@@ -51,11 +51,11 @@ async fn test_zkid_oidc_txn_verifies() {
 }
 
 #[tokio::test]
-async fn test_zkid_oidc_txn_with_bad_jwt_sig() {
+async fn test_oidb_oidc_txn_with_bad_jwt_sig() {
     let (tw_sk, mut swarm) = setup_local_net().await;
-    let (mut zkid_sig, zkid_pk) = get_sample_zkid_openid_sig_and_pk();
+    let (mut oidb_sig, oidb_pk) = get_sample_oidb_openid_sig_and_pk();
 
-    match &mut zkid_sig.sig {
+    match &mut oidb_sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(_) => panic!("Internal inconsistency"),
         ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
             openid_sig.jwt_sig_b64 = "bad signature".to_string() // Mauling the signature
@@ -63,7 +63,7 @@ async fn test_zkid_oidc_txn_with_bad_jwt_sig() {
     }
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_zkid_transaction(&mut info, zkid_sig, zkid_pk, &tw_sk).await;
+    let signed_txn = sign_oidb_transaction(&mut info, oidb_sig, oidb_pk, &tw_sk).await;
 
     info!("Submit OpenID transaction with bad JWT signature");
     let result = info
@@ -77,14 +77,14 @@ async fn test_zkid_oidc_txn_with_bad_jwt_sig() {
 }
 
 #[tokio::test]
-async fn test_zkid_oidc_txn_with_expired_epk() {
+async fn test_oidb_oidc_txn_with_expired_epk() {
     let (tw_sk, mut swarm) = setup_local_net().await;
-    let (mut zkid_sig, zkid_pk) = get_sample_zkid_openid_sig_and_pk();
+    let (mut oidb_sig, oidb_pk) = get_sample_oidb_openid_sig_and_pk();
 
-    zkid_sig.exp_timestamp_secs = 1; // This should fail the verification since the expiration date is way in the past
+    oidb_sig.exp_timestamp_secs = 1; // This should fail the verification since the expiration date is way in the past
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_zkid_transaction(&mut info, zkid_sig, zkid_pk, &tw_sk).await;
+    let signed_txn = sign_oidb_transaction(&mut info, oidb_sig, oidb_pk, &tw_sk).await;
 
     info!("Submit OpenID transaction with expired EPK");
     let result = info
@@ -98,11 +98,11 @@ async fn test_zkid_oidc_txn_with_expired_epk() {
 }
 
 #[tokio::test]
-async fn test_zkid_groth16_verifies() {
+async fn test_oidb_groth16_verifies() {
     let (_, _, mut swarm, signed_txn) =
-        get_zkid_transaction(get_sample_zkid_groth16_sig_and_pk).await;
+        get_oidb_transaction(get_sample_oidb_groth16_sig_and_pk).await;
 
-    info!("Submit zkID Groth16 transaction");
+    info!("Submit OIDB Groth16 transaction");
     let result = swarm
         .aptos_public_info()
         .client()
@@ -110,16 +110,16 @@ async fn test_zkid_groth16_verifies() {
         .await;
 
     if let Err(e) = result {
-        panic!("Error with zkID Groth16 TXN verification: {:?}", e)
+        panic!("Error with OIDB Groth16 TXN verification: {:?}", e)
     }
 }
 
 #[tokio::test]
-async fn test_zkid_groth16_with_mauled_proof() {
+async fn test_oidb_groth16_with_mauled_proof() {
     let (tw_sk, mut swarm) = setup_local_net().await;
-    let (mut zkid_sig, zkid_pk) = get_sample_zkid_groth16_sig_and_pk();
+    let (mut oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
 
-    match &mut zkid_sig.sig {
+    match &mut oidb_sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => {
             proof.non_malleability_signature =
                 EphemeralSignature::ed25519(tw_sk.sign(&proof.proof).unwrap()); // bad signature using the TW SK rather than the ESK
@@ -128,30 +128,30 @@ async fn test_zkid_groth16_with_mauled_proof() {
     }
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_zkid_transaction(&mut info, zkid_sig, zkid_pk, &tw_sk).await;
+    let signed_txn = sign_oidb_transaction(&mut info, oidb_sig, oidb_pk, &tw_sk).await;
 
-    info!("Submit zkID Groth16 transaction");
+    info!("Submit OIDB Groth16 transaction");
     let result = info
         .client()
         .submit_without_serializing_response(&signed_txn)
         .await;
 
     if result.is_ok() {
-        panic!("zkID Groth16 TXN with mauled proof should have failed verification")
+        panic!("OIDB Groth16 TXN with mauled proof should have failed verification")
     }
 }
 
 #[tokio::test]
-async fn test_zkid_groth16_with_bad_tw_signature() {
+async fn test_oidb_groth16_with_bad_tw_signature() {
     let (_tw_sk, mut swarm) = setup_local_net().await;
-    let (zkid_sig, zkid_pk) = get_sample_zkid_groth16_sig_and_pk();
+    let (oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
 
     // using the sample ESK rather than the TW SK to get a bad training wheels signature
-    let signed_txn = sign_zkid_transaction(&mut info, zkid_sig, zkid_pk, &get_sample_esk()).await;
+    let signed_txn = sign_oidb_transaction(&mut info, oidb_sig, oidb_pk, &get_sample_esk()).await;
 
-    info!("Submit zkID Groth16 transaction");
+    info!("Submit OIDB Groth16 transaction");
     let result = info
         .client()
         .submit_without_serializing_response(&signed_txn)
@@ -159,22 +159,22 @@ async fn test_zkid_groth16_with_bad_tw_signature() {
 
     if result.is_ok() {
         panic!(
-            "zkID Groth16 TXN with bad training wheels signature should have failed verification"
+            "OIDB Groth16 TXN with bad training wheels signature should have failed verification"
         )
     }
 }
 
-async fn sign_zkid_transaction<'a>(
+async fn sign_oidb_transaction<'a>(
     info: &mut AptosPublicInfo<'a>,
-    mut zkid_sig: ZkIdSignature,
-    zkid_pk: ZkIdPublicKey,
+    mut oidb_sig: OidbSignature,
+    oidb_pk: OidbPublicKey,
     tw_sk: &Ed25519PrivateKey,
 ) -> SignedTransaction {
-    let zkid_addr = info
-        .create_user_account_with_any_key(&AnyPublicKey::zkid(zkid_pk.clone()))
+    let oidb_addr = info
+        .create_user_account_with_any_key(&AnyPublicKey::oidb(oidb_pk.clone()))
         .await
         .unwrap();
-    info.mint(zkid_addr, 10_000_000_000).await.unwrap();
+    info.mint(oidb_addr, 10_000_000_000).await.unwrap();
 
     let recipient = info
         .create_and_fund_user_account(20_000_000_000)
@@ -184,15 +184,15 @@ async fn sign_zkid_transaction<'a>(
     let raw_txn = info
         .transaction_factory()
         .payload(aptos_stdlib::aptos_coin_transfer(recipient.address(), 100))
-        .sender(zkid_addr)
+        .sender(oidb_addr)
         .sequence_number(1)
         .build();
 
     let esk = get_sample_esk();
-    zkid_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+    oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
     // Compute the training wheels signature if not present
-    match &mut zkid_sig.sig {
+    match &mut oidb_sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => {
             proof.training_wheels_signature = Some(EphemeralSignature::ed25519(
                 tw_sk.sign(&proof.proof).unwrap(),
@@ -201,21 +201,21 @@ async fn sign_zkid_transaction<'a>(
         ZkpOrOpenIdSig::OpenIdSig(_) => {},
     }
 
-    SignedTransaction::new_zkid(raw_txn, zkid_pk, zkid_sig)
+    SignedTransaction::new_oidb(raw_txn, oidb_pk, oidb_sig)
 }
 
-async fn get_zkid_transaction(
-    get_pk_and_sig_func: fn() -> (ZkIdSignature, ZkIdPublicKey),
-) -> (ZkIdSignature, ZkIdPublicKey, LocalSwarm, SignedTransaction) {
+async fn get_oidb_transaction(
+    get_pk_and_sig_func: fn() -> (OidbSignature, OidbPublicKey),
+) -> (OidbSignature, OidbPublicKey, LocalSwarm, SignedTransaction) {
     let (tw_sk, mut swarm) = setup_local_net().await;
 
-    let (zkid_sig, zkid_pk) = get_pk_and_sig_func();
+    let (oidb_sig, oidb_pk) = get_pk_and_sig_func();
 
     let mut info = swarm.aptos_public_info();
     let signed_txn =
-        sign_zkid_transaction(&mut info, zkid_sig.clone(), zkid_pk.clone(), &tw_sk).await;
+        sign_oidb_transaction(&mut info, oidb_sig.clone(), oidb_pk.clone(), &tw_sk).await;
 
-    (zkid_sig, zkid_pk, swarm, signed_txn)
+    (oidb_sig, oidb_pk, swarm, signed_txn)
 }
 
 async fn setup_local_net() -> (Ed25519PrivateKey, LocalSwarm) {
@@ -245,17 +245,17 @@ async fn spawn_network_and_execute_gov_proposals(
     let maybe_response = client
         .get_account_resource_bcs::<Groth16VerificationKey>(
             AccountAddress::ONE,
-            "0x1::zkid::Groth16VerificationKey",
+            "0x1::openid_account::Groth16VerificationKey",
         )
         .await;
     let vk = maybe_response.unwrap().into_inner();
     println!("Groth16 VK: {:?}", vk);
 
     let maybe_response = client
-        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::zkid::Configuration")
+        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::openid_account::Configuration")
         .await;
     let config = maybe_response.unwrap().into_inner();
-    println!("zkID configuration before: {:?}", config);
+    println!("OIDB configuration before: {:?}", config);
 
     let iss = get_sample_iss();
     let jwk = get_sample_jwk();
@@ -268,7 +268,7 @@ async fn spawn_network_and_execute_gov_proposals(
         r#"
 script {{
 use aptos_framework::jwks;
-use aptos_framework::zkid;
+use aptos_framework::openid_account;
 use aptos_framework::aptos_governance;
 use std::string::utf8;
 use std::option;
@@ -286,8 +286,8 @@ fun main(core_resources: &signer) {{
     ];
     jwks::set_patches(&framework_signer, patches);
 
-    zkid::update_max_exp_horizon(&framework_signer, {});
-    zkid::update_training_wheels(&framework_signer, option::some(x"{}"));
+    openid_account::update_max_exp_horizon(&framework_signer, {});
+    openid_account::update_training_wheels(&framework_signer, option::some(x"{}"));
 }}
 }}
 "#,
@@ -317,10 +317,10 @@ fun main(core_resources: &signer) {{
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);
 
     let maybe_response = client
-        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::zkid::Configuration")
+        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::openid_account::Configuration")
         .await;
     let config = maybe_response.unwrap().into_inner();
-    println!("zkID configuration after: {:?}", config);
+    println!("OIDB configuration after: {:?}", config);
 
     let mut info = swarm.aptos_public_info();
 

@@ -13433,7 +13433,7 @@
             "ed25519": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
             "secp256k1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
             "secp256r1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
-            "zk_id": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "oidb": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
           }
         }
       },
@@ -13447,7 +13447,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "zk_id"
+                "example": "oidb"
               }
             }
           },
@@ -13538,7 +13538,7 @@
             "ed25519": "#/components/schemas/Signature_string(HexEncodedBytes)",
             "secp256k1_ecdsa": "#/components/schemas/Signature_string(HexEncodedBytes)",
             "web_authn": "#/components/schemas/Signature_string(HexEncodedBytes)",
-            "zk_id": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "oidb": "#/components/schemas/Signature_string(HexEncodedBytes)"
           }
         }
       },
@@ -13552,7 +13552,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "zk_id"
+                "example": "oidb"
               }
             }
           },

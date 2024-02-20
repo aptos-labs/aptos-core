@@ -14,7 +14,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-/// Reflection of aptos_framework::zkid::Groth16PreparedVerificationKey
+/// Reflection of aptos_framework::openid_account::Groth16PreparedVerificationKey
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Groth16VerificationKey {
     pub alpha_g1: Vec<u8>,
@@ -39,7 +39,7 @@ impl AsMoveValue for Groth16VerificationKey {
 /// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
 /// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
 impl MoveStructType for Groth16VerificationKey {
-    const MODULE_NAME: &'static IdentStr = ident_str!("zkid");
+    const MODULE_NAME: &'static IdentStr = ident_str!("openid_account");
     const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
 }
 

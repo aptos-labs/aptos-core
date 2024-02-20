@@ -8,9 +8,9 @@ use crate::{
         circuit_testcases::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
-            SAMPLE_JWT_PARSED, SAMPLE_PEPPER, SAMPLE_PROOF, SAMPLE_UID_KEY, SAMPLE_ZKID_PK,
+            SAMPLE_JWT_PARSED, SAMPLE_PEPPER, SAMPLE_PROOF, SAMPLE_UID_KEY, SAMPLE_OIDB_PK,
         },
-        Groth16Zkp, OpenIdSig, SignedGroth16Zkp, ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig,
+        Groth16Zkp, OpenIdSig, SignedGroth16Zkp, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, Uniform};
@@ -39,7 +39,7 @@ pub fn get_sample_jwk() -> RSA_JWK {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-pub fn get_sample_zkid_groth16_sig_and_pk() -> (ZkIdSignature, ZkIdPublicKey) {
+pub fn get_sample_oidb_groth16_sig_and_pk() -> (OidbSignature, OidbPublicKey) {
     let proof = *SAMPLE_PROOF;
 
     let groth16zkp = SignedGroth16Zkp {
@@ -51,7 +51,7 @@ pub fn get_sample_zkid_groth16_sig_and_pk() -> (ZkIdSignature, ZkIdPublicKey) {
         training_wheels_signature: None,
     };
 
-    let zk_sig = ZkIdSignature {
+    let zk_sig = OidbSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(groth16zkp.clone()),
         jwt_header_b64: SAMPLE_JWT_HEADER_B64.to_string(),
         exp_timestamp_secs: SAMPLE_EXP_DATE,
@@ -59,12 +59,12 @@ pub fn get_sample_zkid_groth16_sig_and_pk() -> (ZkIdSignature, ZkIdPublicKey) {
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
     };
 
-    (zk_sig, SAMPLE_ZKID_PK.clone())
+    (zk_sig, SAMPLE_OIDB_PK.clone())
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
-pub fn get_sample_zkid_openid_sig_and_pk() -> (ZkIdSignature, ZkIdPublicKey) {
+pub fn get_sample_oidb_openid_sig_and_pk() -> (OidbSignature, OidbPublicKey) {
     let jwt_payload_b64 =
         base64url_encode_str(serde_json::to_string(&*SAMPLE_JWT_PARSED).unwrap().as_str());
 
@@ -91,7 +91,7 @@ pub fn get_sample_zkid_openid_sig_and_pk() -> (ZkIdSignature, ZkIdPublicKey) {
         idc_aud_val: None,
     };
 
-    let zk_sig = ZkIdSignature {
+    let zk_sig = OidbSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_sig.clone()),
         jwt_header_b64,
         exp_timestamp_secs: SAMPLE_EXP_DATE,
@@ -99,7 +99,7 @@ pub fn get_sample_zkid_openid_sig_and_pk() -> (ZkIdSignature, ZkIdPublicKey) {
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
     };
 
-    (zk_sig, SAMPLE_ZKID_PK.clone())
+    (zk_sig, SAMPLE_OIDB_PK.clone())
 }
 
 #[cfg(test)]
@@ -107,13 +107,13 @@ mod test {
     use crate::zkid::{
         circuit_testcases::{SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_EXP_DATE, SAMPLE_JWK},
         get_public_inputs_hash,
-        test_utils::get_sample_zkid_groth16_sig_and_pk,
+        test_utils::get_sample_oidb_groth16_sig_and_pk,
         Configuration, OpenIdSig,
     };
 
     /// Since our proof generation toolkit is incomplete; currently doing it here.
     #[test]
-    fn zkid_print_nonce_commitment_and_public_inputs_hash() {
+    fn oidb_print_nonce_commitment_and_public_inputs_hash() {
         let config = Configuration::new_for_testing();
         let nonce = OpenIdSig::reconstruct_oauth_nonce(
             SAMPLE_EPK_BLINDER.as_slice(),
@@ -129,9 +129,9 @@ mod test {
             nonce
         );
 
-        let (zkid_sig, zkid_pk) = get_sample_zkid_groth16_sig_and_pk();
+        let (oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
         let public_inputs_hash =
-            get_public_inputs_hash(&zkid_sig, &zkid_pk, &SAMPLE_JWK, &config).unwrap();
+            get_public_inputs_hash(&oidb_sig, &oidb_pk, &SAMPLE_JWK, &config).unwrap();
 
         println!("Public inputs hash: {}", public_inputs_hash);
     }

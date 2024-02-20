@@ -35,7 +35,7 @@ pub struct SignedGroth16Zkp {
     /// An optional extra field (e.g., `"<name>":"<val>") that will be matched publicly in the JWT
     pub extra_field: Option<String>,
     /// Will be set to the override `aud` value that the circuit should match, instead of the `aud` in the IDC.
-    /// This will allow users to recover their zkID accounts derived by an application that is no longer online.
+    /// This will allow users to recover their OIDB accounts derived by an application that is no longer online.
     pub override_aud_val: Option<String>,
     /// A signature on the proof (via the training wheels SK) to mitigate against flaws in our circuit
     pub training_wheels_signature: Option<EphemeralSignature>,
