@@ -11,6 +11,7 @@
 //!
 //! Postconditions: no critical edges in the control flow graph.
 
+use log::log_enabled;
 use move_model::{ast::TempIndex, model::FunctionEnv};
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -30,7 +31,7 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if cfg!(debug_assertions) {
+        if cfg!(debug_assertions) || log_enabled!(Level::Debug) {
             Self::check_precondition(&data);
         }
         if fun_env.is_native() {
@@ -40,7 +41,7 @@ impl FunctionTargetProcessor for SplitCriticalEdgesProcessor {
         transformer.transform();
         data.code = transformer.code;
         data.annotations.clear();
-        if cfg!(debug_assertions) {
+        if cfg!(debug_assertions) || log_enabled!(Level::Debug) {
             Self::check_postcondition(&data.code);
         }
         data
