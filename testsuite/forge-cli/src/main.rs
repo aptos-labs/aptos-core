@@ -788,36 +788,35 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         )
 }
 
-fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
+fn quorum_store_backlog_txn_limit_count(
+    config: &mut NodeConfig,
+    target_tps: usize,
+    vn_latency: f64,
+) {
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_txn_limit_count = (target_tps as f64 * vn_latency) as u64;
+}
+
+fn optimize_for_maximum_throughput(
+    config: &mut NodeConfig,
+    target_tps: usize,
+    vn_latency: f64,
+    blocks_per_s: f64,
+) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = 30000;
-    config.consensus.max_receiving_block_txns = 40000;
+    config.consensus.max_sending_block_txns = (target_tps as f64 / blocks_per_s) as u64;
+    config.consensus.max_receiving_block_txns =
+        (target_tps as f64 / blocks_per_s * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_txn_limit_count = 200000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_per_validator_batch_limit_count = 50;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_min_txn_per_s = 2000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_max_txn_per_s = 8000;
+    quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
     config.consensus.quorum_store.sender_max_batch_txns = 1000;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
@@ -1840,18 +1839,25 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 12;
 
+    // Config is based on these values. The target TPS should be a slight overestimate of
+    // the actual throughput to be able to have reasonable queueing but also so throughput
+    // will improve as performance improves.
+    const TARGET_TPS: usize = 20_000;
+    const BLOCKS_PER_S: f64 = 4.0;
+    const VN_LATENCY_S: f64 = 4.0;
+    const VFN_LATENCY_S: f64 = 7.0;
+
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 500_000,
+            mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
 
-            // consensus and quorum store configs copied from the consensus-only suite
-            optimize_for_maximum_throughput(config);
+            optimize_for_maximum_throughput(config, TARGET_TPS, VN_LATENCY_S, BLOCKS_PER_S);
 
             // Other consensus / Quroum store configs
             config.consensus.quorum_store_pull_timeout_ms = 200;
