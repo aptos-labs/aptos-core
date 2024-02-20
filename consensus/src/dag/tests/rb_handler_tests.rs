@@ -10,7 +10,9 @@ use crate::dag::{
     storage::DAGStorage,
     tests::{
         dag_test::MockStorage,
-        helpers::{new_node, MockOrderRule, MockPayloadManager, TEST_DAG_WINDOW},
+        helpers::{
+            new_node_with_empty_payload, MockOrderRule, MockPayloadManager, TEST_DAG_WINDOW,
+        },
     },
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
@@ -64,8 +66,8 @@ async fn test_node_broadcast_receiver_succeed() {
         NoPipelineBackpressure::new(),
     );
 
-    let wellformed_node = new_node(1, 10, signers[0].author(), vec![]);
-    let equivocating_node = new_node(1, 20, signers[0].author(), vec![]);
+    let wellformed_node = new_node_with_empty_payload(1, 10, signers[0].author(), vec![]);
+    let equivocating_node = new_node_with_empty_payload(1, 20, signers[0].author(), vec![]);
 
     assert_ne!(wellformed_node.digest(), equivocating_node.digest());
 
@@ -139,7 +141,7 @@ async fn test_node_broadcast_receiver_failure() {
         .collect();
 
     // Round 1
-    let node = new_node(1, 10, signers[0].author(), vec![]);
+    let node = new_node_with_empty_payload(1, 10, signers[0].author(), vec![]);
     let vote = rb_receivers[1].process(node.clone()).await.unwrap();
 
     // Round 2 with invalid parent
@@ -153,7 +155,7 @@ async fn test_node_broadcast_receiver_failure() {
             .aggregate_signatures(&partial_sigs)
             .unwrap(),
     );
-    let node = new_node(2, 20, signers[0].author(), vec![node_cert]);
+    let node = new_node_with_empty_payload(2, 20, signers[0].author(), vec![node_cert]);
     assert_eq!(
         rb_receivers[1].process(node).await.unwrap_err().to_string(),
         NodeBroadcastHandleError::InvalidParent.to_string(),
@@ -163,7 +165,7 @@ async fn test_node_broadcast_receiver_failure() {
     let node_certificates: Vec<_> = signers
         .iter()
         .map(|signer| {
-            let node = new_node(1, 10, signer.author(), vec![]);
+            let node = new_node_with_empty_payload(1, 10, signer.author(), vec![]);
             let mut partial_sigs = PartialSignatures::empty();
             rb_receivers
                 .iter_mut()
@@ -182,7 +184,7 @@ async fn test_node_broadcast_receiver_failure() {
         .collect();
 
     // Add Round 2 node with proper certificates
-    let node = new_node(2, 20, signers[0].author(), node_certificates);
+    let node = new_node_with_empty_payload(2, 20, signers[0].author(), node_certificates);
     assert_eq!(
         rb_receivers[0].process(node).await.unwrap_err().to_string(),
         NodeBroadcastHandleError::MissingParents.to_string()
@@ -208,7 +210,7 @@ async fn test_node_broadcast_receiver_storage() {
     ));
     let order_rule = Arc::new(MockOrderRule {});
 
-    let node = new_node(1, 10, signers[0].author(), vec![]);
+    let node = new_node_with_empty_payload(1, 10, signers[0].author(), vec![]);
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag.clone(),
