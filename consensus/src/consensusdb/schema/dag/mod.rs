@@ -11,6 +11,7 @@ use crate::{
     define_schema,
 };
 use anyhow::Result;
+use aptos_consensus_types::dag_batch::{BatchDigest, DagBatch};
 use aptos_crypto::HashValue;
 use aptos_schemadb::{
     schema::{KeyCodec, ValueCodec},
@@ -112,6 +113,30 @@ impl KeyCodec<CertifiedNodeSchema> for HashValue {
 }
 
 impl ValueCodec<CertifiedNodeSchema> for CertifiedNode {
+    fn encode_value(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_value(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+pub const DAG_BATCH_CF_NAME: ColumnFamilyName = "dag_batch";
+
+define_schema!(DagBatchSchema, BatchDigest, DagBatch, DAG_BATCH_CF_NAME);
+
+impl KeyCodec<DagBatchSchema> for BatchDigest {
+    fn encode_key(&self) -> Result<Vec<u8>> {
+        Ok(bcs::to_bytes(&self)?)
+    }
+
+    fn decode_key(data: &[u8]) -> Result<Self> {
+        Ok(bcs::from_bytes(data)?)
+    }
+}
+
+impl ValueCodec<DagBatchSchema> for DagBatch {
     fn encode_value(&self) -> Result<Vec<u8>> {
         Ok(bcs::to_bytes(&self)?)
     }

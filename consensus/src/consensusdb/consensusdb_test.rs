@@ -8,6 +8,7 @@ use crate::dag::{CertifiedNode, Extensions, Node, NodeMessage, Vote};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
+    dag_batch::DagBatch,
 };
 use aptos_crypto::bls12381::Signature;
 use aptos_temppath::TempPath;
@@ -118,4 +119,11 @@ fn test_dag() {
 
     let vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
     test_dag_type::<DagVoteSchema, <DagVoteSchema as Schema>::Key>(node.id(), vote, &db);
+
+    let dag_batch = DagBatch::new(1, 1, Author::random(), Payload::empty(false));
+    test_dag_type::<DagBatchSchema, <DagBatchSchema as Schema>::Key>(
+        *dag_batch.digest(),
+        dag_batch,
+        &db,
+    );
 }
