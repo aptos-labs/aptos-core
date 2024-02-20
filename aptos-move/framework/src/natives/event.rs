@@ -16,12 +16,10 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_runtime::native_functions::NativeFunction;
 #[cfg(feature = "testing")]
-use move_vm_types::value_serde::deserialize_and_allow_delayed_values;
-#[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
-    loaded_data::runtime_types::Type, value_serde::serialize_and_allow_delayed_values,
-    values::Value,
+    delayed_values::error::code_invariant_error, loaded_data::runtime_types::Type,
+    value_serde::serialize_and_allow_delayed_values, values::Value,
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -146,15 +144,19 @@ fn native_emitted_events_by_handle(
     let key = EventKey::new(creation_num, addr);
     let ty_tag = context.type_to_type_tag(&ty)?;
 
-    // TODO[agg_v2](cleanup): Fail conservatively here.
-    let (ty_layout, _) = context.type_to_type_layout(&ty)?;
+    let (layout, has_identifier_mappings) = context.type_to_type_layout(&ty)?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::InvariantViolation(code_invariant_error(
+            "Events should not have any delayed fields when tested",
+        )));
+    }
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
         .emitted_v1_events(&key, &ty_tag)
         .into_iter()
         .map(|blob| {
-            Value::simple_deserialize(blob, &ty_layout).ok_or_else(|| {
+            Value::simple_deserialize(blob, &layout).ok_or_else(|| {
                 SafeNativeError::InvariantViolation(PartialVMError::new(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                 ))
@@ -174,18 +176,21 @@ fn native_emitted_events(
     debug_assert!(arguments.is_empty());
 
     let ty = ty_args.pop().unwrap();
-
     let ty_tag = context.type_to_type_tag(&ty)?;
 
-    // TODO[agg_v2](cleanup): We probably should fail here?
-    let (ty_layout, _) = context.type_to_type_layout(&ty)?;
+    let (layout, has_identifier_mappings) = context.type_to_type_layout(&ty)?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::InvariantViolation(code_invariant_error(
+            "Events should not have any delayed fields when tested",
+        )));
+    }
 
     let ctx = context.extensions_mut().get_mut::<NativeEventContext>();
     let events = ctx
         .emitted_v2_events(&ty_tag)
         .into_iter()
         .map(|blob| {
-            deserialize_and_allow_delayed_values(blob, &ty_layout).ok_or_else(|| {
+            Value::simple_deserialize(blob, &layout).ok_or_else(|| {
                 SafeNativeError::InvariantViolation(PartialVMError::new(
                     StatusCode::VALUE_DESERIALIZATION_ERROR,
                 ))

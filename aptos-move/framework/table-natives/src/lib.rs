@@ -174,8 +174,13 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                // TODO[agg_v2](test): Make sure we have no custom layouts here?
-                let (key_layout, _) = context.type_to_type_layout(key_ty)?;
+                let (key_layout, has_identifier_mappings) = context.type_to_type_layout(key_ty)?;
+                if has_identifier_mappings {
+                    return Err(partial_extension_error(
+                        "cannot serialize table key with delayed fields",
+                    ));
+                }
+
                 let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
                 let table = Table {
                     handle,

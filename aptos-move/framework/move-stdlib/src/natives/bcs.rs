@@ -44,10 +44,9 @@ fn native_to_bytes(
     let ref_to_val = safely_pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
-    // TODO[agg_v2](cleanup): Fail early if there are any custom layouts.
-    let (layout, _) = match context.type_to_type_layout(&arg_type) {
-        Ok(layout) => layout,
-        Err(_) => {
+    let layout = match context.type_to_type_layout(&arg_type) {
+        Ok((layout, false)) => layout,
+        _ => {
             context.charge(BCS_TO_BYTES_FAILURE)?;
             return Err(SafeNativeError::Abort {
                 abort_code: NFE_BCS_SERIALIZATION_FAILURE,

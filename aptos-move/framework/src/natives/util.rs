@@ -34,8 +34,12 @@ fn native_from_bytes(
     debug_assert_eq!(args.len(), 1);
 
     // TODO(Gas): charge for getting the layout
-    // TODO[agg_v2](cleanup): Fail conservatively here if there are mappings.
-    let (layout, _) = context.type_to_type_layout(&ty_args[0])?;
+    let (layout, has_identifier_mappings) = context.type_to_type_layout(&ty_args[0])?;
+    if has_identifier_mappings {
+        return Err(SafeNativeError::Abort {
+            abort_code: EFROM_BYTES,
+        });
+    }
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
     context.charge(

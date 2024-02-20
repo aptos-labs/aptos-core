@@ -214,7 +214,7 @@ impl VMRuntime {
     ) -> PartialVMResult<Value> {
         let (layout, has_identifier_mappings) =
             match self.loader.type_to_type_layout(ty, module_store) {
-                Ok(layout) => layout,
+                Ok(data) => data,
                 Err(_err) => {
                     return Err(PartialVMError::new(
                         StatusCode::INVALID_PARAM_TYPE_FOR_DESERIALIZATION,
