@@ -92,6 +92,7 @@ pub fn extract_txns_from_block<'a>(
                 Payload::InQuorumStoreWithLimit(proof_with_data) => {
                     extract_txns_from_proof_stores(&proof_with_data.proof_with_data.proofs)
                 },
+                Payload::DAG(_) => bail!("DAG Payload is not yet supported"),
             }
         },
         None => Ok(vec![]),

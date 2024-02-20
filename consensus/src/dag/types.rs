@@ -189,6 +189,15 @@ impl From<Payload> for DagPayload {
     }
 }
 
+impl Into<Payload> for DagPayload {
+    fn into(self) -> Payload {
+        match self {
+            DagPayload::Inline(payload) => payload,
+            DagPayload::Decoupled(info) => Payload::DAG(info.into()),
+        }
+    }
+}
+
 /// Node representation in the DAG, parents contain 2f+1 strong links (links to previous round)
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {

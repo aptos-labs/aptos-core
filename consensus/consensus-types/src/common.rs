@@ -2,7 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::{
+    dag_payload::DAGPayloadBundle,
+    proof_of_store::{BatchInfo, ProofOfStore},
+};
+use anyhow::bail;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
@@ -12,7 +16,7 @@ use aptos_types::{
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::{cmp::min, collections::HashSet, fmt, fmt::Write, sync::Arc};
+use std::{collections::HashSet, fmt, fmt::Write, sync::Arc};
 use tokio::sync::oneshot;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
@@ -177,19 +181,26 @@ pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
     InQuorumStoreWithLimit(ProofWithDataWithTxnLimit),
+    DAG(DAGPayloadBundle),
 }
 
 impl Payload {
-    pub fn transform_to_quorum_store_v2(self, max_txns_to_execute: Option<usize>) -> Self {
+    pub fn transform_to_quorum_store_v2(
+        self,
+        max_txns_to_execute: Option<usize>,
+    ) -> anyhow::Result<Self> {
         match self {
-            Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
+            Payload::InQuorumStore(proof_with_status) => Ok(Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),
-            ),
+            )),
             Payload::InQuorumStoreWithLimit(_) => {
-                panic!("Payload is already in quorumStoreV2 format");
+                bail!("Payload is already in quorumStoreV2 format");
             },
             Payload::DirectMempool(_) => {
-                panic!("Payload is in direct mempool format");
+                bail!("Payload is in direct mempool format");
+            },
+            Payload::DAG(_) => {
+                bail!("Payload is in DAG format");
             },
         }
     }
@@ -200,6 +211,10 @@ impl Payload {
         } else {
             Payload::DirectMempool(Vec::new())
         }
+    }
+
+    pub fn empty_dag_payload() -> Self {
+        Payload::DAG(DAGPayloadBundle::new_empty())
     }
 
     pub fn len(&self) -> usize {
@@ -217,12 +232,11 @@ impl Payload {
                     .iter()
                     .map(|proof| proof.num_txns() as usize)
                     .sum();
-                if proof_with_status.max_txns_to_execute.is_some() {
-                    min(proof_with_status.max_txns_to_execute.unwrap(), num_txns)
-                } else {
-                    num_txns
-                }
+                proof_with_status
+                    .max_txns_to_execute
+                    .map_or(num_txns, |max_txns| max_txns.min(num_txns))
             },
+            Payload::DAG(payload) => payload.len(),
         }
     }
 
@@ -235,6 +249,7 @@ impl Payload {
                     || (proof_with_status.max_txns_to_execute.is_some()
                         && proof_with_status.max_txns_to_execute.unwrap() == 0)
             },
+            Payload::DAG(payload) => payload.is_empty(),
         }
     }
 
@@ -245,12 +260,16 @@ impl Payload {
             (Payload::InQuorumStoreWithLimit(p1), Payload::InQuorumStoreWithLimit(p2)) => {
                 p1.extend(p2)
             },
+            (Payload::DAG(p1), Payload::DAG(p2)) => p1.extend(p2),
             (_, _) => unreachable!(),
         }
     }
 
-    pub fn is_direct(&self) -> bool {
-        matches!(self, Payload::DirectMempool(_))
+    pub fn is_in_quorum_store(&self) -> bool {
+        matches!(
+            self,
+            Payload::InQuorumStore(_) | Payload::InQuorumStoreWithLimit(_)
+        )
     }
 
     /// This is computationally expensive on the first call
@@ -274,6 +293,7 @@ impl Payload {
                 .iter()
                 .map(|proof| proof.num_bytes() as usize)
                 .sum(),
+            Payload::DAG(payload) => payload.size(),
         }
     }
 
@@ -295,6 +315,9 @@ impl Payload {
                     proof.verify(validator)?;
                 }
                 Ok(())
+            },
+            (false, Payload::DAG(_)) => {
+                unreachable!("verify() is not expected in DAG mode");
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
@@ -321,6 +344,9 @@ impl fmt::Display for Payload {
                     proof_with_status.proof_with_data.proofs.len()
                 )
             },
+            Payload::DAG(payload) => {
+                write!(f, "DAG Payload: {}", payload)
+            },
         }
     }
 }
@@ -338,9 +364,11 @@ impl From<&Vec<&Payload>> for PayloadFilter {
         if exclude_payloads.is_empty() {
             return PayloadFilter::Empty;
         }
-        let direct_mode = exclude_payloads.iter().any(|payload| payload.is_direct());
+        let quorum_store_mode = exclude_payloads
+            .iter()
+            .any(|payload| payload.is_in_quorum_store());
 
-        if direct_mode {
+        if !quorum_store_mode {
             let mut exclude_txns = Vec::new();
             for payload in exclude_payloads {
                 if let Payload::DirectMempool(txns) = payload {
