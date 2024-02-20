@@ -1,9 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{types::Vote, NodeId};
-use crate::dag::{CertifiedNode, Node};
-use aptos_consensus_types::common::{Author, Round};
+use super::{types::Vote, Node, NodeId, NodeMessage};
+use crate::dag::CertifiedNode;
+use aptos_consensus_types::{
+    common::{Author, Round},
+    dag_batch::{BatchDigest, DagBatch},
+};
 use aptos_crypto::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
@@ -51,6 +54,12 @@ pub trait DAGStorage: Send + Sync {
 
     fn delete_pending_node(&self) -> anyhow::Result<()>;
 
+    fn save_pending_node_msg(&self, node_msg: &NodeMessage) -> anyhow::Result<()>;
+
+    fn get_pending_node_msg(&self) -> anyhow::Result<Option<NodeMessage>>;
+
+    fn delete_pending_node_msg(&self) -> anyhow::Result<()>;
+
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()>;
 
     fn get_votes(&self) -> anyhow::Result<Vec<(NodeId, Vote)>>;
@@ -66,4 +75,10 @@ pub trait DAGStorage: Send + Sync {
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>>;
 
     fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures>;
+
+    fn save_batch(&self, batch: &DagBatch) -> anyhow::Result<()>;
+
+    fn get_batches(&self) -> anyhow::Result<Vec<(HashValue, DagBatch)>>;
+
+    fn delete_batches(&self, digests: Vec<BatchDigest>) -> anyhow::Result<()>;
 }
