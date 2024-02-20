@@ -7,7 +7,7 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
-    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
+    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::EphemeralPublicKey,
     vm_status::{StatusCode, VMStatus},
     zkid::{
@@ -100,16 +100,28 @@ fn get_jwk_for_zkid_authenticator(
     Ok(jwk)
 }
 
-pub fn validate_zkid_authenticators(
+pub(crate) fn validate_zkid_authenticators(
     authenticators: &Vec<(ZkIdPublicKey, ZkIdSignature)>,
+    features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
+    // zkID feature gating.
+    for (_, sig) in authenticators {
+        if !features.is_zkid_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+        if (!features.is_zkid_enabled() || !features.is_zkid_zkless_enabled())
+            && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+        {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+    }
+
     if authenticators.is_empty() {
         return Ok(());
     }
 
     let config = &get_configs_onchain(resolver)?;
-
     if authenticators.len() > config.max_zkid_signatures_per_txn as usize {
         return Err(invalid_signature!("Too many zkID authenticators"));
     }

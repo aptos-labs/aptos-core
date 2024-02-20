@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod access_path_test;
+mod account;
 mod aggregator;
 mod aggregator_v2;
 mod aggregator_v2_events;
@@ -46,4 +47,5 @@ mod token_objects;
 mod transaction_fee;
 mod type_too_large;
 mod vector_numeric_address;
+mod vm;
 mod vote;
