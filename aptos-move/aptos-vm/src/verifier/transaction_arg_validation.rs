@@ -118,7 +118,7 @@ pub fn validate_combine_signer_and_txn_args(
         match ty {
             Type::Signer => signer_param_cnt += 1,
             Type::Reference(inner_type) => {
-                if matches!(&**inner_type, Type::Signer) {
+                if matches!(session.type_context().get_type_by_index(*inner_type), Type::Signer) {
                     signer_param_cnt += 1;
                 }
             },
@@ -131,7 +131,7 @@ pub fn validate_combine_signer_and_txn_args(
     for ty in func.parameters[signer_param_cnt..].iter() {
         let valid = is_valid_txn_arg(
             session,
-            &ty.subst(&func.type_arguments).unwrap(),
+            &session.subst_ty(ty, &func.type_arguments).unwrap(),
             allowed_structs,
         );
         if !valid {
@@ -195,9 +195,15 @@ pub(crate) fn is_valid_txn_arg(
 
     match typ {
         Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
-        Vector(inner) => is_valid_txn_arg(session, inner, allowed_structs),
-        Struct { idx, .. } | StructInstantiation { idx, .. } => {
+        Vector(inner) => is_valid_txn_arg(session, session.type_context().get_type_by_index(*inner), allowed_structs),
+        Struct { idx, .. } => {
             session.get_struct_type(*idx).is_some_and(|st| {
+                let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
+                allowed_structs.contains_key(&full_name)
+            })
+        },
+        StructInstantiation { idx, .. } => {
+            session.get_struct_type(session.type_context().get_instantiation_by_index(*idx).0).is_some_and(|st| {
                 let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
                 allowed_structs.contains_key(&full_name)
             })
@@ -226,7 +232,7 @@ pub(crate) fn construct_args(
     for (ty, arg) in types.iter().zip(args) {
         let arg = construct_arg(
             session,
-            &ty.subst(ty_args).unwrap(),
+            &session.subst_ty(ty, ty_args).unwrap(),
             allowed_structs,
             arg,
             &mut gas_meter,
@@ -307,13 +313,14 @@ pub(crate) fn recursively_construct_arg(
 
     match ty {
         Vector(inner) => {
+            let inner_ty = session.type_context().get_type_by_index(*inner);
             // get the vector length and iterate over each element
             let mut len = get_len(cursor)?;
             serialize_uleb128(len, arg);
             while len > 0 {
                 recursively_construct_arg(
                     session,
-                    inner,
+                    inner_ty,
                     allowed_structs,
                     cursor,
                     initial_cursor_len,
@@ -324,9 +331,31 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct { idx, .. } | StructInstantiation { idx, .. } => {
+        Struct { idx, .. } => {
             let st = session
                 .get_struct_type(*idx)
+                .ok_or_else(invalid_signature)?;
+
+            let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
+            let constructor = allowed_structs
+                .get(&full_name)
+                .ok_or_else(invalid_signature)?;
+            // By appending the BCS to the output parameter we construct the correct BCS format
+            // of the argument.
+            arg.append(&mut validate_and_construct(
+                session,
+                ty,
+                constructor,
+                allowed_structs,
+                cursor,
+                initial_cursor_len,
+                gas_meter,
+                max_invocations,
+            )?);
+        },
+        StructInstantiation { idx, .. } => {
+            let st = session
+                .get_struct_type(session.type_context().get_instantiation_by_index(*idx).0)
                 .ok_or_else(invalid_signature)?;
 
             let full_name = format!("{}::{}", st.module.short_str_lossless(), st.name);
@@ -429,9 +458,10 @@ fn validate_and_construct(
     let mut args = vec![];
     for param_type in &instantiation.parameters {
         let mut arg = vec![];
+        let subst_ty = session.subst_ty(param_type, &instantiation.type_arguments).unwrap();
         recursively_construct_arg(
             session,
-            &param_type.subst(&instantiation.type_arguments).unwrap(),
+            &subst_ty,
             allowed_structs,
             cursor,
             initial_cursor_len,

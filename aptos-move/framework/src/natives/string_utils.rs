@@ -376,7 +376,7 @@ fn native_format_list(
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
-    let mut list_ty = &ty_args[0];
+    let mut list_ty = ty_args[0].clone();
 
     let arg_mismatch = 1;
     let invalid_fmt = 2;
@@ -397,7 +397,7 @@ fn native_format_list(
 
     let match_list_ty = |context: &mut SafeNativeContext, list_ty, name| {
         if let TypeTag::Struct(struct_tag) = context
-            .type_to_type_tag(list_ty)
+            .type_to_type_tag(&list_ty)
             .map_err(SafeNativeError::InvariantViolation)?
         {
             if !(struct_tag.address == AccountAddress::ONE
@@ -423,18 +423,18 @@ fn native_format_list(
             in_braces = 0;
             if c == '}' {
                 // verify`that the type is a list
-                match_list_ty(context, list_ty, "Cons")?;
+                match_list_ty(context, list_ty.clone(), "Cons")?;
 
                 // We know that the type is a list, so we can safely unwrap
-                let ty_args = if let Type::StructInstantiation { ty_args, .. } = list_ty {
-                    ty_args
+                let ty_args = if let Type::StructInstantiation { idx, .. } = &list_ty {
+                    &context.type_context().get_instantiation_by_index(*idx).1
                 } else {
                     unreachable!()
                 };
                 let mut it = val.value_as::<Struct>()?.unpack()?;
                 let car = it.next().unwrap();
                 val = it.next().unwrap();
-                list_ty = &ty_args[1];
+                list_ty = ty_args[1].clone();
 
                 let ty = context.type_to_fully_annotated_layout(&ty_args[0])?;
                 let mut format_context = FormatContext {

@@ -25,7 +25,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::{StructNameIndex, StructType, Type},
+    loaded_data::runtime_types::{StructNameIndex, StructType, Type, TypeContext},
     values::{GlobalValue, Value},
 };
 use std::{borrow::Borrow, sync::Arc};
@@ -450,6 +450,14 @@ impl<'r, 'l> Session<'r, 'l> {
         self.module_store
             .get_struct_type_by_identifier(&name.name, &name.module)
             .ok()
+    }
+
+    pub fn subst_ty(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
+        self.move_vm.runtime.loader().type_context.subst(ty, ty_args)
+    }
+
+    pub fn type_context(&self) -> &'l TypeContext {
+        &self.move_vm.runtime.loader().type_context
     }
 }
 
