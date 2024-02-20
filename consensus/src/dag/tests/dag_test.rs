@@ -7,8 +7,9 @@ use crate::dag::{
     storage::{CommitEvent, DAGStorage},
     tests::helpers::{new_certified_node_with_empty_payload, TEST_DAG_WINDOW},
     types::{CertifiedNode, DagSnapshotBitmask, Node},
-    NodeId, Vote,
+    NodeId, NodeMessage, Vote,
 };
+use aptos_consensus_types::dag_payload::{DecoupledPayload, PayloadDigest};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -59,6 +60,18 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
+    fn save_pending_node_msg(&self, _node_msg: &NodeMessage) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn get_pending_node_msg(&self) -> anyhow::Result<Option<NodeMessage>> {
+        todo!()
+    }
+
+    fn delete_pending_node_msg(&self) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
         self.vote_data.lock().insert(node_id.clone(), vote.clone());
         Ok(())
@@ -106,6 +119,18 @@ impl DAGStorage for MockStorage {
         self.latest_ledger_info
             .clone()
             .ok_or_else(|| anyhow::anyhow!("ledger info not set"))
+    }
+
+    fn save_payload(&self, _payload: &DecoupledPayload) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn get_payloads(&self) -> anyhow::Result<Vec<(HashValue, DecoupledPayload)>> {
+        Ok(vec![])
+    }
+
+    fn delete_payloads(&self, _digests: Vec<PayloadDigest>) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 
