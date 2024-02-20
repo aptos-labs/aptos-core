@@ -1606,6 +1606,34 @@ impl PseudoGasContext {
     }
 }
 
+struct TypeLayoutContext {
+    // Configuration.
+    is_fully_annotated: bool,
+
+    // Changed when visiting a type.
+    node_count: u64,
+    has_identifier_mappings: bool,
+}
+
+impl TypeLayoutContext {
+    fn increase_node_count(&mut self, additional_num_nodes: u64) -> PartialVMResult<()> {
+        self.node_count += additional_num_nodes;
+        if self.node_count > MAX_TYPE_TO_LAYOUT_NODES {
+            let msg = format!(
+                "Too many type nodes when constructing a type layout: {} < {}",
+                MAX_TYPE_TO_LAYOUT_NODES, self.node_count
+            );
+            Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(msg))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn adjust_identifier_mappings(&mut self, additional_identifier_mappings: bool) {
+        self.has_identifier_mappings |= additional_identifier_mappings;
+    }
+}
+
 impl Loader {
     fn struct_name_to_type_tag(
         &self,
@@ -1715,45 +1743,40 @@ impl Loader {
         struct_idx: StructNameIndex,
         module_store: &ModuleStorageAdapter,
         ty_args: &[Type],
-        count: &mut u64,
+        context: &mut TypeLayoutContext,
         depth: u64,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+    ) -> PartialVMResult<MoveTypeLayout> {
         let name = &*self.name_cache.idx_to_identifier(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(struct_layout_info) = &struct_info.struct_layout_info {
-                    *count += struct_layout_info.node_count;
-                    return Ok((
-                        struct_layout_info.struct_layout.clone(),
-                        struct_layout_info.has_identifier_mappings,
-                    ));
+                    context.increase_node_count(struct_layout_info.node_count)?;
+                    context.adjust_identifier_mappings(struct_layout_info.has_identifier_mappings);
+
+                    return Ok(struct_layout_info.struct_layout.clone());
                 }
             }
         }
 
-        let count_before = *count;
         let struct_type = module_store.get_struct_type_by_identifier(&name.name, &name.module)?;
 
-        let field_tys = struct_type
+        let node_count_before = context.node_count;
+        let mut field_layouts = struct_type
             .fields
             .iter()
-            .map(|ty| self.subst(ty, ty_args))
+            .map(|ty| {
+                let ty = self.subst(ty, ty_args)?;
+                self.type_to_type_layout_impl(&ty, module_store, context, depth)
+            })
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveTypeLayout>, Vec<bool>) =
-            field_tys
-                .iter()
-                .map(|ty| self.type_to_type_layout_impl(ty, module_store, false, count, depth))
-                .collect::<PartialVMResult<Vec<_>>>()?
-                .into_iter()
-                .unzip();
+        let struct_node_count = context.node_count - node_count_before;
 
         // Some types can have fields which are lifted at serialization or deserialization
         // times. Right now these are Aggregator and AggregatorSnapshot.
         let maybe_mapping = self.get_identifier_mapping_kind(name);
-        let has_identifier_mappings =
-            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+        let struct_has_identifier_mappings = maybe_mapping.is_some();
+        context.adjust_identifier_mappings(struct_has_identifier_mappings);
 
-        let field_node_count = *count - count_before;
         let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
             // For DerivedString, the whole object should be lifted.
             MoveTypeLayout::Native(
@@ -1779,11 +1802,11 @@ impl Loader {
             .or_insert_with(StructInfoCache::new);
         info.struct_layout_info = Some(StructLayoutInfoCacheItem {
             struct_layout: layout.clone(),
-            node_count: field_node_count,
-            has_identifier_mappings,
+            node_count: struct_node_count,
+            has_identifier_mappings: struct_has_identifier_mappings,
         });
 
-        Ok((layout, has_identifier_mappings))
+        Ok(layout)
     }
 
     // TODO[agg_v2](cleanup):
@@ -1821,94 +1844,65 @@ impl Loader {
         &self,
         ty: &Type,
         module_store: &ModuleStorageAdapter,
-        annotated: bool,
-        count: &mut u64,
+        context: &mut TypeLayoutContext,
         depth: u64,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        if *count > MAX_TYPE_TO_LAYOUT_NODES {
-            return Err(PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES));
-        }
+    ) -> PartialVMResult<MoveTypeLayout> {
+        context.increase_node_count(1)?;
+
         if depth > VALUE_DEPTH_MAX {
             return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
         }
+
         Ok(match ty {
-            Type::Bool => {
-                *count += 1;
-                (MoveTypeLayout::Bool, false)
-            },
-            Type::U8 => {
-                *count += 1;
-                (MoveTypeLayout::U8, false)
-            },
-            Type::U16 => {
-                *count += 1;
-                (MoveTypeLayout::U16, false)
-            },
-            Type::U32 => {
-                *count += 1;
-                (MoveTypeLayout::U32, false)
-            },
-            Type::U64 => {
-                *count += 1;
-                (MoveTypeLayout::U64, false)
-            },
-            Type::U128 => {
-                *count += 1;
-                (MoveTypeLayout::U128, false)
-            },
-            Type::U256 => {
-                *count += 1;
-                (MoveTypeLayout::U256, false)
-            },
-            Type::Address => {
-                *count += 1;
-                (MoveTypeLayout::Address, false)
-            },
-            Type::Signer => {
-                *count += 1;
-                (MoveTypeLayout::Signer, false)
-            },
+            Type::Bool => MoveTypeLayout::Bool,
+            Type::U8 => MoveTypeLayout::U8,
+            Type::U16 => MoveTypeLayout::U16,
+            Type::U32 => MoveTypeLayout::U32,
+            Type::U64 => MoveTypeLayout::U64,
+            Type::U128 => MoveTypeLayout::U128,
+            Type::U256 => MoveTypeLayout::U256,
+            Type::Address => MoveTypeLayout::Address,
+            Type::Signer => MoveTypeLayout::Signer,
             Type::Vector(ty) => {
-                *count += 1;
-                let (layout, has_identifier_mappings) =
-                    self.type_to_type_layout_impl(ty, module_store, annotated, count, depth + 1)?;
-                (
-                    MoveTypeLayout::Vector(Box::new(layout)),
-                    has_identifier_mappings,
-                )
+                let layout = self.type_to_type_layout_impl(ty, module_store, context, depth + 1)?;
+                MoveTypeLayout::Vector(Box::new(layout))
             },
             Type::Struct { idx, .. } => {
-                *count += 1;
-                if annotated {
+                if context.is_fully_annotated {
                     self.struct_name_to_fully_annotated_layout(
                         *idx,
                         module_store,
                         &[],
-                        count,
+                        context,
                         depth + 1,
                     )?
                 } else {
-                    self.struct_name_to_type_layout(*idx, module_store, &[], count, depth + 1)?
+                    self.struct_name_to_type_layout(*idx, module_store, &[], context, depth + 1)?
                 }
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
-                *count += 1;
-                if annotated {
+                if context.is_fully_annotated {
                     self.struct_name_to_fully_annotated_layout(
                         *idx,
                         module_store,
                         ty_args,
-                        count,
+                        context,
                         depth + 1,
                     )?
                 } else {
-                    self.struct_name_to_type_layout(*idx, module_store, ty_args, count, depth + 1)?
+                    self.struct_name_to_type_layout(
+                        *idx,
+                        module_store,
+                        ty_args,
+                        context,
+                        depth + 1,
+                    )?
                 }
             },
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("no type layout for {:?}", ty)),
+                        .with_message(format!("No type layout for {:?}", ty)),
                 );
             },
         })
@@ -1919,18 +1913,17 @@ impl Loader {
         struct_idx: StructNameIndex,
         module_store: &ModuleStorageAdapter,
         ty_args: &[Type],
-        count: &mut u64,
+        context: &mut TypeLayoutContext,
         depth: u64,
-    ) -> PartialVMResult<(MoveTypeLayout, bool)> {
+    ) -> PartialVMResult<MoveTypeLayout> {
         let name = &*self.name_cache.idx_to_identifier(struct_idx);
         if let Some(struct_map) = self.type_cache.read().structs.get(name) {
             if let Some(struct_info) = struct_map.get(ty_args) {
                 if let Some(struct_layout_info) = &struct_info.annotated_struct_layout_info {
-                    *count += struct_layout_info.node_count;
-                    return Ok((
-                        struct_layout_info.struct_layout.clone(),
-                        struct_layout_info.has_identifier_mappings,
-                    ));
+                    context.increase_node_count(struct_layout_info.node_count)?;
+                    context.adjust_identifier_mappings(struct_layout_info.has_identifier_mappings);
+
+                    return Ok(struct_layout_info.struct_layout.clone());
                 }
             }
         }
@@ -1953,29 +1946,25 @@ impl Loader {
         };
         let struct_tag = self.struct_name_to_type_tag(struct_idx, ty_args, &mut gas_context)?;
 
-        let count_before = *count;
-        let (mut field_layouts, field_has_identifier_mappings): (Vec<MoveFieldLayout>, Vec<bool>) =
-            struct_type
-                .field_names
-                .iter()
-                .zip(&struct_type.fields)
-                .map(|(n, ty)| {
-                    let ty = self.subst(ty, ty_args)?;
-                    let (l, has_identifier_mappings) =
-                        self.type_to_type_layout_impl(&ty, module_store, true, count, depth)?;
-                    Ok((MoveFieldLayout::new(n.clone(), l), has_identifier_mappings))
-                })
-                .collect::<PartialVMResult<Vec<_>>>()?
-                .into_iter()
-                .unzip();
+        let node_count_before = context.node_count;
+        let mut field_layouts = struct_type
+            .field_names
+            .iter()
+            .zip(&struct_type.fields)
+            .map(|(n, ty)| {
+                let ty = self.subst(ty, ty_args)?;
+                let layout = self.type_to_type_layout_impl(&ty, module_store, context, depth)?;
+                Ok(MoveFieldLayout::new(n.clone(), layout))
+            })
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        let struct_node_count = context.node_count - node_count_before;
 
         // Some types can have fields which are lifted at serialization or deserialization
         // times. Right now these are Aggregator and AggregatorSnapshot.
         let maybe_mapping = self.get_identifier_mapping_kind(name);
-        let has_identifier_mappings =
-            maybe_mapping.is_some() || field_has_identifier_mappings.into_iter().any(|b| b);
+        let struct_has_identifier_mappings = maybe_mapping.is_some();
+        context.adjust_identifier_mappings(struct_has_identifier_mappings);
 
-        let field_node_count = *count - count_before;
         let layout = if Some(IdentifierMappingKind::DerivedString) == maybe_mapping {
             // For DerivedString, the whole object should be lifted.
             MoveTypeLayout::Native(
@@ -2007,11 +1996,11 @@ impl Loader {
             .or_insert_with(StructInfoCache::new);
         info.struct_layout_info = Some(StructLayoutInfoCacheItem {
             struct_layout: layout.clone(),
-            node_count: field_node_count,
-            has_identifier_mappings,
+            node_count: struct_node_count,
+            has_identifier_mappings: struct_has_identifier_mappings,
         });
 
-        Ok((layout, has_identifier_mappings))
+        Ok(layout)
     }
 
     pub(crate) fn calculate_depth_of_struct(
@@ -2110,8 +2099,13 @@ impl Loader {
         ty: &Type,
         module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let mut count = 0;
-        self.type_to_type_layout_impl(ty, module_store, false, &mut count, 1)
+        let mut context = TypeLayoutContext {
+            is_fully_annotated: false,
+            node_count: 0,
+            has_identifier_mappings: false,
+        };
+        let layout = self.type_to_type_layout_impl(ty, module_store, &mut context, 1)?;
+        Ok((layout, context.has_identifier_mappings))
     }
 
     pub(crate) fn type_to_fully_annotated_layout(
@@ -2119,8 +2113,13 @@ impl Loader {
         ty: &Type,
         module_store: &ModuleStorageAdapter,
     ) -> PartialVMResult<(MoveTypeLayout, bool)> {
-        let mut count = 0;
-        self.type_to_type_layout_impl(ty, module_store, true, &mut count, 1)
+        let mut context = TypeLayoutContext {
+            is_fully_annotated: true,
+            node_count: 0,
+            has_identifier_mappings: false,
+        };
+        let layout = self.type_to_type_layout_impl(ty, module_store, &mut context, 1)?;
+        Ok((layout, context.has_identifier_mappings))
     }
 }
 
