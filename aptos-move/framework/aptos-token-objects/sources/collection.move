@@ -119,6 +119,27 @@ module aptos_token_objects::collection {
         token: address,
     }
 
+    struct MintEvent has drop, store {
+        index: u64,
+        token: address,
+    }
+
+    #[event]
+    struct BurnEventV2 has drop, store {
+        collection_addr: address,
+        index: u64,
+        token: address,
+        previous_owner: address,
+    }
+
+    #[event]
+    struct MintEventV2 has drop, store {
+        collection_addr: address,
+        index: AggregatorSnapshot<u64>,
+        token: address,
+    }
+
+    #[deprecated]
     #[event]
     struct ConcurrentBurnEvent has drop, store {
         collection_addr: address,
@@ -126,11 +147,7 @@ module aptos_token_objects::collection {
         token: address,
     }
 
-    struct MintEvent has drop, store {
-        index: u64,
-        token: address,
-    }
-
+    #[deprecated]
     #[event]
     struct ConcurrentMintEvent has drop, store {
         collection_addr: address,
@@ -369,7 +386,7 @@ module aptos_token_objects::collection {
             );
             aggregator_v2::add(&mut supply.total_minted, 1);
             event::emit(
-                ConcurrentMintEvent {
+                MintEventV2 {
                     collection_addr,
                     index: aggregator_v2::snapshot(&supply.total_minted),
                     token,
@@ -384,6 +401,7 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
+            /// TODO[agg_v2](cleanup): Update to MintEventV2 in the future release
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
                     index: supply.total_minted,
@@ -395,6 +413,7 @@ module aptos_token_objects::collection {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             supply.total_minted = supply.total_minted + 1;
+            /// TODO[agg_v2](cleanup): Update to MintEventV2 in the future release
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
@@ -413,21 +432,25 @@ module aptos_token_objects::collection {
         collection: &Object<Collection>,
         token: address,
         index: Option<u64>,
+        previous_owner: address,
     ) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let collection_addr = object::object_address(collection);
         if (exists<ConcurrentSupply>(collection_addr)) {
             let supply = borrow_global_mut<ConcurrentSupply>(collection_addr);
             aggregator_v2::sub(&mut supply.current_supply, 1);
+
             event::emit(
-                ConcurrentBurnEvent {
+                BurnEventV2 {
                     collection_addr,
                     index: *option::borrow(&index),
                     token,
+                    previous_owner,
                 },
             );
         } else if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
+            /// TODO[agg_v2](cleanup): Update to BurnEventV2 in the future release
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -438,6 +461,7 @@ module aptos_token_objects::collection {
         } else if (exists<UnlimitedSupply>(collection_addr)) {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
+            /// TODO[agg_v2](cleanup): Update to BurnEventV2 in the future release
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {

@@ -430,13 +430,16 @@ module aptos_token_objects::token {
     }
 
     public fun burn(burn_ref: BurnRef) acquires Token, TokenIdentifiers {
-        let addr = if (option::is_some(&burn_ref.inner)) {
+        let (addr, previous_owner) = if (option::is_some(&burn_ref.inner)) {
             let delete_ref = option::extract(&mut burn_ref.inner);
             let addr = object::address_from_delete_ref(&delete_ref);
+            let previous_owner = object::owner(object::address_to_object<Token>(addr));
             object::delete(delete_ref);
-            addr
+            (addr, previous_owner)
         } else {
-            option::extract(&mut burn_ref.self)
+            let addr = option::extract(&mut burn_ref.self);
+            let previous_owner = object::owner(object::address_to_object<Token>(addr));
+            (addr, previous_owner)
         };
 
         if (royalty::exists_at(addr)) {
@@ -463,7 +466,7 @@ module aptos_token_objects::token {
         };
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&collection, addr, option::some(index));
+        collection::decrement_supply(&collection, addr, option::some(index), previous_owner);
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
