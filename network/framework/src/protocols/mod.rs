@@ -6,9 +6,11 @@
 //!
 //! Each protocol corresponds to a certain order of messages
 pub mod direct_send;
-pub mod health_checker;
+// pub mod health_checker;  // TODO: HealthChecker deprecated, delete health_checker/*
 pub mod identity;
 pub mod network;
-pub mod rpc;
+pub mod rpc_error;
 pub mod stream;
 pub mod wire;
+
+pub use rpc_error::RpcError;

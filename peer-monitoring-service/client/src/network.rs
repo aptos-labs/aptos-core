@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_logger::{trace, warn};
-use aptos_network::application::{
+use aptos_network2::application::{
     interface::{NetworkClient, NetworkClientInterface},
     storage::PeersAndMetadata,
 };

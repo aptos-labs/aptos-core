@@ -12,7 +12,7 @@ use crate::{
 use anyhow::bail;
 use aptos_consensus_types::common::Author;
 use aptos_enum_conversion_derive::EnumConversion;
-use aptos_network::{protocols::network::RpcError, ProtocolId};
+use aptos_network2::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::RBMessage;
 use aptos_types::epoch_state::EpochState;
 use bytes::Bytes;

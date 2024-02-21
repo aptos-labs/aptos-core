@@ -14,7 +14,7 @@ use aptos_config::{
     },
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+use aptos_network2::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::{

@@ -47,7 +47,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::info;
-use aptos_network::{
+use aptos_network2::{
     application::interface::NetworkClient,
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{

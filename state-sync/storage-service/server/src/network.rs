@@ -2,9 +2,9 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_network::{
-    application::interface::NetworkServiceEvents,
+use aptos_config::network_id::PeerNetworkId;
+use aptos_network2::{
+    application::interface::NetworkEvents,
     protocols::network::{Event, RpcError},
     ProtocolId,
 };
@@ -16,12 +16,15 @@ use bytes::Bytes;
 use futures::{
     channel::oneshot,
     future,
-    stream::{select_all, BoxStream, Stream, StreamExt},
+    stream::{BoxStream, Stream, StreamExt},
 };
 use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+use tokio::runtime::Handle;
+use tokio_stream::wrappers::ReceiverStream;
+use aptos_network2::protocols::network::network_event_prefetch;
 
 /// A simple wrapper for each network request
 pub struct NetworkRequest {
@@ -33,24 +36,22 @@ pub struct NetworkRequest {
 
 /// A stream of requests from network. Each request also comes with a callback to
 /// send the response.
+///
+/// TODO: StorageServiceNetworkEvents is a Stream over NetworkRequest, but NetworkRequest doesn't add anything to RpcRequest. Drop this and just use the underlying NetworkEvents<StorageServiceMessage> (Stream over StorageServiceMessage) directly.
 pub struct StorageServiceNetworkEvents {
     network_request_stream: BoxStream<'static, NetworkRequest>,
 }
 
 impl StorageServiceNetworkEvents {
-    pub fn new(network_service_events: NetworkServiceEvents<StorageServiceMessage>) -> Self {
-        // Transform the event streams to also include the network ID
-        let network_events: Vec<_> = network_service_events
-            .into_network_and_events()
-            .into_iter()
-            .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-            .collect();
-        let network_events = select_all(network_events).fuse();
+    pub fn new(network_events: NetworkEvents<StorageServiceMessage>, handle: &Handle) -> Self {
+        let (event_tx, event_rx) = tokio::sync::mpsc::channel(10); // TODO: configurable prefetch size other than 10?
+        handle.spawn(network_event_prefetch(network_events, event_tx));
+        let network_events = ReceiverStream::new(event_rx);
 
         // Transform each event to a network request
         let network_request_stream = network_events
-            .filter_map(|(network_id, event)| {
-                future::ready(Self::event_to_request(network_id, event))
+            .filter_map(|event| {
+                future::ready(Self::event_to_request(event))
             })
             .boxed();
 
@@ -61,18 +62,17 @@ impl StorageServiceNetworkEvents {
 
     /// Filters out everything except Rpc requests
     fn event_to_request(
-        network_id: NetworkId,
         event: Event<StorageServiceMessage>,
     ) -> Option<NetworkRequest> {
         match event {
+            // TODO: NetworkRequest used to be different than RpcRequest, but they're now really the same, eliminate internal `NetworkRequest` and just use the RpcRequest
             Event::RpcRequest(
-                peer_id,
+                peer_network_id,
                 StorageServiceMessage::Request(storage_service_request),
                 protocol_id,
                 response_tx,
             ) => {
                 let response_sender = ResponseSender::new(response_tx);
-                let peer_network_id = PeerNetworkId::new(network_id, peer_id);
                 Some(NetworkRequest {
                     peer_network_id,
                     protocol_id,

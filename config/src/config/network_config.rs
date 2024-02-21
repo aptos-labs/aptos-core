@@ -343,6 +343,46 @@ impl NetworkConfig {
         }
         Ok(())
     }
+
+    /// Retrieve and merge seeds so that they have all keys associated
+    pub fn merge_seeds(&self) -> PeerSet {
+        self.verify_seeds().expect("Seeds must be well formed");
+        let mut seeds = self.seeds.clone();
+
+        // Merge old seed configuration with new seed configuration
+        // TODO(gnazario): Once fully migrated, remove `seed_addrs`
+        self
+            .seed_addrs
+            .iter()
+            .map(|(peer_id, addrs)| {
+                (
+                    peer_id,
+                    Peer::from_addrs(PeerRole::ValidatorFullNode, addrs.clone()),
+                )
+            })
+            .for_each(|(peer_id, peer)| {
+                seeds
+                    .entry(*peer_id)
+                    // Sad clone due to Rust not realizing these are two distinct paths
+                    .and_modify(|seed| seed.extend(peer.clone()).unwrap())
+                    .or_insert(peer);
+            });
+
+        // Pull public keys out of addresses
+        seeds.values_mut().for_each(
+            |Peer {
+                 addresses, keys, ..
+             }| {
+                addresses
+                    .iter()
+                    .filter_map(NetworkAddress::find_noise_proto)
+                    .for_each(|pubkey| {
+                        keys.insert(pubkey);
+                    });
+            },
+        );
+        seeds
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
