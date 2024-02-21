@@ -11,6 +11,7 @@ use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+// TODO: increase max sending block txns
 pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 2500;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

@@ -27,6 +27,7 @@ pub struct QuorumStoreBackPressureConfig {
 impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
+            // TODO: increase quorum store backpressure
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, target TPS * commit latency seconds
             backlog_txn_limit_count: 8000 * 2,
@@ -36,7 +37,7 @@ impl Default for QuorumStoreBackPressureConfig {
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
             dynamic_min_txn_per_s: 160,
-            dynamic_max_txn_per_s: 2000,
+            dynamic_max_txn_per_s: 8000,
         }
     }
 }
