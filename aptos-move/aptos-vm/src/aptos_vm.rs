@@ -38,13 +38,15 @@ use aptos_types::{
         partitioner::PartitionedTransactions,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
+    block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     chain_id::ChainId,
     fee_statement::FeeStatement,
+    move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
+    randomness::Randomness,
     state_store::{StateView, TStateView},
     transaction::{
         authenticator::AnySignature, signature_verified_transaction::SignatureVerifiedTransaction,
@@ -1701,13 +1703,47 @@ impl AptosVM {
         let mut session =
             self.new_session(resolver, SessionId::block_meta_ext(&block_metadata_ext));
 
-        let args = serialize_values(&block_metadata_ext.get_prologue_ext_move_args());
+        let block_metadata_with_randomness = match block_metadata_ext {
+            BlockMetadataExt::V0(_) => unreachable!(),
+            BlockMetadataExt::V1(v1) => v1,
+        };
+
+        let BlockMetadataWithRandomness {
+            id,
+            epoch,
+            round,
+            proposer,
+            previous_block_votes_bitvec,
+            failed_proposer_indices,
+            timestamp_usecs,
+            randomness,
+        } = block_metadata_with_randomness;
+
+        let args = vec![
+            MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+            MoveValue::Address(AccountAddress::from_bytes(id.to_vec()).unwrap()),
+            MoveValue::U64(epoch),
+            MoveValue::U64(round),
+            MoveValue::Address(proposer),
+            failed_proposer_indices
+                .into_iter()
+                .map(|i| i as u64)
+                .collect::<Vec<_>>()
+                .as_move_value(),
+            previous_block_votes_bitvec.as_move_value(),
+            MoveValue::U64(timestamp_usecs),
+            randomness
+                .as_ref()
+                .map(Randomness::randomness_cloned)
+                .as_move_value(),
+        ];
+
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
                 BLOCK_PROLOGUE_EXT,
                 vec![],
-                args,
+                serialize_values(&args),
                 &mut gas_meter,
             )
             .map(|_return_vals| ())
