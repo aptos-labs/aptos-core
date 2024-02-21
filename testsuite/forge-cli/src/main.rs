@@ -1837,7 +1837,6 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     const USE_CRAZY_MACHINES: bool = true;
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 100;
-    const VFN_COUNT: usize = 10;
 
     // Config is based on these values. The target TPS should be a slight overestimate of
     // the actual throughput to be able to have reasonable queueing but also so throughput
@@ -1901,7 +1900,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     if ENABLE_VFNS {
         forge_config = forge_config
-            .with_initial_fullnode_count(VFN_COUNT)
+            .with_initial_fullnode_count(VALIDATOR_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
                 optimize_state_sync_for_throughput(config);
