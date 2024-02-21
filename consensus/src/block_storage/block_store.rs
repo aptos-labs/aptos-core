@@ -13,7 +13,7 @@ use crate::{
     persistent_liveness_storage::{
         PersistentLivenessStorage, RecoveryData, RootInfo, RootMetadata,
     },
-    pipeline::execution_client::ExecutionClient,
+    pipeline::execution_client::TExecutionClient,
     util::time_service::TimeService,
 };
 use anyhow::{bail, ensure, format_err, Context};
@@ -64,7 +64,7 @@ fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
 ///             ╰--------------> D3
 pub struct BlockStore {
     inner: Arc<RwLock<BlockTree>>,
-    execution_client: Arc<dyn ExecutionClient>,
+    execution_client: Arc<dyn TExecutionClient>,
     /// The persistent storage backing up the in-memory data structure, every write should go
     /// through this before in-memory tree.
     storage: Arc<dyn PersistentLivenessStorage>,
@@ -81,7 +81,7 @@ impl BlockStore {
     pub fn new(
         storage: Arc<dyn PersistentLivenessStorage>,
         initial_data: RecoveryData,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
         vote_back_pressure_limit: Round,
@@ -133,7 +133,7 @@ impl BlockStore {
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
         highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn PersistentLivenessStorage>,
         max_pruned_blocks_in_mem: usize,
         time_service: Arc<dyn TimeService>,
@@ -172,7 +172,7 @@ impl BlockStore {
             vec![],                   /* reconfig_events */
         );
 
-        let executed_root_block = PipelinedBlock::new(
+        let pipelined_root_block = PipelinedBlock::new(
             *root_block,
             vec![],
             // Create a dummy state_compute_result with necessary fields filled in.
@@ -180,7 +180,7 @@ impl BlockStore {
         );
 
         let tree = BlockTree::new(
-            executed_root_block,
+            pipelined_root_block,
             root_qc,
             root_ordered_cert,
             root_commit_cert,
@@ -219,7 +219,7 @@ impl BlockStore {
         block_store
     }
 
-    /// Commit the given block id with the proof, returns () on success or error
+    /// Send an ordered block id with the proof for execution, returns () on success or error
     pub async fn send_for_execution(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
         let block_id_to_commit = finality_proof.commit_info().id();
         let block_to_commit = self
@@ -241,10 +241,9 @@ impl BlockStore {
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();
 
-        // This callback is invoked synchronously withe coupled-execution and asynchronously in decoupled setup.
-        // the callback could be used for multiple batches of blocks.
+        // This callback is invoked synchronously with and could be used for multiple batches of blocks.
         self.execution_client
-            .send_for_execution(
+            .finalize_order(
                 &blocks_to_commit,
                 finality_proof.ledger_info().clone(),
                 Box::new(

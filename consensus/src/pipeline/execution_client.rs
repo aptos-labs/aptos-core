@@ -24,6 +24,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_executor_types::ExecutorResult;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_types::{
@@ -38,12 +39,12 @@ use futures::{
 };
 use futures_channel::mpsc::unbounded;
 use move_core_types::account_address::AccountAddress;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 #[async_trait::async_trait]
-pub trait ExecutionClient: Send + Sync {
+pub trait TExecutionClient: Send + Sync {
     /// Initialize the execution phase for a new epoch.
-    async fn init_for_new_epoch(
+    async fn start_epoch(
         &self,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
@@ -52,13 +53,14 @@ pub trait ExecutionClient: Send + Sync {
         features: &Features,
     );
 
+    /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
 
     /// Send ordered blocks to the real execution phase through the channel.
-    async fn send_for_execution(
+    async fn finalize_order(
         &self,
         blocks: &[Arc<PipelinedBlock>],
-        finality_proof: LedgerInfoWithSignatures,
+        ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;
 
@@ -160,10 +162,7 @@ impl ExecutionProxyClient {
                 Some(&counters::BUFFER_MANAGER_MSGS),
             );
 
-        self.handle
-            .write()
-            .unwrap()
-            .init(block_tx, commit_msg_tx, reset_tx);
+        self.handle.write().init(block_tx, commit_msg_tx, reset_tx);
 
         let (
             execution_schedule_phase,
@@ -193,8 +192,8 @@ impl ExecutionProxyClient {
 }
 
 #[async_trait::async_trait]
-impl ExecutionClient for ExecutionProxyClient {
-    async fn init_for_new_epoch(
+impl TExecutionClient for ExecutionProxyClient {
+    async fn start_epoch(
         &self,
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
@@ -221,17 +220,17 @@ impl ExecutionClient for ExecutionProxyClient {
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
-        self.handle.read().unwrap().execute_tx.clone()
+        self.handle.read().execute_tx.clone()
     }
 
-    async fn send_for_execution(
+    async fn finalize_order(
         &self,
         blocks: &[Arc<PipelinedBlock>],
-        finality_proof: LedgerInfoWithSignatures,
+        ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
         assert!(!blocks.is_empty());
-        let execute_tx = self.handle.read().unwrap().execute_tx.clone();
+        let execute_tx = self.handle.read().execute_tx.clone();
 
         if execute_tx.is_none() {
             debug!("Failed to send to buffer manager, maybe epoch ends");
@@ -249,7 +248,7 @@ impl ExecutionClient for ExecutionProxyClient {
                     .iter()
                     .map(|b| (**b).clone())
                     .collect::<Vec<PipelinedBlock>>(),
-                ordered_proof: finality_proof,
+                ordered_proof,
                 callback,
             })
             .await
@@ -265,7 +264,7 @@ impl ExecutionClient for ExecutionProxyClient {
         peer_id: AccountAddress,
         commit_msg: IncomingCommitRequest,
     ) -> Result<()> {
-        if let Some(tx) = &self.handle.read().unwrap().commit_tx {
+        if let Some(tx) = &self.handle.read().commit_tx {
             tx.push(peer_id, commit_msg)
         } else {
             counters::EPOCH_MANAGER_ISSUES_DETAILS
@@ -281,7 +280,7 @@ impl ExecutionClient for ExecutionProxyClient {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
-        let reset_tx = self.handle.read().unwrap().reset_tx.clone();
+        let reset_tx = self.handle.read().reset_tx.clone();
 
         if let Some(mut reset_tx) = reset_tx {
             // reset execution phase and commit phase
@@ -303,7 +302,7 @@ impl ExecutionClient for ExecutionProxyClient {
     }
 
     async fn end_epoch(&self) {
-        let reset_tx = self.handle.write().unwrap().reset();
+        let reset_tx = self.handle.write().reset();
         if let Some(mut tx) = reset_tx {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
@@ -323,8 +322,8 @@ impl ExecutionClient for ExecutionProxyClient {
 pub struct DummyExecutionClient;
 
 #[async_trait::async_trait]
-impl ExecutionClient for DummyExecutionClient {
-    async fn init_for_new_epoch(
+impl TExecutionClient for DummyExecutionClient {
+    async fn start_epoch(
         &self,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
@@ -338,7 +337,7 @@ impl ExecutionClient for DummyExecutionClient {
         None
     }
 
-    async fn send_for_execution(
+    async fn finalize_order(
         &self,
         _: &[Arc<PipelinedBlock>],
         _: LedgerInfoWithSignatures,

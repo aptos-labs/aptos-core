@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
-    pipeline::execution_client::ExecutionClient,
+    pipeline::execution_client::TExecutionClient,
 };
 use anyhow::ensure;
 use aptos_channels::aptos_channel;
@@ -157,7 +157,7 @@ impl StateSyncTrigger {
 pub(super) struct DagStateSynchronizer {
     epoch_state: Arc<EpochState>,
     time_service: TimeService,
-    execution_client: Arc<dyn ExecutionClient>,
+    execution_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn DAGStorage>,
     payload_manager: Arc<dyn TPayloadManager>,
     dag_window_size_config: Round,
@@ -167,7 +167,7 @@ impl DagStateSynchronizer {
     pub fn new(
         epoch_state: Arc<EpochState>,
         time_service: TimeService,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
         dag_window_size_config: Round,

@@ -11,7 +11,7 @@ use crate::{
     network_interface::ConsensusMsg,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::ExecutionClient,
+    pipeline::execution_client::TExecutionClient,
 };
 use anyhow::{bail, Context};
 use aptos_consensus_types::{
@@ -215,7 +215,7 @@ impl BlockStore {
         highest_commit_cert: &'a QuorumCert,
         retriever: &'a mut BlockRetriever,
         storage: Arc<dyn PersistentLivenessStorage>,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         payload_manager: Arc<PayloadManager>,
     ) -> anyhow::Result<RecoveryData> {
         info!(

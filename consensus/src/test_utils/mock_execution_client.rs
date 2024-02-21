@@ -7,7 +7,7 @@ use crate::{
     network::IncomingCommitRequest,
     payload_manager::PayloadManager,
     pipeline::{
-        buffer_manager::OrderedBlocks, execution_client::ExecutionClient,
+        buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
         signing_phase::CommitSignerProvider,
     },
     state_replication::StateComputerCommitCallBackType,
@@ -86,8 +86,8 @@ impl MockExecutionClient {
 }
 
 #[async_trait::async_trait]
-impl ExecutionClient for MockExecutionClient {
-    async fn init_for_new_epoch(
+impl TExecutionClient for MockExecutionClient {
+    async fn start_epoch(
         &self,
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
@@ -101,7 +101,7 @@ impl ExecutionClient for MockExecutionClient {
         Some(self.executor_channel.clone())
     }
 
-    async fn send_for_execution(
+    async fn finalize_order(
         &self,
         blocks: &[Arc<PipelinedBlock>],
         finality_proof: LedgerInfoWithSignatures,

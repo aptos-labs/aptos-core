@@ -37,7 +37,7 @@ use crate::{
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::ExecutionClient,
+    pipeline::execution_client::TExecutionClient,
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
         quorum_store_coordinator::CoordinatorCommand,
@@ -123,7 +123,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
-    execution_client: Arc<dyn ExecutionClient>,
+    execution_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
     vtxn_pool: VTxnPoolState,
@@ -161,7 +161,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn PersistentLivenessStorage>,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         reconfig_events: ReconfigNotificationListener<P>,
@@ -746,7 +746,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
         self.execution_client
-            .init_for_new_epoch(
+            .start_epoch(
                 epoch_state.clone(),
                 safety_rules_container.clone(),
                 payload_manager.clone(),
@@ -995,7 +995,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         self.execution_client
-            .init_for_new_epoch(
+            .start_epoch(
                 epoch_state.clone(),
                 commit_signer,
                 payload_manager.clone(),

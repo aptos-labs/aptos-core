@@ -21,7 +21,7 @@ use std::{
 };
 
 /// A representation of a block that has been added to the execution pipeline. It might either be in ordered
-/// executed state. In the ordered state, the block is waiting to be executed. In the executed state,
+/// or in executed state. In the ordered state, the block is waiting to be executed. In the executed state,
 /// the block has been executed and the output is available.
 #[derive(Clone, Eq, PartialEq)]
 pub struct PipelinedBlock {

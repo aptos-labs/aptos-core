@@ -9,7 +9,7 @@ use crate::{
     network::NetworkSender,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
-    pipeline::execution_client::ExecutionClient,
+    pipeline::execution_client::TExecutionClient,
     round_manager::VerifiedEvent,
 };
 use anyhow::{anyhow, ensure, Context, Result};
@@ -29,7 +29,7 @@ pub struct RecoveryManager {
     epoch_state: Arc<EpochState>,
     network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
-    execution_client: Arc<dyn ExecutionClient>,
+    execution_client: Arc<dyn TExecutionClient>,
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<PayloadManager>,
@@ -40,7 +40,7 @@ impl RecoveryManager {
         epoch_state: Arc<EpochState>,
         network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         last_committed_round: Round,
         max_blocks_to_request: u64,
         payload_manager: Arc<PayloadManager>,

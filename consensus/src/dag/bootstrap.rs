@@ -32,7 +32,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    pipeline::{buffer_manager::OrderedBlocks, execution_client::ExecutionClient},
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{
@@ -331,7 +331,7 @@ pub struct DagBootstrapper {
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
-    execution_client: Arc<dyn ExecutionClient>,
+    execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
     executor: BoundedExecutor,
@@ -354,7 +354,7 @@ impl DagBootstrapper {
         payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
-        execution_client: Arc<dyn ExecutionClient>,
+        execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
         executor: BoundedExecutor,
@@ -710,7 +710,7 @@ pub(super) fn bootstrap_dag_for_test(
     time_service: aptos_time_service::TimeService,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    execution_client: Arc<dyn ExecutionClient>,
+    execution_client: Arc<dyn TExecutionClient>,
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
