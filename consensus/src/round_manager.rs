@@ -786,7 +786,7 @@ impl RoundManager {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
                 if !block_store.vote_back_pressure() {
                     if let Err(e) = self_sender.push(author, event) {
-                        error!("Failed to send event to round manager {:?}", e);
+                        warn!("Failed to send event to round manager {:?}", e);
                     }
                     break;
                 }
