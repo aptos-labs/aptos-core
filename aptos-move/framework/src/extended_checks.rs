@@ -116,6 +116,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
                 self.check_entry_functions(module);
+                self.check_and_record_functions_using_randomness(module);
                 self.check_and_record_events(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
@@ -163,7 +164,7 @@ impl<'a> ExtendedChecker<'a> {
 // Entry Functions
 
 impl<'a> ExtendedChecker<'a> {
-    fn check_entry_functions(&mut self, module: &ModuleEnv) {
+    fn check_entry_functions(&self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
             if !fun.is_entry() {
                 continue;
@@ -172,18 +173,6 @@ impl<'a> ExtendedChecker<'a> {
             if self.has_attribute(fun, LEGACY_ENTRY_FUN_ATTRIBUTE) {
                 // Skip checking for legacy entries.
                 continue;
-            }
-
-            // Record functions which use randomness.
-            if self.has_attribute(fun, USES_RANDOMNESS_ATTRIBUTE) {
-                let module_id = self.get_runtime_module_id(module);
-                self.output
-                    .entry(module_id)
-                    .or_default()
-                    .fun_attributes
-                    .entry(fun.get_simple_name_string().to_string())
-                    .or_default()
-                    .push(KnownAttribute::uses_randomness());
             }
 
             self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameter_types());
@@ -461,6 +450,37 @@ impl<'a> ExtendedChecker<'a> {
             }
         } else {
             None
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------------
+// Uses Randomness
+
+impl<'a> ExtendedChecker<'a> {
+    fn check_and_record_functions_using_randomness(&mut self, module: &ModuleEnv) {
+        for ref fun in module.get_functions() {
+            if !self.has_attribute(fun, USES_RANDOMNESS_ATTRIBUTE) {
+                continue;
+            }
+
+            // Only entry functions can have this annotation.
+            if !fun.is_entry() {
+                self.env.error(
+                    &fun.get_id_loc(),
+                    "only entry functions can have #[uses_randomness] annotation",
+                )
+            }
+
+            // Record functions which use randomness.
+            let module_id = self.get_runtime_module_id(module);
+            self.output
+                .entry(module_id)
+                .or_default()
+                .fun_attributes
+                .entry(fun.get_simple_name_string().to_string())
+                .or_default()
+                .push(KnownAttribute::uses_randomness());
         }
     }
 }
