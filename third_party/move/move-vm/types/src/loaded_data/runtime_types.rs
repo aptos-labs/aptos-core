@@ -16,7 +16,12 @@ use move_binary_format::{
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
-use std::{cmp::max, collections::BTreeMap, fmt::Debug, cell::RefCell, collections::btree_map};
+use std::{
+    cell::RefCell,
+    cmp::max,
+    collections::{btree_map, BTreeMap},
+    fmt::Debug,
+};
 
 pub const TYPE_DEPTH_MAX: usize = 256;
 
@@ -199,6 +204,7 @@ pub enum Type {
     U256,
 }
 
+#[derive(Debug)]
 pub struct TypeContext {
     identifier_cache: IndexMap<StructIdentifier>,
     instantiation_map: IndexMap<(StructNameIndex, Vec<Type>)>,
@@ -304,8 +310,13 @@ impl Type {
 
 impl TypeContext {
     pub fn new() -> Self {
-        TypeContext { identifier_cache: IndexMap::new(), instantiation_map: IndexMap::new(), type_id_map: IndexMap::new() }
+        TypeContext {
+            identifier_cache: IndexMap::new(),
+            instantiation_map: IndexMap::new(),
+            type_id_map: IndexMap::new(),
+        }
     }
+
     pub fn get_idx_by_identifier(&self, struct_identifier: StructIdentifier) -> StructNameIndex {
         StructNameIndex(self.identifier_cache.get_or_insert(struct_identifier))
     }
@@ -322,11 +333,18 @@ impl TypeContext {
         TypeIndex(self.type_id_map.get_or_insert(ty))
     }
 
-    pub fn get_instantiation_by_index(&self, inst_idx: StructInstantiationIndex) -> &(StructNameIndex, Vec<Type>) {
+    pub fn get_instantiation_by_index(
+        &self,
+        inst_idx: StructInstantiationIndex,
+    ) -> &(StructNameIndex, Vec<Type>) {
         self.instantiation_map.get_by_index(inst_idx.0)
     }
 
-    pub fn get_idx_by_instantiation(&self, idx: StructNameIndex, ty_args: Vec<Type>) -> StructInstantiationIndex {
+    pub fn get_idx_by_instantiation(
+        &self,
+        idx: StructNameIndex,
+        ty_args: Vec<Type>,
+    ) -> StructInstantiationIndex {
         StructInstantiationIndex(self.instantiation_map.get_or_insert((idx, ty_args)))
     }
 
@@ -529,7 +547,9 @@ impl TypeContext {
 
     pub fn check_ref_eq(&self, lhs: &Type, expected_inner: TypeIndex) -> PartialVMResult<()> {
         match lhs {
-            Type::MutableReference(inner) | Type::Reference(inner) if *inner == expected_inner => Ok(()),
+            Type::MutableReference(inner) | Type::Reference(inner) if *inner == expected_inner => {
+                Ok(())
+            },
             _ => Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("VecMutBorrow expects a vector reference".to_string()),
@@ -656,6 +676,41 @@ impl TypeContext {
 
             Ok(n)
         })
+    }
+
+    pub fn format_type(&self, ty: &Type) -> String {
+        match ty {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::Address
+            | Type::Signer => format!("{:?}", ty),
+            Type::Reference(idx) => format!("&{}", self.format_type(self.get_type_by_index(*idx))),
+            Type::MutableReference(idx) => {
+                format!("&mut {}", self.format_type(self.get_type_by_index(*idx)))
+            },
+            Type::Vector(idx) => format!("Vec<{}>", self.format_type(self.get_type_by_index(*idx))),
+            Type::Struct { idx, .. } => {
+                let struct_identifier = self.get_identifier_by_idx(*idx);
+                format!("{}::{}", struct_identifier.module, struct_identifier.name)
+            },
+            Type::TyParam(id) => format!("ty_{}", id),
+            Type::StructInstantiation { idx, .. } => {
+                let (struct_identifier_id, ty_args) = self.get_instantiation_by_index(*idx);
+                let struct_identifier = self.get_identifier_by_idx(*struct_identifier_id);
+                let mut result =
+                    format!("{}::{}<", struct_identifier.module, struct_identifier.name);
+                for ty in ty_args {
+                    result = format!("{}{}, ", result, self.format_type(ty));
+                }
+                result += ">";
+                result
+            },
+        }
     }
 }
 

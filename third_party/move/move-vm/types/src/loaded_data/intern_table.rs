@@ -4,14 +4,15 @@
 
 use boxcar::Vec as CVec;
 use dashmap::{mapref::entry::Entry, DashMap};
-use std::hash::Hash;
+use std::{fmt::Debug, hash::Hash};
 
-pub struct IndexMap<K> {
+#[derive(Debug)]
+pub struct IndexMap<K: Debug + Hash + Eq> {
     map: DashMap<K, usize>,
     entries: CVec<K>,
 }
 
-impl<K: Eq + Hash + Clone> IndexMap<K> {
+impl<K: Eq + Hash + Clone + Debug> IndexMap<K> {
     pub fn new() -> Self {
         Self {
             map: DashMap::new(),

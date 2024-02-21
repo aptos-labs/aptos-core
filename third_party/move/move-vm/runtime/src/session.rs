@@ -453,7 +453,11 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     pub fn subst_ty(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
-        self.move_vm.runtime.loader().type_context.subst(ty, ty_args)
+        self.move_vm
+            .runtime
+            .loader()
+            .type_context
+            .subst(ty, ty_args)
     }
 
     pub fn type_context(&self) -> &'l TypeContext {

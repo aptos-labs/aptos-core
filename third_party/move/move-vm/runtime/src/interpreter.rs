@@ -1484,7 +1484,7 @@ impl Frame {
                     .check_ref_eq(&top_ty, expected_ty_idx)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(expected_ty_idx))?;
+                    .push_ty(Type::Reference(resolver.get_field_type(*fh_idx)?))?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let expected_ty_idx = resolver.field_handle_to_struct(*fh_idx)?;
@@ -1492,7 +1492,7 @@ impl Frame {
                 top_ty.check_eq(&Type::MutableReference(expected_ty_idx))?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(expected_ty_idx))?;
+                    .push_ty(Type::MutableReference(resolver.get_field_type(*fh_idx)?))?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
