@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{types::Vote, Node, NodeId, NodeMessage};
+use super::{types::Vote, NodeId, NodeMessage};
 use crate::dag::CertifiedNode;
 use aptos_consensus_types::{
     common::{Author, Round},
@@ -48,12 +48,6 @@ impl CommitEvent {
 }
 
 pub trait DAGStorage: Send + Sync {
-    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()>;
-
-    fn get_pending_node(&self) -> anyhow::Result<Option<Node>>;
-
-    fn delete_pending_node(&self) -> anyhow::Result<()>;
-
     fn save_pending_node_msg(&self, node_msg: &NodeMessage) -> anyhow::Result<()>;
 
     fn get_pending_node_msg(&self) -> anyhow::Result<Option<NodeMessage>>;

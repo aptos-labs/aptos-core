@@ -31,5 +31,6 @@ pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
 #[cfg(test)]
 pub use types::Extensions;
 pub use types::{
-    CertifiedNode, DAGMessage, DAGNetworkMessage, DAGRpcResult, Node, NodeId, NodeMessage, Vote,
+    CertifiedNode, DAGMessage, DAGNetworkMessage, DAGRpcResult, DagPayload, Node, NodeId,
+    NodeMessage, Vote,
 };

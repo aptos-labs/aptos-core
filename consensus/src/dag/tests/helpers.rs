@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dag::types::{CertifiedNode, DagPayload, Extensions, Node, NodeCertificate},
+    dag::{
+        types::{CertifiedNode, DagPayload, Extensions, Node, NodeCertificate},
+        NodeMessage,
+    },
     payload_manager::TPayloadManager,
 };
 use aptos_consensus_types::common::{Author, Payload, Round};
@@ -12,7 +15,7 @@ pub(super) const TEST_DAG_WINDOW: u64 = 5;
 pub(super) struct MockPayloadManager {}
 
 impl TPayloadManager for MockPayloadManager {
-    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+    fn prefetch_dag_payload_data(&self, _payload: &DagPayload, _timestamp: u64) {}
 }
 
 pub(crate) fn new_certified_node(
@@ -74,6 +77,16 @@ pub(crate) fn new_node_with_empty_payload(
         Payload::empty(false).into(),
         parents,
     )
+}
+
+pub(crate) fn new_node_message_inline_payload(
+    round: Round,
+    timestamp: u64,
+    author: Author,
+    parents: Vec<NodeCertificate>,
+) -> NodeMessage {
+    let node = new_node_with_empty_payload(round, timestamp, author, parents);
+    NodeMessage::new(node, None)
 }
 
 /// Generate certified nodes for dag given the virtual dag

@@ -6,16 +6,18 @@ use crate::dag::{
     dag_store::DagStore,
     errors::NodeBroadcastHandleError,
     health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
+    payload::TDagPayloadResolver,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     tests::{
         dag_test::MockStorage,
-        helpers::{new_node_with_empty_payload, MockPayloadManager, TEST_DAG_WINDOW},
+        helpers::{new_node_message_inline_payload, MockPayloadManager, TEST_DAG_WINDOW},
     },
     types::NodeCertificate,
     NodeId, RpcHandler, Vote,
 };
 use aptos_config::config::DagPayloadConfig;
+use aptos_consensus_types::dag_payload::DecoupledPayload;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     epoch_state::EpochState,
@@ -29,11 +31,26 @@ use std::{collections::BTreeMap, sync::Arc};
 struct MockFetchRequester {}
 
 impl TFetchRequester for MockFetchRequester {
-    fn request_for_node(&self, _node: crate::dag::Node) -> anyhow::Result<()> {
+    fn request_for_node(&self, _node: crate::dag::NodeMessage) -> anyhow::Result<()> {
         Ok(())
     }
 
     fn request_for_certified_node(&self, _node: crate::dag::CertifiedNode) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
+struct MockDagPayloadManager {}
+
+impl TDagPayloadResolver for MockDagPayloadManager {
+    fn get_payload_if_exists(
+        &self,
+        _node: &crate::dag::CertifiedNode,
+    ) -> Option<Arc<DecoupledPayload>> {
+        unreachable!()
+    }
+
+    fn add_payload(&self, _payload: DecoupledPayload) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -56,6 +73,7 @@ async fn test_node_broadcast_receiver_succeed() {
         0,
         TEST_DAG_WINDOW,
     ));
+    let dag_payload_manager = Arc::new(MockDagPayloadManager {});
 
     let health_backoff = HealthBackoff::new(
         epoch_state.clone(),
@@ -63,13 +81,14 @@ async fn test_node_broadcast_receiver_succeed() {
         NoPipelineBackpressure::new(),
     );
 
-    let wellformed_node = new_node_with_empty_payload(1, 10, signers[0].author(), vec![]);
-    let equivocating_node = new_node_with_empty_payload(1, 20, signers[0].author(), vec![]);
+    let wellformed_node = new_node_message_inline_payload(1, 10, signers[0].author(), vec![]);
+    let equivocating_node = new_node_message_inline_payload(1, 20, signers[0].author(), vec![]);
 
     assert_ne!(wellformed_node.digest(), equivocating_node.digest());
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag,
+        dag_payload_manager,
         signers[3].clone(),
         epoch_state.clone(),
         storage.clone(),
@@ -108,6 +127,7 @@ async fn test_node_broadcast_receiver_failure() {
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
+            let payload_manager = Arc::new(MockDagPayloadManager {});
             let dag = Arc::new(DagStore::new(
                 epoch_state.clone(),
                 storage.clone(),
@@ -118,6 +138,7 @@ async fn test_node_broadcast_receiver_failure() {
 
             NodeBroadcastHandler::new(
                 dag,
+                payload_manager,
                 signer.clone(),
                 epoch_state.clone(),
                 storage,
@@ -135,7 +156,7 @@ async fn test_node_broadcast_receiver_failure() {
         .collect();
 
     // Round 1
-    let node = new_node_with_empty_payload(1, 10, signers[0].author(), vec![]);
+    let node = new_node_message_inline_payload(1, 10, signers[0].author(), vec![]);
     let vote = rb_receivers[1].process(node.clone()).await.unwrap();
 
     // Round 2 with invalid parent
@@ -149,7 +170,7 @@ async fn test_node_broadcast_receiver_failure() {
             .aggregate_signatures(&partial_sigs)
             .unwrap(),
     );
-    let node = new_node_with_empty_payload(2, 20, signers[0].author(), vec![node_cert]);
+    let node = new_node_message_inline_payload(2, 20, signers[0].author(), vec![node_cert]);
     assert_eq!(
         rb_receivers[1].process(node).await.unwrap_err().to_string(),
         NodeBroadcastHandleError::InvalidParent.to_string(),
@@ -159,7 +180,7 @@ async fn test_node_broadcast_receiver_failure() {
     let node_certificates: Vec<_> = signers
         .iter()
         .map(|signer| {
-            let node = new_node_with_empty_payload(1, 10, signer.author(), vec![]);
+            let node = new_node_message_inline_payload(1, 10, signer.author(), vec![]);
             let mut partial_sigs = PartialSignatures::empty();
             rb_receivers
                 .iter_mut()
@@ -178,7 +199,7 @@ async fn test_node_broadcast_receiver_failure() {
         .collect();
 
     // Add Round 2 node with proper certificates
-    let node = new_node_with_empty_payload(2, 20, signers[0].author(), node_certificates);
+    let node = new_node_message_inline_payload(2, 20, signers[0].author(), node_certificates);
     assert_eq!(
         rb_receivers[0].process(node).await.unwrap_err().to_string(),
         NodeBroadcastHandleError::MissingParents.to_string()
@@ -195,6 +216,7 @@ async fn test_node_broadcast_receiver_storage() {
     });
 
     let storage = Arc::new(MockStorage::new());
+    let dag_payload_manager = Arc::new(MockDagPayloadManager {});
     let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
@@ -203,10 +225,11 @@ async fn test_node_broadcast_receiver_storage() {
         TEST_DAG_WINDOW,
     ));
 
-    let node = new_node_with_empty_payload(1, 10, signers[0].author(), vec![]);
+    let node = new_node_message_inline_payload(1, 10, signers[0].author(), vec![]);
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag.clone(),
+        dag_payload_manager.clone(),
         signers[3].clone(),
         epoch_state.clone(),
         storage.clone(),
@@ -229,6 +252,7 @@ async fn test_node_broadcast_receiver_storage() {
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag,
+        dag_payload_manager.clone(),
         signers[3].clone(),
         epoch_state.clone(),
         storage.clone(),

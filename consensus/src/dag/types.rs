@@ -157,6 +157,13 @@ pub enum DagPayload {
 }
 
 impl DagPayload {
+    pub fn digest(&self) -> Option<&PayloadDigest> {
+        match self {
+            DagPayload::Inline(_) => None,
+            DagPayload::Decoupled(info) => Some(info.digest()),
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             DagPayload::Inline(payload) => payload.len(),
@@ -168,17 +175,6 @@ impl DagPayload {
         match self {
             DagPayload::Inline(payload) => payload.size(),
             DagPayload::Decoupled(info) => info.size(),
-        }
-    }
-}
-
-impl Deref for DagPayload {
-    type Target = Payload;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            DagPayload::Inline(payload) => payload,
-            _ => unimplemented!(),
         }
     }
 }
@@ -452,8 +448,17 @@ impl NodeMessage {
         &self.node
     }
 
-    pub fn payload(&self) -> Option<&DecoupledPayload> {
+    pub fn decoupled_payload(&self) -> Option<&DecoupledPayload> {
         self.decoupled_payload.as_ref()
+    }
+
+    pub fn payload(&self) -> &Payload {
+        match self.node.payload() {
+            DagPayload::Inline(payload) => payload,
+            DagPayload::Decoupled(_) => self
+                .decoupled_payload()
+                .expect("must exist in decoupled mode"),
+        }
     }
 
     pub fn unwrap(self) -> (Node, Option<DecoupledPayload>) {
@@ -670,7 +675,7 @@ impl SignatureBuilder {
 
 impl BroadcastStatus<DAGMessage, DAGRpcResult> for Arc<SignatureBuilder> {
     type Aggregated = ();
-    type Message = Node;
+    type Message = NodeMessage;
     type Response = Vote;
 
     /// Processes the [Vote]s received for a given [Node]. Once a supermajority voting power
@@ -986,7 +991,7 @@ impl core::fmt::Debug for DAGNetworkMessage {
 
 #[derive(Clone, Serialize, Deserialize, Debug, EnumConversion)]
 pub enum DAGMessage {
-    NodeMsg(Node),
+    NodeMsg(NodeMessage),
     VoteMsg(Vote),
     CertifiedNodeMsg(CertifiedNodeMessage),
     CertifiedAckMsg(CertifiedAck),

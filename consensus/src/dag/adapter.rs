@@ -4,18 +4,18 @@
 use super::{
     dag_store::DagStore,
     observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
+    payload::DagPayloadStore,
     types::DagPayload,
     NodeMessage,
 };
 use crate::{
     consensusdb::{
         CertifiedNodeSchema, ConsensusDB, DagVoteSchema, DecoupledPayloadSchema, NodeMsgSchema,
-        NodeSchema,
     },
     counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
-        CertifiedNode, Node, NodeId, Vote,
+        CertifiedNode, NodeId, Vote,
     },
     pipeline::buffer_manager::OrderedBlocks,
 };
@@ -98,6 +98,7 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     dag: Arc<DagStore>,
+    payload_store: Arc<DagPayloadStore>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -108,6 +109,7 @@ impl OrderedNotifierAdapter {
     pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         dag: Arc<DagStore>,
+        payload_store: Arc<DagPayloadStore>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -115,6 +117,7 @@ impl OrderedNotifierAdapter {
         Self {
             executor_channel,
             dag,
+            payload_store,
             parent_block_info: Arc::new(RwLock::new(parent_block_info)),
             epoch_state,
             ledger_info_provider,
@@ -146,10 +149,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
         let mut validator_txns = vec![];
-        let mut payload = if matches!(anchor.payload(), DagPayload::Decoupled(_)) {
-            Payload::empty_dag_payload()
-        } else {
-            Payload::empty(anchor.payload().is_in_quorum_store())
+        let mut payload = match anchor.payload() {
+            DagPayload::Inline(payload) => Payload::empty(payload.is_in_quorum_store()),
+            DagPayload::Decoupled(_) => Payload::empty_dag_payload(),
         };
         let mut node_digests = vec![];
         for node in &ordered_nodes {
@@ -320,18 +322,6 @@ impl StorageAdapter {
 }
 
 impl DAGStorage for StorageAdapter {
-    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()> {
-        Ok(self.consensus_db.put::<NodeSchema>(&(), node)?)
-    }
-
-    fn get_pending_node(&self) -> anyhow::Result<Option<Node>> {
-        Ok(self.consensus_db.get::<NodeSchema>(&())?)
-    }
-
-    fn delete_pending_node(&self) -> anyhow::Result<()> {
-        Ok(self.consensus_db.delete::<NodeSchema>(vec![()])?)
-    }
-
     fn save_pending_node_msg(&self, node_msg: &NodeMessage) -> anyhow::Result<()> {
         Ok(self.consensus_db.put::<NodeMsgSchema>(&(), node_msg)?)
     }

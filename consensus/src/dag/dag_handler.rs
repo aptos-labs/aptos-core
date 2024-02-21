@@ -1,5 +1,9 @@
 // Copyright © Aptos Foundation
 
+use super::{
+    payload::{DagPayloadManager, PayloadRequestHandler},
+    NodeMessage,
+};
 use crate::{
     dag::{
         dag_driver::DagDriver,
@@ -12,26 +16,30 @@ use crate::{
         },
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
-        CertifiedNode, Node,
+        CertifiedNode,
     },
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
 };
 use aptos_bounded_executor::{concurrent_map, BoundedExecutor};
 use aptos_channels::aptos_channel;
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    dag_payload::PayloadLinkMsg,
+};
 use aptos_logger::{debug, error, warn};
 use aptos_types::epoch_state::EpochState;
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::sync::Arc;
-use tokio::{runtime::Handle, select};
+use tokio::{runtime::Handle, select, sync::mpsc::UnboundedReceiver};
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
     node_receiver: Arc<NodeBroadcastHandler>,
     dag_driver: Arc<DagDriver>,
-    node_fetch_waiter: FetchWaiter<Node>,
+    node_fetch_waiter: FetchWaiter<NodeMessage>,
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
+    payload_manager: Arc<DagPayloadManager>,
     new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     verified_msg_processor: Arc<VerifiedMessageProcessor>,
 }
@@ -42,8 +50,10 @@ impl NetworkHandler {
         node_receiver: NodeBroadcastHandler,
         dag_driver: DagDriver,
         fetch_receiver: FetchRequestHandler,
-        node_fetch_waiter: FetchWaiter<Node>,
+        payload_receiver: PayloadRequestHandler,
+        node_fetch_waiter: FetchWaiter<NodeMessage>,
         certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
+        payload_manager: Arc<DagPayloadManager>,
         state_sync_trigger: StateSyncTrigger,
         new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     ) -> Self {
@@ -62,13 +72,16 @@ impl NetworkHandler {
                 fetch_receiver,
                 state_sync_trigger,
                 epoch_state,
+                payload_receiver,
             }),
+            payload_manager,
         }
     }
 
     pub async fn run(
         self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
+        payload_link_rx: &mut UnboundedReceiver<PayloadLinkMsg>,
         executor: BoundedExecutor,
         _buffer: Vec<DAGMessage>,
     ) -> SyncOutcome {
@@ -81,6 +94,7 @@ impl NetworkHandler {
             mut certified_node_fetch_waiter,
             mut new_round_event,
             verified_msg_processor,
+            payload_manager,
             ..
         } = self;
 
@@ -185,6 +199,12 @@ impl NetworkHandler {
                         });
                     }).await;
                 },
+                Some(link_msg) = payload_link_rx.recv() => {
+                    let payload_manager_clone = payload_manager.clone();
+                    executor.spawn(async move {
+                        monitor!("dag_on_payload_link_msg", payload_manager_clone.process_link_message(link_msg).await);
+                    }).await;
+                }
             }
         }
     }
@@ -194,6 +214,7 @@ struct VerifiedMessageProcessor {
     node_receiver: Arc<NodeBroadcastHandler>,
     dag_driver: Arc<DagDriver>,
     fetch_receiver: FetchRequestHandler,
+    payload_receiver: PayloadRequestHandler,
     state_sync_trigger: StateSyncTrigger,
     epoch_state: Arc<EpochState>,
 }
@@ -252,6 +273,19 @@ impl VerifiedMessageProcessor {
                         DAGMessage::FetchRequest(request) => monitor!(
                             "dag_on_fetch_request",
                             self.fetch_receiver
+                                .process(request)
+                                .await
+                                .map(|r| r.into())
+                                .map_err(|err| {
+                                    err.downcast::<FetchRequestHandleError>().map_or(
+                                        DAGError::Unknown,
+                                        DAGError::FetchRequestHandleError,
+                                    )
+                                })
+                        ),
+                        DAGMessage::PayloadRequest(request) => monitor!(
+                            "dag_on_payload_request",
+                            self.payload_receiver
                                 .process(request)
                                 .await
                                 .map(|r| r.into())

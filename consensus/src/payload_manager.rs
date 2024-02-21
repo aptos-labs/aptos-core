@@ -3,6 +3,7 @@
 
 use crate::{
     counters,
+    dag::DagPayload,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
 use aptos_consensus_types::{
@@ -20,7 +21,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc::UnboundedSender, oneshot};
 
 pub trait TPayloadManager: Send + Sync {
-    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
+    fn prefetch_dag_payload_data(&self, payload: &DagPayload, timestamp: u64);
 }
 
 pub struct DAGLink {
@@ -74,8 +75,13 @@ pub enum PayloadManager {
 }
 
 impl TPayloadManager for PayloadManager {
-    fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64) {
-        self.prefetch_payload_data(payload, timestamp);
+    fn prefetch_dag_payload_data(&self, payload: &DagPayload, timestamp: u64) {
+        match payload {
+            DagPayload::Inline(payload) => self.prefetch_payload_data(payload, timestamp),
+            DagPayload::Decoupled(info) => {
+                self.prefetch_payload_data(&Payload::DAG(info.clone().into()), timestamp)
+            },
+        }
     }
 }
 

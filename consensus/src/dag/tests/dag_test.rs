@@ -6,7 +6,7 @@ use crate::dag::{
     dag_store::DagStore,
     storage::{CommitEvent, DAGStorage},
     tests::helpers::{new_certified_node_with_empty_payload, TEST_DAG_WINDOW},
-    types::{CertifiedNode, DagSnapshotBitmask, Node},
+    types::{CertifiedNode, DagSnapshotBitmask},
     NodeId, NodeMessage, Vote,
 };
 use aptos_consensus_types::dag_payload::{DecoupledPayload, PayloadDigest};
@@ -19,7 +19,7 @@ use aptos_types::{
 use std::{collections::HashMap, sync::Arc};
 
 pub struct MockStorage {
-    node_data: Mutex<Option<Node>>,
+    node_data: Mutex<Option<NodeMessage>>,
     vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
     latest_ledger_info: Option<LedgerInfoWithSignatures>,
@@ -46,30 +46,18 @@ impl MockStorage {
 }
 
 impl DAGStorage for MockStorage {
-    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()> {
-        self.node_data.lock().replace(node.clone());
+    fn save_pending_node_msg(&self, node_msg: &NodeMessage) -> anyhow::Result<()> {
+        self.node_data.lock().replace(node_msg.clone());
         Ok(())
-    }
-
-    fn get_pending_node(&self) -> anyhow::Result<Option<Node>> {
-        Ok(self.node_data.lock().clone())
-    }
-
-    fn delete_pending_node(&self) -> anyhow::Result<()> {
-        self.node_data.lock().take();
-        Ok(())
-    }
-
-    fn save_pending_node_msg(&self, _node_msg: &NodeMessage) -> anyhow::Result<()> {
-        todo!()
     }
 
     fn get_pending_node_msg(&self) -> anyhow::Result<Option<NodeMessage>> {
-        todo!()
+        Ok(self.node_data.lock().clone())
     }
 
     fn delete_pending_node_msg(&self) -> anyhow::Result<()> {
-        todo!()
+        self.node_data.lock().take();
+        Ok(())
     }
 
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
