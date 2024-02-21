@@ -71,10 +71,11 @@ impl OnChainExecutionConfig {
     pub fn default_for_genesis() -> Self {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::Fairness {
-                sender_conflict_window_size: 32,
+                sender_conflict_window_size: 256,
                 module_conflict_window_size: 2,
                 entry_fun_conflict_window_size: 3,
             },
+            // TODO: increase block gas limit
             block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
                 effective_block_gas_limit: 20000,
                 execution_gas_effective_multiplier: 1,
