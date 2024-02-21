@@ -7,7 +7,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
     BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
-    NodeConfig, StateSyncConfig,
+    NodeConfig, QcAggregatorType, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
