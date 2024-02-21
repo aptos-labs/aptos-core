@@ -25,9 +25,6 @@ use diesel::{
 use field_count::FieldCount;
 use serde::{Deserialize, Serialize};
 
-const DEFAULT_ACCOUNT_ADDRESS: &str =
-    "0x0000000000000000000000000000000000000000000000000000000000000000";
-
 #[derive(Debug, Deserialize, FieldCount, Identifiable, Insertable, Serialize)]
 #[diesel(primary_key(version))]
 #[diesel(table_name = transactions)]
@@ -255,21 +252,13 @@ impl Transaction {
         let mut wsc_details = vec![];
 
         for txn in transactions {
-            let (txn, txn_detail, event_list, mut wsc_list, mut wsc_detail_list) =
+            let (txn, txn_detail, mut event_list, mut wsc_list, mut wsc_detail_list) =
                 Self::from_transaction(txn);
-            let mut event_v1_list = event_list
-                .into_iter()
-                .filter(|e| {
-                    !(e.sequence_number == 0
-                        && e.creation_number == 0
-                        && e.account_address == DEFAULT_ACCOUNT_ADDRESS)
-                })
-                .collect::<Vec<_>>();
             txns.push(txn);
             if let Some(a) = txn_detail {
                 txn_details.push(a);
             }
-            events.append(&mut event_v1_list);
+            events.append(&mut event_list);
             wscs.append(&mut wsc_list);
             wsc_details.append(&mut wsc_detail_list);
         }

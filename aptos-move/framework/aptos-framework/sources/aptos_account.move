@@ -3,7 +3,7 @@ module aptos_framework::aptos_account {
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
     use aptos_framework::create_signer::create_signer;
-    use aptos_framework::event::{EventHandle, emit_event, emit};
+    use aptos_framework::event::{EventHandle, emit_event};
     use std::error;
     use std::signer;
     use std::vector;
@@ -32,12 +32,6 @@ module aptos_framework::aptos_account {
 
     /// Event emitted when an account's direct coins transfer config is updated.
     struct DirectCoinTransferConfigUpdatedEvent has drop, store {
-        new_allow_direct_transfers: bool,
-    }
-
-    #[event]
-    struct AllowDirectTransfers has drop, store {
-        account: address,
         new_allow_direct_transfers: bool,
     }
 
@@ -140,8 +134,6 @@ module aptos_framework::aptos_account {
             };
 
             direct_transfer_config.allow_arbitrary_coin_transfers = allow;
-            emit(
-                AllowDirectTransfers { account: addr, new_allow_direct_transfers: allow });
             emit_event(
                 &mut direct_transfer_config.update_coin_transfer_events,
                 DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });
@@ -150,8 +142,6 @@ module aptos_framework::aptos_account {
                 allow_arbitrary_coin_transfers: allow,
                 update_coin_transfer_events: new_event_handle<DirectCoinTransferConfigUpdatedEvent>(account),
             };
-            emit(
-                AllowDirectTransfers { account: addr, new_allow_direct_transfers: allow });
             emit_event(
                 &mut direct_transfer_config.update_coin_transfer_events,
                 DirectCoinTransferConfigUpdatedEvent { new_allow_direct_transfers: allow });

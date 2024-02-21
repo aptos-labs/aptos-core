@@ -124,20 +124,8 @@ module aptos_framework::coin {
         amount: u64,
     }
 
-    #[event]
-    struct Deposit<phantom CoinType> has drop, store {
-        account: address,
-        amount: u64,
-    }
-
     /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
-        amount: u64,
-    }
-
-    #[event]
-    struct Withdraw<phantom CoinType> has drop, store {
-        account: address,
         amount: u64,
     }
 
@@ -208,10 +196,7 @@ module aptos_framework::coin {
     }
 
     /// Merges `coin` into aggregatable coin (`dst_coin`).
-    public(friend) fun merge_aggregatable_coin<CoinType>(
-        dst_coin: &mut AggregatableCoin<CoinType>,
-        coin: Coin<CoinType>
-    ) {
+    public(friend) fun merge_aggregatable_coin<CoinType>(dst_coin: &mut AggregatableCoin<CoinType>, coin: Coin<CoinType>) {
         spec {
             update supply<CoinType> = supply<CoinType> - coin.value;
         };
@@ -268,8 +253,8 @@ module aptos_framework::coin {
     #[view]
     /// Returns `true` is account_addr has frozen the CoinStore or if it's not registered at all
     public fun is_coin_store_frozen<CoinType>(account_addr: address): bool acquires CoinStore {
-        if (!is_account_registered<CoinType>(account_addr)) {
-            return true
+        if(!is_account_registered<CoinType>(account_addr)) {
+          return true
         };
 
         let coin_store = borrow_global<CoinStore<CoinType>>(account_addr);
@@ -371,11 +356,11 @@ module aptos_framework::coin {
             !coin_store.frozen,
             error::permission_denied(EFROZEN),
         );
+
         event::emit_event<DepositEvent>(
             &mut coin_store.deposit_events,
             DepositEvent { amount: coin.value },
         );
-        event::emit(Deposit<CoinType> { account: account_addr, amount: coin.value });
 
         merge(&mut coin_store.coin, coin);
     }
@@ -530,11 +515,7 @@ module aptos_framework::coin {
             name,
             symbol,
             decimals,
-            supply: if (monitor_supply) {
-                option::some(
-                    optional_aggregator::new(MAX_U128, parallelizable)
-                )
-            } else { option::none() },
+            supply: if (monitor_supply) { option::some(optional_aggregator::new(MAX_U128, parallelizable)) } else { option::none() },
         };
         move_to(account, coin_info);
 
@@ -576,9 +557,7 @@ module aptos_framework::coin {
             spec {
                 use aptos_framework::optional_aggregator;
                 use aptos_framework::aggregator;
-                assume optional_aggregator::is_parallelizable(supply) ==> (aggregator::spec_aggregator_get_val(
-                    option::borrow(supply.aggregator)
-                )
+                assume optional_aggregator::is_parallelizable(supply) ==> (aggregator::spec_aggregator_get_val(option::borrow(supply.aggregator))
                     + amount <= aggregator::spec_get_limit(option::borrow(supply.aggregator)));
                 assume !optional_aggregator::is_parallelizable(supply) ==>
                     (option::borrow(supply.integer).value + amount <= option::borrow(supply.integer).limit);
@@ -644,7 +623,6 @@ module aptos_framework::coin {
             &mut coin_store.withdraw_events,
             WithdrawEvent { amount },
         );
-        event::emit(Withdraw<CoinType> { account: account_addr, amount });
 
         extract(&mut coin_store.coin, amount)
     }
