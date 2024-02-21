@@ -1,20 +1,20 @@
 // Copyright © Aptos Foundation
 
-use crate::zkid::{
+use crate::oidb::{
     base64url_encode_str,
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
-    test_utils::{get_sample_zkid_groth16_sig_and_pk, get_sample_zkid_openid_sig_and_pk},
+    test_utils::{get_sample_oidb_groth16_sig_and_pk, get_sample_oidb_openid_sig_and_pk},
     Configuration, ZkpOrOpenIdSig, DEVNET_VERIFICATION_KEY,
 };
 use std::ops::{AddAssign, Deref};
 
-// TODO(zkid): Add instructions on how to produce this test case.
+// TODO(oidb): Add instructions on how to produce this test case.
 #[test]
-fn test_zkid_groth16_proof_verification() {
+fn test_oidb_groth16_proof_verification() {
     let config = Configuration::new_for_devnet();
 
-    let (zk_sig, zk_pk) = get_sample_zkid_groth16_sig_and_pk();
+    let (zk_sig, zk_pk) = get_sample_oidb_groth16_sig_and_pk();
     let proof = match &zk_sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => proof.clone(),
         ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
@@ -23,7 +23,7 @@ fn test_zkid_groth16_proof_verification() {
     let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &SAMPLE_JWK, &config).unwrap();
 
     println!(
-        "zkID Groth16 test public inputs hash: {}",
+        "OIDB Groth16 test public inputs hash: {}",
         public_inputs_hash
     );
 
@@ -33,27 +33,27 @@ fn test_zkid_groth16_proof_verification() {
 }
 
 #[test]
-fn test_zkid_oidc_sig_verifies() {
+fn test_oidb_oidc_sig_verifies() {
     // Verification should succeed
     let config = Configuration::new_for_testing();
-    let (zkid_sig, zkid_pk) = get_sample_zkid_openid_sig_and_pk();
+    let (oidb_sig, oidb_pk) = get_sample_oidb_openid_sig_and_pk();
 
-    let oidc_sig = match &zkid_sig.sig {
+    let oidc_sig = match &oidb_sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(_) => panic!("Internal inconsistency"),
         ZkpOrOpenIdSig::OpenIdSig(oidc_sig) => oidc_sig.clone(),
     };
 
     oidc_sig
         .verify_jwt_claims(
-            zkid_sig.exp_timestamp_secs,
-            &zkid_sig.ephemeral_pubkey,
-            &zkid_pk,
+            oidb_sig.exp_timestamp_secs,
+            &oidb_sig.ephemeral_pubkey,
+            &oidb_pk,
             &config,
         )
         .unwrap();
 
     oidc_sig
-        .verify_jwt_signature(&SAMPLE_JWK, &zkid_sig.jwt_header_b64)
+        .verify_jwt_signature(&SAMPLE_JWK, &oidb_sig.jwt_header_b64)
         .unwrap();
 
     // Maul the pepper; verification should fail
@@ -63,9 +63,9 @@ fn test_zkid_oidc_sig_verifies() {
 
     let e = bad_oidc_sig
         .verify_jwt_claims(
-            zkid_sig.exp_timestamp_secs,
-            &zkid_sig.ephemeral_pubkey,
-            &zkid_pk,
+            oidb_sig.exp_timestamp_secs,
+            &oidb_sig.ephemeral_pubkey,
+            &oidb_pk,
             &config,
         )
         .unwrap_err();
@@ -76,8 +76,8 @@ fn test_zkid_oidc_sig_verifies() {
     let e = bad_oidc_sig
         .verify_jwt_claims(
             SAMPLE_JWT_PARSED.oidc_claims.iat + config.max_exp_horizon_secs,
-            &zkid_sig.ephemeral_pubkey,
-            &zkid_pk,
+            &oidb_sig.ephemeral_pubkey,
+            &oidb_pk,
             &config,
         )
         .unwrap_err();
@@ -92,9 +92,9 @@ fn test_zkid_oidc_sig_verifies() {
 
     let e = bad_oidc_sig
         .verify_jwt_claims(
-            zkid_sig.exp_timestamp_secs,
-            &zkid_sig.ephemeral_pubkey,
-            &zkid_pk,
+            oidb_sig.exp_timestamp_secs,
+            &oidb_sig.ephemeral_pubkey,
+            &oidb_pk,
             &config,
         )
         .unwrap_err();
@@ -109,9 +109,9 @@ fn test_zkid_oidc_sig_verifies() {
 
     let e = bad_oidc_sig
         .verify_jwt_claims(
-            zkid_sig.exp_timestamp_secs,
-            &zkid_sig.ephemeral_pubkey,
-            &zkid_pk,
+            oidb_sig.exp_timestamp_secs,
+            &oidb_sig.ephemeral_pubkey,
+            &oidb_pk,
             &config,
         )
         .unwrap_err();
@@ -126,9 +126,9 @@ fn test_zkid_oidc_sig_verifies() {
 
     let e = bad_oidc_sig
         .verify_jwt_claims(
-            zkid_sig.exp_timestamp_secs,
-            &zkid_sig.ephemeral_pubkey,
-            &zkid_pk,
+            oidb_sig.exp_timestamp_secs,
+            &oidb_sig.ephemeral_pubkey,
+            &oidb_pk,
             &config,
         )
         .unwrap_err();
