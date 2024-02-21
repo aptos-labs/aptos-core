@@ -26,6 +26,8 @@ module aptos_framework::randomness {
     const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
     const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+    /// Entry functions which use randomness should be annotated with #[uses_randomness] attribute.
+    const E_NON_ANNOTATED_RANDOMNESS_ENTRY_FUNCTION: u64 = 2;
 
     /// 32-byte randomness seed unique to every block.
     /// This resource is updated in every block prologue.

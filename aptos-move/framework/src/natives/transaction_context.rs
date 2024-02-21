@@ -14,17 +14,22 @@ use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 /// The native transaction context extension. This needs to be attached to the
-/// NativeContextExtensions value which is passed into session functions, so its accessible from
-/// natives of this extension.
+/// NativeContextExtensions value which is passed into session functions, so it
+/// is accessible from natives of this extension.
 #[derive(Tid)]
 pub struct NativeTransactionContext {
     txn_hash: Vec<u8>,
-    /// This is the number of AUIDs (Aptos unique identifiers) issued during the execution of this transaction
+    /// The number of AUIDs (Aptos unique identifiers) issued during the
+    /// execution of this transaction.
     auid_counter: u64,
     script_hash: Vec<u8>,
     chain_id: u8,
-    /// True if the current TXN's payload was an entry function marked as either public(friend) or private
+    /// True if the current transaction's payload was a public(friend) or
+    /// private entry function.
     is_friend_or_private_entry_func: bool,
+    /// True if the current transaction's payload had `#[uses_randomness]`
+    /// annotation.
+    uses_randomness: bool,
 }
 
 impl NativeTransactionContext {
@@ -37,6 +42,7 @@ impl NativeTransactionContext {
             script_hash,
             chain_id,
             is_friend_or_private_entry_func: false,
+            uses_randomness: false,
         }
     }
 
@@ -51,6 +57,14 @@ impl NativeTransactionContext {
     pub fn get_is_friend_or_private_entry_func(&self) -> bool {
         self.is_friend_or_private_entry_func
     }
+
+    pub fn set_uses_randomness(&mut self) {
+        self.uses_randomness = true;
+    }
+
+    pub fn get_uses_randomness(&self) -> bool {
+        self.uses_randomness
+    }
 }
 
 /***************************************************************************************************
@@ -61,7 +75,7 @@ impl NativeTransactionContext {
  **************************************************************************************************/
 fn native_get_txn_hash(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GET_TXN_HASH_BASE)?;
@@ -80,7 +94,7 @@ fn native_get_txn_hash(
  **************************************************************************************************/
 fn native_generate_unique_address(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GENERATE_UNIQUE_ADDRESS_BASE)?;
@@ -110,7 +124,7 @@ fn native_generate_unique_address(
  **************************************************************************************************/
 fn native_get_script_hash(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GET_SCRIPT_HASH_BASE)?;

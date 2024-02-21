@@ -198,6 +198,16 @@ Randomness APIs calls must originate from a private entry function. Otherwise, t
 
 
 
+<a id="0x1_randomness_E_NON_ANNOTATED_RANDOMNESS_ENTRY_FUNCTION"></a>
+
+Entry functions which use randomness should be annotated with #[uses_randomness] attribute.
+
+
+<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_E_NON_ANNOTATED_RANDOMNESS_ENTRY_FUNCTION">E_NON_ANNOTATED_RANDOMNESS_ENTRY_FUNCTION</a>: u64 = 2;
+</code></pre>
+
+
+
 <a id="0x1_randomness_initialize"></a>
 
 ## Function `initialize`

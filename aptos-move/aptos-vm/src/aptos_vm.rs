@@ -17,7 +17,9 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier,
+    verifier::uses_randomness::does_entry_function_use_randomness,
+    zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -737,10 +739,18 @@ impl AptosVM {
             )])?;
         }
 
-        let is_friend_or_private = session.load_function_def_is_friend_or_private(
-            entry_fn.module(),
-            entry_fn.function(),
-            entry_fn.ty_args(),
+        let uses_randomness = does_entry_function_use_randomness(session, script_fn)?;
+        if uses_randomness {
+            let txn_context = session
+                .get_native_extensions()
+                .get_mut::<NativeTransactionContext>();
+            txn_context.set_uses_randomness();
+        }
+
+        let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
+            script_fn.module(),
+            script_fn.function(),
+            script_fn.ty_args(),
         )?;
         if is_friend_or_private {
             let txn_context = session
@@ -749,8 +759,7 @@ impl AptosVM {
             txn_context.set_is_friend_or_private_entry_func();
         }
 
-        let function =
-            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
+        let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,

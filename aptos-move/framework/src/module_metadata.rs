@@ -78,12 +78,13 @@ pub struct KnownAttribute {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
     // An older compiler placed view functions at 0. This was then published to
-    // Testnet and now we need to recognize this as a legacy index.
+    // Testnet, and now we need to recognize this as a legacy index.
     LegacyViewFunction = 0,
     ViewFunction = 1,
     ResourceGroup = 2,
     ResourceGroupMember = 3,
     Event = 4,
+    UsesRandomness = 5,
 }
 
 impl KnownAttribute {
@@ -146,6 +147,17 @@ impl KnownAttribute {
 
     pub fn is_event(&self) -> bool {
         self.kind == KnownAttributeKind::Event as u8
+    }
+
+    pub fn uses_randomness() -> Self {
+        Self {
+            kind: KnownAttributeKind::UsesRandomness as u8,
+            args: vec![],
+        }
+    }
+
+    pub fn is_uses_randomness(&self) -> bool {
+        self.kind == KnownAttributeKind::UsesRandomness as u8
     }
 }
 
@@ -418,7 +430,9 @@ pub fn verify_module_metadata(
         for attr in attrs {
             if attr.is_view_function() {
                 is_valid_view_function(&functions, fun)?
-            } else {
+            };
+
+            if !attr.is_uses_randomness() && !attr.is_view_function() {
                 return Err(AttributeValidationError {
                     key: fun.clone(),
                     attribute: attr.kind,
