@@ -64,10 +64,12 @@ move-compiler/tests/move_check/borrows/{
 move-compiler/tests/move_check/commands/{
   abort_negative_stack_size.move,
   assign_resource.move,
+  branch_assigns_then_moves.move,
   break_unreachable.move,
   consume_stack.move,
   dead_return.move,
   dead_return_local.move,
+  else_moves_if_doesnt.move,
   if_moves_else_doesnt.move,
   if_moves_no_else.move,
   invalid_fallthrough2.move,
@@ -122,6 +124,7 @@ move-compiler/tests/move_check/instantiation_loops/{
   two_loops.move,
 }
 move-compiler/tests/move_check/liveness/{
+  copy_after_move.move,
   dead_refs_branch.move,
   dead_refs_branch_both.move,
   dead_refs_branch_both_invalid.move,
@@ -134,6 +137,7 @@ move-compiler/tests/move_check/liveness/{
   dead_refs_simple_invalid.move,
   explicit_last_copy.move,
   loop_weirdness.move,
+  move_in_infinite_loop_branched.move,
   trailing_semi.move,
   trailing_semi_loops.move,
   unused_assignment.move,

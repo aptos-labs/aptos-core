@@ -70,14 +70,12 @@ move-compiler/tests/move_check/translated_ir_tests/move/commands/assign_in_one_i
 move-compiler/tests/move_check/translated_ir_tests/move/commands/assign_wrong_if_branch.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/assign_wrong_if_branch.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/assign_wrong_if_branch_no_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/assign_wrong_if_branch_no_else.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/assign_wrong_type.exp   move-compiler-v2/tests/checking/typing/v1-commands/assign_wrong_type.exp
-move-compiler/tests/move_check/translated_ir_tests/move/commands/branch_assigns_then_moves.exp   move-compiler-v2/tests/live-var/v1-commands/branch_assigns_then_moves.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/break_outside_loop.exp   move-compiler-v2/tests/bytecode-generator/v1-commands/break_outside_loop.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/break_outside_loop_in_else.exp   move-compiler-v2/tests/bytecode-generator/v1-commands/break_outside_loop_in_else.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/break_outside_loop_in_if.exp   move-compiler-v2/tests/bytecode-generator/v1-commands/break_outside_loop_in_if.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/continue_outside_loop.exp   move-compiler-v2/tests/bytecode-generator/v1-commands/continue_outside_loop.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/continue_outside_loop_in_if.exp   move-compiler-v2/tests/bytecode-generator/v1-commands/continue_outside_loop_in_if.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/else_assigns_if_doesnt.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/else_assigns_if_doesnt.exp
-move-compiler/tests/move_check/translated_ir_tests/move/commands/else_moves_if_doesnt.exp   move-compiler-v2/tests/live-var/v1-commands/else_moves_if_doesnt.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/if_assigns_else_doesnt.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/if_assigns_else_doesnt.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/if_assigns_no_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/if_assigns_no_else.exp
 move-compiler/tests/move_check/translated_ir_tests/move/commands/move_before_assign.exp   move-compiler-v2/tests/uninit-use-checker/v1-commands/move_before_assign.exp
@@ -121,8 +119,6 @@ move-compiler/tests/move_check/inlining/shadowing_unused.exp   move-compiler-v2/
 move-compiler/tests/move_check/inlining/shadowing_unused_nodecl.exp   move-compiler-v2/tests/checking/inlining/shadowing_unused_nodecl.exp
 move-compiler/tests/move_check/inlining/spec_inlining.exp   move-compiler-v2/tests/checking/inlining/spec_inlining.exp
 move-compiler/tests/move_check/inlining/unused_inline.exp   move-compiler-v2/tests/checking/inlining/unused_inline.exp
-move-compiler/tests/move_check/liveness/copy_after_move.exp   move-compiler-v2/tests/live-var/v1-liveness/copy_after_move.exp
-move-compiler/tests/move_check/liveness/move_in_infinite_loop_branched.exp   move-compiler-v2/tests/live-var/v1-liveness/move_in_infinite_loop_branched.exp
 move-compiler/tests/move_check/locals/use_before_assign_if.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if.exp
 move-compiler/tests/move_check/locals/use_before_assign_if_else.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_if_else.exp
 move-compiler/tests/move_check/locals/use_before_assign_loop.exp   move-compiler-v2/tests/uninit-use-checker/v1-locals/use_before_assign_loop.exp

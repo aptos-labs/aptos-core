@@ -1153,7 +1153,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let loc = self.to_loc(loc);
                 let elem_ty = if let Some(tys) = ty_opt {
                     if tys.len() != 1 {
-                        self.error(&loc, &format!("wrong number of type arguments (expected 1, got {})", tys.len()));
+                        self.error(
+                            &loc,
+                            &format!(
+                                "wrong number of type arguments (expected 1, got {})",
+                                tys.len()
+                            ),
+                        );
                         Type::Error
                     } else {
                         self.translate_type(&tys[0])
