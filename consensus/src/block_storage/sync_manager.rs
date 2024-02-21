@@ -122,7 +122,6 @@ impl BlockStore {
             if qc.ends_epoch() {
                 retriever
                     .network
-                    .clone()
                     .broadcast_epoch_change(EpochChangeProof::new(
                         vec![qc.ledger_info().clone()],
                         /* more = */ false,

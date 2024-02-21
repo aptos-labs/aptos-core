@@ -581,7 +581,6 @@ impl RoundManager {
 
         if self.sync_only() {
             self.network
-                .clone()
                 .broadcast_sync_info(self.block_store.sync_info())
                 .await;
             bail!("[RoundManager] sync_only flag is set, broadcasting SyncInfo");
@@ -1171,7 +1170,6 @@ impl RoundManager {
                 .collect();
             half_peers.truncate(half_peers.len() / 2);
             self.network
-                .clone()
                 .send_proposal(proposal_msg.clone(), half_peers)
                 .await;
             Err(anyhow::anyhow!("Injected error in reconfiguration suffix"))
