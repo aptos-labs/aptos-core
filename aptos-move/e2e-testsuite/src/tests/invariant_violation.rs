@@ -13,17 +13,12 @@ use move_core_types::{value::MoveValue, vm_status::StatusCode};
 #[test]
 fn invariant_violation_error() {
     let _scenario = fail::FailScenario::setup();
-    fail::cfg(
-        "move_adapter::execute_script_or_entry_function",
-        "100%return",
-    )
-    .unwrap();
+    fail::cfg("aptos_vm::execute_script_or_entry_function", "100%return").unwrap();
 
     ::aptos_logger::Logger::init_for_testing();
 
     let mut executor = FakeExecutor::from_head_genesis();
 
-    // create and publish a sender with 1_000_000 coins and a receiver with 100_000 coins
     let sender = executor.create_raw_account_data(1_000_000, 10);
     let receiver = executor.create_raw_account_data(100_000, 10);
     executor.add_account_data(&sender);

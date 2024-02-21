@@ -14,10 +14,7 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
-use aptos_types::{
-    chain_id::ChainId,
-    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
-};
+use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::VMResult,
@@ -28,12 +25,12 @@ use move_bytecode_verifier::VerifierConfig;
 use move_vm_runtime::{
     config::VMConfig, move_vm::MoveVM, native_extensions::NativeContextExtensions,
 };
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
 
 pub struct MoveVmExt {
     inner: MoveVM,
     chain_id: u8,
-    features: Arc<Features>,
+    features: Features,
 }
 
 pub fn get_max_binary_format_version(
@@ -134,7 +131,7 @@ impl MoveVmExt {
                 resolver,
             )?,
             chain_id,
-            features: Arc::new(features),
+            features,
         })
     }
 
@@ -204,30 +201,9 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
-
-        let script_hash = match session_id {
-            SessionId::Txn {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | SessionId::Prologue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            }
-            | SessionId::Epilogue {
-                sender: _,
-                sequence_number: _,
-                script_hash,
-            } => script_hash,
-            SessionId::ValidatorTxn { script_hash } => script_hash,
-            _ => vec![],
-        };
-
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
-            script_hash,
+            session_id.into_script_hash(),
             self.chain_id,
         ));
         extensions.add(NativeCodeContext::default());
@@ -241,12 +217,12 @@ impl MoveVmExt {
         SessionExt::new(
             self.inner.new_session_with_extensions(resolver, extensions),
             resolver,
-            self.features.clone(),
+            self.features.is_storage_slot_metadata_enabled(),
         )
     }
 
-    pub fn get_chain_id(&self) -> ChainId {
-        ChainId::new(self.chain_id)
+    pub(crate) fn features(&self) -> &Features {
+        &self.features
     }
 }
 

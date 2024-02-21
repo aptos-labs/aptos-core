@@ -12,8 +12,7 @@ use aptos_aggregator::{
     delta_change_set::DeltaWithMax,
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr,
+        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
     },
 };
 use aptos_gas_algebra::Fee;
@@ -44,6 +43,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
