@@ -2773,7 +2773,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
 dependencies = [
  "chrono",
 ]
@@ -3285,8 +3285,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.2"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c#af0dcea7144225a709e4f595e58f8026b99e901c"
+version = "1.3.0"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3299,6 +3298,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c#5d1cefad0ea0d37fb08e9aec7847080745c83f9c"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -13001,12 +13001,12 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
 dependencies = [
  "ahash 0.8.8",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2)",
- "aptos-protos 1.1.2",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c)",
+ "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c)",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -14610,7 +14610,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
 dependencies = [
  "anyhow",
  "async-trait",
