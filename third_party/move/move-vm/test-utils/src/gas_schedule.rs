@@ -20,7 +20,7 @@ use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
-        InternalGasUnit, NumArgs, NumBytes, ToUnit,
+        InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
     },
     language_storage::ModuleId,
     u256,
@@ -503,6 +503,10 @@ impl<'b> GasMeter for GasStatus<'b> {
         &mut self,
         _locals: impl Iterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
         Ok(())
     }
 }

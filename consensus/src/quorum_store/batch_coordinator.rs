@@ -4,7 +4,7 @@
 use crate::{
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
-        batch_store::BatchStore,
+        batch_store::{BatchStore, BatchWriter},
         counters,
         types::{Batch, PersistedValue},
     },
@@ -23,7 +23,7 @@ pub enum BatchCoordinatorCommand {
 
 pub struct BatchCoordinator {
     my_peer_id: PeerId,
-    network_sender: NetworkSender,
+    network_sender: Arc<NetworkSender>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
     max_batch_bytes: u64,
@@ -43,7 +43,7 @@ impl BatchCoordinator {
     ) -> Self {
         Self {
             my_peer_id,
-            network_sender,
+            network_sender: Arc::new(network_sender),
             batch_store,
             max_batch_txns,
             max_batch_bytes,

@@ -701,7 +701,10 @@ pub fn setup_environment_and_start_node(
 
     let maybe_jwk_consensus_key =
         load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
-    debug!("maybe_jwk_consensus_key={:?}", maybe_jwk_consensus_key);
+    debug!(
+        "jwk_consensus_key_err={:?}",
+        maybe_jwk_consensus_key.as_ref().err()
+    );
 
     let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, maybe_jwk_consensus_key) {
         (Some(interfaces), Ok(consensus_key)) => {

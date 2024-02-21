@@ -9,7 +9,7 @@ use aptos_consensus_types::{
     block::Block,
     block_data::{BlockData, BlockType},
     common::{Author, Round},
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -24,7 +24,7 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
     let blocks = rounds
         .into_iter()
         .map(|round| {
-            ExecutedBlock::new(
+            PipelinedBlock::new(
                 Block::new_for_testing(
                     HashValue::random(),
                     BlockData::new_for_testing(

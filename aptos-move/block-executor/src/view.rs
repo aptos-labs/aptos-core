@@ -1261,7 +1261,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         {
                             return Some(Ok((key.clone(), (metadata, group_size.get()))));
                         } else {
-                            // TODO[agg_v2](fix): `get_group_size` can fail on group tag serialization. Do
+                            // TODO[agg_v2](cleanup): `get_group_size` can fail on group tag serialization. Do
                             //       we want to propagate this error? This is somewhat an invariant
                             //       violation so PanicError is also ok?
                             return Some(Err(code_invariant_error(format!(
@@ -1515,7 +1515,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TResourceGr
         unimplemented!("Currently resolved by ResourceGroupAdapter");
     }
 
-    fn is_resource_group_split_in_change_set_capable(&self) -> bool {
+    fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
         match &self.latest_view {
             ViewState::Sync(_) => true,
             ViewState::Unsync(_) => true,
@@ -3067,7 +3067,7 @@ mod test {
             Some(state_value_3.clone())
         );
 
-        // TODO[agg_v2](fix): This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
+        // TODO[agg_v2](test): This is printing Ok(Versioned(Err(StorageVersion), ValueType { bytes: Some(b"!0\0\0\0\0\0\0"), metadata: None }, None))
         // Is Err(StorageVersion) expected here?
         println!(
             "data: {:?}",
@@ -3108,14 +3108,14 @@ mod test {
         let _read_set_with_delayed_fields =
             captured_reads.get_read_values_with_delayed_fields(&HashSet::new(), &HashSet::new());
 
-        // TODO[agg_v2](fix): This prints
+        // TODO[agg_v2](test): This prints
         // read: (KeyType(4, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         // read: (KeyType(2, false), Versioned(Err(StorageVersion), Some(Struct(Runtime([Struct(Runtime([Tagged(IdentifierMapping(Aggregator), U64), U64]))])))))
         // for read in read_set_with_delayed_fields {
         //     println!("read: {:?}", read);
         // }
 
-        // TODO[agg_v2](fix): This assertion fails.
+        // TODO[agg_v2](test): This assertion fails.
         // let data_read = DataRead::Versioned(Ok((1,0)), Arc::new(TransactionWrite::from_state_value(Some(state_value_4))), Some(Arc::new(layout)));
         // assert!(read_set_with_delayed_fields.any(|x| x == (&KeyType::<u32>(4, false), &data_read)));
     }

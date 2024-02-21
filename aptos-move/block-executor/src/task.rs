@@ -13,7 +13,7 @@ use aptos_types::{
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
-use move_core_types::value::MoveTypeLayout;
+use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -162,6 +162,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
+
+    /// Execution output for transactions that should be discarded.
+    fn discard_output(discard_code: StatusCode) -> Self;
 
     fn materialize_agg_v1(
         &self,

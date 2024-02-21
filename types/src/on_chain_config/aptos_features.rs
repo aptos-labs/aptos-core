@@ -3,9 +3,9 @@
 
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
-
+use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -48,16 +48,18 @@ pub enum FeatureFlag {
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
-    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
+    RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
-    ZK_ID_SIGNATURES = 46,
-    ZK_ID_ZKLESS_SIGNATURE = 47,
+    OIDB_SIGNATURE = 46,
+    OIDB_ZKLESS_SIGNATURE = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
+    REFUNDABLE_BYTES = 51,
+    OBJECT_CODE_DEPLOYMENT = 52,
 }
 
 /// Representation of features on chain as a bitset.
@@ -82,6 +84,8 @@ impl Default for Features {
         features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
         features.enable(AGGREGATOR_V2_API);
         features.enable(BN254_STRUCTURES);
+        features.enable(REFUNDABLE_BYTES);
+
         features
     }
 }
@@ -109,6 +113,17 @@ impl Features {
     pub fn disable(&mut self, flag: FeatureFlag) {
         let (byte_index, bit_mask) = self.resize_for_flag(flag);
         self.features[byte_index] &= !bit_mask;
+    }
+
+    pub fn into_flag_vec(self) -> Vec<FeatureFlag> {
+        let Self { features } = self;
+        features
+            .into_iter()
+            .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
+            .enumerate()
+            .filter(|(_feature_idx, enabled)| *enabled)
+            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .collect()
     }
 
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
@@ -151,33 +166,37 @@ impl Features {
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
         // This feature depends on resource groups being split inside VMChange set,
-        // which is gated by RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM feature, so
+        // which is gated by RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET feature, so
         // require that feature to be enabled as well.
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
-            && self.is_resource_group_charge_as_size_sum_enabled()
+            && self.is_resource_groups_split_in_vm_change_set_enabled()
     }
 
-    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+    pub fn is_resource_groups_split_in_vm_change_set_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET)
     }
 
-    /// Whether the zkID feature is enabled, specifically the ZK path with ZKP-based signatures.
-    /// The ZK-less path is controlled via a different `FeatureFlag::ZK_ID_ZKLESS_SIGNATURE` flag.
-    pub fn is_zkid_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURES)
+    /// Whether the OIDB feature is enabled, specifically the ZK path with ZKP-based signatures.
+    /// The ZK-less path is controlled via a different `FeatureFlag::OIDB_ZKLESS_SIGNATURE` flag.
+    pub fn is_oidb_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OIDB_SIGNATURE)
     }
 
-    /// If `FeatureFlag::ZK_ID_SIGNATURES` is enabled, this feature additionally allows for a "ZK-less
+    /// If `FeatureFlag::OIDB_SIGNATURE` is enabled, this feature additionally allows for a "ZK-less
     /// path" where the blockchain can verify OpenID signatures directly. This ZK-less mode exists
     /// for two reasons. First, it gives as a simpler way to test the feature. Second, it acts as a
     /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
     /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
     /// but without privacy).
-    pub fn is_zkid_zkless_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_ZKLESS_SIGNATURE)
+    pub fn is_oidb_zkless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OIDB_ZKLESS_SIGNATURE)
     }
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
+    }
+
+    pub fn is_refundable_bytes_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
 }

@@ -131,7 +131,11 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
-    /// Entry function-only rotation key function that allows the signer update their authentication_key.
+    /// Private entry function for key rotation that allows the signer to update their authentication key.
+    /// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+    /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+    /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+    /// the format expected in `rotate_authentication_key`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
     },
@@ -573,6 +577,15 @@ pub enum EntryFunctionCall {
     ObjectTransferCall {
         object: AccountAddress,
         to: AccountAddress,
+    },
+
+    /// Creates a new object with a unique address derived from the publisher address and the object seed.
+    /// Publishes the code passed in the function to the newly created object.
+    /// The caller must provide package metadata describing the package via `metadata_serialized` and
+    /// the code to be published via `code`. This contains a vector of modules to be deployed on-chain.
+    ObjectCodeDeploymentPublish {
+        metadata_serialized: Vec<u8>,
+        code: Vec<Vec<u8>>,
     },
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -1243,6 +1256,10 @@ impl EntryFunctionCall {
                 approved,
             } => multisig_account_vote_transanction(multisig_account, sequence_number, approved),
             ObjectTransferCall { object, to } => object_transfer_call(object, to),
+            ObjectCodeDeploymentPublish {
+                metadata_serialized,
+                code,
+            } => object_code_deployment_publish(metadata_serialized, code),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1663,7 +1680,11 @@ pub fn account_rotate_authentication_key(
     ))
 }
 
-/// Entry function-only rotation key function that allows the signer update their authentication_key.
+/// Private entry function for key rotation that allows the signer to update their authentication key.
+/// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+/// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+/// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+/// the format expected in `rotate_authentication_key`.
 pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2958,6 +2979,31 @@ pub fn object_transfer_call(object: AccountAddress, to: AccountAddress) -> Trans
         ident_str!("transfer_call").to_owned(),
         vec![],
         vec![bcs::to_bytes(&object).unwrap(), bcs::to_bytes(&to).unwrap()],
+    ))
+}
+
+/// Creates a new object with a unique address derived from the publisher address and the object seed.
+/// Publishes the code passed in the function to the newly created object.
+/// The caller must provide package metadata describing the package via `metadata_serialized` and
+/// the code to be published via `code`. This contains a vector of modules to be deployed on-chain.
+pub fn object_code_deployment_publish(
+    metadata_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("object_code_deployment").to_owned(),
+        ),
+        ident_str!("publish").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
+        ],
     ))
 }
 
@@ -4909,6 +4955,19 @@ mod decoder {
         }
     }
 
+    pub fn object_code_deployment_publish(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ObjectCodeDeploymentPublish {
+                metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                code: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5835,6 +5894,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_transfer_call".to_string(),
             Box::new(decoder::object_transfer_call),
+        );
+        map.insert(
+            "object_code_deployment_publish".to_string(),
+            Box::new(decoder::object_code_deployment_publish),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

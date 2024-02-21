@@ -1,66 +1,28 @@
-// ---- Model Dump
-module 0x42::m {
-    friend fun bar(): u64 {
-        42
-    }
-    spec fun $bar(): u64 {
-        42
-    }
-    spec fun $foo(): u64 {
-        m::$bar()
-    }
-} // end 0x42::m
-module 0x42::o {
-    use 0x42::m; // resolved as: 0x42::m
-    private fun bar(): u64 {
-        42
-    }
-    spec fun $bar(): u64 {
-        42
-    }
-    spec fun $foo(): u64;
-} // end 0x42::o
-module 0x42::n {
-    use 0x42::o; // resolved as: 0x42::o
-    public fun test() {
-        if Eq<u64>({
-          let ();
-          {
-            let ();
-            m::bar()
-          };
-          o::bar()
-        }, 42) {
-          Tuple()
-        } else {
-          Abort(1)
-        };
-        Tuple()
-    }
-    spec fun $test() {
-        Tuple()
-    }
-} // end 0x42::n
-
 
 Diagnostics:
-error: `public(friend)` function `0x42::m::bar` cannot be called from `0x42::n::test` because `0x42::n` is not a friend of `0x42::m`
-   ┌─ tests/checking/inlining/private_call_2.move:4:9
+error: function `0x42::m::bar` cannot be called from function `0x42::n::test` because module `0x42::n` is not a `friend` of `0x42::m`
+   ┌─ tests/checking/inlining/private_call_2.move:7:24
    │
  4 │         bar()
-   │         ^^^^^
+   │         ----- called here
+   ·
+ 7 │     public(friend) fun bar(): u64 { 42 }
+   │                        ^^^ callee
    ·
 14 │         m::foo();
-   │         -------- in a call inlined at this callsite
+   │         -------- from a call inlined at this callsite
    ·
 25 │         assert!(o::foo() == 42, 1);
-   │                 -------- in a call inlined at this callsite
+   │                 -------- from a call inlined at this callsite
 
-error: function `0x42::o::bar` cannot be called from `0x42::n::test` because it is private to module `0x42::o`
-   ┌─ tests/checking/inlining/private_call_2.move:15:2
+error: function `0x42::o::bar` cannot be called from function `0x42::n::test` because it is private to module `0x42::o`
+   ┌─ tests/checking/inlining/private_call_2.move:18:9
    │
 15 │     bar()
-   │     ^^^^^
+   │     ----- called here
+   ·
+18 │     fun bar(): u64 { 42 }
+   │         ^^^ callee
    ·
 25 │         assert!(o::foo() == 42, 1);
-   │                 -------- in a call inlined at this callsite
+   │                 -------- from a call inlined at this callsite

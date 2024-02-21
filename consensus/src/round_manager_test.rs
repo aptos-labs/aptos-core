@@ -21,8 +21,9 @@ use crate::{
     pipeline::buffer_manager::OrderedBlocks,
     round_manager::RoundManager,
     test_utils::{
-        consensus_runtime, create_vec_signed_transactions, timed_block_on, MockPayloadManager,
-        MockStateComputer, MockStorage, TreeInserter,
+        consensus_runtime, create_vec_signed_transactions,
+        mock_execution_client::MockExecutionClient, timed_block_on, MockPayloadManager,
+        MockStorage, TreeInserter,
     },
     util::time_service::{ClockTimeService, TimeService},
 };
@@ -107,7 +108,7 @@ pub struct NodeSetup {
     pending_network_events: Vec<Event<ConsensusMsg>>,
     all_network_events: Box<dyn Stream<Item = Event<ConsensusMsg>> + Send + Unpin>,
     ordered_blocks_events: mpsc::UnboundedReceiver<OrderedBlocks>,
-    mock_state_computer: Arc<MockStateComputer>,
+    mock_execution_client: Arc<MockExecutionClient>,
     _state_sync_receiver: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
     id: usize,
     onchain_consensus_config: OnChainConsensusConfig,
@@ -243,16 +244,21 @@ impl NodeSetup {
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
         let (self_sender, self_receiver) = aptos_channels::new_test(1000);
-        let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
+        let network = Arc::new(NetworkSender::new(
+            author,
+            consensus_network_client,
+            self_sender,
+            validators,
+        ));
 
         let all_network_events = Box::new(select(network_events, self_receiver));
 
         let last_vote_sent = initial_data.last_vote();
         let (ordered_blocks_tx, ordered_blocks_events) = mpsc::unbounded::<OrderedBlocks>();
         let (state_sync_client, _state_sync_receiver) = mpsc::unbounded();
-        let mock_state_computer = Arc::new(MockStateComputer::new(
-            state_sync_client,
-            ordered_blocks_tx,
+        let mock_execution_client = Arc::new(MockExecutionClient::new(
+            state_sync_client.clone(),
+            ordered_blocks_tx.clone(),
             Arc::clone(&storage),
         ));
         let time_service = Arc::new(ClockTimeService::new(executor));
@@ -260,7 +266,7 @@ impl NodeSetup {
         let block_store = Arc::new(BlockStore::new(
             storage.clone(),
             initial_data,
-            mock_state_computer.clone(),
+            mock_execution_client.clone(),
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
@@ -315,7 +321,7 @@ impl NodeSetup {
             pending_network_events: Vec::new(),
             all_network_events,
             ordered_blocks_events,
-            mock_state_computer,
+            mock_execution_client,
             _state_sync_receiver,
             id,
             onchain_consensus_config,
@@ -476,7 +482,7 @@ impl NodeSetup {
             .map(|b| b.round())
             .collect::<Vec<_>>();
         assert_eq!(&rounds, expected_rounds);
-        self.mock_state_computer
+        self.mock_execution_client
             .commit_to_storage(ordered_blocks)
             .await
             .unwrap();

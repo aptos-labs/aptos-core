@@ -7,7 +7,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug)]
 pub struct BlockExecutorLocalConfig {
     pub concurrency_level: usize,
+    // If specified, parallel execution fallbacks to sequential, if issue occurs.
+    // Otherwise, if there is an error in either of the execution, we will panic.
     pub allow_fallback: bool,
+    // If true, we will discard the failed blocks and continue with the next block.
+    // (allow_fallback needs to be set)
+    pub discard_failed_blocks: bool,
 }
 
 /// Configuration from on-chain configuration, that is
@@ -66,6 +71,7 @@ impl BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
                 allow_fallback: true,
+                discard_failed_blocks: false,
             },
             onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
         }
@@ -79,6 +85,7 @@ impl BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 concurrency_level,
                 allow_fallback: true,
+                discard_failed_blocks: false,
             },
             onchain: BlockExecutorConfigFromOnchain::new_maybe_block_limit(maybe_block_gas_limit),
         }

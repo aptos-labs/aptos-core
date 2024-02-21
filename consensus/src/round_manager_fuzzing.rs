@@ -16,8 +16,9 @@ use crate::{
     network_interface::{ConsensusNetworkClient, DIRECT_SEND, RPC},
     payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
+    pipeline::execution_client::DummyExecutionClient,
     round_manager::RoundManager,
-    test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
+    test_utils::{MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -82,7 +83,7 @@ fn build_empty_store(
     Arc::new(BlockStore::new(
         storage,
         initial_data,
-        Arc::new(EmptyStateComputer),
+        Arc::new(DummyExecutionClient),
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
@@ -155,12 +156,12 @@ fn create_node_for_fuzzing() -> RoundManager {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
     });
-    let network = NetworkSender::new(
+    let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
         self_sender,
         epoch_state.verifier.clone(),
-    );
+    ));
 
     // TODO: mock
     let block_store = build_empty_store(storage.clone(), initial_data);

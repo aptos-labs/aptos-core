@@ -10,6 +10,7 @@ use crate::{
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
+    oidb::{OidbPublicKey, OidbSignature},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
     transaction::authenticator::{
@@ -18,7 +19,6 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
-    zkid::{ZkIdPublicKey, ZkIdSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -624,15 +624,15 @@ impl SignedTransaction {
         }
     }
 
-    pub fn new_zkid(
+    pub fn new_oidb(
         raw_txn: RawTransaction,
-        public_key: ZkIdPublicKey,
-        signature: ZkIdSignature,
+        public_key: OidbPublicKey,
+        signature: OidbSignature,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::single_sender(
             AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::zkid(public_key),
-                AnySignature::zkid(signature),
+                AnyPublicKey::oidb(public_key),
+                AnySignature::oidb(signature),
             )),
         );
         SignedTransaction {
@@ -781,6 +781,30 @@ impl TransactionWithProof {
         }
     }
 
+    pub fn verify(&self, ledger_info: &LedgerInfo) -> Result<()> {
+        let txn_hash = self.transaction.hash();
+        ensure!(
+            txn_hash == self.proof.transaction_info().transaction_hash(),
+            "Transaction hash ({}) not expected ({}).",
+            txn_hash,
+            self.proof.transaction_info().transaction_hash(),
+        );
+
+        if let Some(events) = &self.events {
+            let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
+            let event_root_hash =
+                InMemoryEventAccumulator::from_leaves(&event_hashes[..]).root_hash();
+            ensure!(
+                event_root_hash == self.proof.transaction_info().event_root_hash(),
+                "Event root hash ({}) not expected ({}).",
+                event_root_hash,
+                self.proof.transaction_info().event_root_hash(),
+            );
+        }
+
+        self.proof.verify(ledger_info, self.version)
+    }
+
     /// Verifies the transaction with the proof, both carried by `self`.
     ///
     /// A few things are ensured if no error is raised:
@@ -821,27 +845,7 @@ impl TransactionWithProof {
             sequence_number,
         );
 
-        let txn_hash = self.transaction.hash();
-        ensure!(
-            txn_hash == self.proof.transaction_info().transaction_hash(),
-            "Transaction hash ({}) not expected ({}).",
-            txn_hash,
-            self.proof.transaction_info().transaction_hash(),
-        );
-
-        if let Some(events) = &self.events {
-            let event_hashes: Vec<_> = events.iter().map(CryptoHash::hash).collect();
-            let event_root_hash =
-                InMemoryEventAccumulator::from_leaves(&event_hashes[..]).root_hash();
-            ensure!(
-                event_root_hash == self.proof.transaction_info().event_root_hash(),
-                "Event root hash ({}) not expected ({}).",
-                event_root_hash,
-                self.proof.transaction_info().event_root_hash(),
-            );
-        }
-
-        self.proof.verify(ledger_info, version)
+        self.verify(ledger_info)
     }
 }
 
@@ -1813,7 +1817,14 @@ impl Transaction {
 
     pub fn try_as_block_metadata(&self) -> Option<&BlockMetadata> {
         match self {
-            Transaction::BlockMetadata(v1) => Some(v1),
+            Transaction::BlockMetadata(bm) => Some(bm),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_block_metadata_ext(&self) -> Option<&BlockMetadataExt> {
+        match self {
+            Transaction::BlockMetadataExt(bme) => Some(bme),
             _ => None,
         }
     }

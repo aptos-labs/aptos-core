@@ -6,7 +6,7 @@ use crate::{
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
     types::{
-        code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
+        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError,
         DeltaApplicationFailureReason, PanicOr,
     },
 };
@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -66,6 +67,14 @@ pub trait TAggregatorV1View {
         // precise read.
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
+    }
+
+    fn get_aggregator_v1_state_value_size(
+        &self,
+        id: &Self::Identifier,
+    ) -> PartialVMResult<Option<u64>> {
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
+        Ok(maybe_state_value.map(|v| v.size() as u64))
     }
 
     /// Consumes a single delta of aggregator V1, and tries to materialize it

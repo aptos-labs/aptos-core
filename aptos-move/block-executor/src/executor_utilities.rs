@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{errors::*, view::LatestView};
-use aptos_aggregator::types::{code_invariant_error, PanicOr};
+use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
-use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
+use aptos_mvhashmap::types::ValueWithLayout;
 use aptos_types::{
     contract_event::TransactionEvent, delayed_fields::PanicError, executable::Executable,
     state_store::TStateView, transaction::BlockExecutableTransaction as Transaction,
@@ -118,14 +118,11 @@ pub(crate) fn map_finalized_group<T: Transaction>(
 
 pub(crate) fn serialize_groups<T: Transaction>(
     finalized_groups: Vec<(T::Key, T::Value, Vec<(T::Tag, Arc<T::Value>)>)>,
-    txn_idx: TxnIndex,
-) -> Result<Vec<(T::Key, T::Value)>, PanicOr<IntentionalFallbackToSequential>> {
+) -> Result<Vec<(T::Key, T::Value)>, ResourceGroupSerializationError> {
     fail_point!(
         "fail-point-resource-group-serialization",
         !finalized_groups.is_empty(),
-        |_| Err(PanicOr::Or(
-            IntentionalFallbackToSequential::ResourceGroupSerializationError
-        ))
+        |_| Err(ResourceGroupSerializationError)
     );
 
     finalized_groups
@@ -133,7 +130,6 @@ pub(crate) fn serialize_groups<T: Transaction>(
         .map(|(group_key, mut metadata_op, finalized_group)| {
             let btree: BTreeMap<T::Tag, Bytes> = finalized_group
                 .into_iter()
-                // TODO[agg_v2](fix): Should anything be done using the layout here?
                 .map(|(resource_tag, arc_v)| {
                     let bytes = arc_v
                         .extract_raw_bytes()
@@ -142,25 +138,15 @@ pub(crate) fn serialize_groups<T: Transaction>(
                 })
                 .collect();
 
-            let res = bcs::to_bytes(&btree)
+            bcs::to_bytes(&btree)
                 .map_err(|e| {
-                    PanicOr::Or(
-                        IntentionalFallbackToSequential::resource_group_serialization_error(
-                            format!("Unexpected resource group error {:?}", e),
-                            txn_idx,
-                        ),
-                    )
+                    alert!("Unexpected resource group error {:?}", e);
+                    ResourceGroupSerializationError
                 })
                 .map(|group_bytes| {
                     metadata_op.set_bytes(group_bytes.into());
                     (group_key, metadata_op)
-                });
-
-            if res.is_err() {
-                alert!("Failed to serialize resource group");
-            }
-
-            res
+                })
         })
         .collect()
 }

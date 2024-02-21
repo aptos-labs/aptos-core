@@ -120,7 +120,12 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                     Pre => self.seen_uses.enter_scope(),
                     Post => {
                         for (id, var) in pat.vars() {
-                            self.node_symbol_decl_visitor(true, &id, &var, "parameter");
+                            self.node_symbol_decl_visitor(
+                                true,
+                                &id,
+                                &var,
+                                "anonymous function parameter",
+                            );
                         }
                         self.seen_uses.exit_scope();
                     },

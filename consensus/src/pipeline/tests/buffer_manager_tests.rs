@@ -14,7 +14,6 @@ use crate::{
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         execution_schedule_phase::ExecutionSchedulePhase,
         execution_wait_phase::ExecutionWaitPhase,
-        ordering_state_computer::OrderingStateComputer,
         persisting_phase::PersistingPhase,
         pipeline_phase::PipelinePhase,
         signing_phase::SigningPhase,
@@ -29,7 +28,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
-    block::block_test_utils::certificate_for_genesis, executed_block::ExecutedBlock,
+    block::block_test_utils::certificate_for_genesis, pipelined_block::PipelinedBlock,
     vote_proposal::VoteProposal,
 };
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
@@ -129,13 +128,7 @@ pub fn prepare_buffer_manager(
     );
 
     let (result_tx, result_rx) = create_channel::<OrderedBlocks>();
-    let (reset_tx, _) = create_channel::<ResetRequest>();
-
-    let persisting_proxy = Arc::new(OrderingStateComputer::new(
-        result_tx,
-        Arc::new(EmptyStateComputer),
-        reset_tx,
-    ));
+    let state_computer = Arc::new(EmptyStateComputer::new(result_tx));
 
     let (block_tx, block_rx) = create_channel::<OrderedBlocks>();
     let (buffer_reset_tx, buffer_reset_rx) = create_channel::<ResetRequest>();
@@ -155,7 +148,7 @@ pub fn prepare_buffer_manager(
         Arc::new(Mutex::new(safety_rules)),
         network,
         msg_rx,
-        persisting_proxy,
+        state_computer,
         block_rx,
         buffer_reset_rx,
         Arc::new(EpochState {
@@ -255,7 +248,10 @@ async fn loopback_commit_vote(
     };
 }
 
-async fn assert_results(batches: Vec<Vec<ExecutedBlock>>, result_rx: &mut Receiver<OrderedBlocks>) {
+async fn assert_results(
+    batches: Vec<Vec<PipelinedBlock>>,
+    result_rx: &mut Receiver<OrderedBlocks>,
+) {
     for (i, batch) in enumerate(batches) {
         let OrderedBlocks { ordered_blocks, .. } = result_rx.next().await.unwrap();
         assert_eq!(

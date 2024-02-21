@@ -14,6 +14,8 @@ edition = "2021"
 better_any = "0.1.1"
 bytes = "1.4.0"
 fail = "0.4.0"
+lazy_static = "1.4.0"
+lru = "0.7.5"
 move-binary-format = { path = "../../move-binary-format" }
 once_cell = "1.7.2"
 parking_lot = "0.11.1"

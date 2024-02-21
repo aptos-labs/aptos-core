@@ -291,6 +291,7 @@ impl InnerBuilder {
             self.author,
             self.config.clone(),
             self.quorum_store_storage.clone(),
+            self.batch_store.clone().unwrap(),
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,
         );
