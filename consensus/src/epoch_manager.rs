@@ -39,7 +39,9 @@ use crate::{
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
     pipeline::execution_client::TExecutionClient,
     quorum_store::{
-        quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
+        quorum_store_builder::{
+            DAGInnerBuilder, DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder,
+        },
         quorum_store_coordinator::CoordinatorCommand,
         quorum_store_db::QuorumStoreStorage,
     },
@@ -56,6 +58,7 @@ use aptos_config::config::{
 };
 use aptos_consensus_types::{
     common::{Author, Round},
+    dag_payload::PayloadLinkMsg,
     delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
 };
@@ -81,12 +84,12 @@ use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
 use futures::{
     channel::{
-        mpsc,
         mpsc::{unbounded, Sender, UnboundedSender},
         oneshot,
     },
     SinkExt, StreamExt,
 };
+use futures_channel::mpsc;
 use itertools::Itertools;
 use std::{
     cmp::Ordering,
@@ -151,6 +154,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
+    dag_payload_link_rx: Option<tokio::sync::mpsc::UnboundedReceiver<PayloadLinkMsg>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -207,6 +211,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aptos_time_service,
             dag_config,
             payload_manager: Arc::new(PayloadManager::DirectMempool),
+            dag_payload_link_rx: None,
         }
     }
 
@@ -629,36 +634,55 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (consensus_to_quorum_store_tx, consensus_to_quorum_store_rx) =
             mpsc::channel(self.config.intra_consensus_channel_buffer_size);
 
-        let quorum_store_config = if consensus_config.is_dag_enabled() {
+        let is_dag_enabled = consensus_config.is_dag_enabled();
+        let is_quorum_store_enabled = self.quorum_store_enabled;
+
+        let quorum_store_config = if is_dag_enabled {
             self.dag_config.quorum_store.clone()
         } else {
             self.config.quorum_store.clone()
         };
 
-        let mut quorum_store_builder = if self.quorum_store_enabled {
-            info!("Building QuorumStore");
-            QuorumStoreBuilder::QuorumStore(InnerBuilder::new(
-                self.epoch(),
-                self.author,
-                epoch_state.verifier.len() as u64,
-                quorum_store_config,
-                consensus_to_quorum_store_rx,
-                self.quorum_store_to_mempool_sender.clone(),
-                self.config.mempool_txn_pull_timeout_ms,
-                self.storage.aptos_db().clone(),
-                network_sender,
-                epoch_state.verifier.clone(),
-                self.config.safety_rules.backend.clone(),
-                self.quorum_store_storage.clone(),
-                !consensus_config.is_dag_enabled(),
-            ))
-        } else {
-            info!("Building DirectMempool");
-            QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(
-                consensus_to_quorum_store_rx,
-                self.quorum_store_to_mempool_sender.clone(),
-                self.config.mempool_txn_pull_timeout_ms,
-            ))
+        let mut quorum_store_builder = match (is_dag_enabled, is_quorum_store_enabled) {
+            (true, true) => unreachable!("not yet supported"),
+            (true, false) => {
+                info!("Building DAG Payload Store");
+                let (dag_payload_link_tx, dag_payload_link_rx) =
+                    tokio::sync::mpsc::unbounded_channel();
+                self.dag_payload_link_rx = Some(dag_payload_link_rx);
+                QuorumStoreBuilder::DAG(DAGInnerBuilder::new(
+                    consensus_to_quorum_store_rx,
+                    self.quorum_store_to_mempool_sender.clone(),
+                    dag_payload_link_tx,
+                    self.config.mempool_txn_pull_timeout_ms,
+                ))
+            },
+            (false, true) => {
+                info!("Building QuorumStore");
+                QuorumStoreBuilder::QuorumStore(InnerBuilder::new(
+                    self.epoch(),
+                    self.author,
+                    epoch_state.verifier.len() as u64,
+                    quorum_store_config,
+                    consensus_to_quorum_store_rx,
+                    self.quorum_store_to_mempool_sender.clone(),
+                    self.config.mempool_txn_pull_timeout_ms,
+                    self.storage.aptos_db().clone(),
+                    network_sender.clone(),
+                    epoch_state.verifier.clone(),
+                    self.config.safety_rules.backend.clone(),
+                    self.quorum_store_storage.clone(),
+                    !consensus_config.is_dag_enabled(),
+                ))
+            },
+            (false, false) => {
+                info!("Building DirectMempool");
+                QuorumStoreBuilder::DirectMempool(DirectMempoolInnerBuilder::new(
+                    consensus_to_quorum_store_rx,
+                    self.quorum_store_to_mempool_sender.clone(),
+                    self.config.mempool_txn_pull_timeout_ms,
+                ))
+            },
         };
 
         let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
@@ -1042,12 +1066,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             features,
         );
 
+        let payload_link_rx = self
+            .dag_payload_link_rx
+            .take()
+            .expect("must be set in DAG mode");
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
         self.dag_rpc_tx = Some(dag_rpc_tx);
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);
 
-        tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
+        tokio::spawn(bootstrapper.start(dag_rpc_rx, payload_link_rx, dag_shutdown_rx));
     }
 
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {

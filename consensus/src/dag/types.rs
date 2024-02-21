@@ -157,6 +157,13 @@ pub enum DagPayload {
 }
 
 impl DagPayload {
+    pub fn digest(&self) -> Option<&PayloadDigest> {
+        match self {
+            DagPayload::Inline(payload) => None,
+            DagPayload::Decoupled(info) => Some(info.digest()),
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             DagPayload::Inline(payload) => payload.len(),

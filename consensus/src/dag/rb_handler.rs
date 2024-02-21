@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff, NodeMessage};
+use super::{
+    dag_store::DagStore,
+    health::HealthBackoff,
+    payload::{DagPayloadManager, TDagPayloadResolver},
+    NodeMessage,
+};
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
@@ -15,6 +20,7 @@ use crate::{
         types::{NodeCertificate, Vote},
         NodeId,
     },
+    payload_manager::PayloadManager,
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure};
@@ -35,6 +41,7 @@ use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<DagStore>,
+    payload_manager: Arc<dyn TDagPayloadResolver>,
     /// Note: The mutex around BTreeMap is to work around Rust Sync semantics.
     /// Fine grained concurrency is implemented by the DashSet below.
     votes_by_round_peer: Mutex<BTreeMap<Round, BTreeMap<Author, Vote>>>,
@@ -52,6 +59,7 @@ pub(crate) struct NodeBroadcastHandler {
 impl NodeBroadcastHandler {
     pub fn new(
         dag: Arc<DagStore>,
+        payload_manager: Arc<dyn TDagPayloadResolver>,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
@@ -66,6 +74,7 @@ impl NodeBroadcastHandler {
 
         Self {
             dag,
+            payload_manager,
             votes_by_round_peer: Mutex::new(votes_by_round_peer),
             votes_fine_grained_lock: DashSet::with_capacity(epoch_state.verifier.len() * 10),
             signer,
@@ -222,7 +231,7 @@ impl RpcHandler for NodeBroadcastHandler {
         });
 
         let node_msg = self.validate(node_msg)?;
-        let (node, _payload) = node_msg.unwrap();
+        let (node, payload) = node_msg.unwrap();
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
             .remote_peer(*node.author())
@@ -238,7 +247,9 @@ impl RpcHandler for NodeBroadcastHandler {
             return Ok(ack.clone());
         }
 
-        // TODO: send payload to PayloadManager
+        if let Some(payload) = payload {
+            self.payload_manager.add_payload(payload)?;
+        }
 
         let signature = node.sign_vote(&self.signer)?;
         let vote = Vote::new(node.metadata().clone(), signature);

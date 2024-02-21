@@ -7,12 +7,12 @@ use anyhow::bail;
 use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::{
     common::Payload,
-    dag_payload::{DecoupledPayload, PayloadDigest},
+    dag_payload::{DecoupledPayload, PayloadDigest, PayloadLinkMsg},
 };
 use aptos_logger::{debug, error};
 use aptos_types::transaction::SignedTransaction;
 use dashmap::DashMap;
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, stream::FuturesOrdered, FutureExt, StreamExt};
 use std::{ops::DerefMut, sync::Arc};
 use tokio::sync::oneshot;
 
@@ -143,6 +143,45 @@ impl DagPayloadManager {
                 error!("unable to send request prefetch {:?}, {}", err, node.id());
             },
         }
+    }
+
+    pub async fn process_link_message(self: Arc<Self>, msg: PayloadLinkMsg) {
+        let (bundle, tx) = msg.unwrap();
+        debug!("processing link message {:?}", bundle);
+        let mut futures = bundle
+            .payload_infos()
+            .iter()
+            .map(|info| {
+                let manager = self.clone();
+                async move {
+                    let Some(node) = manager
+                        .dag_store
+                        .read()
+                        .get_node_by_round_author(info.round(), info.author())
+                        .cloned()
+                    else {
+                        bail!("Node not found");
+                    };
+                    let result = manager.retrieve_payload(&node);
+                    match result {
+                        Ok(rx) => Ok(rx.await?),
+                        Err(err) => Err(err),
+                    }
+                }
+            })
+            .collect::<FuturesOrdered<_>>();
+        let mut all_txns = vec![];
+        while let Some(result) = futures.next().await {
+            debug!("received result");
+            match result {
+                Ok(txns) => all_txns.extend(txns),
+                Err(err) => {
+                    tx.send(Err(err)).ok();
+                    return;
+                },
+            }
+        }
+        tx.send(Ok(all_txns)).ok();
     }
 }
 

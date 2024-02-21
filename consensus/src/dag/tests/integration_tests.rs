@@ -44,6 +44,7 @@ use tokio::task::JoinHandle;
 struct DagBootstrapUnit {
     nh_task_handle: JoinHandle<SyncOutcome>,
     df_task_handle: JoinHandle<()>,
+    pf_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
         Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
@@ -76,7 +77,7 @@ impl DagBootstrapUnit {
 
         let execution_client = Arc::new(DummyExecutionClient);
 
-        let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
+        let (nh_abort_handle, df_abort_handle, pf_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
             bootstrap_dag_for_test(
                 self_peer,
                 signer,
@@ -95,6 +96,7 @@ impl DagBootstrapUnit {
             Self {
                 nh_task_handle: nh_abort_handle,
                 df_task_handle: df_abort_handle,
+                pf_task_handle: pf_abort_handle,
                 dag_rpc_tx,
                 network_events,
             },

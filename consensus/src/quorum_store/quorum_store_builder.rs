@@ -6,7 +6,7 @@ use crate::{
     error::error_kind,
     network::{IncomingBatchRetrievalRequest, NetworkSender},
     network_interface::ConsensusMsg,
-    payload_manager::PayloadManager,
+    payload_manager::{DAGLink, PayloadManager},
     quorum_store::{
         batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
@@ -24,7 +24,9 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
+use aptos_consensus_types::{
+    common::Author, dag_payload::PayloadLinkMsg, request_response::GetPayloadCommand,
+};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -37,10 +39,12 @@ use aptos_types::{
 use futures::StreamExt;
 use futures_channel::mpsc::{Receiver, Sender};
 use std::{sync::Arc, time::Duration};
+use tokio::sync::mpsc::UnboundedSender;
 
 pub enum QuorumStoreBuilder {
     DirectMempool(DirectMempoolInnerBuilder),
     QuorumStore(InnerBuilder),
+    DAG(DAGInnerBuilder),
 }
 
 impl QuorumStoreBuilder {
@@ -53,6 +57,7 @@ impl QuorumStoreBuilder {
         match self {
             QuorumStoreBuilder::DirectMempool(inner) => inner.init_payload_manager(),
             QuorumStoreBuilder::QuorumStore(inner) => inner.init_payload_manager(),
+            QuorumStoreBuilder::DAG(inner) => inner.init_payload_manager(),
         }
     }
 
@@ -68,6 +73,10 @@ impl QuorumStoreBuilder {
                 None
             },
             QuorumStoreBuilder::QuorumStore(inner) => Some(inner.start()),
+            QuorumStoreBuilder::DAG(inner) => {
+                inner.start();
+                None
+            },
         }
     }
 }
@@ -98,6 +107,48 @@ impl DirectMempoolInnerBuilder {
         Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
     ) {
         (Arc::from(PayloadManager::DirectMempool), None)
+    }
+
+    fn start(self) {
+        let quorum_store = DirectMempoolQuorumStore::new(
+            self.consensus_to_quorum_store_receiver,
+            self.quorum_store_to_mempool_sender,
+            self.mempool_txn_pull_timeout_ms,
+        );
+        spawn_named!("DirectMempoolQuorumStore", quorum_store.start());
+    }
+}
+
+pub struct DAGInnerBuilder {
+    consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
+    quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
+    dag_payload_link_tx: UnboundedSender<PayloadLinkMsg>,
+    mempool_txn_pull_timeout_ms: u64,
+}
+
+impl DAGInnerBuilder {
+    pub fn new(
+        consensus_to_quorum_store_receiver: Receiver<GetPayloadCommand>,
+        quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
+        dag_payload_link_tx: UnboundedSender<PayloadLinkMsg>,
+        mempool_txn_pull_timeout_ms: u64,
+    ) -> Self {
+        Self {
+            consensus_to_quorum_store_receiver,
+            quorum_store_to_mempool_sender,
+            dag_payload_link_tx,
+            mempool_txn_pull_timeout_ms,
+        }
+    }
+
+    fn init_payload_manager(
+        &mut self,
+    ) -> (
+        Arc<PayloadManager>,
+        Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    ) {
+        let link = Arc::new(DAGLink::new(self.dag_payload_link_tx.clone()));
+        (Arc::from(PayloadManager::DAG(link)), None)
     }
 
     fn start(self) {

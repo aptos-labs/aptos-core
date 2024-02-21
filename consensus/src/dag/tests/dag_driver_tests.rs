@@ -11,6 +11,7 @@ use crate::{
         errors::DagDriverError,
         health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
         order_rule::OrderRule,
+        payload::TDagPayloadResolver,
         round_state::{OptimisticResponsive, RoundState},
         tests::{
             dag_test::MockStorage,
@@ -24,7 +25,10 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    dag_payload::DecoupledPayload,
+};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -108,6 +112,21 @@ impl TFetchRequester for MockFetchRequester {
     }
 }
 
+struct MockDagPayloadManager {}
+
+impl TDagPayloadResolver for MockDagPayloadManager {
+    fn get_payload_if_exists(
+        &self,
+        _node: &crate::dag::CertifiedNode,
+    ) -> Option<Arc<DecoupledPayload>> {
+        None
+    }
+
+    fn add_payload(&self, _payload: DecoupledPayload) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 fn setup(
     signers: &[ValidatorSigner],
     validator_verifier: ValidatorVerifier,
@@ -128,6 +147,7 @@ fn setup(
         0,
         TEST_DAG_WINDOW,
     ));
+    let payload_manager = Arc::new(MockDagPayloadManager {});
 
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),
@@ -165,6 +185,7 @@ fn setup(
         signers[0].author(),
         epoch_state.clone(),
         dag,
+        payload_manager,
         Arc::new(MockPayloadClient::new(None)),
         rb,
         time_service,

@@ -6,6 +6,7 @@ use crate::dag::{
     dag_store::DagStore,
     errors::NodeBroadcastHandleError,
     health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
+    payload::TDagPayloadResolver,
     rb_handler::NodeBroadcastHandler,
     storage::DAGStorage,
     tests::{
@@ -16,6 +17,7 @@ use crate::dag::{
     NodeId, RpcHandler, Vote,
 };
 use aptos_config::config::DagPayloadConfig;
+use aptos_consensus_types::dag_payload::DecoupledPayload;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     epoch_state::EpochState,
@@ -38,6 +40,21 @@ impl TFetchRequester for MockFetchRequester {
     }
 }
 
+struct MockDagPayloadManager {}
+
+impl TDagPayloadResolver for MockDagPayloadManager {
+    fn get_payload_if_exists(
+        &self,
+        _node: &crate::dag::CertifiedNode,
+    ) -> Option<Arc<DecoupledPayload>> {
+        unreachable!()
+    }
+
+    fn add_payload(&self, _payload: DecoupledPayload) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 #[tokio::test]
 async fn test_node_broadcast_receiver_succeed() {
     let (signers, validator_verifier) = random_validator_verifier(4, None, false);
@@ -56,6 +73,7 @@ async fn test_node_broadcast_receiver_succeed() {
         0,
         TEST_DAG_WINDOW,
     ));
+    let dag_payload_manager = Arc::new(MockDagPayloadManager {});
 
     let health_backoff = HealthBackoff::new(
         epoch_state.clone(),
@@ -70,6 +88,7 @@ async fn test_node_broadcast_receiver_succeed() {
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag,
+        dag_payload_manager,
         signers[3].clone(),
         epoch_state.clone(),
         storage.clone(),
@@ -108,6 +127,7 @@ async fn test_node_broadcast_receiver_failure() {
         .iter()
         .map(|signer| {
             let storage = Arc::new(MockStorage::new());
+            let payload_manager = Arc::new(MockDagPayloadManager {});
             let dag = Arc::new(DagStore::new(
                 epoch_state.clone(),
                 storage.clone(),
@@ -118,6 +138,7 @@ async fn test_node_broadcast_receiver_failure() {
 
             NodeBroadcastHandler::new(
                 dag,
+                payload_manager,
                 signer.clone(),
                 epoch_state.clone(),
                 storage,
@@ -195,6 +216,7 @@ async fn test_node_broadcast_receiver_storage() {
     });
 
     let storage = Arc::new(MockStorage::new());
+    let dag_payload_manager = Arc::new(MockDagPayloadManager {});
     let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
@@ -207,6 +229,7 @@ async fn test_node_broadcast_receiver_storage() {
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag.clone(),
+        dag_payload_manager.clone(),
         signers[3].clone(),
         epoch_state.clone(),
         storage.clone(),
@@ -229,6 +252,7 @@ async fn test_node_broadcast_receiver_storage() {
 
     let rb_receiver = NodeBroadcastHandler::new(
         dag,
+        dag_payload_manager.clone(),
         signers[3].clone(),
         epoch_state.clone(),
         storage.clone(),

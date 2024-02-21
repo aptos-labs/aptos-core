@@ -4,6 +4,7 @@
 use super::{
     dag_store::DagStore,
     observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
+    payload::DagPayloadStore,
     types::DagPayload,
     NodeMessage,
 };
@@ -97,6 +98,7 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     dag: Arc<DagStore>,
+    payload_store: Arc<DagPayloadStore>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -107,6 +109,7 @@ impl OrderedNotifierAdapter {
     pub(super) fn new(
         executor_channel: UnboundedSender<OrderedBlocks>,
         dag: Arc<DagStore>,
+        payload_store: Arc<DagPayloadStore>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
@@ -114,6 +117,7 @@ impl OrderedNotifierAdapter {
         Self {
             executor_channel,
             dag,
+            payload_store,
             parent_block_info: Arc::new(RwLock::new(parent_block_info)),
             epoch_state,
             ledger_info_provider,

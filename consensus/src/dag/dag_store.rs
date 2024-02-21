@@ -13,7 +13,10 @@ use crate::{
     payload_manager::TPayloadManager,
 };
 use anyhow::{anyhow, ensure};
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    dag_payload::PayloadDigest,
+};
 use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
@@ -439,7 +442,7 @@ impl InMemDag {
 pub struct DagStore {
     dag: RwLock<InMemDag>,
     storage: Arc<dyn DAGStorage>,
-    payload_manager: Arc<dyn TPayloadManager>,
+    external_payload_manager: Arc<dyn TPayloadManager>,
 }
 
 impl DagStore {
@@ -491,7 +494,7 @@ impl DagStore {
         Self {
             dag: RwLock::new(dag),
             storage,
-            payload_manager,
+            external_payload_manager: payload_manager,
         }
     }
 
@@ -503,7 +506,7 @@ impl DagStore {
         Self {
             dag: RwLock::new(dag),
             storage,
-            payload_manager,
+            external_payload_manager: payload_manager,
         }
     }
 
@@ -518,23 +521,31 @@ impl DagStore {
         self.storage.save_certified_node(&node)?;
 
         debug!("Added node {}", node.id());
-        self.payload_manager
+        self.external_payload_manager
             .prefetch_payload_data(node.payload(), node.metadata().timestamp());
 
         self.dag.write().add_validated_node(node)
     }
 
-    pub fn commit_callback(&self, commit_round: Round) {
+    pub fn commit_callback(&self, commit_round: Round) -> Vec<PayloadDigest> {
         let to_prune = self.dag.write().commit_callback(commit_round);
         if let Some(to_prune) = to_prune {
-            let digests = to_prune
-                .iter()
-                .flat_map(|(_, round_ref)| round_ref.iter().flatten())
-                .map(|node_status| *node_status.as_node().metadata().digest())
-                .collect();
-            if let Err(e) = self.storage.delete_certified_nodes(digests) {
+            let (node_digests, payload_digests): (Vec<HashValue>, Vec<Option<PayloadDigest>>) =
+                to_prune
+                    .iter()
+                    .flat_map(|(_, round_ref)| round_ref.iter().flatten())
+                    .map(|node_status| {
+                        let node_digest = *node_status.as_node().metadata().digest();
+                        let payload_digest = node_status.as_node().payload().digest().cloned();
+                        (node_digest, payload_digest)
+                    })
+                    .unzip();
+            if let Err(e) = self.storage.delete_certified_nodes(node_digests) {
                 error!("Error deleting expired nodes: {:?}", e);
             }
+            payload_digests.into_iter().filter_map(|d| d).collect()
+        } else {
+            Vec::new()
         }
     }
 }

@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff, NodeMessage};
+use super::{payload::TDagPayloadResolver, types::DagPayload};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
+        dag_store::DagStore,
         errors::DagDriverError,
+        health::HealthBackoff,
         observability::{
             counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
@@ -17,7 +19,7 @@ use crate::{
         storage::DAGStorage,
         types::{
             CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
-            Extensions, Node, SignatureBuilder,
+            Extensions, Node, NodeMessage, SignatureBuilder,
         },
         DAGRpcResult, RpcHandler,
     },
@@ -26,7 +28,10 @@ use crate::{
 use anyhow::{bail, ensure};
 use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
-use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
+use aptos_consensus_types::{
+    common::{Author, Payload, PayloadFilter},
+    dag_payload::DecoupledPayload,
+};
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
@@ -40,13 +45,14 @@ use futures::{
     future::{join, AbortHandle, Abortable},
 };
 use futures_channel::oneshot;
-use std::{collections::HashSet, ops::Deref, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<DagStore>,
+    payload_manager: Arc<dyn TDagPayloadResolver>,
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
@@ -68,6 +74,7 @@ impl DagDriver {
         author: Author,
         epoch_state: Arc<EpochState>,
         dag: Arc<DagStore>,
+        payload_manager: Arc<dyn TDagPayloadResolver>,
         payload_client: Arc<dyn PayloadClient>,
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
@@ -91,6 +98,7 @@ impl DagDriver {
             author,
             epoch_state,
             dag,
+            payload_manager,
             payload_client,
             reliable_broadcast,
             time_service,
@@ -227,18 +235,31 @@ impl DagDriver {
                     )
                     .map(|node_status| node_status.as_node())
                     .collect::<Vec<_>>();
-
-                let payload_filter =
-                    PayloadFilter::from(&nodes.iter().map(|node| node.payload().deref()).collect());
+                let payload_filter = {
+                    let payloads: Vec<_> = nodes
+                        .iter()
+                        .filter_map(|node| {
+                            // TODO: decide if payload should be fetched here or wait until later
+                            let Some(payload) =
+                                self.payload_manager.get_payload_if_exists(node.as_ref())
+                            else {
+                                debug!("payload not found for node {}", node.id());
+                                return None;
+                            };
+                            Some(payload.as_ref().clone())
+                        })
+                        .collect();
+                    PayloadFilter::from(&payloads.iter().map(|payload| payload.payload()).collect())
+                };
                 let validator_txn_hashes = nodes
                     .iter()
                     .flat_map(|node| node.validator_txns())
                     .map(|txn| txn.hash());
-                let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
+                let vtxn_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
                     HashSet::from_iter(validator_txn_hashes),
                 );
 
-                (strong_links, validator_payload_filter, payload_filter)
+                (strong_links, vtxn_payload_filter, payload_filter)
             }
         };
 
@@ -278,17 +299,25 @@ impl DagDriver {
             self.time_service.now_unix_time().as_micros() as u64,
             highest_parent_timestamp + 1,
         );
+        // TODO: check mode and create proper payload
+        let (dag_payload, decoupled_payload) = if self.quorum_store_enabled {
+            (DagPayload::Inline(payload), None)
+        } else {
+            let payload =
+                DecoupledPayload::new(self.epoch_state.epoch, new_round, self.author, payload);
+            (DagPayload::Decoupled(payload.info()), Some(payload))
+        };
         let new_node = Node::new(
             self.epoch_state.epoch,
             new_round,
             self.author,
             timestamp,
             validator_txns,
-            payload.into(),
+            dag_payload,
             strong_links,
             Extensions::empty(),
         );
-        let new_node_msg = NodeMessage::new(new_node, None);
+        let new_node_msg = NodeMessage::new(new_node, decoupled_payload);
         self.storage
             .save_pending_node_msg(&new_node_msg)
             .expect("node must be saved");
@@ -373,13 +402,15 @@ impl RpcHandler for DagDriver {
             return Ok(CertifiedAck::new(epoch));
         }
 
+        // TODO: should we fetch payload here or wait for next round?
+
         observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
         NUM_TXNS_PER_NODE.observe(certified_node.payload().len() as f64);
         NODE_PAYLOAD_SIZE.observe(certified_node.payload().size() as f64);
 
         let node_metadata = certified_node.metadata().clone();
-        self.add_node(certified_node)
-            .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
+        self.add_node(certified_node)?;
+        self.order_rule.lock().process_new_node(&node_metadata);
 
         Ok(CertifiedAck::new(epoch))
     }

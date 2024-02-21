@@ -1,28 +1,36 @@
 // Copyright © Aptos Foundation
 
-use super::{
-    adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
-    anchor_election::{AnchorElection, CommitHistory, RoundRobinAnchorElection},
-    dag_driver::DagDriver,
-    dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
-    dag_handler::NetworkHandler,
-    dag_network::TDAGNetworkSender,
-    dag_state_sync::{DagStateSynchronizer, StateSyncTrigger},
-    dag_store::DagStore,
-    health::{ChainHealthBackoff, HealthBackoff, PipelineLatencyBasedBackpressure, TChainHealth},
-    order_rule::OrderRule,
-    rb_handler::NodeBroadcastHandler,
-    storage::{CommitEvent, DAGStorage},
-    types::{CertifiedNodeMessage, DAGMessage},
-    DAGRpcResult, ProofNotifier,
-};
 use crate::{
     dag::{
-        adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
-        anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
-        dag_state_sync::{SyncModeMessageHandler, SyncOutcome},
+        adapter::{
+            compute_initial_block_and_ledger_info, LedgerInfoProvider, OrderedNotifierAdapter,
+            TLedgerInfoProvider,
+        },
+        anchor_election::{
+            AnchorElection, CommitHistory, LeaderReputationAdapter, MetadataBackendAdapter,
+            RoundRobinAnchorElection,
+        },
+        dag_driver::DagDriver,
+        dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
+        dag_handler::NetworkHandler,
+        dag_network::TDAGNetworkSender,
+        dag_state_sync::{
+            DagStateSynchronizer, StateSyncTrigger, SyncModeMessageHandler, SyncOutcome,
+        },
+        dag_store::DagStore,
+        health::{
+            ChainHealthBackoff, HealthBackoff, PipelineLatencyBasedBackpressure, TChainHealth,
+        },
         observability::logging::{LogEvent, LogSchema},
+        order_rule::OrderRule,
+        payload::{
+            DagPayloadManager, DagPayloadStore, PayloadFetcherService, PayloadRequestHandler,
+        },
+        rb_handler::NodeBroadcastHandler,
         round_state::{AdaptiveResponsive, RoundState},
+        storage::{CommitEvent, DAGStorage},
+        types::{CertifiedNodeMessage, DAGMessage},
+        DAGRpcResult, ProofNotifier,
     },
     liveness::{
         leader_reputation::{ProposerAndVoterHeuristic, ReputationHeuristic},
@@ -40,7 +48,10 @@ use aptos_channels::{
     message_queues::QueueStyle,
 };
 use aptos_config::config::DagConsensusConfig;
-use aptos_consensus_types::common::{Author, Round};
+use aptos_consensus_types::{
+    common::{Author, Round},
+    dag_payload::PayloadLinkMsg,
+};
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
@@ -55,14 +66,12 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
-use futures_channel::{
-    mpsc::{UnboundedReceiver, UnboundedSender},
-    oneshot,
-};
+use futures_channel::{mpsc::UnboundedSender, oneshot};
 use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     select,
+    sync::mpsc,
     task::{block_in_place, JoinHandle},
 };
 use tokio_retry::strategy::ExponentialBackoff;
@@ -70,6 +79,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 #[derive(Clone)]
 struct BootstrapBaseState {
     dag_store: Arc<DagStore>,
+    payload_store: Arc<DagPayloadStore>,
     order_rule: OrderRule,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
@@ -97,6 +107,7 @@ trait TDagMode {
     async fn run(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        payload_link_rx: &mut mpsc::UnboundedReceiver<PayloadLinkMsg>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode>;
 }
@@ -104,6 +115,7 @@ trait TDagMode {
 struct ActiveMode {
     handler: NetworkHandler,
     fetch_service: DagFetcherService,
+    payload_fetch_service: PayloadFetcherService,
     base_state: BootstrapBaseState,
     buffer: Vec<DAGMessage>,
 }
@@ -113,11 +125,13 @@ impl TDagMode for ActiveMode {
     async fn run(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        payload_link_rx: &mut mpsc::UnboundedReceiver<PayloadLinkMsg>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         monitor!(
             "dag_active_mode",
-            self.run_internal(dag_rpc_rx, bootstrapper).await
+            self.run_internal(dag_rpc_rx, payload_link_rx, bootstrapper)
+                .await
         )
     }
 }
@@ -126,6 +140,7 @@ impl ActiveMode {
     async fn run_internal(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        payload_link_rx: &mut mpsc::UnboundedReceiver<PayloadLinkMsg>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         info!(
@@ -146,18 +161,27 @@ impl ActiveMode {
 
         // Spawn the fetch service
         let handle = tokio::spawn(self.fetch_service.start());
+        let handle2 = tokio::spawn(self.payload_fetch_service.start());
         defer!({
             // Signal and stop the fetch service
             debug!("aborting fetch service");
             handle.abort();
-            let _ = block_in_place(move || Handle::current().block_on(handle));
+            handle2.abort();
+            let _ = block_in_place(move || {
+                Handle::current().block_on(futures::future::join(handle, handle2))
+            });
             debug!("aborting fetch service complete");
         });
 
         // Run the network handler until it returns with state sync status.
         let sync_outcome = self
             .handler
-            .run(dag_rpc_rx, bootstrapper.executor.clone(), self.buffer)
+            .run(
+                dag_rpc_rx,
+                payload_link_rx,
+                bootstrapper.executor.clone(),
+                self.buffer,
+            )
             .await;
 
         info!(
@@ -186,11 +210,13 @@ impl TDagMode for SyncMode {
     async fn run(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        payload_link_rx: &mut mpsc::UnboundedReceiver<PayloadLinkMsg>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         monitor!(
             "dag_sync_mode",
-            self.run_internal(dag_rpc_rx, bootstrapper).await
+            self.run_internal(dag_rpc_rx, payload_link_rx, bootstrapper)
+                .await
         )
     }
 }
@@ -199,6 +225,7 @@ impl SyncMode {
     async fn run_internal(
         self,
         dag_rpc_rx: &mut Receiver<Author, IncomingDAGRequest>,
+        _payload_link_rx: &mut mpsc::UnboundedReceiver<PayloadLinkMsg>,
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
@@ -277,21 +304,23 @@ impl SyncMode {
                             info!("sync succeeded. running full bootstrap.");
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
-                            let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
+                            let (new_state, new_handler, new_fetch_service, payload_fetch_service) = bootstrapper.full_bootstrap();
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
+                                payload_fetch_service,
                                 base_state: new_state,
                                 buffer,
                             }))
                         } else {
                             info!("sync failed. resuming with current DAG state.");
                             // If the sync task fails, then continue the DAG in Active Mode with existing state.
-                            let (new_handler, new_fetch_service) =
+                            let (new_handler, new_fetch_service, payload_fetch_service) =
                                 bootstrapper.bootstrap_components(&self.base_state);
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
+                                payload_fetch_service,
                                 base_state: self.base_state,
                                 buffer,
                             }))
@@ -507,9 +536,17 @@ impl DagBootstrapper {
             dag_window_size_config,
         ));
 
+        let payload_store = Arc::new(DagPayloadStore::new(
+            self.epoch_state.clone(),
+            self.storage.clone(),
+            initial_round,
+            dag_window_size_config,
+        ));
+
         let ordered_notifier = Arc::new(OrderedNotifierAdapter::new(
             self.ordered_nodes_tx.clone(),
             dag.clone(),
+            payload_store.clone(),
             self.epoch_state.clone(),
             parent_block_info,
             ledger_info_provider.clone(),
@@ -527,6 +564,7 @@ impl DagBootstrapper {
 
         BootstrapBaseState {
             dag_store: dag,
+            payload_store,
             order_rule,
             ledger_info_provider,
             ordered_notifier,
@@ -537,7 +575,7 @@ impl DagBootstrapper {
     fn bootstrap_components(
         &self,
         base_state: &BootstrapBaseState,
-    ) -> (NetworkHandler, DagFetcherService) {
+    ) -> (NetworkHandler, DagFetcherService, PayloadFetcherService) {
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
         let rb_config = self.config.rb_config.clone();
         let round_state_config = self.config.round_state_config.clone();
@@ -557,6 +595,7 @@ impl DagBootstrapper {
 
         let BootstrapBaseState {
             dag_store,
+            payload_store,
             ledger_info_provider,
             order_rule,
             ordered_notifier,
@@ -590,6 +629,19 @@ impl DagBootstrapper {
             )),
         );
 
+        let (payload_fetcher, payload_requester) = PayloadFetcherService::new(
+            self.epoch_state.clone(),
+            self.dag_network_sender.clone(),
+            payload_store.clone(),
+            self.time_service.clone(),
+            self.config.fetcher_config.clone(),
+        );
+        let payload_manager = Arc::new(DagPayloadManager::new(
+            dag_store.clone(),
+            payload_store.clone(),
+            payload_requester,
+        ));
+
         let chain_health: Arc<dyn TChainHealth> = ChainHealthBackoff::new(
             ChainHealthBackoffConfig::new(self.config.health_config.chain_backoff_config.clone()),
             commit_history.clone(),
@@ -610,6 +662,7 @@ impl DagBootstrapper {
             self.self_peer,
             self.epoch_state.clone(),
             dag_store.clone(),
+            payload_manager.clone(),
             self.payload_client.clone(),
             rb,
             self.time_service.clone(),
@@ -625,6 +678,7 @@ impl DagBootstrapper {
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
+            payload_manager.clone(),
             self.signer.clone(),
             self.epoch_state.clone(),
             self.storage.clone(),
@@ -635,22 +689,32 @@ impl DagBootstrapper {
             health_backoff,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
+        let payload_request_handler = PayloadRequestHandler::new(payload_store.clone());
 
         let dag_handler = NetworkHandler::new(
             self.epoch_state.clone(),
             rb_handler,
             dag_driver,
             fetch_handler,
+            payload_request_handler,
             node_fetch_waiter,
             certified_node_fetch_waiter,
+            payload_manager.clone(),
             state_sync_trigger,
             new_round_rx,
         );
 
-        (dag_handler, dag_fetcher)
+        (dag_handler, dag_fetcher, payload_fetcher)
     }
 
-    fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
+    fn full_bootstrap(
+        &self,
+    ) -> (
+        BootstrapBaseState,
+        NetworkHandler,
+        DagFetcherService,
+        PayloadFetcherService,
+    ) {
         let (anchor_election, commit_history, commit_events) = self.build_anchor_election();
 
         let base_state = self.bootstrap_dag_store(
@@ -660,13 +724,15 @@ impl DagBootstrapper {
             self.onchain_config.dag_ordering_causal_history_window as u64,
         );
 
-        let (handler, fetch_service) = self.bootstrap_components(&base_state);
-        (base_state, handler, fetch_service)
+        let (handler, fetch_service, payload_fetch_service) =
+            self.bootstrap_components(&base_state);
+        (base_state, handler, fetch_service, payload_fetch_service)
     }
 
     pub async fn start(
         self,
         mut dag_rpc_rx: Receiver<Author, IncomingDAGRequest>,
+        mut payload_link_rx: mpsc::UnboundedReceiver<PayloadLinkMsg>,
         mut shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
     ) {
         info!(
@@ -674,11 +740,12 @@ impl DagBootstrapper {
             epoch = self.epoch_state.epoch,
         );
 
-        let (base_state, handler, fetch_service) = self.full_bootstrap();
+        let (base_state, handler, fetch_service, payload_fetch_service) = self.full_bootstrap();
 
         let mut mode = Mode::Active(ActiveMode {
             handler,
             fetch_service,
+            payload_fetch_service,
             base_state,
             buffer: Vec::new(),
         });
@@ -690,7 +757,7 @@ impl DagBootstrapper {
                     info!(LogSchema::new(LogEvent::Shutdown), epoch = self.epoch_state.epoch);
                     return;
                 },
-                Some(next_mode) = mode.run(&mut dag_rpc_rx, &self) => {
+                Some(next_mode) = mode.run(&mut dag_rpc_rx, &mut payload_link_rx, &self) => {
                     info!(LogSchema::new(LogEvent::ModeTransition), next_mode = %next_mode);
                     mode = next_mode;
                 }
@@ -714,8 +781,9 @@ pub(super) fn bootstrap_dag_for_test(
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
+    JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
-    UnboundedReceiver<OrderedBlocks>,
+    futures_channel::mpsc::UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let mut features = Features::default();
@@ -741,17 +809,30 @@ pub(super) fn bootstrap_dag_for_test(
         features,
     );
 
-    let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
+    let (_base_state, handler, fetch_service, payload_fetch_service) = bootstraper.full_bootstrap();
 
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
+    let (payload_link_tx, mut payload_link_rx) = mpsc::unbounded_channel();
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;
         handler
-            .run(&mut dag_rpc_rx, bootstraper.executor.clone(), Vec::new())
+            .run(
+                &mut dag_rpc_rx,
+                &mut payload_link_rx,
+                bootstraper.executor.clone(),
+                Vec::new(),
+            )
             .await
     });
     let df_handle = tokio::spawn(fetch_service.start());
+    let pf_handle = tokio::spawn(payload_fetch_service.start());
 
-    (dh_handle, df_handle, dag_rpc_tx, ordered_nodes_rx)
+    (
+        dh_handle,
+        df_handle,
+        pf_handle,
+        dag_rpc_tx,
+        ordered_nodes_rx,
+    )
 }
