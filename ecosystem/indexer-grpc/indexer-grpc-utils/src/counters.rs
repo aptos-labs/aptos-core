@@ -5,7 +5,7 @@ use crate::{constants::IndexerGrpcRequestMetadata, timestamp_to_iso, timestamp_t
 use aptos_metrics_core::{register_gauge_vec, register_int_gauge_vec, GaugeVec, IntGaugeVec};
 use aptos_protos::util::timestamp::Timestamp;
 use once_cell::sync::Lazy;
-use prometheus::{register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec};
+use prometheus::{register_int_counter_vec, IntCounterVec};
 
 pub enum IndexerGrpcStep {
     // [Data Service] New request received.
@@ -216,10 +216,13 @@ pub static IN_MEMORY_CACHE_STATS: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static IN_MEMORY_CACHE_DUPLICATE_FETCH_COUNTER: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "indexer_grpc_in_memory_cache_duplicate_fetch",
+pub const CACHE_FETCH_DUPLICATE: &str = "duplicate";
+pub const CACHE_FETCH_FIRST: &str = "first_fetch";
+pub static IN_MEMORY_CACHE_FETCH_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_in_memory_cache_fetch",
         "Depulicate fetch counter for in-memory cache",
+        &["type"]
     )
     .unwrap()
 });

@@ -4,7 +4,8 @@
 use crate::{
     compression_util::{CacheEntry, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     counters::{
-        log_grpc_step, IndexerGrpcStep, CACHE_STATS_TYPE_HIT, CACHE_STATS_TYPE_MISS, IN_MEMORY_CACHE_DUPLICATE_FETCH_COUNTER,
+        log_grpc_step, IndexerGrpcStep, CACHE_FETCH_DUPLICATE, CACHE_FETCH_FIRST,
+        CACHE_STATS_TYPE_HIT, CACHE_STATS_TYPE_MISS, IN_MEMORY_CACHE_FETCH_COUNTER,
         IN_MEMORY_CACHE_STATS,
     },
 };
@@ -120,7 +121,10 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             conn,
             storage_format,
             read_through_cache,
-            cache_stats: Cache::builder().max_capacity(100_000).time_to_live(std::time::Duration::from_secs(60)).build(),
+            cache_stats: Cache::builder()
+                .max_capacity(100_000)
+                .time_to_live(std::time::Duration::from_secs(60))
+                .build(),
         }
     }
 
@@ -350,19 +354,24 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                             IN_MEMORY_CACHE_STATS
                                 .with_label_values(&[CACHE_STATS_TYPE_HIT])
                                 .inc();
-                            encoded_transactions_with_versions.push((version, data.clone()));
+                            encoded_transactions_with_versions.push((version, data));
                         } else {
                             IN_MEMORY_CACHE_STATS
                                 .with_label_values(&[CACHE_STATS_TYPE_MISS])
                                 .inc();
                             cache_miss_versions.push(version);
-                            match self.cache_stats.get(&cache_key) {
-                                Some(_) => {
-                                    IN_MEMORY_CACHE_DUPLICATE_FETCH_COUNTER.inc();
-                                }
-                                None => {
+                            match self.cache_stats.contains_key(&cache_key) {
+                                true => {
+                                    IN_MEMORY_CACHE_FETCH_COUNTER
+                                        .with_label_values(&[CACHE_FETCH_DUPLICATE])
+                                        .inc();
+                                },
+                                false => {
+                                    IN_MEMORY_CACHE_FETCH_COUNTER
+                                        .with_label_values(&[CACHE_FETCH_FIRST])
+                                        .inc();
                                     self.cache_stats.insert(cache_key, 1);
-                                }
+                                },
                             }
                         }
                     }
