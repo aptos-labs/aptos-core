@@ -35,13 +35,15 @@ pub fn generate_execution_config_upgrade_proposal(
             if is_testnet && next_execution_hash.is_empty() {
                 emitln!(
                     writer,
-                    "execution_config::set(framework_signer, execution_blob);"
+                    "execution_config::set_for_next_epoch(framework_signer, execution_blob);"
                 );
+                emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
             } else {
                 emitln!(
                     writer,
                     "execution_config::set(&framework_signer, execution_blob);"
                 );
+                emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
             }
         },
     );
